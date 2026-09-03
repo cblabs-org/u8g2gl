@@ -1,0 +1,3 @@
+[submodule ".agents/skills/lvgl-pro-expert"]
+	path = .agents/skills/lvgl-pro-expert
+	url = https://github.com/mm-skills/lvgl-pro-expert.git
