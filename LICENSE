@@ -1,0 +1,37 @@
+MIT License
+
+Copyright (c) 2026 Matt McNeill (CB Labs)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+============================== FONTS ==============================
+
+Fonts are not part of U8G2GL and are not covered by the licence above.
+U8G2GL compiles or references fonts; it does not supply them.
+
+Fonts bundled with U8G2 (referenced via <builtin>) remain under U8G2's
+own terms. U8G2GL emits a reference to a symbol that U8G2 already
+provides -- no font data is copied or redistributed by U8G2GL. For the
+licensing conditions of each U8G2 font group, see:
+
+	https://github.com/olikraus/u8g2/wiki/fntgrp
+
+Fonts you supply yourself (referenced via <bdf>) remain yours, under
+whatever terms they carry. Compiling them into your firmware is your
+decision and your responsibility.

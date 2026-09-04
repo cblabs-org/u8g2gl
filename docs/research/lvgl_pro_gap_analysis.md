@@ -1,5 +1,8 @@
 # U8G2GL — LVGL Pro Gap Analysis & Architectural Alignment
 
+> [!WARNING]
+> **Frozen research input — not current design.** Written before design spec v0.2. Where this conflicts with [design_spec.md](../design_spec.md), the spec wins. Notably superseded here: the recommendation to keep `renderAnimationUpdate()` as a co-equal third lifecycle phase, and the `<widget>` parser-bridge file. Retained for its dimension-by-dimension LVGL Pro comparison, which is still accurate.
+
 A critical, dimension-by-dimension evaluation of the departures-board widget system against LVGL Pro's mature architecture, with concrete recommendations for U8G2GL.
 
 > [!IMPORTANT]

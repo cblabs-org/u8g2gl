@@ -1,5 +1,8 @@
 # U8G2GL Widget Design Assessment
 
+> [!WARNING]
+> **Frozen research input — not current design.** Written before design spec v0.2. Where this conflicts with [design_spec.md](../design_spec.md), the spec wins. Notably superseded here: the `wd_*_xml_parser.c` bridge file (removed — there is no runtime XML path) and C-style APIs (generated code is C++). The component/widget tier boundaries and the per-widget complexity analysis remain the basis of the spec's §6.
+
 A widget-by-widget analysis of how the departures-board widgets translate into U8G2GL's emerging design, using LVGL Pro's `<component>` vs `<widget>` distinction.
 
 ---

@@ -1,5 +1,8 @@
 # U8G2 Drawing Primitives Audit
 
+> [!WARNING]
+> **Frozen research input.** Written before design spec v0.2. The API inventory and primitive→widget mapping remain accurate and are still the best reference for both. Two conclusions are superseded by [design_spec.md](../design_spec.md): page mode (`firstPage`/`nextPage`) is **not** supported — it breaks the widget contract, see [D-2] — and the `updateDisplayArea` tile formula shown in §6 under-covers when the widget is not tile-aligned; use the corrected helper in spec §11.4.
+
 A complete inventory of every U8G2 drawing API, categorised by function, with analysis of how each primitive maps to widget construction in U8G2GL.
 
 > [!TIP]
