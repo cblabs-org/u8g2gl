@@ -2,101 +2,94 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.0
+**Version**: 1.1
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.2, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
 
-> This plan sequences the work. It does not restate the design — where this document and the spec disagree on *what* to build, the spec wins; where they disagree on *where* or *in what order*, this plan wins, because it is grounded in reconnaissance the spec was written without.
+> This plan sequences the work. Where it and the spec disagree on *what* to build, the spec wins; on *where* and *in what order*, this plan wins.
 
 ---
 
-## 1. What Reconnaissance Changed
+## 1. Architectural Stance
 
-The design spec was written assuming U8G2GL was a greenfield framework whose only consumer was departures-board. Inspection of `esp32-app-foundation` shows otherwise, and three findings reshape the programme.
+### 1.1 The heritage constraint is rejected — [A-1]
 
-### 1.1 The runtime substantially exists — [F-1]
+`esp32-app-foundation/modules/U8G2Display/` contains a working widget layer inherited from departures-board: `IGfxWidget`, `DrawingPrimitives`, eight widgets, `IDisplayBoard`, `CarouselEngine`, six system boards.
 
-`esp32-app-foundation/modules/U8G2Display/` already contains most of what spec §6 and §11 describe as new work:
+**It is an integration reference, not an architectural basis.**
 
-| Present today | Spec section it satisfies |
-|---|---|
-| `IGfxWidget.hpp` — `tick`/`render`/`renderAnimationUpdate`, coords, visibility | §11.3 widget lifecycle |
-| `DrawingPrimitives.{hpp,cpp}` — state saver, aligned text, blank area | §11.3, Appendix A |
-| `LabelWidget`, `ClockWidget`, `ProgressBarWidget`, `ScrollingTextWidget`, `ScrollingMessagePoolWidget`, `ImageWidget`, `WifiStatusWidget`, `SystemMessageWidget` | §6.2 built-in widgets, largely |
-| `IDisplayBoard.hpp` — `render`/`tick`/`onActivate`/`onDeactivate`/`isExpired`/`canAdvance` | §12.4 screen lifecycle |
-| `CarouselEngine`, `BoardCatalog`, system boards (Boot, Error, WiFiWizard, Diagnostics, OTAProgress, Screensaver) | §12 navigation, partially |
+What it legitimately teaches: how a display module is shaped inside this framework — `library.json`, native-build exclusion, `web/` diagnostic assets, carousel and board lifecycle integration points, where adapters attach. That knowledge is valuable and should be reused.
 
-**Consequence: Phase 1 is not "build a runtime". It is "add binding and codegen to a runtime that ships today."** That is a materially smaller and lower-risk programme than the spec implies, and it moves the centre of gravity to host-side tooling.
+What it must *not* do is set the architecture. Its widget model is a flat list of imperatively-driven objects with `setCoords`/`setVisible` and per-widget setters — the departures-board paradigm. Building U8G2GL as a binding-and-codegen veneer over that model would encode a design we are explicitly trying to move past, and would trade the programme's whole purpose for a shorter Phase 1.
 
-**What is genuinely absent** and constitutes the real work:
+> **Correction from v1.0 of this plan.** The previous revision treated the existing runtime as the foundation to build on and reduced the programme to "codegen over what exists". That was sunk-cost reasoning: *the code exists* is not an argument that *the design is right*. This revision plans the optimal architecture and treats migration as a separate, explicit concern.
 
-- No subject/observer binding of any kind — boards push imperatively
-- No XML, schema, validator, or code generator
-- No component system
-- No table/collection widget (`wd_service_list` equivalent)
-- No focus ring or declarative input dispatch
-- No pixel-level regression testing
+### 1.2 The target: parallel LVGL 9's core decomposition — [A-2]
 
-### 1.2 There is an exact precedent to mirror — [F-2]
+LVGL's core is a well-factored answer to the same problem, arrived at over a decade. The architecture should mirror its decomposition, diverging only where monochrome genuinely demands it.
 
-`uidesign/crowpanel-128-rotary/lvglpro/` is a real LVGL Pro project living in the repository — `project.xml`, `globals.xml`, `screens/`, `fonts/`, `images/` — generating `ui_gen.c`/`ui.c` consumed by `modules/LVGLDisplay/ui/`.
+| LVGL 9 core | U8G2GL equivalent | Status |
+|---|---|---|
+| `lv_obj` — base object | `u8g2gl_obj` — coords, flags, class ptr, parent | **Adopt** |
+| `lv_obj_class` — `base_class`, ctor/dtor, `event_cb`, **property table** | `u8g2gl_obj_class` | **Adopt** — this is what makes `extends` (§6.4) and XML property codegen work |
+| `lv_obj_property` — generic get/set by ID | property descriptors per class | **Adopt** — the codegen substrate |
+| `lv_observer` — subjects and observers | subject system (§8) | **Adopt** |
+| `lv_group` — encoder/keypad focus | focus group (§12.2) | **Adopt, and rename**: the spec's `<focus_ring>` is LVGL's group |
+| `lv_obj_style` | reduced monochrome style set (§10) | **Adopt, reduced** |
+| `lv_obj_event` | event dispatch | **Adopt, reduced** |
+| `lv_obj_tree` — runtime parent/child | see [A-3] | **Diverge** |
+| `lv_obj_pos` — runtime positioning | resolved at build time ([D-7]) | **Diverge** |
+| `lv_refr` — dirty regions, partial render | full-frame redraw ([D-4]), frame gate ([D-15]) | **Diverge** |
+| `layouts/` — flex, grid | none ([D-7]) | **Omit** |
+| `lv_display` + `flush_cb` | U8G2 instance behind an adapter port | **Adapt** |
+| `lv_indev` | `ButtonModule` / `EncoderModule` adapter | **Adapt** |
 
-U8G2GL mirrors this exactly rather than inventing a layout:
+The divergences are all already-decided spec positions, and all trace to the same root: monochrome full-frame redraw with build-time layout. That coherence is a good sign the spec and this architecture agree.
 
-```
-uidesign/<board>/u8g2gl/     ← XML source (authored / generated by agent)
-        ↓  u8g2gl generate
-modules/U8G2Display/ui/      ← generated C++ (committed, per [D-11])
-```
+### 1.3 Object tree: build-time hierarchy, flat runtime — [A-3]
 
-This settles spec §4's project layout for the foundation context and means build integration follows a path already proven in this repository.
+The one genuinely open architectural question, and it should be settled before code.
 
-### 1.3 Input already has a home — [F-3]
+LVGL keeps a real runtime tree — parent pointer plus child array per object — because it needs runtime layout, dirty-region invalidation, and dynamic add/remove. U8G2GL needs none of those ([D-4], [D-7]), but hierarchy still has to *mean* something: hiding a container must hide its children, and a child must clip to its parent.
 
-`modules/ButtonModule` and `modules/EncoderModule` exist. Spec §12.1 correctly says the framework must not own GPIO or debounce; the foundation already provides both. The focus-ring work integrates with these modules rather than defining a parallel input path.
+**Proposal: a flat array of objects, each holding a parent index; no child lists.**
 
-### 1.4 The Wasm harness is a port, not a build — [F-4]
+- Render walks the flat array in document order — cache-friendly, no traversal.
+- Effective visibility = own flag AND all ancestors' flags, computed by walking *up* (depth is 2–4 in practice, and the walk is a handful of comparisons).
+- Effective clip = intersection of ancestor bounds, same walk.
+- Cost: one `uint8_t`/`uint16_t` per object, versus a child vector per node.
 
-`departures-board/tools/layoutsim/` vendors `emsdk` and compiles real widget code to Wasm via `build_wasm.py`, wired into PlatformIO as a pre-build step. [D-9] is therefore a port of working machinery.
+This keeps LVGL's hierarchy *semantics* while spending almost nothing, and it composes with components being inlined at generation time (§6.3). It is the kind of decision that is nearly free now and expensive after fifty widgets exist — hence [PD-3] below.
 
 ---
 
 ## 2. Programme Decisions Pending — human call required
 
-These three are mine to surface, not to settle. Each blocks work, and each is expensive to reverse after code exists.
-
 ### PD-1 · Licence — blocks all PRs
 
 | Option | Case for | Case against |
 |---|---|---|
-| **MIT** (current spec §22) | Already written and committed | A module inside an Apache-2.0 repo carrying a different licence is confusing and complicates upstreaming |
-| **Apache-2.0** *(recommended)* | Matches `esp32-app-foundation` exactly — LICENSE plus 120 `SPDX-License-Identifier: Apache-2.0` headers. Adds an explicit patent grant. Still permissive, still commercial-friendly, so §22's actual requirement is met | Requires amending spec §22 and the `LICENSE` file already committed at `a79aaa7` |
+| **MIT** (current spec §22) | Already committed | A differently-licensed module inside an Apache-2.0 repo complicates upstreaming |
+| **Apache-2.0** *(recommended)* | Matches foundation exactly — LICENSE plus 120 SPDX headers. Adds a patent grant. Permissive and commercial-friendly, so §22's actual requirement is met | Amend spec §22 and the committed `LICENSE` |
 
-**Recommendation: Apache-2.0** for everything that lands in the foundation. If the CLI lives in a standalone repo (PD-2) it may stay MIT without friction, but a single licence across the programme is simpler to explain.
-
-> **Unrelated defect found:** `esp32-app-foundation/library.json` declares `"license": "CC-BY-NC-SA-4.0"`, contradicting its own `LICENSE` file and all 120 SPDX headers. That metadata says the framework is non-commercial. It should be corrected independently of this programme — flagged here because it was found during recon, not because it is ours to fix.
+> **Unrelated defect, surfaced not fixed:** `esp32-app-foundation/library.json` declares `"license": "CC-BY-NC-SA-4.0"` against an Apache-2.0 LICENSE and 120 Apache SPDX headers. That metadata currently advertises the framework as non-commercial.
 
 ### PD-2 · Where the host-side CLI lives — blocks PR-02
 
-| Option | Case for | Case against |
-|---|---|---|
-| **Standalone `U8G2GL` repo** *(recommended)* | [D-10] specifies npm distribution; `npx u8g2gl` needs a package. Both foundation *and* departures-board-v3 consume it — vendoring twice is worse. Keeps this repo from being docs-only. Independent release cadence from firmware | Cross-repo coordination during early development |
-| **`esp32-app-foundation/tools/`** | One repo, atomic commits across tool and consumer | A TypeScript/Node host tool inside a firmware library is structurally odd; complicates npm publishing; v3 would need to vendor the framework purely to obtain a build tool |
+**Recommended: standalone in this repository**, npm-published, consumed by foundation as a pre-build step. [D-10] specifies npm distribution; both foundation and departures-board-v3 need the tool, and vendoring it twice is worse than a cross-repo dependency. The alternative — `foundation/tools/` — puts a TypeScript host tool inside a firmware library and forces v3 to vendor a framework to obtain a build tool.
 
-**Recommendation: standalone**, in this repository, published to npm, consumed by foundation as a pre-build step.
+### PD-3 · Ratify the core object model — blocks PR-01
 
-### PD-3 · Widget naming compatibility — blocks PR-03, highest technical risk
+[A-2] and [A-3] are architecture, and they are mine to propose but yours to ratify before they are cast in code. Specifically: the LVGL-parallel decomposition, and the flat-runtime/build-time-tree model.
 
-Spec [D-12]/[D-13] want XML `<u8g2gl_label>` to map 1:1 onto a C++ class `u8g2gl_label`. The existing class is `LabelWidget`, and it is used by every system board plus departures-board-v3's application boards.
+This supersedes v1.0's PD-3 (widget naming aliases), which existed only because that revision planned to build on the legacy widgets. With [A-1] that question dissolves — new code gets the spec's naming ([D-12]/[D-13]) directly, and the legacy question becomes migration, not naming.
 
-| Option | Blast radius | Verdict |
-|---|---|---|
-| **(a)** Rename existing widgets to `u8g2gl_*` | Breaks every board in foundation *and* the pinned downstream v3 | Reject — enormous cost for a naming property |
-| **(b)** Generate code using existing names (`LabelWidget`) | Zero | Loses the 1:1 readability [D-12]/[D-13] were for |
-| **(c)** Type aliases — `using u8g2gl_label = LabelWidget;` *(recommended)* | Zero | Generated code reads 1:1 with the XML; existing code untouched; a later rename stays optional |
+### PD-4 · Migration strategy for legacy `U8G2Display` — blocks PR-05
 
-**Recommendation: (c).** The spec's stated purpose for 1:1 naming is that generated code can be read against its XML without a translation table — an alias satisfies that completely. This converts the programme's biggest compatibility risk into a header of `using` declarations.
+The new module cannot land big-bang: `modules/U8G2Display` is consumed by six system boards *and* by departures-board-v3 through a pinned `framework.lock`.
+
+**Recommended: strangler-fig.** Build the optimal architecture as a new `modules/U8G2GL/`; migrate system boards to it one PR at a time; retire `modules/U8G2Display` once nothing depends on it. End state is a single module with the right architecture, reached without a flag day and without stranding the pinned downstream.
 
 ---
 
@@ -104,112 +97,120 @@ Spec [D-12]/[D-13] want XML `<u8g2gl_label>` to map 1:1 onto a C++ class `u8g2gl
 
 | Repository | Role | Licence |
 |---|---|---|
-| **U8G2GL** (this repo) | Programme home — spec, concept, this plan, PA workspace. Host-side CLI if PD-2 lands standalone | PD-1 |
-| **esp32-app-foundation** | Upstream home for runtime, binding, `uidesign/`, build integration | Apache-2.0 |
-| **departures-board-v3** | Downstream pathfinder. Vendors framework at `framework/`, pinned by `framework.lock` (`f53cc1d7`) | — |
-| departures-board (v1) | Reference only — source of the `layoutsim` Wasm harness and the original widget designs | — |
+| **U8G2GL** (this repo) | Programme home — spec, concept, plan, workspace. Host CLI if PD-2 lands standalone | PD-1 |
+| **esp32-app-foundation** | Upstream home for the runtime, `uidesign/`, build integration | Apache-2.0 |
+| **departures-board-v3** | Downstream pathfinder. Pinned at `framework.lock` `f53cc1d7` | — |
+| departures-board (v1) | Reference only — `layoutsim` Wasm harness, original widget designs | — |
 
-**Development sequence, as directed:** build in `esp32-app-foundation` first, reach the gate there, then progress to `departures-board-v3` as the stretch scenario. v3 is a consumer, not a development venue — it picks up the work by advancing its `framework.lock`.
+Build in `esp32-app-foundation` first; v3 is a consumer that picks the work up by advancing its lock.
 
 ---
 
-## 4. Programme Dependency Graph
-
-Not a straight line. PR-01 and PR-02 are in different repositories with no file overlap and should run **in parallel**.
+## 4. Dependency Graph
 
 ```
+              ┌─────────────────────────────────┐
+              │ PR-00  Spec: core object model  │   (U8G2GL)
+              │        + ADR in foundation      │
+              └────────────────┬────────────────┘
+                               │  ratifies PD-3
+              ┌────────────────┴────────────────┐
+              ▼                                 ▼
+  ┌─────────────────────────────┐  ┌──────────────────────────────┐
+  │ PR-01  Core runtime:        │  │ PR-02  CLI + schema +        │
+  │  obj, class, property table,│  │        display catalogue      │
+  │  observer, frame gate       │  │        + validator            │
+  └──────────────┬──────────────┘  └───────────────┬──────────────┘
+                 │                                 │
+                 ▼                                 │
+  ┌─────────────────────────────┐                  │
+  │ PR-03  Widget set on the    │                  │
+  │        new object model     │                  │
+  └──────────────┬──────────────┘                  │
+                 ├─────────────────┬───────────────┘
+                 ▼                 ▼
+  ┌─────────────────────────┐  ┌──────────────────────────┐
+  │ PR-06 Wasm preview +    │  │ PR-04  Generator XML→C++ │
+  │       snapshot harness  │  └────────────┬─────────────┘
+  └───────────┬─────────────┘               ▼
+              │                 ┌──────────────────────────┐
+              │                 │ PR-05  uidesign/ + build │
+              │                 │        + first migration │
+              │                 └────────────┬─────────────┘
+              └──────────────┬───────────────┘
+                             ▼
+              ╔════════════════════════════════╗
+              ║ PR-07  ★ GO / NO-GO GATE       ║
+              ╚════════════════════════════════╝
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+  ┌────────────────────┐        ┌──────────────────────┐
+  │ PR-08 Components,  │        │ PR-09 Focus group +  │
+  │  custom widgets,   │        │  Button/Encoder indev│
+  │  collections       │        └──────────────────────┘
+  └────────────────────┘                    │
+              └──────────────┬──────────────┘
+                             ▼
               ┌──────────────────────────────┐
-  main ──┬───►│ PR-01  Subject/binding core  │──┐   (foundation)
-         │    └──────────────────────────────┘  │
-         │                                      ▼
-         │    ┌──────────────────────────────┐ ┌──────────────────────────┐
-         └───►│ PR-02  CLI + schema +        │ │ PR-03  Widget adaptation │
-              │        display catalogue     │ │        + aliases (PD-3)  │
-              └──────────────────────────────┘ └──────────────────────────┘
-                            │                       │         │
-                            └───────────┬───────────┘         │
-                                        ▼                     ▼
-                            ┌────────────────────┐  ┌──────────────────────┐
-                            │ PR-04  Generator   │  │ PR-06  Wasm preview  │
-                            │        XML → C++   │  │        + snapshots   │
-                            └────────────────────┘  └──────────────────────┘
-                                        │                     │
-                                        ▼                     │
-                            ┌────────────────────┐            │
-                            │ PR-05  uidesign/ + │            │
-                            │        build hooks │            │
-                            └────────────────────┘            │
-                                        │                     │
-                                        └──────────┬──────────┘
-                                                   ▼
-                                    ╔═══════════════════════════════╗
-                                    ║ PR-07  ★ GO / NO-GO GATE      ║
-                                    ║ Retarget one real board,      ║
-                                    ║ pixel-diff vs firmware output ║
-                                    ╚═══════════════════════════════╝
-                                                   │
-                                    ┌──────────────┴──────────────┐
-                                    ▼                             ▼
-                        ┌────────────────────┐        ┌──────────────────────┐
-                        │ PR-08 Components,  │        │ PR-09 Focus ring +   │
-                        │ widgets, collections│        │ Button/Encoder wiring│
-                        └────────────────────┘        └──────────────────────┘
-                                    └──────────────┬──────────────┘
-                                                   ▼
-                                    ┌──────────────────────────────┐
-                                    │ PR-10  departures-board-v3   │
-                                    │        (stretch)             │
-                                    └──────────────────────────────┘
+              │ PR-10  Retire U8G2Display    │
+              ├──────────────────────────────┤
+              │ PR-11  departures-board-v3   │
+              └──────────────────────────────┘
 ```
 
 ---
 
 ## 5. Project Ledger
 
-Each row is one Pull Request, delegated to a Tier-2 Principal Architect who decomposes it into Work Orders.
+### Phase 0 — Architecture
+
+| PR | Repo | Scope | Depends | Blocked by |
+|---|---|---|---|---|
+| **PR-00** | U8G2GL + foundation | Add the missing core-architecture section to the spec — object model, class system, property table, groups, [A-3] tree model. Land an ADR in `foundation/docs/developer/adr/`. Reconcile §20 phases and §22 licence | — | PD-1, PD-3 |
+
+The spec as committed jumps from XML tags straight to widget behaviour and never defines an object model. That gap is invisible while the plan assumed legacy widgets and fatal now. **PR-00 is a genuine prerequisite, not documentation tidy-up.**
 
 ### Phase 1 — Prove the loop
 
-| PR | Repo | Scope | Depends on | Blocked by |
+| PR | Repo | Scope | Depends | Blocked by |
 |---|---|---|---|---|
-| **PR-00** | U8G2GL | Spec reconciliation — amend §2/§4/§20 for the foundation context, §22 for PD-1, record [F-1]–[F-4] | — | PD-1 |
-| **PR-01** | foundation | Subject/observer core (`int`/`string`/`bool`/`time`), copy-on-set string storage (§8.2), dirty flag, `ui_handler()` deadline aggregation ([D-15]). **Purely additive — new files only** | — | — |
-| **PR-02** | CLI (PD-2) | CLI skeleton, XML schema, validator with §15-grade diagnostics, display catalogue generated from U8G2 ([D-14]), `find` query modes (§5.2), `--json` contract ([D-16]) | — | PD-2 |
-| **PR-03** | foundation | Widget adaptation — alias header per PD-3, bind-capable mixin over existing widgets, gap widgets (`u8g2gl_box`/`line`/`glyph` wrappers over `DrawingPrimitives`) | PR-01 | PD-3 |
-| **PR-04** | CLI | Code generator — XML → C++ against the PR-03 API. Component inlining, build-time layout resolution ([D-7]), constant arithmetic | PR-02, PR-03 | — |
-| **PR-05** | foundation | `uidesign/<board>/u8g2gl/` per [F-2], PlatformIO/CMake pre-build integration (§16), committed `generated/` | PR-04 | — |
-| **PR-06** | CLI + foundation | Wasm preview and snapshot harness — port `layoutsim` per [F-4]. Golden-image CI | PR-03 | — |
-| **PR-07** | foundation | **★ GATE** — retarget one existing system board from XML; pixel-diff against current firmware output; measure budget on `esp32dev` (§18, Q-4) | PR-05, PR-06 | — |
+| **PR-01** | foundation | New `modules/U8G2GL/` core: `u8g2gl_obj`, class system with `base_class`, property table, subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests | PR-00 | PD-3, PD-4 |
+| **PR-02** | CLI | Schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | PD-2 |
+| **PR-03** | foundation | Widget set on the new model: label, scrolling label, xbm, glyph, box/line/circle primitives, progress bar, clock. Ported *in behaviour* from the legacy widgets, rewritten to the object model | PR-01 | — |
+| **PR-04** | CLI | Generator XML → C++: property emission, component inlining, build-time layout ([D-7]) | PR-02, PR-03 | — |
+| **PR-05** | foundation | `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent, PlatformIO/CMake pre-build, committed `generated/`, first system board migrated | PR-04 | PD-4 |
+| **PR-06** | CLI + foundation | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
+| **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
 
-### Phase 2 — Composition (only if PR-07 passes)
+### Phase 2 — Composition
 
-| PR | Repo | Scope | Depends on |
+| PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-08** | both | Components (§6.3), custom widgets (§6.4), collection API (§9) | PR-07 |
-| **PR-09** | foundation | Focus ring (§12.2), input dispatch wired to `ButtonModule`/`EncoderModule` per [F-3] | PR-07 |
+| **PR-08** | both | Components (§6.3), custom widgets via `extends` (§6.4), collection API (§9) | PR-07 |
+| **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
 
-### Phase 3 — Stretch
+### Phase 3 — Consolidation and stretch
 
-| PR | Repo | Scope | Depends on |
+| PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-10** | departures-board-v3 | Advance `framework.lock`; retarget the application board set; the real-world proof | PR-08, PR-09 |
+| **PR-10** | foundation | Migrate remaining system boards; retire `modules/U8G2Display` (PD-4 end state) | PR-08, PR-09 |
+| **PR-11** | departures-board-v3 | Advance `framework.lock`; retarget the application board set | PR-10 |
 
 ---
 
 ## 6. The Gate — PR-07
 
-The spec's Phase 1 exit criterion, made concrete and given teeth.
-
-**Target:** one existing system board in `modules/U8G2Display/boards/`. `DiagnosticsBoard` is the recommended candidate — real content, exercises labels and value binding, no downstream dependency — subject to the Tier-2 PA confirming it on inspection.
+**Target:** one existing system board, re-authored in XML on the new architecture. `DiagnosticsBoard` is the recommended candidate — real content, exercises labels and value binding, no downstream dependency — subject to the Tier-2 PA confirming on inspection.
 
 **Pass requires all four:**
 
-1. The board renders **pixel-identically** from XML, verified by automated diff against the current firmware's output — not by eye.
+1. Renders **pixel-identically** to the legacy board, by automated diff — not by eye.
 2. The XML is materially shorter and clearer than the C++ it replaces.
-3. The measured flash and RAM budget is comfortable on `esp32dev` ([D-1], §18) — the floor, alongside WiFi and TLS.
-4. Edit-regenerate-rebuild is faster in practice than editing C++ was.
+3. Measured flash and RAM comfortable on `esp32dev` alongside WiFi and TLS ([D-1], §18, Q-4).
+4. Edit → regenerate → rebuild faster in practice than editing C++ was.
 
-**On failure, stop.** The spec says this and the programme honours it. A NO-GO is a legitimate outcome, not a setback: PR-01 through PR-06 leave the foundation with a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all independently valuable, none dependent on the XML layer. That is what makes stopping cheap, and it is why the sequencing front-loads them.
+**On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
 
 ---
 
@@ -217,10 +218,11 @@ The spec's Phase 1 exit criterion, made concrete and given teeth.
 
 | Pair | Overlap | Guidance |
 |---|---|---|
-| PR-01 ∥ PR-02 | None — different repositories | **Safe to parallelise.** Recommended, as it is the programme's critical path |
-| PR-03 ∥ PR-04 | No file overlap, but a **contract** dependency: PR-04 generates against the API PR-03 defines | Agree the generated-code shape as a written contract before both start, or serialise |
-| PR-04 ∥ PR-06 | Both consume PR-03's API; different repos and directories | Safe, with the same contract caveat |
-| PR-08 ∥ PR-09 | Both touch `modules/U8G2Display` | **Conflict likely.** Serialise, or split by directory with an explicit boundary |
+| PR-01 ∥ PR-02 | None — different repos | **Safe. Recommended** — the critical path |
+| PR-03 ∥ PR-04 | Contract dependency: PR-04 generates against PR-03's property tables | Freeze the property-descriptor format in PR-01 so both can proceed against it |
+| PR-04 ∥ PR-06 | Both consume PR-03; different repos | Safe, same caveat |
+| PR-08 ∥ PR-09 | Both touch `modules/U8G2GL` | **Conflict likely.** Serialise or split by directory |
+| Any ∥ PR-10 | PR-10 deletes the legacy module | Strictly last |
 
 ---
 
@@ -228,20 +230,21 @@ The spec's Phase 1 exit criterion, made concrete and given teeth.
 
 | ID | Risk | Severity | Mitigation |
 |---|---|---|---|
-| R-1 | Widget API churn breaks existing boards or pinned v3 | **High** | PD-3 option (c) — aliases, zero blast radius |
-| R-2 | Generated code is harder to debug than the C++ it replaces | High | PR-07 gate criterion 2; stop is a real option |
-| R-3 | Cross-repo drift between CLI and runtime | Medium | Generated files record generator version (§13.2); runtime refuses a major mismatch (§16) |
-| R-4 | `bdfconv` packaging (Q-2) blocks the font pipeline | Medium | Wasm route, already proven by `layoutsim`; `<builtin>` fonts need no pipeline at all (§22.1) |
-| R-5 | Scope creep back toward the visual editor | Medium | Editor stays out of the committed plan; Phase 4 remains speculative |
-| R-6 | Programme stalls with foundation half-migrated | Medium | Every PR through PR-06 is independently valuable and additive |
-| R-7 | Q-1 (multi-target layout) unresolved when v3 needs it | Low | v3 is PR-10; two real targets will exist by then, which is exactly what Q-1 was waiting for |
+| R-1 | Two display modules coexisting confuses contributors and doubles maintenance | **High** | PD-4 strangler-fig with PR-10 as an explicit, scheduled retirement — not "someday" |
+| R-2 | Rebuilding widgets loses hard-won behaviour from the legacy set (scroll timing, clock alignment, stipple fill) | **High** | PR-03 ports *behaviour* deliberately; PR-06's pixel snapshots make regressions visible |
+| R-3 | Generated code harder to debug than the C++ it replaces | High | PR-07 criterion 2; stop is real |
+| R-4 | Object model wrong in a way only discovered at PR-08 | Medium | PR-00 ratifies it against LVGL's proven decomposition before code |
+| R-5 | Cross-repo drift between CLI and runtime | Medium | Generator version in generated files (§13.2); runtime rejects major mismatch (§16) |
+| R-6 | `bdfconv` packaging (Q-2) blocks fonts | Medium | Wasm route proven by `layoutsim`; `<builtin>` needs no pipeline (§22.1) |
+| R-7 | Downstream v3 stranded on the pinned lock | Medium | v3 only moves at PR-11; legacy module survives until PR-10 |
+| R-8 | Scope creep toward the visual editor | Medium | Editor stays out of the committed plan |
 
 ---
 
 ## 9. Immediate Next Actions
 
-1. **Settle PD-1, PD-2, PD-3** (§2). All three block the first PRs.
-2. On resolution, the Chief Architect spawns the Tier-2 Principal Architect for **PR-01** and **PR-02** in parallel.
-3. PR-00 (spec reconciliation) can proceed alongside, once PD-1 is known.
+1. **Settle PD-1 (licence), PD-2 (CLI home), PD-3 (ratify the object model), PD-4 (migration strategy).** PD-3 is the substantive one — [A-2] and [A-3] in §1.
+2. On PD-1 + PD-3, spawn the Tier-2 Principal Architect for **PR-00**.
+3. PR-02 is independent of the architecture question and can start as soon as PD-1 and PD-2 land — worth running in parallel with PR-00 to keep the critical path short.
 
-Programme state is tracked in `.agents/skills/principal-architect-workspace/PROGRAM.md`; the PR sequence and its dependency graph in `PROGRAM-PLAN.md`.
+Programme state: `.agents/skills/principal-architect-workspace/PROGRAM.md` · PR graph: `PROGRAM-PLAN.md`

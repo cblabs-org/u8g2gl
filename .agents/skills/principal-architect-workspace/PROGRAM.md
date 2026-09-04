@@ -12,13 +12,19 @@ Human-facing plan: [implementation_plan.md](../../../docs/implementation_plan.md
 PR sequence and graph: [PROGRAM-PLAN.md](PROGRAM-PLAN.md)
 
 ## Status
-**Planning.** Blocked on three programme decisions (PD-1 licence, PD-2 CLI home,
-PD-3 widget naming). No PRs spawned. No Tier-2 PA engaged.
+**Planning.** Blocked on four programme decisions (PD-1 licence, PD-2 CLI home,
+PD-3 ratify core object model, PD-4 legacy migration strategy). No PRs spawned.
 
 ## Reconnaissance findings driving the plan
-- **F-1** `modules/U8G2Display/` already ships the widget runtime (IGfxWidget,
-  DrawingPrimitives, 8 widgets, IDisplayBoard, CarouselEngine, system boards).
-  Programme is codegen+binding over an existing runtime, not greenfield.
+- **A-1** `modules/U8G2Display/` is an INTEGRATION REFERENCE, NOT an architectural
+  basis. Its flat imperative widget model is departures-board heritage; building a
+  veneer over it would encode the design we are moving past. Corrected from plan v1.0.
+- **A-2** Architecture parallels LVGL 9's core decomposition: obj, obj_class with
+  base_class + property table, observer, group (focus), style, event. Diverge only
+  where monochrome demands: no runtime tree/layout/dirty-regions ([D-4],[D-7]).
+- **A-3** Object tree is build-time; runtime is a flat array with a parent index.
+  Hierarchy semantics (inherited visibility, clip-to-parent) by walking up, ~1 byte
+  per object, versus LVGL's per-node child vectors.
 - **F-2** `uidesign/<board>/lvglpro/` → `modules/LVGLDisplay/ui/` is an exact
   precedent to mirror for XML-source → generated-code layout.
 - **F-3** `ButtonModule`/`EncoderModule` exist — §12 input integrates, not invents.
@@ -52,3 +58,19 @@ be cheap for the gate to be honest.
 
 Defect surfaced, not ours to fix: esp32-app-foundation/library.json declares
 `CC-BY-NC-SA-4.0` against an Apache-2.0 LICENSE and 120 Apache SPDX headers.
+
+### 2026-09-04T15:56:37Z — Plan v1.1: heritage anchoring rejected
+Human correction: do not let `modules/U8G2Display` heritage constrain the design;
+target the optimal architecture paralleling LVGL for u8g2 matrix displays.
+
+Plan v1.0 had reduced the programme to "codegen over the existing runtime" — sunk-cost
+reasoning. Rewritten: the legacy module is an integration reference only (A-1), the
+architecture parallels LVGL 9's core (A-2), and hierarchy resolves at build time to a
+flat runtime (A-3).
+
+Consequences: PD-3 changed meaning entirely — from "widget naming aliases" (an artefact
+of building on legacy) to "ratify the core object model". New PD-4 covers legacy
+migration by strangler-fig, since six system boards and a pinned downstream v3 depend
+on the old module. New PR-00 is a real prerequisite: the committed spec has no object
+model section at all — it goes from XML tags straight to widget behaviour. That gap was
+invisible while legacy widgets were assumed and is fatal now. PR count 10 → 12.
