@@ -2,7 +2,7 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.2
+**Version**: 1.3
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
@@ -76,18 +76,17 @@ Its load-bearing decision is [D-17]: widget properties are declared as **build-t
 
 ## 2. Programme Decisions Pending — human call required
 
-### PD-1 · Licence — blocks all PRs
+### ~~PD-1~~ · Licence — **RESOLVED: MIT**
 
-| Option | Case for | Case against |
-|---|---|---|
-| **MIT** (current spec §22) | Already committed | A differently-licensed module inside an Apache-2.0 repo complicates upstreaming |
-| **Apache-2.0** *(recommended)* | Matches foundation exactly — LICENSE plus 120 SPDX headers. Adds a patent grant. Permissive and commercial-friendly, so §22's actual requirement is met | Amend spec §22 and the committed `LICENSE` |
+Matches U8G2's permissive posture (BSD-2-Clause) and LVGL's own licence. MIT flows cleanly into an Apache-2.0 consumer — foundation already carries seven MIT dependencies including LVGL itself, listed in `THIRD-PARTY-NOTICES.md`. No change needed to `LICENSE` or spec §22, which already say MIT.
 
 > **Unrelated defect, surfaced not fixed:** `esp32-app-foundation/library.json` declares `"license": "CC-BY-NC-SA-4.0"` against an Apache-2.0 LICENSE and 120 Apache SPDX headers. That metadata currently advertises the framework as non-commercial.
 
-### PD-2 · Where the host-side CLI lives — blocks PR-02
+### ~~PD-2~~ · CLI home — **RESOLVED: this repository, with the runtime**
 
-**Recommended: standalone in this repository**, npm-published, consumed by foundation as a pre-build step. [D-10] specifies npm distribution; both foundation and departures-board-v3 need the tool, and vendoring it twice is worse than a cross-repo dependency. The alternative — `foundation/tools/` — puts a TypeScript host tool inside a firmware library and forces v3 to vendor a framework to obtain a build tool.
+Settled by the LVGL precedent (§3). U8G2GL ships the framework — runtime library *and* CLI — as an MIT project foundation consumes as a dependency, exactly as it consumes `lvgl/lvgl`. What lands upstream in foundation is the Apache-2.0 *integration module*, `modules/U8G2GLDisplay/`.
+
+This is a stronger answer than the original question anticipated: it also corrects the PR ledger, which had wrongly placed the object model and widget set inside foundation.
 
 ### PD-3 · Ratify the core object model — blocks PR-01
 
@@ -105,14 +104,29 @@ The new module cannot land big-bang: `modules/U8G2Display` is consumed by six sy
 
 ## 3. Repository Topology
 
-| Repository | Role | Licence |
+**Settled by precedent — U8G2GL is a library foundation consumes, exactly as LVGL is.**
+
+`modules/LVGLDisplay/library.json` declares `"lvgl/lvgl": "^9.5.0"` as an external dependency and `"UIDesign": "*"` for its generated UI. LVGL (MIT) already sits inside this Apache-2.0 project, listed in `THIRD-PARTY-NOTICES.md` alongside seven other MIT components. U8G2GL takes the same shape.
+
+| Repository | Ships | Licence |
 |---|---|---|
-| **U8G2GL** (this repo) | Programme home — spec, concept, plan, workspace. Host CLI if PD-2 lands standalone | PD-1 |
-| **esp32-app-foundation** | Upstream home for the runtime, `uidesign/`, build integration | Apache-2.0 |
+| **U8G2GL** (this repo) | **The framework** — runtime C++ library *and* host CLI, plus spec/concept/plan/workspace. Published for any U8G2 user, not only foundation users | MIT |
+| **esp32-app-foundation** | **The integration module** — `modules/U8G2GLDisplay/`: adapter port, board/carousel lifecycle wiring, `uidesign/<board>/u8g2gl/`, web diagnostics. Declares `u8g2gl` as a dependency | Apache-2.0 |
 | **departures-board-v3** | Downstream pathfinder. Pinned at `framework.lock` `f53cc1d7` | — |
 | departures-board (v1) | Reference only — `layoutsim` Wasm harness, original widget designs | — |
 
-Build in `esp32-app-foundation` first; v3 is a consumer that picks the work up by advancing its lock.
+The parallel is exact:
+
+| LVGL | U8G2GL |
+|---|---|
+| `lvgl/lvgl` — MIT framework, external dependency | `u8g2gl` — MIT framework, external dependency |
+| `modules/LVGLDisplay/` — Apache-2.0 integration | `modules/U8G2GLDisplay/` — Apache-2.0 integration |
+| `uidesign/<board>/lvglpro/` → `UIDesign` lib | `uidesign/<board>/u8g2gl/` → generated UI lib |
+| `lib_ignore = LVGLDisplay` per-board opt-out | same mechanism |
+
+**Correction from v1.2.** The previous ledger placed PR-01 and PR-03 — the object model and widget set — inside foundation. That was wrong: it would have made the framework a foundation-internal feature rather than a library, contradicting [concept.md](concept.md)'s positioning and making it unusable by any U8G2 project that is not a foundation app. The runtime belongs in this repository with the CLI. What goes upstream is the *integration module*, which is what "pushing u8g2gl upstream" should mean.
+
+Consequence for licensing: MIT is not merely acceptable here, it is the right choice — it matches U8G2's permissive posture (BSD-2-Clause), matches LVGL's own licence, and flows cleanly into an Apache-2.0 consumer. Foundation adds one row to `THIRD-PARTY-NOTICES.md`.
 
 ---
 
@@ -185,12 +199,12 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends | Blocked by |
 |---|---|---|---|---|
-| **PR-01** | foundation | New `modules/U8G2GL/` core: `u8g2gl_obj`, class system with `base_class`, property table, subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests | PR-00 | PD-3, PD-4 |
-| **PR-02** | CLI | Schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | PD-2 |
-| **PR-03** | foundation | Widget set on the new model: label, scrolling label, xbm, glyph, box/line/circle primitives, progress bar, clock. Ported *in behaviour* from the legacy widgets, rewritten to the object model | PR-01 | — |
-| **PR-04** | CLI | Generator XML → C++: property emission, component inlining, build-time layout ([D-7]) | PR-02, PR-03 | — |
-| **PR-05** | foundation | `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent, PlatformIO/CMake pre-build, committed `generated/`, first system board migrated | PR-04 | PD-4 |
-| **PR-06** | CLI + foundation | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
+| **PR-01** | **U8G2GL** | Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | PD-3 |
+| **PR-02** | **U8G2GL** | CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
+| **PR-03** | **U8G2GL** | Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Behaviour ported from the legacy widgets, rewritten to the model. Each ships its `<api>` manifest | PR-01 | — |
+| **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, component inlining, build-time layout ([D-7]), identifier mangling, demotion | PR-02, PR-03 | — |
+| **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | PD-4 |
+| **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
 | **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
 
 ### Phase 2 — Composition

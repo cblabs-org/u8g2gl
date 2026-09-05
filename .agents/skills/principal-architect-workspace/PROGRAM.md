@@ -99,3 +99,29 @@ unchanged project regenerates to an empty diff, which matters because generated
 code is committed ([D-11]) and appears in review.
 
 Still blocked on PD-1..PD-4. No Tier-2 PA spawned.
+
+### 2026-09-05T09:22:51Z — PD-1 and PD-2 resolved; repository topology corrected
+Human resolved PD-1: **MIT**, matching U8G2 (BSD-2-Clause) and LVGL (MIT), on the
+reasoning that an Apache-2.0 project consuming MIT as a submodule is fine. Verified
+and correct — MIT is the more permissive licence and flows downstream cleanly.
+
+Investigating that phrasing surfaced a topology error in the plan. Foundation's
+`modules/LVGLDisplay/library.json` declares `"lvgl/lvgl": "^9.5.0"` as an external
+dependency plus `"UIDesign": "*"` for generated UI; LVGL (MIT) already sits inside
+this Apache-2.0 project alongside six other MIT components. So the established
+pattern is: MIT framework as a dependency, thin Apache-2.0 integration module in
+`modules/`.
+
+Plan v1.2 had PR-01 (object model) and PR-03 (widget set) landing *inside*
+foundation. That was wrong — it would have made U8G2GL a foundation-internal
+feature rather than a library, contradicting concept.md's positioning and making it
+unusable by any U8G2 project that is not a foundation app. Corrected in v1.3: the
+runtime and CLI both live in the U8G2GL repo (MIT); what goes upstream is
+`modules/U8G2GLDisplay/` (Apache-2.0), the integration module. PR-01..PR-04 and
+PR-06 all move to this repository; only PR-05 and PR-07 land in foundation.
+
+This also resolves PD-2 more strongly than the original question framed it — the
+CLI question was really a question about what the U8G2GL repo *is*.
+
+Remaining: PD-3 (ratify object model, blocks PR-01), PD-4 (legacy migration,
+blocks PR-05).

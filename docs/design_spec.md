@@ -1556,6 +1556,10 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 *Rationale:* The runtime is linked into user firmware and the generator emits code into user projects, so the licence has to permit commercial and closed-source use without conditions. Anything copyleft or non-commercial would exclude industrial HMI users — plausibly the most motivated segment of an already small audience (see [concept.md §2.1](concept.md)) — and would make the generated code legally awkward to ship.
 
+MIT also **matches the ecosystem U8G2GL sits in**: U8G2 itself is BSD-2-Clause and LVGL is MIT, so U8G2GL adopts the same permissive posture as both the layer below it and its closest analogue.
+
+**Consumption by more restrictive projects is unaffected.** MIT is the more permissive licence, so it flows downstream without friction — an Apache-2.0 project may consume U8G2GL by adding a dependency and a notice entry. `esp32-app-foundation` is precisely this case: Apache-2.0, already consuming LVGL and six other MIT components listed in its `THIRD-PARTY-NOTICES.md`. The only obligation MIT imposes is that the copyright and permission notice travel with distributions, which such a notices file already discharges.
+
 This resolves [Q-6]. The concern was that departures-board is CC BY-NC-SA and U8G2GL derives design ideas from it; since the owner holds the copyright on both, there is no conflict to manage. Where code is genuinely ported from departures-board into the runtime, the owner relicenses it MIT for that purpose.
 
 **Compatibility of dependencies:**
