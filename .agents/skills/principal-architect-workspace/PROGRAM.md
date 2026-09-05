@@ -74,3 +74,28 @@ migration by strangler-fig, since six system boards and a pinned downstream v3 d
 on the old module. New PR-00 is a real prerequisite: the committed spec has no object
 model section at all — it goes from XML tags straight to widget behaviour. That gap was
 invisible while legacy widgets were assumed and is fatal now. PR count 10 → 12.
+
+### 2026-09-05T07:52:18Z — XML-to-code contract authored (spec §13, v0.3)
+Closed the gap between generator and runtime work packages. §7 of the plan had
+flagged PR-03 ∥ PR-04 as blocked on an unwritten contract; that contract is now
+design_spec.md §13, normative, at spec v0.3 / schema 0.3.
+
+Load-bearing decision [D-17]: widget properties are build-time `<api>` manifests
+the generator reads, not runtime property tables. Considered and rejected: a
+hardcoded generator table (makes custom widgets second-class) and an LVGL-style
+runtime property table (pays dispatch and type erasure for a build-time lookup).
+LVGL needs lv_obj_property at runtime because its editor loads XML on-device;
+we have no runtime XML, so we need the descriptor without the dispatch.
+
+Second-order win: built-in and custom widgets collapse to one mechanism. The
+generator's widget knowledge becomes data, so adding a widget needs no generator
+release. This retroactively strengthens §6.4 — the Tier-4 story was previously
+asserted but not mechanised.
+
+§13 also settles identifier mangling and collision policy (hard error, never a
+silent rename), the static-demotion rule, component-inlining semantics, [A-3]'s
+flat array with parent indices, and byte-level determinism — no timestamps, so an
+unchanged project regenerates to an empty diff, which matters because generated
+code is committed ([D-11]) and appears in review.
+
+Still blocked on PD-1..PD-4. No Tier-2 PA spawned.

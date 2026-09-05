@@ -2,9 +2,9 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.1
+**Version**: 1.2
 **Date**: September 2026
-**Companion documents**: [design_spec.md](design_spec.md) (v0.2, what to build) · [concept.md](concept.md) (why)
+**Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
 
 > This plan sequences the work. Where it and the spec disagree on *what* to build, the spec wins; on *where* and *in what order*, this plan wins.
@@ -61,6 +61,16 @@ LVGL keeps a real runtime tree — parent pointer plus child array per object �
 - Cost: one `uint8_t`/`uint16_t` per object, versus a child vector per node.
 
 This keeps LVGL's hierarchy *semantics* while spending almost nothing, and it composes with components being inlined at generation time (§6.3). It is the kind of decision that is nearly free now and expensive after fifty widgets exist — hence [PD-3] below.
+
+---
+
+### 1.4 The generator↔runtime contract is now written — [A-4]
+
+§7 of this plan flagged PR-03 ∥ PR-04 as blocked on an unwritten contract: the generator emits code against an API the runtime defines, and neither could be specified without the other. That contract is now [design_spec.md §13](design_spec.md), written at Chief Architect tier because it is an interface between work packages, not an implementation detail to be discovered inside one.
+
+Its load-bearing decision is [D-17]: widget properties are declared as **build-time `<api>` manifests** that the generator reads, not runtime property tables. LVGL needs `lv_obj_property` at runtime because its editor loads XML on-device; U8G2GL has no runtime XML, so it needs the descriptor without the dispatch. The consequence is that built-in and custom widgets become the same mechanism — the generator's widget knowledge is data, so adding a widget needs no generator release, and the Tier-4 custom-widget story stops being second-class.
+
+§13 also settles what was previously implicit: identifier mangling and collision handling, the static-demotion rule, component-inlining semantics, [A-3]'s flat object array with parent indices, byte-level determinism (no timestamps, so an unchanged project regenerates to an empty diff), and the boundary of what is never generated.
 
 ---
 
@@ -219,7 +229,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | Pair | Overlap | Guidance |
 |---|---|---|
 | PR-01 ∥ PR-02 | None — different repos | **Safe. Recommended** — the critical path |
-| PR-03 ∥ PR-04 | Contract dependency: PR-04 generates against PR-03's property tables | Freeze the property-descriptor format in PR-01 so both can proceed against it |
+| PR-03 ∥ PR-04 | Contract dependency: PR-04 generates against PR-03's widget manifests | **Resolved.** The contract is now written — [design_spec.md §13](design_spec.md), normative, with [D-17] fixing the manifest mechanism. Both sides build against §13 rather than against each other, so they may proceed in parallel |
 | PR-04 ∥ PR-06 | Both consume PR-03; different repos | Safe, same caveat |
 | PR-08 ∥ PR-09 | Both touch `modules/U8G2GL` | **Conflict likely.** Serialise or split by directory |
 | Any ∥ PR-10 | PR-10 deletes the legacy module | Strictly last |

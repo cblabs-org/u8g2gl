@@ -4,7 +4,7 @@
 
 > *"Same paradigm as LVGL Pro, simplified for monochrome, honest about the cost."*
 
-**Version**: 0.2 Draft
+**Version**: 0.3 Draft
 **Author**: Matt McNeill, CB Labs
 **Date**: September 2026
 **Status**: Design — no implementation started
@@ -200,6 +200,12 @@ The browser preview compiles the actual U8G2GL runtime and U8G2 to Wasm via Emsc
 
 *Consequence:* The same Wasm build is the snapshot-test harness (§17). Fidelity and testability come from one investment.
 
+### [D-17] Widget properties are declared as build-time manifests, not runtime tables
+
+Each widget class ships an `<api>` manifest the generator reads at build time; generated code contains direct setter calls. There is no runtime property table.
+
+*Rationale and full contract:* §13.1. In short — LVGL needs `lv_obj_property` at runtime because its editor loads XML on-device; U8G2GL has no runtime XML, so it needs the property *descriptor* without the property *dispatch*. This keeps custom widgets (§6.4) first-class without a generator release, at zero runtime cost.
+
 ### [D-10] The CLI is TypeScript on Node, distributed via npm
 
 *Rationale:* `npx u8g2gl generate` is the lowest-friction install for the target audience and works identically on macOS, Linux, and Windows. It shares the schema, the XML parser, and the Wasm host with the browser preview — one codebase, not two. The alternative (Python) has a worse Windows story and cannot share code with the preview.
@@ -245,7 +251,7 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 ### 5.1 `u8g2gl.xml`
 
 ```xml
-<u8g2gl schema="0.2" name="departures-board" version="1.0">
+<u8g2gl schema="0.3" name="departures-board" version="1.0">
     <targets>
         <!-- setup names a U8G2 full-buffer constructor; geometry is derived -->
         <target name="default" default="true">
@@ -509,6 +515,8 @@ Direct U8G2 draw calls. No instance, no tick, no state. The generator emits them
 
 Ship with the framework. The user configures via XML; the framework implements the C++.
 
+**Built-in widgets are declared exactly as custom ones are.** Each ships a `<widget>` manifest with an `<api>` block ([D-17], §13.1) alongside its implementation — `u8g2gl_label.xml` beside `u8g2gl_label.hpp`. Tier 2 and Tier 4 differ in *who wrote the widget*, not in how the generator handles it. The table below is therefore documentation of those manifests, not a separate hardcoded list inside the generator.
+
 | XML Tag | Description | Key Properties |
 |---|---|---|
 | `<u8g2gl_label>` | Text with alignment and truncation | `text`, `bind_text`, `bind_text_fmt`, `font`, `align`, `truncate` |
@@ -588,6 +596,8 @@ widgets/wd_service_list/
     </api>
 </widget>
 ```
+
+**The `<api>` block is also the generator's manifest** ([D-17], §13.1). It is the single declaration of what the widget accepts: the schema validates against it, the generator emits setter calls from it, and diagnostics quote it. A custom widget is therefore a first-class citizen — adding one requires no generator change and no framework release.
 
 There is no `_parser.c` bridge file. v0.1 carried one over from LVGL Pro, which needs it because LVGL Pro supports *runtime* XML loading in its editor. U8G2GL has no runtime XML path, so the generator emits the setter calls directly and the bridge is dead weight.
 
@@ -1009,76 +1019,262 @@ No transition animations. A full-screen transition on a monochrome SPI panel is 
 
 ---
 
-## 13. Code Generation
+## 13. The XML-to-Code Contract
 
-### 13.1 Pipeline
+This section is **normative**. It is the interface between the generator and the runtime — the two are built by separate work packages, and everything either side may assume about the other is stated here. Where earlier sections describe *what* an XML construct means, this one defines *exactly what code it becomes*.
+
+### 13.1 How the generator knows what an attribute means — [D-17]
+
+Every other decision in this section depends on this one. Given `<u8g2gl_label font="small_9">`, how does the generator know that `font` is valid on a label, what type it takes, and what to emit?
+
+Three models were considered:
+
+| Model | Mechanism | Verdict |
+|---|---|---|
+| **Direct setters, hardcoded** | Generator holds a built-in table of widget → setter signatures, emits `lbl.set_font(...)` | Readable output, zero runtime cost — but adding a widget means editing the generator, so custom widgets (§6.4) become second-class |
+| **Runtime property table** | Emit `u8g2gl_obj_set_property(&lbl, U8G2GL_PROP_FONT, v)`; classes register descriptors, as `lv_obj_property` does | Uniform and extensible, but pays runtime dispatch and type erasure for a lookup we can do at build time |
+| **Build-time manifest, direct setters** ✅ | Each class *declares* its properties as data the generator reads; the generator emits direct setter calls | Extensible like the property table, emits code like the hardcoded model, costs nothing at runtime |
+
+**Decision: the third.** Widget classes ship a declarative property manifest that the generator consumes at build time; the generated code contains direct, type-checked setter calls.
+
+*Rationale:* LVGL needs `lv_obj_property` at *runtime* because LVGL Pro can load XML on-device in its editor. U8G2GL has no runtime XML — §6.4 already deleted the parser-bridge file for exactly this reason. We need the property *descriptor*, not the property *dispatch*. Paying for runtime lookup would buy nothing, and hardcoding the generator would make the custom-widget tier a fiction.
+
+**The manifest is the `<api>` block that §6.4 already defines.** Built-in widgets ship the same `<api>` declaration as custom ones — `u8g2gl_label.xml` sits beside `u8g2gl_label.hpp`. This unifies Tier 2 and Tier 4: they differ in *who wrote them*, not in how the generator handles them. The generator's knowledge of widgets is data, not code, and adding a widget requires no generator release.
+
+```xml
+<!-- runtime/widgets/u8g2gl_label.xml — ships with the framework -->
+<widget name="u8g2gl_label" extends="u8g2gl_obj" animated="false">
+    <api>
+        <prop name="text"      type="string" setter="set_text" default="" />
+        <prop name="font"      type="font"   setter="set_font" required="true" />
+        <prop name="align"     type="enum"   setter="set_align"
+              values="left,center,right" default="left"
+              emit="U8G2GL_ALIGN_{VALUE^^}" />
+        <prop name="truncate"  type="bool"   setter="set_truncate" default="false" />
+        <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
+    </api>
+</widget>
+```
+
+`animated="false"` is what licenses static demotion (§13.5). `emit` gives the enumerator spelling. `required` drives a §15 diagnostic rather than a silent default.
+
+### 13.2 Type mapping
+
+| `<prop>` type | XML value | Emitted C++ | Validation |
+|---|---|---|---|
+| `int` | `12`, `#const`, expression | `int32_t` literal | Resolved to a literal at build time (§7.2); range-checked against the display |
+| `bool` | `true` / `false` | `true` / `false` | — |
+| `string` | text | `"..."` escaped, `PROGMEM` where the setter takes a `__FlashStringHelper` | Escaped for C++ string literals |
+| `enum` | one of `values` | enumerator via `emit` pattern | Must be a member of `values` |
+| `font` | font name | `ui_font_<name>` | Must exist in `globals.xml` `<fonts>` |
+| `image` | image name | `ui_image_<name>` | Must exist in `<images>` |
+| `subject` | subject name | `&ui_subject_<name>` | Must exist in `<subjects>`; type must match the binding |
+| `style` | style name | `ui_style_<name>` | Must exist in a `<styles>` block in scope |
+| `color` | `0`/`1`/`xor` | `U8G2GL_COLOR_*` | Monochrome set only (§10) |
+
+All numeric coordinate attributes resolve to literal integers before emission ([D-7]) — no expression survives into generated code.
+
+### 13.3 The object tree — flat array with parent index
+
+Per [A-3], XML nesting is a build-time construct. The generator flattens it.
+
+1. **Inline components first** (§13.6). The tree the flattener sees contains no `<component>` instances, only concrete objects.
+2. **Walk depth-first in document order.** Each object receives its index in emission order — which is therefore also draw order ([D-4]).
+3. **Record the parent index**: the index of the enclosing object, or `U8G2GL_NO_PARENT` for objects directly under `<view>`.
+4. **Emit the parent table** as a static array beside the object array.
+
+```cpp
+// Objects, in document order — index is draw order
+static u8g2gl_label            statusbar_title;   // 0
+static u8g2gl_clock            statusbar_clock;   // 1
+static u8g2gl_label            body_message;      // 2
+
+static u8g2gl_obj* const ui_screen_home_objs[] = {
+    &statusbar_title, &statusbar_clock, &body_message,
+};
+static const uint8_t ui_screen_home_parents[] = {
+    U8G2GL_NO_PARENT, U8G2GL_NO_PARENT, U8G2GL_NO_PARENT,
+};
+```
+
+The parent index is `uint8_t` while a screen holds ≤ 255 objects and widens to `uint16_t` above that; the generator picks the narrower type and the runtime reads it through a typedef. Effective visibility and clipping are computed by walking *up* the parent chain at render time — depth is 2–4 in practice, so the walk is a handful of comparisons and no child lists are stored.
+
+### 13.4 Identifier mangling
+
+XML names are author-facing; C++ identifiers are generated. The mapping is total, deterministic, and collision-checked.
+
+| Kind | XML | Emitted |
+|---|---|---|
+| Screen function | `<screen name="home">` | `ui_screen_home_init()` etc. |
+| Screen-level object | `name="title"` | `title` (static, screen's TU) |
+| Component-inlined object | `title` inside instance `statusbar` | `statusbar_title` |
+| Nested component | instance `bar` → instance `clk` → `digits` | `bar_clk_digits` |
+| Subject | `<int name="temperature">` | `ui_subject_temperature`, `ui_set_temperature()` |
+| Font | `<bdf name="small_9">` | `ui_font_small_9` |
+| Image | `<xbm name="icon_wifi">` | `ui_image_icon_wifi` |
+| Style | `<style name="header">` | `ui_style_header` |
+
+**Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_`, `ui_`, `wd_`, or matching a C++ keyword. Component instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
+
+### 13.5 Static demotion — when an object is not emitted
+
+Tier 1 primitives always inline. A Tier 2 widget is **demoted to inline draw calls** if and only if *all* hold:
+
+- it has no `name` attribute — nothing can reference it;
+- it has no `bind_*` attribute or binding child;
+- it has no `<event_cb>` or event child;
+- it is not a member of a `<focus_ring>`;
+- its class manifest declares `animated="false"`;
+- it has no children.
+
+Otherwise an object is instantiated. This is why §6.1 could delete `<u8g2gl_text>`: a `<u8g2gl_label>` meeting these conditions compiles to the same `drawStr` a dedicated static tag would have produced, with no second tag for authors to choose between.
+
+Demotion is **observable in the budget** (§18) and reported by `--json` ([D-16]), so an author who expects an object and gets an inline call can see why.
+
+### 13.6 Component inlining
+
+Components (§6.3) produce no runtime construct. Inlining is textual substitution over a parsed tree, in four steps:
+
+1. **Bind arguments to `<api>` props** — supplied attributes, then declared defaults. A missing required prop is an error.
+2. **Substitute `$prop`** throughout the component's `<view>` subtree. A `type="subject"` prop substitutes the *subject name*, which the enclosing `bind_*` then resolves (§6.3) — a two-step resolution that completes entirely at build time.
+3. **Prefix every `name`** in the subtree with the instance name (§13.4).
+4. **Splice** the resulting objects into the parent tree at the instance's position, inheriting its coordinate origin.
+
+Instantiating a component twice therefore yields two independent object sets with distinct identifiers, and no runtime component representation exists.
+
+### 13.7 Emitted files and functions
+
+Per screen, one `.cpp`. Plus one `ui.hpp` umbrella, and one unit each for subjects, fonts, and images.
+
+```cpp
+void ui_screen_home_init();        // once at boot: construct, configure, bind
+void ui_screen_home_activate();    // becoming active
+void ui_screen_home_deactivate();  // leaving
+uint32_t ui_screen_home_tick(uint32_t ms);   // returns next deadline ([D-15])
+void ui_screen_home_render(U8G2& d);         // draw, document order
+```
+
+`init` is ordered: construct → set properties → apply styles → register bindings → wire events → build the focus ring. Bindings are registered last so no observer fires against a partly configured object.
+
+### 13.8 Binding emission
+
+```xml
+<u8g2gl_label name="temp" bind_text="temperature" bind_text_fmt="%d°C" />
+```
+
+```cpp
+temp.bind_text(&ui_subject_temperature, "%d°C");
+```
+
+The generator type-checks the format string against the subject's declared type and rejects a mismatch at build time (§8.4). Conditional flags emit similarly:
+
+```cpp
+wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+```
+
+Event callbacks emit an `extern` declaration only; the definition is the user's, and its absence is a link error whose expected signature is stated in the generated header (§8.4).
+
+### 13.9 Determinism
+
+Generated output is a committed artefact ([D-11]) and appears in review diffs. It must therefore be **byte-identical for identical input**:
+
+- objects and calls emitted in document order — never hash or set order;
+- includes sorted lexicographically;
+- **no timestamps** — the header carries source path, schema version, and generator version only, so regenerating an unchanged project produces an empty diff;
+- floating point never appears in output (all arithmetic is integer, §7.2);
+- diagnostics ordered by file, then line, then column.
+
+A generator change that alters output without an input change is a breaking change and requires a generator version bump.
+
+### 13.10 What is never generated
+
+The boundary matters as much as the contract:
+
+- **The `U8G2` instance and display construction** — the application owns its hardware (§12.1).
+- **Event callback bodies** — declarations only.
+- **Custom widget implementations** — the generator emits calls into `wd_*` classes, never their internals ([D-6]).
+- **The main loop** — the application drives `ui_handler()` ([D-15]).
+- **Anything under `modules/` or the app's own sources** — generation writes only to the configured output directory ([D-11]).
+
+### 13.11 Pipeline
 
 ```
-XML → parse → validate → resolve → compile assets → emit C++ → report budget
+XML → parse → validate → resolve → flatten → compile assets → emit → report
 ```
 
-1. **Parse** every XML file, retaining file/line/column for diagnostics.
-2. **Validate** against the schema and against cross-file references (fonts, images, subjects, components, widget props).
-3. **Resolve** — inline components, evaluate constant arithmetic, resolve anchors and stacking to literal integers, resolve `type="subject"` prop indirection.
-4. **Compile assets** — BDF→C arrays via `bdfconv`, PNG→XBM.
-5. **Emit** C++ per screen, plus subjects, fonts, images, and the umbrella header.
-6. **Report** the flash and RAM budget (§18).
+1. **Parse** all XML, retaining file/line/column for diagnostics.
+2. **Validate** against the schema, then cross-file references — fonts, images, subjects, components, and widget properties against their manifests (§13.1).
+3. **Resolve** — inline components (§13.6), evaluate constant arithmetic, resolve anchors to literals ([D-7]), resolve `type="subject"` indirection.
+4. **Flatten** to the object array and parent table (§13.3); apply demotion (§13.5); mangle and collision-check identifiers (§13.4).
+5. **Compile assets** — BDF via `bdfconv`, PNG→XBM (§14).
+6. **Emit** per §13.7, deterministically per §13.9.
+7. **Report** the budget (§18), including which elements were demoted.
 
-### 13.2 Generated Output
+### 13.12 Worked example
+
+```xml
+<!-- screens/screen_home.xml -->
+<screen name="home">
+    <view>
+        <status_bar name="bar" title_subject="station_name" />
+        <u8g2gl_hline x="0" y="11" width="#screen_width" />
+        <u8g2gl_label name="msg" x="0" y="16" right="0" height="12"
+                      bind_text="service_message" font="small_9" align="center" />
+    </view>
+</screen>
+```
 
 ```cpp
 // generated/ui_screen_home.cpp — GENERATED, DO NOT EDIT
-// Source: screens/screen_home.xml (schema 0.2, u8g2gl 0.2.0)
+// Source: screens/screen_home.xml
+// Schema: 0.3   Generator: u8g2gl 0.3.0   Target: default (SSD1322 256x64)
 
 #include "ui.hpp"
 
-static u8g2gl_label            lbl_station;
-static u8g2gl_scrolling_label  scrl_messages;
-static u8g2gl_clock            clk_sys;
-static wd_service_list         list_departures;
+static u8g2gl_scrolling_label  bar_title;    // 0  from component "status_bar"
+static u8g2gl_clock            bar_clock;    // 1  from component "status_bar"
+static u8g2gl_label            msg;          // 2
+
+static u8g2gl_obj* const ui_screen_home_objs[] = { &bar_title, &bar_clock, &msg };
+static const uint8_t ui_screen_home_parents[] = {
+    U8G2GL_NO_PARENT, U8G2GL_NO_PARENT, U8G2GL_NO_PARENT,
+};
 
 void ui_screen_home_init() {
-    lbl_station.set_coords(0, 0, 192, 11);
-    lbl_station.set_font(ui_font_small_9);
-    lbl_station.bind_text(&ui_subject_station_name);
+    bar_title.set_coords(0, 0, 204, 11);
+    bar_title.set_font(ui_font_small_9);
 
-    clk_sys.set_coords(216, 0, 40, 11);      // right="0" resolved for 256px target
-    clk_sys.set_font(ui_font_clock_small_7);
-    clk_sys.set_blink(true);
-    clk_sys.bind_time(&ui_subject_system_time);
+    bar_clock.set_coords(216, 0, 40, 11);        // right="0" → 256-40
+    bar_clock.set_font(ui_font_clock_small_7);
+    bar_clock.set_blink(true);
 
-    list_departures.set_coords(0, 13, 256, 38);
-    list_departures.set_font(ui_font_tall_12);
-    static const u8g2gl_column_def cols[] = {
-        { 24, U8G2GL_ALIGN_LEFT }, { 40, U8G2GL_ALIGN_LEFT }, { 120, U8G2GL_ALIGN_LEFT },
-        { 16, U8G2GL_ALIGN_CENTER }, { 55, U8G2GL_ALIGN_RIGHT },
-    };
-    list_departures.set_columns(cols, 5);
-    // ...
+    msg.set_coords(0, 16, 256, 12);              // right="0" → width 256
+    msg.set_font(ui_font_small_9);
+    msg.set_align(U8G2GL_ALIGN_CENTER);
+
+    // bindings registered last — §13.7
+    bar_title.bind_text(&ui_subject_station_name);
+    bar_clock.bind_time(&ui_subject_system_time);
+    msg.bind_text(&ui_subject_service_message);
 }
 
-void ui_screen_home_tick(uint32_t ms) {
-    lbl_station.tick(ms);
-    scrl_messages.tick(ms);
-    clk_sys.tick(ms);
-    list_departures.tick(ms);
+uint32_t ui_screen_home_tick(uint32_t ms) {
+    uint32_t next = U8G2GL_IDLE;
+    next = u8g2gl_min(next, bar_title.tick(ms));
+    next = u8g2gl_min(next, bar_clock.tick(ms));
+    next = u8g2gl_min(next, msg.tick(ms));
+    return next;
 }
 
 void ui_screen_home_render(U8G2& d) {
-    lbl_station.render(d);
-    d.drawHLine(0, 11, 256);          // static primitive, inlined
-    list_departures.render(d);
-    d.drawHLine(0, 51, 256);
-    scrl_messages.render(d);
-    clk_sys.render(d);
+    bar_title.render(d);
+    bar_clock.render(d);
+    d.drawHLine(0, 11, 256);      // demoted — unnamed, unbound, static (§13.5)
+    msg.render(d);
 }
 ```
 
-Note the 1:1 correspondence between XML tag and C++ class: `<u8g2gl_label>` instantiates `u8g2gl_label`. A reader can move between the XML and the generated code without a translation table, and the generator needs no name-mapping logic.
-
-Every generated file carries the source path, schema version, and generator version in its header, so a stale `generated/` directory is diagnosable from the artefact alone.
-
----
+Every mechanism appears here: component inlining with prefixed names, anchor resolution against the target width, static demotion of the separator, deadline aggregation ([D-15]), bindings registered last, and a header carrying versions but no timestamp.
 
 ## 14. Assets & Fonts
 
@@ -1167,7 +1363,7 @@ This is the mechanism by which "diagnostics are the product" (§1.2) actually pa
 
 ### 15.4 Schema Versioning
 
-`u8g2gl.xml` declares `schema="0.2"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
+`u8g2gl.xml` declares `schema="0.3"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
 
 ---
 
@@ -1441,4 +1637,6 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 | Frame timing | `bool ui_needs_render()` | `uint32_t ui_handler()` returning ms-until-next-work **[D-15]** | Copies LVGL 9's `lv_timer_handler` contract; a deadline lets the app sleep precisely, a bool does not |
 | Display discovery | Hand-typed target; no discovery | Queryable catalogue with identify / source / compare modes §5.2 | Real question is "I have this module" or "what should I buy", not "filter a list" |
 | Tool output | Human text only | `--json` contract on every command **[D-16]** | Agents and skills are first-class consumers, per §1.2 |
+| XML→code mapping | Pipeline sketch + one example | Normative contract §13 | It is the interface between generator and runtime, built by separate work packages |
+| Widget property knowledge | Undefined | Build-time `<api>` manifests **[D-17]** | Custom widgets stay first-class without a generator release, at no runtime cost |
 | Diagnostics, build, testing, budget | Absent | §15–§18 | These determine adoption and maintainability |
