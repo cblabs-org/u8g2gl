@@ -2,7 +2,7 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.5
+**Version**: 1.6
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
@@ -152,6 +152,19 @@ Build `modules/U8G2GLDisplay/` alongside the existing `modules/U8G2Display/`; mi
 
 Lower risk than when first posed, because [PD-2] moved the runtime out of foundation: what supersedes the legacy module is now a thin integration layer, not a whole framework.
 
+#### Freeze policy — when the legacy module stops being maintained
+
+Strangler-fig fails if both implementations stay live and drift. The transition is therefore dated to a landing, not left to judgement:
+
+| Trigger | `modules/U8G2Display` status |
+|---|---|
+| Today, until PR-05 lands | **Active.** Normal maintenance |
+| **PR-05 lands** (first board migrated) | **Frozen.** Correctness and security fixes only. No new features, no new boards, no new widgets. New work targets `modules/U8G2GLDisplay/` |
+| PR-10 lands (remaining boards migrated) | **Deprecated.** Compiles, warns, scheduled for removal |
+| departures-board-v3 advances `framework.lock` past PR-10 | **Removed** |
+
+The freeze is announced in the PR-05 description and enforced at review: a PR adding a feature to the legacy module is rejected and redirected. A bug fixed in both modules during the frozen window must reference the same issue in both commits, so divergence is visible in history rather than discovered later.
+
 ---
 
 ## 3. Repository Topology
@@ -265,6 +278,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 |---|---|---|---|
 | **PR-08** | both | Components (§6.3), custom widgets via `extends` (§6.4), collection API (§9) | PR-07 |
 | **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
+| **PR-08b** | U8G2GL | `<row>`/`<col>` stacking sugar (§7.2), *if real usage has shown the need* | PR-08 |
 
 ### Phase 3 — Consolidation and stretch
 

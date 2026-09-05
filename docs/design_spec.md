@@ -639,18 +639,18 @@ Supplying two of `{x, width, right}` determines the third. Supplying all three i
 <u8g2gl_label y="#header_height + 2" width="#screen_width - 8" />
 ```
 
-**Stacking sugar.** `<row>` and `<col>` place children adjacently by summing explicit sizes. No growth, no gaps-by-distribution — pure integer accumulation.
+**Stacking sugar — *Deferred to Phase 2*.** `<row>` and `<col>` would place children adjacently by summing explicit sizes — pure integer accumulation, no growth, no distributed remainders.
 
 ```xml
-<row y="0" height="11" gap="0">
+<row y="0" height="11" gap="2">          <!-- NOT in schema 0.3 -->
     <u8g2gl_scrolling_label width="192" ... />
     <u8g2gl_xbm            width="12"  ... />
-    <u8g2gl_clock          width="40"  ... />
 </row>
-<!-- generator emits x=0, x=192, x=204 -->
 ```
 
-`gap` is a literal pixel count inserted between children, not a distributed remainder. There is no `grow`, no `justify`, no `space-between`.
+*Why deferred:* the cost is not generator complexity — summing widths is trivial. It is **schema surface**. Once `<row>` ships, XML in the wild depends on it and changing it is a breaking change. The design is also not settled: it is unclear how `gap` should interact with an anchored child, or what `right="0"` means inside a row. Anchors, centring and constant arithmetic already solve the multi-target problem that motivated adding layout helpers at all (§7.3); stacking is convenience on top. Real usage should inform its design rather than the reverse.
+
+Anchors, centring and constant arithmetic are **in schema 0.3**. Stacking is not.
 
 ### 7.3 Multi-Target Portability
 
@@ -1156,6 +1156,10 @@ void ui_screen_home_render(U8G2& d);         // draw, document order
 
 `init` is ordered: construct → set properties → apply styles → register bindings → wire events → build the focus ring. Bindings are registered last so no observer fires against a partly configured object.
 
+**Every widget class is default-constructible, and is configured exclusively through setters.** The generator emits a default construction followed by setter calls; it never emits constructor arguments. This is a binding requirement on the runtime, and it exists to sever a dependency: without it the generator would need to know each class's constructor signature, which would couple the generator's development to the runtime's and defeat the purpose of this contract.
+
+**What the generator may not assume about the runtime:** the size or field layout of any class, base-class member offsets, allocation strategy, or anything about widget internals. It knows only class names, that they are default-constructible, their `<api>` manifests (§13.1), and that `u8g2gl_obj*` is a valid pointer to any of them. Everything else is the runtime's business and may change without regenerating.
+
 ### 13.8 Binding emission
 
 ```xml
@@ -1524,8 +1528,9 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 - Focus ring, input dispatch, screen navigation (§12)
 - `u8g2gl_button`, `u8g2gl_switch`, `focus_style`
-- Browser preview: file watcher, hot reload, the Phase 1 Wasm renderer in a page
-- Font and glyph browser
+- Browser preview — **minimal**: the Phase 1 Wasm renderer in a page, file watcher, hot reload on XML change. This is a thin harness over infrastructure that already exists after PR-06, not a web application.
+- `<row>` / `<col>` stacking sugar (§7.2), if real usage has shown the need
+- *Discretionary:* font and glyph browser. Genuinely useful, but it is the part of "preview" that is real web development rather than a wrapper, and it should be justified by demand rather than assumed.
 
 ### Phase 4 — *Speculative, not committed*
 

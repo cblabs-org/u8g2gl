@@ -157,3 +157,38 @@ it hand-rolls in C what C++ provides natively under [D-3].
 
 **All four programme decisions are now closed. PR-01 and PR-02 are unblocked and
 parallelisable.** No Tier-2 PA spawned yet.
+
+### 2026-09-05T11:21:27Z — External architecture review ingested
+Reviewer endorsed the v0.1→v0.3 corrections and the additions ([D-14] catalogue,
+[D-15] deadline return, [D-17] manifests, §13 contract, [D-16] --json). Four
+pushbacks; three accepted, one accepted-with-a-better-fix.
+
+1. **`<row>`/`<col>` deferred to Phase 2.** Accepted, but for a stronger reason
+   than offered: the cost is schema surface, not generator complexity. Summing
+   widths is trivial; the problem is that shipping `<row>` in schema 0.3 makes it
+   permanent, and its design is unsettled (how `gap` interacts with an anchored
+   child; what `right="0"` means inside a row). Anchors + arithmetic already solve
+   the multi-target motivation. Now PR-08b, conditional on demonstrated need.
+
+2. **Strangler-fig needs a maintenance-freeze date.** Accepted in full — a real
+   gap. Without it both modules take bug fixes and drift. Added a trigger table
+   to PD-4: frozen at PR-05 (first board migrated), deprecated at PR-10, removed
+   when v3 advances its lock. Enforced at review, with shared issue references
+   required for any fix landing in both during the frozen window.
+
+3. **§13 may be necessary but not sufficient for PR-03 ∥ PR-04** (constructor
+   signatures, base layout unspecified). Observation correct, proposed remedy
+   ("tight coordination") rejected — coordination manages a coupling that should
+   instead be severed. Added to §13.7: every widget is default-constructible and
+   configured solely via setters, so the generator never needs a constructor
+   signature; plus an explicit list of what the generator may not assume (class
+   size, field layout, base offsets, allocation, internals). The contract is now
+   sufficient and the two PRs are genuinely independent.
+
+4. **Phase 3 preview over-scoped.** Partially accepted with a sharper cut than
+   proposed. Hot reload is cheap and high-value over PR-06's existing Wasm
+   harness — kept. The font/glyph browser is the part that is real web
+   development — made discretionary, justified by demand rather than assumed.
+
+No change to any [D-n] decision; all four were refinements to scope, sequencing
+and contract completeness.
