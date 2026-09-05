@@ -125,3 +125,35 @@ CLI question was really a question about what the U8G2GL repo *is*.
 
 Remaining: PD-3 (ratify object model, blocks PR-01), PD-4 (legacy migration,
 blocks PR-05).
+
+### 2026-09-05T10:48:18Z — PD-3 and PD-4 resolved; all programme decisions closed
+PD-4: strangler-fig. PD-3: LVGL-parallel decomposition, **virtual base class**,
+flat runtime array with parent index.
+
+The PD-3 discussion changed my recommendation. I had proposed a monomorphic model
+(~12 B/object, no vptr) on efficiency grounds, since the generator already emits
+concrete calls. The human asked whether the extra cost was worth keeping dynamic
+creation open. Two things emerged:
+
+1. My own monomorphic proposal still needed dispatch for focus routing, and would
+   have supplied it as a generated per-screen function-pointer table — a hand-rolled
+   vtable. That is the same error as mirroring lv_obj_class in C++, inverted. Once
+   dispatch is needed anywhere, the language's mechanism is cleaner and no dearer.
+   This argued *for* the human's position, against my own recommendation.
+2. My quoted cost was wrong: ~60 B per screen, not 90. Corrected in the plan.
+
+Recorded an important boundary so a capability is not assumed that has not been
+bought: a vptr buys polymorphic dispatch and generic traversal, **not** dynamic
+creation. The latter also needs an allocator (pool, not heap, on these parts), a
+class registry, a runtime property mechanism ([D-17] deliberately removed one),
+mutable object/parent arrays where §13.3 emits static const, and lifetime rules.
+All five are additive later; the vptr is the one piece structurally hard to
+retrofit, which is what justifies paying now. The model is *ready for* dynamic
+creation, not *capable of* it.
+
+Also corrected two stale [A-2] rows: lv_obj_property withdrawn (superseded by
+[D-17]) and lv_obj_class reclassified from "Adopt" to "Reject the mechanism" —
+it hand-rolls in C what C++ provides natively under [D-3].
+
+**All four programme decisions are now closed. PR-01 and PR-02 are unblocked and
+parallelisable.** No Tier-2 PA spawned yet.

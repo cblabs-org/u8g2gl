@@ -6,8 +6,8 @@ Full rationale: [implementation_plan.md](../../../docs/implementation_plan.md)
 ## Gating decisions (human)
 | ID | Decision | Blocks | Recommendation |
 |---|---|---|---|
-| PD-1 | Licence: MIT vs Apache-2.0 | all | Apache-2.0 (match foundation) |
-| PD-2 | CLI home: standalone vs foundation/tools | PR-02 | Standalone in U8G2GL, npm-published |
+| ~~PD-1~~ | Licence | — | **RESOLVED: MIT** |
+| ~~PD-2~~ | CLI home | — | **RESOLVED: U8G2GL repo ships runtime + CLI; generated code in app repo** |
 | PD-3 | Ratify core object model (A-2 LVGL parallel, A-3 flat runtime) | PR-00/01 | As proposed |
 | PD-4 | Legacy U8G2Display migration | PR-05 | Strangler-fig, retire at PR-10 |
 

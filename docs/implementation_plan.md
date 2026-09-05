@@ -2,7 +2,7 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.4
+**Version**: 1.5
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
@@ -31,9 +31,9 @@ LVGL's core is a well-factored answer to the same problem, arrived at over a dec
 
 | LVGL 9 core | U8G2GL equivalent | Status |
 |---|---|---|
-| `lv_obj` — base object | `u8g2gl_obj` — coords, flags, class ptr, parent | **Adopt** |
-| `lv_obj_class` — `base_class`, ctor/dtor, `event_cb`, **property table** | `u8g2gl_obj_class` | **Adopt** — this is what makes `extends` (§6.4) and XML property codegen work |
-| `lv_obj_property` — generic get/set by ID | property descriptors per class | **Adopt** — the codegen substrate |
+| `lv_obj` — base object | `u8g2gl_obj` — vptr, int16 coords, flags, parent index (~16 B) | **Adopt, reduced** |
+| `lv_obj_class` — `base_class`, ctor/dtor, `event_cb`, property table | plain C++ inheritance + virtuals | **Reject the mechanism** — it hand-rolls in C what C++ gives natively ([D-3]) |
+| `lv_obj_property` — generic get/set by ID | build-time `<api>` manifests ([D-17]) | **Withdrawn** — descriptor without dispatch; no runtime table |
 | `lv_observer` — subjects and observers | subject system (§8) | **Adopt** |
 | `lv_group` — encoder/keypad focus | focus group (§12.2) | **Adopt, and rename**: the spec's `<focus_ring>` is LVGL's group |
 | `lv_obj_style` | reduced monochrome style set (§10) | **Adopt, reduced** |
@@ -98,11 +98,53 @@ This is a stronger answer than the original question anticipated: it also correc
 
 Generated code is never published from U8G2GL; it belongs to the app that owns the screens, as LVGL Pro's output belongs to the app. A git submodule is the pragmatic pre-1.0 choice for both runtime and CLI — it avoids npm publishing on every iteration — with npm as the release channel once the schema stabilises.
 
-### PD-3 · Ratify the core object model — blocks PR-01
+### ~~PD-3~~ · Core object model — **RESOLVED**
 
-[A-2] and [A-3] are architecture, and they are mine to propose but yours to ratify before they are cast in code. Specifically: the LVGL-parallel decomposition, and the flat-runtime/build-time-tree model.
+**Ratified: LVGL-parallel decomposition, virtual base class, flat runtime array with parent index.**
 
-This supersedes v1.0's PD-3 (widget naming aliases), which existed only because that revision planned to build on the legacy widgets. With [A-1] that question dissolves — new code gets the spec's naming ([D-12]/[D-13]) directly, and the legacy question becomes migration, not naming.
+#### What was corrected during the decision
+
+[A-2] originally listed `lv_obj_property` as "Adopt". [D-17] superseded that — properties are build-time `<api>` manifests, and no runtime property table exists. That row is withdrawn.
+
+More significantly, the reasoning was sharpened: **LVGL's `lv_obj_class` — `base_class`, constructor chaining, virtual `event_cb` — exists because LVGL is C and must hand-roll inheritance and dispatch.** [D-3] chose C++, which provides both natively. The stance is therefore: **adopt LVGL's decomposition — which concerns exist and how they separate — and reject its mechanisms wherever C++ or the generator supplies them more cheaply.** Mirroring `lv_obj_class` in C++ would be reimplementing inheritance on top of inheritance.
+
+#### Why a virtual base rather than a monomorphic one
+
+A fully monomorphic model was considered: the generator already emits concrete calls (§13.12 emits `bar_title.render(d)`, not a call through a base pointer), so `render`/`tick` could be non-virtual and inlinable, at roughly 12 bytes per object.
+
+It was rejected because **it still needs dispatch for focus** — routing a press to whichever object holds it — and would have supplied that as a generated per-screen function-pointer table. That is a hand-rolled vtable: worse than the language's, and the same error as mirroring `lv_obj_class`, merely inverted. Once dispatch is needed anywhere, the built-in mechanism is cleaner and no more expensive.
+
+#### Measured cost
+
+| | Per object (32-bit) | 15-widget screen |
+|---|---|---|
+| `lv_obj_t` at LVGL defaults | ~44 B + heap-allocated `spec_attr` | ~660 B + heap |
+| **U8G2GL `u8g2gl_obj`** — vptr 4, `int16` coords 8, flags 1, parent index 1, pad | **~16 B** | **~240 B, no heap** |
+| Monomorphic alternative (rejected) | ~12 B | ~180 B |
+
+The virtual base costs roughly **60 bytes of RAM per screen** over the monomorphic option, plus a few hundred bytes of flash for the vtables. It costs no ROM-ability: widgets carry mutable state (scroll offset, blink phase) and live in RAM regardless.
+
+#### What the vptr does and does not buy
+
+**Does:** polymorphic dispatch and generic traversal — framework-level `for each obj: tick()` rather than generated per-screen loops, uniform focus dispatch, and user code able to hold a `u8g2gl_obj*` meaningfully. This is also the part that is *structurally* hard to retrofit, which is the argument for paying now.
+
+**Does not: dynamic object creation.** That additionally requires an allocator (a fixed pool, more likely than a heap, on these parts), a class registry to construct by type at runtime, a runtime property mechanism — [D-17] deliberately removed one — mutable object and parent arrays where §13.3 currently emits `static const`, and lifetime rules. The vptr is perhaps a tenth of that work.
+
+All five are **additive later**. The model is therefore *ready for* dynamic creation, not *capable of* it, and the plan should not assume the capability exists until those pieces are built.
+
+#### Object tree — flat array with parent index
+
+| | Real tree (LVGL) | Flat array + parent index ✅ |
+|---|---|---|
+| Cost | Child vector per node: pointer, count, heap allocation | 1 byte per object |
+| Render | Recursive pointer-chasing | Linear scan, cache-friendly; document order *is* draw order |
+| "Iterate my children" | Cheap | Requires a scan |
+| "Am I visible / what is my clip" | Walk up | Walk up — identical |
+| Runtime restructuring | Supported | Not supported |
+
+The deciding question is which direction traversal actually goes. Under [D-4] rendering follows document order and never needs "iterate my children"; it needs "am I visible" and "what is my clip", and **both walk upward**, over a depth of 2–4 in practice. The flat array serves the queries we make and declines to pay for those we do not.
+
+---
 
 ### ~~PD-4~~ · Legacy migration — **RESOLVED: strangler-fig**
 
@@ -209,11 +251,11 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends | Blocked by |
 |---|---|---|---|---|
-| **PR-01** | **U8G2GL** | Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | PD-3 |
+| **PR-01** | **U8G2GL** | *(unblocked)* Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
 | **PR-02** | **U8G2GL** | CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
 | **PR-03** | **U8G2GL** | Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Behaviour ported from the legacy widgets, rewritten to the model. Each ships its `<api>` manifest | PR-01 | — |
 | **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, component inlining, build-time layout ([D-7]), identifier mangling, demotion | PR-02, PR-03 | — |
-| **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | PD-4 |
+| **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
 | **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
 
