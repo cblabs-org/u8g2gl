@@ -2,7 +2,7 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.3
+**Version**: 1.4
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
@@ -88,17 +88,27 @@ Settled by the LVGL precedent (§3). U8G2GL ships the framework — runtime libr
 
 This is a stronger answer than the original question anticipated: it also corrects the PR ledger, which had wrongly placed the object model and widget set inside foundation.
 
+**The three-way split, mirroring LVGL exactly:**
+
+| Artefact | Lives in | Consumed as |
+|---|---|---|
+| Runtime C++ library | U8G2GL repo (MIT) | PlatformIO/CMake dependency, or git submodule during development |
+| CLI / editor tooling | U8G2GL repo (MIT) | npm (`npx u8g2gl`) for release; git submodule while pre-1.0 |
+| XML source + **generated code** | The **application** repo — `uidesign/<board>/u8g2gl/` | A local PlatformIO library, exactly as `lvglpro/` produces `UIDesign` |
+
+Generated code is never published from U8G2GL; it belongs to the app that owns the screens, as LVGL Pro's output belongs to the app. A git submodule is the pragmatic pre-1.0 choice for both runtime and CLI — it avoids npm publishing on every iteration — with npm as the release channel once the schema stabilises.
+
 ### PD-3 · Ratify the core object model — blocks PR-01
 
 [A-2] and [A-3] are architecture, and they are mine to propose but yours to ratify before they are cast in code. Specifically: the LVGL-parallel decomposition, and the flat-runtime/build-time-tree model.
 
 This supersedes v1.0's PD-3 (widget naming aliases), which existed only because that revision planned to build on the legacy widgets. With [A-1] that question dissolves — new code gets the spec's naming ([D-12]/[D-13]) directly, and the legacy question becomes migration, not naming.
 
-### PD-4 · Migration strategy for legacy `U8G2Display` — blocks PR-05
+### ~~PD-4~~ · Legacy migration — **RESOLVED: strangler-fig**
 
-The new module cannot land big-bang: `modules/U8G2Display` is consumed by six system boards *and* by departures-board-v3 through a pinned `framework.lock`.
+Build `modules/U8G2GLDisplay/` alongside the existing `modules/U8G2Display/`; migrate the six system boards one PR at a time; retire the legacy module once nothing depends on it. No flag day, and departures-board-v3 is never stranded on its pinned `framework.lock`.
 
-**Recommended: strangler-fig.** Build the optimal architecture as a new `modules/U8G2GL/`; migrate system boards to it one PR at a time; retire `modules/U8G2Display` once nothing depends on it. End state is a single module with the right architecture, reached without a flag day and without stranding the pinned downstream.
+Lower risk than when first posed, because [PD-2] moved the runtime out of foundation: what supersedes the legacy module is now a thin integration layer, not a whole framework.
 
 ---
 
