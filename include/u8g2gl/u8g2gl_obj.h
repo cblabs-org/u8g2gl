@@ -38,8 +38,8 @@ public:
     uint8_t get_parent_index() const;
 
     // --- Dirty tracking ---
-    // mark_dirty() is intended to set a screen-level flag (WO5),
-    // but for now, sets the per-object DIRTY flag as a placeholder.
+    // mark_dirty() sets the per-object DIRTY flag and gates
+    // the frame at screen level via u8g2gl_mark_dirty() (WO5).
     void mark_dirty();
     bool is_dirty() const;
     void clear_dirty();

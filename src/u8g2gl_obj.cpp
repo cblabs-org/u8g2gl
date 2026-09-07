@@ -1,4 +1,5 @@
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_core.h"
 
 void u8g2gl_obj::set_coords(int16_t x, int16_t y, int16_t w, int16_t h) {
     x_ = x;
@@ -68,7 +69,8 @@ uint8_t u8g2gl_obj::get_parent_index() const {
 }
 
 void u8g2gl_obj::mark_dirty() {
-    set_flag(U8G2GL_FLAG_DIRTY);
+    flags_ |= U8G2GL_FLAG_DIRTY;
+    u8g2gl_mark_dirty();   // gate the frame
 }
 
 bool u8g2gl_obj::is_dirty() const {

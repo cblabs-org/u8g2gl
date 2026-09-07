@@ -13,6 +13,7 @@ add_library(u8g2gl STATIC
     src/u8g2gl_tree.cpp
     src/u8g2gl_subject.cpp
     src/u8g2gl_style.cpp
+    src/u8g2gl_core.cpp
 )
 
 target_include_directories(u8g2gl PUBLIC
@@ -25,6 +26,9 @@ target_compile_options(u8g2gl PRIVATE
 )
 
 if(U8G2GL_BUILD_TESTS)
+    target_include_directories(u8g2gl PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
+    )
     enable_testing()
 
     include(FetchContent)

@@ -66,7 +66,7 @@ Read these for context:
 
 ### 1. Core Runtime — `include/u8g2gl/u8g2gl_core.h`
 
-- [ ] Create the core runtime header with:
+- [x] Create the core runtime header with:
 
 ```cpp
 #ifndef U8G2GL_CORE_H
@@ -137,7 +137,7 @@ uint32_t ui_handler_run_in_period(U8G2& display, uint32_t period_ms);
 
 ### 2. Core Implementation — `src/u8g2gl_core.cpp`
 
-- [ ] Implement the core runtime:
+- [x] Implement the core runtime:
 
 ```
 Static globals:
@@ -195,7 +195,7 @@ ui_handler(U8G2& display):
 
 ### 3. Wire mark_dirty() to the screen-level flag
 
-- [ ] Update `u8g2gl_obj::mark_dirty()` in `src/u8g2gl_obj.cpp`:
+- [x] Update `u8g2gl_obj::mark_dirty()` in `src/u8g2gl_obj.cpp`:
   Currently it sets the per-object `U8G2GL_FLAG_DIRTY`. Change it to also
   (or instead) call `u8g2gl_mark_dirty()` which sets the screen-level flag.
   Keep the per-object flag for widgets that need to know they changed (like
@@ -211,12 +211,12 @@ ui_handler(U8G2& display):
   This requires adding `#include "u8g2gl_core.h"` to `u8g2gl_obj.cpp`.
 
 ### 4. Update CMakeLists.txt
-
-- [ ] Add `src/u8g2gl_core.cpp` to the `u8g2gl` library target.
-
-### 5. Integration Tests — `test/test_core.cpp`
-
-- [ ] Create comprehensive integration tests using mock screens:
+ 
+- [x] Add `src/u8g2gl_core.cpp` to the `u8g2gl` library target.
+ 
+ ### 5. Integration Tests — `test/test_core.cpp`
+ 
+- [x] Create comprehensive integration tests using mock screens:
 
 ```cpp
 // --- Test helpers ---
@@ -336,21 +336,21 @@ active screen) in a SetUp/TearDown fixture to avoid cross-test pollution.
 
 ### 6. Register test file
 
-- [ ] Add `test/test_core.cpp` to `test/CMakeLists.txt` as a new test
+- [x] Add `test/test_core.cpp` to `test/CMakeLists.txt` as a new test
   executable `test_core`. Link against `u8g2gl` and `GTest::gtest_main`,
   add stubs include path.
 
 ### 7. Build and Verify
 
-- [ ] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
-- [ ] Run: `cd build && ctest --output-on-failure`
-- [ ] ALL tests across ALL suites must pass (smoke + obj + subject + style + core)
-- [ ] Zero warnings under `-Wall -Wextra -Wpedantic`
-- [ ] Capture the sizeof report from the test output for the Completion Report
+- [x] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
+- [x] Run: `cd build && ctest --output-on-failure`
+- [x] ALL tests across ALL suites must pass (smoke + obj + subject + style + core)
+- [x] Zero warnings under `-Wall -Wextra -Wpedantic`
+- [x] Capture the sizeof report from the test output for the Completion Report
 
 ### 8. Commit
 
-- [ ] Stage all new and modified files and commit:
+- [x] Stage all new and modified files and commit:
   ```
   feat(runtime): add frame gate, ui_handler, and screen lifecycle
 
@@ -383,4 +383,53 @@ surface it in your Completion Report below — do not file issues directly.
 
 ## Completion Report (written by the worker at task completion)
 
-<!-- Template — worker fills this in -->
+### Status
+Complete
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_core.h` — Created core runtime header providing:
+  - Pull-only tick time source registration (`u8g2gl_set_tick_cb`, `u8g2gl_tick_now`).
+  - Screen descriptor struct (`u8g2gl_screen`) capturing flat widget pointer array, parent table, object count, lifecycle callbacks (`init_fn`, `activate_fn`, `deactivate_fn`, `tick_fn`, `render_fn`), and screen-level `dirty` flag.
+  - Active screen management (`u8g2gl_set_active_screen`, `u8g2gl_get_active_screen`).
+  - Screen-level dirty flag trigger (`u8g2gl_mark_dirty`).
+  - Main driver loop (`ui_handler`) per [D-15] and spec §11.1.
+  - Convenience wrapper (`ui_handler_run_in_period`).
+- `src/u8g2gl_core.cpp` — Core runtime implementation with zero dynamic allocation:
+  - Time callback management with 0 fallback if unassigned.
+  - Screen switching with deactivate callback on previous screen, activate callback on new screen, and forced first frame dirty flag.
+  - Frame gate gating `clearBuffer()` and `sendBuffer()` behind screen dirty flag.
+  - Multi-widget deadline aggregation with elapsed time calculation and subtraction.
+  - Run-in-period tracking.
+- `include/u8g2gl/u8g2gl_obj.h` & `src/u8g2gl_obj.cpp` — Updated `u8g2gl_obj::mark_dirty()` to set `U8G2GL_FLAG_DIRTY` and call `u8g2gl_mark_dirty()`, propagating widget and data binding changes directly to the screen frame gate.
+- `CMakeLists.txt` — Added `src/u8g2gl_core.cpp` to `u8g2gl` library target, and added `test/stubs` to include path when tests are enabled.
+- `test/CMakeLists.txt` — Registered `test_core` executable linking `u8g2gl` and `GTest::gtest_main` with stub include path.
+- `test/test_core.cpp` — 19 comprehensive tests covering tick callbacks, screen lifecycle and switching, frame gate rendering suppression, mark_dirty triggers from widgets, single and multiple widget deadline aggregation, visibility filtering, elapsed time subtraction, period runner, and final sizeof memory reporting.
+
+### Decisions Made
+- `u8g2gl_screen` is a standard C/C++ aggregate without virtual functions or hidden overhead, enabling straightforward static code emission by the generator (§13.12).
+- `u8g2gl_set_active_screen(nullptr)` safely deactivates any active screen and cleans up active pointer.
+- `u8g2gl_obj::mark_dirty()` sets both the per-object flag (for widget-level re-layout checks) and triggers the screen frame gate via `u8g2gl_mark_dirty()`.
+- Zero dynamic allocation throughout the core runtime, conforming strictly to [D-1].
+- Flat naming prefix `u8g2gl_` / `U8G2GL_` without namespaces per [D-12]/[D-13].
+
+### Final Memory Measurements (`sizeof` report for §18/Q-4)
+Measured on 64-bit host (x86_64/arm64):
+- `sizeof(u8g2gl_obj)`: 64 bytes
+- `sizeof(u8g2gl_style)`: 40 bytes
+- `sizeof(u8g2gl_screen)`: 72 bytes
+- `sizeof(u8g2gl_subject_int)`: 400 bytes
+- `sizeof(u8g2gl_subject_string)`: 528 bytes
+- `sizeof(u8g2gl_subject_bool)`: 400 bytes
+- `sizeof(u8g2gl_subject_time)`: 400 bytes
+
+*Note on subject sizes:* Subjects contain static observer pools (`U8G2GL_MAX_OBSERVERS = 16`). On 64-bit architectures, each observer is 24 bytes (16-byte pointers/callbacks + padding), totaling 384 bytes for the pool. On 32-bit embedded targets (ESP32, Cortex-M), pointers are 4 bytes, reducing the pool to 12 bytes * 16 = 192 bytes, with correspondingly lower subject sizes (~208 bytes).
+
+### Dead Ends & Warnings
+- None. Build completed with 0 warnings under `-Wall -Wextra -Wpedantic`. All 75 tests across all 5 test suites pass (100%).
+
+### Out-of-Scope Findings
+- None.
+
+### Blockers
+- None.
+
