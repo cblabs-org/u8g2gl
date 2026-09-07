@@ -3,6 +3,8 @@
 
 #include "u8g2gl_types.h"
 #include "u8g2gl_tree.h"
+#include "u8g2gl_config.h"
+#include "u8g2gl_subject.h"
 
 // Forward declaration of U8G2
 class U8G2;
@@ -10,7 +12,7 @@ class U8G2;
 class u8g2gl_obj {
 public:
     u8g2gl_obj() = default;
-    virtual ~u8g2gl_obj() = default;
+    virtual ~u8g2gl_obj();
 
     // --- Coordinates (set by generated init code) ---
     void set_coords(int16_t x, int16_t y, int16_t w, int16_t h);
@@ -41,6 +43,24 @@ public:
     bool is_dirty() const;
     void clear_dirty();
 
+    // --- Data Binding (§8, §13.8) ---
+    void bind_text(u8g2gl_subject_int* subject, const char* fmt = nullptr);
+    void bind_text(u8g2gl_subject_string* subject);
+
+    void bind_flag_if_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_gt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_lt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
+
+    void bind_flag_if_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag);
+
+    void* get_bound_text_subject() const;
+    const char* get_bound_text_fmt() const;
+    u8g2gl_subject_type_t get_bound_text_type() const;
+
     // --- Virtual lifecycle (overridden by concrete widgets in PR-03) ---
     virtual uint32_t tick(uint32_t now_ms);    // returns next deadline, default U8G2GL_IDLE
     virtual void render(U8G2& display);         // default: no-op
@@ -55,6 +75,9 @@ protected:
     int16_t h_ = 0;
     uint8_t flags_ = 0;
     uint8_t parent_index_ = U8G2GL_NO_PARENT;
+
+private:
+    bool add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_binding_op_t op, int32_t ref_value, uint8_t flag);
 };
 
 #endif // U8G2GL_OBJ_H

@@ -90,3 +90,257 @@ void u8g2gl_obj::render(U8G2& /*display*/) {
 void u8g2gl_obj::render_animation_update(U8G2& /*display*/, uint32_t /*now_ms*/) {
     // Default: no-op
 }
+
+// --- Data Binding System (§8, §13.8) ---
+
+struct u8g2gl_binding_desc {
+    u8g2gl_obj* obj = nullptr;
+    void* subject = nullptr;
+    const char* fmt = nullptr;
+    int32_t ref_value = 0;
+    uint8_t flag = 0;
+    u8g2gl_binding_op_t op = U8G2GL_BIND_OP_EQ;
+    u8g2gl_subject_type_t subject_type = U8G2GL_SUBJECT_INT;
+    bool is_text = false;
+    bool active = false;
+};
+
+static u8g2gl_binding_desc s_binding_pool[U8G2GL_MAX_TOTAL_BINDINGS] = {};
+
+static void u8g2gl_evaluate_binding(u8g2gl_binding_desc* b) {
+    if (!b || !b->active || !b->obj) {
+        return;
+    }
+    bool condition_met = false;
+    if (b->subject_type == U8G2GL_SUBJECT_INT) {
+        auto* s = static_cast<u8g2gl_subject_int*>(b->subject);
+        int32_t val = s->get();
+        switch (b->op) {
+            case U8G2GL_BIND_OP_EQ: condition_met = (val == b->ref_value); break;
+            case U8G2GL_BIND_OP_NOT_EQ: condition_met = (val != b->ref_value); break;
+            case U8G2GL_BIND_OP_GT: condition_met = (val > b->ref_value); break;
+            case U8G2GL_BIND_OP_LT: condition_met = (val < b->ref_value); break;
+        }
+    } else if (b->subject_type == U8G2GL_SUBJECT_BOOL) {
+        auto* s = static_cast<u8g2gl_subject_bool*>(b->subject);
+        int32_t val = s->get() ? 1 : 0;
+        switch (b->op) {
+            case U8G2GL_BIND_OP_EQ: condition_met = (val == b->ref_value); break;
+            case U8G2GL_BIND_OP_NOT_EQ: condition_met = (val != b->ref_value); break;
+            case U8G2GL_BIND_OP_GT: condition_met = (val > b->ref_value); break;
+            case U8G2GL_BIND_OP_LT: condition_met = (val < b->ref_value); break;
+        }
+    }
+
+    if (condition_met) {
+        b->obj->set_flag(b->flag);
+    } else {
+        b->obj->clear_flag(b->flag);
+    }
+    b->obj->mark_dirty();
+}
+
+static void u8g2gl_on_binding_flag_change(void* user_data) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(user_data);
+    u8g2gl_evaluate_binding(b);
+}
+
+static void u8g2gl_on_text_binding_change(void* user_data) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(user_data);
+    if (b && b->active && b->obj) {
+        b->obj->mark_dirty();
+    }
+}
+
+static u8g2gl_binding_desc* u8g2gl_allocate_binding(u8g2gl_obj* obj) {
+    if (!obj) {
+        return nullptr;
+    }
+    uint8_t count = 0;
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == obj) {
+            count++;
+        }
+    }
+    if (count >= U8G2GL_MAX_BINDINGS_PER_OBJ) {
+        return nullptr;
+    }
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (!s_binding_pool[i].active) {
+            s_binding_pool[i] = u8g2gl_binding_desc{};
+            s_binding_pool[i].obj = obj;
+            s_binding_pool[i].active = true;
+            return &s_binding_pool[i];
+        }
+    }
+    return nullptr;
+}
+
+u8g2gl_obj::~u8g2gl_obj() {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this) {
+            s_binding_pool[i].active = false;
+            s_binding_pool[i].obj = nullptr;
+        }
+    }
+}
+
+bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_binding_op_t op, int32_t ref_value, uint8_t flag) {
+    if (!subject) {
+        return false;
+    }
+    u8g2gl_binding_desc* slot = u8g2gl_allocate_binding(this);
+    if (!slot) {
+        return false;
+    }
+
+    slot->obj = this;
+    slot->subject = subject;
+    slot->subject_type = type;
+    slot->op = op;
+    slot->ref_value = ref_value;
+    slot->flag = flag;
+    slot->is_text = false;
+    slot->active = true;
+
+    bool added = false;
+    if (type == U8G2GL_SUBJECT_INT) {
+        added = static_cast<u8g2gl_subject_int*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
+    } else if (type == U8G2GL_SUBJECT_BOOL) {
+        added = static_cast<u8g2gl_subject_bool*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
+    }
+
+    if (!added) {
+        slot->active = false;
+        slot->obj = nullptr;
+        return false;
+    }
+
+    u8g2gl_evaluate_binding(slot);
+    return true;
+}
+
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_EQ, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_gt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_GT, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_LT, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag) {
+    bind_flag_if_eq(subject, ref_value ? 1 : 0, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag) {
+    add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
+}
+
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag) {
+    bind_flag_if_not_eq(subject, ref_value ? 1 : 0, flag);
+}
+
+void u8g2gl_obj::bind_text(u8g2gl_subject_int* subject, const char* fmt) {
+    if (!subject) {
+        return;
+    }
+    u8g2gl_binding_desc* slot = nullptr;
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
+            slot = &s_binding_pool[i];
+            break;
+        }
+    }
+    if (!slot) {
+        slot = u8g2gl_allocate_binding(this);
+    }
+    if (!slot) {
+        return;
+    }
+
+    slot->obj = this;
+    slot->subject = subject;
+    slot->fmt = fmt;
+    slot->subject_type = U8G2GL_SUBJECT_INT;
+    slot->is_text = true;
+    slot->active = true;
+
+    if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
+        slot->active = false;
+        slot->obj = nullptr;
+        return;
+    }
+    mark_dirty();
+}
+
+void u8g2gl_obj::bind_text(u8g2gl_subject_string* subject) {
+    if (!subject) {
+        return;
+    }
+    u8g2gl_binding_desc* slot = nullptr;
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
+            slot = &s_binding_pool[i];
+            break;
+        }
+    }
+    if (!slot) {
+        slot = u8g2gl_allocate_binding(this);
+    }
+    if (!slot) {
+        return;
+    }
+
+    slot->obj = this;
+    slot->subject = subject;
+    slot->fmt = nullptr;
+    slot->subject_type = U8G2GL_SUBJECT_STRING;
+    slot->is_text = true;
+    slot->active = true;
+
+    if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
+        slot->active = false;
+        slot->obj = nullptr;
+        return;
+    }
+    mark_dirty();
+}
+
+void* u8g2gl_obj::get_bound_text_subject() const {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
+            return s_binding_pool[i].subject;
+        }
+    }
+    return nullptr;
+}
+
+const char* u8g2gl_obj::get_bound_text_fmt() const {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
+            return s_binding_pool[i].fmt;
+        }
+    }
+    return nullptr;
+}
+
+u8g2gl_subject_type_t u8g2gl_obj::get_bound_text_type() const {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
+            return s_binding_pool[i].subject_type;
+        }
+    }
+    return U8G2GL_SUBJECT_INT;
+}
