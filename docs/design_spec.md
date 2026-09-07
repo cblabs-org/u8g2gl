@@ -44,11 +44,19 @@ It brings the declarative, component-based workflow of [LVGL Pro](https://lvgl.i
 | Data flows controller→display via imperative push calls | Reactive subject binding for scalars |
 | Layouts cannot be authored or reviewed by tooling | Schema-validated XML — machine-readable, diffable, LLM-authorable |
 
-### 1.2 The Primary Thesis
+### 1.2 The Primary Thesis — the editor is the point
 
-The strongest argument for this project is not the market gap. It is that **a schema-validated declarative format is a dramatically better authoring target than hand-written pixel math** — for humans reviewing diffs, for tooling, and especially for LLM-assisted authoring. A model can be handed a schema, asked to produce a screen, and the result can be validated and rendered without flashing hardware. That loop does not exist today for monochrome UI.
+**U8G2GL exists to make a visual designer possible for monochrome U8G2 displays.** Everything else — the schema, the generator, the runtime, the preview — is infrastructure serving that end.
 
-Design consequence: **schema quality and diagnostic quality are the product.** They outrank the visual editor and are prioritised accordingly in §20.
+This needs stating plainly because the obvious alternative is genuinely strong: *if the goal were simply "produce U8G2 UI code", a language model could emit C++ against the widget library directly.* No XML, no schema, no generator. The declarative format would be a pointless round trip.
+
+XML earns its place for one reason a model cannot supply: **an editor needs a document it can read back.** Generated C++ is write-only in practice — nothing can reliably parse it, modify one coordinate, and rewrite it preserving intent. A declarative project format is round-trippable: load → present → manipulate → save, losslessly, repeatedly. That property is the whole justification for the format's existence.
+
+**Why an editor rather than natural language.** These are pixel-exact designs on 128×64 panels where a widget being one pixel out is visible and wrong. That work is direct manipulation — nudge, align, compare, adjust — and describing it in prose is slower and less precise than doing it. Language is good at *what goes on the screen*; it is poor at *exactly where*. The editor is not a convenience layer over an AI workflow; it is the correct interface for the task.
+
+**What AI authoring actually is here:** a beneficiary, not the purpose. A schema good enough to drive an editor is also good enough for a model to target, and the diagnostics that help a human help a model too. That is a welcome second-order effect of building the format properly — not the reason to build it.
+
+**Consequence for priorities.** The schema must be an *editor's document model* first and a compiler input second. Where those pull apart — round-trip fidelity, preserving authored order and comments, carrying presentation metadata the compiler ignores — the editor's needs win, because the compiler can always discard what it does not need and an editor cannot invent what was never stored.
 
 ### 1.3 Honest Cost Statement
 
@@ -81,7 +89,7 @@ Three operating rules follow.
 
 **Deferral needs a trigger, not a vibe.** A deferred feature records what evidence would justify building it, so the decision is revisited on fact. The pattern: *build it when the friction it removes appears across three or more real screens.* Without a trigger, deferral becomes permanent by inattention, which is a different failure from deciding not to build something.
 
-This principle is descriptive of decisions already taken — page mode ([D-2]), the fractal composition model ([D-6]), a layout engine ([D-7]), zero-copy collections (§9.3), the reduced style set (§10), and the visual editor (§20 Phase 4) were all cut or deferred on these grounds. Stating it makes those coherent rather than incidental, and lets future contributors apply the same test without asking.
+This principle is descriptive of decisions already taken — page mode ([D-2]), the fractal composition model ([D-6]), a layout engine ([D-7]), zero-copy collections (§9.3) and the reduced style set (§10) were all cut or deferred on these grounds. It governs *features within* the product; it does not license cutting the product's purpose (§1.2). Stating it makes those coherent rather than incidental, and lets future contributors apply the same test without asking.
 
 **The measure:** a typical screen should be 15 lines of XML. If typical screens approach 100, the design has failed regardless of what the feature list says.
 
@@ -1514,7 +1522,7 @@ This is settled now rather than after release, because the prefix appears in eve
 
 ## 20. Phased Delivery
 
-Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to Phase 1, because it is the test harness (§17.2), and the visual editor moves out of the committed plan entirely.
+Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to Phase 1, because it is both the test harness (§17.2) and the editor's rendering engine — building it early serves two committed purposes.
 
 ### Phase 1 — Prove the Loop
 
@@ -1543,21 +1551,21 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 - Image pipeline: XBM and PNG→XBM
 - The full departures-board screen set retargeted
 
-### Phase 3 — Interaction & Preview
+### Phase 3 — Interaction & the Editor
 
-- Focus ring, input dispatch, screen navigation (§12)
+**The editor is the programme's destination (§1.2), not an optional extra.** It is third in sequence only because it cannot be built before the schema (Phase 1) and the pixel-exact renderer (Phase 1, §17.2) exist — not because it is discretionary.
+
+- Focus groups, input dispatch, screen navigation (§12)
 - `u8g2gl_button`, `u8g2gl_switch`, `focus_style`
-- Browser preview — **minimal**: the Phase 1 Wasm renderer in a page, file watcher, hot reload on XML change. This is a thin harness over infrastructure that already exists after PR-06, not a web application.
-- `<row>` / `<col>` stacking sugar (§7.2), if real usage has shown the need
-- *Discretionary:* font and glyph browser. Genuinely useful, but it is the part of "preview" that is real web development rather than a wrapper, and it should be justified by demand rather than assumed.
+- **Visual designer** — a web application: canvas with pixel-exact Wasm rendering, direct manipulation (select, drag, nudge by keyboard, align, snap), a property panel driven by `<api>` manifests ([D-17]), a component/widget palette, and lossless XML round-trip. Specified separately in [editor_design.md](editor_design.md).
+- Hot reload for text-editor workflows, sharing the editor's renderer
+- Font and glyph browser
 
-### Phase 4 — *Speculative, not committed*
+### Phase 4 — Beyond the first editor release
 
-- Drag-and-drop visual editor
 - BDF pixel editor
 - Additional built-in widgets driven by demonstrated demand
-
-*Rationale for demoting the editor:* it is a multi-month effort serving an audience that may not exist (see [docs/concept.md](concept.md) §Market Reality). The Phase 3 hot-reload preview delivers most of the practical benefit — see the layout without flashing — for a small fraction of the cost. Building the editor should require evidence of demand, not enthusiasm.
+- `<row>` / `<col>` stacking sugar (§7.2), if usage has shown the need
 
 ---
 
@@ -1602,7 +1610,7 @@ U8G2's own `LICENSE` sets the pattern to copy: the code is 2-clause BSD, followe
 
 This is a reason to make `<builtin>` the documented default path. Several hundred fonts are available with zero pipeline, zero packaging ([Q-2] does not apply to them), and zero licensing thought required beyond what the user already accepted by linking U8G2.
 
-**`<bdf>` fonts are the user's asset and the user's call.** When a user supplies their own BDF — hand-drawn, exported from FontForge, or produced by the speculative Phase 4 pixel editor — the pipeline compiles it into their firmware. That is exactly the workflow `bdfconv` already supports, and the licensing position is unchanged by U8G2GL doing the invoking. Provenance recording (§14.1) exists to make the user's own compliance checkable, not because U8G2GL incurs an obligation.
+**`<bdf>` fonts are the user's asset and the user's call.** When a user supplies their own BDF — hand-drawn, exported from FontForge, or produced by the Phase 4 pixel editor — the pipeline compiles it into their firmware. That is exactly the workflow `bdfconv` already supports, and the licensing position is unchanged by U8G2GL doing the invoking. Provenance recording (§14.1) exists to make the user's own compliance checkable, not because U8G2GL incurs an obligation.
 
 Summarised in the shipped `LICENSE`:
 

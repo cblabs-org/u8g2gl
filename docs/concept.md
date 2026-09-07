@@ -21,40 +21,30 @@ Concretely:
 3. A CLI that validates and compiles XML to C++
 4. A font and asset pipeline (BDF, XBM, PNG→XBM)
 5. A pixel-exact browser preview
-6. A visual editor — *if, and only if, demand materialises*
+6. **A visual editor** — the destination the rest of it exists to enable
 
 ---
 
 ## 2. The Thesis
 
-There are two arguments for this project. One is commonly made and weak. The other is rarely made and strong.
+### 2.1 The point is the editor
 
-### 2.1 The weak argument: "there's a gap in the market"
+Monochrome UI design is pixel work. On a 128×64 panel a widget one pixel out of place is visible and wrong, and correcting it is direct manipulation — nudge, align, compare — not description. **U8G2GL exists to make a visual designer possible for these displays.** The schema, generator, runtime and preview are infrastructure serving that.
 
-It is true that nobody has built a declarative-to-codegen pipeline for U8G2. It is not obviously a good reason to build one.
+The alternative deserves stating because it is genuinely strong: if the goal were only "produce U8G2 UI code", a language model could emit C++ directly against a widget library. No XML, no schema, no generator. The declarative format would be a pointless round trip.
 
-U8G2 is roughly a decade old with thousands of projects built on it. In an ecosystem that mature and that active, a persistently empty niche is at least as likely to be evidence of low demand as of opportunity. Two data points support the pessimistic reading:
+**XML earns its place because an editor needs a document it can read back.** Generated C++ is write-only — nothing reliably parses it, changes one coordinate, and rewrites it preserving intent. A declarative project format round-trips losslessly, which is what makes visual editing possible at all. That is the format's justification, and it is the reason [design_spec.md §1.2](design_spec.md) makes the schema an editor's document model first and a compiler input second.
 
-- **Lopaka** (~1700 stars) is the most successful tool in the space and is a *drawing tool*, not a framework. Its popularity is evidence about what U8G2 users want: pixels to code, quickly. Not architecture.
-- **PixelUI** — a component-based C++ framework with view stacks and animation — has paused development. **UiUiUi** remains niche. Both offered structure; neither found a large audience.
+AI-assisted authoring is a welcome second-order effect — a schema good enough to drive an editor is also good enough for a model to target — but it is a beneficiary, not the purpose.
 
-The plausible explanation is that developers who need multi-screen navigation, reactive data, and component reuse have already moved to an ESP32 with a colour TFT and LVGL, for about $8. The users who remain on monochrome are disproportionately those whose UI is simple enough not to need a framework.
+### 2.2 The market reading, honestly
 
-That leaves a genuine but small addressable audience: people who need monochrome *specifically* — for power, sunlight readability, aesthetics, or an existing panel — **and** have UI complex enough to justify a framework. Industrial HMI, e-paper dashboards, and departure boards.
+Nobody has built a declarative-to-codegen pipeline with a visual designer for U8G2. Two readings of that:
 
-**This should not be presented as a market opportunity.** It should be treated as a project built primarily for its author, with the possibility of wider use as upside.
+- **Lopaka** (~1700 stars) is the most successful tool in the space and is a *drawing tool* — it generates flat procedural code with no bindings, components, multi-screen support or reuse, and no project format to round-trip. Its popularity shows appetite for visual U8G2 tooling; its limits show what is missing.
+- **PixelUI** paused development and **UiUiUi** remains niche. Both offered structure without visual tooling; neither found an audience. That is at least consistent with the reading that *structure alone* is not what people want — visual tooling is.
 
-### 2.2 The strong argument: declarative XML is a vastly better authoring target
-
-A schema-validated declarative format is better than hand-written pixel math for:
-
-- **Review.** A layout change is a readable diff, not a wall of coordinate arithmetic buried in a constructor.
-- **Tooling.** Validation, preview, and asset compilation all become possible because the layout is data.
-- **LLM-assisted authoring.** This is the decisive one. A model can be given the schema, asked for a screen, and the result validated and rendered without touching hardware. Compare hand-writing `drawStr(216, 0, buf)` and hoping — the feedback loop is a firmware flash away, and a model has no way to check its own work.
-
-That loop does not exist for monochrome UI today, and the author already works this way — this repository ships an `lvgl-pro-expert` skill for exactly that purpose on the colour side.
-
-**Consequence for priorities:** if AI authoring is the primary value, then *schema quality and diagnostic quality are the product*. A model that gets a precise, suggestive error message converges in one iteration; one that gets `Error: invalid XML` does not converge at all. This is why [design_spec.md §15](design_spec.md) treats diagnostics as a feature and why the visual editor was demoted out of the committed plan.
+The addressable audience is still genuinely small: people who need monochrome specifically and have UI complex enough to justify a framework. Industrial HMI, e-paper dashboards, departure boards. This should be treated as a project built primarily for its author, with wider use as upside — but the thing being built for the author is the editor, not the pipeline underneath it.
 
 ---
 
@@ -174,7 +164,7 @@ Per §2.1, the addressable audience is small and the modal U8G2 user wants a dra
 The failure mode is replicating LVGL Pro's sophistication for a domain that does not need it. Three structural defences:
 
 1. A Phase 1 exit criterion with an explicit stop condition ([design_spec.md §20](design_spec.md))
-2. The visual editor demoted to speculative Phase 4
+2. `<row>`/`<col>` and other unproven features deferred with explicit triggers ([design_spec.md §1.5](design_spec.md)) — a rule that governs features *within* the product, never its purpose
 3. A *Deferred* label used explicitly, so omissions are recorded decisions rather than oversights
 
 A screen should be 15 lines of XML. If a typical screen approaches 100, the design has failed.

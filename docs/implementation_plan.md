@@ -2,7 +2,7 @@
 
 **Programme-level plan. Chief Architect tier.**
 
-**Version**: 1.6
+**Version**: 1.7
 **Date**: September 2026
 **Companion documents**: [design_spec.md](design_spec.md) (v0.3, what to build) · [concept.md](concept.md) (why)
 **Programme workspace**: `.agents/skills/principal-architect-workspace/`
@@ -327,7 +327,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | R-5 | Cross-repo drift between CLI and runtime | Medium | Generator version in generated files (§13.2); runtime rejects major mismatch (§16) |
 | R-6 | `bdfconv` packaging (Q-2) blocks fonts | Medium | Wasm route proven by `layoutsim`; `<builtin>` needs no pipeline (§22.1) |
 | R-7 | Downstream v3 stranded on the pinned lock | Medium | v3 only moves at PR-11; legacy module survives until PR-10 |
-| R-8 | Scope creep toward the visual editor | Medium | Editor stays out of the committed plan |
+| R-8 | Schema frozen in PR-02 without editor needs, forcing a breaking 0.4 | **High** | Editor design (`editor_design.md`) must land before PR-02 freezes the schema — round-trip fidelity and presentation metadata are editor-first requirements (§1.2) |
 
 ---
 
