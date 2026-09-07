@@ -113,7 +113,7 @@ Five work orders, strictly serialised (each stacks on the previous).
 
 ### WO5 — Frame Gate + ui_handler() + Tick Scheduling
 
-- **[ ] [wo5-frame-gate](wo5-frame-gate/WORKORDER.md)**
+- **[x] [wo5-frame-gate](wo5-frame-gate/WORKORDER.md)** ✅ Complete — `4168285`
   Implement the frame gate (§11.2): dirty flag gates the frame, not individual
   widgets. `ui_handler()` per [D-15]: ticks all widgets, renders if dirty,
   returns ms-to-next-work (minimum of all widget deadlines). `U8G2GL_IDLE`
@@ -276,3 +276,47 @@ cascade/merge, style setters on `u8g2gl_obj`, `apply_style()` + `get_resolved_st
 Measured sizes: `sizeof(u8g2gl_style) = 40 B`, `sizeof(u8g2gl_obj) = 64 B` on 64-bit
 (expected increase from embedding style member). 12 new tests, 56/56 total passing.
 Commit `9333492`. No issues surfaced. Proceeding to WO5 (final).
+
+### 2026-09-07T22:50:00Z — WO5 complete — PR-01 DONE
+Worker delivered: `u8g2gl_core.h/cpp` with frame gate, `ui_handler()`, deadline
+aggregation, pull-only tick callback, `u8g2gl_screen` struct, screen lifecycle
+(activate/deactivate/force-dirty-first-frame), `mark_dirty()` wired to screen-level
+flag, `ui_handler_run_in_period()` convenience. 19 new tests, 75/75 total passing.
+Commit `4168285`.
+
+**Final sizeof report (64-bit host):**
+| Type | Size (B) | 32-bit estimate |
+|---|---|---|
+| `u8g2gl_obj` | 64 | ~48 |
+| `u8g2gl_style` | 40 | ~28 |
+| `u8g2gl_screen` | 72 | ~36 |
+| `u8g2gl_subject_int` | 400 | ~200 |
+| `u8g2gl_subject_string` | 528 | ~280 |
+| `u8g2gl_subject_bool` | 400 | ~200 |
+| `u8g2gl_subject_time` | 400 | ~200 |
+
+Subject sizes dominated by inline observer arrays (16 slots × 24B/slot on 64-bit).
+Acceptable for typical projects with 5–10 subjects. Shared pool alternative noted
+for future optimisation if RAM budget tightens.
+
+**All 5 work orders complete. No issues surfaced across any WO. Zero warnings
+throughout. Branch `u8g2gl-runtime/wo5-frame-gate` is the stack tip (PR head).
+31 files changed, 5029 insertions.**
+
+### Project Wrap-Up
+
+**Architectural outcome:** The U8G2GL runtime core delivers a clean, heap-free
+C++ framework with virtual base class dispatch (PD-3), flat object arrays with
+parent-index hierarchy (§13.3), four typed subjects with static observer pools
+(§8), bitmask-based style cascade (§10), and a frame-gated render loop (§11/[D-15]).
+All §13 contract surfaces are implemented with correct signatures.
+
+**Lessons:**
+1. Embedding `u8g2gl_style` in `u8g2gl_obj` increased sizeof from 16→64B on 64-bit
+   but is the right trade-off vs indirection for embedded.
+2. Per-subject inline observer arrays are large but simple; a shared pool would
+   save RAM at the cost of complexity — defer to when §18 budget analysis runs.
+3. The `__has_include` cascade for U8G2 header resolution (worker-originated)
+   is a good portable pattern worth keeping.
+
+**Unresolved items:** None. All §13 contract surfaces matched. No spec gaps found.
