@@ -74,7 +74,7 @@ Five work orders, strictly serialised (each stacks on the previous).
 
 ### WO2 — Base Object + Flat Array + Parent Index
 
-- **[ ] [wo2-base-object](wo2-base-object/WORKORDER.md)**
+- **[x] [wo2-base-object](wo2-base-object/WORKORDER.md)** ✅ Complete — `6da0afa`
   Implement `u8g2gl_obj` base class: vptr, `int16_t` x/y/w/h, flags byte
   (hidden, dirty, disabled), `uint8_t` parent index, `set_coords()`,
   `set_parent_index()`, visibility/clip walks. Implement the screen-level
@@ -252,3 +252,12 @@ core types/config headers with all U8G2GL constants and enums, U8G2 stub with
 tracking counters, 4 smoke tests — all passing, zero warnings under
 `-Wall -Wextra -Wpedantic`. Commits `f66c65c` + `eb0192d`.
 No issues surfaced. Proceeding to WO2.
+
+### 2026-09-07T22:30:00Z — WO2 complete
+Worker delivered: `u8g2gl_obj` base class (24 B on 64-bit / 16 B on 32-bit target),
+`u8g2gl_tree.h` with visibility/clip walks, `u8g2gl_state_saver` RAII guard,
+`u8g2gl_partial_refresh` with correct tile maths (§11.4). 14 new tests all passing.
+U8G2 stub extended with `getDrawColor()`/`getFont()` getters for state saver.
+Worker used `__has_include` cascade for U8G2 header resolution — portable across
+real U8G2 and stub. Commits `6da0afa` + `7ebb6bd`.
+No issues surfaced. Proceeding to WO3.
