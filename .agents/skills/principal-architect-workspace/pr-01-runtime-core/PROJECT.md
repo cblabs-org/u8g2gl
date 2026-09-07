@@ -86,7 +86,7 @@ Five work orders, strictly serialised (each stacks on the previous).
 
 ### WO3 — Subject / Observer System
 
-- **[ ] [wo3-subjects](wo3-subjects/WORKORDER.md)**
+- **[x] [wo3-subjects](wo3-subjects/WORKORDER.md)** ✅ Complete — `43d9957`
   Implement `u8g2gl_subject` with `int`, `string`, `bool`, `time` variants.
   Copy-on-set string with declared `max_len`, fixed buffer, no heap. Observer
   registration (static pool, declared capacity). `notify()` on value change.
@@ -261,3 +261,11 @@ U8G2 stub extended with `getDrawColor()`/`getFont()` getters for state saver.
 Worker used `__has_include` cascade for U8G2 header resolution — portable across
 real U8G2 and stub. Commits `6da0afa` + `7ebb6bd`.
 No issues surfaced. Proceeding to WO3.
+
+### 2026-09-07T22:37:00Z — WO3 complete
+Worker delivered: four subject classes (int/string/bool/time), copy-on-set string
+with max_len cap, static observer arrays per subject, conditional flag bindings
+(eq/not_eq/gt/lt) and bind_text() on u8g2gl_obj matching §13.8 API exactly.
+Binding descriptors in a global static pool (`U8G2GL_MAX_TOTAL_BINDINGS`) keeping
+sizeof(u8g2gl_obj) unchanged at 24 B. 26 new tests, 44/44 total passing.
+Commits `43d9957` + `746eeb3`. No issues surfaced. Proceeding to WO4.
