@@ -59,7 +59,7 @@ Read these for context:
 
 ### 1. `u8g2gl_obj` Base Class — `include/u8g2gl/u8g2gl_obj.h`
 
-- [ ] Create the header with the base class. Target layout (~16 bytes on 32-bit):
+- [x] Create the header with the base class. Target layout (~16 bytes on 32-bit):
 
 ```cpp
 class u8g2gl_obj {
@@ -123,7 +123,7 @@ protected:
 
 ### 2. `u8g2gl_obj` Implementation — `src/u8g2gl_obj.cpp`
 
-- [ ] Implement all methods. Trivial — most are one-liners. The key ones:
+- [x] Implement all methods. Trivial — most are one-liners. The key ones:
   - `set_coords`: assign all four
   - `set_flag` / `clear_flag` / `has_flag`: bitwise ops on `flags_`
   - `set_hidden(true)` → `set_flag(U8G2GL_FLAG_HIDDEN)`, etc.
@@ -134,7 +134,7 @@ protected:
 
 ### 3. Visibility & Clip Helpers — in `u8g2gl_obj.h` or a separate `u8g2gl_tree.h`
 
-- [ ] Implement free functions that operate on the flat array + parent table:
+- [x] Implement free functions that operate on the flat array + parent table:
 
 ```cpp
 // Check if an object is effectively visible (own flag AND all ancestors)
@@ -165,7 +165,7 @@ u8g2gl_rect u8g2gl_rect_intersect(const u8g2gl_rect& a, const u8g2gl_rect& b);
 
 ### 4. `u8g2gl_state_saver` — `include/u8g2gl/u8g2gl_state_saver.h`
 
-- [ ] RAII guard per §11.3. Saves and restores U8G2 state around widget render:
+- [x] RAII guard per §11.3. Saves and restores U8G2 state around widget render:
 
 ```cpp
 class u8g2gl_state_saver {
@@ -195,7 +195,7 @@ this around every widget's `render()` call — widgets never construct it themse
 
 ### 5. `u8g2gl_partial_refresh` — in `u8g2gl_obj.h` or `u8g2gl_helpers.h`
 
-- [ ] Implement the tile-aligned partial refresh helper per §11.4:
+- [x] Implement the tile-aligned partial refresh helper per §11.4:
 
 ```cpp
 inline void u8g2gl_partial_refresh(U8G2& d, int x, int y, int w, int h) {
@@ -211,12 +211,12 @@ This is the escape hatch helper. Note the comment per spec: the naive formula
 
 ### 6. Update CMakeLists.txt
 
-- [ ] Add `src/u8g2gl_obj.cpp` to the `u8g2gl` library target's source list.
+- [x] Add `src/u8g2gl_obj.cpp` to the `u8g2gl` library target's source list.
   If you create additional `.cpp` files (e.g. for tree helpers), add those too.
 
 ### 7. Tests — `test/test_obj.cpp`
 
-- [ ] Create comprehensive unit tests:
+- [x] Create comprehensive unit tests:
 
 ```
 TEST(Obj, DefaultConstruction)
@@ -282,21 +282,21 @@ TEST(PartialRefresh, NonAligned)
 
 ### 8. Register test file
 
-- [ ] Add `test/test_obj.cpp` to `test/CMakeLists.txt` as a new test executable
+- [x] Add `test/test_obj.cpp` to `test/CMakeLists.txt` as a new test executable
   (or add to the existing one — a separate executable `test_obj` is preferred for
   isolation). Link against `u8g2gl` and `GTest::gtest_main`, add stubs include path.
 
 ### 9. Build and Verify
 
-- [ ] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
-- [ ] Run: `cd build && ctest --output-on-failure`
-- [ ] All previous smoke tests AND all new tests must pass
-- [ ] Zero warnings under `-Wall -Wextra -Wpedantic`
-- [ ] Print `sizeof(u8g2gl_obj)` in the test output (use `RecordProperty` or `printf`)
+- [x] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
+- [x] Run: `cd build && ctest --output-on-failure`
+- [x] All previous smoke tests AND all new tests must pass
+- [x] Zero warnings under `-Wall -Wextra -Wpedantic`
+- [x] Print `sizeof(u8g2gl_obj)` in the test output (use `RecordProperty` or `printf`)
 
 ### 10. Commit
 
-- [ ] Stage all new and modified files and commit:
+- [x] Stage all new and modified files and commit:
   ```
   feat(runtime): add u8g2gl_obj base class, tree helpers, state saver
 
@@ -322,6 +322,35 @@ Principal Architect will triage and file them under the correct author identity.
 
 ---
 
-## Completion Report (written by the worker at task completion)
+## Completion Report
+<!-- Written by the worker at task completion -->
 
-<!-- Template — worker fills this in -->
+### Status
+complete
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_obj.h` — `u8g2gl_obj` virtual base class with int16_t coordinates (`x`, `y`, `w`, `h`), flags byte (`U8G2GL_FLAG_HIDDEN`, `U8G2GL_FLAG_DIRTY`, `U8G2GL_FLAG_DISABLED`), parent index, virtual lifecycle (`tick`, `render`, `render_animation_update`).
+- `src/u8g2gl_obj.cpp` — member implementations for `u8g2gl_obj` (coordinates getters/setters, flag operations, dirty tracking, default no-op lifecycle).
+- `include/u8g2gl/u8g2gl_tree.h` & `src/u8g2gl_tree.cpp` — `u8g2gl_rect` struct, `u8g2gl_rect_intersect` utility, `u8g2gl_is_effectively_visible` upward ancestor visibility walk, `u8g2gl_effective_clip` upward bounding box intersection walk.
+- `include/u8g2gl/u8g2gl_state_saver.h` — `u8g2gl_state_saver` RAII guard saving and restoring U8G2 draw color and font.
+- `include/u8g2gl/u8g2gl_helpers.h` — `u8g2gl_partial_refresh` inline tile math helper per §11.4.
+- `test/stubs/U8G2lib.h` — added `getDrawColor() const`, `getFont() const`, and call/parameter tracking for `updateDisplayArea()`.
+- `CMakeLists.txt` — added `src/u8g2gl_obj.cpp` and `src/u8g2gl_tree.cpp` to `u8g2gl` library target.
+- `test/CMakeLists.txt` — added `test_obj` test target linking against `u8g2gl` and `GTest::gtest_main`.
+- `test/test_obj.cpp` — 14 GoogleTest unit tests verifying default construction, coordinate setters/getters, flags, dirty tracking, sizeof constraint, parent index, lifecycle no-ops, effective visibility, effective clipping, rectangle intersection, state saving/restoring, and tile-aligned/non-aligned partial refresh.
+
+### Decisions Made
+- Organized tree helpers into `u8g2gl_tree.h` / `src/u8g2gl_tree.cpp` and partial refresh into `u8g2gl_helpers.h` for modular separation. `u8g2gl_obj.h` includes `u8g2gl_tree.h` while keeping `u8g2gl_obj.h` free from requiring a complete definition of `U8G2` (using a forward declaration `class U8G2;`).
+- Added `#if __has_include(<U8G2lib.h>)` with `<U8G2lib.h>` preceding `<U8g2lib.h>` to avoid case-insensitive filename warnings (`-Wnonportable-include-path`) on macOS hosts.
+- `sizeof(u8g2gl_obj)` measured at exactly 24 bytes on 64-bit host architecture (`vptr`: 8, coords: 8, flags: 1, parent: 1, padding: 6), corresponding directly to 16 bytes on 32-bit embedded targets (`vptr`: 4, coords: 8, flags: 1, parent: 1, padding: 2).
+
+### Dead Ends & Warnings
+- Inclusion of `u8g2gl_helpers.h` in `u8g2gl_obj.h` caused member access errors into incomplete `U8G2` during `u8g2gl` library compilation because `src/u8g2gl_obj.cpp` does not include U8G2 stub headers. Kept `u8g2gl_helpers.h` independent so callers with U8G2 access include it.
+- Resolved `-Wnonportable-include-path` warnings when including `U8G2lib.h` under strict `-Wall -Wextra -Wpedantic`.
+
+### Out-of-Scope Findings
+(none)
+
+### Blockers
+(none)
+
