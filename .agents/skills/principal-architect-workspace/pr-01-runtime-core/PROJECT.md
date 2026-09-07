@@ -100,7 +100,7 @@ Five work orders, strictly serialised (each stacks on the previous).
 
 ### WO4 — Style System
 
-- **[ ] [wo4-styles](wo4-styles/WORKORDER.md)**
+- **[x] [wo4-styles](wo4-styles/WORKORDER.md)** ✅ Complete — `9333492`
   Implement the reduced monochrome style set (§10). A `u8g2gl_style` struct
   holding the 10 properties, with per-property "set" flags for cascade/merge.
   Style application: a named style block can be applied to an object, with
@@ -269,3 +269,10 @@ with max_len cap, static observer arrays per subject, conditional flag bindings
 Binding descriptors in a global static pool (`U8G2GL_MAX_TOTAL_BINDINGS`) keeping
 sizeof(u8g2gl_obj) unchanged at 24 B. 26 new tests, 44/44 total passing.
 Commits `43d9957` + `746eeb3`. No issues surfaced. Proceeding to WO4.
+
+### 2026-09-07T22:42:00Z — WO4 complete
+Worker delivered: `u8g2gl_style` struct with 10 properties per §10, bitmask-based
+cascade/merge, style setters on `u8g2gl_obj`, `apply_style()` + `get_resolved_style()`.
+Measured sizes: `sizeof(u8g2gl_style) = 40 B`, `sizeof(u8g2gl_obj) = 64 B` on 64-bit
+(expected increase from embedding style member). 12 new tests, 56/56 total passing.
+Commit `9333492`. No issues surfaced. Proceeding to WO5 (final).
