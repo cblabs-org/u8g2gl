@@ -56,3 +56,22 @@ target_compile_options(test_subject PRIVATE
 )
 
 gtest_discover_tests(test_subject)
+
+add_executable(test_style
+    test_style.cpp
+)
+
+target_include_directories(test_style PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_style PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_style PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_style)

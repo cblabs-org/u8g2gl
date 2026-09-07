@@ -55,7 +55,7 @@ Read these for context:
 
 ### 1. Style Struct — `include/u8g2gl/u8g2gl_style.h`
 
-- [ ] Create the style header. The style struct holds 10 properties per §10,
+- [x] Create the style header. The style struct holds 10 properties per §10,
   plus a bitmask indicating which properties have been explicitly set (for
   cascade/merge — an unset property does not override a previously applied one):
 
@@ -125,7 +125,7 @@ struct u8g2gl_style {
 
 ### 2. Style Implementation — `src/u8g2gl_style.cpp`
 
-- [ ] Implement all methods:
+- [x] Implement all methods:
   - Each `set_*` method: assign the value AND set the corresponding bit in `set_mask`
   - `has(prop)`: `return (set_mask & prop) != 0;`
   - `merge_from(other)`: for each property, if `other.has(prop)`, copy the value and
@@ -134,7 +134,7 @@ struct u8g2gl_style {
 
 ### 3. Style Application on u8g2gl_obj
 
-- [ ] Add style support to `u8g2gl_obj`. The generated code (§13.7) applies styles
+- [x] Add style support to `u8g2gl_obj`. The generated code (§13.7) applies styles
   during `init()`. The base class needs:
 
   Add to `u8g2gl_obj.h`:
@@ -177,11 +177,11 @@ struct u8g2gl_style {
 
 ### 4. Update CMakeLists.txt
 
-- [ ] Add `src/u8g2gl_style.cpp` to the `u8g2gl` library target.
+- [x] Add `src/u8g2gl_style.cpp` to the `u8g2gl` library target.
 
 ### 5. Tests — `test/test_style.cpp`
 
-- [ ] Create unit tests:
+- [x] Create unit tests:
 
 ```
 --- Style Struct ---
@@ -248,20 +248,20 @@ TEST(ObjStyle, SizeUnchanged)
 
 ### 6. Register test file
 
-- [ ] Add `test/test_style.cpp` to `test/CMakeLists.txt` as a new test
+- [x] Add `test/test_style.cpp` to `test/CMakeLists.txt` as a new test
   executable `test_style`. Link against `u8g2gl` and `GTest::gtest_main`.
 
 ### 7. Build and Verify
 
-- [ ] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
-- [ ] Run: `cd build && ctest --output-on-failure`
-- [ ] All previous tests AND all new style tests must pass
-- [ ] Zero warnings under `-Wall -Wextra -Wpedantic`
-- [ ] Print `sizeof(u8g2gl_obj)` and `sizeof(u8g2gl_style)` in the test output
+- [x] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
+- [x] Run: `cd build && ctest --output-on-failure`
+- [x] All previous tests AND all new style tests must pass
+- [x] Zero warnings under `-Wall -Wextra -Wpedantic`
+- [x] Print `sizeof(u8g2gl_obj)` and `sizeof(u8g2gl_style)` in the test output
 
 ### 8. Commit
 
-- [ ] Stage all new and modified files and commit:
+- [x] Stage all new and modified files and commit:
   ```
   feat(runtime): add reduced monochrome style system with cascade
 
@@ -291,6 +291,34 @@ document it accurately for PR-03/PR-04.
 
 ---
 
-## Completion Report (written by the worker at task completion)
+## Completion Report
+<!-- Written by the worker at task completion -->
 
-<!-- Template — worker fills this in -->
+### Status
+complete
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_style.h` — Defined property bitmask enum `u8g2gl_style_prop_t` and `u8g2gl_style` struct with the 10 reduced monochrome style properties per spec §10 (`font`, `draw_color`, `invert`, `padding`, `border`, `radius`, `align`, `truncate`, `font_mode`, `bitmap_mode`), tracking mask `set_mask`, setters marking set bits, query `has()`, cascade merge `merge_from()`, and `clear()`.
+- `src/u8g2gl_style.cpp` — Implementation of `u8g2gl_style` methods: each setter assigns value and marks the property bit in `set_mask`; `has()` checks `set_mask & prop`; `merge_from()` cascades all set properties from source style onto destination style while leaving unset properties intact; `clear()` resets values to defaults and `set_mask = 0`.
+- `include/u8g2gl/u8g2gl_obj.h` & `src/u8g2gl_obj.cpp` — Added `apply_style()`, `get_resolved_style()`, individual inline style override setters (`set_font`, `set_draw_color`, `set_invert`, `set_padding`, `set_border`, `set_radius`, `set_align`, `set_truncate`, `set_font_mode`, `set_bitmap_mode`), and protected member `u8g2gl_style style_` on `u8g2gl_obj`. `apply_style()` delegates to `style_.merge_from(style)` and inline setters delegate to `style_.set_*()`, establishing correct style cascade order per spec §13.7.
+- `CMakeLists.txt` — Added `src/u8g2gl_style.cpp` to `u8g2gl` library target.
+- `test/CMakeLists.txt` — Added `test_style` test executable linking against `u8g2gl` and `GTest::gtest_main`.
+- `test/test_style.cpp` — 12 unit tests covering style struct default state, flag setting on `set_*`, all 10 properties, `clear()`, cascade merge overwrites set properties, cascade merge preserves unset properties, empty base merge, multi-merge accumulation and override, object style application, inline override precedence over named styles, multiple style stacking on objects, and sizeof measurement reporting.
+- `test/test_obj.cpp` — Updated `Obj.SizeOf` test expectation to accommodate the embedded `u8g2gl_style` member (increased from 24B pre-style base to 64B on 64-bit platforms).
+
+### Decisions Made
+- Embedded `u8g2gl_style style_` as a direct member of `u8g2gl_obj` as specified in WO4 instructions. While this increases `sizeof(u8g2gl_obj)` from 24 bytes to 64 bytes on 64-bit systems (40 bytes style struct), it provides deterministic, zero-allocation storage for resolved object styles and direct inline override resolution.
+- Style properties are public fields in `u8g2gl_style` for fast direct access by renderers (PR-03) while setter methods mutate values and atomically update `set_mask` for cascade correctness.
+- Zero namespaces used, conforming strictly to `u8g2gl_` / `U8G2GL_` flat symbol prefixes per [D-12]/[D-13].
+
+### Dead Ends & Warnings
+- None. Build completed with zero warnings under `-Wall -Wextra -Wpedantic`. All 56 tests across all 4 test targets passed (100%).
+
+### Out-of-Scope Findings
+- Measured sizes on 64-bit host:
+  - `sizeof(u8g2gl_style) = 40 bytes`
+  - `sizeof(u8g2gl_obj) = 64 bytes`
+  (The increase in `sizeof(u8g2gl_obj)` from 24B base was noted and expected in the workorder).
+
+### Blockers
+- None.

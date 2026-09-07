@@ -91,7 +91,8 @@ TEST(Obj, TickReturnsIdle) {
 TEST(Obj, SizeOf) {
     std::cout << "[          ] sizeof(u8g2gl_obj) = " << sizeof(u8g2gl_obj) << " bytes" << std::endl;
     RecordProperty("sizeof_u8g2gl_obj", std::to_string(sizeof(u8g2gl_obj)));
-    EXPECT_LE(sizeof(u8g2gl_obj), 24u);
+    // Size increased from 24B base due to embedded u8g2gl_style member (WO4)
+    EXPECT_LE(sizeof(u8g2gl_obj), 64u);
 }
 
 TEST(Obj, ParentIndex) {

@@ -12,6 +12,7 @@ add_library(u8g2gl STATIC
     src/u8g2gl_obj.cpp
     src/u8g2gl_tree.cpp
     src/u8g2gl_subject.cpp
+    src/u8g2gl_style.cpp
 )
 
 target_include_directories(u8g2gl PUBLIC

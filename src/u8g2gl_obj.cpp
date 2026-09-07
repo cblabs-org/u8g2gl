@@ -91,6 +91,56 @@ void u8g2gl_obj::render_animation_update(U8G2& /*display*/, uint32_t /*now_ms*/)
     // Default: no-op
 }
 
+// --- Style (§10, §13.7) ---
+
+void u8g2gl_obj::apply_style(const u8g2gl_style& style) {
+    style_.merge_from(style);
+}
+
+const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
+    return style_;
+}
+
+void u8g2gl_obj::set_font(const uint8_t* font) {
+    style_.set_font(font);
+}
+
+void u8g2gl_obj::set_draw_color(u8g2gl_color_t c) {
+    style_.set_draw_color(c);
+}
+
+void u8g2gl_obj::set_invert(bool v) {
+    style_.set_invert(v);
+}
+
+void u8g2gl_obj::set_padding(int16_t p) {
+    style_.set_padding(p);
+}
+
+void u8g2gl_obj::set_border(bool b) {
+    style_.set_border(b);
+}
+
+void u8g2gl_obj::set_radius(int16_t r) {
+    style_.set_radius(r);
+}
+
+void u8g2gl_obj::set_align(u8g2gl_align_t a) {
+    style_.set_align(a);
+}
+
+void u8g2gl_obj::set_truncate(bool t) {
+    style_.set_truncate(t);
+}
+
+void u8g2gl_obj::set_font_mode(u8g2gl_font_mode_t m) {
+    style_.set_font_mode(m);
+}
+
+void u8g2gl_obj::set_bitmap_mode(u8g2gl_bitmap_mode_t m) {
+    style_.set_bitmap_mode(m);
+}
+
 // --- Data Binding System (§8, §13.8) ---
 
 struct u8g2gl_binding_desc {
