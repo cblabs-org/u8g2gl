@@ -7,6 +7,11 @@ class U8G2 {
 public:
     int clear_count = 0;
     int send_count = 0;
+    int update_display_area_count = 0;
+    int last_tx = 0;
+    int last_ty = 0;
+    int last_tw = 0;
+    int last_th = 0;
     uint8_t last_draw_color = 1;
     const uint8_t* last_font = nullptr;
 
@@ -35,8 +40,16 @@ public:
     void drawRFrame(int, int, int, int, int) {}
     void drawButtonUTF8(int, int, uint8_t, int, int, const char*) {}
 
+    uint8_t getDrawColor() const {
+        return last_draw_color;
+    }
+
     void setDrawColor(uint8_t c) {
         last_draw_color = c;
+    }
+
+    const uint8_t* getFont() const {
+        return last_font;
     }
 
     void setFont(const uint8_t* font) {
@@ -73,7 +86,13 @@ public:
         return 0;
     }
 
-    void updateDisplayArea(int, int, int, int) {}
+    void updateDisplayArea(int tx, int ty, int tw, int th) {
+        last_tx = tx;
+        last_ty = ty;
+        last_tw = tw;
+        last_th = th;
+        update_display_area_count++;
+    }
 };
 
 #endif // U8G2LIB_H
