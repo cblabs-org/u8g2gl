@@ -67,6 +67,23 @@ LVGL Pro can claim near-zero overhead because it generates calls into a runtime 
 3. **Build-time compilation.** XML → C++. No runtime interpretation.
 4. **Monochrome-native.** No colour, gradients, or opacity. XOR mode and inversion are first-class.
 5. **Honest about boundaries.** Where the framework cannot help (GPIO, debounce, data lifetimes), it says so and hands off cleanly rather than pretending.
+6. **Lite by design.** U8G2GL implements a deliberate *subset* of LVGL Pro's surface. Simple is the target, not a compromise on the way to complete — see §1.5.
+
+### 1.5 Lite by Design — the deferral rule
+
+The domain is 5–20 elements on a 128×64 panel, not 100+ on a colour TFT. A framework sized for the latter would be wrong here, so **omission is the default and a feature earns inclusion by demonstrated need, never anticipated need.**
+
+Three operating rules follow.
+
+**Schema complexity is expensive; generator complexity is cheap.** A generator pass can be rewritten in an afternoon and nobody outside the project notices. A schema element, once authors have written XML against it, is permanent — changing it breaks their files and any tooling that reads them. When weighing a feature, weigh its *schema* cost, not its implementation cost. `<row>`/`<col>` was deferred on exactly this basis (§7.2): trivial to build, permanent once shipped.
+
+**Unsettled semantics defer, they do not get guessed.** If a feature's edge cases cannot be answered from the design — `<row>`'s behaviour with a hidden child could only be answered by either violating [D-7] or surprising the author — the honest move is to wait for real usage rather than freeze a guess into the schema.
+
+**Deferral needs a trigger, not a vibe.** A deferred feature records what evidence would justify building it, so the decision is revisited on fact. The pattern: *build it when the friction it removes appears across three or more real screens.* Without a trigger, deferral becomes permanent by inattention, which is a different failure from deciding not to build something.
+
+This principle is descriptive of decisions already taken — page mode ([D-2]), the fractal composition model ([D-6]), a layout engine ([D-7]), zero-copy collections (§9.3), the reduced style set (§10), and the visual editor (§20 Phase 4) were all cut or deferred on these grounds. Stating it makes those coherent rather than incidental, and lets future contributors apply the same test without asking.
+
+**The measure:** a typical screen should be 15 lines of XML. If typical screens approach 100, the design has failed regardless of what the feature list says.
 
 ---
 
@@ -648,9 +665,11 @@ Supplying two of `{x, width, right}` determines the third. Supplying all three i
 </row>
 ```
 
-*Why deferred:* the cost is not generator complexity — summing widths is trivial. It is **schema surface**. Once `<row>` ships, XML in the wild depends on it and changing it is a breaking change. The design is also not settled: it is unclear how `gap` should interact with an anchored child, or what `right="0"` means inside a row. Anchors, centring and constant arithmetic already solve the multi-target problem that motivated adding layout helpers at all (§7.3); stacking is convenience on top. Real usage should inform its design rather than the reverse.
+*Why deferred:* per the deferral rule (§1.5), the cost is not generator complexity — summing widths is trivial. It is **schema surface**. Once `<row>` ships, XML in the wild depends on it and changing it is a breaking change. The design is also not settled: it is unclear how `gap` should interact with an anchored child, or what `right="0"` means inside a row. Anchors, centring and constant arithmetic already solve the multi-target problem that motivated adding layout helpers at all (§7.3); stacking is convenience on top. Real usage should inform its design rather than the reverse.
 
 Anchors, centring and constant arithmetic are **in schema 0.3**. Stacking is not.
+
+*Trigger to build it:* hand-maintained accumulation appearing as friction across three or more real screens during PR-07 or PR-10. Until then, `<consts>` arithmetic supplies the single-point-of-change property that motivated it — `x="#bar_title_w + #bar_icon_w"` — without new schema.
 
 ### 7.3 Multi-Target Portability
 

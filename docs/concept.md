@@ -179,6 +179,8 @@ The failure mode is replicating LVGL Pro's sophistication for a domain that does
 
 A screen should be 15 lines of XML. If a typical screen approaches 100, the design has failed.
 
+This is now a stated design principle rather than an aspiration — [design_spec.md §1.5](design_spec.md) makes omission the default, requires a feature to earn inclusion by demonstrated rather than anticipated need, and records that schema surface is the expensive kind of complexity because it is permanent once authors write against it. Deferred features carry an explicit trigger, so deferral is revisited on evidence instead of becoming permanent by inattention.
+
 ### 6.3 Single-maintainer upstream dependency — *medium, accepted*
 
 U8G2 is maintained by one developer. Earlier research suggested hedging with an Adafruit_GFX backend; the design spec rejects this ([§2.3](design_spec.md)) because the abstraction would cost the tight primitive mapping that makes the codegen simple, in exchange for portability nobody has requested. U8G2 is stable, widely deployed, and forkable. The risk is accepted.
