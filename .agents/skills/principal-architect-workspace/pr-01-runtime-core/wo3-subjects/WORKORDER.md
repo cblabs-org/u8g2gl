@@ -58,7 +58,7 @@ Read these for context:
 
 ### 1. Subject Types — `include/u8g2gl/u8g2gl_subject.h`
 
-- [ ] Create the subject system header. Design approach: use a tagged union or
+- [x] Create the subject system header. Design approach: use a tagged union or
   a base class with typed subclasses. The critical requirement is **no dynamic
   allocation** — all storage is inline.
 
@@ -187,7 +187,7 @@ private:
 
 ### 2. Subject Implementation — `src/u8g2gl_subject.cpp`
 
-- [ ] Implement all methods:
+- [x] Implement all methods:
   - `set()`: compare old vs new, if changed: update value, call `notify()`
   - `notify()`: iterate observers, call each active one's callback
   - `add_observer()`: find an unused slot (or append if `observer_count_ < MAX`),
@@ -198,7 +198,7 @@ private:
 
 ### 3. Conditional Flag Bindings — add to `u8g2gl_obj` or a new header
 
-- [ ] Implement the binding methods that §13.8 says generated code will call.
+- [x] Implement the binding methods that §13.8 says generated code will call.
   These connect a subject to an object's flags:
 
 ```cpp
@@ -257,7 +257,7 @@ is the derived class's concern.
 
 ### 4. Add config macro for string buffer
 
-- [ ] Add to `u8g2gl_config.h`:
+- [x] Add to `u8g2gl_config.h`:
   ```cpp
   #ifndef U8G2GL_MAX_STRING_LEN
   #define U8G2GL_MAX_STRING_LEN 128
@@ -270,12 +270,12 @@ is the derived class's concern.
 
 ### 5. Update CMakeLists.txt
 
-- [ ] Add `src/u8g2gl_subject.cpp` to the `u8g2gl` library target.
+- [x] Add `src/u8g2gl_subject.cpp` to the `u8g2gl` library target.
   Add any other new `.cpp` files.
 
 ### 6. Tests — `test/test_subject.cpp`
 
-- [ ] Create comprehensive unit tests:
+- [x] Create comprehensive unit tests:
 
 ```
 --- Int Subject ---
@@ -368,20 +368,20 @@ TEST(ObserverPool, FullPoolReturnsFalse)
 
 ### 7. Register test file
 
-- [ ] Add `test/test_subject.cpp` to `test/CMakeLists.txt` as a new test
+- [x] Add `test/test_subject.cpp` to `test/CMakeLists.txt` as a new test
   executable `test_subject`. Link against `u8g2gl` and `GTest::gtest_main`,
   add stubs include path.
 
 ### 8. Build and Verify
 
-- [ ] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
-- [ ] Run: `cd build && ctest --output-on-failure`
-- [ ] All previous tests (smoke + obj) AND all new subject tests must pass
-- [ ] Zero warnings under `-Wall -Wextra -Wpedantic`
+- [x] Build: `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build`
+- [x] Run: `cd build && ctest --output-on-failure`
+- [x] All previous tests (smoke + obj) AND all new subject tests must pass
+- [x] Zero warnings under `-Wall -Wextra -Wpedantic`
 
 ### 9. Commit
 
-- [ ] Stage all new and modified files and commit:
+- [x] Stage all new and modified files and commit:
   ```
   feat(runtime): add subject/observer system with conditional flag bindings
 
@@ -413,6 +413,33 @@ gap the PA needs to escalate to the Chief Architect.
 
 ---
 
-## Completion Report (written by the worker at task completion)
+## Completion Report
+<!-- Written by the worker at task completion -->
 
-<!-- Template — worker fills this in -->
+### Status
+complete
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_subject.h` — Subject type tag enum `u8g2gl_subject_type_t` (§8.1), binding op enum `u8g2gl_binding_op_t` (§8.4), `u8g2gl_observer_cb` callback typedef, `u8g2gl_observer` entry struct, and subject classes `u8g2gl_subject_int`, `u8g2gl_subject_string`, `u8g2gl_subject_bool`, and `u8g2gl_subject_time` with inline observer arrays (`U8G2GL_MAX_OBSERVERS`).
+- `src/u8g2gl_subject.cpp` — Implementations for all subject classes: value-change detection (`!=` for int/bool/time, truncation-aware `strncmp` for string) to prevent redundant redraws; copy-on-set buffer with declared `max_len` truncation; static pool observer management without heap allocation ([D-1]).
+- `include/u8g2gl/u8g2gl_obj.h` & `src/u8g2gl_obj.cpp` — Added conditional flag bindings (`bind_flag_if_eq`, `bind_flag_if_not_eq`, `bind_flag_if_gt`, `bind_flag_if_lt`) for int and bool subjects (§13.8) with immediate evaluation on binding; added `bind_text()` on `u8g2gl_obj` for int and string subjects; managed via static binding descriptor pool (`U8G2GL_MAX_BINDINGS_PER_OBJ = 4`) keeping `sizeof(u8g2gl_obj)` strictly at 24 bytes on 64-bit host (16 bytes on 32-bit targets) to preserve the base object memory budget.
+- `include/u8g2gl/u8g2gl_config.h` — Added `U8G2GL_MAX_STRING_LEN` (128), `U8G2GL_MAX_BINDINGS_PER_OBJ` (4), and `U8G2GL_MAX_TOTAL_BINDINGS` macros.
+- `CMakeLists.txt` — Added `src/u8g2gl_subject.cpp` to the `u8g2gl` static library target.
+- `test/CMakeLists.txt` — Added `test_subject` test executable linking against `u8g2gl` and `GTest::gtest_main`.
+- `test/test_subject.cpp` — 26 unit tests covering all subject types (default values, set/get, copy semantics, string truncation, observer notifications on value changes, multiple observers), conditional flag bindings (`eq`, `not_eq`, `gt`, `lt` for int and bool), text bindings, observer pool limits, and edge cases.
+
+### Decisions Made
+- Used a static binding descriptor pool (`s_binding_pool`) in `src/u8g2gl_obj.cpp` referenced by observer `user_data` rather than embedding binding arrays directly in `u8g2gl_obj`. This keeps `sizeof(u8g2gl_obj)` at 24 bytes (16 bytes on 32-bit), preserving the base object memory budget established in WO2 and ensuring `Obj.SizeOf` passes.
+- Immediate condition evaluation in `bind_flag_if_*` applies initial flag states to objects based on the subject's current value upon registration, ensuring initial views match subject states before subsequent setter calls.
+- String subject `set()` compares effective truncated string content before copying, avoiding redundant memory copies and observer notifications when incoming strings share truncated prefixes.
+- Zero namespaces used, conforming strictly to `u8g2gl_` / `U8G2GL_` flat symbol prefixes per [D-12]/[D-13].
+
+### Dead Ends & Warnings
+- Analyzed embedding `bindings_[U8G2GL_MAX_BINDINGS_PER_OBJ]` directly in `u8g2gl_obj`: this would have grown `sizeof(u8g2gl_obj)` from 24B to ~120B, breaking the 24B size budget and the `Obj.SizeOf` regression test. Chose the workorder's specified alternative ("use the observer's user_data to point to a static binding descriptor"), preserving zero heap allocation ([D-1]) while satisfying the size constraint.
+- Zero warnings under `-Wall -Wextra -Wpedantic`.
+
+### Out-of-Scope Findings
+- None. §13.8 binding emission API shapes (`temp.bind_text(&ui_subject_temperature, "%d°C")` and `wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN)`) were implemented cleanly without overload ambiguities.
+
+### Blockers
+- None.
