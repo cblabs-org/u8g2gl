@@ -1557,7 +1557,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 - Focus groups, input dispatch, screen navigation (§12)
 - `u8g2gl_button`, `u8g2gl_switch`, `focus_style`
-- **Visual designer** — a web application: canvas with pixel-exact Wasm rendering, direct manipulation (select, drag, nudge by keyboard, align, snap), a property panel driven by `<api>` manifests ([D-17]), a component/widget palette, and lossless XML round-trip. Specified separately in [editor_design.md](editor_design.md).
+- **Visual designer** — a web application: canvas with pixel-exact Wasm rendering, direct manipulation (select, drag, nudge by keyboard, align, snap), a property panel driven by `<api>` manifests ([D-17]), a component/widget palette, and lossless XML round-trip. Specified separately in [ui_spec.md](ui_spec.md).
 - Hot reload for text-editor workflows, sharing the editor's renderer
 - Font and glyph browser
 
