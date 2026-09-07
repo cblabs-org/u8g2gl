@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-01-runtime-core | Executing — WO1/5 (skeleton) | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-01-runtime-core/PROJECT.md) |
+| pr-01-runtime-core | Executing — WO2/5 (base-object) | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-01-runtime-core/PROJECT.md) |
 | pr-02-cli-schema | Not started — PA to decompose | Host Tooling | [PROJECT.md](../pr-02-cli-schema/PROJECT.md) |
 
 ## Recently Completed (last 5)

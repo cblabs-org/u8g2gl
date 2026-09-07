@@ -64,7 +64,7 @@ Five work orders, strictly serialised (each stacks on the previous).
 
 ### WO1 — Project Skeleton + CMake + GoogleTest
 
-- **[ ] [wo1-skeleton](wo1-skeleton/WORKORDER.md)**
+- **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** ✅ Complete — `f66c65c`
   Create the CMake build system, directory structure, GoogleTest integration,
   and a smoke test that proves the harness works. Establish the naming
   convention headers (`u8g2gl_types.h`, `u8g2gl_config.h`), the `U8G2GL_`
@@ -245,3 +245,10 @@ worker knows the API shapes they must hit.
 
 ### 2026-09-07T22:16:09Z — Human approved decomposition
 Human explicitly approved the 5-WO decomposition. Proceeding to WO1 execution.
+
+### 2026-09-07T22:22:00Z — WO1 complete
+Worker delivered: CMake skeleton (C++17, FetchContent GoogleTest v1.14.0),
+core types/config headers with all U8G2GL constants and enums, U8G2 stub with
+tracking counters, 4 smoke tests — all passing, zero warnings under
+`-Wall -Wextra -Wpedantic`. Commits `f66c65c` + `eb0192d`.
+No issues surfaced. Proceeding to WO2.
