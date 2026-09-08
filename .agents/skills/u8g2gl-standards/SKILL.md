@@ -1,6 +1,6 @@
 ---
 name: u8g2gl-standards
-description: Coding standards, naming conventions and architectural discipline for the U8G2GL codebase — the C++ runtime library, the TypeScript CLI, and the designer. Use when writing or reviewing any U8G2GL source code, when a worker agent needs house style, or when auditing a contribution for consistency. Covers naming (which deliberately differs from esp32-app-foundation), memory discipline for embedded targets, encapsulation rules, and file layout.
+description: The single authority on U8G2GL coding standards — naming, memory discipline, documentation, encapsulation and file layout — for the C++ runtime, the TypeScript CLI and the designer. Load this before writing or reviewing ANY U8G2GL source code, whenever a worker agent needs house style, and whenever auditing a contribution. Used by both coding agents and the readability-reviewer agent so author and reviewer work from the same rules. Note the naming scheme deliberately differs from esp32-app-foundation and differs again between C++ and TypeScript — check §2 before judging any identifier.
 ---
 
 # U8G2GL Coding Standards
@@ -9,6 +9,28 @@ Adapted from `esp32-app-foundation`'s `framework-expert` skill, which is the hou
 standard for the author's embedded work. **Where U8G2GL diverges, it does so
 deliberately and the reason is recorded here** — see §2, which is the section most
 likely to trip up anyone arriving from the foundation codebase.
+
+## Two audiences, one authority
+
+This skill is loaded by **both** the agents that write U8G2GL code and the agent
+that reviews it. That is deliberate: an author and a reviewer working from
+different copies of the rules will disagree, and the disagreement will surface as
+churn rather than as a defect. One source, two modes.
+
+**If you are writing code** — read §2 (naming) and the reference for your
+language before you start. §4 lists the things that will get a change rejected;
+they are short and worth knowing by heart.
+
+**If you are reviewing code** — you are probably the `readability-reviewer`
+agent, which carries the review *procedure*, severity model and report format.
+This skill tells you what the rules *are*; that agent tells you how to conduct
+the audit. Cite sections of this skill in your findings so an author can go
+straight to the rule.
+
+**When the two conflict**, this skill wins on *what the standard is*. If you
+think a standard is wrong, say so as an observation — do not quietly deviate.
+The standards are changeable; silent divergence is not, because it produces a
+codebase where nobody can tell intent from accident.
 
 ## When to use this skill
 
