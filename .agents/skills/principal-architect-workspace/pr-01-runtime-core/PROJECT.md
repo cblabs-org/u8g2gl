@@ -366,3 +366,46 @@ autonomous execution.
 **Also corrected by the Architect (not worker scope):** PD-3's ~16 B object
 target omitted the style member entirely. Corrected to ~36 B in
 implementation_plan.md at commit `11a9030`.
+
+
+### 2026-09-08T14:11:38Z — WO6 complete and Architect-verified
+Findings A–D remediated across two rounds; squashed to one commit `c297811`.
+Clean clone of the branch tip builds with zero warnings and passes 80/80.
+
+**Verified independently by the Architect** (both branches built and measured,
+rather than accepting the worker's report):
+
+| Type | WO5 | WO6 |
+|---|---|---|
+| `u8g2gl_obj` | 64 B | 48 B |
+| `u8g2gl_style` | 40 B | 24 B |
+| `u8g2gl_observer` | 24 B | 16 B |
+| `u8g2gl_subject_int`/`_bool`/`_time` | 400 B | 80 B |
+| `u8g2gl_subject_string` | 528 B | 120 B |
+
+Representative project (15 objects, 8 subjects): ~2480 B → ~870 B static RAM.
+
+**Two process failures worth recording, both Architect-side:**
+
+1. **WORKORDER said "ask the user before committing", but `SendMessage` is
+   disabled in this session** — so the round-1 worker finished, asked, and could
+   never be answered. Its code sat uncommitted while its report was captured
+   manually. Round 2 then committed on top of uncommitted work, producing a
+   commit that would not compile from a clean checkout. Repaired by squashing.
+   **Fix for future WOs: do not instruct workers to seek approval before
+   committing while SendMessage is unavailable.** Have them commit on green
+   build and let the Architect review the commit.
+
+2. **Scope judgement was left to the worker and it guessed conservatively.**
+   The binding-API widening was genuinely required to meet Finding B's
+   objective, but the boundary box did not mention binding signatures, so the
+   worker filed it as out-of-scope rather than doing it. Surfacing rather than
+   silently exceeding scope was correct behaviour; the WORKORDER was at fault
+   for not tracing the objective through to the API surface that delivers it.
+
+**Also corrected by the Architect:** PD-3's ~16 B object target omitted the
+style member (`11a9030`); §8.2's `max_len` semantics were ambiguous and allowed
+the off-by-one Finding A exposed (now explicit on `main`).
+
+**PR-01 status: complete.** Stack tip is `u8g2gl-runtime/wo6-sizing-remediation`.
+Ready for stack submission pending human review.
