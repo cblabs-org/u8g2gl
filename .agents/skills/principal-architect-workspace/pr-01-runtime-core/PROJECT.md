@@ -320,3 +320,49 @@ All §13 contract surfaces are implemented with correct signatures.
    is a good portable pattern worth keeping.
 
 **Unresolved items:** None. All §13 contract surfaces matched. No spec gaps found.
+
+
+---
+
+## WO6 — Sizing Remediation (post-review)
+
+### 2026-09-08T13:55:23Z — Human approval recorded
+Chief Architect review of the delivered PR-01 runtime found four memory-sizing
+defects. The human was presented with findings A–E and responded:
+**"Ok please spin up a worker as per the /principal-architect protocols to
+remediate these items"** — explicit approval of this decomposition and of
+autonomous execution.
+
+**Work Order ledger (continued):**
+- **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** — project skeleton, CMake, GoogleTest
+- **[x] [wo2-base-object](wo2-base-object/WORKORDER.md)** — u8g2gl_obj, tree helpers, state saver
+- **[x] [wo3-subjects](wo3-subjects/WORKORDER.md)** — subject/observer system
+- **[x] [wo4-styles](wo4-styles/WORKORDER.md)** — monochrome style cascade
+- **[x] [wo5-frame-gate](wo5-frame-gate/WORKORDER.md)** — frame gate, ui_handler, screen lifecycle
+- **[ ] [wo6-sizing-remediation](wo6-sizing-remediation/WORKORDER.md)** — findings A–D
+
+**Findings remediated in WO6:**
+- **A (defect, spec violation)** — string subjects allocate a fixed 128 B and
+  ignore the declared `max_len`, contradicting §8.2 and making §18's budget
+  report inaccurate. §1.3 makes honest cost reporting non-negotiable.
+- **B** — observer arrays fixed at 16 slots (384 B of a 400 B scalar subject).
+  §13 resolves bindings at build time, so per-subject capacity is knowable and
+  a global constant is the wrong mechanism.
+- **C** — four style enums lack explicit base types, costing 16 B/object. The
+  same codebase types `u8g2gl_binding_op_t : uint8_t`, so this is an
+  inconsistency rather than a decision.
+- **D** — `bool active` in `u8g2gl_observer` is redundant with `cb != nullptr`
+  and forces padding to pointer alignment.
+
+**Deferred, explicitly out of WO6 scope:**
+- **E** — style index into a generated table would take `u8g2gl_obj` from ~36 B
+  to ~17 B, but saves only ~425 B on a 15-widget screen against ~320 KB DRAM at
+  the [D-1] baseline, and needs generator work. Trigger to revisit: a project
+  exceeding 50 objects, or §18 flagging style as material.
+
+**Expected outcome:** representative project (15 objects, 8 subjects) drops from
+~2480 B to ~870 B static RAM, and §18's budget becomes truthful.
+
+**Also corrected by the Architect (not worker scope):** PD-3's ~16 B object
+target omitted the style member entirely. Corrected to ~36 B in
+implementation_plan.md at commit `11a9030`.
