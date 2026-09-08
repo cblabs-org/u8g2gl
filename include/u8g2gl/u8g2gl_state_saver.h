@@ -7,7 +7,17 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_state_saver.h
- * Description: Declarations for u8g2gl_state_saver.h
+ * Purpose: An RAII guard that saves and restores U8G2 drawing state around a
+ *          widget's render(). It exists so a widget can set font, draw colour
+ *          and clip freely without having to restore them, and so that one
+ *          widget forgetting to tidy up cannot corrupt everything drawn after
+ *          it.
+ *
+ *          The framework wraps every render() call in one of these (§11.3), so
+ *          widget authors normally never construct one themselves.
+ *
+ * Description: Scope guard capturing font, draw colour and clip window on
+ *              construction and restoring them on destruction
  *
  * Exported Classes:
  * - u8g2gl_state_saver: RAII guard that saves and restores U8G2 drawing state

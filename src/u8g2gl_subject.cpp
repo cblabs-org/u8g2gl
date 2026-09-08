@@ -7,7 +7,18 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/u8g2gl_subject.cpp
- * Description: Implementation of u8g2gl_subject.cpp
+ * Purpose: Implements the subject types' shared logic. All of it lives in the
+ *          non-template _base classes so that sizing a subject differently does
+ *          not duplicate code — a u8g2gl_subject_int_n<2> and an <8> share every
+ *          instruction here and differ only in the storage they own.
+ *
+ *          Setting a value notifies observers only when it actually changed.
+ *          That check is what stops a controller writing the same value every
+ *          loop from marking the frame dirty and defeating the render gate.
+ *
+ * Description: Value storage and comparison, observer registration with capacity
+ *              checking, and change notification for the int, string, bool and
+ *              time subjects
  */
 #include "u8g2gl/u8g2gl_subject.h"
 #include <cassert>

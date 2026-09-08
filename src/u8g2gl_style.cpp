@@ -7,7 +7,13 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/u8g2gl_style.cpp
- * Description: Implementation of u8g2gl_style.cpp
+ * Purpose: Implements the style property setters and the merge that composes one
+ *          style over another. Each setter records its property in set_mask as
+ *          well as storing the value, because merge_from() must distinguish
+ *          "explicitly set to the default" from "never set" — without that a
+ *          named style could not be selectively overridden by an object.
+ *
+ * Description: Property setters, set_mask maintenance, merge_from and clear
  */
 #include "u8g2gl/u8g2gl_style.h"
 

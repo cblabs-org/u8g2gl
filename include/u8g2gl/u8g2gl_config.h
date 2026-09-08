@@ -7,7 +7,19 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_config.h
- * Description: Declarations for u8g2gl_config.h
+ * Purpose: Every compile-time capacity in the runtime, in one place, each
+ *          overridable with -D. These exist because the library never allocates
+ *          ([D-1]) — capacity that cannot grow at runtime must be decided at
+ *          build time, and a project that needs more should be able to say so
+ *          without editing the library.
+ *
+ *          Defaults are chosen for a typical screen rather than a worst case:
+ *          over-allocating by default costs every project RAM to serve a few.
+ *          Where the generator knows the real number it should emit a
+ *          right-sized type instead of relying on these (§13).
+ *
+ * Description: Observer, object, style, string, and binding capacities, each
+ *              guarded by #ifndef so a project can override it
  *
  * Exported Constants:
  * - U8G2GL_MAX_TOTAL_BINDINGS: Maximum number of active bindings in the static pool

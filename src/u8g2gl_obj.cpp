@@ -7,7 +7,20 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/u8g2gl_obj.cpp
- * Description: Implementation of u8g2gl_obj.cpp
+ *
+ * Purpose: Implements the base object. Two thirds of this file is trivial
+ *          accessor plumbing; the part worth reading is the data-binding system
+ *          from "Data Binding System" onward, which is where objects and
+ *          subjects are wired together and where the only non-obvious design
+ *          decisions in the file live.
+ *
+ *          Binding is what makes the framework declarative: generated code says
+ *          "this label shows that subject" once at init, and thereafter the
+ *          subject notifies the object directly. Nothing polls.
+ *
+ * Description: Accessors for geometry, flags, parent index, dirty state and
+ *              style; default no-op implementations of the virtual lifecycle;
+ *              and the shared binding pool with its observer callbacks
  */
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_core.h"
@@ -154,7 +167,26 @@ void u8g2gl_obj::set_bitmap_mode(u8g2gl_bitmap_mode_t m) {
     style_.set_bitmap_mode(m);
 }
 
-// --- Data Binding System (§8, §13.8) ---
+// ---------------------------------------------------------------------------
+// Data Binding System (§8, §13.8)
+//
+// DESIGN NOTE — one shared pool, not per-object storage
+// ----------------------------------------------------
+// Bindings live in a single file-scope pool rather than in each object. The
+// alternative — an array of binding slots inside u8g2gl_obj — would multiply
+// worst-case capacity by every element on the screen, when in practice only a
+// handful of objects are bound to anything. A shared pool sizes for the total,
+// which is what the generator actually knows at build time (§13).
+//
+// The cost is type erasure: one pool must hold bindings to several subject
+// types, so the subject is stored as void* alongside a u8g2gl_subject_type_t
+// saying what it really is. That tag is how u8g2gl_evaluate_binding() casts
+// back safely. This is deliberate and contained — the public bind_* overloads
+// are fully typed, so a caller never sees the erasure and cannot get it wrong.
+//
+// No allocation happens here or anywhere else in the runtime ([D-1]): the pool
+// is static, and exhaustion is reported by returning false rather than growing.
+// ---------------------------------------------------------------------------
 
 struct u8g2gl_binding_desc {
     u8g2gl_obj* obj = nullptr;
@@ -248,10 +280,21 @@ u8g2gl_obj::~u8g2gl_obj() {
     }
 }
 
+// u8g2gl_obj::add_flag_binding
+// Common implementation behind every bind_flag_if_* overload: claims a pool
+// slot, registers as an observer on the subject, and evaluates once so the
+// flag is correct before the first frame rather than after the first change.
+//   subject   — the subject, type-erased; `type` says what it really is
+//   type      — which subject type `subject` points to, for the cast back
+//   op        — comparison applied against ref_value
+//   ref_value — value compared against the subject's current value
+//   flag      — flag set when the comparison holds, cleared when it does not
 bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_binding_op_t op, int32_t ref_value, uint8_t flag) {
     if (!subject) {
         return false;
     }
+
+    // --- Step 1: Claim a slot in the shared pool ---
     u8g2gl_binding_desc* slot = u8g2gl_allocate_binding(this);
     if (!slot) {
         return false;
@@ -266,6 +309,7 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
     slot->is_text = false;
     slot->active = true;
 
+    // --- Step 2: Register with the subject, casting back via the type tag ---
     bool added = false;
     if (type == U8G2GL_SUBJECT_INT) {
         added = static_cast<u8g2gl_subject_int_base*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
@@ -273,12 +317,20 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
         added = static_cast<u8g2gl_subject_bool_base*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
     }
 
+    // --- Step 3: Roll the slot back if the subject had no observer capacity ---
+    // Both allocations must succeed together. Leaving a claimed-but-unobserved
+    // slot behind would leak pool capacity permanently — the slot would never
+    // fire and never be reclaimed — and the caller would have no way to tell.
     if (!added) {
         slot->active = false;
         slot->obj = nullptr;
         return false;
     }
 
+    // --- Step 4: Evaluate immediately ---
+    // Without this the flag stays at its default until the subject next
+    // changes, so a screen bound to an already-correct value would render wrong
+    // on its first frame and silently fix itself later.
     u8g2gl_evaluate_binding(slot);
     return true;
 }

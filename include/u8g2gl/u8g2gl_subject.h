@@ -7,7 +7,21 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_subject.h
- * Description: Declarations for u8g2gl_subject.h
+ * Purpose: The reactive layer. A subject is a typed value that objects observe;
+ *          setting it notifies every bound object automatically, so controller
+ *          code never touches a widget. This is what replaces imperative
+ *          push-to-widget updates and makes a screen declarative.
+ *
+ *          Each type is split into a non-template _base class holding all the
+ *          logic and a templated _n<> class owning only storage. That split
+ *          exists so capacity can be sized per subject — the generator knows
+ *          each subject's observer count and string length at build time (§13) —
+ *          without instantiating the logic once per distinct size. Binding APIs
+ *          take the _base types, so a right-sized subject can actually be bound.
+ *
+ * Description: int, string, bool and time subjects; the observer record and its
+ *              callback signature; and the base/template split that gives
+ *              per-subject capacity at no code-size cost
  *
  * Exported Classes:
  * - u8g2gl_subject_int_base / u8g2gl_subject_int: int subject

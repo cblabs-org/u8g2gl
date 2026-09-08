@@ -7,7 +7,18 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_types.h
- * Description: Declarations for u8g2gl_types.h
+ * Purpose: The shared vocabulary every other header depends on — the enums and
+ *          constants that would otherwise create circular includes if they lived
+ *          with the types that use them.
+ *
+ *          Every enum here carries an explicit uint8_t base type. That is not
+ *          stylistic: an untyped enum is int, and these are stored in structs
+ *          instantiated per object and per binding, where four bytes instead of
+ *          one is multiplied across the whole screen.
+ *
+ * Description: Alignment, draw colour, font and bitmap modes, object flags,
+ *              event kinds, and the sentinel constants (U8G2GL_NO_PARENT,
+ *              U8G2GL_IDLE) that mark "no value" in their respective domains
  *
  * Exported Types:
  * - u8g2gl_align_t: Text alignment

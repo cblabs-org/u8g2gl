@@ -7,7 +7,15 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/u8g2gl_core.cpp
- * Description: Implementation of u8g2gl_core.cpp
+ * Purpose: Implements the frame. ui_handler() is the only function an
+ *          application calls per loop, and its shape encodes three decisions
+ *          worth knowing: the whole frame is redrawn or none of it is ([D-4]),
+ *          the dirty flag gates the expensive sendBuffer rather than individual
+ *          objects, and the return value is a sleep hint aggregated from every
+ *          widget's own deadline ([D-15]).
+ *
+ * Description: Tick-source registration, active-screen management, frame-level
+ *              dirty gating, and the ui_handler entry points
  */
 #include "u8g2gl/u8g2gl_core.h"
 

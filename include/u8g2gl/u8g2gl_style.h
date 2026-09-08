@@ -7,7 +7,18 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_style.h
- * Description: Declarations for u8g2gl_style.h
+ * Purpose: The complete visual vocabulary for a 1-bit display. Monochrome
+ *          collapses styling to about ten properties — there is no colour, no
+ *          gradient, no opacity and no shadow to describe — so this is a flat
+ *          struct rather than the cascade a colour framework needs.
+ *
+ *          A set_mask bitfield records which properties were explicitly set, so
+ *          merging a named style over an object's own overrides can tell "set to
+ *          the default value" apart from "never set". Without that distinction a
+ *          style could not selectively override.
+ *
+ * Description: The monochrome property set, the per-property set_mask, and
+ *              merge_from() which composes a style over another
  *
  * Exported Classes:
  * - u8g2gl_style: struct holding the 10 style properties
