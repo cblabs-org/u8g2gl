@@ -409,3 +409,21 @@ the off-by-one Finding A exposed (now explicit on `main`).
 
 **PR-01 status: complete.** Stack tip is `u8g2gl-runtime/wo6-sizing-remediation`.
 Ready for stack submission pending human review.
+
+## WO7 — Readability & Documentation Remediation (post-review)
+
+### 2026-09-08T21:22:00Z — Human approval recorded
+Human requested WO7 execution directly: *"please spin up a worker and take on
+this wo7-readability WORKORDER.md as an additional branch to this PR"*.
+
+**Work Order ledger (continued):**
+- **[x] [wo1-skeleton](wo1-skeleton/WORKORDER.md)** — project skeleton
+- **[x] [wo2-base-object](wo2-base-object/WORKORDER.md)** — u8g2gl_obj, tree helpers
+- **[x] [wo3-subjects](wo3-subjects/WORKORDER.md)** — subject/observer system
+- **[x] [wo4-styles](wo4-styles/WORKORDER.md)** — monochrome style cascade
+- **[x] [wo5-frame-gate](wo5-frame-gate/WORKORDER.md)** — frame gate, ui_handler
+- **[x] [wo6-sizing-remediation](wo6-sizing-remediation/WORKORDER.md)** — sizing fixes
+- **[ ] [wo7-readability](wo7-readability/WORKORDER.md)** — SPDX headers, Doxygen, why-comments, enum base types
+  **Branch:** `u8g2gl-runtime/wo7-readability` off `wo6-sizing-remediation`
+  **Complexity:** mechanical
+
