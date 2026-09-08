@@ -2,7 +2,7 @@
 
 **The visual designer for U8G2GL. Functionality and layout requirements.**
 
-**Version**: 0.1 Draft
+**Version**: 0.2 Draft
 **Date**: September 2026
 **Status**: Design input — this document briefs visual design work; it is not an implementation spec
 **Companion documents**: [design_spec.md](design_spec.md) (the framework) · [concept.md](concept.md) (why) · [implementation_plan.md](implementation_plan.md) (sequencing)
@@ -46,24 +46,62 @@ Five flows define the tool. If these are fluent, it works.
 
 ---
 
-## 4. Platform
+## 4. Platform — Theia evaluated
 
-**A web application. Monaco for text editing. A custom lightweight shell for layout. Not a VS Code fork, and not Eclipse Theia.**
+An earlier draft dismissed Eclipse Theia on the grounds that LVGL Pro uses it and LVGL Pro's editor is weak. **That was guilt by association and it was wrong.** LVGL Pro's deficiency is its property and settings surface — no guidance for a non-coding user — which is an implementation gap, not a platform one. §7 of this document fixes exactly that via [D-17] manifests, and that fix would work on any platform. Theia deserved evaluation on its merits; this section is that evaluation.
 
-*Research basis.* LVGL Pro Editor is built on **Eclipse Theia** — confirmed by the `.theia/launch.json` in its generated project directories. Theia is not a VS Code fork; it is an independent TypeScript framework that embeds Monaco and offers a compile-time extension API for building full IDEs. Its preview runs the real LVGL runtime compiled to WebAssembly (`preview-bin/lved-runtime.wasm`), which independently validates the [D-9] architecture already chosen for U8G2GL.
+### 4.1 Licence — **passes cleanly**
 
-Theia is nonetheless the wrong choice here, for the same reason forking VS Code is: it is an *IDE platform*, and we need an *application*. The value being borrowed is the layout paradigm and the editing experience, not extensibility, plugin hosting or a workspace model. Monaco supplies the editing experience directly and, per its own positioning, lets a product "build focused, browser-based IDEs without the overhead" with fine-grained control over UX.
+EPL-2.0. Adopters may "use and distribute Theia in your own products, including closed-source commercial offerings." The only obligation is upstreaming modifications **to Theia core**; product-specific code and extensions kept distinct from the platform layer stay yours.
 
-| Concern | Choice | Why |
+The adopter list is directly relevant to this domain: **Arduino IDE 2.0**, **Arm Mbed Studio**, **TI Code Composer Studio**, and — announced 2026 — **STMicroelectronics STM32CubeMX2** and Samsung's Sokatoa. Embedded-tooling vendors have repeatedly chosen it and shipped.
+
+No conflict with U8G2GL's MIT licence: the runtime and CLI are separate artefacts and stay MIT regardless of what the editor is built on.
+
+### 4.2 Serving — **this is where it fails, and specifically**
+
+Requirement: browser-based, ideally a static client-side app. Theia offers two modes.
+
+| Mode | Backend | Verdict |
 |---|---|---|
-| Text editing | **Monaco** | VS Code's editor as a standalone component. Brings XML syntax highlighting, completion, inline diagnostics, find/replace, multi-cursor — all expected, none worth rebuilding |
-| Layout shell | **Custom, lightweight** | Panels, splitters, tabs. A few hundred lines against a full IDE framework |
-| Canvas rendering | **Wasm renderer from PR-06** | The real runtime, pixel-exact. Same binary as the snapshot tests, so preview and firmware cannot diverge |
-| Compilation | **The CLI**, invoked by the app | One implementation, already specified ([D-10], [D-16]) |
+| **Standard browser** | Node.js server required | Works, but not static hosting |
+| **Browser-only** | None — compiles to a static site | Meets the preference on paper; see below |
 
-Monaco's completion and diagnostics are schema-driven: the XSD/JSON-Schema from PR-02 supplies autocomplete, and [D-16]'s structured `--json` diagnostics become squiggles and Problems rows without a second diagnostic format.
+Browser-only Theia was merged in January 2024 (milestone 1.46) and, as of the **2026-05 community release, remains in MVP state**. Its documented limitations are decisive for us rather than incidental:
 
----
+- **Syntax highlighting is not supported, and is not planned.** The maintainers' position: *"dedicated syntax highlighting won't be supported for the browser-only mode, as it's just as much work as adding real support for VS Code extensions."*
+- **Plugins are exclusively backend-handled** — metadata collection and deployment both — so the extension mechanism is unavailable.
+- Any Theia or VS Code API routed through the backend does not work.
+
+Syntax highlighting in an XML editor is not a nice-to-have here; it is the surface the user spends most of their time in (§3 F1, F4). A static Theia deployment cannot provide it, and the project has said it will not.
+
+**So the choice is not "Theia vs Monaco" — it is "Theia with a Node backend" vs "static client-side app".**
+
+And a static client-side app turns out to be genuinely achievable, for a reason that falls out of an earlier decision. **[D-10] made the CLI TypeScript.** The schema, validator and generator are therefore isomorphic — the same code runs in Node and in a browser, unmodified. Combined with the Wasm renderer (PR-06) and `bdfconv` compiled to Wasm ([Q-2]), the entire pipeline runs client-side:
+
+| Need | Client-side solution |
+|---|---|
+| Parse, validate, generate | The PR-02/PR-04 TypeScript, run in-browser |
+| Render pixel-exactly | PR-06 Wasm runtime |
+| Compile fonts | `bdfconv` via Wasm ([Q-2]) |
+| Read/write project files | File System Access API |
+| Edit XML with highlighting | Monaco standalone |
+
+This is a benefit of [D-10] that was not articulated when it was taken.
+
+### 4.3 Rapid rendering pipeline — **roughly a wash**
+
+Both can host a canvas driven by the Wasm renderer at interactive rates. Theia's Lumino widget system accommodates a custom canvas view; a custom shell has less between the app and the canvas. No fundamental barrier either way, a slight edge to the custom shell for control over the render loop.
+
+### 4.4 Decision
+
+**Monaco plus a custom shell, served as a static client-side application.**
+
+Not because Theia is unsuitable — it is production-grade and its embedded-tooling pedigree is a genuine point in its favour — but because the specific mode that meets the static-hosting requirement is the one mode that cannot give us a syntax-highlighted XML editor.
+
+**Correcting an overstatement in the previous draft:** I described the shell as "a few hundred lines". That is wrong. An IDE-style layout with dockable panels, splitters and tabs is a real component, and the sane route is an existing layout library — **Dockview**, **golden-layout** or **react-mosaic** — rather than hand-rolling. Budget it as a meaningful piece of work, not a trivial one. It remains far smaller than adopting an IDE platform.
+
+**This is not a one-way door.** If a desktop application is wanted later, Theia plus Electron is the natural path and the domain logic — schema, generator, renderer — is platform-independent by construction. Revisit if the static constraint relaxes, or if browser-only Theia gains highlighting.
 
 ## 5. Layout
 
@@ -237,18 +275,28 @@ The sidecar decision matters: putting view state in the project XML would make e
 | ID | Question | Blocks |
 |---|---|---|
 | **U-1** | Element identity — require `name` on editable elements, or generate stable synthetic ids? Naming everything is noisy; synthetic ids are fragile across hand-edits | PR-02 schema |
-| **U-2** | Does the editor run wholly client-side (Wasm in the browser, File System Access API) or with a local server process invoking the CLI? Affects deployment, and whether it works offline from a static host | Editor architecture |
+| ~~U-2~~ | Client-side vs local server | **Resolved** — wholly client-side, per §4.2. [D-10]'s TypeScript CLI is isomorphic, so the whole pipeline runs in-browser |
 | **U-3** | Multi-target editing — one canvas per target, or a target switcher on one canvas? Depends on Q-1's resolution | Phase 3 |
 | **U-4** | Is component editing in-place, or a separate document context? In-place is nicer and much harder | Phase 3 |
+| **U-5** | File System Access API is Chromium-only. Accept a Chrome/Edge requirement, or add a fallback (upload/download, OPFS, or an optional local server) for Firefox and Safari? | Editor architecture |
 
 ---
 
 ## Appendix — Research Notes
 
-- **LVGL Pro Editor is built on Eclipse Theia** — evidenced by `.theia/launch.json` in generated project directories. Its preview uses `preview-bin/lved-runtime.wasm`, the LVGL runtime compiled to WebAssembly, independently validating [D-9].
-- **Theia is not a VS Code fork** — an independent TypeScript framework embedding Monaco, with a compile-time extension API for building IDEs.
-- **Monaco is the lighter path** for an application that wants VS Code's editing experience without an IDE platform.
-- **LVGL Pro's CLI has `compile --target editor|cli`** — the editor consumes a runtime the CLI builds. U8G2GL's CLI needs the same split, which is worth recording against PR-02/PR-06.
-- **`<previews>` and `help=`** are the two editor-facing schema features LVGL Pro carries that our schema currently lacks.
+**Eclipse Theia**
+- LVGL Pro Editor is built on it — evidenced by `.theia/launch.json` in generated project directories. Its preview uses `preview-bin/lved-runtime.wasm`, the LVGL runtime compiled to WebAssembly, independently validating [D-9].
+- Not a VS Code fork: an independent TypeScript framework embedding Monaco, with a compile-time extension API.
+- **EPL-2.0.** Closed-source and commercial products permitted; obligation is upstreaming changes to Theia *core* only.
+- Production adopters in embedded tooling: Arduino IDE 2.0, Arm Mbed Studio, TI Code Composer Studio, STMicroelectronics STM32CubeMX2 (2026), Samsung Sokatoa (2026).
+- **Browser-only mode** merged January 2024 (v1.46); still **MVP as of the 2026-05 community release**. Syntax highlighting explicitly not planned — *"just as much work as adding real support for VS Code extensions."* Plugins are backend-only.
 
-Sources: [Theia Platform](https://theia-ide.org/theia-platform/) · [Eclipse Theia project](https://projects.eclipse.org/projects/ecd.theia) · [TypeFox — Custom IDEs](https://www.typefox.io/cloud-and-desktop-ides/)
+**Monaco**
+- VS Code's editor as a standalone component; built-in tokenisation for XML without requiring VS Code extensions.
+- Positioned for embedding a DSL editor or building a focused browser IDE "without the overhead".
+
+**LVGL Pro, other**
+- CLI splits `compile --target editor|cli` — the editor consumes a runtime the CLI builds. U8G2GL's CLI needs the same split; recorded against PR-02/PR-06.
+- `<previews>` and `help=` are the two editor-facing schema features LVGL Pro carries that our schema currently lacks (§11).
+
+Sources: [Theia FAQ](https://theia-ide.org/docs/faq/) · [Theia Platform](https://theia-ide.org/theia-platform/) · [Eclipse Theia project](https://projects.eclipse.org/projects/ecd.theia) · [Browser-only Theia PR #12853](https://github.com/eclipse-theia/theia/pull/12853) · [Running Theia without a backend](https://eclipsesource.com/blogs/2024/01/29/running-eclipse-theia-without-a-backend/) · [Theia Community Release 2026-05](https://eclipsesource.com/blogs/2026/06/19/the-eclipse-theia-community-release-2026-05/) · [TypeFox — Custom IDEs](https://www.typefox.io/cloud-and-desktop-ides/)
