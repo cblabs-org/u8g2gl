@@ -5,8 +5,7 @@ native host build for tests. Code must compile clean on all three.
 
 ## 1. Naming
 
-See [SKILL.md §2](../SKILL.md) for the full table and the rationale for diverging
-from `esp32-app-foundation`. Summary:
+See [SKILL.md §2](../SKILL.md) for the full table and rationale. Summary:
 
 ```cpp
 class u8g2gl_label : public u8g2gl_obj {      // lowercase_snake, matches XML tag
@@ -36,9 +35,8 @@ swap, and often no way to report an OOM other than a reboot loop.
 **No heap allocation. Anywhere.**
 No `new`, `malloc`, `std::vector`, `std::string`, or anything that allocates —
 not merely inside `tick()`, but anywhere in the runtime. Capacities are declared
-in XML and allocated statically (§9.2). This is stronger than foundation's rule,
-which permits heap outside hot paths, and it is what makes the §18 budget
-truthful.
+in XML and allocated statically (§9.2). Heap-free everywhere — not merely in hot
+paths — is what makes the §18 budget truthful.
 
 **Sizes are declared, not assumed.**
 If storage depends on a count — observers, rows, string length — the count is a
@@ -97,9 +95,10 @@ test/stubs/U8G2lib.h            // the single authoritative U8G2 stub
 
 ## 4. File headers
 
-Every `.h` and `.cpp` begins with a header block. This is imported from
-foundation's house style and adapted to MIT — the runtime currently lacks these
-and they should be added as files are touched.
+Every `.h` and `.cpp` begins with a header block. **The runtime currently lacks
+these entirely** — they should be added as files are touched. Full specification,
+including the exported-symbol list and the other three documentation layers, is in
+[documentation.md](documentation.md).
 
 ```cpp
 /*

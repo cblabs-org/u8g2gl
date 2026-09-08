@@ -1,7 +1,7 @@
 # TypeScript Standards — CLI, Generator and Designer
 
-Applies to the CLI ([D-10]) and the designer ([UD-1]). `esp32-app-foundation` has
-no TypeScript, so this has no upstream to adapt — it is written for this codebase.
+Applies to the CLI ([D-10]) and the designer ([UD-1]). Documentation standards are
+shared across languages — see [documentation.md](documentation.md).
 
 ## 1. The isomorphic constraint
 

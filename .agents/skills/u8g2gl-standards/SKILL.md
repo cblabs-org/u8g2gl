@@ -1,14 +1,18 @@
 ---
 name: u8g2gl-standards
-description: The single authority on U8G2GL coding standards — naming, memory discipline, documentation, encapsulation and file layout — for the C++ runtime, the TypeScript CLI and the designer. Load this before writing or reviewing ANY U8G2GL source code, whenever a worker agent needs house style, and whenever auditing a contribution. Used by both coding agents and the readability-reviewer agent so author and reviewer work from the same rules. Note the naming scheme deliberately differs from esp32-app-foundation and differs again between C++ and TypeScript — check §2 before judging any identifier.
+description: The single authority on U8G2GL coding standards — naming, memory discipline, documentation, encapsulation and file layout — for the C++ runtime, the TypeScript CLI and the designer. Load this before writing or reviewing ANY U8G2GL source code, whenever a worker agent needs house style, and whenever auditing a contribution. Used by both coding agents and the readability-reviewer agent so author and reviewer work from the same rules. Documentation standards — file headers with SPDX, Doxygen on public APIs, in-routine step breakdowns, why-comments — carry equal weight to the code rules. Note the naming scheme differs between C++ and TypeScript, so check §2 before judging any identifier.
 ---
 
 # U8G2GL Coding Standards
 
-Adapted from `esp32-app-foundation`'s `framework-expert` skill, which is the house
-standard for the author's embedded work. **Where U8G2GL diverges, it does so
-deliberately and the reason is recorded here** — see §2, which is the section most
-likely to trip up anyone arriving from the foundation codebase.
+The standards for every line of code in this repository. Naming, documentation,
+memory discipline, structure.
+
+**Documentation is not decoration here.** A monochrome UI framework is read far
+more often than it is written — by the next contributor, by a code generator
+author working against §13's contract, and by agents that were not present when a
+decision was made. §4 and [documentation.md](references/documentation.md) carry
+the same weight as the memory rules.
 
 ## Two audiences, one authority
 
@@ -42,13 +46,10 @@ codebase where nobody can tell intent from accident.
 ## 1. What kind of code this is
 
 U8G2GL is a **library**, not an application framework. It has no `Application`
-hub, no module registry, no event bus, and no boot sequence. That distinction
-matters because much of foundation's discipline exists to constrain *modules
-inside a framework* — the Orchestrator Anti-Pattern, hub references, late
-registration — and **none of it applies here**. Do not import those rules.
-
-What does apply is everything about **memory, encapsulation and clarity on a
-constrained target**. See [references/cpp.md](references/cpp.md).
+hub, no module registry, no event bus, and no boot sequence. Rules that exist to
+constrain modules inside a framework — orchestration, hub references, registration
+order — do not apply. What does apply is **memory, encapsulation, documentation
+and clarity on a constrained target**.
 
 Three distinct bodies of code, with different rules:
 
@@ -58,41 +59,53 @@ Three distinct bodies of code, with different rules:
 | CLI and generator | TypeScript | Node **and** browser | [typescript.md](references/typescript.md) |
 | Designer | TypeScript + React | Browser | [typescript.md](references/typescript.md) |
 
-## 2. Naming — where we deliberately differ from foundation
+## 2. Naming
 
-**This is the most important section for anyone coming from `esp32-app-foundation`.**
+The scheme differs **by language**. Check which you are in before judging any
+identifier — this is the most common source of both real defects and false
+positives inside this repo.
 
-| Category | esp32-app-foundation | **U8G2GL** |
+### C++ runtime — LVGL-style, flat prefixes
+
+| Category | Convention | Example |
 |---|---|---|
-| Classes / structs | `ConfigManager` | `u8g2gl_obj`, `u8g2gl_style` |
-| Interfaces | `ITickable` | *(no `I` prefix — plain base classes)* |
-| Methods | `getData()` | `set_coords()`, `get_x()` |
-| Member variables | `_retryCount` | `observer_count_` *(trailing)* |
-| Enum types | `enum class AppState` | `u8g2gl_align_t : uint8_t` |
-| Enum values | `AppState::Running` | `U8G2GL_ALIGN_LEFT` |
-| Files | `ConfigManager.hpp` | `u8g2gl_obj.h` / `.cpp` |
-| Constants / macros | `MAX_RETRY_COUNT` | `U8G2GL_DEFAULT_OBSERVERS` |
+| Classes / structs | `u8g2gl_` + lowercase_snake | `u8g2gl_obj`, `u8g2gl_style` |
+| Base classes | No `I` prefix | `u8g2gl_obj`, not `IObject` |
+| Methods | snake_case | `set_coords()`, `get_x()` |
+| Member variables | trailing underscore | `observer_count_`, `style_` |
+| Enum types | `u8g2gl_*_t`, **explicit base type** | `u8g2gl_align_t : uint8_t` |
+| Enum values | `U8G2GL_` + SCREAMING_SNAKE | `U8G2GL_ALIGN_LEFT` |
+| Constants / macros | `U8G2GL_` + SCREAMING_SNAKE | `U8G2GL_DEFAULT_OBSERVERS` |
+| Files | lowercase, matching the class | `u8g2gl_obj.h` / `.cpp` |
 
-**Why the divergence** — three reasons, all recorded as decisions:
+**Why flat prefixes and not namespaces** — [D-13]. Symbols stay readable in linker
+maps and debugger backtraces, Arduino sketches use `using namespace` freely enough
+that namespaces protect nothing, and a prefixed header remains usable from C.
 
-1. **[D-13]** — flat `u8g2gl_` / `U8G2GL_` prefixes rather than namespaces, following
-   LVGL's convention. Symbols stay readable in linker maps and debugger
-   backtraces, Arduino sketches use `using namespace` freely enough that
-   namespaces protect nothing, and a prefixed header stays usable from C.
-2. **[D-12] and design_spec §13.4** — an XML tag maps **1:1** onto a class name.
-   `<u8g2gl_label>` instantiates `u8g2gl_label`. This costs a lowercase_snake
-   class name, unconventional in C++, and buys a generator with no name-mapping
-   table plus generated code a user can read against their own XML line by line.
-3. **We are a peer of U8G2 and LVGL, not a module inside a framework.** Consumers
-   read our headers next to `u8g2.h` and `lvgl.h`; matching their idiom lowers the
-   cost of reading ours.
+**Why lowercase_snake class names**, which is unconventional C++ — [D-12] and
+design_spec §13.4. An XML tag maps **1:1** onto a class name: `<u8g2gl_label>`
+instantiates `u8g2gl_label`. That buys a generator with no name-mapping table and
+generated code a user can read against their own XML line by line. Renaming these
+to PascalCase would break the generator's contract.
 
-**Do not "fix" this to match foundation.** It is a ratified decision, and the 1:1
-XML↔class property depends on it.
+**Always give an enum an explicit base type.** An untyped `enum` is `int` — four
+bytes where one will do. This cost 16 bytes per object before it was caught.
+
+### TypeScript CLI and designer — ordinary TypeScript
+
+| Category | Convention | Example |
+|---|---|---|
+| Classes, types, interfaces | PascalCase, **no `I` prefix** | `ProjectFileSystem` |
+| Functions, variables | camelCase | `resolveAnchors()` |
+| Constants | SCREAMING_SNAKE | `SCHEMA_VERSION` |
+| Files | kebab-case | `display-catalogue.ts` |
+| Enums | prefer union string types | `type Severity = 'error' \| 'warning'` |
+
+There is no reason to carry the C++ scheme into TypeScript, and doing so would
+fight every tool in that ecosystem. Judging TypeScript against the C++ table is a
+false positive.
 
 ## 3. Architectural principles
-
-Imported from foundation, minus the framework-module rules that do not apply.
 
 **SOLID, as it lands here**
 - **SRP** — one reason to change. A widget renders itself; it does not own layout
@@ -139,12 +152,12 @@ These come from the design spec and are enforced in review:
 
 ## 5. Reference
 
+- **[references/documentation.md](references/documentation.md) — file headers, Doxygen, in-routine breakdowns. Read this one; it is the most frequently violated.**
 - [references/cpp.md](references/cpp.md) — C++ style, memory discipline, file layout, testing
 - [references/typescript.md](references/typescript.md) — CLI and designer standards
 
 ## Attribution
 
-Adapted from `esp32-app-foundation/.agents/skills/framework-expert` (Apache-2.0,
-© CB Labs), by the same owner, relicensed here under this repository's MIT terms.
-Material specific to the foundation's module framework has been deliberately
-excluded rather than adapted.
+Documentation conventions and memory discipline derive from the author's
+`esp32-app-foundation` house standards (Apache-2.0, © CB Labs), relicensed here
+under this repository's MIT terms. Naming and structure are U8G2GL's own.
