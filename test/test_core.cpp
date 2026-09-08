@@ -1,0 +1,431 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: test/test_core.cpp
+ * Description: Implementation of test_core.cpp
+ */
+#include <gtest/gtest.h>
+#include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_tree.h"
+#include "u8g2gl/u8g2gl_types.h"
+#include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_style.h"
+#include "u8g2gl/u8g2gl_subject.h"
+#include "U8G2lib.h"
+#include <iostream>
+#include <string>
+
+// --- Mock widget subclass for testing ---
+class mock_widget : public u8g2gl_obj {
+public:
+    uint32_t next_deadline = U8G2GL_IDLE;
+    int tick_count = 0;
+    int render_count = 0;
+    uint32_t last_tick_time = 0;
+
+    uint32_t tick(uint32_t now_ms) override {
+        tick_count++;
+        last_tick_time = now_ms;
+        return next_deadline;
+    }
+
+    void render(U8G2& /*display*/) override {
+        render_count++;
+    }
+};
+
+// Mock tick source
+static uint32_t s_mock_time = 0;
+static uint32_t mock_millis() {
+    return s_mock_time;
+}
+
+// Global counters for function pointer callbacks
+static int s_activate_count = 0;
+static int s_deactivate_count = 0;
+static int s_activate_b_count = 0;
+static int s_render_count = 0;
+static mock_widget s_widget1;
+static mock_widget s_widget2;
+
+static void cb_activate() {
+    s_activate_count++;
+}
+
+static void cb_deactivate() {
+    s_deactivate_count++;
+}
+
+static void cb_activate_b() {
+    s_activate_b_count++;
+}
+
+static void cb_render(U8G2& /*display*/) {
+    s_render_count++;
+}
+
+static uint32_t cb_tick_single(uint32_t now_ms) {
+    return s_widget1.tick(now_ms);
+}
+
+static uint32_t cb_tick_two(uint32_t now_ms) {
+    uint32_t d1 = s_widget1.tick(now_ms);
+    uint32_t d2 = s_widget2.tick(now_ms);
+    return u8g2gl_min(d1, d2);
+}
+
+// Test Fixture: resets global state between tests
+class Core : public ::testing::Test {
+protected:
+    void SetUp() override {
+        u8g2gl_set_tick_cb(nullptr);
+        u8g2gl_set_active_screen(nullptr);
+        s_mock_time = 0;
+        s_activate_count = 0;
+        s_deactivate_count = 0;
+        s_activate_b_count = 0;
+        s_render_count = 0;
+        s_widget1 = mock_widget{};
+        s_widget2 = mock_widget{};
+    }
+
+    void TearDown() override {
+        u8g2gl_set_tick_cb(nullptr);
+        u8g2gl_set_active_screen(nullptr);
+        s_mock_time = 0;
+    }
+};
+
+// --- Tick Callback Tests ---
+
+TEST_F(Core, TickCallbackDefault) {
+    // Before setting callback, u8g2gl_tick_now() returns 0
+    EXPECT_EQ(u8g2gl_tick_now(), 0u);
+}
+
+TEST_F(Core, TickCallbackRegistered) {
+    // Set mock callback, set s_mock_time = 1000
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 1000;
+    EXPECT_EQ(u8g2gl_tick_now(), 1000u);
+}
+
+// --- Screen Management Tests ---
+
+TEST_F(Core, NoActiveScreen) {
+    // ui_handler() with no active screen returns U8G2GL_IDLE without crashing
+    U8G2 display;
+    EXPECT_EQ(ui_handler(display), U8G2GL_IDLE);
+    EXPECT_EQ(display.clear_count, 0);
+    EXPECT_EQ(display.send_count, 0);
+}
+
+TEST_F(Core, SetActiveScreen) {
+    u8g2gl_screen screen{};
+    u8g2gl_set_active_screen(&screen);
+    EXPECT_EQ(u8g2gl_get_active_screen(), &screen);
+}
+
+TEST_F(Core, ScreenActivateCalledOnSet) {
+    u8g2gl_screen screen{};
+    screen.activate_fn = cb_activate;
+    EXPECT_EQ(s_activate_count, 0);
+
+    u8g2gl_set_active_screen(&screen);
+    EXPECT_EQ(s_activate_count, 1);
+    EXPECT_TRUE(screen.dirty); // Activation forces first frame
+}
+
+TEST_F(Core, ScreenDeactivateOnSwitch) {
+    u8g2gl_screen screen_a{};
+    screen_a.deactivate_fn = cb_deactivate;
+
+    u8g2gl_screen screen_b{};
+    screen_b.activate_fn = cb_activate_b;
+
+    u8g2gl_set_active_screen(&screen_a);
+    EXPECT_EQ(s_deactivate_count, 0);
+
+    u8g2gl_set_active_screen(&screen_b);
+    EXPECT_EQ(s_deactivate_count, 1);
+    EXPECT_EQ(s_activate_b_count, 1);
+    EXPECT_EQ(u8g2gl_get_active_screen(), &screen_b);
+}
+
+// --- Frame Gate Tests ---
+
+TEST_F(Core, DirtyRendersAndClears) {
+    U8G2 display;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+
+    u8g2gl_set_active_screen(&screen);
+    EXPECT_TRUE(screen.dirty);
+
+    uint32_t idle = ui_handler(display);
+    EXPECT_EQ(idle, U8G2GL_IDLE);
+    EXPECT_EQ(s_render_count, 1);
+    EXPECT_EQ(display.clear_count, 1);
+    EXPECT_EQ(display.send_count, 1);
+    EXPECT_FALSE(screen.dirty);
+}
+
+TEST_F(Core, NotDirtyDoesNotRender) {
+    U8G2 display;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+
+    u8g2gl_set_active_screen(&screen);
+    ui_handler(display); // Clears dirty from activation
+    EXPECT_EQ(s_render_count, 1);
+    EXPECT_EQ(display.clear_count, 1);
+    EXPECT_EQ(display.send_count, 1);
+    EXPECT_FALSE(screen.dirty);
+
+    // Second call: not dirty, so no render or buffer operations
+    uint32_t idle = ui_handler(display);
+    EXPECT_EQ(idle, U8G2GL_IDLE);
+    EXPECT_EQ(s_render_count, 1);
+    EXPECT_EQ(display.clear_count, 1);
+    EXPECT_EQ(display.send_count, 1);
+}
+
+TEST_F(Core, MarkDirtyCausesRender) {
+    U8G2 display;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+
+    u8g2gl_set_active_screen(&screen);
+    ui_handler(display); // Clears dirty
+    EXPECT_FALSE(screen.dirty);
+    EXPECT_EQ(s_render_count, 1);
+
+    u8g2gl_mark_dirty();
+    EXPECT_TRUE(screen.dirty);
+
+    ui_handler(display); // Renders again
+    EXPECT_EQ(s_render_count, 2);
+    EXPECT_EQ(display.clear_count, 2);
+    EXPECT_EQ(display.send_count, 2);
+    EXPECT_FALSE(screen.dirty);
+}
+
+// --- Deadline Aggregation Tests ---
+
+TEST_F(Core, SingleWidgetDeadline) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 0;
+    s_widget1.next_deadline = 500;
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_single;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(s_widget1.tick_count, 1);
+    EXPECT_EQ(s_widget1.last_tick_time, 0u);
+    EXPECT_EQ(sleep_ms, 500u);
+}
+
+TEST_F(Core, TwoWidgetMinimumDeadline) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 0;
+    s_widget1.next_deadline = 1000;
+    s_widget2.next_deadline = 300;
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_two;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(sleep_ms, 300u);
+}
+
+TEST_F(Core, AllIdleReturnsIdle) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 0;
+    s_widget1.next_deadline = U8G2GL_IDLE;
+    s_widget2.next_deadline = U8G2GL_IDLE;
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_two;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(sleep_ms, U8G2GL_IDLE);
+}
+
+TEST_F(Core, MixedIdleAndDeadline) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 0;
+    s_widget1.next_deadline = U8G2GL_IDLE;
+    s_widget2.next_deadline = 200;
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_two;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(sleep_ms, 200u);
+}
+
+// --- Visibility Tests ---
+
+static void cb_render_with_visibility(U8G2& display) {
+    u8g2gl_screen* scr = u8g2gl_get_active_screen();
+    if (!scr) return;
+    for (uint8_t i = 0; i < scr->obj_count; ++i) {
+        if (u8g2gl_is_effectively_visible(scr->objs, scr->parents, i)) {
+            scr->objs[i]->render(display);
+        }
+    }
+}
+
+TEST_F(Core, HiddenWidgetNotRendered) {
+    s_widget1 = mock_widget{};
+    s_widget2 = mock_widget{};
+    s_widget2.set_hidden(true);
+
+    u8g2gl_obj* const objs[] = { &s_widget1, &s_widget2 };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, U8G2GL_NO_PARENT };
+
+    u8g2gl_screen screen{};
+    screen.objs = objs;
+    screen.parents = parents;
+    screen.obj_count = 2;
+    screen.render_fn = cb_render_with_visibility;
+
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    ui_handler(display);
+
+    EXPECT_EQ(s_widget1.render_count, 1);
+    EXPECT_EQ(s_widget2.render_count, 0);
+}
+
+// --- Object mark_dirty triggers screen dirty ---
+
+TEST_F(Core, ObjMarkDirtyGatesFrame) {
+    U8G2 display;
+    mock_widget w;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+    u8g2gl_set_active_screen(&screen);
+
+    ui_handler(display); // Clears dirty from activation
+    EXPECT_FALSE(screen.dirty);
+    EXPECT_EQ(s_render_count, 1);
+
+    // Call mark_dirty() on an individual widget
+    w.mark_dirty();
+    EXPECT_TRUE(w.is_dirty());
+    EXPECT_TRUE(screen.dirty); // Widget mark_dirty() gated the screen!
+
+    ui_handler(display);
+    EXPECT_EQ(s_render_count, 2);
+    EXPECT_FALSE(screen.dirty);
+}
+
+// --- Elapsed Time and Period Wrapper Tests ---
+
+TEST_F(Core, ElapsedSubtractedFromDeadline) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 100;
+    s_widget1.next_deadline = 500;
+
+    auto tick_advances = [](uint32_t now_ms) -> uint32_t {
+        s_mock_time += 50; // simulates 50ms work during tick/render
+        return s_widget1.tick(now_ms);
+    };
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = tick_advances;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(sleep_ms, 450u); // 500 - 50 = 450
+}
+
+TEST_F(Core, ElapsedExceedsDeadlineReturnsZero) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 100;
+    s_widget1.next_deadline = 100;
+
+    auto tick_advances = [](uint32_t now_ms) -> uint32_t {
+        s_mock_time += 150; // exceeds deadline of 100
+        return s_widget1.tick(now_ms);
+    };
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = tick_advances;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    uint32_t sleep_ms = ui_handler(display);
+    EXPECT_EQ(sleep_ms, 0u);
+}
+
+TEST_F(Core, RunInPeriod) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_mock_time = 0;
+    U8G2 display;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+    u8g2gl_set_active_screen(&screen);
+
+    // Initial run
+    uint32_t res1 = ui_handler_run_in_period(display, 50);
+    EXPECT_EQ(res1, U8G2GL_IDLE);
+    EXPECT_EQ(s_render_count, 1);
+
+    // Advance 20ms (< 50ms period)
+    s_mock_time = 20;
+    u8g2gl_mark_dirty();
+    uint32_t res2 = ui_handler_run_in_period(display, 50);
+    EXPECT_EQ(res2, 0u);
+    EXPECT_EQ(s_render_count, 1); // Not executed yet
+
+    // Advance to 50ms (>= 50ms period)
+    s_mock_time = 50;
+    uint32_t res3 = ui_handler_run_in_period(display, 50);
+    EXPECT_EQ(res3, U8G2GL_IDLE);
+    EXPECT_EQ(s_render_count, 2); // Executed!
+}
+
+// --- Final sizeof Report (§18/Q-4) ---
+
+TEST_F(Core, SizeOfReport) {
+    std::cout << "\n================ U8G2GL MEMORY REPORT ================" << std::endl;
+    std::cout << "sizeof(u8g2gl_obj):            " << sizeof(u8g2gl_obj) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_style):          " << sizeof(u8g2gl_style) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_screen):         " << sizeof(u8g2gl_screen) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_observer):       " << sizeof(u8g2gl_observer) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_subject_int):    " << sizeof(u8g2gl_subject_int) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_subject_string): " << sizeof(u8g2gl_subject_string) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_subject_bool):   " << sizeof(u8g2gl_subject_bool) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_subject_time):   " << sizeof(u8g2gl_subject_time) << " bytes" << std::endl;
+    std::cout << "======================================================\n" << std::endl;
+
+    RecordProperty("sizeof_u8g2gl_obj", std::to_string(sizeof(u8g2gl_obj)));
+    RecordProperty("sizeof_u8g2gl_style", std::to_string(sizeof(u8g2gl_style)));
+    RecordProperty("sizeof_u8g2gl_screen", std::to_string(sizeof(u8g2gl_screen)));
+    RecordProperty("sizeof_u8g2gl_observer", std::to_string(sizeof(u8g2gl_observer)));
+    RecordProperty("sizeof_u8g2gl_subject_int", std::to_string(sizeof(u8g2gl_subject_int)));
+    RecordProperty("sizeof_u8g2gl_subject_string", std::to_string(sizeof(u8g2gl_subject_string)));
+    RecordProperty("sizeof_u8g2gl_subject_bool", std::to_string(sizeof(u8g2gl_subject_bool)));
+    RecordProperty("sizeof_u8g2gl_subject_time", std::to_string(sizeof(u8g2gl_subject_time)));
+
+    EXPECT_GT(sizeof(u8g2gl_obj), 0u);
+    EXPECT_GT(sizeof(u8g2gl_screen), 0u);
+}

@@ -199,3 +199,27 @@ than in the source, where the next reader will look.
 ## Completion Report
 
 <!-- Written by the remediation worker at task completion -->
+
+**Changes made:**
+- **P2:** Re-typed `u8g2gl_subject_type_t` and `u8g2gl_event_t` with explicit `uint8_t` base types.
+- **P2:** Re-ordered `u8g2gl_binding_desc` members to group `uint8_t` and `bool` members together after `ref_value`, optimizing struct padding.
+- **P3:** Added the standard SPDX and `File:` header blocks to all 20 source and test files. Populated the Exported Classes block for all 9 headers, grouped by concern where applicable.
+- **P3:** Upgraded informative `//` comments into valid Doxygen (`/** @brief ... */`) blocks for `bind_text`, `bind_flag_if_*`, `ui_handler`, and `add_observer`. Noted the failure mode (silent failure/no-op) when subject observer capacities are exhausted.
+- **P3:** Added the required why-comment above `u8g2gl_is_effectively_visible()` and `u8g2gl_effective_clip()` in `u8g2gl_tree.h`, explaining the flat hierarchy mapping and `[A-3]` rationale.
+- **P3:** Renamed the phase comments in `ui_handler()` (in `u8g2gl_core.cpp`) to the required `// --- Step N: <description> ---` house style.
+
+**Verification Results:**
+- `Core.SizeOfReport` (on 64-bit host) yields:
+  - `sizeof(u8g2gl_obj)`: 48 bytes
+  - `sizeof(u8g2gl_style)`: 24 bytes
+  - `sizeof(u8g2gl_screen)`: 72 bytes
+  - `sizeof(u8g2gl_observer)`: 16 bytes
+  - `sizeof(u8g2gl_subject_int)`: 80 bytes
+  - `sizeof(u8g2gl_subject_string)`: 120 bytes
+  - `sizeof(u8g2gl_subject_bool)`: 80 bytes
+  - `sizeof(u8g2gl_subject_time)`: 80 bytes
+- Compilation emits zero warnings under `-Wall -Wextra -Wpedantic`.
+- All tests pass (80/80).
+
+**Notes for Architect:**
+No behavioral regressions were made. P4 items were deferred.

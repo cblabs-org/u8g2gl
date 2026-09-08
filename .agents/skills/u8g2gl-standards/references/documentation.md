@@ -96,8 +96,42 @@ a contract, name the contract as the group.
   machine-readable and it is how a downstream consumer audits licensing.
 - **The `File:` path must match reality.** A stale path after a rename is worse
   than none, because it is confidently wrong.
-- **The description says what and why, not how.** "Builds the display catalogue"
-  plus the reason for the approach beats a restatement of the code.
+
+### `Purpose:` — the field that does the real work
+
+**A header block must open with why this module exists, not what it contains.**
+The single most common failure is a description that restates the filename:
+
+```
+ * Description: Implementation of u8g2gl_tree.cpp        ← says nothing
+ * Description: Declarations for u8g2gl_style.h          ← says nothing
+```
+
+A reader who opened the file already knows its name. What they do not know is
+what problem it solves, what role it plays, and how it relates to the modules
+either side of it. Give them that:
+
+```
+ * Purpose: Answers the only two questions the render loop asks about an
+ *          object's ancestry — "am I actually visible?" and "what region may I
+ *          draw into?" Hiding a container must hide its children, and a child
+ *          must not paint outside its parent; both fall out of walking parent
+ *          indices upward. This module exists so no widget has to know the
+ *          hierarchy exists.
+ *
+ * Description: Two upward ancestry walks plus the rectangle intersection they
+ *              share. Every walk is bounded and null-tolerant because it runs
+ *              inside the render loop, where a bad pointer means a reboot
+ *              rather than an exception.
+```
+
+**The test:** could a reviewer who has never seen this codebase read the header
+block alone and say what the module is for, and why it is separate from its
+neighbours? If not, the header is not finished.
+
+Say explicitly where the module sits: what calls it, what it calls, and which
+design decision it implements. A pointer such as "implements [A-3]" costs one
+line and connects the code to the reasoning behind it.
 
 ---
 
@@ -148,6 +182,74 @@ A trivial accessor may carry a one-line `@brief` or nothing. Do not pad.
 **Document the contract, not the implementation.** A doc comment describing *how*
 becomes wrong the first time the body changes; one describing *what is guaranteed*
 survives refactoring.
+
+### Function banners in implementation files
+
+Doxygen lives on the **declaration**, in the header — duplicating the full
+contract in the `.cpp` guarantees the two will drift.
+
+But a reviewer reading the implementation should not have to jump to the header
+to know what they are looking at. Give every non-trivial function in a `.cpp` a
+short banner: one line on what it does, and a line per parameter *as the
+implementation uses it*.
+
+```cpp
+// u8g2gl_effective_clip
+// Computes the region an object may draw into: its own bounds intersected with
+// every ancestor's. Walks upward from `index`.
+//   objs    — flat array, document order; a null entry aborts to an empty rect
+//   parents — parallel index array, or nullptr to use each object's own index
+//   index   — the object whose clip is wanted
+u8g2gl_rect u8g2gl_effective_clip(...)
+```
+
+This is orientation, not contract. It says what the parameters *are*; the header
+says what the caller must *guarantee*. Keep it to a few lines — if the banner
+starts restating the header, delete it and fix the header instead.
+
+Trivial functions — a one-line accessor, a straight delegation — do not need one.
+Where a run of them shares a rationale, annotate the *block* once rather than
+each member; sixteen near-identical banners is noise that trains readers to skip
+comments.
+
+### Completeness — check the file, do not eyeball it
+
+**Documenting headers and forgetting implementations is the single most common
+way this standard is under-applied.** It happens because headers are where the
+API lives, so attention goes there naturally and the `.cpp` looks "already
+covered". It is not: the header carries the contract, the implementation carries
+the reasoning, and the reasoning is what a reviewer cannot reconstruct.
+
+Before calling a file done, enumerate its functions and account for every one —
+either it has a banner, or it is trivial enough not to need one. Verify rather
+than assume:
+
+```bash
+# Functions declared at file scope, and whether the line above is a comment
+awk '/^[a-zA-Z].*\(/ && !/^\s/ { printf "%-6d %-60s %s\n", NR, substr($0,1,58),
+     (prev ~ /^\/\//) ? "banner" : "— CHECK" } { prev=$0 }' src/file.cpp
+```
+
+Every `— CHECK` is a decision you must actually make, not a line to skim past.
+
+The same applies to the four documentation layers: a file with a good header
+block and no why-comments is not documented, it is labelled. Ask which of the
+four are missing before you move on.
+
+### What "high standard" means here
+
+A reviewer new to the codebase should be able to open any single file and answer:
+
+1. **What is this module for, and why is it separate from its neighbours?** —
+   the `Purpose:` block
+2. **What can I call, and what must I guarantee when I do?** — Doxygen on
+   declarations
+3. **What is this function doing, and what are its inputs?** — the banner
+4. **What are the stages of this algorithm?** — step comments
+5. **Why is it done this way rather than the obvious way?** — why-comments
+
+If any answer requires reading another file, or reading the implementation to
+understand the interface, the documentation is not finished.
 
 ---
 
@@ -238,14 +340,18 @@ so, answer them.
 
 In rough order of value:
 
-1. **Missing file header or SPDX** — mechanical, and grouped as one finding
+1. **A header block whose description restates the filename** — "Implementation
+   of foo.cpp" is worse than no description, because it occupies the space where
+   the module's purpose should be and looks superficially complete. Check every
+   `Purpose:`/`Description:` against the test above.
+2. **Missing file header or SPDX** — mechanical, and grouped as one finding
    across many files rather than one per file.
-2. **Public API with no doc comment** — especially anything with a lifetime
+3. **Public API with no doc comment** — especially anything with a lifetime
    requirement, a failure mode, or a non-obvious return.
-3. **Long function with no breakdown** — a 40-line body with no structure.
-4. **A non-obvious construct with no why-comment** — the costly kind, because the
+4. **Long function with no breakdown** — a 40-line body with no structure.
+5. **A non-obvious construct with no why-comment** — the costly kind, because the
    knowledge exists only in the author's head.
-5. **Stale documentation** — a `File:` path that no longer matches, a `@param`
+6. **Stale documentation** — a `File:` path that no longer matches, a `@param`
    for a removed parameter, a comment describing behaviour that has changed.
    **Treat stale docs as more serious than missing docs.** Absent documentation
    slows a reader down; wrong documentation actively misleads them.
