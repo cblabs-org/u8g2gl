@@ -102,9 +102,15 @@ first:
 | **Readability** | Functions doing more than their name says; magic numbers wanting a named constant; dead or commented-out code |
 
 **4. Verify every finding before reporting it.** Open the file and read the actual
-line. A report containing things that are not true is worse than no report,
-because it destroys trust in the whole document and wastes a remediation worker's
-time. Quote the offending line as evidence.
+line. A report containing things that are not true is worse than no report — it
+destroys trust in the whole document and wastes a remediation worker's time. Quote
+the offending line as evidence.
+
+**Measure size and layout claims; never reason about them.** If you assert that
+something costs bytes or forces padding, compile a small program and print the
+`sizeof`. State which target width the figure is for — a struct dominated by
+pointers can be identical on a 64-bit host and differ on the 32-bit target, so a
+host measurement alone can be confidently wrong. This has already happened once.
 
 **5. Write the report** to the path you were given (default:
 `tmp/readability-report.md`).
@@ -128,66 +134,123 @@ how easy it is to spot:
   breakdown, struct member ordering. Mechanical, but this is the category the
   review primarily exists to surface — report it fully rather than summarising it
   away.
-- **P4 — Suggestion.** Genuine readability improvements that no rule mandates.
-  Keep these few; a report padded with opinion gets skimmed and the P1s get missed.
+- **P4 — Suggestion.** Genuine improvements that **no rule mandates**. If the
+  standards name a thing as required — a why-comment they give as a worked
+  example, a header block, a doc comment on a public API — its absence is at least
+  P3, never P4. Reserve P4 for your own opinion, and keep it short; a checklist
+  padded with opinion gets skimmed and the P1s get missed.
 
 If you find nothing above P3, say so plainly. "No significant defects" is a
 valid and valuable result — do not manufacture findings to justify the review.
 
-## Report format
+## Output — a WORKORDER, not an essay
 
-Use this structure. Findings are checkboxes with file, line and fix so the
-report can be pasted into a `WORKORDER.md` and handed to a remediation worker
-without transcription.
+**Your deliverable is a `WORKORDER.md` that a remediation worker can execute
+without anyone rewriting it.** A review document that has to be transcribed into a
+work order has failed at its actual job — it moved the work sideways rather than
+forward.
 
-```markdown
-# Readability Review — <scope>
+Write to the path you were given (default:
+`.agents/skills/principal-architect-workspace/<project>/wo-readability/WORKORDER.md`,
+or `tmp/readability-workorder.md` if no project is named).
 
-**Reviewed:** <what: branch, diff range, directory, file list>
-**Date:** <YYYY-MM-DD>
-**Standards:** `u8g2gl-standards` skill (cite the section for each finding)
+Use exactly this structure. It matches the house WORKORDER template, so it drops
+into the PA workflow unchanged.
 
-## Summary
+````markdown
+---
+name: <project>-wo-readability
+description: Remediate readability and documentation defects found in <scope>
+complexity: mechanical   # or standard if findings need judgement
+---
 
-<Two or three sentences. What was reviewed, the headline finding, and whether it
-is fit to proceed. Lead with the most consequential thing, not a count.>
+# WO — Readability & Documentation Remediation
 
-| Severity | Count |
-|---|---|
-| P1 — Correctness or cost | n |
-| P2 — Convention with consequence | n |
-| P3 — Consistency | n |
-| P4 — Suggestion | n |
+**Scope reviewed:** <branch, diff range, directory or file list>
+**Reviewed:** <YYYY-MM-DD>
+**Standards:** `u8g2gl-standards` skill
 
-## P1 — Correctness or cost
+## Role Definition
 
-- [ ] **`src/u8g2gl_foo.cpp:42`** — Stores a `std::function` as a member.
-  ```cpp
-  std::function<void(int)> callback_;
-  ```
-  Hidden SBO heap allocation; the runtime is heap-free by design (cpp.md §2).
-  **Fix:** replace with a function pointer plus `void* ctx`, as
-  `u8g2gl_observer` already does.
+> You are an expert senior software engineer and execution-focused worker agent.
+> You are NOT the Principal Architect. Do not make architectural decisions, do not
+> branch, and do not plan. Execute the checklist below.
 
-## P2 — Convention with consequence
-<same shape>
+## Objective
 
-## P3 — Consistency
-<same shape>
+<One or two sentences. What this remediation achieves and why it matters —
+e.g. "Bring the runtime's documentation up to the standard so PR-03's widget
+authors can work from the headers alone.">
 
-## P4 — Suggestions
-<same shape, and keep it short>
+## Strict Boundary Box
 
-## Observations
+**Do NOT touch:**
+- Any behaviour. This is documentation and naming only — no logic changes.
+- <anything else specific to the scope>
 
-<Anything genuinely worth saying that the standards do not cover, or where you
-think a standard itself may be wrong. Say explicitly that the standards are
-silent. This is also where you note pre-existing defects outside the diff.>
+**Do NOT:** create branches, open PRs, rebase, or merge.
 
-## Files reviewed
+If a fix appears to require a behavioural change, stop and surface it rather than
+making it.
 
-<Plain list, so the reader can see coverage and spot anything you missed.>
-```
+## Tooling Constraints
+
+<the project's build and test commands, and the invariants that must still hold —
+e.g. zero warnings, all tests passing>
+
+## Line-Item Instructions
+
+Ordered by severity. Each item names the file, the line, the evidence and the fix.
+
+### P2 — Convention with consequence
+- [ ] `path/file.h:9` — <defect>. <evidence, quoted>. **Fix:** <specific change>.
+
+### P3 — Consistency
+- [ ] ...
+
+### P4 — Optional, only if the architect approves
+- [ ] ...
+
+## Verification Requirement
+
+- [ ] <build command> — zero warnings
+- [ ] <test command> — all tests pass, none weakened
+- [ ] No behavioural change: <how to confirm, e.g. "diff shows only comments,
+      headers and type declarations">
+
+## Issue Surfacing
+
+If you find a defect outside this checklist, surface it in your Completion Report
+— do not fix it and do not file an issue.
+
+## Review Notes
+
+<The reasoning behind the findings, so a human can judge them before spawning a
+worker: the summary, the severity counts, what was checked, and anything you were
+uncertain about. This section is for the architect, not the worker.>
+
+**Severity counts:** P1 n · P2 n · P3 n · P4 n
+
+**Files reviewed:** <list, so coverage is visible>
+
+**Observations:** <anything the standards do not cover, or where you think a
+standard itself may be wrong>
+
+## Completion Report
+
+<!-- Written by the remediation worker at task completion -->
+````
+
+**Grouping still applies.** Fifteen files missing a header is one line item listing
+fifteen files, not fifteen items. A checklist of forty where thirty are the same
+thing is a checklist nobody reads.
+
+**P4 items go in, but flagged as requiring approval.** A worker should not act on
+opinion without a decision; putting them in the document while marking them
+optional keeps the judgement with the architect where it belongs.
+
+**If you find nothing above P3, say so in the Objective and keep the file short.**
+"No significant defects" is a valid result. Do not manufacture line items.
 
 ## How to be useful
 
