@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <bool name="wifi_connected" value="true" />
+    </subjects>
+    <fonts>
+        <bdf name="small_9" src="fonts/small_9.bdf" />
+    </fonts>
+</globals>

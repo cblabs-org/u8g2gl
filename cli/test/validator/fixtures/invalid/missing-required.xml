@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="screen_missing_required">
+    <view>
+        <u8g2gl_label name="lbl" x="0" y="0" width="100" height="12" text="Hello" />
+    </view>
+</screen>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="screen_overconstrained">
+    <view>
+        <u8g2gl_box name="box_item" x="0" width="50" right="20" y="0" height="20" />
+    </view>
+</screen>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <consts>
+        <int name="screen_width" value="128" />
+        <int name="screen_height" value="64" />
+    </consts>
+
+    <subjects>
+        <string name="station_name" value="London Euston" max_len="48" />
+        <bool name="wifi_connected" value="true" />
+        <int name="temperature" value="21" />
+    </subjects>
+
+    <styles>
+        <style name="header" font="small_9" align="center" draw_color="1" />
+        <style name="body" font="small_9" align="left" draw_color="1" />
+    </styles>
+
+    <fonts>
+        <bdf name="small_9" src="fonts/small_9.bdf" />
+        <bdf name="tall_12" src="fonts/tall_12.bdf" />
+    </fonts>
+
+    <images>
+        <xbm name="icon_wifi" src="images/wifi.xbm" />
+    </images>
+</globals>

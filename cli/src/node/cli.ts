@@ -15,9 +15,24 @@
  * - runCli(args): Main entry point for command-line execution
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
+import {
+  parseProjectFile,
+  parseGlobalsFile,
+  parseScreenFile,
+  parseComponentFile,
+  parseWidgetManifestFile,
+} from '../core/parser/index.js';
+import { validate } from '../core/validator/index.js';
+import type { Diagnostic } from '../core/schema/diagnostic.js';
+import type { U8g2glProject } from '../core/schema/project.js';
+import type { Globals } from '../core/schema/globals.js';
+import type { Screen } from '../core/schema/screen.js';
+import type { Component } from '../core/schema/component.js';
+import type { WidgetManifest } from '../core/schema/widget-manifest.js';
 import {
   identifyDisplay,
   sourceDisplay,
@@ -441,9 +456,207 @@ export function runCli(rawArgs: readonly string[]): void {
     return;
   }
 
+/**
+ * Recursively discovers all XML files within a directory tree.
+ */
+function findXmlFiles(dir: string): string[] {
+  const results: string[] = [];
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (
+        entry.name === 'node_modules' ||
+        entry.name === '.git' ||
+        entry.name === 'dist' ||
+        entry.name.startsWith('.')
+      ) {
+        continue;
+      }
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...findXmlFiles(fullPath));
+      } else if (entry.isFile() && entry.name.endsWith('.xml')) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Return collected entries on error
+  }
+  return results;
+}
+
+/**
+ * Executes the 'validate' subcommand across a project directory or single XML file.
+ */
+function handleValidateCommand(args: readonly string[], json: boolean): void {
+  const targetArg = args[0] ?? '.';
+  const targetPath = resolve(process.cwd(), targetArg);
+
+  if (!existsSync(targetPath)) {
+    console.error(`Error: Path does not exist: ${targetArg}`);
+    process.exit(1);
+  }
+
+  const stat = statSync(targetPath);
+  const xmlFiles: string[] = [];
+
+  if (stat.isFile()) {
+    xmlFiles.push(targetPath);
+  } else if (stat.isDirectory()) {
+    xmlFiles.push(...findXmlFiles(targetPath));
+  }
+
+  if (xmlFiles.length === 0) {
+    console.error(`No XML files found in: ${targetArg}`);
+    process.exit(1);
+  }
+
+  const parsedProjects: { file: string; project: U8g2glProject }[] = [];
+  const parsedGlobalsList: Globals[] = [];
+  const parsedScreens: Screen[] = [];
+  const parsedComponents: Component[] = [];
+  const parsedWidgetManifests: WidgetManifest[] = [];
+  const allDiagnostics: Diagnostic[] = [];
+
+  for (const file of xmlFiles) {
+    let xml: string;
+    try {
+      xml = readFileSync(file, 'utf-8');
+    } catch (err) {
+      console.error(`Error reading ${file}: ${String(err)}`);
+      continue;
+    }
+
+    const match = xml.match(/<([a-zA-Z0-9_]+)/);
+    const rootTag = match ? match[1] : '';
+
+    if (rootTag === 'u8g2gl') {
+      const res = parseProjectFile(xml, file);
+      allDiagnostics.push(...res.diagnostics);
+      if (res.value) {
+        parsedProjects.push({ file, project: res.value });
+      }
+    } else if (rootTag === 'globals') {
+      const res = parseGlobalsFile(xml, file);
+      allDiagnostics.push(...res.diagnostics);
+      if (res.value) {
+        parsedGlobalsList.push(res.value);
+      }
+    } else if (rootTag === 'screen') {
+      const res = parseScreenFile(xml, file);
+      allDiagnostics.push(...res.diagnostics);
+      if (res.value) {
+        parsedScreens.push(res.value);
+      }
+    } else if (rootTag === 'component') {
+      const res = parseComponentFile(xml, file);
+      allDiagnostics.push(...res.diagnostics);
+      if (res.value) {
+        parsedComponents.push(res.value);
+      }
+    } else if (rootTag === 'widget') {
+      const res = parseWidgetManifestFile(xml, file);
+      allDiagnostics.push(...res.diagnostics);
+      if (res.value) {
+        parsedWidgetManifests.push(res.value);
+      }
+    }
+  }
+
+  const mergedGlobals: Globals = {
+    consts: parsedGlobalsList.flatMap((g) => g.consts ?? []),
+    subjects: parsedGlobalsList.flatMap((g) => g.subjects ?? []),
+    styles: parsedGlobalsList.flatMap((g) => g.styles ?? []),
+    fonts: parsedGlobalsList.flatMap((g) => g.fonts ?? []),
+    images: parsedGlobalsList.flatMap((g) => g.images ?? []),
+  };
+
+  if (parsedProjects.length > 0) {
+    for (const p of parsedProjects) {
+      const res = validate({
+        project: p.project,
+        globals: mergedGlobals,
+        screens: parsedScreens,
+        components: parsedComponents,
+        widgetManifests: parsedWidgetManifests,
+        catalogue: CATALOGUE,
+      });
+      allDiagnostics.push(...res.diagnostics);
+    }
+  } else {
+    const dummyProject: U8g2glProject = {
+      schema: '0.3',
+      name: 'unnamed',
+      version: '1.0.0',
+      targets: [],
+    };
+    const res = validate({
+      project: dummyProject,
+      globals: mergedGlobals,
+      screens: parsedScreens,
+      components: parsedComponents,
+      widgetManifests: parsedWidgetManifests,
+      catalogue: CATALOGUE,
+    });
+    allDiagnostics.push(...res.diagnostics);
+  }
+
+  // Deduplicate diagnostics by file:line:column:code:message
+  const seen = new Set<string>();
+  const uniqueDiagnostics: Diagnostic[] = [];
+  for (const d of allDiagnostics) {
+    const key = `${d.file}:${d.line}:${d.column}:${d.code}:${d.message}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueDiagnostics.push(d);
+    }
+  }
+
+  uniqueDiagnostics.sort((a, b) => {
+    if (a.file !== b.file) {
+      return a.file.localeCompare(b.file);
+    }
+    if (a.line !== b.line) {
+      return a.line - b.line;
+    }
+    if (a.column !== b.column) {
+      return a.column - b.column;
+    }
+    return a.code.localeCompare(b.code);
+  });
+
+  let errorCount = 0;
+  let warningCount = 0;
+  for (const d of uniqueDiagnostics) {
+    if (d.severity === 'error') {
+      errorCount++;
+    } else if (d.severity === 'warning') {
+      warningCount++;
+    }
+  }
+
+  if (json) {
+    console.log(JSON.stringify(uniqueDiagnostics, null, 2));
+  } else {
+    for (const d of uniqueDiagnostics) {
+      const prefix = `${d.file}:${d.line}:${d.column}`;
+      console.log(`${prefix} [${d.severity}] ${d.code}: ${d.message}`);
+      if (d.suggestions && d.suggestions.length > 0) {
+        console.log(`  did you mean: ${d.suggestions.join(', ')}?`);
+      }
+    }
+    if (errorCount === 0) {
+      console.log(`Validation passed: 0 errors, ${warningCount} warnings.`);
+    } else {
+      console.error(`Validation failed: ${errorCount} error(s), ${warningCount} warning(s).`);
+    }
+  }
+
+  process.exit(errorCount > 0 ? 1 : 0);
+}
+
   if (subcommand === 'validate') {
-    void json;
-    console.log('Not yet implemented: validate');
+    handleValidateCommand(subcommandArgs, json);
     return;
   }
 
