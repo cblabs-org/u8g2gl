@@ -10,9 +10,7 @@
  *              isomorphic and runs in both Node.js and browser environments.
  *
  * Exports:
- * - (None yet — placeholder barrel)
+ * - Schema types and diagnostic codes from ./schema/index.js
  */
 
-// Core isomorphic exports — schema, parser, validator, catalogue query
-
-export {};
+export * from './schema/index.js';
