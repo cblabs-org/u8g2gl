@@ -17,6 +17,8 @@ Testing/
 # ─── Node / TypeScript (CLI + designer, PR-02/PR-04, Phase 3) ─────────────
 node_modules/
 dist/
+cli/node_modules/
+cli/dist/
 .vite/
 *.tsbuildinfo
 .npm/
