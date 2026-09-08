@@ -138,8 +138,12 @@ uint32_t ui_handler(U8G2& display);
  *
  * @param display   The U8G2 instance.
  * @param period_ms Minimum interval between actual handler runs.
- * @return As ui_handler(), or the remaining time in the current period if the
- *         call was skipped.
+ * @return As ui_handler() when the period has elapsed and the handler ran.
+ *         **Returns 0 when the call was skipped**, which means "do not sleep" —
+ *         so a caller that feeds this straight into a sleep will spin until the
+ *         period expires. Callers wanting to idle should use ui_handler()
+ *         directly and act on its deadline, which is the mechanism designed for
+ *         that ([D-15]).
  */
 uint32_t ui_handler_run_in_period(U8G2& display, uint32_t period_ms);
 

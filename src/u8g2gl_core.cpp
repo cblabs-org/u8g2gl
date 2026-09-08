@@ -29,24 +29,45 @@
 #include "U8g2lib.h"
 #endif
 
+// Module state. Two pointers, deliberately: the library drives one screen at a
+// time and pulls time from the application rather than owning a clock, so there
+// is nothing else to keep here.
 static u8g2gl_tick_cb_t s_tick_cb = nullptr;
 static u8g2gl_screen* s_active_screen = nullptr;
 
+// u8g2gl_set_tick_cb
+// Registers the application's clock. Time is pulled rather than pushed so the
+// framework never has to own a timer or an interrupt.
+//   cb — returns milliseconds since boot; millis() on Arduino
 void u8g2gl_set_tick_cb(u8g2gl_tick_cb_t cb) {
     s_tick_cb = cb;
 }
 
+// u8g2gl_tick_now
+// Current time via the registered callback.
 uint32_t u8g2gl_tick_now() {
+    // With no callback registered, time never advances. Every animation then
+    // appears frozen while rendering still works, which is a confusing symptom
+    // — but returning 0 is preferable to calling through a null pointer, and the
+    // condition is obvious the first time anything is expected to move.
     return s_tick_cb ? s_tick_cb() : 0;
 }
 
+// u8g2gl_set_active_screen
+// Switches the active screen, running the outgoing screen's deactivate hook
+// before the incoming screen's activate hook so the two never overlap.
+//   screen — the screen to make active, or nullptr to leave none active
 void u8g2gl_set_active_screen(u8g2gl_screen* screen) {
     if (s_active_screen && s_active_screen->deactivate_fn) {
         s_active_screen->deactivate_fn();
     }
     s_active_screen = screen;
     if (screen) {
-        screen->dirty = true;  // force first frame
+        // Force the first frame. A newly activated screen has changed nothing by
+        // its own reckoning, so without this the dirty gate would suppress its
+        // initial paint and the display would keep showing the previous screen
+        // until something unrelated happened to change.
+        screen->dirty = true;
         if (screen->activate_fn) {
             screen->activate_fn();
         }
@@ -63,6 +84,10 @@ void u8g2gl_mark_dirty() {
     }
 }
 
+// ui_handler
+// One frame: tick every widget, redraw if anything changed, and report how long
+// the caller may sleep. This is the whole of the framework's per-loop work.
+//   display — the application's U8G2 instance; the framework only draws into it
 uint32_t ui_handler(U8G2& display) {
     if (!s_active_screen) {
         return U8G2GL_IDLE;
@@ -76,7 +101,11 @@ uint32_t ui_handler(U8G2& display) {
         next_deadline = s_active_screen->tick_fn(now);
     }
 
-    // --- Step 2: Render if dirty ---
+    // --- Step 2: Render the whole frame, or none of it ---
+    // There is no per-object skipping: clearBuffer() has wiped the buffer, so an
+    // object that declined to draw would leave a hole rather than its previous
+    // appearance ([D-4]). The gate is the whole frame, and what it saves is the
+    // sendBuffer below — the SPI or I2C transfer, which dominates frame cost.
     if (s_active_screen->dirty) {
         display.clearBuffer();
         if (s_active_screen->render_fn) {
@@ -86,18 +115,33 @@ uint32_t ui_handler(U8G2& display) {
         s_active_screen->dirty = false;
     }
 
-    // --- Step 3: Compute sleep time ---
+    // --- Step 3: Convert the deadline into a sleep the caller can use ---
     if (next_deadline == U8G2GL_IDLE) {
         return U8G2GL_IDLE;
     }
+
+    // The deadline was measured before rendering, and rendering is not free —
+    // a full redraw plus sendBuffer can take several milliseconds on a slow bus.
+    // Re-read the clock and subtract what the frame consumed, otherwise the
+    // caller sleeps for the full interval on top of the time already spent and
+    // every animation runs progressively late.
     uint32_t elapsed = u8g2gl_tick_now() - now;
     if (next_deadline <= elapsed) {
-        return 0;
+        return 0;  // The frame overran its own deadline: due again immediately.
     }
     return next_deadline - elapsed;
 }
 
+// ui_handler_run_in_period
+// Rate-limits ui_handler to at most one run per period. Convenience for loops
+// that would rather cap the update rate than act on a returned deadline.
+//   display   — the application's U8G2 instance
+//   period_ms — minimum interval between actual handler runs
 uint32_t ui_handler_run_in_period(U8G2& display, uint32_t period_ms) {
+    // Function-local statics: this wrapper is a single global rate limiter, not
+    // per-screen state. Calling it for two displays would have them share the
+    // same period, which is a limitation of the convenience rather than a bug —
+    // ui_handler() itself is stateless and should be used directly in that case.
     static uint32_t s_last_period_tick = 0;
     static bool s_period_initialized = false;
 
@@ -107,5 +151,10 @@ uint32_t ui_handler_run_in_period(U8G2& display, uint32_t period_ms) {
         s_last_period_tick = now;
         return ui_handler(display);
     }
+    // Skipped this round. Returning 0 means "do not sleep", so a caller feeding
+    // this to a delay will spin until the period expires — see the note on the
+    // declaration. Returning the remaining period would be friendlier, but that
+    // is a behavioural change and this wrapper is optional sugar over
+    // ui_handler(), which already reports a usable deadline.
     return 0;
 }
