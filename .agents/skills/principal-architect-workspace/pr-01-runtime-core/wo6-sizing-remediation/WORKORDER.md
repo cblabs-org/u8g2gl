@@ -152,6 +152,57 @@ Of particular interest: anything suggesting the delivered API will not match the
 
 ---
 
-## Completion Report
+## Round 1 — Completion Report
 
-<!-- Written by the worker at task completion -->
+<!-- Captured by the Architect: SendMessage was unavailable, so the round-1 worker
+     could not be resumed to write this itself. Adapter graceful-degradation path. -->
+
+### Status
+partial — findings A–D implemented; one gap found on review (see Round 2).
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_types.h` — explicit `: uint8_t` base types on the four style enums (Finding C).
+- `include/u8g2gl/u8g2gl_style.h` — members reordered largest-alignment-first.
+- `include/u8g2gl/u8g2gl_subject.h` — `bool active` removed from `u8g2gl_observer` (Finding D); non-template `_base` + templated `_n<>` storage split applied to all four subject types (Findings A/B); `using` aliases retain source compatibility.
+- `include/u8g2gl/u8g2gl_config.h` — `U8G2GL_MAX_OBSERVERS 16` → `U8G2GL_DEFAULT_OBSERVERS 4`; `U8G2GL_MAX_STRING_LEN` 128 → 32, now the default `MaxLen` template argument.
+- `src/u8g2gl_subject.cpp` — logic moved into `_base` classes so distinct capacities do not duplicate code.
+- `test/test_subject.cpp`, `test/test_style.cpp`, `test/test_core.cpp` — 3 new tests; sizeof report test added.
+
+### Measured Result (Architect-verified against a WO5 baseline build)
+
+| Type | Before (WO5) | After (WO6) |
+|---|---|---|
+| `u8g2gl_obj` | **64 B** | **48 B** |
+| `u8g2gl_style` | 40 B | 24 B |
+| `u8g2gl_observer` | 24 B | 16 B |
+| `u8g2gl_subject_int` / `_bool` / `_time` | 400 B | 80 B |
+| `u8g2gl_subject_string` | 528 B | 120 B |
+
+Build clean, zero warnings under `-Wall -Wextra -Wpedantic`. 78/78 tests pass.
+
+> **Architect correction:** the worker reported `u8g2gl_obj` as "48 → 48, unchanged". It was in fact **64 → 48**, a 25% reduction — Finding C's style packing propagates into the object because `u8g2gl_style` is embedded. Independently verified by building both branches.
+
+### Decisions Made
+1. **`max_len` semantics corrected** — the old runtime treated it as total buffer bytes including the terminator; it now means *usable characters*, with `MaxLen + 1` allocated. This required changing `SubjectString.Truncation`'s assertions (`init(8)` now yields 8 usable chars, previously 7). **Accepted by the Architect** as the better reading of §8.2; the spec ambiguity is being closed separately.
+2. **Overflow asserts in debug** — `add_observer()` now `assert()`s on overflow while still returning `false` in release, per the WORKORDER. Existing and new overflow tests branch on `#ifdef NDEBUG` (`EXPECT_DEATH` vs `EXPECT_FALSE`).
+3. Members inside the new `_base` classes reordered pointer-first — additional ~8 B/subject, consistent with Finding C's rationale.
+
+### Out-of-Scope Findings
+- **Binding API cannot accept non-default-capacity subjects.** `u8g2gl_obj::bind_text` / `bind_flag_if_*` take the default-capacity aliases (`u8g2gl_subject_int*`), not the `_base` types. `_n<2>` and `_n<4>` are sibling types with no conversion between them, so per-subject sizing is unreachable through the public API. **Architect assessment: this is in scope, not out of it** — Finding B's objective ("the runtime must support per-subject sizing now") is unmet without it, and PR-03/PR-04 would hit it immediately. Promoted to Round 2.
+
+---
+
+## Round 2 — Follow-up (binding API)
+
+**Objective:** make Findings A and B actually reachable. Without this, per-subject sizing is built but unusable.
+
+The boundary box excluded `u8g2gl_obj`'s *virtual dispatch, flat-array/parent-index design and frame-gate logic* — **not** its binding signatures. `include/u8g2gl/` was in scope throughout.
+
+- [ ] `include/u8g2gl/u8g2gl_obj.h` + `src/u8g2gl_obj.cpp` — widen binding parameters from the default-capacity aliases to the base types: `u8g2gl_subject_int_base*`, `u8g2gl_subject_string_base*`, `u8g2gl_subject_bool_base*`, and the time equivalent if it has bindings. Covers `bind_text` and all four `bind_flag_if_*` variants plus their bool overloads. Any `_n<N>` converts implicitly to its base, so existing call sites keep compiling unchanged.
+- [ ] Confirm `get_bound_text_subject()` / `get_bound_text_type()` still behave correctly when the stored pointer is a base pointer.
+- [ ] **Add the test that proves A and B work end to end**: bind a `u8g2gl_subject_string_n<16>` and a `u8g2gl_subject_int_n<2>` through the *public* binding API and confirm the observer fires and the value propagates.
+- [ ] Re-verify: zero warnings, all tests pass, and re-report sizeofs in case anything shifts.
+
+### Round 2 Completion Report
+
+<!-- Written by the round-2 worker at task completion -->
