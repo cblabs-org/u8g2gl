@@ -9,6 +9,15 @@
 static const uint8_t dummy_font_a[] = { 0x01, 0x02 };
 static const uint8_t dummy_font_b[] = { 0x03, 0x04 };
 
+// WO6 Finding C: enums given explicit uint8_t base types and members reordered
+// largest-alignment-first should pack u8g2gl_style from 40 B down to ~24 B on
+// a 64-bit host (pointer 8 + two int16_t 4 + uint16_t set_mask 2 + four
+// uint8_t enums 4 + three bool 3 = 21, padded to 24). Guard against silent
+// regrowth.
+static_assert(sizeof(u8g2gl_style) <= 24,
+              "sizeof(u8g2gl_style) grew past the WO6 Finding C packed size; "
+              "check member ordering and enum base types");
+
 TEST(Style, DefaultState) {
     u8g2gl_style s;
     EXPECT_EQ(s.set_mask, 0);

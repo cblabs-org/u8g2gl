@@ -165,7 +165,7 @@ static void u8g2gl_evaluate_binding(u8g2gl_binding_desc* b) {
     }
     bool condition_met = false;
     if (b->subject_type == U8G2GL_SUBJECT_INT) {
-        auto* s = static_cast<u8g2gl_subject_int*>(b->subject);
+        auto* s = static_cast<u8g2gl_subject_int_base*>(b->subject);
         int32_t val = s->get();
         switch (b->op) {
             case U8G2GL_BIND_OP_EQ: condition_met = (val == b->ref_value); break;
@@ -174,7 +174,7 @@ static void u8g2gl_evaluate_binding(u8g2gl_binding_desc* b) {
             case U8G2GL_BIND_OP_LT: condition_met = (val < b->ref_value); break;
         }
     } else if (b->subject_type == U8G2GL_SUBJECT_BOOL) {
-        auto* s = static_cast<u8g2gl_subject_bool*>(b->subject);
+        auto* s = static_cast<u8g2gl_subject_bool_base*>(b->subject);
         int32_t val = s->get() ? 1 : 0;
         switch (b->op) {
             case U8G2GL_BIND_OP_EQ: condition_met = (val == b->ref_value); break;
@@ -257,9 +257,9 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
 
     bool added = false;
     if (type == U8G2GL_SUBJECT_INT) {
-        added = static_cast<u8g2gl_subject_int*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
+        added = static_cast<u8g2gl_subject_int_base*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
     } else if (type == U8G2GL_SUBJECT_BOOL) {
-        added = static_cast<u8g2gl_subject_bool*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
+        added = static_cast<u8g2gl_subject_bool_base*>(subject)->add_observer(slot, u8g2gl_on_binding_flag_change);
     }
 
     if (!added) {
@@ -272,39 +272,39 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
     return true;
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_gt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_GT, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_LT, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
     bind_flag_if_eq(subject, ref_value ? 1 : 0, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
     add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag) {
+void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
     bind_flag_if_not_eq(subject, ref_value ? 1 : 0, flag);
 }
 
-void u8g2gl_obj::bind_text(u8g2gl_subject_int* subject, const char* fmt) {
+void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject) {
         return;
     }
@@ -337,7 +337,7 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_int* subject, const char* fmt) {
     mark_dirty();
 }
 
-void u8g2gl_obj::bind_text(u8g2gl_subject_string* subject) {
+void u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject) {
         return;
     }

@@ -19,20 +19,23 @@ enum u8g2gl_style_prop_t : uint16_t {
 };
 
 struct u8g2gl_style {
-    // Properties
+    // Properties — ordered largest-alignment-first (WO6 Finding C) to avoid
+    // padding: pointer, then 16-bit fields, then 8-bit enums/bools. Behaviour
+    // is unchanged; only layout is.
     const uint8_t* font = nullptr;        // U8G2 font pointer
-    u8g2gl_color_t draw_color = U8G2GL_COLOR_1;
-    bool invert = false;
     int16_t padding = 0;
-    bool border = false;
     int16_t radius = 0;
-    u8g2gl_align_t align = U8G2GL_ALIGN_LEFT;
-    bool truncate = false;
-    u8g2gl_font_mode_t font_mode = U8G2GL_FONT_MODE_SOLID;
-    u8g2gl_bitmap_mode_t bitmap_mode = U8G2GL_BITMAP_MODE_SOLID;
 
     // Which properties are explicitly set
     uint16_t set_mask = 0;
+
+    u8g2gl_color_t draw_color = U8G2GL_COLOR_1;
+    u8g2gl_align_t align = U8G2GL_ALIGN_LEFT;
+    u8g2gl_font_mode_t font_mode = U8G2GL_FONT_MODE_SOLID;
+    u8g2gl_bitmap_mode_t bitmap_mode = U8G2GL_BITMAP_MODE_SOLID;
+    bool invert = false;
+    bool border = false;
+    bool truncate = false;
 
     // --- Setters that also mark the property as set ---
     void set_font(const uint8_t* f);

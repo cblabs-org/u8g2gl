@@ -206,3 +206,81 @@ The boundary box excluded `u8g2gl_obj`'s *virtual dispatch, flat-array/parent-in
 ### Round 2 Completion Report
 
 <!-- Written by the round-2 worker at task completion -->
+
+#### Status
+complete — the binding API now accepts base-typed pointers, so a right-sized
+subject can be bound end to end. All Round 2 checklist items done.
+
+#### Changes Made
+- `include/u8g2gl/u8g2gl_obj.h` — widened every binding parameter from the
+  default-capacity aliases to the `_base` types: `bind_text` (both overloads)
+  now take `u8g2gl_subject_int_base*` / `u8g2gl_subject_string_base*`; all
+  four `bind_flag_if_*` int overloads take `u8g2gl_subject_int_base*`; all
+  four bool overloads (`bind_flag_if_eq`/`bind_flag_if_not_eq`, each with an
+  `int32_t` and a `bool` ref-value overload) take `u8g2gl_subject_bool_base*`.
+  `u8g2gl_subject_time` has no bindings in the public API, so there is no
+  time-equivalent to widen.
+- `src/u8g2gl_obj.cpp` — matching signature changes on all definitions, plus
+  the two internal `static_cast`s in `u8g2gl_evaluate_binding()` and
+  `add_flag_binding()` that previously cast the stored `void* subject` back
+  to the default-capacity alias now cast to the `_base` type instead (the
+  stored pointer is a `_base*` once a non-default-capacity subject is bound,
+  and since none of the four subject classes use virtual inheritance, a
+  base-class pointer and its most-derived pointer are the same address —
+  the cast is safe either way).
+- `test/test_subject.cpp` — added two new tests: `Binding.RightSizedIntSubjectBindsAndPropagates`
+  (binds a `u8g2gl_subject_int_n<2>` via both `bind_text` and
+  `bind_flag_if_eq` through the public API, confirms the observer fires via
+  `is_dirty()`/flag state, and confirms the value propagates via `get()`)
+  and `Binding.RightSizedStringSubjectBindsAndPropagates` (binds a
+  `u8g2gl_subject_string_n<16>` via `bind_text`, confirms the observer fires,
+  and confirms the propagated value via `get()`).
+
+#### Decisions Made
+1. **No `_base` cast needed at the call site.** `u8g2gl_subject_int_n<N>`
+   derives (single, non-virtual) from `u8g2gl_subject_int_base`, so passing a
+   `_n<N>*` where a `_base*` parameter is expected is an implicit
+   standard conversion — existing call sites using the default aliases
+   (`u8g2gl_subject_int` == `u8g2gl_subject_int_n<>`) needed no changes and
+   still compile unchanged, confirmed by the untouched Round-1 binding tests
+   passing without modification.
+2. **`get_bound_text_subject()` left returning the stored `void*` unchanged.**
+   It already stored whatever pointer type was passed to `bind_text`; now
+   that's a `_base*` rather than the default alias, but since the object
+   layout has no virtual base and no multiple inheritance, the numeric
+   pointer value is identical in either case. Verified directly: both new
+   tests assert `obj.get_bound_text_subject() == &subject` where `subject`
+   is the non-default-capacity object, and it passes without a cast.
+3. **Did not add a time-subject binding overload.** The WORKORDER said "the
+   time equivalent if it has bindings" — `u8g2gl_subject_time` has none in
+   `u8g2gl_obj`'s public API (checked: no `bind_*` overload takes it), so
+   there was nothing to widen there.
+
+#### Dead Ends & Warnings
+None. The change was mechanical once the `_base`/`_n<>` split from Round 1
+was confirmed to use ordinary single inheritance — no virtual dispatch, no
+multiple inheritance, so no pointer-adjustment concerns at the `void*`
+boundary inside the binding-descriptor pool.
+
+#### Re-verified sizeofs (unchanged from Round 1 — binding signatures do not
+affect any struct's layout)
+
+| Type | Round 1 | Round 2 |
+|---|---|---|
+| `u8g2gl_obj` | 48 B | 48 B |
+| `u8g2gl_style` | 24 B | 24 B |
+| `u8g2gl_observer` | 16 B | 16 B |
+| `u8g2gl_subject_int` / `_bool` / `_time` (default capacity) | 80 B | 80 B |
+| `u8g2gl_subject_string` (default capacity) | 120 B | 120 B |
+
+Build clean, zero warnings under `-Wall -Wextra -Wpedantic` (verified with a
+full `rm -rf build` + reconfigure + rebuild, not an incremental build).
+80/80 tests pass (78 pre-existing, unmodified, + 2 new). No existing test was
+weakened or changed.
+
+#### Out-of-Scope Findings
+None new. Round 1's note about the style-index table (Finding E) remains
+deliberately deferred and untouched.
+
+#### Blockers
+None.

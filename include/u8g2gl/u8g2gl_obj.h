@@ -45,18 +45,25 @@ public:
     void clear_dirty();
 
     // --- Data Binding (§8, §13.8) ---
-    void bind_text(u8g2gl_subject_int* subject, const char* fmt = nullptr);
-    void bind_text(u8g2gl_subject_string* subject);
+    // WO6 Round 2: parameters take the non-template `_base` types, not the
+    // default-capacity aliases (u8g2gl_subject_int == u8g2gl_subject_int_n<>).
+    // Any u8g2gl_subject_*_n<N> converts implicitly to its base, so a
+    // right-sized subject (e.g. u8g2gl_subject_int_n<2>) can now actually be
+    // bound through this API — Finding B's per-subject sizing was otherwise
+    // unreachable. Existing call sites using the default aliases still
+    // compile unchanged.
+    void bind_text(u8g2gl_subject_int_base* subject, const char* fmt = nullptr);
+    void bind_text(u8g2gl_subject_string_base* subject);
 
-    void bind_flag_if_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_gt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_lt(u8g2gl_subject_int* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
 
-    void bind_flag_if_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_bool* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_bool* subject, bool ref_value, uint8_t flag);
+    void bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    void bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
 
     void* get_bound_text_subject() const;
     const char* get_bound_text_fmt() const;

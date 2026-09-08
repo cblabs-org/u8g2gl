@@ -13,28 +13,28 @@ static constexpr uint8_t U8G2GL_FLAG_HIDDEN   = 0x01;
 static constexpr uint8_t U8G2GL_FLAG_DIRTY    = 0x02;
 static constexpr uint8_t U8G2GL_FLAG_DISABLED = 0x04;
 
-// Alignment enum
-enum u8g2gl_align_t {
+// Alignment enum (WO6 Finding C: explicit narrow base type, was untyped `int`)
+enum u8g2gl_align_t : uint8_t {
     U8G2GL_ALIGN_LEFT = 0,
     U8G2GL_ALIGN_CENTER,
     U8G2GL_ALIGN_RIGHT
 };
 
-// Color enum
-enum u8g2gl_color_t {
+// Color enum (WO6 Finding C: explicit narrow base type, was untyped `int`)
+enum u8g2gl_color_t : uint8_t {
     U8G2GL_COLOR_0 = 0,
     U8G2GL_COLOR_1 = 1,
     U8G2GL_COLOR_XOR = 2
 };
 
-// Font mode enum
-enum u8g2gl_font_mode_t {
+// Font mode enum (WO6 Finding C: explicit narrow base type, was untyped `int`)
+enum u8g2gl_font_mode_t : uint8_t {
     U8G2GL_FONT_MODE_SOLID = 0,
     U8G2GL_FONT_MODE_TRANSPARENT = 1
 };
 
-// Bitmap mode enum
-enum u8g2gl_bitmap_mode_t {
+// Bitmap mode enum (WO6 Finding C: explicit narrow base type, was untyped `int`)
+enum u8g2gl_bitmap_mode_t : uint8_t {
     U8G2GL_BITMAP_MODE_SOLID = 0,
     U8G2GL_BITMAP_MODE_TRANSPARENT = 1
 };

@@ -399,6 +399,7 @@ TEST_F(Core, SizeOfReport) {
     std::cout << "sizeof(u8g2gl_obj):            " << sizeof(u8g2gl_obj) << " bytes" << std::endl;
     std::cout << "sizeof(u8g2gl_style):          " << sizeof(u8g2gl_style) << " bytes" << std::endl;
     std::cout << "sizeof(u8g2gl_screen):         " << sizeof(u8g2gl_screen) << " bytes" << std::endl;
+    std::cout << "sizeof(u8g2gl_observer):       " << sizeof(u8g2gl_observer) << " bytes" << std::endl;
     std::cout << "sizeof(u8g2gl_subject_int):    " << sizeof(u8g2gl_subject_int) << " bytes" << std::endl;
     std::cout << "sizeof(u8g2gl_subject_string): " << sizeof(u8g2gl_subject_string) << " bytes" << std::endl;
     std::cout << "sizeof(u8g2gl_subject_bool):   " << sizeof(u8g2gl_subject_bool) << " bytes" << std::endl;
@@ -408,6 +409,7 @@ TEST_F(Core, SizeOfReport) {
     RecordProperty("sizeof_u8g2gl_obj", std::to_string(sizeof(u8g2gl_obj)));
     RecordProperty("sizeof_u8g2gl_style", std::to_string(sizeof(u8g2gl_style)));
     RecordProperty("sizeof_u8g2gl_screen", std::to_string(sizeof(u8g2gl_screen)));
+    RecordProperty("sizeof_u8g2gl_observer", std::to_string(sizeof(u8g2gl_observer)));
     RecordProperty("sizeof_u8g2gl_subject_int", std::to_string(sizeof(u8g2gl_subject_int)));
     RecordProperty("sizeof_u8g2gl_subject_string", std::to_string(sizeof(u8g2gl_subject_string)));
     RecordProperty("sizeof_u8g2gl_subject_bool", std::to_string(sizeof(u8g2gl_subject_bool)));
