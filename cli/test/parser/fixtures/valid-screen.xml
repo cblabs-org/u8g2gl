@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- U8G2GL Screen Fixture per design_spec §5.4 and §12 -->
+<screen name="home">
+    <styles>
+        <style name="footer" font="small_9" />
+        <style name="selected" invert="true" />
+    </styles>
+
+    <view>
+        <u8g2gl_label name="title" x="0" y="0" width="128" height="12"
+                      text="Home Screen" font="tall_12" align="center" />
+
+        <u8g2gl_hline x="0" y="14" width="128" />
+
+        <u8g2gl_button name="btn_wifi" x="0" y="18" width="128" height="12"
+                      text="Wi-Fi" focus_style="selected" style_invert="false">
+            <screen_load_event screen="screen_wifi" trigger="press" />
+            <bind_flag_if_eq subject="wifi_connected" ref_value="0" flag="hidden" />
+        </u8g2gl_button>
+
+        <u8g2gl_button name="btn_back" x="0" y="32" width="128" height="12"
+                      text="Back" focus_style="selected">
+            <screen_back_event trigger="press" />
+        </u8g2gl_button>
+
+        <focus_ring wrap="true">
+            <focus name="btn_wifi" />
+            <focus name="btn_back" />
+        </focus_ring>
+    </view>
+</screen>

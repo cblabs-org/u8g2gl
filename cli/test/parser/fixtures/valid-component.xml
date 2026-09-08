@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- U8G2GL Component Fixture per design_spec §6.3 -->
+<component name="status_bar">
+    <api>
+        <prop name="title_subject" type="subject" default="station_name" />
+        <prop name="wifi_subject"  type="subject" default="wifi_connected" />
+        <prop name="width"         type="int"     default="#screen_width" />
+        <prop name="height"        type="int"     default="11" />
+        <prop name="font"          type="font"    default="small_9" required="true" />
+    </api>
+
+    <view width="$width" height="$height">
+        <u8g2gl_scrolling_label name="location"
+            x="0" y="0" right="52" height="$height"
+            bind_text="$title_subject" font="$font" />
+
+        <u8g2gl_xbm name="wifi_icon"
+            right="40" y="0" width="12" height="$height"
+            src="icon_wifi">
+            <bind_flag_if_eq subject="$wifi_subject" ref_value="0" flag="hidden" />
+        </u8g2gl_xbm>
+
+        <u8g2gl_clock name="clock"
+            right="0" y="0" width="40" height="$height"
+            format="HH:MM" font="clock_small_7" blink="true"
+            bind_time="system_time" />
+    </view>
+</component>

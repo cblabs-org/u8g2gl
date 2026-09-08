@@ -11,6 +11,8 @@
  *
  * Exports:
  * - Schema types and diagnostic codes from ./schema/index.js
+ * - XML parser APIs and models from ./parser/index.js
  */
 
 export * from './schema/index.js';
+export * from './parser/index.js';

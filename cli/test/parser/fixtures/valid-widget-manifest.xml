@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- U8G2GL Widget Manifest Fixture per design_spec §6.4 and §13.1 -->
+<widget name="wd_service_list" extends="u8g2gl_widget" animated="true">
+    <api>
+        <prop name="font"               type="font"   setter="set_font" required="true" />
+        <prop name="max_rows"           type="int"    setter="set_max_rows" default="16"
+              help="Row capacity. Determines allocated RAM." />
+        <prop name="max_cols"           type="int"    setter="set_max_cols" default="6" />
+        <prop name="max_cell_chars"     type="int"    setter="set_max_cell_chars" default="24"
+              help="Per-cell string capacity including terminator." />
+        <prop name="scroll_dwell_ms"    type="int"    setter="set_scroll_dwell_ms" default="5000" />
+        <prop name="scroll_duration_ms" type="int"    setter="set_scroll_duration_ms" default="1000" />
+        <prop name="align"              type="enum"   setter="set_align"
+              values="left,center,right" default="left"
+              emit="U8G2GL_ALIGN_{VALUE^^}" />
+
+        <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
+
+        <element name="column" access="add" help="Column definition">
+            <arg name="width" type="int" />
+            <arg name="align" type="enum" />
+        </element>
+    </api>
+</widget>
