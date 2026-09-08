@@ -1,0 +1,57 @@
+# ─── C++ / CMake (runtime library, PR-01/PR-03) ───────────────────────────
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+compile_commands.json
+Testing/
+*.o
+*.a
+*.so
+*.dylib
+*.dSYM/
+
+# ─── Node / TypeScript (CLI + designer, PR-02/PR-04, Phase 3) ─────────────
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.npm/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+coverage/
+
+# ─── Emscripten / WebAssembly (editor + snapshot harness, PR-06) ──────────
+emsdk/
+.emscripten*
+*.wasm
+*.wasm.map
+# Exception: intentionally shipped Wasm artefacts, if any are ever committed
+!assets/**/*.wasm
+
+# ─── Generated output ──────────────────────────────────────────────────────
+# Note: in a CONSUMING project, generated/ is committed on purpose ([D-11]).
+# In THIS repo it only ever appears as test fixtures' scratch output.
+/generated/
+**/__generated__/
+
+# ─── Editor / OS ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# ─── Agent harness ─────────────────────────────────────────────────────────
+# .claude is a local symlink to .agents; the real content is tracked there.
+.claude
+
+# ─── Scratch ───────────────────────────────────────────────────────────────
+tmp/
+*.log
