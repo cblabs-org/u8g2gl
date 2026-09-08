@@ -1,3 +1,9 @@
 [submodule ".agents/skills/lvgl-pro-expert"]
 	path = .agents/skills/lvgl-pro-expert
 	url = https://github.com/mm-skills/lvgl-pro-expert.git
+[submodule ".agents/skills/embedded-systems"]
+	path = .agents/skills/embedded-systems
+	url = https://github.com/mm-skills/embedded-systems.git
+[submodule ".agents/skills/oo-expert"]
+	path = .agents/skills/oo-expert
+	url = https://github.com/mm-skills/oo-expert.git
