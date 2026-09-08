@@ -208,6 +208,48 @@ says what the caller must *guarantee*. Keep it to a few lines — if the banner
 starts restating the header, delete it and fix the header instead.
 
 Trivial functions — a one-line accessor, a straight delegation — do not need one.
+Where a run of them shares a rationale, annotate the *block* once rather than
+each member; sixteen near-identical banners is noise that trains readers to skip
+comments.
+
+### Completeness — check the file, do not eyeball it
+
+**Documenting headers and forgetting implementations is the single most common
+way this standard is under-applied.** It happens because headers are where the
+API lives, so attention goes there naturally and the `.cpp` looks "already
+covered". It is not: the header carries the contract, the implementation carries
+the reasoning, and the reasoning is what a reviewer cannot reconstruct.
+
+Before calling a file done, enumerate its functions and account for every one —
+either it has a banner, or it is trivial enough not to need one. Verify rather
+than assume:
+
+```bash
+# Functions declared at file scope, and whether the line above is a comment
+awk '/^[a-zA-Z].*\(/ && !/^\s/ { printf "%-6d %-60s %s\n", NR, substr($0,1,58),
+     (prev ~ /^\/\//) ? "banner" : "— CHECK" } { prev=$0 }' src/file.cpp
+```
+
+Every `— CHECK` is a decision you must actually make, not a line to skim past.
+
+The same applies to the four documentation layers: a file with a good header
+block and no why-comments is not documented, it is labelled. Ask which of the
+four are missing before you move on.
+
+### What "high standard" means here
+
+A reviewer new to the codebase should be able to open any single file and answer:
+
+1. **What is this module for, and why is it separate from its neighbours?** —
+   the `Purpose:` block
+2. **What can I call, and what must I guarantee when I do?** — Doxygen on
+   declarations
+3. **What is this function doing, and what are its inputs?** — the banner
+4. **What are the stages of this algorithm?** — step comments
+5. **Why is it done this way rather than the obvious way?** — why-comments
+
+If any answer requires reading another file, or reading the implementation to
+understand the interface, the documentation is not finished.
 
 ---
 

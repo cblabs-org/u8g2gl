@@ -17,6 +17,18 @@
  */
 #include "u8g2gl/u8g2gl_style.h"
 
+// Every setter below follows one pattern: store the value, then record the
+// property's bit in set_mask.
+//
+// The mask is the whole reason these are functions rather than public fields.
+// merge_from() has to distinguish "this style explicitly sets align to LEFT"
+// from "this style says nothing about align", and LEFT is also the default — so
+// the value alone cannot answer it. Without the mask, merging a named style over
+// an object would overwrite every unspecified property with a default and
+// selective override would be impossible.
+//
+// Assigning to a field directly therefore silently breaks merging. That is why
+// the fields are set through here.
 void u8g2gl_style::set_font(const uint8_t* f) {
     font = f;
     set_mask |= U8G2GL_STYLE_FONT;
@@ -71,6 +83,16 @@ bool u8g2gl_style::has(u8g2gl_style_prop_t prop) const {
     return (set_mask & static_cast<uint16_t>(prop)) != 0;
 }
 
+// u8g2gl_style::merge_from
+// Composes another style over this one: every property @p other explicitly set
+// replaces the corresponding property here, and everything it left unset is
+// untouched. Used to layer a named style under an object's own inline overrides.
+//
+// Written as one explicit block per property rather than a loop over the mask.
+// A loop would need a table mapping each bit to a field offset, which is more
+// machinery, harder to read, and no smaller once the table is counted — the
+// property set is fixed and small by design (§10).
+//   other — the style to merge in; only its set properties are copied
 void u8g2gl_style::merge_from(const u8g2gl_style& other) {
     if (other.has(U8G2GL_STYLE_FONT)) {
         font = other.font;
