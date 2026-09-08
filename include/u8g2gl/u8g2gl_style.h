@@ -1,3 +1,21 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_style.h
+ * Description: Declarations for u8g2gl_style.h
+ *
+ * Exported Classes:
+ * - u8g2gl_style: struct holding the 10 style properties
+ *
+ *     Style API:
+ *     - u8g2gl_style_cascade(): Merge two styles
+ *     - u8g2gl_style_set_font(), etc.: Individual property setters
+ */
 #ifndef U8G2GL_STYLE_H
 #define U8G2GL_STYLE_H
 

@@ -1,3 +1,17 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_state_saver.h
+ * Description: Declarations for u8g2gl_state_saver.h
+ *
+ * Exported Classes:
+ * - u8g2gl_state_saver: RAII guard that saves and restores U8G2 drawing state
+ */
 #ifndef U8G2GL_STATE_SAVER_H
 #define U8G2GL_STATE_SAVER_H
 

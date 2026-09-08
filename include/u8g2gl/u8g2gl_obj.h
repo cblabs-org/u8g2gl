@@ -1,3 +1,36 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_obj.h
+ * Description: Declarations for u8g2gl_obj.h
+ *
+ * Exported Classes:
+ * - u8g2gl_obj: base class for all widgets
+ *
+ *     Geometry:
+ *     - set_coords():        Position and size in device pixels
+ *     - get_x/y/w/h():       Individual accessors
+ *
+ *     Visibility & flags:
+ *     - set_hidden():        Exclude from rendering
+ *     - has_flag():          Test a U8G2GL_FLAG_* bit
+ *
+ *     Hierarchy:
+ *     - set_parent_index():  Index into the screen's flat object array
+ *
+ *     Data binding:
+ *     - bind_text():         Bind display text to a subject
+ *     - bind_flag_if_*():    Conditional flag from a subject's value
+ *
+ *     Lifecycle (virtual):
+ *     - tick():              Advance animation; returns next deadline
+ *     - render():            Draw to the U8G2 buffer
+ */
 #ifndef U8G2GL_OBJ_H
 #define U8G2GL_OBJ_H
 
@@ -52,9 +85,45 @@ public:
     // bound through this API — Finding B's per-subject sizing was otherwise
     // unreachable. Existing call sites using the default aliases still
     // compile unchanged.
+    /**
+     * @brief Bind this object's text to an int subject.
+     *
+     * The object registers as an observer and re-renders when the subject changes.
+     * Binding replaces any literal text; the two are mutually exclusive.
+     * The two bind_text() overloads are mutually exclusive per object.
+     *
+     * @param subject Subject to observe. Must outlive this object — subjects are
+     *                statically allocated by generated code, so this holds by
+     *                construction for generated screens.
+     * @param fmt     Optional printf format applied to the value. nullptr uses the
+     *                raw string.
+     *
+     * Note: Silently fails to register if observer capacity is exhausted.
+     */
     void bind_text(u8g2gl_subject_int_base* subject, const char* fmt = nullptr);
+
+    /**
+     * @brief Bind this object's text to a string subject.
+     *
+     * The object registers as an observer and re-renders when the subject changes.
+     * Binding replaces any literal text; the two are mutually exclusive.
+     * The two bind_text() overloads are mutually exclusive per object.
+     *
+     * @param subject Subject to observe. Must outlive this object.
+     *
+     * Note: Silently fails to register if observer capacity is exhausted.
+     */
     void bind_text(u8g2gl_subject_string_base* subject);
 
+    /**
+     * @brief Conditionally set or clear a flag based on a subject's value.
+     *
+     * @param subject   Subject to observe. Must outlive this object.
+     * @param ref_value Value to compare against.
+     * @param flag      Flag to set/clear (e.g., U8G2GL_FLAG_HIDDEN).
+     *
+     * Note: Silently fails to register if observer capacity is exhausted.
+     */
     void bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
     void bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
     void bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);

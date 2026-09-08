@@ -1,3 +1,25 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_subject.h
+ * Description: Declarations for u8g2gl_subject.h
+ *
+ * Exported Classes:
+ * - u8g2gl_subject_int_base / u8g2gl_subject_int: int subject
+ * - u8g2gl_subject_string_base / u8g2gl_subject_string: string subject
+ * - u8g2gl_subject_bool_base / u8g2gl_subject_bool: bool subject
+ * - u8g2gl_subject_time_base / u8g2gl_subject_time: time subject
+ *
+ *     Subject API:
+ *     - get(): Get current value
+ *     - set(): Set value and notify observers
+ *     - add_observer(): Register an observer callback
+ */
 #ifndef U8G2GL_SUBJECT_H
 #define U8G2GL_SUBJECT_H
 
@@ -6,7 +28,7 @@
 #include "u8g2gl_config.h"
 
 // Subject type tag (§8.1)
-enum u8g2gl_subject_type_t {
+enum u8g2gl_subject_type_t : uint8_t {
     U8G2GL_SUBJECT_INT = 0,
     U8G2GL_SUBJECT_STRING,
     U8G2GL_SUBJECT_BOOL,
@@ -60,6 +82,14 @@ public:
     void set(int32_t value);     // notifies observers if value changed
 
     // Observer management
+    /**
+     * @brief Register an observer callback for this subject.
+     *
+     * @param user_data Context pointer passed back to the callback.
+     * @param cb        The callback function to invoke on change.
+     * @return false on overflow (release-safe). Overflow also asserts in debug
+     *         builds, as capacity is declared and statically known.
+     */
     bool add_observer(void* user_data, u8g2gl_observer_cb cb);
     void notify();
 

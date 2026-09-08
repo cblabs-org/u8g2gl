@@ -1,3 +1,14 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: src/u8g2gl_core.cpp
+ * Description: Implementation of u8g2gl_core.cpp
+ */
 #include "u8g2gl/u8g2gl_core.h"
 
 #if __has_include(<U8G2lib.h>)
@@ -52,12 +63,12 @@ uint32_t ui_handler(U8G2& display) {
     uint32_t now = u8g2gl_tick_now();
     uint32_t next_deadline = U8G2GL_IDLE;
 
-    // Phase 1: tick all widgets, collect deadlines
+    // --- Step 1: Tick all widgets, collect deadlines ---
     if (s_active_screen->tick_fn) {
         next_deadline = s_active_screen->tick_fn(now);
     }
 
-    // Phase 2: render if dirty
+    // --- Step 2: Render if dirty ---
     if (s_active_screen->dirty) {
         display.clearBuffer();
         if (s_active_screen->render_fn) {
@@ -67,7 +78,7 @@ uint32_t ui_handler(U8G2& display) {
         s_active_screen->dirty = false;
     }
 
-    // Phase 3: compute sleep time
+    // --- Step 3: Compute sleep time ---
     if (next_deadline == U8G2GL_IDLE) {
         return U8G2GL_IDLE;
     }

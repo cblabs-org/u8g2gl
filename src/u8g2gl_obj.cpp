@@ -1,3 +1,14 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: src/u8g2gl_obj.cpp
+ * Description: Implementation of u8g2gl_obj.cpp
+ */
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_core.h"
 
@@ -150,9 +161,9 @@ struct u8g2gl_binding_desc {
     void* subject = nullptr;
     const char* fmt = nullptr;
     int32_t ref_value = 0;
-    uint8_t flag = 0;
-    u8g2gl_binding_op_t op = U8G2GL_BIND_OP_EQ;
     u8g2gl_subject_type_t subject_type = U8G2GL_SUBJECT_INT;
+    u8g2gl_binding_op_t op = U8G2GL_BIND_OP_EQ;
+    uint8_t flag = 0;
     bool is_text = false;
     bool active = false;
 };

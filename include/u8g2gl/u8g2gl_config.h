@@ -1,3 +1,18 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_config.h
+ * Description: Declarations for u8g2gl_config.h
+ *
+ * Exported Constants:
+ * - U8G2GL_MAX_TOTAL_BINDINGS: Maximum number of active bindings in the static pool
+ * - U8G2GL_NO_PARENT: Sentinel for root objects
+ */
 #ifndef U8G2GL_CONFIG_H
 #define U8G2GL_CONFIG_H
 

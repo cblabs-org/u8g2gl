@@ -1,3 +1,14 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: test/test_obj.cpp
+ * Description: Implementation of test_obj.cpp
+ */
 #include <gtest/gtest.h>
 #include <iostream>
 #include <string>

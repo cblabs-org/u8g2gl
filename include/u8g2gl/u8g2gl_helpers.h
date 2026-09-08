@@ -1,3 +1,18 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_helpers.h
+ * Description: Declarations for u8g2gl_helpers.h
+ *
+ * Exported Functions:
+ * - u8g2gl_min(): Minimum of two uint32_t values
+ * - u8g2gl_max(): Maximum of two uint32_t values
+ */
 #ifndef U8G2GL_HELPERS_H
 #define U8G2GL_HELPERS_H
 

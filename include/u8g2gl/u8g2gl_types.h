@@ -1,3 +1,21 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_types.h
+ * Description: Declarations for u8g2gl_types.h
+ *
+ * Exported Types:
+ * - u8g2gl_align_t: Text alignment
+ * - u8g2gl_color_t: Draw color (0, 1, XOR)
+ * - u8g2gl_font_mode_t: Font rendering mode
+ * - u8g2gl_bitmap_mode_t: Bitmap rendering mode
+ * - u8g2gl_event_t: Event types for focus/input
+ */
 #ifndef U8G2GL_TYPES_H
 #define U8G2GL_TYPES_H
 
@@ -45,7 +63,7 @@ inline uint32_t u8g2gl_min(uint32_t a, uint32_t b) {
 }
 
 // Event enum stub (for §12, don't implement dispatch)
-enum u8g2gl_event_t {
+enum u8g2gl_event_t : uint8_t {
     U8G2GL_EVENT_NONE = 0,
     U8G2GL_EVENT_ENCODER_CW,
     U8G2GL_EVENT_ENCODER_CCW,

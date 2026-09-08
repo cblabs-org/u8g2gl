@@ -1,3 +1,22 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ *
+ * https://github.com/cblabs-org/u8g2gl
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * File: include/u8g2gl/u8g2gl_core.h
+ * Description: Declarations for u8g2gl_core.h
+ *
+ * Exported Classes:
+ * - u8g2gl_screen: struct holding screen lifecycle callbacks and object arrays
+ *
+ *     UI Core:
+ *     - ui_handler(): The main handler for rendering and ticking
+ *     - u8g2gl_mark_dirty(): Mark the active screen dirty
+ *     - u8g2gl_set_tick_cb(): Set a callback to get current time
+ */
 #ifndef U8G2GL_CORE_H
 #define U8G2GL_CORE_H
 
@@ -53,6 +72,18 @@ void u8g2gl_mark_dirty();
 // The caller puts this in their loop:
 //   uint32_t idle_ms = ui_handler(u8g2);
 //   delay(idle_ms);  // or feed to RTOS sleep
+/**
+ * @brief Handle UI updates, ticking all widgets and rendering if necessary.
+ *
+ * Per [D-15] and §11.1:
+ * 1. Get current time via tick callback
+ * 2. Tick all widgets in the active screen, collecting deadlines
+ * 3. If dirty: render all visible widgets (with state saver + clip), sendBuffer
+ * 4. Return ms until next work needed (minimum deadline - now)
+ *
+ * @param display The U8G2 display instance to render to.
+ * @return The number of milliseconds until the next required UI work.
+ */
 uint32_t ui_handler(U8G2& display);
 
 // --- Convenience: run-in-period wrapper ---
