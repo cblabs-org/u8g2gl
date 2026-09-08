@@ -12,7 +12,9 @@
  * Exports:
  * - Schema types and diagnostic codes from ./schema/index.js
  * - XML parser APIs and models from ./parser/index.js
+ * - Display catalogue query APIs from ./catalogue/index.js
  */
 
 export * from './schema/index.js';
 export * from './parser/index.js';
+export * from './catalogue/index.js';
