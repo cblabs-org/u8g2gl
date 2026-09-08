@@ -127,6 +127,10 @@ const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
     return style_;
 }
 
+// The style setters below are one-line delegations to the embedded u8g2gl_style.
+// They exist so generated code can emit an inline override without constructing
+// a whole style object, and carry no logic of their own — their contracts are on
+// the declarations in u8g2gl_obj.h.
 void u8g2gl_obj::set_font(const uint8_t* font) {
     style_.set_font(font);
 }
@@ -202,6 +206,12 @@ struct u8g2gl_binding_desc {
 
 static u8g2gl_binding_desc s_binding_pool[U8G2GL_MAX_TOTAL_BINDINGS] = {};
 
+// u8g2gl_evaluate_binding
+// Applies one flag binding: reads the subject's current value, compares it, and
+// sets or clears the object's flag accordingly. This is where the pool's type
+// erasure is undone — subject_type says what the void* really is, and the cast
+// back must match it.
+//   b — the binding slot; inactive or detached slots are ignored
 static void u8g2gl_evaluate_binding(u8g2gl_binding_desc* b) {
     if (!b || !b->active || !b->obj) {
         return;
@@ -232,14 +242,32 @@ static void u8g2gl_evaluate_binding(u8g2gl_binding_desc* b) {
     } else {
         b->obj->clear_flag(b->flag);
     }
+
+    // Marks dirty whenever the subject changed, even if the flag's value did
+    // not — a subject going 5 -> 6 under an "if greater than 3" binding leaves
+    // the flag set but still schedules a frame. Comparing the previous flag
+    // state would avoid that redraw; it is not done because the check costs a
+    // branch on every notification to save a redraw that only occurs when a
+    // bound value is changing anyway, and a changing value usually means
+    // something else on screen needs repainting too.
     b->obj->mark_dirty();
 }
 
+// u8g2gl_on_binding_flag_change
+// Observer callback for flag bindings. Subjects deliver a void* context rather
+// than a std::function, so the binding slot itself is passed as the context and
+// recovered here.
+//   user_data — the u8g2gl_binding_desc registered with the subject
 static void u8g2gl_on_binding_flag_change(void* user_data) {
     auto* b = static_cast<u8g2gl_binding_desc*>(user_data);
     u8g2gl_evaluate_binding(b);
 }
 
+// u8g2gl_on_text_binding_change
+// Observer callback for text bindings. Unlike a flag binding there is nothing to
+// evaluate: the widget reads the subject directly when it renders, so the only
+// thing needed on change is to schedule a frame.
+//   user_data — the u8g2gl_binding_desc registered with the subject
 static void u8g2gl_on_text_binding_change(void* user_data) {
     auto* b = static_cast<u8g2gl_binding_desc*>(user_data);
     if (b && b->active && b->obj) {
@@ -247,10 +275,22 @@ static void u8g2gl_on_text_binding_change(void* user_data) {
     }
 }
 
+// u8g2gl_allocate_binding
+// Claims a free slot in the shared pool for an object, subject to a per-object
+// cap. Returns nullptr rather than growing when either limit is reached — the
+// runtime never allocates ([D-1]), so exhaustion is a reportable outcome, not an
+// error to recover from.
+//   obj — the object the binding belongs to
 static u8g2gl_binding_desc* u8g2gl_allocate_binding(u8g2gl_obj* obj) {
     if (!obj) {
         return nullptr;
     }
+
+    // --- Step 1: Enforce the per-object cap ---
+    // The pool is shared, so without this one object could consume every slot
+    // and starve the rest of the screen. Capping per object turns exhaustion
+    // into a local, diagnosable failure instead of an unrelated widget silently
+    // losing its binding.
     uint8_t count = 0;
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
         if (s_binding_pool[i].active && s_binding_pool[i].obj == obj) {
@@ -260,6 +300,11 @@ static u8g2gl_binding_desc* u8g2gl_allocate_binding(u8g2gl_obj* obj) {
     if (count >= U8G2GL_MAX_BINDINGS_PER_OBJ) {
         return nullptr;
     }
+
+    // --- Step 2: Take the first free slot ---
+    // Both passes scan the whole pool, so binding is O(pool) per call. That is
+    // acceptable because binding happens once per object during init, never in
+    // the render path.
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
         if (!s_binding_pool[i].active) {
             s_binding_pool[i] = u8g2gl_binding_desc{};
@@ -271,6 +316,16 @@ static u8g2gl_binding_desc* u8g2gl_allocate_binding(u8g2gl_obj* obj) {
     return nullptr;
 }
 
+// u8g2gl_obj::~u8g2gl_obj
+// Releases every pool slot belonging to this object.
+//
+// This is the counterpart to u8g2gl_allocate_binding and it is not optional:
+// slots hold a raw u8g2gl_obj*, so a destroyed object leaving its slots active
+// would leave the pool pointing at freed memory, and the next subject
+// notification would evaluate a binding against it. Generated screens use static
+// objects that outlive the program, so this rarely runs in production — but
+// tests construct and destroy objects freely, which is exactly where a dangling
+// slot would surface as an unrelated failure.
 u8g2gl_obj::~u8g2gl_obj() {
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
         if (s_binding_pool[i].active && s_binding_pool[i].obj == this) {
@@ -367,6 +422,13 @@ void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref
     bind_flag_if_not_eq(subject, ref_value ? 1 : 0, flag);
 }
 
+// u8g2gl_obj::bind_text (int subject)
+// Binds display text to an integer subject, optionally formatted. Stores the
+// subject on the object rather than evaluating anything: the widget reads and
+// formats the value at render time, so this only has to arrange for a frame to
+// be scheduled when the value changes.
+//   subject — subject to observe; must outlive this object
+//   fmt     — printf format applied at render time, or nullptr for the raw value
 void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject) {
         return;
@@ -400,6 +462,11 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     mark_dirty();
 }
 
+// u8g2gl_obj::bind_text (string subject)
+// As the int overload, without formatting. The two are mutually exclusive per
+// object — binding one replaces the other, because an object has a single text
+// source.
+//   subject — subject to observe; must outlive this object
 void u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject) {
         return;
