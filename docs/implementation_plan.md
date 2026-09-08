@@ -119,8 +119,12 @@ It was rejected because **it still needs dispatch for focus** — routing a pres
 | | Per object (32-bit) | 15-widget screen |
 |---|---|---|
 | `lv_obj_t` at LVGL defaults | ~44 B + heap-allocated `spec_attr` | ~660 B + heap |
-| **U8G2GL `u8g2gl_obj`** — vptr 4, `int16` coords 8, flags 1, parent index 1, pad | **~16 B** | **~240 B, no heap** |
+| **U8G2GL `u8g2gl_obj`** — vptr 4, `int16` coords 8, flags 1, parent index 1, embedded style ~20 | **~36 B** *(corrected)* | **~540 B, no heap** |
 | Monomorphic alternative (rejected) | ~12 B | ~180 B |
+
+> **Correction, post-PR-01.** The ~16 B figure above was mine and was optimistic: I costed vptr, coords, flags and parent index but **omitted the style member entirely**. Measured on delivered code, `u8g2gl_obj` is 64 B on a 64-bit host (~48 B on 32-bit), of which the embedded `u8g2gl_style` is 40 B. With the packing fixes in WO6 it lands at **~36 B on 32-bit**, which is the honest target. It still beats `lv_obj_t`'s ~44 B with no heap allocation, so the decision stands — but the margin is thinner than stated and the figure is corrected here rather than left as a target the code cannot meet.
+>
+> A style *index* into a generated table would take this to ~17 B, and is recorded as deferred (§WO6 finding E) with a trigger: revisit if a project exceeds 50 objects, or if §18 flags style as material.
 
 The virtual base costs roughly **60 bytes of RAM per screen** over the monomorphic option, plus a few hundred bytes of flash for the vtables. It costs no ROM-ability: widgets carry mutable state (scroll offset, blink phase) and live in RAM regardless.
 
