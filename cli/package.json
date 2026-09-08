@@ -19,6 +19,11 @@
       "default": "./dist/node/cli.js"
     }
   },
+  "files": [
+    "dist/",
+    "src/data/catalogue.json",
+    "src/data/page-mode-map.json"
+  ],
   "scripts": {
     "build": "tsc",
     "build:catalogue": "tsx src/node/build-catalogue.ts",

@@ -6,17 +6,18 @@
  *
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
- *          for XML validation, display queries, and code generation.
+ *          for XML validation, display queries, and display catalogue enumeration.
  * Description: Command parser and subcommand router supporting global flags
- *              (--json, --version, --help) and subcommands (validate, find, catalogue).
- *              Wires the isomorphic display catalogue query engine into the CLI (§5.2).
+ *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue).
+ *              Wires the isomorphic display catalogue query engine and schema validator
+ *              into human-readable compiler-style diagnostics (§15.1) and JSON output (§15.3, [D-16]).
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
 import {
@@ -42,6 +43,14 @@ import {
   type FitsTarget,
 } from '../core/catalogue/query.js';
 import type { BusFamily } from '../core/schema/display-record.js';
+import { formatDiagnostics } from './format-diagnostic.js';
+import {
+  formatIdentifyResult,
+  formatSourceResult,
+  formatCompareResult,
+  formatCatalogueSummary,
+} from './format-display.js';
+import { readProjectFiles, getProjectFileMap } from './read-project.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
 const KNOWN_COMMANDS = ['validate', 'find', 'catalogue'] as const;
@@ -89,14 +98,15 @@ function printUsage(): void {
   console.log(`Usage: u8g2gl [options] <command> [command-options]
 
 Commands:
-  validate   Validate a U8G2GL XML file against the schema
+  validate   Validate a U8G2GL XML project or file against the schema
   find       Query the display catalogue for matching displays
-  catalogue  Display information from the display catalogue
+  catalogue  Display summary from the display catalogue
 
 Global Options:
-  --json     Format output as JSON
-  --version  Show version number
-  --help     Show help
+  --json      Format output as JSON
+  --no-color  Disable ANSI colour output
+  --version   Show version number
+  --help      Show help
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -153,8 +163,9 @@ function parseFitsRam(fitsArg: string): number | undefined {
  * @brief Handles the `catalogue` subcommand (enumerate mode).
  *
  * @param json Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
  */
-function handleCatalogueCommand(json: boolean): void {
+function handleCatalogueCommand(json: boolean, useColor: boolean): void {
   const displays = enumerateDisplays(CATALOGUE);
 
   if (json) {
@@ -162,36 +173,7 @@ function handleCatalogueCommand(json: boolean): void {
     return;
   }
 
-  // Human-readable summary
-  const controllers = new Map<string, { geometries: Set<string>; buses: Set<string>; count: number }>();
-
-  for (const d of displays) {
-    let entry = controllers.get(d.controller);
-    if (!entry) {
-      entry = { geometries: new Set(), buses: new Set(), count: 0 };
-      controllers.set(d.controller, entry);
-    }
-    entry.geometries.add(`${d.width}x${d.height}`);
-    entry.buses.add(d.bus.family);
-    entry.count++;
-  }
-
-  console.log(`U8G2 Display Catalogue (${displays.length} displays across ${controllers.size} controllers)\n`);
-  console.log(`${'CONTROLLER'.padEnd(16)} ${'GEOMETRIES'.padEnd(28)} ${'BUSES'.padEnd(20)} TOTAL`);
-  console.log('-'.repeat(74));
-
-  const sortedControllers = Array.from(controllers.keys()).sort();
-  for (const ctrl of sortedControllers) {
-    const entry = controllers.get(ctrl);
-    if (!entry) {
-      continue;
-    }
-    const geoms = Array.from(entry.geometries).sort().join(', ');
-    const buses = Array.from(entry.buses).sort().join(', ');
-    console.log(
-      `${ctrl.padEnd(16)} ${geoms.slice(0, 26).padEnd(28)} ${buses.padEnd(20)} ${entry.count}`
-    );
-  }
+  console.log(formatCatalogueSummary(displays, { color: useColor }));
 }
 
 /**
@@ -199,8 +181,9 @@ function handleCatalogueCommand(json: boolean): void {
  *
  * @param args Subcommand argument array.
  * @param json Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
  */
-function handleFindCommand(args: readonly string[], json: boolean): void {
+function handleFindCommand(args: readonly string[], json: boolean, useColor: boolean): void {
   // --- Step 1: Detect mode flags and arguments ---
   let isCompare = false;
   const compareSetups: string[] = [];
@@ -274,25 +257,7 @@ function handleFindCommand(args: readonly string[], json: boolean): void {
       return;
     }
 
-    if (compareResult.notFound.length > 0) {
-      console.warn(`Warning: Setups not found: ${compareResult.notFound.join(', ')}`);
-    }
-
-    const diffKeys = Object.keys(compareResult.differences);
-    if (diffKeys.length === 0) {
-      console.log('Selected displays have identical catalogued attributes.');
-      return;
-    }
-
-    console.log(`Comparison of ${compareResult.records.length} displays (showing differing fields):\n`);
-    console.log(`${'FIELD'.padEnd(20)} ${compareResult.records.map((r) => r.setup.slice(0, 30).padEnd(32)).join(' ')}`);
-    console.log('-'.repeat(20 + compareResult.records.length * 33));
-
-    for (const key of diffKeys) {
-      const values = compareResult.differences[key] ?? [];
-      const valStrings = values.map((v) => String(v).slice(0, 30).padEnd(32)).join(' ');
-      console.log(`${key.padEnd(20)} ${valStrings}`);
-    }
+    console.log(formatCompareResult(compareResult, { color: useColor }));
     return;
   }
 
@@ -311,40 +276,12 @@ function handleFindCommand(args: readonly string[], json: boolean): void {
     const sourceResult = sourceDisplay(CATALOGUE, constraints);
 
     if (json) {
-      console.log(JSON.stringify(sourceResult, null, 2));
+      // Machine-readable contract: array of matched DisplayRecord entries (§15.3)
+      console.log(JSON.stringify(sourceResult.matches.map((m) => m.record), null, 2));
       return;
     }
 
-    if (sourceResult.matches.length === 0) {
-      console.log('No displays match the specified constraints.');
-      return;
-    }
-
-    console.log(`Found ${sourceResult.matches.length} matching displays:\n`);
-    const hasFits = constraints.fitsTarget !== undefined;
-    const header = hasFits
-      ? `${'SETUP'.padEnd(42)} ${'GEOMETRY'.padEnd(10)} ${'RAM'.padEnd(10)} HEADROOM`
-      : `${'SETUP'.padEnd(42)} ${'GEOMETRY'.padEnd(10)} ${'BUS'.padEnd(12)} RAM`;
-    console.log(header);
-    console.log('-'.repeat(header.length + 10));
-
-    for (const item of sourceResult.matches.slice(0, 30)) {
-      const d = item.record;
-      const geom = `${d.width}x${d.height}`;
-      const ramKb = `${(d.framebufferBytes / 1024).toFixed(1)} KB`;
-
-      if (hasFits) {
-        const tag = item.classification === 'check' ? 'check headroom' : (item.classification ?? '');
-        console.log(`${d.setup.padEnd(42)} ${geom.padEnd(10)} ${ramKb.padEnd(10)} ${tag}`);
-      } else {
-        console.log(`${d.setup.padEnd(42)} ${geom.padEnd(10)} ${d.bus.family.padEnd(12)} ${ramKb}`);
-      }
-    }
-
-    if (hasFits) {
-      console.log('\nClassification is framebuffer vs internal SRAM headroom (§5.2, §18).');
-      console.log('Note: The framebuffer must live in internal SRAM; PSRAM does not increase display headroom.');
-    }
+    console.log(formatSourceResult(sourceResult, { color: useColor }));
     return;
   }
 
@@ -359,251 +296,217 @@ function handleFindCommand(args: readonly string[], json: boolean): void {
   const result = identifyDisplay(CATALOGUE, queryString);
 
   if (json) {
-    console.log(JSON.stringify(result, null, 2));
+    // Machine-readable contract: array of matched DisplayRecord entries (§15.3, [D-16])
+    console.log(JSON.stringify(result.matches, null, 2));
     return;
   }
 
-  if (result.matches.length === 0) {
-    console.log(result.message ?? `No matching displays found for "${queryString}".`);
-    if (result.suggestions.length > 0) {
-      console.log(`Suggestions: ${result.suggestions.join(', ')}`);
-    }
-    return;
-  }
-
-  console.log(`Found ${result.matches.length} matching displays:\n`);
-  for (const d of result.matches.slice(0, 10)) {
-    const geom = `${d.width}x${d.height}`;
-    const busDesc = `${d.bus.family.toUpperCase()} (${d.bus.wiring})`;
-    console.log(`  ${d.setup.padEnd(46)} ${geom.padEnd(10)} ${busDesc}`);
-  }
-
-  const topMatch = result.matches[0];
-  if (topMatch) {
-    console.log(`\n  framebuffer: ${topMatch.framebufferBytes} bytes (${topMatch.tiles.width}x${topMatch.tiles.height} tiles)`);
-  }
-
-  for (const note of result.notes) {
-    console.log(`\n  note: ${note}`);
-  }
-
-  return;
+  console.log(formatIdentifyResult(result, { color: useColor }));
 }
 
 /**
- * @brief Main execution entry point for the CLI.
+ * @brief Executes the `validate` subcommand across a project directory or single XML file.
  *
- * Parses raw argument vector, handles global flags, and dispatches
- * to known subcommands. Exits the process with an appropriate status code:
- * - 0: Success
- * - 1: Execution error or unknown command
- * - 2: Usage error (missing arguments or invalid flags)
+ * Implements §15.1 and §15.3:
+ * - `--json` emits `{ "diagnostics": Diagnostic[], "errors": N, "warnings": N }` to stdout.
+ * - Default human-readable output renders compiler-style diagnostics with source lines and carets.
+ * - Exits 0 on clean (no errors), 1 on errors.
  *
- * @param rawArgs Command-line arguments (excluding node binary and script path).
+ * @param args Subcommand arguments.
+ * @param json Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
  */
-export function runCli(rawArgs: readonly string[]): void {
-  // --- Step 1: Scan for global flags and isolate subcommand ---
-  let json = false;
-  let showHelp = false;
-  let showVersion = false;
-  let subcommand: string | undefined;
-  const subcommandArgs: string[] = [];
-
-  for (let i = 0; i < rawArgs.length; i++) {
-    const arg = rawArgs[i];
-    if (!arg) {
-      continue;
-    }
-
-    if (arg === '--json') {
-      json = true;
-    } else if (arg === '--help' || arg === '-h') {
-      showHelp = true;
-    } else if (arg === '--version' || arg === '-v') {
-      showVersion = true;
-    } else if (!subcommand && !arg.startsWith('-')) {
-      subcommand = arg;
-    } else {
-      subcommandArgs.push(arg);
-    }
-  }
-
-  // --- Step 2: Handle global informational flags ---
-  if (showHelp) {
-    printUsage();
-    return;
-  }
-
-  if (showVersion) {
-    console.log(getPackageVersion());
-    return;
-  }
-
-  // --- Step 3: Validate presence of a subcommand ---
-  if (!subcommand) {
-    printUsage();
-    process.exit(2);
-  }
-
-  // --- Step 4: Dispatch subcommand ---
-  if (subcommand === 'find') {
-    handleFindCommand(subcommandArgs, json);
-    return;
-  }
-
-  if (subcommand === 'catalogue') {
-    handleCatalogueCommand(json);
-    return;
-  }
-
-/**
- * Recursively discovers all XML files within a directory tree.
- */
-function findXmlFiles(dir: string): string[] {
-  const results: string[] = [];
-  try {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (
-        entry.name === 'node_modules' ||
-        entry.name === '.git' ||
-        entry.name === 'dist' ||
-        entry.name.startsWith('.')
-      ) {
-        continue;
-      }
-      const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...findXmlFiles(fullPath));
-      } else if (entry.isFile() && entry.name.endsWith('.xml')) {
-        results.push(fullPath);
-      }
-    }
-  } catch {
-    // Return collected entries on error
-  }
-  return results;
-}
-
-/**
- * Executes the 'validate' subcommand across a project directory or single XML file.
- */
-function handleValidateCommand(args: readonly string[], json: boolean): void {
+function handleValidateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
   const targetArg = args[0] ?? '.';
   const targetPath = resolve(process.cwd(), targetArg);
 
   if (!existsSync(targetPath)) {
-    console.error(`Error: Path does not exist: ${targetArg}`);
+    const notFoundMsg = `Path does not exist: ${targetArg}`;
+    if (json) {
+      console.log(
+        JSON.stringify(
+          {
+            diagnostics: [
+              {
+                code: 'U8G2GL_MISSING_FILE',
+                severity: 'error',
+                file: targetArg,
+                line: 1,
+                column: 1,
+                message: notFoundMsg,
+              },
+            ],
+            errors: 1,
+            warnings: 0,
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(1);
+    }
+    console.error(`Error: ${notFoundMsg}`);
     process.exit(1);
   }
 
   const stat = statSync(targetPath);
-  const xmlFiles: string[] = [];
+  const allDiagnostics: Diagnostic[] = [];
+  const fileContentMap = new Map<string, string>();
 
-  if (stat.isFile()) {
-    xmlFiles.push(targetPath);
-  } else if (stat.isDirectory()) {
-    xmlFiles.push(...findXmlFiles(targetPath));
-  }
-
-  if (xmlFiles.length === 0) {
-    console.error(`No XML files found in: ${targetArg}`);
-    process.exit(1);
-  }
-
-  const parsedProjects: { file: string; project: U8g2glProject }[] = [];
-  const parsedGlobalsList: Globals[] = [];
+  let parsedProject: U8g2glProject = {
+    schema: '0.3',
+    name: 'unnamed',
+    version: '1.0.0',
+    targets: [],
+  };
+  let parsedGlobals: Globals = {
+    consts: [],
+    subjects: [],
+    styles: [],
+    fonts: [],
+    images: [],
+  };
   const parsedScreens: Screen[] = [];
   const parsedComponents: Component[] = [];
-  const parsedWidgetManifests: WidgetManifest[] = [];
-  const allDiagnostics: Diagnostic[] = [];
+  const parsedWidgets: WidgetManifest[] = [];
 
-  for (const file of xmlFiles) {
-    let xml: string;
+  if (stat.isDirectory()) {
+    // --- Directory: Load standard project structure via readProjectFiles ---
+    let projectFiles;
     try {
-      xml = readFileSync(file, 'utf-8');
+      projectFiles = readProjectFiles(targetPath);
     } catch (err) {
-      console.error(`Error reading ${file}: ${String(err)}`);
-      continue;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (json) {
+        console.log(
+          JSON.stringify(
+            {
+              diagnostics: [
+                {
+                  code: 'U8G2GL_MISSING_FILE',
+                  severity: 'error',
+                  file: 'u8g2gl.xml',
+                  line: 1,
+                  column: 1,
+                  message: errMsg,
+                },
+              ],
+              errors: 1,
+              warnings: 0,
+            },
+            null,
+            2,
+          ),
+        );
+        process.exit(1);
+      }
+      console.error(`error: u8g2gl.xml:1:1\n   ${errMsg}`);
+      process.exit(1);
     }
 
-    const match = xml.match(/<([a-zA-Z0-9_]+)/);
+    const loadedMap = getProjectFileMap(projectFiles);
+    for (const [k, v] of loadedMap.entries()) {
+      fileContentMap.set(k, v);
+    }
+
+    // 1. Parse project manifest
+    const projRes = parseProjectFile(projectFiles.projectXml, 'u8g2gl.xml');
+    allDiagnostics.push(...projRes.diagnostics);
+    if (projRes.value) {
+      parsedProject = projRes.value;
+    }
+
+    // 2. Parse globals
+    if (projectFiles.globalsXml) {
+      const globRes = parseGlobalsFile(projectFiles.globalsXml, 'globals.xml');
+      allDiagnostics.push(...globRes.diagnostics);
+      if (globRes.value) {
+        parsedGlobals = globRes.value;
+      }
+    }
+
+    // 3. Parse screens
+    for (const screen of projectFiles.screenXmls) {
+      const scrRes = parseScreenFile(screen.content, screen.filename);
+      allDiagnostics.push(...scrRes.diagnostics);
+      if (scrRes.value) {
+        parsedScreens.push(scrRes.value);
+      }
+    }
+
+    // 4. Parse components
+    for (const comp of projectFiles.componentXmls) {
+      const compRes = parseComponentFile(comp.content, comp.filename);
+      allDiagnostics.push(...compRes.diagnostics);
+      if (compRes.value) {
+        parsedComponents.push(compRes.value);
+      }
+    }
+
+    // 5. Parse widget manifests
+    for (const widget of projectFiles.widgetManifestXmls) {
+      const widRes = parseWidgetManifestFile(widget.content, widget.filename);
+      allDiagnostics.push(...widRes.diagnostics);
+      if (widRes.value) {
+        parsedWidgets.push(widRes.value);
+      }
+    }
+  } else {
+    // --- Single file validation ---
+    const fileXml = readFileSync(targetPath, 'utf-8');
+    fileContentMap.set(targetArg, fileXml);
+
+    const match = fileXml.match(/<([a-zA-Z0-9_]+)/);
     const rootTag = match ? match[1] : '';
 
     if (rootTag === 'u8g2gl') {
-      const res = parseProjectFile(xml, file);
+      const res = parseProjectFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
-        parsedProjects.push({ file, project: res.value });
+        parsedProject = res.value;
       }
     } else if (rootTag === 'globals') {
-      const res = parseGlobalsFile(xml, file);
+      const res = parseGlobalsFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
-        parsedGlobalsList.push(res.value);
+        parsedGlobals = res.value;
       }
     } else if (rootTag === 'screen') {
-      const res = parseScreenFile(xml, file);
+      const res = parseScreenFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
         parsedScreens.push(res.value);
       }
     } else if (rootTag === 'component') {
-      const res = parseComponentFile(xml, file);
+      const res = parseComponentFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
         parsedComponents.push(res.value);
       }
     } else if (rootTag === 'widget') {
-      const res = parseWidgetManifestFile(xml, file);
+      const res = parseWidgetManifestFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
-        parsedWidgetManifests.push(res.value);
+        parsedWidgets.push(res.value);
       }
     }
   }
 
-  const mergedGlobals: Globals = {
-    consts: parsedGlobalsList.flatMap((g) => g.consts ?? []),
-    subjects: parsedGlobalsList.flatMap((g) => g.subjects ?? []),
-    styles: parsedGlobalsList.flatMap((g) => g.styles ?? []),
-    fonts: parsedGlobalsList.flatMap((g) => g.fonts ?? []),
-    images: parsedGlobalsList.flatMap((g) => g.images ?? []),
-  };
+  // --- Step 2: Execute Schema & Semantic Validation ---
+  const valResult = validate({
+    project: parsedProject,
+    globals: parsedGlobals,
+    screens: parsedScreens,
+    components: parsedComponents,
+    widgetManifests: parsedWidgets,
+    catalogue: CATALOGUE,
+  });
+  allDiagnostics.push(...valResult.diagnostics);
 
-  if (parsedProjects.length > 0) {
-    for (const p of parsedProjects) {
-      const res = validate({
-        project: p.project,
-        globals: mergedGlobals,
-        screens: parsedScreens,
-        components: parsedComponents,
-        widgetManifests: parsedWidgetManifests,
-        catalogue: CATALOGUE,
-      });
-      allDiagnostics.push(...res.diagnostics);
-    }
-  } else {
-    const dummyProject: U8g2glProject = {
-      schema: '0.3',
-      name: 'unnamed',
-      version: '1.0.0',
-      targets: [],
-    };
-    const res = validate({
-      project: dummyProject,
-      globals: mergedGlobals,
-      screens: parsedScreens,
-      components: parsedComponents,
-      widgetManifests: parsedWidgetManifests,
-      catalogue: CATALOGUE,
-    });
-    allDiagnostics.push(...res.diagnostics);
-  }
-
-  // Deduplicate diagnostics by file:line:column:code:message
+  // --- Step 3: Deduplicate and sort deterministically ---
   const seen = new Set<string>();
   const uniqueDiagnostics: Diagnostic[] = [];
+
   for (const d of allDiagnostics) {
     const key = `${d.file}:${d.line}:${d.column}:${d.code}:${d.message}`;
     if (!seen.has(key)) {
@@ -635,28 +538,127 @@ function handleValidateCommand(args: readonly string[], json: boolean): void {
     }
   }
 
+  // --- Step 4: Emit JSON or Human-Readable Output ---
   if (json) {
-    console.log(JSON.stringify(uniqueDiagnostics, null, 2));
-  } else {
-    for (const d of uniqueDiagnostics) {
-      const prefix = `${d.file}:${d.line}:${d.column}`;
-      console.log(`${prefix} [${d.severity}] ${d.code}: ${d.message}`);
-      if (d.suggestions && d.suggestions.length > 0) {
-        console.log(`  did you mean: ${d.suggestions.join(', ')}?`);
-      }
+    // Machine-readable contract (§15.3, [D-16])
+    console.log(
+      JSON.stringify(
+        {
+          diagnostics: uniqueDiagnostics,
+          errors: errorCount,
+          warnings: warningCount,
+        },
+        null,
+        2,
+      ),
+    );
+    process.exit(errorCount > 0 ? 1 : 0);
+  }
+
+  if (errorCount > 0) {
+    const formatted = formatDiagnostics(
+      uniqueDiagnostics,
+      (f) => fileContentMap.get(f),
+      { color: useColor },
+    );
+    console.error(formatted);
+    console.error(`\nValidation failed: ${errorCount} error(s), ${warningCount} warning(s).`);
+    process.exit(1);
+  }
+
+  if (warningCount > 0) {
+    const formatted = formatDiagnostics(
+      uniqueDiagnostics,
+      (f) => fileContentMap.get(f),
+      { color: useColor },
+    );
+    console.log(formatted);
+    console.log(`\nValidation passed: 0 errors, ${warningCount} warning(s).`);
+    process.exit(0);
+  }
+
+  console.log('Validation passed: 0 errors, 0 warnings.');
+  process.exit(0);
+}
+
+/**
+ * @brief Main execution entry point for the CLI.
+ *
+ * Parses raw argument vector, handles global flags, and dispatches
+ * to known subcommands. Exits the process with an appropriate status code:
+ * - 0: Success
+ * - 1: Execution error or unknown command
+ * - 2: Usage error (missing arguments or invalid flags)
+ *
+ * @param rawArgs Command-line arguments (excluding node binary and script path).
+ */
+export function runCli(rawArgs: readonly string[]): void {
+  // --- Step 1: Scan for global flags and isolate subcommand ---
+  let json = false;
+  let noColor = false;
+  let showHelp = false;
+  let showVersion = false;
+  let subcommand: string | undefined;
+  const subcommandArgs: string[] = [];
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    if (!arg) {
+      continue;
     }
-    if (errorCount === 0) {
-      console.log(`Validation passed: 0 errors, ${warningCount} warnings.`);
+
+    if (arg === '--json') {
+      json = true;
+    } else if (arg === '--no-color') {
+      noColor = true;
+    } else if (arg === '--help' || arg === '-h') {
+      showHelp = true;
+    } else if (arg === '--version' || arg === '-v') {
+      showVersion = true;
+    } else if (!subcommand && !arg.startsWith('-')) {
+      subcommand = arg;
     } else {
-      console.error(`Validation failed: ${errorCount} error(s), ${warningCount} warning(s).`);
+      subcommandArgs.push(arg);
     }
   }
 
-  process.exit(errorCount > 0 ? 1 : 0);
-}
+  // Determine whether terminal colour output should be enabled
+  const useColor =
+    !noColor &&
+    !json &&
+    process.stdout?.isTTY === true &&
+    process.env.NO_COLOR === undefined;
+
+  // --- Step 2: Handle global informational flags ---
+  if (showHelp) {
+    printUsage();
+    return;
+  }
+
+  if (showVersion) {
+    console.log(getPackageVersion());
+    return;
+  }
+
+  // --- Step 3: Validate presence of a subcommand ---
+  if (!subcommand) {
+    printUsage();
+    process.exit(2);
+  }
+
+  // --- Step 4: Dispatch subcommand ---
+  if (subcommand === 'find') {
+    handleFindCommand(subcommandArgs, json, useColor);
+    return;
+  }
+
+  if (subcommand === 'catalogue') {
+    handleCatalogueCommand(json, useColor);
+    return;
+  }
 
   if (subcommand === 'validate') {
-    handleValidateCommand(subcommandArgs, json);
+    handleValidateCommand(subcommandArgs, json, useColor);
     return;
   }
 
