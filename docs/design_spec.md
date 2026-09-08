@@ -715,6 +715,10 @@ The `time` type is new in 0.2. v0.1 used `bind_time="system_time"` in examples w
 
 Setting a string subject **copies** into a framework-owned fixed buffer sized by `max_len`. The caller's buffer may be freed or reused immediately.
 
+**`max_len` is usable characters, excluding the terminator.** The framework allocates `max_len + 1` bytes. A subject declared `max_len="16"` therefore stores up to 16 visible characters and costs 17 bytes. This was ambiguous in v0.2 and produced a real off-by-one in the first implementation, which read it as total buffer bytes; the wording is now explicit because the value appears in the §18 budget report and in generated storage declarations, where an off-by-one is silent.
+
+**The declared value sizes the allocation, not merely the truncation point.** A generator emitting storage for a string subject must emit exactly `max_len + 1` bytes; a runtime that allocates a fixed maximum regardless of the declaration makes the §18 budget report untrue, which §1.3 forbids.
+
 *Rationale:* The alternative — storing the caller's pointer — creates exactly the lifetime hazard §9 exists to eliminate. Copy cost is trivial for scalars; the RAM is declared, bounded, and reported (§18). Truncation at `max_len` is silent at runtime but produces a build-time warning if a `bind_text_fmt` format string can provably exceed it.
 
 ### 8.3 Sigils
