@@ -1066,7 +1066,16 @@ Three models were considered:
 
 *Rationale:* LVGL needs `lv_obj_property` at *runtime* because LVGL Pro can load XML on-device in its editor. U8G2GL has no runtime XML — §6.4 already deleted the parser-bridge file for exactly this reason. We need the property *descriptor*, not the property *dispatch*. Paying for runtime lookup would buy nothing, and hardcoding the generator would make the custom-widget tier a fiction.
 
-**The manifest is the `<api>` block that §6.4 already defines.** Built-in widgets ship the same `<api>` declaration as custom ones — `u8g2gl_label.xml` sits beside `u8g2gl_label.hpp`. This unifies Tier 2 and Tier 4: they differ in *who wrote them*, not in how the generator handles them. The generator's knowledge of widgets is data, not code, and adding a widget requires no generator release.
+**The manifest is the `<api>` block that §6.4 already defines.**
+
+**Two generation targets.** The same manifest drives both, mirroring LVGL Pro's `compile --target editor|cli`:
+
+| Target | Emitted from the manifest | Cost |
+|---|---|---|
+| `firmware` | Direct setter calls (§13.7) | None beyond the calls themselves |
+| `editor` | A class registry (construct-by-name) and property thunks (set-by-name), compiled under `#ifdef U8G2GL_EDITOR` | Zero in firmware — compiled out |
+
+The editor target exists because the designer must render arbitrary XML without running a C++ compiler in the browser ([ui_spec.md §UD-4](ui_spec.md)). It is the first real consumer of [PD-3]'s virtual base, and it is why the object model was specified as *ready for* dynamic construction even though firmware never uses it. Built-in widgets ship the same `<api>` declaration as custom ones — `u8g2gl_label.xml` sits beside `u8g2gl_label.hpp`. This unifies Tier 2 and Tier 4: they differ in *who wrote them*, not in how the generator handles them. The generator's knowledge of widgets is data, not code, and adding a widget requires no generator release.
 
 ```xml
 <!-- runtime/widgets/u8g2gl_label.xml — ships with the framework -->

@@ -1,11 +1,13 @@
 # U8G2GL Designer — UI Specification
 
-**The visual designer for U8G2GL. Functionality and layout requirements.**
+**The visual designer for U8G2GL: functionality, architecture and layout.**
 
-**Version**: 0.3 Draft
+**Version**: 1.0
 **Date**: September 2026
-**Status**: Design input — this document briefs visual design work; it is not an implementation spec
+**Status**: Design specification — briefs visual design work and gates schema decisions in PR-02
 **Companion documents**: [design_spec.md](design_spec.md) (the framework) · [concept.md](concept.md) (why) · [implementation_plan.md](implementation_plan.md) (sequencing)
+
+> **[UD-n]** marks a binding editor decision with its rationale. **[U-n]** marks an open question. Where this document and `design_spec.md` disagree on framework behaviour, the design spec wins; on editor behaviour, this document wins.
 
 ---
 
@@ -13,372 +15,440 @@
 
 The designer is the point of the U8G2GL programme ([design_spec.md §1.2](design_spec.md)). The schema, generator, runtime and Wasm renderer are infrastructure that exists to make it possible.
 
-Monochrome UI work is **pixel work**. On a 128×64 panel an element one pixel out is visible and wrong, and fixing it is direct manipulation — nudge, align, compare — not description. The designer's job is to make that manipulation fast, exact, and reversible.
+Monochrome UI work is **pixel work**. On a 128×64 panel an element one pixel out is visible and wrong, and fixing it is direct manipulation — nudge, align, compare — not description. The designer's job is to make that manipulation fast, exact and reversible.
 
-This document defines *what the tool does* and *how it is laid out*. It does not specify visual styling; that is the design work this briefs.
+**The specific gap this fills.** LVGL Pro has a visual editor whose weakness is the property and settings surface: no guidance for a non-coding user. Lopaka has a good canvas but no bindings, components, multi-screen or project format. SquareLine Studio is capable but over-complex for a domain this size. The opportunity is a lean canvas *with* a property surface that teaches.
 
 ---
 
 ## 2. Design Principles
 
-1. **Lean, not comprehensive.** SquareLine Studio is the cautionary reference — capable but over-complex for this domain. A monochrome screen has 5–20 elements. The tool should feel proportionate to that.
-2. **Familiar layout, minimal machinery.** Adopt the VS Code *paradigm* — activity bar, sidebars, tabbed editor area, bottom panel, status bar — because it is instantly legible to the target user. Do not adopt a full IDE platform to get it (§4).
-3. **Two views of one document.** The canvas and the XML are the same thing seen differently. Selection, edits and errors are shared between them, live and bidirectionally. This is the tool's defining behaviour.
-4. **Pixel-exact by default.** Every position is an integer, always visible, always nudgeable. Nothing is approximate.
-5. **The XML stays authored, not generated.** Round-trip must preserve what a human wrote — comments, ordering, formatting. The editor is a *co-author* of the file, not its owner.
-6. **One editing surface, three contexts, three supporting panels.** The canvas/XML/properties trio is a single surface used for screens, components and the screen-flow graph. Problems-and-budget, fonts, and sample data support it. Anything beyond that needs a case (§12).
+1. **Lean, not comprehensive.** A monochrome screen has 5–20 elements. The tool should feel proportionate to that.
+2. **Familiar layout, minimal machinery.** Adopt the VS Code *paradigm* — activity bar, sidebars, tabbed editor, bottom panel, status bar — because it is instantly legible. Do not adopt an IDE platform to get it ([UD-1]).
+3. **Two views of one document.** Canvas and XML are the same thing seen differently. Selection, edits and errors are shared, live and bidirectional. This is the defining behaviour.
+4. **Pixel-exact by default.** Every position is an integer, always visible, always nudgeable.
+5. **The XML stays authored.** Round-trip preserves comments, ordering and formatting. The editor is a *co-author*, not the file's owner.
+6. **The property panel teaches.** Every property carries its description, its consequence and its constraints inline. This is the gap in the incumbent tools and the main reason to build another.
+7. **One editing surface, three contexts, four supporting panels.** Beyond that needs a case (§14).
 
 ---
 
-## 3. What the User Does With It
+## 3. Editor Decisions
 
-Eight flows define the tool. If these are fluent, it works. F2 is the one that runs dozens of times a session.
+### [UD-1] Monaco plus a custom shell — not Theia, not a VS Code fork
 
-**F1 · Lay out a screen.** Open a project, pick a screen, drag widgets from the palette onto the canvas, position them exactly, set properties. Save. The XML on disk is what the compiler consumes.
+**Stack:** TypeScript · React · Dockview (panel layout) · Monaco (text) · Wasm (canvas) · Vite.
 
-**F2 · Adjust an existing screen precisely.** Select an element — on canvas or in XML — and move it a pixel at a time. Watch the coordinate readout. Align it to a neighbour. This is the most-repeated action in the tool and must be the fastest.
+*Evaluation.* Eclipse Theia was assessed against licence, serving and rendering (Appendix A). It passes on licence — EPL-2.0 permits closed-source commercial products — and its embedded-tooling pedigree is strong: Arduino IDE 2.0, Arm Mbed Studio, TI Code Composer Studio, STMicroelectronics STM32CubeMX2, Samsung Sokatoa. Custom-heavy UI inside Theia demonstrably works, so "Theia fights bespoke surfaces" is not supportable.
 
-**F3 · Bind data.** Pick an element, choose a subject to bind a property to, set a format string. See the preview render with placeholder or live values.
+*Why not, nonetheless.* Two reasons, in order of weight:
 
-**F4 · Build and fix.** Compile. Errors appear as inline squiggles in the XML and as rows in a Problems panel, each carrying file, line, column and a suggestion. Click a row, land on the fault.
+1. **Optionality.** A Monaco-based design surface can later be wrapped in Theia, Electron, *or* a VS Code extension. Starting in Theia forecloses the static-hosting path and the VS Code path permanently. The VS Code path is not hypothetical — **PlatformIO IDE is a VS Code extension**, so target users are plausibly already there.
+2. **Centre of gravity.** Theia optimises for text-editing IDEs. Our primary surface is a canvas; XML is secondary. Roughly 25–30% of this application is shell Theia would supply, and it is the least differentiated 25–30% — canvas, property panel, fonts, sample data and flow view are custom regardless.
 
-**F5 · Design a component.** Open a component, edit it in isolation against its `<previews>` declaration, set prop defaults, and see what a consumer will get.
+*Cost accepted.* We build the shell. That is a real component — dockable panels, splitters, tabs — hence Dockview rather than hand-rolling. Migration to Theia or VS Code remains available, and is cheaper from this direction than the reverse.
 
-**F6 · Check a layout against real data.** Switch sample sets — typical, empty, longest plausible — and confirm the layout survives each. Length-dependent breakage is the most common monochrome layout failure.
+### [UD-2] Static-first, with a served fallback — one filesystem interface
 
-**F7 · Wire up navigation.** In the flow view, drag from a button to a screen; the corresponding `<screen_load_event>` is written.
+The editor programs against a single `ProjectFileSystem` interface; the implementation is chosen at runtime.
 
-**F8 · Work with fonts and glyphs.** Browse what a font contains, check a glyph's metrics, confirm a string fits a width before committing to a layout.
+| Mode | Mechanism | Install | Browsers |
+|---|---|---|---|
+| **Static** | File System Access API | **None** — design work needs no toolchain | Chromium |
+| **Served** | `npx u8g2gl design` over localhost | Node, already required by [D-10] | All |
+
+*Why static is genuinely zero-install:* [D-10] made the CLI TypeScript, so schema, validator and generator are isomorphic and run unmodified in-browser. With the Wasm renderer and `bdfconv` via Wasm ([Q-2]), the entire design pipeline is client-side. Node is needed only for the *firmware* build, a separate step in the user's own toolchain.
+
+Same frontend either way. Resolves the Chromium-only concern without imposing it on Firefox and Safari users.
+
+### [UD-3] Text is the single source of truth; the canvas produces text edits
+
+The `.xml` file is the model. The canvas is a *view* that emits text edits against it.
+
+*Consequence — this is what makes principle 5 achievable:* the document is held as a **CST (concrete syntax tree)**, not an AST. A CST preserves whitespace, comments, attribute order and quote style, and gives every attribute an exact source range. A canvas nudge rewrites one attribute's value in place, producing a **one-line diff**. A parse-and-reserialise cycle that normalises the document is forbidden.
+
+*Second consequence:* undo is unified for free. Canvas edits, property-panel edits and typing all become text edits on one Monaco undo stack. There is no separate canvas undo to keep in sync.
+
+### [UD-4] Two runtime build targets — the editor's Wasm constructs objects dynamically
+
+The CLI builds the runtime twice, mirroring LVGL Pro's `compile --target editor|cli`:
+
+| Target | Contains | Used by |
+|---|---|---|
+| `firmware` | Generated code with direct setter calls ([D-17]). No registry, no property table | The device |
+| `editor` | The same runtime **plus** a class registry (construct-by-name) and property thunks (set-by-name), generated from the same `<api>` manifests | The editor's Wasm canvas |
+
+*Why this is necessary.* The editor must render arbitrary XML without running a C++ compiler in the browser, so the runtime must build an object graph from a description at run time. That is exactly the dynamic-creation capability [PD-3] recorded the object model as *ready for* but not *capable of*, and exactly the runtime property mechanism [D-17] deliberately removed from firmware.
+
+*Why it costs firmware nothing.* Both are generated from one manifest, and the registry compiles out under `#ifdef U8G2GL_EDITOR`. [D-17]'s build-time manifests serve both paths: setter emission for firmware, thunk generation for the editor. This retrospectively justifies [PD-3]'s virtual base — the editor build is the first real consumer of polymorphic dispatch.
+
+### [UD-5] The property panel is generated entirely from `<api>` manifests
+
+No hardcoded widget knowledge. A custom widget with a manifest gets a full property panel — descriptions, validation, grouping — without an editor release. The same property that lets the generator handle it ([D-17]).
+
+### [UD-6] Sample data is design-time only and never compiled
+
+Named value sets per subject, used to render the canvas realistically. Never reaches firmware.
+
+### [UD-7] The screen-flow view is a projection, not a new capability
+
+It reads and writes `<screen_load_event>` / `<screen_back_event>` declarations that §12 already supports, adding no framework surface. Carousel configuration and modals are excluded (§7.3, §14).
 
 ---
 
-## 4. Platform — Theia evaluated
+## 4. Application Architecture
 
-An earlier draft dismissed Eclipse Theia on the grounds that LVGL Pro uses it and LVGL Pro's editor is weak. **That was guilt by association and it was wrong.** LVGL Pro's deficiency is its property and settings surface — no guidance for a non-coding user — which is an implementation gap, not a platform one. §9 of this document fixes exactly that via [D-17] manifests, and that fix would work on any platform. Theia deserved evaluation on its merits; this section is that evaluation.
+How an edit becomes pixels. Every surface in this document sits over this pipeline.
 
-### 4.1 Licence — **passes cleanly**
+```
+                    ┌──────────────────────────────────────────┐
+                    │  .xml on disk (ProjectFileSystem, UD-2)  │
+                    └────────────┬───────────────┬─────────────┘
+                          load   │               ▲  save (debounced)
+                                 ▼               │
+                    ┌──────────────────────────────────────────┐
+                    │  CST — text + source ranges  [UD-3]      │
+                    │  single source of truth, one undo stack  │
+                    └───┬──────────────────┬───────────────────┘
+             text edits │                  │ semantic view
+                        ▼                  ▼
+        ┌───────────────────────┐   ┌──────────────────────────┐
+        │ Monaco (XML editor)   │   │ Validator (PR-02 TS)     │
+        │ squiggles, completion │◄──┤ [D-16] diagnostics       │
+        └───────────────────────┘   └────────┬─────────────────┘
+                        ▲                    │ if structurally valid
+             text edits │                    ▼
+        ┌───────────────┴───────┐   ┌──────────────────────────┐
+        │ Canvas + Properties   │   │ Resolver (PR-04 TS)      │
+        │ (views, emit edits)   │   │ inline components,       │
+        └───────────────────────┘   │ evaluate anchors/consts  │
+                        ▲            └────────┬─────────────────┘
+                        │                     ▼
+                        │            ┌──────────────────────────┐
+                        │            │ Scene description (JSON) │
+                        │            │  + active sample set     │
+                        │            └────────┬─────────────────┘
+                        │                     ▼
+                        │            ┌──────────────────────────┐
+                        └────────────┤ Wasm runtime [UD-4]      │
+                          framebuffer│ construct → tick → render│
+                                     └──────────────────────────┘
+```
 
-EPL-2.0. Adopters may "use and distribute Theia in your own products, including closed-source commercial offerings." The only obligation is upstreaming modifications **to Theia core**; product-specific code and extensions kept distinct from the platform layer stay yours.
+### 4.1 The edit cycle
 
-The adopter list is directly relevant to this domain: **Arduino IDE 2.0**, **Arm Mbed Studio**, **TI Code Composer Studio**, and — announced 2026 — **STMicroelectronics STM32CubeMX2** and Samsung's Sokatoa. Embedded-tooling vendors have repeatedly chosen it and shipped.
+1. An edit arrives — a keystroke in Monaco, a canvas drag, a property field.
+2. Non-text edits are converted to **text edits at CST ranges** and applied. One undo stack.
+3. Parse is incremental and debounced — roughly 50 ms while typing, immediate for canvas edits.
+4. **Validate.** Diagnostics render as Monaco markers and Problems rows whether or not the document is valid.
+5. If structurally valid, **resolve** — inline components (§13.6), evaluate constant arithmetic and anchors ([D-7]) to literal integers.
+6. Emit a **scene description**: a flat object list with resolved coordinates and properties, plus the parent index table ([A-3]).
+7. Hand it to the Wasm runtime with the active sample set. It constructs, ticks and renders to a framebuffer.
+8. Blit the framebuffer to the canvas at the current zoom, nearest-neighbour.
 
-No conflict with U8G2GL's MIT licence: the runtime and CLI are separate artefacts and stay MIT regardless of what the editor is built on.
+**Target: under 16 ms** from canvas drag to repaint, so dragging feels direct. Achievable at this scale — 5–20 objects and a framebuffer of 2 KB or less.
 
-### 4.2 Serving — **this is where it fails, and specifically**
+**Degraded rendering.** If the document is structurally invalid mid-edit, the canvas keeps the last good frame, dimmed, rather than blanking. Losing the picture while typing an attribute is disorienting and unnecessary.
 
-Requirement: browser-based, ideally a static client-side app. Theia offers two modes.
+### 4.2 Animation in the canvas
 
-| Mode | Backend | Verdict |
+Widgets animate ([D-15]). The canvas runs the same `ui_handler()` loop, so scrolling labels scroll and clocks blink while designing. A **freeze toggle** stops the clock and pins animations at t=0 for stable pixel comparison — essential when aligning against an animating element.
+
+### 4.3 Selection synchronisation
+
+The CST gives every element a source range and a stable identity.
+
+- **Canvas → XML:** hit-test yields the object; its id maps to a CST node; Monaco reveals and highlights that range.
+- **XML → canvas:** caret offset resolves to the innermost enclosing element; the canvas selects it.
+- **Neither direction rewrites the document.** Selection is never an edit.
+
+Hit-testing respects draw order ([D-4]): the topmost element under the cursor wins; repeated clicks at the same point cycle downward through overlaps.
+
+### 4.4 What runs where
+
+| Concern | Static mode | Served mode |
 |---|---|---|
-| **Standard browser** | Node.js server required | Works, but not static hosting |
-| **Browser-only** | None — compiles to a static site | Meets the preference on paper; see below |
-
-Browser-only Theia was merged in January 2024 (milestone 1.46) and, as of the **2026-05 community release, remains in MVP state**. Its documented limitations are decisive for us rather than incidental:
-
-- **Syntax highlighting is not supported, and is not planned.** The maintainers' position: *"dedicated syntax highlighting won't be supported for the browser-only mode, as it's just as much work as adding real support for VS Code extensions."*
-- **Plugins are exclusively backend-handled** — metadata collection and deployment both — so the extension mechanism is unavailable.
-- Any Theia or VS Code API routed through the backend does not work.
-
-Syntax highlighting in an XML editor is not a nice-to-have here; it is the surface the user spends most of their time in (§3 F1, F4). A static Theia deployment cannot provide it, and the project has said it will not.
-
-**So the choice is not "Theia vs Monaco" — it is "Theia with a Node backend" vs "static client-side app".**
-
-And a static client-side app turns out to be genuinely achievable, for a reason that falls out of an earlier decision. **[D-10] made the CLI TypeScript.** The schema, validator and generator are therefore isomorphic — the same code runs in Node and in a browser, unmodified. Combined with the Wasm renderer (PR-06) and `bdfconv` compiled to Wasm ([Q-2]), the entire pipeline runs client-side:
-
-| Need | Client-side solution |
-|---|---|
-| Parse, validate, generate | The PR-02/PR-04 TypeScript, run in-browser |
-| Render pixel-exactly | PR-06 Wasm runtime |
-| Compile fonts | `bdfconv` via Wasm ([Q-2]) |
-| Read/write project files | File System Access API |
-| Edit XML with highlighting | Monaco standalone |
-
-This is a benefit of [D-10] that was not articulated when it was taken.
-
-### 4.3 Rapid rendering pipeline — **roughly a wash**
-
-Both can host a canvas driven by the Wasm renderer at interactive rates. Theia's Lumino widget system accommodates a custom canvas view; a custom shell has less between the app and the canvas. No fundamental barrier either way, a slight edge to the custom shell for control over the render loop.
-
-### 4.4 Decision
-
-**Monaco plus a custom shell, served as a static client-side application.**
-
-Not because Theia is unsuitable — it is production-grade and its embedded-tooling pedigree is a genuine point in its favour — but because the specific mode that meets the static-hosting requirement is the one mode that cannot give us a syntax-highlighted XML editor.
-
-**The stack:**
-
-| Layer | Choice | Note |
-|---|---|---|
-| Language | TypeScript | Matches [D-10]; the CLI's schema, validator and generator run unmodified in-browser |
-| UI framework | React | First-class bindings for Monaco and the layout libraries |
-| Panel layout | **Dockview** | TS-native, zero-dependency, VS Code-style docking. Confirm during implementation; `golden-layout` and `react-mosaic` are the fallbacks |
-| Text editor | Monaco | |
-| Canvas | PR-06 Wasm runtime | |
-| Build | Vite | |
-
-**Correcting an overstatement in the previous draft:** I described the shell as "a few hundred lines". That is wrong. An IDE-style layout with dockable panels, splitters and tabs is a real component, and the sane route is an existing layout library — **Dockview**, **golden-layout** or **react-mosaic** — rather than hand-rolling. Budget it as a meaningful piece of work, not a trivial one. It remains far smaller than adopting an IDE platform.
-
-**This is not a one-way door.** If a desktop application is wanted later, Theia plus Electron is the natural path and the domain logic — schema, generator, renderer — is platform-independent by construction. Revisit if the static constraint relaxes, or if browser-only Theia gains highlighting.
-
-### 4.5 Filesystem — one interface, two implementations
-
-A project is a folder of many files and the editor must write back in place, so a filesystem capability is required rather than optional.
-
-It should not be a binary choice. **[D-10] already requires Node for the CLI**, so a local server costs no additional install — `npx u8g2gl design` is the same pattern as Vite or Storybook, and is familiar to embedded developers.
-
-| Mode | Mechanism | Trade |
-|---|---|---|
-| **Static** | File System Access API — `showDirectoryPicker()`, persistent handles | Zero install, runs from a URL. Chromium only |
-| **Served** | `npx u8g2gl design` over localhost | Every browser; trivial file access; CLI invocation built in |
-
-The editor programs against a single `ProjectFileSystem` interface and selects an implementation at runtime. Same frontend either way. This dissolves [U-5] rather than forcing a browser-support decision, and it preserves the static-hosting goal without making it a constraint that breaks Firefox and Safari users.
-
-*Consequence:* the generated-output question also resolves. In served mode the CLI writes `generated/`; in static mode the in-browser generator does, through the same interface.
+| Parse, validate, resolve, generate | In-browser TypeScript | Same code, either side |
+| Render | Wasm in-browser | Wasm in-browser |
+| Font compilation | `bdfconv` via Wasm | CLI or Wasm |
+| File access | File System Access API | Local server |
+| Firmware build | User's own toolchain | User's own toolchain |
 
 ---
 
-## 5. Layout
+## 5. User Flows
 
-VS Code's regions, adapted. Nothing here is novel, which is the point.
+Eight flows define the tool. **F2 runs dozens of times a session and must be the fastest thing in it.**
+
+**F1 · Lay out a screen.** Open project → select screen → drag widgets from palette to canvas → position → set properties → save.
+
+**F2 · Adjust precisely.** Select (canvas or XML) → nudge by pixel → read coordinates → align to a neighbour.
+
+**F3 · Bind data.** Select element → choose subject → set format string → see it render against sample data.
+
+**F4 · Build and fix.** Continuous validation; build on demand. Errors appear as squiggles and Problems rows with file, line, column and suggestion. Click a row → land on the fault.
+
+**F5 · Design a component.** Open component → edit in isolation against `<previews>` → set prop defaults → see what a consumer gets.
+
+**F6 · Check against real data.** Switch sample sets — typical, empty, longest plausible — and confirm the layout survives each.
+
+**F7 · Wire navigation.** In the flow view, drag from a focusable element to a screen; the `<screen_load_event>` is written.
+
+**F8 · Work with fonts.** Browse glyphs, check metrics, measure whether a string fits a width before a layout depends on it.
+
+---
+
+## 6. Layout
 
 ```
 ┌──┬───────────────────┬──────────────────────────────────┬─────────────────┐
 │  │ PRIMARY SIDEBAR   │  EDITOR AREA (tabbed, splittable)│ PROPERTY PANEL  │
 │A │                   │ ┌──────────────┬───────────────┐ │                 │
-│C │  ▸ Screens        │ │              │               │ │  Element: clock │
-│T │    home.xml       │ │   CANVAS     │  XML (Monaco) │ │ ─────────────── │
-│I │    settings.xml   │ │              │               │ │  Geometry       │
-│V │  ▸ Components     │ │  ┌────────┐  │  <screen ...  │ │   x [216] y [0] │
-│I │    status_bar     │ │  │        │  │    <u8g2gl_.. │ │   w [ 40] h [11]│
-│T │  ▸ Widgets        │ │  │ 256×64 │  │      x="216"  │ │  ─────────────  │
-│Y │  ▸ Assets         │ │  │        │  │      ...      │ │  Appearance     │
-│  │    fonts          │ │  └────────┘  │               │ │   font [clock_7]│
-│B │    images         │ │              │               │ │   align [left ▾]│
-│A │  ▸ Subjects       │ │   ⊞ grid  4× │               │ │  ─────────────  │
-│R │                   │ │              │               │ │  Binding        │
-│  │                   │ └──────────────┴───────────────┘ │   bind_time [▾] │
-│  │                   │                                  │                 │
+│C │  ▾ Screens        │ │              │               │ │ u8g2gl_clock    │
+│T │    ▸ home         │ │   CANVAS     │  XML (Monaco) │ │ name: clock     │
+│I │      settings     │ │              │               │ │ ─── Geometry ───│
+│V │  ▾ Components     │ │  ┌────────┐  │ <screen ...   │ │ x [216] y [  0] │
+│I │      status_bar   │ │  │        │  │   <u8g2gl_cl..│ │ w [ 40] h [ 11] │
+│T │  ▾ Widgets        │ │  │ 256×64 │  │     x="216"   │ │ ⓘ right="0" set │
+│Y │      wd_list      │ │  │        │  │     ...       │ │ ── Appearance ──│
+│  │  ▾ Assets         │ │  └────────┘  │               │ │ font [clock_7 ▾]│
+│B │      fonts        │ │              │               │ │ ⓘ 7px, 11 glyphs│
+│A │      images       │ │ ⊞grid ⊡tile  │               │ │ ─── Binding ────│
+│R │  ▾ Subjects       │ │ 4× ▾  ▶ anim │               │ │ bind_time [sys▾]│
+│  │  ▾ Sample data    │ │              │               │ │ blink [✓]       │
+│  │      ● typical    │ └──────────────┴───────────────┘ │                 │
 ├──┴───────────────────┴──────────────────────────────────┴─────────────────┤
-│ PANEL:  Problems (3)  │  Build Output  │  Budget                          │
-│  ⛔ screens/home.xml:14:32  unknown font 'small_9' — did you mean 'small_09'│
+│ Problems (2) │ Output │ Budget                                     ▲ ─ □  │
+│ ⛔ screens/home.xml:14:32 unknown font 'small_9' — did you mean 'small_09'?│
+│ ⚠ screens/home.xml:22:5  wd_list capacity 2.3 KB — 48% of RAM budget      │
 ├───────────────────────────────────────────────────────────────────────────┤
-│ STATUS BAR:  ● Built  │ default (SSD1322 256×64) │ x:216 y:0 │ 4× │ 1.2 KB │
+│ ● Built 0.4s │ default · SSD1322 256×64 │ sel 216,0 40×11 │ 4× │ RAM 4.8KB│
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Regions
+| Region | Contents |
+|---|---|
+| **Activity bar** | Explorer · Palette · Assets · Fonts · Sample data · Flow · Search |
+| **Primary sidebar** | Context-dependent. Explorer shows the project tree; Palette shows draggable widgets grouped by category |
+| **Editor area** | Tabs per document. Default split: canvas ∥ XML. Either pane collapsible; ratio draggable and remembered |
+| **Property panel** | Selection properties, grouped. With nothing selected, shows screen-level properties |
+| **Bottom panel** | Problems · Output · Budget. Collapsible; auto-opens to Problems on a failed build |
+| **Status bar** | Build state and duration · active target · selection geometry · zoom · RAM total |
 
-| Region | Contents | Notes |
-|---|---|---|
-| **Activity bar** | Explorer, Palette, Assets, Fonts, Search | Icon strip; switches the primary sidebar |
-| **Primary sidebar** | Project tree — screens, components, widgets, assets, subjects | Also the widget **palette** when that activity is selected; drag from here to canvas |
-| **Editor area** | Tabbed. Each screen opens as a tab, split canvas ∥ XML by default | Split is user-adjustable; either pane can be collapsed |
-| **Property panel** | Properties of the current selection, grouped | Right-hand side. Hidden when nothing is selected |
-| **Bottom panel** | Problems · Build Output · Budget | Collapsible. Problems is the default tab after a failed build |
-| **Status bar** | Build state, active target, cursor/selection coordinates, zoom, RAM figure | Coordinates are always visible — this matters for F2 |
+**Selection geometry lives permanently in the status bar.** F2 depends on knowing exact coordinates without opening anything.
 
-### The split editor is the core
-
-Canvas and XML side by side is the default because F2 depends on it. Selecting on the canvas highlights and scrolls to the corresponding XML element; placing the caret in an element selects it on the canvas. Edits in either propagate immediately.
+**Responsive behaviour.** Below roughly 1200px the property panel collapses to an icon rail and expands on selection; below 900px the XML pane collapses by default, leaving the canvas. The tool assumes a desktop-class screen — this is not a mobile target.
 
 ---
 
-## 6. Document Contexts
+## 7. Document Contexts
 
-The canvas/XML/properties surface operates in three contexts. Switching context changes what is edited, not how.
+One editing surface; three contexts. Switching changes *what* is edited, not *how*.
 
-### 6.1 Screen context
-The default. A screen's `<view>`, its elements positioned against the active target's display bounds.
+### 7.1 Screen context
+A screen's `<view>` against the active target's display bounds. The default.
 
-### 6.2 Component context
-Editing a `<component>` or a Tier-4 widget's `<api>`. Rendered in isolation against its `<previews>` declaration rather than a full display, since a component has no inherent screen position.
+### 7.2 Component context
+A `<component>`, or a Tier-4 widget's `<api>`, rendered in isolation against its `<previews>` declaration rather than a full display — a component has no inherent screen position.
 
-- **Components (Tier 3)** are fully editable — layout, properties, `<api>` props, and defaults.
-- **Custom widgets (Tier 4)** expose their `<api>` manifest and a preview only. Their rendering is C++ ([D-6]) and the editor cannot show or edit it — it renders whatever the compiled Wasm runtime draws. The panel states this rather than appearing broken.
+- **Components (Tier 3)** are fully editable: layout, properties, `<api>` props and defaults.
+- **Custom widgets (Tier 4)** expose their `<api>` and a preview only. Their rendering is C++ ([D-6]); the editor shows whatever the Wasm runtime draws and cannot edit it. The panel says so rather than appearing broken.
 
-Prop defaults drive the preview, so a component author sees what a consumer will get.
+Multiple `<preview>` declarations render as a small gallery, so a component can be checked in several configurations at once.
 
-### 6.3 Screen-flow context
-A read-write graph view of navigation. Nodes are screens; edges are `<screen_load_event>` and `<screen_back_event>` declarations that already exist in the XML (§12.3).
+### 7.3 Screen-flow context
+A read-write graph. Nodes are screens; edges are `<screen_load_event>` and `<screen_back_event>` declarations already present in the XML. Dragging an edge writes the event; deleting removes it. Per [UD-7] this adds no framework capability.
 
-Dragging an edge from a focusable element to a screen writes the corresponding event; deleting one removes it. **This adds no framework capability** — it is a projection of declarations §12 already supports, which is what keeps it cheap.
-
-Explicitly *not* in this view:
+**Excluded, deliberately:**
 
 | Excluded | Reason |
 |---|---|
-| **Carousel configuration** | `CarouselEngine` and `BoardCatalog` are esp32-app-foundation concepts. Encoding one consumer's navigation policy into a general framework is the heritage anchoring [A-1] rejects. Belongs in `modules/U8G2GLDisplay` |
-| **Modals / overlays** | Not a framework feature yet. Requires overlay rendering, z-order beyond document order ([D-4]), a focus stack and dismissal semantics — a `[D-n]` decision and runtime work in PR-01/PR-03 before an editor could expose it. Recorded as a future request, not designed for now |
+| **Carousel configuration** | `CarouselEngine` and `BoardCatalog` are esp32-app-foundation concepts. Encoding one consumer's navigation policy into a general framework is the heritage anchoring [A-1] rejects — it belongs in `modules/U8G2GLDisplay` |
+| **Modals / overlays** | Not a framework capability. Needs overlay rendering, z-order beyond document order ([D-4]), a focus stack and dismissal semantics — a `[D-n]` decision and runtime work must precede any editor surface |
 
 ---
 
-## 7. Sample Data
+## 8. The Canvas
 
-**Design-time values for bindings.** Without them the canvas renders empty labels, and a layout cannot be judged.
+The most important surface.
 
-This matters more in monochrome than in colour UI because **layout is length-dependent**: an 8-character station name and a 30-character one differ in whether the text fits, scrolls or truncates. Designing against empty strings produces layouts that break on real data.
+**Rendering.** The Wasm runtime draws the actual framebuffer. Scaled **nearest-neighbour** — never smoothed, because a blurred 1-bit pixel misrepresents the output. Presented on dark chrome so the display bounds read as a physical panel.
 
-- A named **sample set** supplies a value per subject; the canvas renders against the active set.
-- Multiple sets per project — *typical*, *empty*, *longest plausible*, *worst case* — switchable from the canvas toolbar so a layout can be checked against each.
-- Collection subjects (§9) take sample rows, so tables and lists render realistically.
-- **Never compiled.** Sample data is design-time only and must not reach firmware.
+**Zoom.** 1× · 2× · 4× · 8× · fit. Ctrl/⌘+scroll zooms about the cursor; space-drag pans. A **pixel grid** appears at 4× and above; an **8-pixel tile grid** toggles independently, because tile boundaries are real — partial refresh works in tiles.
 
-*Schema consequence in §13.*
+**Selection.** Click selects; repeated clicks cycle down through overlaps; marquee selects many; Esc clears. Selected elements show handles and a live `x, y, w, h` badge.
 
----
-
-## 8. The Canvas — pixel-exact manipulation
-
-The most important surface. F2 runs through it dozens of times per session.
-
-**Rendering.** The PR-06 Wasm runtime draws the actual framebuffer. Scaled with **nearest-neighbour** — never smoothed, since a blurred 1-bit pixel is a lie about the output.
-
-**Zoom.** 1×, 2×, 4×, 8×, fit. A **pixel grid** appears at 4× and above. An **8-pixel tile grid** is separately toggleable, because tile boundaries are real ([D-14] framebuffer geometry, and partial refresh works in tiles).
-
-**Selection.** Click to select; marquee for multiple. Selected elements show handles and a live `x, y, w, h` readout. Overlapping elements cycle on repeated clicks at the same point, since document order is draw order ([D-4]) and overlap is legal.
-
-**Movement — the precision path.**
+**Movement.**
 
 | Input | Effect |
 |---|---|
 | Drag | Move, snapping to guides |
-| Arrow key | **1 pixel** |
-| Shift + arrow | 8 pixels (one tile) |
+| Arrow | **1 px** |
+| Shift + arrow | 8 px (one tile) |
 | Alt + drag | Duplicate |
-| Property panel field | Type an exact value; steppers increment by 1 |
+| Drag handle | Resize; Shift constrains ratio |
+| Property field | Exact value; steppers ±1 |
 
-**Alignment aids.** Edge and centre guides against siblings and the display bounds, appearing on drag. Snapping is to integers only — there is no sub-pixel position to snap to. An explicit align toolbar (left/centre/right, top/middle/bottom, distribute) operates on multi-selection.
+**Alignment.** Edge and centre guides against siblings and display bounds appear during drag, with a snap threshold of 3 *screen* pixels — not device pixels, so it stays usable at 1×. Snapping is to integers only; there is no sub-pixel position. An align toolbar (left/centre/right, top/middle/bottom, distribute) acts on multi-selection.
 
-**Out-of-bounds is an error, not a clip.** An element extending past the display is flagged in Problems, because §15 already requires the generator to reject it.
+**Overflow is an error.** An element extending past the display is drawn with a hatched indicator and raised in Problems, because §15 requires the generator to reject it.
 
-**Component instances render inline** but are not editable in place — selecting one selects the instance and offers "open component". Consistent with §13.6, where components are inlined at generation time.
+**Component instances render inline** but are not editable in place — selecting one selects the instance and offers *Open component*.
+
+**Animation** runs live; the freeze toggle (§4.2) pins t=0.
 
 ---
 
 ## 9. The Property Panel
 
-Driven entirely by the `<api>` manifests of [D-17]. The panel has no hardcoded knowledge of widgets — a custom widget with a manifest gets a full property panel for free, which is the same property that lets the generator handle it without a release.
+**The differentiator.** LVGL Pro's weakness is here, and principle 6 exists because of it. Generated entirely from `<api>` manifests ([UD-5]).
 
-**Editor per type**, from the manifest's `type`:
+### 9.1 Editors by type
 
-| Type | Control |
+| `<prop>` type | Control |
 |---|---|
-| `int` | Number field with steppers; coordinate fields grouped as x/y/w/h |
+| `int` | Number field with steppers; coordinates grouped as x/y and w/h pairs |
 | `bool` | Toggle |
-| `string` | Text field; multiline where appropriate |
-| `enum` | Dropdown, options from `values` |
-| `font` | Dropdown of declared fonts, each rendered in its own face |
-| `image` | Picker with thumbnails |
-| `subject` | Dropdown of declared subjects, filtered to type-compatible ones |
+| `string` | Text field; multiline where the manifest says so |
+| `enum` | Segmented control for ≤3 options, dropdown above that |
+| `font` | Dropdown, each option rendered in its own face |
+| `image` | Picker with thumbnails at 1:1 |
+| `subject` | Dropdown filtered to type-compatible subjects |
 | `style` | Dropdown of styles in scope |
 
-**Helpers are the differentiator.** The `help` attribute already present on `<prop>` becomes inline description text, not a hover-only tooltip. Beyond that:
+### 9.2 Guidance — what makes it teach
 
-- **Live validation** — a value that would fail the compiler is flagged as it is typed, not at build
-- **Contextual consequence** — capacity properties show their memory cost inline (`max_rows: 16 → 2.3 KB`), from the §18 budget model
-- **Binding assist** — choosing a subject offers a format string with the correct conversion for its type, and rejects mismatches (§8.4)
-- **Anchor awareness** — setting `right` disables `x` with an explanation, rather than silently conflicting (§7.2 forbids over-constraint)
+- **Descriptions inline, not on hover.** The manifest's `help` renders as secondary text beneath the control. A non-coding user should never have to hover to discover meaning.
+- **Live validation.** A value the compiler would reject is flagged as typed, with the reason.
+- **Consequence shown where it is incurred.** Capacity fields display their memory cost (`max_rows 16 → 2.3 KB`) from the §18 budget model, so a costly choice is felt when made rather than at build time.
+- **Constraint awareness.** Setting `right` disables `x` with an explanation rather than silently conflicting (§7.2 forbids over-constraint). Setting `bind_text` disables `text`.
+- **Binding assistance.** Choosing a subject offers a format string with the correct conversion for its type and rejects mismatches (§8.4).
+- **Font feedback.** Selecting a font shows pixel height and glyph coverage, and warns when bound text may exceed the element width at that font.
+- **Defaults are visible.** A property at its default renders greyed, gaining a *reset* affordance once overridden, so what has been deliberately set is obvious at a glance.
 
-**Grouping.** Geometry, Appearance, Content, Binding, Advanced. Order comes from the manifest, so widget authors control their own panel.
+### 9.3 Grouping
+
+Geometry · Appearance · Content · Binding · Advanced. Order and grouping come from the manifest, so widget authors control their own panel. Advanced collapses by default.
+
+### 9.4 Multi-selection
+
+Shared properties show a common value or a mixed indicator; editing applies to all. Geometry shows the bounding box, with align and distribute acting on the set.
 
 ---
 
 ## 10. The XML Editor
 
-Monaco, with:
+Monaco, configured for this schema.
 
-- **Schema-driven completion** — valid elements and attributes at the cursor, from PR-02's schema
-- **Inline diagnostics** — [D-16] JSON mapped to squiggles with hovers carrying the suggestion
-- **Two-way selection sync** with the canvas
-- **Format on demand**, never on save — formatting is the author's, per principle 5
-- **Go to definition** on a component tag, font name or subject name
+- **Schema-driven completion** — valid elements and attributes at the cursor from PR-02's schema, including enum values and declared font, image and subject names.
+- **Inline diagnostics** — [D-16] JSON mapped to markers; hovers carry the suggestion.
+- **Two-way selection sync** (§4.3).
+- **Go to definition** on a component tag, font, image, style or subject name.
+- **Format on demand only, never on save** — formatting belongs to the author (principle 5).
+- **Breadcrumbs** showing the element path at the caret.
 
-**Round-trip is a hard requirement.** Editing on the canvas rewrites only the attributes that changed. Comments, blank lines, attribute order and indentation elsewhere in the file survive untouched. A canvas nudge must produce a one-line diff. This constrains the implementation — a parse/serialise cycle that normalises the document is unacceptable — and it is the requirement most likely to be compromised under delivery pressure, so it is stated as non-negotiable here.
-
----
-
-## 11. Compiler, Fonts and Assets
-
-**Build surface.** A build action, plus automatic validation as you type. Three bottom-panel tabs:
-
-- **Problems** — structured diagnostics: severity, file, line, column, message, suggestion. Click to navigate. Sorted by severity then position.
-- **Build Output** — the CLI's raw output, for when something goes genuinely wrong
-- **Budget** — the §18 memory report, per target, with over-budget items highlighted. Visible during design rather than after, so a costly choice is felt when it is made
-
-**Font browser** (F5). Grid of glyphs in a selected font; metrics for a chosen glyph (width, ascent, descent); a string-width ruler answering "does this fit in 40 pixels?" before a layout depends on it. Read-only.
-
-**Glyph/BDF pixel editor.** Draw and edit glyphs directly. Genuinely useful for icon fonts, which monochrome projects rely on heavily. **Scoped after the first editor release** ([design_spec.md §20](design_spec.md) Phase 4) — the browser answers the common question; authoring glyphs is a different tool with its own surface.
-
-**Asset management.** Import PNG/XBM, preview at 1:1 with the threshold/dither choice visible (§14.2), since that choice is visual and belongs beside its result.
+**Round-trip is non-negotiable.** A canvas nudge must produce a one-line diff. Comments, blank lines, attribute order and indentation elsewhere survive untouched. This constrains implementation ([UD-3]) and is the requirement most likely to be quietly compromised under delivery pressure — hence its restatement here.
 
 ---
 
-## 12. Deliberately Not In Scope
+## 11. Sample Data
 
-Per [design_spec.md §1.5](design_spec.md), omission is the default. The following are excluded from the first release, each for a reason:
+**Design-time values for bindings.** Without them the canvas renders empty labels and a layout cannot be judged.
 
-| Excluded | Why |
+This matters more in monochrome than in colour UI because **layout is length-dependent**: an 8-character station name and a 30-character one differ in whether text fits, scrolls or truncates. Designing against empty strings produces layouts that break on real data.
+
+- A **sample set** supplies a value per subject. Multiple named sets per project.
+- Conventional sets, offered on project creation: **typical**, **empty**, **longest plausible**, **worst case**.
+- Collection subjects (§9) take sample rows, so tables and lists render realistically.
+- Switchable from the canvas toolbar and cycleable by keyboard, so a layout can be swept against every set in seconds.
+- **Never compiled** ([UD-6]).
+
+An element bound to a subject with no sample value renders a visible placeholder rather than blank, so the omission is obvious rather than silent.
+
+---
+
+## 12. Fonts and Assets
+
+**Font browser** (F8). Glyph grid for a selected font; metrics for a chosen glyph — width, ascent, descent, bounding box. A **string ruler**: type a string, see its rendered width in pixels against a target width. Answers "does this fit in 40 pixels?" before a layout depends on it. Read-only in v1.
+
+**Glyph / BDF pixel editor.** Draw and edit glyphs — genuinely useful for the icon fonts monochrome projects rely on. **Scoped after the first editor release** ([design_spec.md §20](design_spec.md) Phase 4): the browser answers the common question, and authoring glyphs is a separate tool with its own surface.
+
+**Assets.** Import PNG/XBM; preview at 1:1 with the threshold/dither choice (§14.2) shown beside its result, since that choice is visual and belongs next to its outcome.
+
+---
+
+## 13. Build, Problems and Budget
+
+**Continuous validation** as you type; **build** on demand.
+
+- **Problems** — severity, file, line, column, message, suggestion. Click to navigate. Sorted by severity then position; filterable by severity and file.
+- **Output** — the CLI's raw output, for when something goes genuinely wrong.
+- **Budget** — the §18 memory report per target, over-budget items highlighted. Visible during design rather than after.
+
+The status bar carries build state, duration and RAM total, so the cost of a design is ambient rather than something to go looking for.
+
+---
+
+## 14. Deliberately Not In Scope
+
+Per [design_spec.md §1.5](design_spec.md), omission is the default.
+
+| Excluded | Reason |
 |---|---|
-| Plugin/extension system | This is an application, not a platform (§4) |
-| Integrated terminal, git UI, file manager | The user has an IDE; this is not competing with it |
-| Multi-user / real-time collaboration | No demand established; large cost |
+| Plugin / extension system | An application, not a platform ([UD-1]) |
+| Integrated terminal, git UI | The user has an IDE; not competing with it |
+| Multi-user collaboration | No demand established; large cost |
 | Animation timeline | Animation is widget-internal ([D-5]); nothing to sequence |
 | Flex/grid layout tooling | No layout engine exists ([D-7]) |
-| `<row>`/`<col>` UI | Not in schema 0.3 (§7.2). Add with the schema feature, if it lands |
-| Theme/skin editor | Monochrome. The entire style set is ten properties (§10) |
-| Carousel configuration | An esp32-app-foundation concept, not a framework one (§6.3) |
-| Modals / overlays | Not a framework capability yet — needs a `[D-n]` decision and runtime work first (§6.3) |
-| Undo across files | Per-document undo only. Cross-file transactional undo is a large problem for narrow benefit |
+| `<row>`/`<col>` UI | Not in schema 0.3 (§7.2). Arrives with the schema feature, if it does |
+| Theme / skin editor | Monochrome. The whole style set is ten properties (§10) |
+| Carousel configuration | Belongs to the consuming application (§7.3) |
+| Modals / overlays | Not a framework capability yet (§7.3) |
+| Cross-file undo | Per-document undo only. Large problem, narrow benefit |
+| Firmware build / flashing | The user's toolchain does this |
 
 ---
 
-## 13. Schema Requirements — gates PR-02
+## 15. Schema Requirements — gates PR-02
 
-**This is the section with a deadline.** PR-02 freezes schema 0.3. The schema must be an editor's document model first and a compiler input second ([design_spec.md §1.2](design_spec.md)); a compiler can ignore what it does not need, but an editor cannot invent what was never stored. Risk R-8 in the implementation plan tracks this.
+**This section has a deadline.** PR-02 freezes schema 0.3. The schema must be an editor's document model first and a compiler input second ([design_spec.md §1.2](design_spec.md)): a compiler can ignore what it does not need, but an editor cannot invent what was never stored. Risk R-8 tracks this.
 
-| Requirement | Detail | Status in 0.3 |
+| Requirement | Detail | Status |
 |---|---|---|
-| **`<previews>`** | Named preview configurations per component/widget — dimensions and context for rendering in isolation in the palette and component editor. Present in LVGL Pro; explicitly skipped in our gap analysis as "editor-only" | **Missing — must add** |
-| **`help` on every `<prop>`** | Inline description text in the property panel | Partially present in examples; **must be formalised** |
-| **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"` and declaration order drives panel layout | **Missing — must add** |
-| **Palette metadata** | Display name, category, and an icon per widget for the palette | **Missing — must add** |
-| **Stable element identity** | The editor must address elements across edits. `name` is optional today; unnamed elements need a stable synthetic identity, or `name` becomes required for editable elements | **Must decide** |
-| **Round-trip fidelity** | Comments, attribute order and whitespace preserved through an edit cycle | Not a schema feature, but a **stated contract** the parser must honour |
-| **Sample data** | Named sets of design-time subject values, including rows for collections. Design-time only — never compiled. Best as a separate `samples/` document or sidecar, since it is project-shared but not firmware-bound | **Missing — must add** |
-| **Editor state** | Zoom, last selection, panel sizes, collapsed nodes | **Sidecar file** (`.u8g2gl-editor.json`), *not* in the XML — it is per-user, not per-project, and would otherwise pollute diffs |
-
-The sidecar decision matters: putting view state in the project XML would make every pan and zoom a source-control change. Authored, shared, semantic data (`<previews>`, `help`, grouping) belongs in the XML; per-user view state does not.
+| **`<previews>`** | Named preview configurations per component/widget — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Must add** |
+| **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** |
+| **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Must add** |
+| **Palette metadata** | Display name, category, icon per widget | **Must add** |
+| **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** |
+| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) |
+| **Stable element identity** | The editor must address elements across edits; `name` is optional today | **Must decide** ([U-1]) |
+| **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** |
+| **Editor view state** | Zoom, selection, panel sizes, active sample set | **Sidecar** `.u8g2gl-editor.json`, *not* project XML — per-user, and would otherwise make every pan a source-control change |
 
 ---
 
-## 14. Open Questions
+## 16. Open Questions
 
 | ID | Question | Blocks |
 |---|---|---|
-| **U-1** | Element identity — require `name` on editable elements, or generate stable synthetic ids? Naming everything is noisy; synthetic ids are fragile across hand-edits | PR-02 schema |
-| ~~U-2~~ | Client-side vs local server | **Resolved** — one `ProjectFileSystem` interface, two implementations (§4.5). Static via File System Access API, served via `npx u8g2gl design` |
-| **U-3** | Multi-target editing — one canvas per target, or a target switcher on one canvas? Depends on Q-1's resolution | Phase 3 |
-| ~~U-4~~ | Component editing in-place vs separate context | **Resolved** — a separate document context (§6.2), rendered against `<previews>` |
-| ~~U-5~~ | Chromium-only File System Access API | **Resolved by §4.5** — the served mode covers Firefox and Safari at no extra install cost, since [D-10] already requires Node |
-| **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for clear separation | PR-02 schema |
+| **U-1** | Element identity — require `name` on editable elements, or generate stable synthetic ids? Naming everything is noisy; synthetic ids are fragile across hand-edits | PR-02 |
+| **U-3** | Multi-target — one canvas per target, or a switcher on one canvas? Depends on [Q-1] | Phase 3 |
+| **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation | PR-02 |
+| **U-7** | Does the palette support user-authored categories, or is the taxonomy fixed? | Phase 3 |
 
 ---
 
-## Appendix — Research Notes
+## Appendix A — Platform Research
 
 **Eclipse Theia**
-- LVGL Pro Editor is built on it — evidenced by `.theia/launch.json` in generated project directories. Its preview uses `preview-bin/lved-runtime.wasm`, the LVGL runtime compiled to WebAssembly, independently validating [D-9].
+- LVGL Pro Editor is built on it — `.theia/launch.json` appears in its generated project directories. Its preview uses `preview-bin/lved-runtime.wasm`, the LVGL runtime compiled to WebAssembly, independently validating [D-9].
 - Not a VS Code fork: an independent TypeScript framework embedding Monaco, with a compile-time extension API.
-- **EPL-2.0.** Closed-source and commercial products permitted; obligation is upstreaming changes to Theia *core* only.
-- Production adopters in embedded tooling: Arduino IDE 2.0, Arm Mbed Studio, TI Code Composer Studio, STMicroelectronics STM32CubeMX2 (2026), Samsung Sokatoa (2026).
+- **EPL-2.0.** Closed-source commercial products permitted; the obligation is upstreaming changes to Theia *core* only.
+- Embedded-tooling adopters: Arduino IDE 2.0, Arm Mbed Studio, TI Code Composer Studio, STMicroelectronics STM32CubeMX2 (2026), Samsung Sokatoa (2026).
 - **Browser-only mode** merged January 2024 (v1.46); still **MVP as of the 2026-05 community release**. Syntax highlighting explicitly not planned — *"just as much work as adding real support for VS Code extensions."* Plugins are backend-only.
 
-**Monaco**
-- VS Code's editor as a standalone component; built-in tokenisation for XML without requiring VS Code extensions.
-- Positioned for embedding a DSL editor or building a focused browser IDE "without the overhead".
+**Monaco** — VS Code's editor standalone; built-in XML tokenisation without VS Code extensions; positioned for embedding a DSL editor or a focused browser IDE "without the overhead".
 
-**LVGL Pro, other**
-- CLI splits `compile --target editor|cli` — the editor consumes a runtime the CLI builds. U8G2GL's CLI needs the same split; recorded against PR-02/PR-06.
-- `<previews>` and `help=` are the two editor-facing schema features LVGL Pro carries that our schema currently lacks (§11).
+**LVGL Pro, other** — the CLI splits `compile --target editor|cli`, the editor consuming a runtime the CLI builds. Adopted as [UD-4]. `<previews>` and `help=` are the two editor-facing schema features it carries that ours lacks (§15).
 
 Sources: [Theia FAQ](https://theia-ide.org/docs/faq/) · [Theia Platform](https://theia-ide.org/theia-platform/) · [Eclipse Theia project](https://projects.eclipse.org/projects/ecd.theia) · [Browser-only Theia PR #12853](https://github.com/eclipse-theia/theia/pull/12853) · [Running Theia without a backend](https://eclipsesource.com/blogs/2024/01/29/running-eclipse-theia-without-a-backend/) · [Theia Community Release 2026-05](https://eclipsesource.com/blogs/2026/06/19/the-eclipse-theia-community-release-2026-05/) · [TypeFox — Custom IDEs](https://www.typefox.io/cloud-and-desktop-ides/)
