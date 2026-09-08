@@ -195,6 +195,21 @@ pushbacks; three accepted, one accepted-with-a-better-fix.
 No change to any [D-n] decision; all four were refinements to scope, sequencing
 and contract completeness.
 
+### 2026-09-08T23:09:00Z — PR-01 Complete: Runtime Core
+**Summary**: C++ runtime library delivered across 7 WOs (5 initial + 2 post-review
+remediation). 80 tests, zero warnings, ~870 B static RAM for a representative
+15-widget/8-subject project. All §13 contract surfaces implemented.
+**Cross-PR decisions**: (1) Subject observer capacity is template-parameterised —
+PR-04 generator must count bindings per subject and emit `_n<N>` types.
+(2) `bind_text()`/`bind_flag_if_*()` take `_base` subject types — PR-03 uses this.
+(3) Style embedding deferred (Finding E trigger: 50+ objects or §18 flag).
+**Architecture evolution**: PD-3's object size target corrected from ~16 B to ~36 B
+(style member was omitted). WO6 reduced actual from 48 B → 48 B on 64-bit (no
+further change; subjects fell from 400→80 B). The runtime is heap-free and the
+§13 contract is now *sufficient* — PR-03 and PR-04 are genuinely independent.
+**Unresolved items escalated from PA**: None. Finding E deferred with trigger.
+Stack tip: `u8g2gl-runtime/wo7-readability`.
+
 ### 2026-09-09T00:34:06Z — UI design closed; context bridge written
 All seven editor decisions [UD-1..7] are settled and recorded in ui_spec.md,
 now v1.1 with a decision-summary table at the top for orientation after a
