@@ -2,12 +2,28 @@
 
 **The visual designer for U8G2GL: functionality, architecture and layout.**
 
-**Version**: 1.0
+**Version**: 1.1
 **Date**: September 2026
-**Status**: Design specification — briefs visual design work and gates schema decisions in PR-02
+**Status**: Settled. All seven editor decisions are closed; four questions remain open (§16). Gates schema decisions in PR-02 via §15.
 **Companion documents**: [design_spec.md](design_spec.md) (the framework) · [concept.md](concept.md) (why) · [implementation_plan.md](implementation_plan.md) (sequencing)
 
 > **[UD-n]** marks a binding editor decision with its rationale. **[U-n]** marks an open question. Where this document and `design_spec.md` disagree on framework behaviour, the design spec wins; on editor behaviour, this document wins.
+
+## Decision summary
+
+Seven decisions, all settled. Full rationale in §3; this table is for orientation.
+
+| | Decision | The reason it went this way |
+|---|---|---|
+| **[UD-1]** | Monaco + custom shell — TypeScript, React, Dockview, Vite. **Not Theia, not a VS Code fork** | Optionality. A Monaco surface can later be wrapped in Theia, Electron *or* a VS Code extension; starting in Theia forecloses the static path and the VS Code path permanently. Theia was evaluated properly and passes on licence — it is rejected on centre of gravity, not capability |
+| **[UD-2]** | Static-first, served fallback, behind one `ProjectFileSystem` interface | Static mode needs **no install at all** because the TypeScript CLI is isomorphic. The served mode costs nothing extra since Node is already required, and it covers Firefox and Safari |
+| **[UD-3]** | Text is the single source of truth; the document is a **CST, not an AST** | A canvas nudge must produce a one-line diff. A parse-and-reserialise cycle that normalises the file is forbidden. Undo unifies for free as a consequence |
+| **[UD-4]** | Two runtime build targets — `firmware` and `editor` | The editor must render arbitrary XML without a C++ compiler in the browser, so its Wasm build needs a class registry and property thunks. Both generate from the same `<api>` manifests; the registry compiles out under `#ifdef`, so firmware pays nothing |
+| **[UD-5]** | Property panel generated entirely from `<api>` manifests | A custom widget gets a full panel — descriptions, validation, grouping — with no editor release. Same property that lets the generator handle it |
+| **[UD-6]** | Sample data is design-time only, never compiled | Monochrome layout is **length-dependent**; an 8- and a 30-character string differ in whether text fits, scrolls or truncates. Designing against empty labels produces layouts that break on real data |
+| **[UD-7]** | Screen-flow view is a projection, not a new capability | It reads and writes `<screen_load_event>` declarations §12 already supports. Carousel is excluded as a consumer's concern; modals are excluded because they are a *framework* capability that does not exist yet |
+
+**The thesis underneath all of it** ([design_spec.md §1.2](design_spec.md)): the editor is the point of the programme, not a deferred extra. XML earns its place because an editor needs a document it can read back — generated C++ is write-only in practice. AI-assisted authoring is a beneficiary of a good schema, not the reason for one.
 
 ---
 

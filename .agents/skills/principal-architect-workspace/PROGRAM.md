@@ -8,6 +8,8 @@ Deliver U8G2GL per [design_spec.md](../../../docs/design_spec.md) v0.2: a build-
 XML-to-C++ UI framework for U8G2 monochrome displays. Upstream home is
 `esp32-app-foundation`; `departures-board-v3` is the downstream pathfinder.
 
+**Reloading after a compaction? Read [CONTEXT_BRIDGE.md](CONTEXT_BRIDGE.md) first.**
+
 Human-facing plan: [implementation_plan.md](../../../docs/implementation_plan.md)
 PR sequence and graph: [PROGRAM-PLAN.md](PROGRAM-PLAN.md)
 
@@ -192,3 +194,23 @@ pushbacks; three accepted, one accepted-with-a-better-fix.
 
 No change to any [D-n] decision; all four were refinements to scope, sequencing
 and contract completeness.
+
+### 2026-09-09T00:34:06Z — UI design closed; context bridge written
+All seven editor decisions [UD-1..7] are settled and recorded in ui_spec.md,
+now v1.1 with a decision-summary table at the top for orientation after a
+compaction. The UI design discussion is complete; nothing from it remains only
+in conversation.
+
+Wrote CONTEXT_BRIDGE.md so a fresh session can reload cold: the decision
+registers by ID, document precedence (design_spec on framework behaviour,
+ui_spec on editor behaviour, plan on sequencing), programme state, the skills
+and agents built, and seven process lessons that were earned rather than
+assumed — branch verification, worktrees for parallel work, SendMessage being
+disabled, tracing objectives to their API surface, measuring rather than
+asserting size claims, syncing before stack submission, and checking worker
+output for substance rather than presence.
+
+State at time of writing: PR-01 merged (#1). PR-02 CLI in progress with six WOs
+committed on branch. The live risk is R-8 — PR-02 must not freeze schema 0.3
+without ui_spec §15's nine schema requirements, or 0.4 becomes a breaking
+change. [U-1] and [U-6] gate that and need an owner decision.
