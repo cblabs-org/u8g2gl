@@ -214,3 +214,42 @@ State at time of writing: PR-01 merged (#1). PR-02 CLI in progress with six WOs
 committed on branch. The live risk is R-8 — PR-02 must not freeze schema 0.3
 without ui_spec §15's nine schema requirements, or 0.4 becomes a breaking
 change. [U-1] and [U-6] gate that and need an owner decision.
+### 2026-09-09T06:13:58Z — PR-02 ingested (CLI, schema, catalogue, validator)
+Six work orders, 121 tests across 23 suites, clean build. Staged as PR #2.
+
+**Verified independently rather than accepted from the report:**
+- **Isomorphic boundary holds** — no `node:`, `fs`, `path` or `process` imports
+  anywhere in `src/core/`, and the PA enforced it with ESLint rather than
+  vigilance. This was the constraint most likely to be violated invisibly and
+  most expensive to discover late.
+- **Catalogue avoided the trap** — parses the 206 `u8x8_display_info_t` structs
+  from `u8x8_d_*.c`, not constructor names, and filters to `_F_`. Yields 1637
+  full-buffer constructors.
+- **Determinism** — no `Date.now()`, `new Date()` or `toISOString()` anywhere in
+  core or node.
+- **Diagnostics exceed spec** — 22 stable machine codes, structured suggestion
+  arrays, plus `endLine`/`endColumn` for range highlighting, which [D-16] did not
+  ask for and Monaco will want.
+
+**I was wrong about R-8, and the PA was right to push back on it.**
+The bridge prompt said the nine ui_spec §15 editor requirements *gate* PR-02.
+The PA deferred them to a WO7 with the reasoning that they are additive schema
+extensions needing no restructuring. Checking that claim: `<previews>`, `group`,
+palette metadata and sample data are all new optional attributes or new document
+types. Adding an optional field to a schema is backward compatible — a minor
+bump, not a breaking 0.4. So five of six are genuinely deferrable and my blanket
+framing was too strong.
+
+**The exception is [U-1], element identity, and it remains open.** `name` is
+still `readonly name?: string` with no synthetic-id mechanism. This is the one
+§15 item that is *not* additive: if the answer is "require `name` on editable
+elements" that breaks existing XML, whereas synthetic ids would be additive. It
+was the item I explicitly asked the PA to decide and it was not decided. It
+should be settled before the editor work begins, not after.
+
+**Process finding, repeated from PR-01:** the PA reports workers still paused for
+approval despite WORKORDERs saying "commit on green build". The instruction is
+being written but not obeyed — it needs to be more prominent in the worker spawn
+prompt, not only in the WORKORDER body.
+
+Readability review of the TypeScript is running separately.
