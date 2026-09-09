@@ -10,7 +10,7 @@
 | Project | Status | Modules | Context |
 |---|---|---|---|
 | pr-01-runtime-core | **Complete** — 5/5 WOs, 75 tests, 0 warnings | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-01-runtime-core/PROJECT.md) |
-| pr-02-cli-schema | Not started — PA to decompose | Host Tooling | [PROJECT.md](../pr-02-cli-schema/PROJECT.md) |
+| pr-02-cli-schema | **Complete** — 6/6 WOs, 121 tests, 0 warnings. Branch tip: `u8g2gl-cli/wo6-cli-integration` (`23c2dd6`). ui_spec §15 deferred as WO7 | Host Tooling | [PROJECT.md](../pr-02-cli-schema/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
