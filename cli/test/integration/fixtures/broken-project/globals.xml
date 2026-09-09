@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <consts>
+        <int name="123invalid_name" value="10" />
+    </consts>
+
+    <fonts>
+        <bdf name="small_09" src="fonts/small_09.bdf" />
+    </fonts>
+</globals>

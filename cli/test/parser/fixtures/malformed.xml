@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- U8G2GL Malformed XML Fixture: unclosed tags, bad attributes -->
+<screen name="broken_screen">
+    <view>
+        <u8g2gl_label text="Unclosed label" x="0" y="0"
+        <u8g2gl_button name="unclosed_quote" text="missing quote>
+    </view>

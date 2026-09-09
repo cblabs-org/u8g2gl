@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="screen_home">
+    <view>
+        <status_bar name="bad_status_bar" title="Status" />
+        <u8g2gl_label name="bad_label" x="0" y="20" width="100" height="12" font="small_9" />
+    </view>
+</screen>

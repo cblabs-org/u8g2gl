@@ -1,0 +1,45 @@
+{
+  "name": "u8g2gl",
+  "version": "0.3.0",
+  "description": "CLI and schema toolkit for U8G2GL",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "u8g2gl": "./dist/node/cli.js"
+  },
+  "main": "./dist/core/index.js",
+  "types": "./dist/core/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./node": {
+      "types": "./dist/node/cli.d.ts",
+      "default": "./dist/node/cli.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "src/data/catalogue.json",
+    "src/data/page-mode-map.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:catalogue": "tsx src/node/build-catalogue.ts",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

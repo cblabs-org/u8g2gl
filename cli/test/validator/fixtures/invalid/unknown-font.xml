@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="screen_bad_font">
+    <view>
+        <u8g2gl_label name="lbl" x="0" y="0" width="100" height="12" font="nonexistent_font" />
+    </view>
+</screen>

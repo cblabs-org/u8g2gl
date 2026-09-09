@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="screen_duplicate">
+    <view>
+        <u8g2gl_box name="box_one" x="0" y="0" width="10" height="10" />
+        <u8g2gl_box name="box_one" x="20" y="0" width="10" height="10" />
+    </view>
+</screen>

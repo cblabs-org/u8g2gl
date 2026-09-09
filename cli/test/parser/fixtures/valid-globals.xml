@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- U8G2GL Globals Fixture per design_spec §5.3 -->
+<globals>
+    <consts>
+        <int name="header_height" value="11" />
+        <int name="row_height" value="13" />
+        <string name="app_name" value="Departures Board" />
+    </consts>
+
+    <subjects>
+        <int name="temperature" value="0" />
+        <string name="station_name" value="" max_len="48" />
+        <bool name="wifi_connected" value="true" />
+        <time name="system_time" />
+    </subjects>
+
+    <styles>
+        <style name="header" font="small_9" draw_color="1" align="left" font_mode="solid" bitmap_mode="transparent" />
+        <style name="body" font="tall_12" />
+        <style name="selected" invert="true" padding="2" radius="1" />
+    </styles>
+
+    <fonts>
+        <bdf name="small_9" src="fonts/custom_9px.bdf" range="0x20-0x7F" />
+        <bdf name="tall_12" src="fonts/custom_12px.bdf" range="0x20-0x7F" />
+        <bdf name="clock_small_7" src="fonts/clock_7px.bdf" range="0x30-0x3A" />
+        <bdf name="weather_icons_11" src="fonts/weather_11px.bdf" range="0xE000-0xE01F" />
+        <builtin name="u8g2_font_6x10_mr" />
+    </fonts>
+
+    <images>
+        <xbm name="icon_wifi" src="assets/wifi.xbm" />
+        <xbm name="icon_battery" src="assets/battery.xbm" />
+        <convert name="logo" src="assets/logo.png"
+                 width="32" height="32" mode="threshold" threshold="128" />
+    </images>
+</globals>
