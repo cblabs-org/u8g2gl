@@ -5,7 +5,7 @@ title: "XML Manifests + Manifest→Validator Cross-Test"
 branch: u8g2gl-widgets/wo5-manifests-crosstest
 base: u8g2gl-widgets/wo4-switch-button
 complexity: standard
-status: pending
+status: complete
 ---
 
 # WO5 — XML Manifests + Manifest→Validator Cross-Test
@@ -248,3 +248,14 @@ You may NOT touch:
 - **CLI tests**: all passing / N failures
 - **Notes**: <any observations>
 ```
+
+## Completion Report
+- **Date**: 2026-09-10T07:44:10Z
+- **Status**: COMPLETE
+- **Commit**: 57c016a
+- **Branch verified**: yes (u8g2gl-widgets/wo5-manifests-crosstest)
+- **Manifest files**: 17 created (8 Tier-1 primitives, 8 Tier-2 widgets, 1 base u8g2gl_obj)
+- **Cross-test**: 69 tests passed, 0 failed
+- **CLI tests**: all passing (24 test files, 190 tests passed, 0 failures)
+- **Notes**: All 17 XML manifest files adhere strictly to C++ header setter signatures and the TypeScript WidgetManifest schema. catalogue.json was inspected and preserved as the U8G2 display hardware catalogue without modification, as widgetManifests are injected directly from parsed XML manifests. Full C++ test suite (164/164 tests) and CLI test suite (190/190 tests) pass with zero errors.
+
