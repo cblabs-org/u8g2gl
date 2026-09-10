@@ -96,7 +96,7 @@ describe('Schema Types', () => {
   });
 
   describe('Diagnostic types and codes', () => {
-    it('contains all 22 required diagnostic codes with correct U8G2GL prefixes', () => {
+    it('contains all 23 required diagnostic codes with correct U8G2GL prefixes', () => {
       const expectedCodes: Record<string, DiagnosticCode> = {
         UNKNOWN_FONT: 'U8G2GL_UNKNOWN_FONT',
         UNKNOWN_IMAGE: 'U8G2GL_UNKNOWN_IMAGE',
@@ -108,6 +108,7 @@ describe('Schema Types', () => {
         PAGE_MODE_DISPLAY: 'U8G2GL_PAGE_MODE_DISPLAY',
         UNKNOWN_ATTRIBUTE: 'U8G2GL_UNKNOWN_ATTRIBUTE',
         MISSING_REQUIRED: 'U8G2GL_MISSING_REQUIRED',
+        MISSING_NAME: 'U8G2GL_MISSING_NAME',
         TYPE_MISMATCH: 'U8G2GL_TYPE_MISMATCH',
         OVERCONSTRAINED: 'U8G2GL_OVERCONSTRAINED',
         OUT_OF_BOUNDS: 'U8G2GL_OUT_OF_BOUNDS',

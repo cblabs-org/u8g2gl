@@ -27,8 +27,11 @@ import type { SourceLocation } from './source-location.js';
  * Per §7.2, coordinate values may be integers or compile-time arithmetic expressions.
  */
 export interface CommonAttributes {
-  /** Optional identifier for the instance, enabling bindings and focus references. */
-  readonly name?: string;
+  /** Required identifier for the instance. Used as C++ variable name by the
+   *  generator (§13.3) and as stable element identity for the editor.
+   *  Per [U-1], every element must have a name. The parser auto-generates
+   *  one from {tag}_{index} if omitted, with a warning diagnostic. */
+  readonly name: string;
   /** X coordinate or expression relative to parent left edge. */
   readonly x?: string;
   /** Y coordinate or expression relative to parent top edge. */

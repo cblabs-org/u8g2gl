@@ -10,7 +10,7 @@
         <u8g2gl_label name="title" x="0" y="0" width="128" height="12"
                       text="Home Screen" font="tall_12" align="center" />
 
-        <u8g2gl_hline x="0" y="14" width="128" />
+        <u8g2gl_hline name="divider" x="0" y="14" width="128" />
 
         <u8g2gl_button name="btn_wifi" x="0" y="18" width="128" height="12"
                       text="Wi-Fi" focus_style="selected" style_invert="false">

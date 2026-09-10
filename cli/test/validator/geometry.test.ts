@@ -56,6 +56,7 @@ describe('validateGeometry', () => {
           {
             tag: 'u8g2gl_box',
             attributes: {
+              name: 'box_overconstrained',
               x: '10',
               width: '50',
               right: '20', // Overconstrained!
@@ -88,6 +89,7 @@ describe('validateGeometry', () => {
           {
             tag: 'u8g2gl_box',
             attributes: {
+              name: 'box_overconstrained',
               y: '5',
               height: '30',
               bottom: '10', // Overconstrained!
@@ -120,6 +122,7 @@ describe('validateGeometry', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl_oob',
               x: '50',
               width: '100', // 50 + 100 = 150 > 128
             },
@@ -151,6 +154,7 @@ describe('validateGeometry', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl_oob',
               y: '40',
               height: '30', // 40 + 30 = 70 > 64
             },
@@ -182,6 +186,7 @@ describe('validateGeometry', () => {
           {
             tag: 'u8g2gl_box',
             attributes: {
+              name: 'box_symbolic',
               x: '0',
               width: '#screen_width', // Symbolic constant, should skip bounds check
               y: '0',
