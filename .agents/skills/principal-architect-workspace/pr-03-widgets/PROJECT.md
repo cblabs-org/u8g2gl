@@ -29,6 +29,8 @@ Branches: `u8g2gl-widgets/wo<N>-<topic>`, stacked serially.
 | WO5 | `u8g2gl-widgets/wo5-manifests-crosstest` | XML manifests + manifest→validator cross-test | standard | WO4 |
 | WO6 | `u8g2gl-widgets/wo6-element-identity` | Element identity [U-1] — Option A: require `name` | standard | WO5 |
 | WO7 | `u8g2gl-widgets/wo7-integration` | Sizeof report, readability review, stack submission | standard | WO6 |
+| WO8 | `u8g2gl-widgets/wo8-identity-remediation` | Unique name allocation + 32-bit sizeof (architect-raised, post-review) | standard | WO7 |
+| WO9 | `u8g2gl-widgets/wo9-name-policy` | Missing-name policy, write-back, `--fix-names` (architect-raised, owner-directed) | standard | WO8 |
 
 ## Human Approval
 
@@ -60,3 +62,25 @@ All WOs serialised — no parallelism, no merge conflicts.
 Reference widgets from `esp32-app-foundation/modules/U8G2Display/widgets/` have been
 read in full: LabelWidget, ScrollingTextWidget, ClockWidget, ProgressBarWidget,
 ImageWidget. Behaviour to port is documented in each WORKORDER.
+
+
+## Outcome
+
+**MERGED as [#3](https://github.com/cblabs-org/u8g2gl/pull/3) on 2026-09-10.**
+
+Nine work orders. WO1–WO7 as decomposed; WO8 and WO9 raised by the Chief Architect
+after review of the open PR, WO9 at the owner's explicit direction.
+
+Final: C++ 166 tests, CLI 224 tests, zero warnings under `-Wall -Wextra -Wpedantic`.
+Schema stayed at `0.3`; CLI went `0.3.0` -> `0.5.0` (two output-affecting changes,
+each bumped per `rules/03-versioning.md`).
+
+`[U-1]` element identity is closed — see `docs/ui_spec.md` §16.1 for the decision and
+its reasoning.
+
+**Carried into PR-04:**
+- Single-file `validate` always errors (no globals/manifests in scope) — pre-existing,
+  makes single-file invocation misleading
+- `--fix-names` has no `--dry-run`; the edits are already computed in core so one is cheap
+- 64-bit sizeof ceilings have ~33% headroom and will not catch a moderate regression
+- No 32-bit measurement is possible on this host; the harness skips loudly instead

@@ -297,3 +297,64 @@ what this distillation used.
 **Context distilled** into CONTEXT_BRIDGE.md §4 and §7 ahead of a compaction:
 full PR state with measured figures, the three things to scrutinise when PR-03
 returns, and the corrected R-8 assessment.
+
+---
+
+## Session — 2026-09-10 · PR-03 merged, `[U-1]` closed
+
+**PR-03 merged as [#3](https://github.com/cblabs-org/u8g2gl/pull/3).** Nine work
+orders: WO1–WO7 as decomposed, plus WO8 and WO9 raised by the Chief Architect after
+reviewing the open PR. C++ 166 tests, CLI 224, zero warnings. CLI `0.3.0` → `0.5.0`;
+schema unchanged at `0.3`.
+
+### `[U-1]` element identity — settled
+
+`name` is required. **The CLI errors on a missing name; the editor generates one and
+persists it on save.** The split is by journey because *auto-correction requires a
+human who can see it and undo it* — the editor has an undo stack and a save cycle, a
+build pipeline has neither. Full decision and reasoning: `docs/ui_spec.md` §16.1.
+
+### Two review findings a green build did not catch
+
+WO6 shipped 197 passing tests and both of these:
+
+1. **Collision.** Synthesis counter was per-parent; the uniqueness namespace was
+   per-screen. Two unnamed labels in two containers both became `label_0` and failed
+   to a hard error — making the warn-and-continue path unreachable for exactly the
+   documents that needed it. Fixed in WO8.
+2. **Positional identity.** Names recomputed from position on every load, so an
+   insertion renumbered later siblings. Generated code binds to the name, so this
+   silently rebinds application code to a different widget. Fixed in WO9.
+
+Both were found by reading the code against its stated intent and then *writing a
+throwaway test to check*, not by reading alone. The reproduction took about five
+minutes and neither defect was visible in the completion reports, which were accurate
+about everything they claimed.
+
+### Process lessons — both mine, both about deferral
+
+**Name the consumer, and check when it arrives.** I deferred the positional-identity
+defect as "an editor concern, nothing consumes it yet". The consumer was the
+*generator* — PR-04, the very next PR. The owner caught it. "Nothing consumes this
+yet" is a claim with a date on it, and the date is usually sooner than it feels.
+
+**Check a prescribed fix is buildable before prescribing it.** I told the PA to
+"write the name back to the document" and asserted it needed a round-trip serializer,
+which would have made it a large piece of work properly belonging elsewhere. It
+needed no such thing: source locations were already recorded, so an attribute
+*insertion* sufficed. I had conflated "write to the document" with "re-emit the
+document". Checking took one grep.
+
+**A third, smaller one:** I rebased the stack onto `main` before noticing the branches
+were already pushed, turning tidying into a rewrite of published history. The
+force-push was blocked, which was the right outcome — I discarded the rebase instead.
+Check whether a branch is published *before* rebasing it, not after.
+
+### Worth keeping
+
+The workers caught things the work orders did not specify. WO8 found that
+`<style name="x"/>` names a style *reference*, not an element — a naive pre-pass would
+have let it steal a label's identifier. WO9's integration test deliberately includes
+the label manifest so revalidation is not confounded by `UNKNOWN_WIDGET`, which is the
+exact trap I fell into checking it manually. Both are cases of a worker understanding
+the intent rather than the letter, which is what the WORKORDER format is for.

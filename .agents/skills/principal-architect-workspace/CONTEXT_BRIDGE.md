@@ -69,85 +69,67 @@ migration with a dated freeze policy `[PD-4]`.
 **`[UD-n]` editor decisions** — all seven closed. See the summary table at the top
 of `ui_spec.md`.
 
+**Closed since:** `[U-1]` element identity — ui_spec §16.1, settled in PR-03.
+
 **Still open:** `[Q-1]` multi-target layout overrides (needs two real targets);
 `[Q-2]` `bdfconv` packaging (work, not risk — Wasm recommended); `[Q-4]` measured
-runtime budget on `esp32dev`; `[Q-5]` frame-loop ownership; `[U-1]` element
-identity **(gates PR-02)**; `[U-3]` multi-target canvas; `[U-6]` where sample data
-lives **(gates PR-02)**; `[U-7]` palette taxonomy.
+runtime budget on `esp32dev`; `[Q-5]` frame-loop ownership; `[U-3]` multi-target
+canvas; `[U-6]` where sample data lives **(gates PR-04's sample-data hooks)**;
+`[U-7]` palette taxonomy.
 
 ---
 
 ## 4. Programme state
 
-**PR-01 — runtime core. MERGED (#1).** `u8g2gl_obj`, four subject types, style
-cascade, frame gate with `ui_handler()` deadline aggregation. 80 tests, zero
-warnings. Seven WOs, of which two were review remediations: **WO6** fixed four
-memory-sizing defects — one a spec violation, string subjects allocated a fixed
-128 B and ignored their declared `max_len`, which made the §18 budget untrue —
-and **WO7** fixed documentation, which was absent entirely.
+**PR-01 — runtime core. MERGED (`#1`).** Object model, subjects, styles, frame gate.
+Seven work orders including two review remediations.
 
-Measured after remediation (64-bit host; 32-bit target ~25–40% smaller):
-`u8g2gl_obj` 64→48 B, `u8g2gl_style` 40→24 B, `u8g2gl_observer` 24→16 B, scalar
-subjects 400→80 B, string subject 528→120 B. A 15-object / 8-subject project
-dropped ~2480 B → ~870 B static RAM. `Core.SizeOfReport` prints these every test
-run so a regression is caught rather than discovered in a budget later.
+**PR-02 — CLI, schema, validator, display catalogue. MERGED (`#2`).** Six work orders.
 
-**PR-02 — CLI, schema, validator, display catalogue. MERGED (#2).** Six WOs,
-121 tests across 23 suites. Delivers: schema 0.3 document model, zero-dependency
-XML parser with per-attribute source locations, display catalogue of 1637
-full-buffer constructors, validator with seven passes, and `u8g2gl` commands with
-`--json` throughout.
+**PR-03 — widget set + element identity. MERGED (`#3`), 2026-09-10.** Nine work
+orders. Tier-1 primitives and eight Tier-2 widgets, 17 `<api>` manifests with a
+manifest-to-validator cross-test, and `[U-1]` settled end to end. WO8 and WO9 were
+architect-raised remediations after review — see §4.1, because the shape of that
+review is the reusable part.
 
-Verified independently at review rather than accepted from the report:
-- **Isomorphic boundary holds and is ESLint-enforced** — `no-restricted-imports`
-  on `src/core/**` blocks `node:*` and all builtins with an explanatory message.
-  This was the constraint most likely to break invisibly; it now cannot regress
-  silently. Best thing in the PR.
-- **Catalogue avoided the known trap** — parses the 206 `u8x8_display_info_t`
-  structs from `u8x8_d_*.c`, not constructor names (34% of names yield no
-  geometry by regex), and filters to `_F_`.
-- **22 stable diagnostic codes** with structured suggestion arrays, plus
-  `endLine`/`endColumn` beyond what [D-16] asked for — Monaco will want those.
-- No clock reads anywhere, so determinism holds.
+Final state: **C++ 166 tests, CLI 224 tests, zero warnings** under
+`-Wall -Wextra -Wpedantic`. Widget sizes on a 64-bit host: `u8g2gl_obj` 48 B, widgets
+56–72 B. **No 32-bit measurement exists** — the host is Apple silicon and cannot
+produce one. `SizeOfReport.ThirtyTwoBitTarget` measures for real under ILP32 and
+otherwise skips loudly, so §18 still cannot cite a target figure but the harness is
+ready.
 
-Readability review returned **no P1 and no P2** — 40/40 TypeScript files carry
-SPDX headers, purpose-first descriptions and TSDoc. A marked contrast with PR-01,
-and the difference is that the standards skill existed before PR-02 was written.
+Versions after PR-03: schema **0.3** (unchanged), CLI/generator **0.5.0**.
 
-**PR-03 — built-in widget set + element identity. IN PROGRESS.** Decomposition
-approved by the owner 2026-09-10. Seven WOs:
+**Next:** PR-04 generator, PR-05 foundation integration, PR-06 Wasm preview, then
+**PR-07 — the GO/NO-GO gate**. Ledger in plan §5.
 
-| WO | Scope | State |
-|---|---|---|
-| WO1 | Tier-1 primitives + `u8g2gl_label` | complete |
-| WO2 | `scrolling_label`, `xbm`, `glyph` | **in flight** |
-| WO3 | `progress_bar`, `clock` | pending |
-| WO4 | `switch`, `button` | pending |
-| WO5 | XML manifests + manifest→validator cross-test | pending |
-| WO6 | Element identity [U-1] | pending |
-| WO7 | Sizeof report, readability review, stack submission | pending |
+### 4.1 What PR-03's review actually caught, and why it took two passes
 
-**⚠ Review WO6 carefully when it lands.** The PA chose **Option A — require
-`name` on every element**. That is the one genuinely *breaking* option of the
-three offered: it invalidates existing XML, where synthetic ids or the hybrid
-(name-when-present, promoted on first edit) would have been additive. It may
-still be right — requiring a name is simple and author-controlled — but it was
-the option carrying the highest cost and the reasoning needs checking.
+WO6 implemented `[U-1]` as "require `name`, auto-generate on load with a warning".
+Review found two defects a green build did not:
 
-**Next:** PR-04 generator, PR-05 foundation integration module, PR-06 Wasm
-preview, then **PR-07 — the GO/NO-GO gate**. Full ledger in plan §5.
+1. **The synthesised name collided.** The counter was per-parent; the uniqueness
+   namespace was per-screen. Two unnamed labels in two containers both became
+   `label_0` and failed to a hard `DUPLICATE_NAME` error — so the warn-and-continue
+   path was unreachable for exactly the documents needing it. WO8 fixed it with a
+   document-wide allocator seeded by a pre-pass over explicit names.
 
-**R-8 — corrected, and my original framing was wrong.** The bridge prompt told
-PR-02's PA that ui_spec §13's nine schema requirements *gated* that PR. The PA
-deferred them, arguing they are additive. Checking that: `<previews>`, property
-`group`, palette metadata and sample data are all new *optional* attributes or
-new document types, and adding an optional field to a schema is a minor bump, not
-a breaking change. Five of six are genuinely deferrable.
+2. **The name was positional, so it was not an identity.** Insert an element and its
+   later siblings renumber. **Generated code binds to the name**, so this silently
+   rebinds a user's application code to a different widget. WO9 fixed it.
 
-**The exception is [U-1] element identity** — the only non-additive item, which is
-why it was pulled into PR-03 rather than left to drift.
+**The process lesson is in how the second one was mis-scoped.** I first deferred it as
+"an editor concern — nothing consumes it yet". Wrong: the consumer is the *generator*,
+which is PR-04, the very next PR. The owner caught it. **When deferring, name the
+consumer and check when it actually arrives** — "nothing consumes this yet" is a claim
+with a date on it, and the date is usually sooner than it feels.
 
----
+I also prescribed the fix — "write the name back to the document" — without checking
+it was buildable, and asserted it needed a round-trip serializer. It did not: source
+locations were already recorded, so an attribute *insertion* was enough. **Check that
+a prescribed fix is buildable before prescribing it**, and do not confuse "write to
+the document" with "re-emit the document".
 
 ## 5. Infrastructure built this programme
 

@@ -4,7 +4,7 @@
 
 **Version**: 1.1
 **Date**: September 2026
-**Status**: Settled. All seven editor decisions are closed; four questions remain open (§16). Gates schema decisions in PR-02 via §15.
+**Status**: Settled. All seven editor decisions are closed; three questions remain open (§16) after `[U-1]` closed in PR-03 (§16.1). §15's schema requirements gate PR-04 — 'editor-target generation' is named there as PR-04 scope.
 **Companion documents**: [design_spec.md](design_spec.md) (the framework) · [concept.md](concept.md) (why) · [implementation_plan.md](implementation_plan.md) (sequencing)
 
 > **[UD-n]** marks a binding editor decision with its rationale. **[U-n]** marks an open question. Where this document and `design_spec.md` disagree on framework behaviour, the design spec wins; on editor behaviour, this document wins.
@@ -437,7 +437,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | **Palette metadata** | Display name, category, icon per widget | **Must add** |
 | **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** |
 | **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) |
-| **Stable element identity** | The editor must address elements across edits; `name` is optional today | **Must decide** ([U-1]) |
+| **Stable element identity** | The editor must address elements across edits | **Settled** ([U-1], PR-03). `name` is required. The CLI errors on a missing name; the editor generates one and persists it on save |
 | **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** |
 | **Editor view state** | Zoom, selection, panel sizes, active sample set | **Sidecar** `.u8g2gl-editor.json`, *not* project XML — per-user, and would otherwise make every pan a source-control change |
 
@@ -447,10 +447,41 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 | ID | Question | Blocks |
 |---|---|---|
-| **U-1** | Element identity — require `name` on editable elements, or generate stable synthetic ids? Naming everything is noisy; synthetic ids are fragile across hand-edits | PR-02 |
 | **U-3** | Multi-target — one canvas per target, or a switcher on one canvas? Depends on [Q-1] | Phase 3 |
 | **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation | PR-02 |
 | **U-7** | Does the palette support user-authored categories, or is the taxonomy fixed? | Phase 3 |
+
+*(**U-1** closed in PR-03 — see §16.1.)*
+
+### 16.1 `[U-1]` Element identity — closed, PR-03
+
+**`name` is required on every element. The CLI errors when one is missing; the
+editor generates one and writes it into the document.**
+
+The split is by *journey*, not by command, and the reason is that **auto-correction
+requires a human who can see it and undo it**. The editor has a canvas, a property
+panel, an undo stack and a save cycle. A build pipeline has none of those — if the
+build invents identity it does so silently, into generated code, in CI, with nobody
+looking.
+
+**Why not synthetic ids.** Any identity derived from document position is unstable
+under insertion. Generated code binds to the name, so a name that renumbers when an
+element is inserted above it silently rebinds the user's application code to a
+different widget, with no diagnostic. Auto-generation is therefore only safe where it
+is *persisted* — which is what the editor does and the build refuses to.
+
+**Mechanism.** The policy is a parameter on the parser (`'error' | 'generate'`,
+defaulting to `'error'`) rather than a branch, because `src/core/` is isomorphic and
+serves both journeys; branching would let them drift into two implementations.
+Write-back inserts a `name="…"` attribute at the element's recorded source location,
+so it needs no serializer and preserves comments, attribute order and whitespace —
+which is also how `[UD-3]` round-trip fidelity is satisfied for this case. `u8g2gl
+validate --fix-names` exposes the same mechanism to the CLI as an explicit opt-in:
+the build never *silently* invents identity, but the user may ask it to.
+
+**Requirement on the editor.** Generate names on load so a hand-authored file opens,
+but persist them on **save**, not on open — opening a file to look at it must not
+rewrite it.
 
 ---
 

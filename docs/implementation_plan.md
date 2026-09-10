@@ -268,9 +268,9 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends | Blocked by |
 |---|---|---|---|---|
-| **PR-01** | **U8G2GL** | *(unblocked)* Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
-| **PR-02** | **U8G2GL** | CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
-| **PR-03** | **U8G2GL** | Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Behaviour ported from the legacy widgets, rewritten to the model. Each ships its `<api>` manifest | PR-01 | — |
+| **PR-01** ✅ | **U8G2GL** | **MERGED (#1).** Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
+| **PR-02** ✅ | **U8G2GL** | **MERGED (#2).** CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
+| **PR-03** ✅ | **U8G2GL** | **MERGED (#3).** Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Each ships its `<api>` manifest. Also settled `[U-1]` element identity (ui_spec §16.1) | PR-01 | — |
 | **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, component inlining, build-time layout ([D-7]), identifier mangling, demotion | PR-02, PR-03 | — |
 | **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
