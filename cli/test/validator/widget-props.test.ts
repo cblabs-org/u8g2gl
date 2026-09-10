@@ -98,6 +98,7 @@ describe('validateWidgetProps', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl',
               font: 'small_9',
               txt: 'Hello', // Typo for 'text' (dist = 1)
             },
@@ -129,6 +130,7 @@ describe('validateWidgetProps', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl',
               text: 'Hello',
               // Missing required 'font'
             },
@@ -160,6 +162,7 @@ describe('validateWidgetProps', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl',
               font: 'small_9',
               align: 'middle', // Invalid: allowed is left, center, right
             },

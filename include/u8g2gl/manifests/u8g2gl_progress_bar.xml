@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_progress_bar" extends="u8g2gl_obj" animated="true">
+  <api>
+    <prop name="value" type="int" setter="set_value" default="0"
+          help="Target progress percentage (0..100)." />
+    <prop name="fill_style" type="enum" setter="set_fill_style"
+          values="solid,stipple" default="stipple"
+          emit="U8G2GL_FILL_{VALUE^^}"
+          help="Fill pattern for progress bar (solid or 2x2 checkered stipple)." />
+    <prop name="animate_duration_ms" type="int" setter="set_animate_duration_ms" default="0"
+          help="Animation duration in milliseconds for value transitions (0 = instant)." />
+    <prop name="show_percent_text" type="bool" setter="set_show_percent_text" default="false"
+          help="Render numeric percentage text centered in progress bar." />
+    <prop name="font" type="font" setter="set_font"
+          help="Font used for centered percentage text." />
+    <bind name="bind_value" type="int" setter="bind_value" />
+  </api>
+</widget>

@@ -8,8 +8,10 @@
  *          duplicate names, and component-inlining collisions (§13.4, §15.1).
  * Description: Checks that identifier names conform to [a-z][a-z0-9_]*, contain no
  *              double underscores, avoid reserved prefixes (u8g2gl_, ui_, wd_),
- *              and do not collide with C++ keywords. Detects duplicates within scope
- *              and warns on component inlining collisions.
+ *              and do not collide with C++ keywords. Enforces [U-1] element identity
+ *              (every widget element must possess a valid, non-empty name).
+ *              Detects duplicate identifiers within screen/component scopes and flags
+ *              component-inlining collisions.
  *
  * Exports:
  * - validateIdentifiers(input): Runs Pass 7 identifier validation
@@ -350,34 +352,44 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
 
     walkNodes(screen.view?.children ?? [], (node) => {
       const name = node.attributes.name;
-      if (typeof name === 'string' && name) {
-        const nameLoc = node.attributeLocs?.name ?? node.loc;
-        const diag = checkNameRule(name, nameLoc, 'element');
-        if (diag) {
-          diagnostics.push(diag);
-        }
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        diagnostics.push(
+          createIdDiagnostic(
+            DIAGNOSTIC_CODES.MISSING_NAME,
+            `Element <${node.tag}> in screen '${screen.name}' is missing a required 'name' attribute.`,
+            node.loc,
+            node.tag,
+          ),
+        );
+        return;
+      }
 
-        if (seenElementNames.has(name)) {
-          diagnostics.push(
-            createIdDiagnostic(
-              DIAGNOSTIC_CODES.DUPLICATE_NAME,
-              `Duplicate element name '${name}' in screen '${screen.name}'.`,
-              nameLoc,
-              name,
-            ),
-          );
-        } else {
-          seenElementNames.add(name);
-          directElementMap.set(name, nameLoc);
-        }
+      const nameLoc = node.attributeLocs?.name ?? node.loc;
+      const diag = checkNameRule(name, nameLoc, 'element');
+      if (diag) {
+        diagnostics.push(diag);
+      }
 
-        if (componentMap.has(node.tag)) {
-          componentInstances.push({
-            instanceName: name,
-            componentName: node.tag,
-            loc: nameLoc,
-          });
-        }
+      if (seenElementNames.has(name)) {
+        diagnostics.push(
+          createIdDiagnostic(
+            DIAGNOSTIC_CODES.DUPLICATE_NAME,
+            `Duplicate element name '${name}' in screen '${screen.name}'.`,
+            nameLoc,
+            name,
+          ),
+        );
+      } else {
+        seenElementNames.add(name);
+        directElementMap.set(name, nameLoc);
+      }
+
+      if (componentMap.has(node.tag)) {
+        componentInstances.push({
+          instanceName: name,
+          componentName: node.tag,
+          loc: nameLoc,
+        });
       }
     });
 
@@ -432,6 +444,41 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         diagnostics.push(propDiag);
       }
     }
+
+    const seenCompElementNames = new Set<string>();
+    walkNodes(comp.view?.children ?? [], (node) => {
+      const name = node.attributes.name;
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        diagnostics.push(
+          createIdDiagnostic(
+            DIAGNOSTIC_CODES.MISSING_NAME,
+            `Element <${node.tag}> in component '${comp.name}' is missing a required 'name' attribute.`,
+            node.loc,
+            node.tag,
+          ),
+        );
+        return;
+      }
+
+      const nameLoc = node.attributeLocs?.name ?? node.loc;
+      const diag = checkNameRule(name, nameLoc, 'element');
+      if (diag) {
+        diagnostics.push(diag);
+      }
+
+      if (seenCompElementNames.has(name)) {
+        diagnostics.push(
+          createIdDiagnostic(
+            DIAGNOSTIC_CODES.DUPLICATE_NAME,
+            `Duplicate element name '${name}' in component '${comp.name}'.`,
+            nameLoc,
+            name,
+          ),
+        );
+      } else {
+        seenCompElementNames.add(name);
+      }
+    });
   }
 
   return diagnostics;

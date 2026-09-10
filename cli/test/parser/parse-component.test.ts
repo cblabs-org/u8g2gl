@@ -86,7 +86,7 @@ describe('parseComponentFile', () => {
   it('infers component name from file path if name attribute is absent', () => {
     const xml = `<component>
     <view>
-        <u8g2gl_label text="Test" />
+        <u8g2gl_label name="lbl" text="Test" />
     </view>
 </component>`;
     const result = parseComponentFile(xml, 'components/weather_badge/weather_badge.xml');

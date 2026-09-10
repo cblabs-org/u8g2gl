@@ -26,6 +26,7 @@ import {
 } from './raw-xml.js';
 import { parseStyleDeclarations } from './parse-globals.js';
 import { parseWidgetTree } from './parse-widget-tree.js';
+import type { ParseOptions, SourceEdit } from './name-policy.js';
 import { tokenizeXml } from './xml-tokeniser.js';
 import type { ParseResult } from './index.js';
 
@@ -75,6 +76,7 @@ export function parseScreen(
   root: RawXmlElement,
   filename: string,
   diagnostics: Diagnostic[],
+  options?: ParseOptions,
 ): Screen | undefined {
   if (root.name !== 'screen') {
     diagnostics.push({
@@ -127,7 +129,7 @@ export function parseScreen(
   const visualChildren = viewEl.children.filter(
     (child) => child.name !== 'focus_ring',
   );
-  const widgetChildren = parseWidgetTree(visualChildren, filename, diagnostics);
+  const widgetChildren = parseWidgetTree(visualChildren, filename, diagnostics, options);
 
   const view: View = {
     children: widgetChildren,
@@ -149,23 +151,29 @@ export function parseScreen(
 export function parseScreenFile(
   xml: string,
   filename: string,
+  options?: ParseOptions,
 ): ParseResult<Screen> {
   const rawDoc = tokenizeXml(xml, filename);
   const diagnostics = [...rawDoc.diagnostics];
 
+  // The caller may supply its own sink; otherwise collect locally so the edits
+  // still reach the ParseResult, which is where --fix-names reads them from.
+  const nameEdits: SourceEdit[] = options?.nameEdits ?? [];
+
   if (!rawDoc.root) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
-  const screen = parseScreen(rawDoc.root, filename, diagnostics);
+  const screen = parseScreen(rawDoc.root, filename, diagnostics, { ...options, nameEdits });
   const hasError = diagnostics.some((d) => d.severity === 'error');
 
   if (hasError || !screen) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
   return {
     value: screen,
     diagnostics,
+    nameEdits,
   };
 }

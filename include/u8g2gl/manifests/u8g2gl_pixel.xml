@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_pixel" animated="false">
+  <api>
+    <prop name="x" type="int" setter="drawPixel" required="true" help="Pixel X coordinate" />
+    <prop name="y" type="int" setter="drawPixel" required="true" help="Pixel Y coordinate" />
+  </api>
+</widget>

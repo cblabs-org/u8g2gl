@@ -49,6 +49,7 @@ describe('validateTypes', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl_test',
               bind_text: 'wifi_connected', // bool, invalid for bind_text
             },
             children: [],
@@ -79,6 +80,7 @@ describe('validateTypes', () => {
           {
             tag: 'u8g2gl_progress',
             attributes: {
+              name: 'prog_test',
               bind_value: 'station_name', // string, invalid for bind_value
             },
             children: [],
@@ -108,6 +110,7 @@ describe('validateTypes', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl_test',
               bind_text: 'station_name', // string
               bind_text_fmt: 'Station: %03d', // %d expects integer
             },
@@ -139,6 +142,7 @@ describe('validateTypes', () => {
           {
             tag: 'u8g2gl_label',
             attributes: {
+              name: 'lbl_test',
               bind_text: 'temperature', // int
               bind_text_fmt: 'Temp: %s', // %s expects string
             },
@@ -168,7 +172,9 @@ describe('validateTypes', () => {
         children: [
           {
             tag: 'u8g2gl_label',
-            attributes: {},
+            attributes: {
+              name: 'lbl_test',
+            },
             children: [
               {
                 kind: 'binding',

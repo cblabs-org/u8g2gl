@@ -57,6 +57,7 @@ describe('parseScreenFile', () => {
 
     const hlineNode = screen.view.children[1]!;
     expect(hlineNode.tag).toBe('u8g2gl_hline');
+    expect(hlineNode.attributes.name).toBe('divider');
     expect(hlineNode.attributes.width).toBe('128');
 
     // Button with children

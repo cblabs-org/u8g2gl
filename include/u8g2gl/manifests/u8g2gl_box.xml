@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_box" animated="false">
+  <api>
+    <prop name="x" type="int" setter="drawBox" required="true" help="Left edge" />
+    <prop name="y" type="int" setter="drawBox" required="true" help="Top edge" />
+    <prop name="width" type="int" setter="drawBox" required="true" help="Length in pixels" />
+    <prop name="height" type="int" setter="drawBox" required="true" help="Height in pixels" />
+    <prop name="filled" type="bool" setter="drawBox" default="true" help="Whether box is filled or outline frame" />
+    <prop name="radius" type="int" setter="drawRBox" default="0" help="Corner radius in pixels" />
+  </api>
+</widget>

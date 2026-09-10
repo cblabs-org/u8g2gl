@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_label" extends="u8g2gl_obj" animated="false">
+  <api>
+    <prop name="text" type="string" setter="set_text" default=""
+          help="Static display text. Overridden when bind_text is active." />
+    <prop name="font" type="font" setter="set_font" required="true"
+          help="U8G2 font for rendering." />
+    <prop name="align" type="enum" setter="set_align"
+          values="left,center,right" default="left"
+          emit="U8G2GL_ALIGN_{VALUE^^}"
+          help="Horizontal text alignment within bounds." />
+    <prop name="truncate" type="bool" setter="set_truncate" default="false"
+          help="Clip text exceeding widget width." />
+    <bind name="bind_text" type="string" setter="bind_text"
+          fmt="bind_text_fmt" />
+    <bind name="bind_text_int" type="int" setter="bind_text"
+          fmt="bind_text_fmt" />
+  </api>
+</widget>
