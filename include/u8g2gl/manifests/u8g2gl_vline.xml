@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_vline" animated="false">
+  <api>
+    <prop name="x" type="int" setter="drawVLine" required="true" help="Left edge" />
+    <prop name="y" type="int" setter="drawVLine" required="true" help="Top edge" />
+    <prop name="height" type="int" setter="drawVLine" required="true" help="Length in pixels" />
+  </api>
+</widget>

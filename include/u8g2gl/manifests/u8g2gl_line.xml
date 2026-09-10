@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_line" animated="false">
+  <api>
+    <prop name="x1" type="int" setter="drawLine" required="true" help="Start X coordinate" />
+    <prop name="y1" type="int" setter="drawLine" required="true" help="Start Y coordinate" />
+    <prop name="x2" type="int" setter="drawLine" required="true" help="End X coordinate" />
+    <prop name="y2" type="int" setter="drawLine" required="true" help="End Y coordinate" />
+  </api>
+</widget>

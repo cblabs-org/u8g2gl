@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_obj" animated="false">
+  <api>
+    <prop name="x" type="int" setter="set_coords" help="Left edge in device pixels." />
+    <prop name="y" type="int" setter="set_coords" help="Top edge in device pixels." />
+    <prop name="width" type="int" setter="set_coords" help="Width in device pixels." />
+    <prop name="height" type="int" setter="set_coords" help="Height in device pixels." />
+    <prop name="hidden" type="bool" setter="set_hidden" default="false" help="Exclude from rendering." />
+    <prop name="disabled" type="bool" setter="set_disabled" default="false" help="Disable object interaction." />
+    <prop name="font" type="font" setter="set_font" help="Resolved U8G2 font." />
+    <prop name="draw_color" type="color" setter="set_draw_color" default="1" help="Monochrome draw color (0, 1, xor)." />
+    <prop name="invert" type="bool" setter="set_invert" default="false" help="Invert foreground and background." />
+    <prop name="padding" type="int" setter="set_padding" default="0" help="Inner padding in pixels." />
+    <prop name="border" type="bool" setter="set_border" default="false" help="Render outer border." />
+    <prop name="radius" type="int" setter="set_radius" default="0" help="Corner rounding radius in pixels." />
+    <prop name="align" type="enum" setter="set_align" values="left,center,right" default="left" emit="U8G2GL_ALIGN_{VALUE^^}" help="Horizontal text alignment." />
+    <prop name="truncate" type="bool" setter="set_truncate" default="false" help="Clip overflowing text." />
+    <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
+    <bind name="bind_text_int" type="int" setter="bind_text" fmt="bind_text_fmt" />
+  </api>
+</widget>
