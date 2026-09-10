@@ -23,6 +23,32 @@ public:
     int ascent_val = 0;
     int descent_val = 0;
 
+    int draw_xbmp_count = 0;
+    int last_draw_xbmp_x = 0;
+    int last_draw_xbmp_y = 0;
+    int last_draw_xbmp_w = 0;
+    int last_draw_xbmp_h = 0;
+    const uint8_t* last_draw_xbmp_bitmap = nullptr;
+    uint8_t last_bitmap_mode = 0;
+
+    int draw_glyph_count = 0;
+    int last_draw_glyph_x = 0;
+    int last_draw_glyph_y = 0;
+    uint16_t last_draw_glyph_codepoint = 0;
+
+    int draw_box_count = 0;
+    int last_draw_box_x = 0;
+    int last_draw_box_y = 0;
+    int last_draw_box_w = 0;
+    int last_draw_box_h = 0;
+
+    int set_clip_window_count = 0;
+    int last_clip_x0 = 0;
+    int last_clip_y0 = 0;
+    int last_clip_x1 = 0;
+    int last_clip_y1 = 0;
+    int max_clip_window_count = 0;
+
     void clearBuffer() {
         clear_count++;
     }
@@ -34,7 +60,13 @@ public:
     void drawHLine(int, int, int) {}
     void drawVLine(int, int, int) {}
     void drawLine(int, int, int, int) {}
-    void drawBox(int, int, int, int) {}
+    void drawBox(int x, int y, int w, int h) {
+        draw_box_count++;
+        last_draw_box_x = x;
+        last_draw_box_y = y;
+        last_draw_box_w = w;
+        last_draw_box_h = h;
+    }
     void drawFrame(int, int, int, int) {}
     void drawStr(int, int, const char*) {}
     void drawUTF8(int x, int y, const char* s) {
@@ -43,8 +75,20 @@ public:
         last_draw_utf8_y = y;
         last_draw_utf8_text = s;
     }
-    void drawGlyph(int, int, uint16_t) {}
-    void drawXBMP(int, int, int, int, const uint8_t*) {}
+    void drawGlyph(int x, int y, uint16_t glyph) {
+        draw_glyph_count++;
+        last_draw_glyph_x = x;
+        last_draw_glyph_y = y;
+        last_draw_glyph_codepoint = glyph;
+    }
+    void drawXBMP(int x, int y, int w, int h, const uint8_t* bitmap) {
+        draw_xbmp_count++;
+        last_draw_xbmp_x = x;
+        last_draw_xbmp_y = y;
+        last_draw_xbmp_w = w;
+        last_draw_xbmp_h = h;
+        last_draw_xbmp_bitmap = bitmap;
+    }
     void drawPixel(int, int) {}
     void drawCircle(int, int, int, uint8_t = 0x0F) {}
     void drawDisc(int, int, int, uint8_t = 0x0F) {}
@@ -72,9 +116,19 @@ public:
     void setFontMode(uint8_t m) {
         last_font_mode = m;
     }
-    void setBitmapMode(uint8_t) {}
-    void setClipWindow(int, int, int, int) {}
-    void setMaxClipWindow() {}
+    void setBitmapMode(uint8_t m) {
+        last_bitmap_mode = m;
+    }
+    void setClipWindow(int x0, int y0, int x1, int y1) {
+        set_clip_window_count++;
+        last_clip_x0 = x0;
+        last_clip_y0 = y0;
+        last_clip_x1 = x1;
+        last_clip_y1 = y1;
+    }
+    void setMaxClipWindow() {
+        max_clip_window_count++;
+    }
     void setFontPosTop() {}
 
     int getStrWidth(const char*) {
