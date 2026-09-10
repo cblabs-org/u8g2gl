@@ -5,7 +5,7 @@ title: "[U-1] missing-name policy — CLI errors, editor generates, --fix-names 
 branch: u8g2gl-widgets/wo9-name-policy
 base: u8g2gl-widgets/wo8-identity-remediation
 complexity: standard
-status: pending
+status: complete
 ---
 
 # WO9 — Missing-Name Policy and Write-Back
@@ -213,4 +213,121 @@ it, do not file an issue. The architect triages.
 
 ## Completion Report
 
-<!-- Written by the worker at task completion -->
+**Status**: complete. Branch `u8g2gl-widgets/wo9-name-policy`, commit `b4b237b`,
+pushed to origin. No other branch created, no rebase, no merge, no PR.
+
+### What changed
+
+**New — `cli/src/core/parser/name-policy.ts`** (isomorphic)
+`MissingNamePolicy`, `DEFAULT_MISSING_NAME_POLICY = 'error'`, `SourceEdit`,
+`ParseOptions`, `createNameInsertion()` and `applyTextEdits()`. No XML
+serializer: an insertion is ` name="…"` at the column one past the tag name,
+derived from the element's recorded `<` location. `applyTextEdits()` resolves
+1-based coordinates to offsets against a line-start table whose newline handling
+(LF/CR/CRLF) matches the tokeniser's own `advance()`, then applies
+**back-to-front** — descending offset, so an insertion never shifts an offset
+still to be applied. That choice is stated in a comment at the sort.
+
+**New — `cli/src/node/fix-names.ts`** (Node-only)
+`fixMissingNames()` re-parses screens and components under `'generate'`, applies
+their insertions to the files on disk, and returns one `NameFixRecord` per file
+actually modified. It re-reads each file immediately before writing.
+
+**`parse-widget-tree.ts`**
+- `WidgetParseContext` (allocator + policy + optional edit sink) replaces the
+  bare allocator parameter, and `createWidgetParseContext()` builds one.
+- `parseWidgetNode()`'s **default `allocator` parameter is removed**; the
+  context is required, and its Doxygen says why a default would be wrong.
+- The identity step branches on the policy: `'error'` emits an error and
+  synthesises nothing (and deliberately carries **no** `suggestions`, since there
+  is no machine-applicable name to propose); `'generate'` delegates to a new
+  `synthesiseName()` helper carrying the unchanged WO8 allocation logic plus the
+  edit record.
+- `parseWidgetTree()` gained an optional `ParseOptions`; omitting it selects
+  `'error'`.
+
+**`parse-screen.ts` / `parse-component.ts`** — `parseScreen`, `parseScreenFile`,
+`parseComponent`, `parseComponentFile` all take `ParseOptions`. `ParseResult<T>`
+gained `nameEdits?`, so a caller that passed no sink still receives the edits.
+
+**`diagnostic.ts`** — documentation only: the two-severity duality of
+`U8G2GL_MISSING_NAME` is now documented on its declaration as deterministic in
+the caller's policy, explicitly flagged as deliberate rather than two code paths
+sharing a constant.
+
+**`cli.ts`** — `--fix-names` on `validate`. The fix pass runs *before* the load,
+writes to disk, and the existing validate path then reads the rewritten files, so
+the "re-validate" is a genuine re-validation rather than an assumption. Target
+resolution now takes the first **positional** argument, so
+`validate --fix-names <path>` works in either order. `--json` gains `fixedNames`
+**only when `--fix-names` was given**, leaving the existing `[D-16]` contract
+byte-identical for every other caller. Usage text updated.
+
+**`cli/package.json`** — `0.4.0` → `0.5.0` (minor, per `rules/03-versioning.md`;
+output-affecting). `VALID_SCHEMA_VERSION` untouched — schema stays `0.3`.
+
+### Tests
+
+**203 before → 224 after; 26 files; all pass, none weakened or removed.**
+
+- `test/parser/name-policy.test.ts` (new, 15 tests) — default is `'error'` with
+  no synthesis and no value; explicit `'error'` is identical to the default;
+  `parseWidgetTree` defaults safely too; `'generate'` warns and synthesises;
+  edit shape, position and count; **round trip** — generate, apply, reparse under
+  `'error'`, assert zero `MISSING_NAME` and zero errors; a second fix pass is a
+  no-op; comments, attribute order and indentation preserved on an input
+  containing all three; multiple insertions in one file, including two on one
+  line; CRLF; an out-of-range edit is skipped rather than thrown.
+- `test/integration/cli.test.ts` (+6) — without the flag, unnamed elements are
+  errors and **nothing on disk changes**; `--fix-names` writes, reports and
+  revalidates clean; `--json` shape; idempotence; single file with the flag
+  before the path; an already-named project is left byte-identical.
+- `test/validator/element-identity.test.ts` — the nine WO8 synthesis assertions
+  now pass `{ missingNamePolicy: 'generate' }`. **Every assertion is unchanged**;
+  only the opt-in was added, which is precisely the WO's requirement that WO8
+  behaviour be reproduced exactly under `'generate'`. The `<style name="x"/>`
+  case and the later-in-document-order collision case both still pass verbatim.
+
+### Verification
+
+- `npx vitest run` — 224/224 pass.
+- `npx tsc --noEmit` — clean. `npm run lint` — clean.
+- `cmake --build build` — no warnings; `ctest --test-dir build` — 166/166 (1
+  skipped, the pre-existing 32-bit sizeof report).
+- **Isomorphic constraint, verified two ways.** (1) `grep -rn "from 'node:\|require(\|from 'fs'\|from 'path'\|process\.\|__dirname" cli/src/core/` returns nothing.
+  (2) `npx eslint src/core --max-warnings 0` passes, and `eslint.config.js`
+  already carries a `no-restricted-imports` rule over `src/core/**/*.ts` banning
+  `node:*` and every Node builtin — so this is enforced by the build, not by
+  vigilance. The new `name-policy.ts` imports only a type from `../schema/`.
+- `git diff` touches only Boundary Box files: `cli/package.json`,
+  `cli/src/core/parser/{index,parse-component,parse-screen,parse-widget-tree,name-policy}.ts`,
+  `cli/src/core/schema/diagnostic.ts`, `cli/src/node/{cli,fix-names}.ts`,
+  `cli/test/**`. `git status` is clean; the integration tests build their
+  throwaway projects under the git-ignored `tmp/` and remove them afterwards.
+- `cli/src/core/validator/` untouched — the belt-and-braces `MISSING_NAME` check
+  is intact.
+
+### Found but not fixed — for the architect
+
+1. **A screen or component validated as a single file always errors.** Validating
+   one file in isolation has no globals or widget manifests, so it reports
+   `U8G2GL_UNKNOWN_WIDGET` and `U8G2GL_UNKNOWN_FONT` for content that is
+   perfectly valid inside its project. Pre-existing, unrelated to WO9, but it
+   made one `--fix-names` test unable to assert exit 0 for a single file — the
+   test asserts the write and the absence of `MISSING_NAME` instead, with a
+   comment saying why. Worth deciding whether single-file validate should locate
+   its project root.
+2. **The `'error'` diagnostic names the fix in prose, not in `suggestions`.**
+   Per §4 of the TypeScript standards suggestions must be machine-applicable, and
+   under this policy there is deliberately no name to apply. A consumer wanting to
+   offer "fix this" therefore has to know about `--fix-names` out of band. If that
+   matters, the diagnostic contract may want a structured "remedy command" field —
+   a schema-adjacent decision, so not taken here.
+3. **`parseWidgetNode()` now requires a `WidgetParseContext`, whose
+   `NameAllocator` is exported as a type.** Exporting it was necessary for
+   declaration emit and to let an external caller build a context at all. The
+   allocator's *logic* is untouched.
+4. **`--fix-names` writes before validating, and does not stage or back up.** On a
+   dirty working tree the user's only undo is `git checkout`. Deliberate — it is a
+   command the user typed — but if a `--dry-run` is wanted, the edits are already
+   computed in core and would be a small addition.
