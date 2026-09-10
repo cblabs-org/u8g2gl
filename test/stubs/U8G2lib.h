@@ -2,6 +2,7 @@
 #define U8G2LIB_H
 
 #include <cstdint>
+#include <cstdio>
 
 class U8G2 {
 public:
@@ -19,6 +20,8 @@ public:
     int last_draw_utf8_x = 0;
     int last_draw_utf8_y = 0;
     const char* last_draw_utf8_text = nullptr;
+    char last_draw_utf8_buf[32] = {};
+    int (*custom_utf8_width)(const char*) = nullptr;
     int utf8_width_val = 0;
     int ascent_val = 0;
     int descent_val = 0;
@@ -41,6 +44,16 @@ public:
     int last_draw_box_y = 0;
     int last_draw_box_w = 0;
     int last_draw_box_h = 0;
+
+    int draw_frame_count = 0;
+    int last_draw_frame_x = 0;
+    int last_draw_frame_y = 0;
+    int last_draw_frame_w = 0;
+    int last_draw_frame_h = 0;
+
+    int draw_pixel_count = 0;
+    int last_draw_pixel_x = 0;
+    int last_draw_pixel_y = 0;
 
     int set_clip_window_count = 0;
     int last_clip_x0 = 0;
@@ -67,13 +80,24 @@ public:
         last_draw_box_w = w;
         last_draw_box_h = h;
     }
-    void drawFrame(int, int, int, int) {}
+    void drawFrame(int x, int y, int w, int h) {
+        draw_frame_count++;
+        last_draw_frame_x = x;
+        last_draw_frame_y = y;
+        last_draw_frame_w = w;
+        last_draw_frame_h = h;
+    }
     void drawStr(int, int, const char*) {}
     void drawUTF8(int x, int y, const char* s) {
         draw_utf8_count++;
         last_draw_utf8_x = x;
         last_draw_utf8_y = y;
         last_draw_utf8_text = s;
+        if (s != nullptr) {
+            std::snprintf(last_draw_utf8_buf, sizeof(last_draw_utf8_buf), "%s", s);
+        } else {
+            last_draw_utf8_buf[0] = '\0';
+        }
     }
     void drawGlyph(int x, int y, uint16_t glyph) {
         draw_glyph_count++;
@@ -89,7 +113,11 @@ public:
         last_draw_xbmp_h = h;
         last_draw_xbmp_bitmap = bitmap;
     }
-    void drawPixel(int, int) {}
+    void drawPixel(int x, int y) {
+        draw_pixel_count++;
+        last_draw_pixel_x = x;
+        last_draw_pixel_y = y;
+    }
     void drawCircle(int, int, int, uint8_t = 0x0F) {}
     void drawDisc(int, int, int, uint8_t = 0x0F) {}
     void drawTriangle(int, int, int, int, int, int) {}
@@ -135,7 +163,10 @@ public:
         return 0;
     }
 
-    int getUTF8Width(const char*) {
+    int getUTF8Width(const char* s) {
+        if (custom_utf8_width != nullptr) {
+            return custom_utf8_width(s);
+        }
         return utf8_width_val;
     }
 

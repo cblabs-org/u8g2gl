@@ -171,5 +171,40 @@ target_compile_options(test_glyph PRIVATE
 
 gtest_discover_tests(test_glyph)
 
+add_executable(test_progress_bar
+    test_progress_bar.cpp
+)
 
+target_include_directories(test_progress_bar PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
 
+target_link_libraries(test_progress_bar PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_progress_bar PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_progress_bar)
+
+add_executable(test_clock
+    test_clock.cpp
+)
+
+target_include_directories(test_clock PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_clock PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_clock PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_clock)
