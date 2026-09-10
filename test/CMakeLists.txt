@@ -246,3 +246,23 @@ target_compile_options(test_button PRIVATE
 )
 
 gtest_discover_tests(test_button)
+
+add_executable(test_sizeof_report
+    test_sizeof_report.cpp
+)
+
+target_include_directories(test_sizeof_report PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_sizeof_report PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_sizeof_report PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_sizeof_report)
+
