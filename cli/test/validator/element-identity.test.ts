@@ -11,16 +11,27 @@
  *              errors, and auto-generated names conform to §13.4 identifier rules.
  *              The WO8 block asserts the remediated guarantee: synthesis allocates from
  *              a document-wide pool, so it can never itself cause U8G2GL_DUPLICATE_NAME.
+ *              Since WO9 every synthesis assertion here opts into the 'generate'
+ *              policy explicitly; the default 'error' journey is covered in
+ *              test/parser/name-policy.test.ts.
  */
 
 import { describe, expect, it } from 'vitest';
 import { parseScreenFile, parseComponentFile } from '../../src/core/parser/index.js';
+import type { ParseOptions } from '../../src/core/parser/index.js';
 import { validateIdentifiers } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import type { Screen } from '../../src/core/schema/screen.js';
 import type { WidgetNode, WidgetNodeChild } from '../../src/core/schema/widget-node.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
+
+/**
+ * The editor journey. WO9 made `'error'` the default missing-name policy, so
+ * every assertion about synthesis must now opt in explicitly — which is the
+ * point: silent synthesis is no longer something a caller can inherit.
+ */
+const GENERATE: ParseOptions = { missingNamePolicy: 'generate' };
 
 describe('[U-1] Element Identity', () => {
   const baseInput: ValidateInput = {
@@ -44,7 +55,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-    const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+    const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
     expect(parseResult.value).toBeDefined();
 
     const warnings = parseResult.diagnostics.filter((d) => d.severity === 'warning');
@@ -138,7 +149,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-    const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+    const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
     expect(parseResult.value).toBeDefined();
 
     const screen = parseResult.value!;
@@ -208,7 +219,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </component>`;
 
-    const parseResult = parseComponentFile(xml, 'components/badge/badge.xml');
+    const parseResult = parseComponentFile(xml, 'components/badge/badge.xml', GENERATE);
     expect(parseResult.value).toBeDefined();
 
     const missingNameDiag = parseResult.diagnostics.find(
@@ -234,7 +245,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
       expect(parseResult.value).toBeDefined();
 
       const screen = parseResult.value!;
@@ -275,7 +286,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
       expect(parseResult.value).toBeDefined();
 
       const screen = parseResult.value!;
@@ -298,7 +309,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
       const screen = parseResult.value!;
 
       expect(screen.view.children[0]!.attributes.name).toBe('label_1');
@@ -323,7 +334,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
       const screen = parseResult.value!;
 
       const collected: string[] = [];
@@ -357,7 +368,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </component>`;
 
-      const parseResult = parseComponentFile(xml, 'components/badge/badge.xml');
+      const parseResult = parseComponentFile(xml, 'components/badge/badge.xml', GENERATE);
       expect(parseResult.value).toBeDefined();
 
       const comp = parseResult.value!;
@@ -383,7 +394,7 @@ describe('[U-1] Element Identity', () => {
     </view>
 </screen>`;
 
-      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml');
+      const parseResult = parseScreenFile(xml, 'screens/screen_home.xml', GENERATE);
       const screen = parseResult.value!;
       expect(screen.view.children[0]!.attributes.name).toBe('label_0');
     });

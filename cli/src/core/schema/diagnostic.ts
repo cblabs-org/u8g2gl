@@ -42,6 +42,21 @@ export const DIAGNOSTIC_CODES = {
   PAGE_MODE_DISPLAY: 'U8G2GL_PAGE_MODE_DISPLAY',
   UNKNOWN_ATTRIBUTE: 'U8G2GL_UNKNOWN_ATTRIBUTE',
   MISSING_REQUIRED: 'U8G2GL_MISSING_REQUIRED',
+  /**
+   * An element carries no `name` attribute ([U-1]).
+   *
+   * **This code is deliberately emitted at two severities, and which one you get
+   * is a deterministic function of the `MissingNamePolicy` the caller passed to
+   * the parser — never a judgement made inside it.** Under `'error'` (the
+   * default, and the CLI's build journey) it is an `error` and no name is
+   * synthesised. Under `'generate'` (the designer, and `validate --fix-names`)
+   * it is a `warning` and the synthesised name is carried in `suggestions`.
+   *
+   * One code rather than two because it is one condition; the severity says what
+   * was *done about it*, which the caller already chose. A consumer branching on
+   * `code` therefore always knows in advance which severity it will see. This is
+   * intentional, not an accident of two code paths sharing a constant.
+   */
   MISSING_NAME: 'U8G2GL_MISSING_NAME',
   TYPE_MISMATCH: 'U8G2GL_TYPE_MISMATCH',
   OVERCONSTRAINED: 'U8G2GL_OVERCONSTRAINED',

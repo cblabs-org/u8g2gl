@@ -8,7 +8,8 @@
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
  *          for XML validation, display queries, and display catalogue enumeration.
  * Description: Command parser and subcommand router supporting global flags
- *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue).
+ *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue),
+ *              including validate's --fix-names write-back of generated element names.
  *              Wires the isomorphic display catalogue query engine and schema validator
  *              into human-readable compiler-style diagnostics (§15.1) and JSON output (§15.3, [D-16]).
  *
@@ -51,6 +52,7 @@ import {
   formatCatalogueSummary,
 } from './format-display.js';
 import { readProjectFiles, getProjectFileMap } from './read-project.js';
+import { fixMissingNames, type NameFixRecord } from './fix-names.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
 const KNOWN_COMMANDS = ['validate', 'find', 'catalogue'] as const;
@@ -107,6 +109,12 @@ Global Options:
   --no-color  Disable ANSI colour output
   --version   Show version number
   --help      Show help
+
+Validate Options:
+  u8g2gl validate [path]                       Validate a project directory or single XML file
+    --fix-names   Generate names for unnamed elements, write them into the
+                  source files, then re-validate. Without it, an unnamed
+                  element is an error: the build never invents identity.
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -308,16 +316,27 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
  * @brief Executes the `validate` subcommand across a project directory or single XML file.
  *
  * Implements §15.1 and §15.3:
- * - `--json` emits `{ "diagnostics": Diagnostic[], "errors": N, "warnings": N }` to stdout.
+ * - `--json` emits `{ "diagnostics": Diagnostic[], "errors": N, "warnings": N }` to stdout,
+ *   plus `"fixedNames": [{ "file": string, "names": string[] }]` when `--fix-names` is given.
  * - Default human-readable output renders compiler-style diagnostics with source lines and carets.
  * - Exits 0 on clean (no errors), 1 on errors.
+ *
+ * Parsing uses the default `'error'` missing-name policy: an unnamed element is
+ * an error and no identity is invented. `--fix-names` runs a `'generate'` pass
+ * first, writes the names into the source files, and then validates the
+ * rewritten files through this same path — so the fixed project is genuinely
+ * re-validated rather than assumed clean.
  *
  * @param args Subcommand arguments.
  * @param json Whether to output JSON.
  * @param useColor Whether ANSI colouring is enabled.
  */
 function handleValidateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
-  const targetArg = args[0] ?? '.';
+  const fixNames = args.includes('--fix-names');
+  // Only positional arguments name a target; a flag must never be mistaken for
+  // a path, or `validate --fix-names` alone would look for a file called
+  // '--fix-names'.
+  const targetArg = args.find((a) => !a.startsWith('-')) ?? '.';
   const targetPath = resolve(process.cwd(), targetArg);
 
   if (!existsSync(targetPath)) {
@@ -347,6 +366,44 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     }
     console.error(`Error: ${notFoundMsg}`);
     process.exit(1);
+  }
+
+  // --- Step 1b: Optional write-back pass, before anything is loaded ---
+  // The fix runs first and writes to disk, so the load below reads the
+  // rewritten files and the validation that follows is a genuine re-validation.
+  let fixedNames: readonly NameFixRecord[] = [];
+  if (fixNames) {
+    try {
+      fixedNames = fixMissingNames(targetPath, targetArg);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (json) {
+        console.log(
+          JSON.stringify(
+            {
+              diagnostics: [
+                {
+                  code: 'U8G2GL_MISSING_FILE',
+                  severity: 'error',
+                  file: targetArg,
+                  line: 1,
+                  column: 1,
+                  message: errMsg,
+                },
+              ],
+              errors: 1,
+              warnings: 0,
+              fixedNames: [],
+            },
+            null,
+            2,
+          ),
+        );
+        process.exit(1);
+      }
+      console.error(`Error: ${errMsg}`);
+      process.exit(1);
+    }
   }
 
   const stat = statSync(targetPath);
@@ -540,19 +597,35 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
 
   // --- Step 4: Emit JSON or Human-Readable Output ---
   if (json) {
-    // Machine-readable contract (§15.3, [D-16])
+    // Machine-readable contract (§15.3, [D-16]). `fixedNames` is present only
+    // when --fix-names was requested, so the existing contract is unchanged for
+    // every caller that does not ask for the fix.
     console.log(
       JSON.stringify(
         {
           diagnostics: uniqueDiagnostics,
           errors: errorCount,
           warnings: warningCount,
+          ...(fixNames ? { fixedNames } : {}),
         },
         null,
         2,
       ),
     );
     process.exit(errorCount > 0 ? 1 : 0);
+  }
+
+  if (fixNames) {
+    const total = fixedNames.reduce((sum, record) => sum + record.names.length, 0);
+    if (total === 0) {
+      console.log('No missing element names: nothing written.');
+    } else {
+      console.log(`Wrote ${total} generated name(s) into ${fixedNames.length} file(s):`);
+      for (const record of fixedNames) {
+        console.log(`  ${record.file}: ${record.names.join(', ')}`);
+      }
+      console.log('');
+    }
   }
 
   if (errorCount > 0) {

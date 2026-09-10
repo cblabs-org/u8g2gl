@@ -25,6 +25,7 @@ import {
   type RawXmlElement,
 } from './raw-xml.js';
 import { parseWidgetTree } from './parse-widget-tree.js';
+import type { ParseOptions, SourceEdit } from './name-policy.js';
 import { parseFocusRing } from './parse-screen.js';
 import { tokenizeXml } from './xml-tokeniser.js';
 import type { ParseResult } from './index.js';
@@ -47,6 +48,7 @@ export function parseComponent(
   root: RawXmlElement,
   filename: string,
   diagnostics: Diagnostic[],
+  options?: ParseOptions,
 ): Component | undefined {
   if (root.name !== 'component') {
     diagnostics.push({
@@ -118,7 +120,7 @@ export function parseComponent(
   const visualChildren = viewEl.children.filter(
     (child) => child.name !== 'focus_ring',
   );
-  const widgetChildren = parseWidgetTree(visualChildren, filename, diagnostics);
+  const widgetChildren = parseWidgetTree(visualChildren, filename, diagnostics, options);
 
   const view: View = {
     children: widgetChildren,
@@ -140,23 +142,29 @@ export function parseComponent(
 export function parseComponentFile(
   xml: string,
   filename: string,
+  options?: ParseOptions,
 ): ParseResult<Component> {
   const rawDoc = tokenizeXml(xml, filename);
   const diagnostics = [...rawDoc.diagnostics];
 
+  // As in parseScreenFile: collect locally when the caller supplied no sink, so
+  // the edits always reach the ParseResult.
+  const nameEdits: SourceEdit[] = options?.nameEdits ?? [];
+
   if (!rawDoc.root) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
-  const component = parseComponent(rawDoc.root, filename, diagnostics);
+  const component = parseComponent(rawDoc.root, filename, diagnostics, { ...options, nameEdits });
   const hasError = diagnostics.some((d) => d.severity === 'error');
 
   if (hasError || !component) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
   return {
     value: component,
     diagnostics,
+    nameEdits,
   };
 }
