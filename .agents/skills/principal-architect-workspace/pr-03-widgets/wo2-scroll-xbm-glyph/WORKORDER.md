@@ -5,7 +5,7 @@ title: "u8g2gl_scrolling_label + u8g2gl_xbm + u8g2gl_glyph"
 branch: u8g2gl-widgets/wo2-scroll-xbm-glyph
 base: u8g2gl-widgets/wo1-primitives-label
 complexity: standard
-status: pending
+status: complete
 ---
 
 # WO2 — u8g2gl_scrolling_label + u8g2gl_xbm + u8g2gl_glyph
@@ -310,3 +310,16 @@ Append this to the bottom of this file when done:
 - **sizeof(u8g2gl_glyph)**: N bytes
 - **Notes**: <any observations>
 ```
+
+## Completion Report
+- **Date**: 2026-09-10T07:25:00Z
+- **Status**: COMPLETE
+- **Commit**: 3675821
+- **Branch verified**: yes (u8g2gl-widgets/wo2-scroll-xbm-glyph)
+- **Tests**: 118 passed, 0 failed
+- **Warnings**: 0
+- **sizeof(u8g2gl_scrolling_label)**: 72 bytes (host: 64-bit, budget <= 88 bytes)
+- **sizeof(u8g2gl_xbm)**: 56 bytes (host: 64-bit, budget <= 80 bytes)
+- **sizeof(u8g2gl_glyph)**: 56 bytes (host: 64-bit, budget <= 72 bytes)
+- **Notes**: All three widgets implemented with zero heap allocation, zero-copy pointer semantics, and full documentation compliance. Verified zero compiler warnings under -Wall -Wextra -Wpedantic, 118 passing tests across the entire suite.
+
