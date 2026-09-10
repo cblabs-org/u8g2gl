@@ -51,6 +51,20 @@ public:
     int last_draw_frame_w = 0;
     int last_draw_frame_h = 0;
 
+    int draw_rbox_count = 0;
+    int last_draw_rbox_x = 0;
+    int last_draw_rbox_y = 0;
+    int last_draw_rbox_w = 0;
+    int last_draw_rbox_h = 0;
+    int last_draw_rbox_r = 0;
+
+    int draw_rframe_count = 0;
+    int last_draw_rframe_x = 0;
+    int last_draw_rframe_y = 0;
+    int last_draw_rframe_w = 0;
+    int last_draw_rframe_h = 0;
+    int last_draw_rframe_r = 0;
+
     int draw_pixel_count = 0;
     int last_draw_pixel_x = 0;
     int last_draw_pixel_y = 0;
@@ -121,8 +135,22 @@ public:
     void drawCircle(int, int, int, uint8_t = 0x0F) {}
     void drawDisc(int, int, int, uint8_t = 0x0F) {}
     void drawTriangle(int, int, int, int, int, int) {}
-    void drawRBox(int, int, int, int, int) {}
-    void drawRFrame(int, int, int, int, int) {}
+    void drawRBox(int x, int y, int w, int h, int r) {
+        draw_rbox_count++;
+        last_draw_rbox_x = x;
+        last_draw_rbox_y = y;
+        last_draw_rbox_w = w;
+        last_draw_rbox_h = h;
+        last_draw_rbox_r = r;
+    }
+    void drawRFrame(int x, int y, int w, int h, int r) {
+        draw_rframe_count++;
+        last_draw_rframe_x = x;
+        last_draw_rframe_y = y;
+        last_draw_rframe_w = w;
+        last_draw_rframe_h = h;
+        last_draw_rframe_r = r;
+    }
     void drawButtonUTF8(int, int, uint8_t, int, int, const char*) {}
 
     uint8_t getDrawColor() const {

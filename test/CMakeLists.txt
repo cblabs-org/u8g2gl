@@ -208,3 +208,41 @@ target_compile_options(test_clock PRIVATE
 )
 
 gtest_discover_tests(test_clock)
+
+add_executable(test_switch
+    test_switch.cpp
+)
+
+target_include_directories(test_switch PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_switch PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_switch PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_switch)
+
+add_executable(test_button
+    test_button.cpp
+)
+
+target_include_directories(test_button PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_button PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_button PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_button)
