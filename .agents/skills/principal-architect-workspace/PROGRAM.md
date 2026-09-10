@@ -253,3 +253,47 @@ being written but not obeyed — it needs to be more prominent in the worker spa
 prompt, not only in the WORKORDER body.
 
 Readability review of the TypeScript is running separately.
+
+### 2026-09-10T06:26:42Z — PR-02 merged; PR-03 briefed and running; context distilled
+
+**PR-02 merged as #2.** Readability review returned no P1 and no P2 — 40/40
+TypeScript files carry SPDX headers, purpose-first descriptions and TSDoc, and
+the isomorphic boundary is ESLint-enforced rather than merely documented. The
+contrast with PR-01, which shipped with no documentation at all, is entirely
+explained by the `u8g2gl-standards` skill existing before PR-02 was written.
+That is the clearest evidence so far that the standards infrastructure pays.
+
+Two minor findings deferred, neither blocking: `core/validator/*.ts` uses an
+unnumbered `// --- N. ---` banner instead of the house `// --- Step N: ---`
+(59 correct uses elsewhere, so it is local drift), and `parse-widget-tree.ts`
+threads a `diagnostics` parameter that is never written to — verified zero
+`.push` calls, so either a placeholder or a dropped requirement.
+
+**PR-03 briefed and running.** Seven WOs, owner-approved 2026-09-10. WO1
+(primitives + label) complete; WO2 (scrolling label, xbm, glyph) in flight.
+
+Element identity [U-1] was folded into PR-03 at the owner's request rather than
+left to drift — correct, because it is the only non-additive item among ui_spec
+§13's schema requirements and settling it after the generator exists is the
+expensive path.
+
+**The PA chose Option A — require `name` on every element.** I offered three
+options and leaned toward the hybrid (name when present, positional synthetic id
+otherwise, promoted to a real name on first edit). Option A is the one genuinely
+breaking choice: it invalidates existing XML where the others would have been
+additive. It may still be right, and the PA was asked to decide rather than
+comply — but it carries the highest cost of the three and the reasoning must be
+checked when WO6 lands, against round-trip fidelity, the sidecar state file, and
+§13.4's mangling rules.
+
+**Process failure, third occurrence, now with a diagnosis.** A workspace commit
+landed on PR-02's own branch. Recovered before it reached the remote. The rule in
+`.agents/rules/04-branch-hygiene.md` existed and I still did it, because I printed
+the branch in the *same batched command* as the commit — so the check produced
+information I could not act on. **A check must gate the action, not accompany
+it.** Where another session holds the tree, the answer is a worktree, which is
+what this distillation used.
+
+**Context distilled** into CONTEXT_BRIDGE.md §4 and §7 ahead of a compaction:
+full PR state with measured figures, the three things to scrutinise when PR-03
+returns, and the corrected R-8 assessment.

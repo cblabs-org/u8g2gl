@@ -79,27 +79,73 @@ lives **(gates PR-02)**; `[U-7]` palette taxonomy.
 
 ## 4. Programme state
 
-**PR-01 — runtime core. MERGED** (`#1`). Object model, subjects, styles, frame
-gate. 80 tests, zero warnings. Seven work orders including two review remediations:
-WO6 fixed four memory-sizing defects (one a spec violation — string subjects
-ignored their declared `max_len`, making the §18 budget untrue); WO7 fixed
-documentation, which was absent entirely.
+**PR-01 — runtime core. MERGED (#1).** `u8g2gl_obj`, four subject types, style
+cascade, frame gate with `ui_handler()` deadline aggregation. 80 tests, zero
+warnings. Seven WOs, of which two were review remediations: **WO6** fixed four
+memory-sizing defects — one a spec violation, string subjects allocated a fixed
+128 B and ignored their declared `max_len`, which made the §18 budget untrue —
+and **WO7** fixed documentation, which was absent entirely.
 
-**PR-02 — CLI, schema, validator, display catalogue. IN PROGRESS.** Six WOs
-committed on `u8g2gl-cli/wo1-skeleton` … `wo6-cli-integration`: skeleton, schema
-0.3 document model, XML parser with source locations, U8G2 display catalogue and
-query engine, validator with §15 diagnostics, CLI integration.
+Measured after remediation (64-bit host; 32-bit target ~25–40% smaller):
+`u8g2gl_obj` 64→48 B, `u8g2gl_style` 40→24 B, `u8g2gl_observer` 24→16 B, scalar
+subjects 400→80 B, string subject 528→120 B. A 15-object / 8-subject project
+dropped ~2480 B → ~870 B static RAM. `Core.SizeOfReport` prints these every test
+run so a regression is caught rather than discovered in a budget later.
 
-**Next after PR-02:** PR-03 widgets, PR-04 generator, PR-05 foundation integration
-module, PR-06 Wasm preview, then **PR-07 — the GO/NO-GO gate**. Full ledger in
-plan §5.
+**PR-02 — CLI, schema, validator, display catalogue. MERGED (#2).** Six WOs,
+121 tests across 23 suites. Delivers: schema 0.3 document model, zero-dependency
+XML parser with per-attribute source locations, display catalogue of 1637
+full-buffer constructors, validator with seven passes, and `u8g2gl` commands with
+`--json` throughout.
 
-**⚠ PR-02 must not freeze schema 0.3 without `ui_spec.md` §15's nine schema
-requirements.** That is risk R-8 and the reason ui_spec exists now rather than
-later. `<previews>`, formalised `help`, property grouping, palette metadata,
-editor-target generation hooks, sample data, element identity, round-trip
-fidelity, and editor view state as a **sidecar** file — not in the project XML,
-or every pan and zoom becomes a source-control diff.
+Verified independently at review rather than accepted from the report:
+- **Isomorphic boundary holds and is ESLint-enforced** — `no-restricted-imports`
+  on `src/core/**` blocks `node:*` and all builtins with an explanatory message.
+  This was the constraint most likely to break invisibly; it now cannot regress
+  silently. Best thing in the PR.
+- **Catalogue avoided the known trap** — parses the 206 `u8x8_display_info_t`
+  structs from `u8x8_d_*.c`, not constructor names (34% of names yield no
+  geometry by regex), and filters to `_F_`.
+- **22 stable diagnostic codes** with structured suggestion arrays, plus
+  `endLine`/`endColumn` beyond what [D-16] asked for — Monaco will want those.
+- No clock reads anywhere, so determinism holds.
+
+Readability review returned **no P1 and no P2** — 40/40 TypeScript files carry
+SPDX headers, purpose-first descriptions and TSDoc. A marked contrast with PR-01,
+and the difference is that the standards skill existed before PR-02 was written.
+
+**PR-03 — built-in widget set + element identity. IN PROGRESS.** Decomposition
+approved by the owner 2026-09-10. Seven WOs:
+
+| WO | Scope | State |
+|---|---|---|
+| WO1 | Tier-1 primitives + `u8g2gl_label` | complete |
+| WO2 | `scrolling_label`, `xbm`, `glyph` | **in flight** |
+| WO3 | `progress_bar`, `clock` | pending |
+| WO4 | `switch`, `button` | pending |
+| WO5 | XML manifests + manifest→validator cross-test | pending |
+| WO6 | Element identity [U-1] | pending |
+| WO7 | Sizeof report, readability review, stack submission | pending |
+
+**⚠ Review WO6 carefully when it lands.** The PA chose **Option A — require
+`name` on every element**. That is the one genuinely *breaking* option of the
+three offered: it invalidates existing XML, where synthetic ids or the hybrid
+(name-when-present, promoted on first edit) would have been additive. It may
+still be right — requiring a name is simple and author-controlled — but it was
+the option carrying the highest cost and the reasoning needs checking.
+
+**Next:** PR-04 generator, PR-05 foundation integration module, PR-06 Wasm
+preview, then **PR-07 — the GO/NO-GO gate**. Full ledger in plan §5.
+
+**R-8 — corrected, and my original framing was wrong.** The bridge prompt told
+PR-02's PA that ui_spec §13's nine schema requirements *gated* that PR. The PA
+deferred them, arguing they are additive. Checking that: `<previews>`, property
+`group`, palette metadata and sample data are all new *optional* attributes or
+new document types, and adding an optional field to a schema is a minor bump, not
+a breaking change. Five of six are genuinely deferrable.
+
+**The exception is [U-1] element identity** — the only non-additive item, which is
+why it was pulled into PR-03 rather than left to drift.
 
 ---
 
@@ -154,18 +200,42 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Working tree is on `u8g2gl-cli/wo6-cli-integration`** with uncommitted PR-02
-workspace files (`MEMORY.md` modified, `pr-02-cli-schema/PROJECT.md` and
-`wo1-skeleton/` untracked) belonging to the PR-02 PA session. **Do not commit or
-stash those** without asking — they are another session's in-flight work.
+**Date of this revision: 2026-09-10.**
 
-Documentation work belongs on `main`; use a worktree rather than switching this
-tree.
+**The main working tree is on `u8g2gl-widgets/wo2-scroll-xbm-glyph` with a PR-03
+worker actively mid-WO** — uncommitted `scrolling_label`, `xbm` and `glyph`
+sources plus modified `CMakeLists.txt`. **Do not commit, stash, or switch branches
+in that tree.** For your own documentation work use a worktree:
 
-**Open items needing the owner:**
-- `[U-1]` and `[U-6]` gate PR-02's schema freeze and have no good default.
-- Whether PR-02's PA has ui_spec §15's nine schema requirements in scope — if not,
-  schema 0.3 ships without editor support and 0.4 becomes a breaking change.
+```bash
+git worktree add /tmp/wt main    # then commit and push from there
+git worktree remove /tmp/wt
+```
+
+**Nothing is blocked on the owner right now.** PR-03 is running. The next thing
+that needs you is ingesting PR-03 when it completes.
+
+**When PR-03 returns, review these three specifically:**
+
+1. **WO6's element-identity decision.** The PA chose Option A (require `name`),
+   the one breaking choice. Check the reasoning holds against round-trip fidelity
+   ([UD-3]), the sidecar editor-state file, and §13.4's mangling and collision
+   rules. If it does not, this is far cheaper to change before the generator
+   exists than after.
+2. **WO5's manifest→validator cross-test.** This is the seam between PR-02 and
+   PR-03: manifests must satisfy the `PropDef` schema in
+   `cli/src/core/schema/widget-manifest.ts`. If that test is missing or weak, a
+   PR-04 integration failure has been deferred rather than prevented.
+3. **Measured `sizeof` for every widget**, with the host width stated. Widget
+   instances multiply across a screen. Do not accept asserted figures — build both
+   sides and measure, which is how the PR-01 padding claim was found to be wrong
+   on the host and right on the target.
+
+**Still open, no owner decision needed yet:** `[Q-1]` multi-target layout
+overrides (needs two real targets to test against), `[Q-2]` `bdfconv` packaging
+(work, not risk — Wasm route recommended), `[Q-4]` measured budget at the PR-07
+gate, `[U-3]` multi-target canvas, `[U-6]` where sample data lives, `[U-7]` palette
+taxonomy.
 
 **The governing principle when in doubt** (design_spec §1.5): omission is the
 default; a feature earns inclusion by *demonstrated* rather than anticipated need;
