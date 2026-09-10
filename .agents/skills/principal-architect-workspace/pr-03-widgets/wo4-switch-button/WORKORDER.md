@@ -5,7 +5,7 @@ title: "u8g2gl_switch + u8g2gl_button"
 branch: u8g2gl-widgets/wo4-switch-button
 base: u8g2gl-widgets/wo3-progress-clock
 complexity: standard
-status: pending
+status: complete
 ---
 
 # WO4 — u8g2gl_switch + u8g2gl_button
@@ -213,3 +213,15 @@ zero warnings, full documentation.
 - **sizeof(u8g2gl_button)**: N bytes
 - **Notes**: <any observations>
 ```
+
+## Completion Report
+- **Date**: 2026-09-10T06:36:30Z
+- **Status**: COMPLETE
+- **Commit**: edc01ae7be27c3f8115682855bfa076d5e1694f4
+- **Branch verified**: yes (u8g2gl-widgets/wo4-switch-button)
+- **Tests**: 164 passed, 0 failed (9/9 Switch, 13/13 Button, 142/142 existing suite)
+- **Warnings**: 0
+- **sizeof(u8g2gl_switch)**: 56 bytes (budget <= 72 bytes)
+- **sizeof(u8g2gl_button)**: 64 bytes (budget <= 80 bytes)
+- **Notes**: Implemented u8g2gl_switch and u8g2gl_button conforming to zero-heap discipline ([D-1]), zero std::function members, static U8G2GL_IDLE tick lifecycle ([D-15]), rounded track and handle rendering for switches, configurable nested border frames, focus state visual inversion (§12.2), and centered UTF-8 text layout for buttons. Extended test stub U8G2lib.h for drawRBox and drawRFrame call tracking.
+
