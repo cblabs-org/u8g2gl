@@ -14,6 +14,14 @@ public:
     int last_th = 0;
     uint8_t last_draw_color = 1;
     const uint8_t* last_font = nullptr;
+    uint8_t last_font_mode = 0;
+    int draw_utf8_count = 0;
+    int last_draw_utf8_x = 0;
+    int last_draw_utf8_y = 0;
+    const char* last_draw_utf8_text = nullptr;
+    int utf8_width_val = 0;
+    int ascent_val = 0;
+    int descent_val = 0;
 
     void clearBuffer() {
         clear_count++;
@@ -29,7 +37,12 @@ public:
     void drawBox(int, int, int, int) {}
     void drawFrame(int, int, int, int) {}
     void drawStr(int, int, const char*) {}
-    void drawUTF8(int, int, const char*) {}
+    void drawUTF8(int x, int y, const char* s) {
+        draw_utf8_count++;
+        last_draw_utf8_x = x;
+        last_draw_utf8_y = y;
+        last_draw_utf8_text = s;
+    }
     void drawGlyph(int, int, uint16_t) {}
     void drawXBMP(int, int, int, int, const uint8_t*) {}
     void drawPixel(int, int) {}
@@ -56,7 +69,9 @@ public:
         last_font = font;
     }
 
-    void setFontMode(uint8_t) {}
+    void setFontMode(uint8_t m) {
+        last_font_mode = m;
+    }
     void setBitmapMode(uint8_t) {}
     void setClipWindow(int, int, int, int) {}
     void setMaxClipWindow() {}
@@ -67,7 +82,7 @@ public:
     }
 
     int getUTF8Width(const char*) {
-        return 0;
+        return utf8_width_val;
     }
 
     int getMaxCharWidth() {
@@ -79,11 +94,19 @@ public:
     }
 
     int getAscent() {
-        return 0;
+        return ascent_val;
     }
 
     int getDescent() {
-        return 0;
+        return descent_val;
+    }
+
+    int getDisplayWidth() const {
+        return 128;
+    }
+
+    int getDisplayHeight() const {
+        return 64;
     }
 
     void updateDisplayArea(int tx, int ty, int tw, int th) {

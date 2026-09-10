@@ -10,6 +10,7 @@ option(U8G2GL_BUILD_TESTS "Build U8G2GL tests" ON)
 add_library(u8g2gl STATIC
     src/u8g2gl.cpp
     src/u8g2gl_obj.cpp
+    src/u8g2gl_label.cpp
     src/u8g2gl_tree.cpp
     src/u8g2gl_subject.cpp
     src/u8g2gl_style.cpp
