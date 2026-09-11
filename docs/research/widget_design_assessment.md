@@ -1,7 +1,11 @@
 # U8G2GL Widget Design Assessment
 
 > [!WARNING]
-> **Frozen research input — not current design.** Written before design spec v0.2. Where this conflicts with [design_spec.md](../design_spec.md), the spec wins. Notably superseded here: the `wd_*_xml_parser.c` bridge file (removed — there is no runtime XML path) and C-style APIs (generated code is C++). The component/widget tier boundaries and the per-widget complexity analysis remain the basis of the spec's §6.
+> **Frozen research input — not current design.** Written before design spec v0.2. Where this conflicts with [design_spec.md](../design_spec.md), the spec wins. Notably superseded here: the `wd_*_xml_parser.c` bridge file (removed — there is no runtime XML path) and C-style APIs (generated code is C++).
+>
+> **The tier model in this document is withdrawn ([D-18], 2026-09-11).** There are no longer four tiers, no `<component>` vs `<widget>` distinction, and no "always inlined" primitive category — there is one element vocabulary, and whether an instance becomes an object is a generator outcome. The Tier Summary Table and the Layered Architecture diagram below are historical.
+>
+> **One specific argument in this document is wrong** and was repeated downstream before being caught — see the correction under `wd_train_formation`. The per-widget *complexity analysis* remains useful; its *stated reasons* for tier placement should not be trusted without checking against the source.
 
 A widget-by-widget analysis of how the departures-board widgets translate into U8G2GL's emerging design, using LVGL Pro's `<component>` vs `<widget>` distinction.
 
@@ -459,6 +463,15 @@ render():
 ```
 
 **Why it must be a custom widget**: This is pure custom rendering — drawing train shapes from primitives, state machine animation, variable-width carriage layout based on data count. There is no XML composition that could express "draw a nose cone triangle overlapping a rounded rectangle frame."
+
+> [!CAUTION]
+> **The sentence above is wrong, and was corrected on 2026-09-11.**
+>
+> Reading the actual implementation, `trainFormationWidget::render()` uses only `drawRFrame`, `drawTriangle`, `drawLine`, `drawBox` and `drawText` — every one of them already in the primitive set. "A nose cone triangle overlapping a rounded rectangle frame" is three tags. The drawing vocabulary was never the obstacle.
+>
+> **The real reason is that the structure depends on runtime data.** `numCoaches` arrives at run time and determines the divider count, the cell count and the total width; `carriageWidth = availableWidth / numCoaches` is clamped, and the clamp *changes mode* into marquee; mode cycles on a `tick()` state machine; and the facilities mode selects from a variable-length icon array built at render time. A `<view>` is resolved at build time, so it can express "three carriages" but never "N carriages".
+>
+> **The correct line is static structure versus data-driven structure** (design_spec §6.5), not primitive vocabulary versus custom pixel math. That line is sharper, testable, and concedes what this document did not: the nose-cone assembly and a single carriage cell *are* designable, and only the repetition and the mode machine need C++. See also [Q-8] on repeaters, which would shrink the C++ residue further.
 
 **U8G2GL design**:
 

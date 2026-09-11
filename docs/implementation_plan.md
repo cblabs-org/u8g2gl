@@ -60,7 +60,7 @@ LVGL keeps a real runtime tree — parent pointer plus child array per object �
 - Effective clip = intersection of ancestor bounds, same walk.
 - Cost: one `uint8_t`/`uint16_t` per object, versus a child vector per node.
 
-This keeps LVGL's hierarchy *semantics* while spending almost nothing, and it composes with components being inlined at generation time (§6.3). It is the kind of decision that is nearly free now and expensive after fifty widgets exist — hence [PD-3] below.
+This keeps LVGL's hierarchy *semantics* while spending almost nothing. [D-18] later made it load-bearing rather than merely available: a composite is a real container object, and `parent_index_` is what its children hang from. It is the kind of decision that is nearly free now and expensive after fifty widgets exist — hence [PD-3] below.
 
 ---
 
@@ -70,7 +70,7 @@ This keeps LVGL's hierarchy *semantics* while spending almost nothing, and it co
 
 Its load-bearing decision is [D-17]: widget properties are declared as **build-time `<api>` manifests** that the generator reads, not runtime property tables. LVGL needs `lv_obj_property` at runtime because its editor loads XML on-device; U8G2GL has no runtime XML, so it needs the descriptor without the dispatch. The consequence is that built-in and custom widgets become the same mechanism — the generator's widget knowledge is data, so adding a widget needs no generator release, and the Tier-4 custom-widget story stops being second-class.
 
-§13 also settles what was previously implicit: identifier mangling and collision handling, the static-demotion rule, component-inlining semantics, [A-3]'s flat object array with parent indices, byte-level determinism (no timestamps, so an unchanged project regenerates to an empty diff), and the boundary of what is never generated.
+§13 also settles what was previously implicit: identifier mangling and collision handling, the realisation rule ([D-18]), composite-expansion semantics, [A-3]'s flat object array with parent indices, byte-level determinism (no timestamps, so an unchanged project regenerates to an empty diff), and the boundary of what is never generated.
 
 ---
 
@@ -271,7 +271,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | **PR-01** ✅ | **U8G2GL** | **MERGED (#1).** Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
 | **PR-02** ✅ | **U8G2GL** | **MERGED (#2).** CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
 | **PR-03** ✅ | **U8G2GL** | **MERGED (#3).** Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Each ships its `<api>` manifest. Also settled `[U-1]` element identity (ui_spec §16.1) | PR-01 | — |
-| **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, component inlining, build-time layout ([D-7]), identifier mangling, demotion | PR-02, PR-03 | — |
+| **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, composite expansion, build-time layout ([D-7], [D-20]), identifier mangling, realisation ([D-18]) | PR-02, PR-03 | — |
 | **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
 | **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
@@ -280,7 +280,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-08** | both | Components (§6.3), custom widgets via `extends` (§6.4), collection API (§9) | PR-07 |
+| **PR-08** | both | Composites (§6.4), custom elements via `extends` (§6.5), collection API (§9) | PR-07 |
 | **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
 | **PR-08b** | U8G2GL | `<row>`/`<col>` stacking sugar (§7.2), *if real usage has shown the need* | PR-08 |
 

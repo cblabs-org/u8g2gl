@@ -56,7 +56,7 @@ The second row is a trap worth naming. Selection is shared but keyboard focus is
 
 ### 2.2 Preconditions
 
-An element exists and is selectable. It is not inside a component instance (`ui_spec.md` §8: instances render inline but are not editable in place — selecting one offers *Open component* instead). Its position is not expression-valued — see §2.6, which is where this flow turned out to be genuinely undecided.
+An element exists and is selectable. It is not inside a composite instance (`ui_spec.md` §8: instances render inline but are not editable in place — selecting one offers *Open element* instead). Its position is not expression-valued — see §2.6, which is where this flow turned out to be genuinely undecided.
 
 ### 2.3 The path
 
@@ -113,7 +113,7 @@ Refusing is not obstruction. The user retains the constant and the ability to ab
 | **Out of bounds** | **Permitted and flagged.** The element renders with the §8 hatched indicator and a Problems row appears. The nudge is never blocked: pixel-exact means the value is what was asked for, and a coordinate clamped by the editor is a coordinate the XML and the canvas disagree about |
 | **Expression-valued** | Per `[FD-4]` |
 | **Document structurally invalid** | The canvas holds the last good frame, dimmed (§4.1). Nudging is still permitted — the edit is applied to text — but the canvas cannot show the result until the document parses. The dimming is what tells the user why nothing is moving |
-| **Inside a component instance** | Not selectable for edit. Offers *Open component* |
+| **Inside a composite instance** | Not selectable for edit. Offers *Open element* |
 
 ### 2.9 Keyboard reference
 
@@ -308,9 +308,11 @@ Also unspecified: drop position (pointer, snapped to tile?), default size, and t
 
 Also unspecified: whether a build is blocked while Problems contains errors, and what the canvas shows during a build — F4 is the only flow with a meaningfully long-running operation.
 
-### 5.3 F5 · Design a component
+### 5.3 F5 · Design an element
 
-> Open component → edit in isolation against `<previews>` → set prop defaults → see what a consumer gets.
+> Open element → edit in isolation against `<previews>` → set prop defaults → see what a consumer gets.
+>
+> **Not yet worked.** [D-18] changed this flow's subject matter materially — a composite is now a real container with its own bounds, so the flow must settle how resizing an element in its preview interacts with its children's anchors, and what the gallery shows when a `<view>` and a C++ class are both present.
 
 **This flow cannot be executed at all today.** `<previews>` does not exist in schema 0.3 — confirmed: zero of the seventeen manifests carry it. F5 is blocked on a schema addition, not on editor work, and `ui_spec.md` §15 already lists it. Worth stating plainly that a listed flow is currently unreachable.
 

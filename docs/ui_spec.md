@@ -92,9 +92,11 @@ The CLI builds the runtime twice, mirroring LVGL Pro's `compile --target editor|
 | Target | Contains | Used by |
 |---|---|---|
 | `firmware` | Generated code with direct setter calls ([D-17]). No registry, no property table | The device |
-| `editor` | The same runtime **plus** a class registry (construct-by-name) and property thunks (set-by-name), generated from the same `<api>` manifests | The editor's Wasm canvas |
+| `editor` | The same runtime **plus** a class registry (construct-by-name), property thunks (set-by-name), and a **draw-by-name table** for elements that have no class, generated from the same `<api>` manifests | The editor's Wasm canvas |
 
 *Why this is necessary.* The editor must render arbitrary XML without running a C++ compiler in the browser, so the runtime must build an object graph from a description at run time. That is exactly the dynamic-creation capability [PD-3] recorded the object model as *ready for* but not *capable of*, and exactly the runtime property mechanism [D-17] deliberately removed from firmware.
+
+*The draw-by-name table.* Per [D-18] the drawing set (design_spec §6.2) has no classes — it is served by free functions such as `u8g2gl_draw_box()`. The editor cannot construct those by name, so its target adds a table mapping tag to draw function. **Both targets call the same free function**, which is what keeps [D-9]'s single-implementation guarantee: a per-primitive class would have needed this path anyway and given two code paths through it.
 
 *Why it costs firmware nothing.* Both are generated from one manifest, and the registry compiles out under `#ifdef U8G2GL_EDITOR`. [D-17]'s build-time manifests serve both paths: setter emission for firmware, thunk generation for the editor. This retrospectively justifies [PD-3]'s virtual base — the editor build is the first real consumer of polymorphic dispatch.
 
@@ -136,7 +138,7 @@ How an edit becomes pixels. Every surface in this document sits over this pipeli
              text edits │                    ▼
         ┌───────────────┴───────┐   ┌──────────────────────────┐
         │ Canvas + Properties   │   │ Resolver (PR-04 TS)      │
-        │ (views, emit edits)   │   │ inline components,       │
+        │ (views, emit edits)   │   │ expand composites,       │
         └───────────────────────┘   │ evaluate anchors/consts  │
                         ▲            └────────┬─────────────────┘
                         │                     ▼
@@ -157,7 +159,7 @@ How an edit becomes pixels. Every surface in this document sits over this pipeli
 2. Non-text edits are converted to **text edits at CST ranges** and applied. One undo stack.
 3. Parse is incremental and debounced — roughly 50 ms while typing, immediate for canvas edits.
 4. **Validate.** Diagnostics render as Monaco markers and Problems rows whether or not the document is valid.
-5. If structurally valid, **resolve** — inline components (§13.6), evaluate constant arithmetic and anchors ([D-7]) to literal integers.
+5. If structurally valid, **resolve** — expand composites (§13.6), evaluate constant arithmetic, anchors and `#parent_*` ([D-7], [D-20]) to literal integers.
 6. Emit a **scene description**: a flat object list with resolved coordinates and properties, plus the parent index table ([A-3]).
 7. Hand it to the Wasm runtime with the active sample set. It constructs, ticks and renders to a framebuffer.
 8. Blit the framebuffer to the canvas at the current zoom, nearest-neighbour.
@@ -204,7 +206,7 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 
 **F4 · Build and fix.** Continuous validation; build on demand. Errors appear as squiggles and Problems rows with file, line, column and suggestion. Click a row → land on the fault.
 
-**F5 · Design a component.** Open component → edit in isolation against `<previews>` → set prop defaults → see what a consumer gets.
+**F5 · Design an element.** Open element → edit in isolation against `<previews>` → set prop defaults → see what a consumer gets.
 
 **F6 · Check against real data.** Switch sample sets — typical, empty, longest plausible — and confirm the layout survives each.
 
@@ -223,7 +225,7 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 │C │  ▾ Screens        │ │              │               │ │ u8g2gl_clock    │
 │T │    ▸ home         │ │   CANVAS     │  XML (Monaco) │ │ name: clock     │
 │I │      settings     │ │              │               │ │ ─── Geometry ───│
-│V │  ▾ Components     │ │  ┌────────┐  │ <screen ...   │ │ x [216] y [  0] │
+│V │  ▾ Elements       │ │  ┌────────┐  │ <screen ...   │ │ x [216] y [  0] │
 │I │      status_bar   │ │  │        │  │   <u8g2gl_cl..│ │ w [ 40] h [ 11] │
 │T │  ▾ Widgets        │ │  │ 256×64 │  │     x="216"   │ │ ⓘ right="0" set │
 │Y │      wd_list      │ │  │        │  │     ...       │ │ ── Appearance ──│
@@ -264,13 +266,16 @@ One editing surface; three contexts. Switching changes *what* is edited, not *ho
 ### 7.1 Screen context
 A screen's `<view>` against the active target's display bounds. The default.
 
-### 7.2 Component context
-A `<component>`, or a Tier-4 widget's `<api>`, rendered in isolation against its `<previews>` declaration rather than a full display — a component has no inherent screen position.
+### 7.2 Element context
+A user-authored element, rendered in isolation against its `<previews>` declaration rather than a full display — an element has no inherent screen position.
 
-- **Components (Tier 3)** are fully editable: layout, properties, `<api>` props and defaults.
-- **Custom widgets (Tier 4)** expose their `<api>` and a preview only. Their rendering is C++ ([D-6]); the editor shows whatever the Wasm runtime draws and cannot edit it. The panel says so rather than appearing broken.
+Per [D-18] there are no longer two kinds of user element, so the editor's split narrows to its real cause — **whether the element has a `<view>`**:
 
-Multiple `<preview>` declarations render as a small gallery, so a component can be checked in several configurations at once.
+- **An element with a `<view>`** is fully editable: layout, properties, `<api>` props and defaults.
+- **An element rendered by C++** exposes its `<api>` and a preview only. The editor shows whatever the Wasm runtime draws and cannot edit it. The panel says so rather than appearing broken.
+- **An element with both** ([D-18]) edits its `<view>` and previews its C++ behaviour — the canvas is honest that it is showing a designed structure a class will drive.
+
+Multiple `<preview>` declarations render as a small gallery, so an element can be checked in several configurations at once. Because a composite is a real container with its own bounds ([D-18], [D-20]), a preview at more than one size is the way to check that its anchors actually hold — a resizable element whose children are absolutely positioned looks correct at exactly one width.
 
 ### 7.3 Screen-flow context
 A read-write graph. Nodes are screens; edges are `<screen_load_event>` and `<screen_back_event>` declarations already present in the XML. Dragging an edge writes the event; deleting removes it. Per [UD-7] this adds no framework capability.
@@ -309,7 +314,7 @@ The most important surface.
 
 **Overflow is an error.** An element extending past the display is drawn with a hatched indicator and raised in Problems, because §15 requires the generator to reject it.
 
-**Component instances render inline** but are not editable in place — selecting one selects the instance and offers *Open component*.
+**Composite instances render inline** but are not editable in place — selecting one selects the instance and offers *Open element*.
 
 **Animation** runs live; the freeze toggle (§4.2) pins t=0.
 
@@ -359,7 +364,7 @@ Monaco, configured for this schema.
 - **Schema-driven completion** — valid elements and attributes at the cursor from PR-02's schema, including enum values and declared font, image and subject names.
 - **Inline diagnostics** — [D-16] JSON mapped to markers; hovers carry the suggestion.
 - **Two-way selection sync** (§4.3).
-- **Go to definition** on a component tag, font, image, style or subject name.
+- **Go to definition** on an element tag, font, image, style or subject name.
 - **Format on demand only, never on save** — formatting belongs to the author (principle 5).
 - **Breadcrumbs** showing the element path at the caret.
 
@@ -431,10 +436,11 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 | Requirement | Detail | Status |
 |---|---|---|
-| **`<previews>`** | Named preview configurations per component/widget — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Must add** |
+| **`<previews>`** | Named preview configurations per element — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Must add** |
 | **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** |
 | **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Must add** |
-| **Palette metadata** | Display name, category, icon per widget | **Must add** |
+| **Palette metadata** | Display name, category, icon per element | **Must add** |
+| **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Must add** |
 | **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** |
 | **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) |
 | **Stable element identity** | The editor must address elements across edits | **Settled** ([U-1], PR-03). `name` is required. The CLI errors on a missing name; the editor generates one and persists it on save |

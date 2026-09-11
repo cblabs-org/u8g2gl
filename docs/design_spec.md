@@ -40,7 +40,7 @@ It brings the declarative, component-based workflow of [LVGL Pro](https://lvgl.i
 |---|---|
 | U8G2 screen layouts are hand-coded pixel coordinates in C++ | Declare layouts in XML; generate the C++ |
 | No way to preview a screen without flashing firmware | Wasm preview running the real runtime (§17) |
-| Reusable widgets require copy-pasting C++ classes | Components and widgets declared in XML, shared as folders |
+| Reusable widgets require copy-pasting C++ classes | Elements declared in XML, shared as folders |
 | Data flows controller→display via imperative push calls | Reactive subject binding for scalars |
 | Layouts cannot be authored or reviewed by tooling | Schema-validated XML — machine-readable, diffable, LLM-authorable |
 
@@ -70,7 +70,7 @@ LVGL Pro can claim near-zero overhead because it generates calls into a runtime 
 
 ### 1.4 Design Principles
 
-1. **Familiar to LVGL Pro users.** Same project structure, naming, and component/widget distinction.
+1. **Familiar to LVGL Pro users.** Same project structure and naming. U8G2GL departs on one point — it has a single element vocabulary rather than a component/widget distinction ([D-18]) — because LVGL's split exists to serve runtime XML loading, which U8G2GL does not have.
 2. **Pixel-exact positioning.** No fractional layout. Where layout helpers exist they resolve to integers at build time (§7).
 3. **Build-time compilation.** XML → C++. No runtime interpretation.
 4. **Monochrome-native.** No colour, gradients, or opacity. XOR mode and inversion are first-class.
@@ -195,13 +195,15 @@ It exists solely for the case where the main loop is blocked (a firmware downloa
 
 *Rationale:* The reference `iGfxWidget` documents this explicitly: *"USE tick() 99% of the time for standard animations... This is called by the main loop and safely precedes a synchronized full-screen render."* v0.1 and the research documents elevated it to a co-equal third phase, which would have made every widget author implement partial-refresh tile math for no reason. Normal animation is `tick()` mutating state, picked up by the next full frame.
 
-### [D-6] Custom widgets do not compose named sub-elements
+### [D-6] Sub-element access is resolved at build time, never by runtime string lookup
 
-A custom widget's `<view>` is a declaration of what it extends, not an internal layout tree. Its rendering is C++.
+A widget that composes children reaches them through **typed member pointers emitted by the generator**. There is no name-based lookup at runtime.
 
-*Rationale:* v0.1 §5's "fractal architecture" had C++ retrieving internal elements by string name — `get_element(self, "fill")` — which is a runtime string lookup inside a framework whose premise is build-time resolution. It is slow, untyped, and unvalidated. It also directly contradicted the widget design assessment, which argued (correctly) that the progress bar must be a C++ widget *because* its stipple rendering cannot be expressed as sub-element composition — while v0.1 used that same progress bar as the flagship example of sub-element composition.
+*Rationale:* v0.1 §5's "fractal architecture" had C++ retrieving internal elements by string name — `get_element(self, "fill")` — which is a runtime string lookup inside a framework whose premise is build-time resolution. It is slow, untyped, and unvalidated.
 
-*Consequence:* Composition happens at the **component** tier, in XML, inlined by the generator (§6.3). That is the correct place for it, and it is free. The "fractal" framing is withdrawn.
+*Amended by [D-18].* This decision originally concluded that custom widgets may not compose named sub-elements *at all*, and pushed all composition to a separate component tier. That conclusion was too broad: it rejected a mechanism (string lookup) by banning a capability (composition). A widget may compose children; the generator resolves them to typed pointers at build time, so nothing is looked up, dispatched, or left unvalidated. The rejection of runtime string lookup stands in full.
+
+*What remains true:* the progress bar is still a C++ widget, because its stipple rendering is pixel arithmetic rather than a composition of sub-elements. v0.1's error was using that same widget as its flagship example of sub-element composition.
 
 ### [D-7] Layout sugar is a code-generator feature, never a runtime one
 
@@ -229,7 +231,43 @@ The browser preview compiles the actual U8G2GL runtime and U8G2 to Wasm via Emsc
 
 Each widget class ships an `<api>` manifest the generator reads at build time; generated code contains direct setter calls. There is no runtime property table.
 
-*Rationale and full contract:* §13.1. In short — LVGL needs `lv_obj_property` at runtime because its editor loads XML on-device; U8G2GL has no runtime XML, so it needs the property *descriptor* without the property *dispatch*. This keeps custom widgets (§6.4) first-class without a generator release, at zero runtime cost.
+*Rationale and full contract:* §13.1. In short — LVGL needs `lv_obj_property` at runtime because its editor loads XML on-device; U8G2GL has no runtime XML, so it needs the property *descriptor* without the property *dispatch*. This keeps custom elements (§6.5) first-class without a generator release, at zero runtime cost.
+
+### [D-18] There is one element vocabulary; the widget tiers are collapsed
+
+**Every element — a line, a label, a composite, a custom C++ widget — is declared by an `<api>` manifest and instantiated by its tag. Whether an instance becomes a C++ object or a sequence of draw calls is a generator outcome, never an authoring category.**
+
+*Full record:* [decisions/d18-unified-element-model.md](decisions/d18-unified-element-model.md).
+
+*Rationale:* the four tiers of §6 described the generator's *output*, and that leaked into the author's vocabulary. Three separate problems shared one cause — components produce no runtime construct and so have no box, no clipping and nowhere to hang behaviour; primitives cannot be bound at all, so hiding a separator on a flag was impossible; and static demotion (§13.5) could no longer fire at all, because its first condition is "the element has no `name`" and [U-1] made `name` mandatory.
+
+**The realisation rule**, which replaces the Tier 1 / Tier 2 split, §13.5's six conditions, and `animated="false"`:
+
+> An element gets an **object** if and only if it must remember something between frames, or something must hold a reference to it — a focus ring, an event, or a parent composite's child pointer. Otherwise it compiles to draw calls.
+
+*Consequences:* composites become real container objects (≈40 bytes on a 32-bit target, against [D-1]'s 16 KB floor); bindable primitives are served by **free draw functions** shared by the firmware and editor targets rather than by per-primitive classes; `components/` and `<component>` are removed; §13.6's inlining survives only as an unobservable optimisation. Schema 0.4.
+
+### [D-19] Text overflow is a label property, not a widget type
+
+**`u8g2gl_label` carries `long_mode="clip|dots|scroll|scroll_circular"`, default `clip`. `truncate` is deleted and `u8g2gl_scrolling_label` is removed.**
+
+*Full record:* [decisions/d19-label-long-mode.md](decisions/d19-label-long-mode.md).
+
+*Rationale:* the two manifests were identical but for three properties, so six declarations were maintained in two places. Overflow was already expressed twice and inconsistently — as a boolean on one widget, and as an entire second widget for the third behaviour. LVGL's single `lv_label` with a `long_mode` enum is both the familiar model (§1.4) and the correct one.
+
+*Cost:* roughly 16 bytes per label instance, since every label now carries scroll state. `wrap` is deliberately **not** offered — U8G2GL labels are single-line.
+
+### [D-20] Geometry is bindable; runtime layout belongs to the application
+
+**`x`, `y`, `width` and `height` are bindable like any other property. Anchors resolve at build time against the containing element. There is no runtime layout pass.**
+
+*Full record:* [decisions/d20-bindable-geometry.md](decisions/d20-bindable-geometry.md).
+
+*Rationale:* [D-18] makes composites real containers, which raised two questions [D-7] never had to answer — what `right="0"` means inside a resizable widget, and what happens when something must resize while the firmware runs. The first is answered by the container existing, plus `#parent_width` / `#parent_height` as ordinary constants in the existing arithmetic (§7.2). The second is answered imperatively: the application sets a subject, or a custom widget moves its own children.
+
+A generated per-container `layout()` function was considered and rejected — it would have required amending [D-7], a third phase in §11.3's lifecycle, a forward-reference rule to keep one pass deterministic, and the editor running the identical function to stay pixel-exact. **[D-7] is therefore untouched.**
+
+*Trigger to revisit:* hand-written relayout appearing as friction across three or more real screens — the same trigger [D-7] sets for `<row>`/`<col>`.
 
 ### [D-10] The CLI is TypeScript on Node, distributed via npm
 
@@ -246,11 +284,10 @@ my_project/
 ├── screens/                 ← One XML file per screen
 │   ├── screen_home.xml
 │   └── screen_settings.xml
-├── components/              ← Reusable pure-XML compositions (optional)
-│   └── status_bar/
-│       └── status_bar.xml
-├── widgets/                 ← Custom C++-backed widgets (optional)
-│   └── wd_service_list/
+├── widgets/                 ← User-authored elements (optional), one folder each
+│   ├── status_bar/          ← a composite: XML only
+│   │   └── status_bar.xml
+│   └── wd_service_list/     ← a custom element: XML + C++
 │       ├── wd_service_list.xml    ← API declaration
 │       ├── wd_service_list.hpp
 │       └── wd_service_list.cpp
@@ -276,7 +313,7 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 ### 5.1 `u8g2gl.xml`
 
 ```xml
-<u8g2gl schema="0.3" name="departures-board" version="1.0">
+<u8g2gl schema="0.4" name="departures-board" version="1.0">
     <targets>
         <!-- setup names a U8G2 full-buffer constructor; geometry is derived -->
         <target name="default" default="true">
@@ -513,39 +550,95 @@ Note `max_len` on string subjects: the framework owns the storage (§8.2), so th
 
 ---
 
-## 6. Widget Tiers
+## 6. The Element Model
 
-Four tiers, distinguished by *who writes the code*.
+Per **[D-18]** there is one kind of thing in a U8G2GL document: an **element**.
+Every element — a horizontal line, a label, a composite, a custom C++ widget —
+is declared by an `<api>` manifest (§13.1) and instantiated by its tag. The
+generator handles all of them the same way.
 
-### 6.1 Tier 1 — Static Primitives
+The four-tier model of earlier drafts is withdrawn. It described the generator's
+*output* and leaked that into the author's vocabulary; see [D-18] for the full
+reasoning.
 
-Direct U8G2 draw calls. No instance, no tick, no state. The generator emits them inline into `render()`.
+### 6.1 How an element is realised
 
-| XML Tag | Attributes | U8G2 Call |
+> An element gets an **object** if and only if it must remember something
+> between frames, or something must hold a reference to it — a focus ring, an
+> event, or a parent composite's child pointer. Otherwise it compiles to draw
+> calls.
+
+That is the whole rule. It replaces the old primitive/widget split, the six
+demotion conditions, and the `animated` manifest attribute.
+
+**The author never chooses.** A `<u8g2gl_box>` nobody binds to compiles to one
+`u8g2gl_draw_box()` call and costs no RAM. The same tag with a bound `hidden`
+flag compiles to a guarded call — still no object. Bind its `width` to a subject
+and it stays a guarded call with an expression in it. It becomes an object only
+when something must hold on to it.
+
+**The outcome is reported, never hidden.** §18's budget and `--json` ([D-16])
+state, per element, whether it became an object and why — so an author who
+expects one and gets a draw call can see the reason rather than guess.
+
+### 6.2 The drawing set
+
+Elements that map directly onto a U8G2 call. These have no state of their own
+and, in the ordinary case, no object.
+
+| XML Tag | Attributes | Draw function |
 |---|---|---|
-| `<u8g2gl_hline>` | `x`, `y`, `width` | `drawHLine` |
-| `<u8g2gl_vline>` | `x`, `y`, `height` | `drawVLine` |
-| `<u8g2gl_line>` | `x1`, `y1`, `x2`, `y2` | `drawLine` |
-| `<u8g2gl_box>` | `x`, `y`, `width`, `height`, `filled`, `radius` | `drawBox`/`drawFrame`/`drawRBox`/`drawRFrame` |
-| `<u8g2gl_circle>` | `x`, `y`, `radius`, `filled`, `segments` | `drawCircle`/`drawDisc` |
-| `<u8g2gl_ellipse>` | `x`, `y`, `rx`, `ry`, `filled`, `segments` | `drawEllipse`/`drawFilledEllipse` |
-| `<u8g2gl_triangle>` | `x0`,`y0`,`x1`,`y1`,`x2`,`y2`, `filled` | `drawTriangle` / 3× `drawLine` |
-| `<u8g2gl_pixel>` | `x`, `y` | `drawPixel` |
+| `<u8g2gl_hline>` | `x`, `y`, `width` | `u8g2gl_draw_hline` |
+| `<u8g2gl_vline>` | `x`, `y`, `height` | `u8g2gl_draw_vline` |
+| `<u8g2gl_line>` | `x1`, `y1`, `x2`, `y2` | `u8g2gl_draw_line` |
+| `<u8g2gl_box>` | `x`, `y`, `width`, `height`, `filled`, `radius` | `u8g2gl_draw_box` |
+| `<u8g2gl_circle>` | `x`, `y`, `radius`, `filled`, `segments` | `u8g2gl_draw_circle` |
+| `<u8g2gl_ellipse>` | `x`, `y`, `rx`, `ry`, `filled`, `segments` | `u8g2gl_draw_ellipse` |
+| `<u8g2gl_triangle>` | `x0`,`y0`,`x1`,`y1`,`x2`,`y2`, `filled` | `u8g2gl_draw_triangle` |
+| `<u8g2gl_pixel>` | `x`, `y` | `u8g2gl_draw_pixel` |
 
-**Coordinate convention.** All rectangular elements use `x`, `y`, `width`, `height` where `x`/`y` is the top-left pixel and the element occupies `x .. x+width-1` inclusive. v0.1's `<u8g2gl_line x1="0" x2="256">` on a 256-wide display was off by one and mixed two coordinate conventions in one schema; splitting axis-aligned lines into `<u8g2gl_hline>`/`<u8g2gl_vline>` fixes both, and matches the U8G2 API those cases actually compile to. Only genuinely diagonal lines use the two-point form.
+**These are free functions in the runtime, not classes** ([D-18]). Generated
+firmware calls them directly; the editor target's draw-by-name table calls the
+same functions. One implementation serves both, which is what [D-9] requires —
+a per-primitive class would have needed the editor path anyway and given two
+code paths through it.
 
-**`<u8g2gl_text>` is removed.** It duplicated `<u8g2gl_label>` with a literal `text` attribute. The generator automatically demotes any `<u8g2gl_label>` with no bindings, no animation, and no name to inline draw calls — the optimisation happens without a second tag for users to choose between.
+Adding a drawing element is therefore a manifest entry plus a small free
+function. No class, no release, no runtime cost.
 
-### 6.2 Tier 2 — Built-in Widgets
+**They are bindable like anything else.** Hiding a separator on a flag, or
+driving a box's width from a subject, needs no widget:
 
-Ship with the framework. The user configures via XML; the framework implements the C++.
+```xml
+<u8g2gl_box name="level_bar" x="4" y="20" height="6" bind_width="level" />
+<u8g2gl_hline name="sep" x="0" y="11" width="#screen_width">
+    <bind_flag_if_eq subject="compact_mode" ref_value="1" flag="hidden" />
+</u8g2gl_hline>
+```
 
-**Built-in widgets are declared exactly as custom ones are.** Each ships a `<widget>` manifest with an `<api>` block ([D-17], §13.1) alongside its implementation — `u8g2gl_label.xml` beside `u8g2gl_label.hpp`. Tier 2 and Tier 4 differ in *who wrote the widget*, not in how the generator handles it. The table below is therefore documentation of those manifests, not a separate hardcoded list inside the generator.
+**Coordinate convention.** All rectangular elements use `x`, `y`, `width`,
+`height` where `x`/`y` is the top-left pixel and the element occupies
+`x .. x+width-1` inclusive. v0.1's `<u8g2gl_line x1="0" x2="256">` on a 256-wide
+display was off by one and mixed two coordinate conventions in one schema;
+splitting axis-aligned lines into `<u8g2gl_hline>`/`<u8g2gl_vline>` fixes both,
+and matches the U8G2 API those cases actually compile to. Only genuinely
+diagonal lines use the two-point form.
+
+**`<u8g2gl_text>` does not exist.** It duplicated `<u8g2gl_label>` with a
+literal `text` attribute. A label that nothing refers to compiles to `setFont` +
+`drawStr` under §6.1's rule, so the optimisation happens without a second tag
+for authors to choose between. Under the old §13.5 this promise was unkept —
+see §13.5 for why.
+
+### 6.3 Framework elements with state
+
+These ship with the framework, hold state between frames, and therefore always
+become objects. The user configures them in XML; the framework implements the
+C++.
 
 | XML Tag | Description | Key Properties |
 |---|---|---|
-| `<u8g2gl_label>` | Text with alignment and truncation | `text`, `bind_text`, `bind_text_fmt`, `font`, `align`, `truncate` |
-| `<u8g2gl_scrolling_label>` | Marquee horizontal scroll | label properties + `scroll_px_per_sec`, `initial_delay_ms`, `static_dwell_ms` |
+| `<u8g2gl_label>` | Text with alignment and overflow handling | `text`, `bind_text`, `bind_text_fmt`, `font`, `align`, `long_mode`, `scroll_px_per_sec`, `initial_delay_ms`, `static_dwell_ms` |
 | `<u8g2gl_xbm>` | Monochrome bitmap | `src`, `bind_src`, `bitmap_mode` |
 | `<u8g2gl_glyph>` | Single glyph from an icon font | `glyph`, `bind_glyph`, `font` |
 | `<u8g2gl_progress_bar>` | Animated progress indicator | `bind_value`, `bind_text`, `fill_style`, `animate_duration_ms` |
@@ -553,47 +646,88 @@ Ship with the framework. The user configures via XML; the framework implements t
 | `<u8g2gl_switch>` | Toggle indicator | `bind_value` |
 | `<u8g2gl_button>` | Focusable text item | `text`, `bind_text`, `font`, `border_width`, `focus_style` |
 
-**All time-valued properties carry a `_ms` suffix and are milliseconds. All rate properties name their unit.** v0.1 had `scroll_speed="25"` documented as frames-per-second in one document, unitless in another, and implemented as pixels-per-40ms in the prototype. `scroll_px_per_sec` cannot be misread.
+**`<u8g2gl_scrolling_label>` is removed** ([D-19]). Overflow is a property of
+the label, not a second widget:
 
-### 6.3 Tier 3 — Components (Pure XML)
+| `long_mode` | Behaviour |
+|---|---|
+| `clip` | Hard clip at the widget bounds. **Default** |
+| `dots` | Truncate with an ellipsis |
+| `scroll` | Marquee, reversing at each end |
+| `scroll_circular` | Marquee, wrapping continuously |
 
-User-created reusable compositions. No C++. Inlined by the generator, so they cost nothing at runtime.
+`wrap` is deliberately **not** offered — U8G2GL labels are single-line. A user
+arriving from LVGL will try it, so the omission is documented rather than
+silent. `truncate` is deleted; `long_mode="clip"` is its replacement and says
+what it does.
+
+**All time-valued properties carry a `_ms` suffix and are milliseconds. All rate
+properties name their unit.** v0.1 had `scroll_speed="25"` documented as
+frames-per-second in one document, unitless in another, and implemented as
+pixels-per-40ms in the prototype. `scroll_px_per_sec` cannot be misread.
+
+**Framework elements are declared exactly as user ones are.** Each ships a
+`<widget>` manifest with an `<api>` block ([D-17], §13.1) alongside its
+implementation — `u8g2gl_label.xml` beside `u8g2gl_label.h`. The table above is
+documentation of those manifests, not a separate hardcoded list inside the
+generator.
+
+### 6.4 Composites — an element with a `<view>`
+
+A user-authored element whose body is a `<view>` of other elements. No C++.
 
 ```xml
-<!-- components/status_bar/status_bar.xml -->
-<component>
+<!-- widgets/status_bar/status_bar.xml -->
+<widget name="status_bar">
     <api>
         <prop name="title_subject" type="subject" default="station_name" />
         <prop name="wifi_subject"  type="subject" default="wifi_connected" />
-        <prop name="width"         type="int"     default="#screen_width" />
-        <prop name="height"        type="int"     default="11" />
         <prop name="font"          type="font"    default="small_9" />
     </api>
 
-    <view width="$width" height="$height">
-        <u8g2gl_scrolling_label name="location"
-            x="0" y="0" right="52" height="$height"
-            bind_text="$title_subject" font="$font" />
+    <view>
+        <u8g2gl_label name="location"
+            x="0" y="0" right="52" height="#parent_height"
+            bind_text="$title_subject" font="$font" long_mode="scroll" />
 
         <u8g2gl_xbm name="wifi_icon"
-            right="40" y="0" width="12" height="$height"
+            right="40" y="0" width="12" height="#parent_height"
             src="icon_wifi">
             <bind_flag_if_eq subject="$wifi_subject" ref_value="0" flag="hidden" />
         </u8g2gl_xbm>
 
         <u8g2gl_clock name="clock"
-            right="0" y="0" width="40" height="$height"
+            right="0" y="0" width="40" height="#parent_height"
             format="HH:MM" font="clock_small_7" blink="true"
             bind_time="system_time" />
     </view>
-</component>
+</widget>
 ```
 
-**On `type="subject"` props.** A prop declared `type="subject"` receives the *name* of a subject, and `bind_text="$title_subject"` therefore means "bind to whichever subject the caller named". This is a two-level indirection and v0.1 left it entirely implicit. It is resolved statically during generation — the emitted code binds directly to the concrete subject — but it must be documented, and the validator must report a clear error when a caller passes a name that is not a declared subject.
+A composite **is a real container object** ([D-18]). It has bounds, so
+`right="0"` and `#parent_height` inside it mean what they appear to mean; it
+gets a framework clip window like any other object (§11.3); and its size is set
+where it is placed:
 
-### 6.4 Tier 4 — Custom Widgets (XML + C++)
+```xml
+<status_bar name="bar" x="0" y="0" width="#screen_width" height="11" />
+```
 
-For custom rendering algorithms, state machines, or data structures. Per **[D-6]**, the XML declares the API only; all rendering is C++.
+Instantiating it twice yields two independent containers with distinct
+identifiers (§13.4). Its children are reachable from C++ through generated typed
+member pointers ([D-6]), never by name lookup.
+
+**On `type="subject"` props.** A prop declared `type="subject"` receives the
+*name* of a subject, so `bind_text="$title_subject"` means "bind to whichever
+subject the caller named". This is a two-level indirection resolved statically
+during generation — the emitted code binds directly to the concrete subject —
+but it must be documented, and the validator must report a clear error when a
+caller passes a name that is not a declared subject.
+
+### 6.5 Custom elements — an element with C++
+
+For custom rendering algorithms, state machines, or data structures that a
+`<view>` cannot express.
 
 ```
 widgets/wd_service_list/
@@ -622,11 +756,39 @@ widgets/wd_service_list/
 </widget>
 ```
 
-**The `<api>` block is also the generator's manifest** ([D-17], §13.1). It is the single declaration of what the widget accepts: the schema validates against it, the generator emits setter calls from it, and diagnostics quote it. A custom widget is therefore a first-class citizen — adding one requires no generator change and no framework release.
+**An element may have a `<view>`, C++, or both.** A widget that declares both
+gets its children built from the `<view>` and its behaviour from its class,
+which is how a designed static assembly can be driven by hand-written
+repetition — the case §6.5's predecessor could not express.
 
-There is no `_parser.c` bridge file. v0.1 carried one over from LVGL Pro, which needs it because LVGL Pro supports *runtime* XML loading in its editor. U8G2GL has no runtime XML path, so the generator emits the setter calls directly and the bridge is dead weight.
+**Where the line actually falls.** A `<view>` is a *static* structure: the
+generator resolves it at build time, so it can express "three carriages" but not
+"N carriages". Reach for C++ when the structure itself depends on runtime data —
+a variable row count, a mode machine, content-dependent sizing — or when the
+drawing is pixel arithmetic rather than composition. That is a sharper line than
+"custom pixel math", and it is testable.
 
-The `extends` attribute is real C++ inheritance, which is what makes `wd_scrolling_message_pool extends u8g2gl_scrolling_label` work without reimplementing marquee rendering.
+**The `<api>` block is also the generator's manifest** ([D-17], §13.1). It is
+the single declaration of what the element accepts: the schema validates against
+it, the generator emits setter calls from it, and diagnostics quote it. A custom
+element is therefore a first-class citizen — adding one requires no generator
+change and no framework release.
+
+There is no `_parser.c` bridge file. v0.1 carried one over from LVGL Pro, which
+needs it because LVGL Pro supports *runtime* XML loading in its editor. U8G2GL
+has no runtime XML path, so the generator emits the setter calls directly and
+the bridge is dead weight.
+
+The `extends` attribute is real C++ inheritance, which is what makes
+`wd_scrolling_message_pool extends u8g2gl_label` work without reimplementing
+marquee rendering.
+
+### 6.6 Naming
+
+Framework element tags carry the `u8g2gl_` prefix ([D-12]). User element tags
+are unprefixed or carry `wd_` by convention; `u8g2gl_` and `ui_` remain
+reserved (§13.4). All user elements live under `widgets/`, one folder each,
+whether or not they contain C++.
 
 ---
 
@@ -647,7 +809,9 @@ Absolute positioning is therefore the model. What v0.1 got wrong was concluding 
 
 Per **[D-7]**, these resolve to literal integers during generation. Nothing ships to the device.
 
-**Anchors.** Any element may use `right` / `bottom` instead of `x` / `y`, measured from the parent's opposite edge:
+**Anchors are measured against the containing element** — the screen, or the composite an element sits inside ([D-20]). Before [D-18] a composite left no container behind, so "the parent's edge" had no referent inside one; it does now.
+
+**Anchors.** Any element may use `right` / `bottom` instead of `x` / `y`, measured from the container's opposite edge:
 
 ```xml
 <u8g2gl_clock right="0" y="0" width="40" height="11" />
@@ -658,6 +822,17 @@ Supplying two of `{x, width, right}` determines the third. Supplying all three i
 
 **Centring.** `hcenter="true"` / `vcenter="true"` centre within the parent. Odd remainders round down, deterministically and identically in preview and firmware.
 
+**Container size.** `#parent_width` and `#parent_height` give the containing element's size, so a composite can lay out relative to whatever size it is given:
+
+```xml
+<!-- inside widgets/status_bar/status_bar.xml -->
+<u8g2gl_label name="location" x="0" y="0" right="52" height="#parent_height" />
+```
+
+These are ordinary constants inside the arithmetic below, **not** a percentage syntax. `width="#parent_width / 2"` needs no new grammar and is strictly more expressive than `50%` would be — `#parent_width - 52` has no percentage equivalent. Per §1.5 percentages wait for demonstrated need.
+
+At screen level the container is the display, so `#parent_width` and `#screen_width` coincide.
+
 **Constant arithmetic.** Coordinate attributes accept integer expressions over constants and literals: `+ - * /` with parentheses, evaluated as integers at build time.
 
 ```xml
@@ -667,7 +842,7 @@ Supplying two of `{x, width, right}` determines the third. Supplying all three i
 **Stacking sugar — *Deferred to Phase 2*.** `<row>` and `<col>` would place children adjacently by summing explicit sizes — pure integer accumulation, no growth, no distributed remainders.
 
 ```xml
-<row y="0" height="11" gap="2">          <!-- NOT in schema 0.3 -->
+<row y="0" height="11" gap="2">          <!-- NOT in schema 0.4 -->
     <u8g2gl_scrolling_label width="192" ... />
     <u8g2gl_xbm            width="12"  ... />
 </row>
@@ -675,7 +850,7 @@ Supplying two of `{x, width, right}` determines the third. Supplying all three i
 
 *Why deferred:* per the deferral rule (§1.5), the cost is not generator complexity — summing widths is trivial. It is **schema surface**. Once `<row>` ships, XML in the wild depends on it and changing it is a breaking change. The design is also not settled: it is unclear how `gap` should interact with an anchored child, or what `right="0"` means inside a row. Anchors, centring and constant arithmetic already solve the multi-target problem that motivated adding layout helpers at all (§7.3); stacking is convenience on top. Real usage should inform its design rather than the reverse.
 
-Anchors, centring and constant arithmetic are **in schema 0.3**. Stacking is not.
+Anchors, centring, container constants and constant arithmetic are **in schema 0.4**. Stacking is not.
 
 *Trigger to build it:* hand-maintained accumulation appearing as friction across three or more real screens during PR-07 or PR-10. Until then, `<consts>` arithmetic supplies the single-point-of-change property that motivated it — `x="#bar_title_w + #bar_icon_w"` — without new schema.
 
@@ -726,7 +901,7 @@ Setting a string subject **copies** into a framework-owned fixed buffer sized by
 | Sigil | Meaning | Where valid |
 |---|---|---|
 | `#name` | Constant reference | Any attribute value |
-| `$name` | Component prop reference | Inside a `<component>` or `<widget>` body |
+| `$name` | Element prop reference | Inside a `<widget>` body |
 | bare | Subject name | Only inside `bind_*` attributes and `subject=` |
 
 Bare subject references are unambiguous because they are only legal in positions that accept nothing else. The validator enforces this.
@@ -743,6 +918,19 @@ Bare subject references are unambiguous because they are only legal in positions
 ```
 
 `bind_text_fmt` uses `printf` syntax. The generator type-checks the conversion against the subject's type and rejects mismatches at build time.
+
+**Geometry binding.** Per **[D-20]** `x`, `y`, `width` and `height` bind like any other property:
+
+```xml
+<u8g2gl_label name="title" x="0" y="0" height="11" bind_width="title_width" />
+<u8g2gl_box   name="bar"   x="4" y="20" height="6"  bind_width="level" />
+```
+
+This is the whole of runtime layout. There is no layout pass and no reflow: an element that must move or resize is driven by a subject the application sets, or by a custom element that owns it and calls `set_w()` directly. [D-7] is untouched.
+
+Note the asymmetry this creates with the drawing set — a bound `<u8g2gl_box>` needs no object, because a full-frame redraw ([D-4]) reads the subject at draw time (§13.5). A bound `<u8g2gl_label>` does, because it carries state regardless.
+
+**A container whose own geometry is bound may not have anchor-positioned children.** Its children would need re-resolving whenever the binding changed, which is reflow. Absolute coordinates only, enforced as a diagnostic.
 
 **Conditional flags:**
 ```xml
@@ -1062,15 +1250,15 @@ Three models were considered:
 
 | Model | Mechanism | Verdict |
 |---|---|---|
-| **Direct setters, hardcoded** | Generator holds a built-in table of widget → setter signatures, emits `lbl.set_font(...)` | Readable output, zero runtime cost — but adding a widget means editing the generator, so custom widgets (§6.4) become second-class |
+| **Direct setters, hardcoded** | Generator holds a built-in table of widget → setter signatures, emits `lbl.set_font(...)` | Readable output, zero runtime cost — but adding a widget means editing the generator, so custom elements (§6.5) become second-class |
 | **Runtime property table** | Emit `u8g2gl_obj_set_property(&lbl, U8G2GL_PROP_FONT, v)`; classes register descriptors, as `lv_obj_property` does | Uniform and extensible, but pays runtime dispatch and type erasure for a lookup we can do at build time |
 | **Build-time manifest, direct setters** ✅ | Each class *declares* its properties as data the generator reads; the generator emits direct setter calls | Extensible like the property table, emits code like the hardcoded model, costs nothing at runtime |
 
 **Decision: the third.** Widget classes ship a declarative property manifest that the generator consumes at build time; the generated code contains direct, type-checked setter calls.
 
-*Rationale:* LVGL needs `lv_obj_property` at *runtime* because LVGL Pro can load XML on-device in its editor. U8G2GL has no runtime XML — §6.4 already deleted the parser-bridge file for exactly this reason. We need the property *descriptor*, not the property *dispatch*. Paying for runtime lookup would buy nothing, and hardcoding the generator would make the custom-widget tier a fiction.
+*Rationale:* LVGL needs `lv_obj_property` at *runtime* because LVGL Pro can load XML on-device in its editor. U8G2GL has no runtime XML — §6.5 already deleted the parser-bridge file for exactly this reason. We need the property *descriptor*, not the property *dispatch*. Paying for runtime lookup would buy nothing, and hardcoding the generator would make the custom-widget tier a fiction.
 
-**The manifest is the `<api>` block that §6.4 already defines.**
+**The manifest is the `<api>` block that §6.5 already defines.**
 
 **Two generation targets.** The same manifest drives both, mirroring LVGL Pro's `compile --target editor|cli`:
 
@@ -1083,20 +1271,37 @@ The editor target exists because the designer must render arbitrary XML without 
 
 ```xml
 <!-- runtime/widgets/u8g2gl_label.xml — ships with the framework -->
-<widget name="u8g2gl_label" extends="u8g2gl_obj" animated="false">
+<widget name="u8g2gl_label" extends="u8g2gl_obj">
     <api>
         <prop name="text"      type="string" setter="set_text" default="" />
         <prop name="font"      type="font"   setter="set_font" required="true" />
         <prop name="align"     type="enum"   setter="set_align"
               values="left,center,right" default="left"
               emit="U8G2GL_ALIGN_{VALUE^^}" />
-        <prop name="truncate"  type="bool"   setter="set_truncate" default="false" />
+        <prop name="long_mode" type="enum"   setter="set_long_mode"
+              values="clip,dots,scroll,scroll_circular" default="clip"
+              emit="U8G2GL_LONG_{VALUE^^}" />
         <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
     </api>
 </widget>
 ```
 
-`animated="false"` is what licenses static demotion (§13.5). `emit` gives the enumerator spelling. `required` drives a §15 diagnostic rather than a silent default.
+`emit` gives the enumerator spelling. `required` drives a §15 diagnostic rather than a silent default.
+
+**`animated` is gone.** It existed solely to license static demotion, which §13.5 now replaces with the realisation rule ([D-18]). A manifest no longer declares whether its element animates; the generator determines per instance whether an object is needed.
+
+#### `setter=` and `draw=` — the two emission targets
+
+Per [D-18] an element may be realised as an object or as draw calls, so a manifest declares how each property reaches the display:
+
+| Attribute | Meaning | Emitted as |
+|---|---|---|
+| `setter="set_font"` | A method on the element's class | `lbl.set_font(ui_font_small_9);` |
+| `draw="u8g2gl_draw_box"` | A free function taking the element's geometry and properties | `u8g2gl_draw_box(d, 4, 20, 96, 8, true, 0);` |
+
+A manifest declaring `draw=` and no class is a drawing element (§6.2); it can still be bound, in which case the generated call carries an expression or a guard rather than a literal. A manifest declaring `setter=` has a class and produces an object when §6.1's rule calls for one.
+
+**This resolves a real ambiguity.** The shipped manifests currently spell both as `setter=` — `u8g2gl_box.xml` uses `setter="drawBox"`, naming a U8G2 method, while `u8g2gl_label.xml` uses `setter="set_text"`, naming a runtime method. The same attribute meant two different things.
 
 ### 13.2 Type mapping
 
@@ -1118,7 +1323,7 @@ All numeric coordinate attributes resolve to literal integers before emission ([
 
 Per [A-3], XML nesting is a build-time construct. The generator flattens it.
 
-1. **Inline components first** (§13.6). The tree the flattener sees contains no `<component>` instances, only concrete objects.
+1. **Expand composites first** (§13.6). The tree the flattener sees contains only concrete elements.
 2. **Walk depth-first in document order.** Each object receives its index in emission order — which is therefore also draw order ([D-4]).
 3. **Record the parent index**: the index of the enclosing object, or `U8G2GL_NO_PARENT` for objects directly under `<view>`.
 4. **Emit the parent table** as a static array beside the object array.
@@ -1147,40 +1352,124 @@ XML names are author-facing; C++ identifiers are generated. The mapping is total
 |---|---|---|
 | Screen function | `<screen name="home">` | `ui_screen_home_init()` etc. |
 | Screen-level object | `name="title"` | `title` (static, screen's TU) |
-| Component-inlined object | `title` inside instance `statusbar` | `statusbar_title` |
-| Nested component | instance `bar` → instance `clk` → `digits` | `bar_clk_digits` |
+| Composite child | `title` inside instance `statusbar` | `statusbar_title` |
+| Nested composite | instance `bar` → instance `clk` → `digits` | `bar_clk_digits` |
 | Subject | `<int name="temperature">` | `ui_subject_temperature`, `ui_set_temperature()` |
 | Font | `<bdf name="small_9">` | `ui_font_small_9` |
 | Image | `<xbm name="icon_wifi">` | `ui_image_icon_wifi` |
 | Style | `<style name="header">` | `ui_style_header` |
 
-**Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_`, `ui_`, `wd_`, or matching a C++ keyword. Component instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
+**Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_`, `ui_`, `wd_`, or matching a C++ keyword. Composite instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
 
-### 13.5 Static demotion — when an object is not emitted
+### 13.5 Realisation — when an object is emitted
 
-Tier 1 primitives always inline. A Tier 2 widget is **demoted to inline draw calls** if and only if *all* hold:
+Per **[D-18]** this is one rule, applied per instance:
 
-- it has no `name` attribute — nothing can reference it;
-- it has no `bind_*` attribute or binding child;
-- it has no `<event_cb>` or event child;
-- it is not a member of a `<focus_ring>`;
-- its class manifest declares `animated="false"`;
-- it has no children.
+> An element gets an **object** if and only if it must remember something
+> between frames, or something must hold a reference to it. Otherwise it
+> compiles to draw calls.
 
-Otherwise an object is instantiated. This is why §6.1 could delete `<u8g2gl_text>`: a `<u8g2gl_label>` meeting these conditions compiles to the same `drawStr` a dedicated static tag would have produced, with no second tag for authors to choose between.
+Concretely, an object is emitted when *any* of the following holds:
 
-Demotion is **observable in the budget** (§18) and reported by `--json` ([D-16]), so an author who expects an object and gets an inline call can see why.
+- the element's class carries state between frames — a scroll offset, a blink
+  phase, an animation lerp, collection storage;
+- it has a `bind_*` attribute or binding child **and** its class is the thing
+  that must observe the subject (a drawing element instead compiles the binding
+  into its call — see below);
+- it has an `<event_cb>` or event child;
+- it is a member of a `<focus_ring>`;
+- it is a composite, or has children;
+- a parent composite's generated code holds a typed pointer to it.
 
-### 13.6 Component inlining
+Otherwise the generator emits draw calls. **Nothing about the element's tag
+decides this** — a `<u8g2gl_label>` may be either, and so may a `<u8g2gl_box>`.
 
-Components (§6.3) produce no runtime construct. Inlining is textual substitution over a parsed tree, in four steps:
+#### Bindings without an object
 
-1. **Bind arguments to `<api>` props** — supplied attributes, then declared defaults. A missing required prop is an error.
-2. **Substitute `$prop`** throughout the component's `<view>` subtree. A `type="subject"` prop substitutes the *subject name*, which the enclosing `bind_*` then resolves (§6.3) — a two-step resolution that completes entirely at build time.
+Because rendering is a full-frame redraw ([D-4]), a stateless element does not
+need to *store* a bound value — the generated `render()` reads it at draw time:
+
+```cpp
+u8g2gl_draw_hline(d, 0, 11, 256);                              // static
+if (ui_subject_wifi.value)                                      // bound hidden
+    u8g2gl_draw_disc(d, 250, 4, 2);
+u8g2gl_draw_box(d, 4, 20, ui_subject_level.value, 6, true, 0);  // bound width
+```
+
+Two consequences:
+
+1. **Frame-dirty tracking moves to the subject.** With no object observing, the
+   generator registers one frame-dirty observer per subject a screen references
+   — which is *fewer* observers than one per binding whenever two elements share
+   a subject, and is what §11.2 already describes ("dirty tracking gates the
+   frame, not the widget").
+2. **Ancestor visibility folds into the expression.** §13.3 computes effective
+   visibility by walking up the parent chain at render time. For an element with
+   no object the generator walks it at *build* time and emits a single
+   conjunction — `if (!bar.is_hidden() && ui_subject_wifi.value)` — which is
+   strictly cheaper than the runtime walk it replaces.
+
+The generator may hoist adjacent siblings sharing an identical condition into
+one guarded block. It must **never reorder** to create that opportunity: draw
+order is document order ([D-4]).
+
+#### Font state on inline text
+
+A text element with no object still needs `setFont` before `drawStr`, and it has
+no `u8g2gl_state_saver` around it (§11.3 wraps object renders only). The
+generator emits the `setFont` inline and tracks font state across consecutive
+inline draws, so that neither redundant calls nor a label inheriting the
+previous element's font can occur.
+
+#### Why the old rule could not fire
+
+The predecessor to this section demoted an element only if, first condition, *it
+had no `name` attribute*. `[U-1]` subsequently made `name` **mandatory** — the
+CLI errors on a missing name and the editor synthesises one and writes it into
+the document — so no unnamed element could ever reach the generator and
+**demotion was unreachable**. §6.2's deletion of `<u8g2gl_text>` rested on it,
+and was therefore a promise the generated code did not keep.
+
+The repair is not to special-case synthesised names. "Has no name" was only ever
+a *proxy* for "nothing refers to this", and now that every element is named the
+generator tests the real property directly. It can do so with certainty:
+generated objects are `static` and file-local (§13.12), so nothing outside the
+generated translation unit can refer to one, and every reference that exists —
+bindings, focus rings, events, composite child pointers — is declared in the
+project's own XML.
+
+Realisation is **observable in the budget** (§18) and reported by `--json`
+([D-16]), stating per element whether an object was emitted and which condition
+caused it.
+
+### 13.6 Composite expansion
+
+A composite (§6.4) produces a **container object** plus its children. Expansion
+runs in four steps:
+
+1. **Bind arguments to `<api>` props** — supplied attributes, then declared
+   defaults. A missing required prop is an error.
+2. **Substitute `$prop`** throughout the `<view>` subtree. A `type="subject"`
+   prop substitutes the *subject name*, which the enclosing `bind_*` then
+   resolves (§6.4) — a two-step resolution completing entirely at build time.
 3. **Prefix every `name`** in the subtree with the instance name (§13.4).
-4. **Splice** the resulting objects into the parent tree at the instance's position, inheriting its coordinate origin.
+4. **Emit the container**, then its children with `parent_index` pointing at it.
+   Anchors and `#parent_width` / `#parent_height` inside the subtree resolve
+   against the container's declared geometry ([D-20]), not the display.
 
-Instantiating a component twice therefore yields two independent object sets with distinct identifiers, and no runtime component representation exists.
+Instantiating a composite twice yields two independent containers with distinct
+identifiers. The generator holds typed member pointers to any child its own code
+must reach ([D-6]); children reachable only from XML are ordinary tree members.
+
+**Inlining survives only as an optimisation.** Where a composite carries no
+state, no bindings, no events and no focus members, its container adds nothing
+observable and the generator may elide it, emitting the children directly. That
+is a realisation decision under §13.5 and is reported in the budget — it is not
+a separate authoring concept, and §6.4's semantics do not change when it
+happens.
+
+**Expansion runs first**, before flattening (§13.3), so the flattener sees only
+concrete elements.
 
 ### 13.7 Emitted files and functions
 
@@ -1247,8 +1536,8 @@ XML → parse → validate → resolve → flatten → compile assets → emit �
 ```
 
 1. **Parse** all XML, retaining file/line/column for diagnostics.
-2. **Validate** against the schema, then cross-file references — fonts, images, subjects, components, and widget properties against their manifests (§13.1).
-3. **Resolve** — inline components (§13.6), evaluate constant arithmetic, resolve anchors to literals ([D-7]), resolve `type="subject"` indirection.
+2. **Validate** against the schema, then cross-file references — fonts, images, subjects, and element properties against their manifests (§13.1). Composite instantiation is validated on the same path as any other element, inside composites as well as screens, and a composite that instantiates itself directly or transitively is a hard error.
+3. **Resolve** — expand composites (§13.6), evaluate constant arithmetic, resolve anchors and `#parent_*` to literals ([D-7], [D-20]), resolve `type="subject"` indirection.
 4. **Flatten** to the object array and parent table (§13.3); apply demotion (§13.5); mangle and collision-check identifiers (§13.4).
 5. **Compile assets** — BDF via `bdfconv`, PNG→XBM (§14).
 6. **Emit** per §13.7, deterministically per §13.9.
@@ -1260,8 +1549,9 @@ XML → parse → validate → resolve → flatten → compile assets → emit �
 <!-- screens/screen_home.xml -->
 <screen name="home">
     <view>
-        <status_bar name="bar" title_subject="station_name" />
-        <u8g2gl_hline x="0" y="11" width="#screen_width" />
+        <status_bar name="bar" x="0" y="0" width="#screen_width" height="11"
+                    title_subject="station_name" />
+        <u8g2gl_hline name="rule" x="0" y="11" width="#screen_width" />
         <u8g2gl_label name="msg" x="0" y="16" right="0" height="12"
                       bind_text="service_message" font="small_9" align="center" />
     </view>
@@ -1271,54 +1561,79 @@ XML → parse → validate → resolve → flatten → compile assets → emit �
 ```cpp
 // generated/ui_screen_home.cpp — GENERATED, DO NOT EDIT
 // Source: screens/screen_home.xml
-// Schema: 0.3   Generator: u8g2gl 0.3.0   Target: default (SSD1322 256x64)
+// Schema: 0.4   Generator: u8g2gl 0.5.0   Target: default (SSD1322 256x64)
 
 #include "ui.hpp"
 
-static u8g2gl_scrolling_label  bar_title;    // 0  from component "status_bar"
-static u8g2gl_clock            bar_clock;    // 1  from component "status_bar"
-static u8g2gl_label            msg;          // 2
+static status_bar      bar;              // 0  composite container
+static u8g2gl_label    bar_location;     // 1  child of bar
+static u8g2gl_xbm      bar_wifi_icon;    // 2  child of bar
+static u8g2gl_clock    bar_clock;        // 3  child of bar
+static u8g2gl_label    msg;              // 4
+// "rule" is not here — no object required (§13.5)
 
-static u8g2gl_obj* const ui_screen_home_objs[] = { &bar_title, &bar_clock, &msg };
+static u8g2gl_obj* const ui_screen_home_objs[] = {
+    &bar, &bar_location, &bar_wifi_icon, &bar_clock, &msg,
+};
 static const uint8_t ui_screen_home_parents[] = {
-    U8G2GL_NO_PARENT, U8G2GL_NO_PARENT, U8G2GL_NO_PARENT,
+    U8G2GL_NO_PARENT, 0, 0, 0, U8G2GL_NO_PARENT,
 };
 
 void ui_screen_home_init() {
-    bar_title.set_coords(0, 0, 204, 11);
-    bar_title.set_font(ui_font_small_9);
+    bar.set_coords(0, 0, 256, 11);
 
-    bar_clock.set_coords(216, 0, 40, 11);        // right="0" → 256-40
+    bar_location.set_coords(0, 0, 204, 11);       // right="52" → 256-52
+    bar_location.set_font(ui_font_small_9);
+    bar_location.set_long_mode(U8G2GL_LONG_SCROLL);
+
+    bar_wifi_icon.set_coords(204, 0, 12, 11);     // right="40", width=12
+    bar_wifi_icon.set_src(ui_image_icon_wifi);
+
+    bar_clock.set_coords(216, 0, 40, 11);         // right="0" → 256-40
     bar_clock.set_font(ui_font_clock_small_7);
     bar_clock.set_blink(true);
 
-    msg.set_coords(0, 16, 256, 12);              // right="0" → width 256
+    msg.set_coords(0, 16, 256, 12);               // right="0" → width 256
     msg.set_font(ui_font_small_9);
     msg.set_align(U8G2GL_ALIGN_CENTER);
 
     // bindings registered last — §13.7
-    bar_title.bind_text(&ui_subject_station_name);
+    bar_location.bind_text(&ui_subject_station_name);
+    bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
     bar_clock.bind_time(&ui_subject_system_time);
     msg.bind_text(&ui_subject_service_message);
 }
 
 uint32_t ui_screen_home_tick(uint32_t ms) {
     uint32_t next = U8G2GL_IDLE;
-    next = u8g2gl_min(next, bar_title.tick(ms));
+    next = u8g2gl_min(next, bar_location.tick(ms));
     next = u8g2gl_min(next, bar_clock.tick(ms));
     next = u8g2gl_min(next, msg.tick(ms));
     return next;
 }
 
 void ui_screen_home_render(U8G2& d) {
-    bar_title.render(d);
+    bar.render(d);                        // container: clip window, no pixels
+    bar_location.render(d);
+    bar_wifi_icon.render(d);              // hidden flag checked by the object
     bar_clock.render(d);
-    d.drawHLine(0, 11, 256);      // demoted — unnamed, unbound, static (§13.5)
+    u8g2gl_draw_hline(d, 0, 11, 256);     // no object — §13.5
     msg.render(d);
 }
 ```
 
-Every mechanism appears here: component inlining with prefixed names, anchor resolution against the target width, static demotion of the separator, deadline aggregation ([D-15]), bindings registered last, and a header carrying versions but no timestamp.
+Every mechanism appears here: composite expansion with prefixed names and a real
+container ([D-18]), anchor resolution against the target width, `rule` realised
+as a bare draw call while every other element earned an object (§13.5), deadline
+aggregation ([D-15]), bindings registered last, and a header carrying versions
+but no timestamp.
+
+**Note what changed from the previous draft of this example.** `rule` carries a
+`name`, as [U-1] requires, and is *still* emitted as a draw call — because
+realisation now tests whether anything refers to the element rather than whether
+it was named. `bar` exists as an object where it previously vanished, which is
+what gives `#parent_height` and `right="52"` inside the composite something to
+measure against.
 
 ## 14. Assets & Fonts
 
@@ -1372,7 +1687,7 @@ error: screens/screen_home.xml:14:32
    = did you mean 'small_09'?
 ```
 
-- Unknown identifiers (fonts, images, subjects, components, styles) suggest the nearest declared name by edit distance.
+- Unknown identifiers (fonts, images, subjects, elements, styles) suggest the nearest declared name by edit distance.
 - An unknown `setup=` display suggests near matches from the display catalogue (§5.2); a page-mode constructor is rejected with its `_F_` equivalent named.
 - Geometry errors report computed values: `element extends to x=264, display is 256px wide (0..255)`.
 - Over-constrained anchors name all three conflicting attributes.
@@ -1403,11 +1718,24 @@ Two properties make this useful rather than decorative:
 
 This is the mechanism by which "diagnostics are the product" (§1.2) actually pays off. A model that receives `{"code":"U8G2GL_UNKNOWN_FONT","suggestions":["small_09"],"line":14}` converges in one iteration. One that receives `Error: invalid XML` does not converge at all.
 
-*Skills consume this surface, they do not duplicate it.* A U8G2GL skill's job is the guidance a schema cannot carry — when to reach for a component over a custom widget, how to lay out a status bar that reads well at 128px, which display suits a battery build. The factual substrate (what displays exist, what fonts are declared, what failed and where) stays in the tool, where it is generated from source and cannot drift.
+*Skills consume this surface, they do not duplicate it.* A U8G2GL skill's job is the guidance a schema cannot carry — when a `<view>` suffices and when the structure really needs C++, how to lay out a status bar that reads well at 128px, which display suits a battery build. The factual substrate (what displays exist, what fonts are declared, what failed and where) stays in the tool, where it is generated from source and cannot drift.
 
 ### 15.4 Schema Versioning
 
-`u8g2gl.xml` declares `schema="0.3"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
+`u8g2gl.xml` declares `schema="0.4"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
+
+**0.3 → 0.4 is breaking**, and the CLI must refuse 0.3 naming each change rather than failing obscurely:
+
+| Change | Migration | Source |
+|---|---|---|
+| `<component>` removed | Becomes `<widget>` with a `<view>`; move `components/x/` to `widgets/x/` | [D-18] |
+| `components/` directory removed | One `widgets/` directory for all user elements | [D-18] |
+| `truncate` removed | `long_mode="clip"` | [D-19] |
+| `<u8g2gl_scrolling_label>` removed | `<u8g2gl_label long_mode="scroll">` | [D-19] |
+| `animated` removed from manifests | Delete the attribute; realisation is per instance | [D-18] |
+| Manifest `setter=` naming a U8G2 call | Becomes `draw=` naming a runtime free function | [D-18] |
+
+No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures, which is why the break is taken now rather than carried.
 
 ---
 
@@ -1437,7 +1765,7 @@ Absent from v0.1 entirely. It is what makes the project maintainable.
 | Layer | Method |
 |---|---|
 | **Schema** | Fixture XML files, valid and invalid, asserting exact diagnostic text |
-| **Resolution** | Unit tests on anchor/arithmetic/component-inlining, asserting resolved integers |
+| **Resolution** | Unit tests on anchor/arithmetic/composite-expansion, asserting resolved integers |
 | **Codegen** | Golden-file tests — generated C++ compared byte-for-byte against a checked-in expectation |
 | **Compilation** | Every example project compiled for each target in CI |
 | **Rendering** | Snapshot tests — render to the Wasm framebuffer, compare PNG against a golden image |
@@ -1500,12 +1828,11 @@ Each of those is invisible in XML and obvious in a budget table, which is the po
 | Built-in widget tags | `u8g2gl_label`, `u8g2gl_box` | `lv_label`, `lv_obj` |
 | Custom widget prefix | `wd_` | `wd_` |
 | Constants | `#const_name` | `#const_name` |
-| Component props | `$prop_name` | `$prop_name` |
+| Element props | `$prop_name` | `$prop_name` |
 | Subjects (XML) | plain (`temperature`) | `subject_*` |
 | Subjects (generated) | `ui_subject_temperature` | — |
 | Screen files | `screen_*.xml` | `screen_*.xml` |
-| Component dirs | `components/name/name.xml` | same |
-| Widget dirs | `widgets/wd_name/wd_name.xml` | same |
+| Element dirs | `widgets/name/name.xml` | `components/`, `widgets/` |
 | Generated files | `ui_screen_*.cpp` | similar |
 
 ### 19.1 The `u8g2gl_` Prefix — [D-12]
@@ -1556,7 +1883,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 ### Phase 2 — Composition & Animation
 
-- Component system: `<component>`, `<api>`, `<prop>`, inlining
+- Composite elements: `<widget>` with a `<view>`, `<api>`, `<prop>`, expansion ([D-18])
 - Custom widget system: `<widget>` + C++ inheritance
 - Animated built-ins: `u8g2gl_scrolling_label`, `u8g2gl_clock`, `u8g2gl_progress_bar`
 - Collection API (§9)
@@ -1570,7 +1897,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 - Focus groups, input dispatch, screen navigation (§12)
 - `u8g2gl_button`, `u8g2gl_switch`, `focus_style`
-- **Visual designer** — a web application: canvas with pixel-exact Wasm rendering, direct manipulation (select, drag, nudge by keyboard, align, snap), a property panel driven by `<api>` manifests ([D-17]), a component/widget palette, and lossless XML round-trip. Specified separately in [ui_spec.md](ui_spec.md).
+- **Visual designer** — a web application: canvas with pixel-exact Wasm rendering, direct manipulation (select, drag, nudge by keyboard, align, snap), a property panel driven by `<api>` manifests ([D-17]), an element palette, and lossless XML round-trip. Specified separately in [ui_spec.md](ui_spec.md).
 - Hot reload for text-editor workflows, sharing the editor's renderer
 - Font and glyph browser
 
@@ -1592,6 +1919,8 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-4** | Confirm the measured runtime budget against the `esp32dev` baseline — the floor, not the target ([D-1]). Expected comfortable, since departures-board already runs this workload there, so this is verification rather than open risk. | Phase 1 exit |
 | ~~Q-5~~ | ~~Frame-timing ownership~~ | **Resolved** — app owns the loop, framework owns scheduling and returns a sleep hint, per LVGL 9's model. See [D-15] |
 | ~~Q-6~~ | ~~Framework licence~~ | **Resolved** — MIT, see §22 |
+| **Q-7** | The property panel needs conditional visibility (`visible_when`) — `scroll_px_per_sec` and friends are meaningless unless `long_mode` is a scrolling value ([D-19]). Additive schema; LVGL Pro has the identical problem and does not solve it | Phase 3 |
+| **Q-8** | **Repeaters.** A `<view>` is a static structure, so it can express "three carriages" but not "N carriages" (§6.5). A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be *designed* rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not. Schema surface, so §1.5 applies: defer until a real screen demonstrates the need | Phase 2 |
 
 ---
 
@@ -1671,7 +2000,13 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 | Preview | JS reimplementation | Wasm **[D-9]** | Avoids two diverging renderers; doubles as test harness |
 | Overhead claim | "Zero runtime overhead" | Withdrawn; budget reported §18 | It was false |
 | Lines | `x1,y1,x2,y2` (off-by-one in examples) | `<u8g2gl_hline>`/`<u8g2gl_vline>` with `x,y,width` | Consistent convention; matches the API |
-| `<u8g2gl_text>` | Separate static tag | Removed | Duplicated `<u8g2gl_label>`; generator demotes automatically |
+| `<u8g2gl_text>` | Separate static tag | Removed | Duplicated `<u8g2gl_label>`; realisation handles it automatically |
+| Widget tiers | Four tiers, author-visible | One element vocabulary **[D-18]** | The tiers described the generator's output, not the author's vocabulary |
+| Components | A separate pure-XML tier, inlined to nothing | A widget with a `<view>`, realised as a container **[D-18]** | Having no runtime object left them with no box, no clipping and nowhere to hang behaviour |
+| Primitives | Always inlined, never bindable | Free draw functions, bindable **[D-18]** | Hiding a separator on a flag was impossible; classes would have cost RAM for no state |
+| Static demotion | Six conditions, first being "no `name`" | One realisation rule **[D-18]** | `[U-1]` made `name` mandatory, so the old rule could never fire |
+| Scrolling text | A second widget class | `long_mode` on the label **[D-19]** | Two manifests identical but for three properties |
+| Geometry | Build-time literals only | Bindable; no layout pass **[D-20]** | Composites need to resize; a layout engine is still refused |
 | `bind_time` | Used, never declared | `time` subject type added | Undeclared type |
 | Subject naming | `subject_*` convention, never followed | Plain in XML, prefixed in generated code | Convention nobody obeyed |
 | Units | `scroll_speed="25"` | `scroll_px_per_sec`, `*_ms` | Three contradictory readings existed |
