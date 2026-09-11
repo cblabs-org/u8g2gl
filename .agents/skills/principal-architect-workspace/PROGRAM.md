@@ -1,7 +1,7 @@
 # PROGRAM — U8G2GL
 
 **Tier 1 · Chief Architect**
-<!-- Last updated: 2026-09-04T11:25:07Z -->
+<!-- Last updated: 2026-09-11T19:48:04Z -->
 
 ## Mandate
 Deliver U8G2GL per [design_spec.md](../../../docs/design_spec.md) v0.2: a build-time
@@ -14,8 +14,14 @@ Human-facing plan: [implementation_plan.md](../../../docs/implementation_plan.md
 PR sequence and graph: [PROGRAM-PLAN.md](PROGRAM-PLAN.md)
 
 ## Status
-**Planning.** Blocked on four programme decisions (PD-1 licence, PD-2 CLI home,
-PD-3 ratify core object model, PD-4 legacy migration strategy). No PRs spawned.
+**PR-01, PR-02 and PR-03 merged** (#1, #2, #3). All four programme decisions
+closed. PR-04 (generator) is next and is **gated on remediation** — see
+[REMEDIATION-D18.md](REMEDIATION-D18.md) and the 2026-09-11 log entry.
+
+Schema is **0.4** as of `245f9be`, breaking against 0.3. Design decisions
+[D-18], [D-19] and [D-20] collapsed the widget tier model; PR-02's schema types
+and PR-03's manifests no longer match the spec and must be corrected before the
+generator consumes them.
 
 ## Reconnaissance findings driving the plan
 - **A-1** `modules/U8G2Display/` is an INTEGRATION REFERENCE, NOT an architectural
@@ -373,3 +379,105 @@ have let it steal a label's identifier. WO9's integration test deliberately incl
 the label manifest so revalidation is not confounded by `UNKNOWN_WIDGET`, which is the
 exact trap I fell into checking it manually. Both are cases of a worker understanding
 the intent rather than the letter, which is what the WORKORDER format is for.
+
+---
+
+### 2026-09-11T19:48:04Z — Widget tiers collapsed; PR-02/PR-03 remediation gates PR-04
+
+**Owner-led design session, owner-approved.** Three decisions committed as
+[`245f9be`](https://github.com/cblabs-org/u8g2gl/commit/245f9be), assessment as
+`13b746b`. No code changed.
+
+- **[D-18]** One element vocabulary. The four tiers are withdrawn. Whether an
+  instance becomes an object or draw calls is a generator outcome governed by a
+  single realisation rule, not an authoring category. Composites become real
+  container objects; primitives are served by free draw functions shared by the
+  firmware and editor targets.
+- **[D-19]** `long_mode` on the label. `truncate` and `u8g2gl_scrolling_label`
+  deleted.
+- **[D-20]** Geometry is bindable; anchors resolve against the container.
+  **No runtime layout pass — [D-7] survives untouched.**
+
+**[D-6] is amended, not withdrawn.** Its rejection of runtime string lookup
+stands in full; only its blanket ban on composing sub-elements goes, since the
+generator resolves children to typed pointers at build time.
+
+### The finding that forced this
+
+Three separate problems shared one cause, and the owner found it by asking why
+the component/widget distinction existed at all:
+
+1. Components produced no runtime construct, so they had no box, no clipping and
+   nowhere to hang behaviour. `right="0"` inside one had no referent.
+2. Primitives could not be bound, so hiding a separator on a flag was impossible.
+3. **Static demotion could never fire.** §13.5's first condition was "the element
+   has no `name`" — and `[U-1]`, which this programme closed in PR-03, made
+   `name` mandatory. §6's deletion of `<u8g2gl_text>` rested on demotion working,
+   so it was a promise the generated code did not keep.
+
+Item 3 is the one worth sitting with. `[U-1]` was decided carefully, reviewed,
+and merged — and it silently disabled an optimisation specified three sections
+away in the same document. Neither the decision record nor the WORKORDER
+mentions §13.5. **A decision that changes what is always true about a document
+invalidates every rule that tested for its absence**, and nothing in the process
+looks for those.
+
+### A second finding, about a research document
+
+`widget_design_assessment.md` justified making `wd_train_formation` a C++ widget
+on the grounds that "there is no XML composition that could express a nose cone
+triangle overlapping a rounded rectangle frame". Reading the implementation,
+`render()` uses only `drawRFrame`, `drawTriangle`, `drawLine`, `drawBox` and
+`drawText` — all already in the primitive set. The claim is simply false, and it
+had been repeated downstream before the owner challenged it.
+
+The real line is **static structure versus data-driven structure**: `numCoaches`
+arrives at runtime and determines the divider count, cell count and total width.
+Corrected in place with a `[!CAUTION]` block rather than quietly, because the
+bad argument had already travelled.
+
+*Process point:* that document is marked "frozen research input, spec wins" —
+which protected the spec from its *conclusions* but not from its *reasoning*,
+which had been absorbed. Freezing a document does not quarantine the arguments
+already taken from it.
+
+### One latent defect, not a design issue
+
+`set_coords()` does not call `mark_dirty()` (`src/u8g2gl_obj.cpp:28`). Harmless
+while coordinates are only set during `init()`; a silent missed redraw the moment
+[D-20] makes geometry dynamic. It works whenever anything else on screen is
+animating and fails only on a static screen. **Recommended as its own fix,
+first**, ahead of the schema work.
+
+### Remediation — the critical path
+
+Full assessment in [REMEDIATION-D18.md](REMEDIATION-D18.md).
+
+| PR | Remediation | Gates PR-04? |
+|---|---|---|
+| PR-01 | Small — 3 contained items | No |
+| PR-02 | Moderate — the schema model changes shape | **Yes** |
+| PR-03 | Moderate — one class deleted, all 17 manifests touched | **Yes** |
+
+PR-04 consumes the schema model and manifests directly, so starting it against
+the current shapes means writing it twice. Recommended sequencing: the dirty-flag
+fix alone first, then PR-02 and PR-03 remediation as one PR (the manifest changes
+are two halves of one change and split leaves the cross-test red), then PR-04.
+
+**Nothing invalidates the approach of any merged PR.** The object model,
+catalogue, diagnostics, parser and widget implementations all stand.
+
+### Two validator gaps found in passing
+
+Both predate these decisions and close on the same code path as the remediation:
+unknown element tags are not validated inside composites (the check runs only
+over screens), and there is no cycle detection for a composite instantiating
+itself.
+
+### Deferred, recorded as open questions
+
+`[Q-7]` conditional property visibility (`visible_when`), and `[Q-8]`
+**repeaters** — a composite instantiated N times against a declared-capacity
+collection. Q-8 is the one with teeth: it is the difference between a designer
+being able to draw a list row and list rows being a C++ job permanently. Schema
+surface, so §1.5 applies — deferred until a real screen demonstrates the need.
