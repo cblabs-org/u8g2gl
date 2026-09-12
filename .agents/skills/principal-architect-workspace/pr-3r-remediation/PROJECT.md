@@ -28,16 +28,19 @@ serially. PR head is the last branch in the stack.
 
 ## Work Order Decomposition
 
-| WO | Branch | Scope | Source | Complexity |
-|---|---|---|---|---|
-| WO1 | `wo1-dirty-geometry` | `mark_dirty()` on all mutators; per-axis `set_x/y/w/h` | R1.1, R1.2 | standard |
-| WO2 | `wo2-label-long-mode` | `long_mode` absorbs `u8g2gl_scrolling_label`; delete `truncate` from style | R1.3, R3.1, R3.2 | standard |
-| WO3 | `wo3-draw-functions` | Eight `u8g2gl_draw_*` free functions | new work, required by WO4 | standard |
-| WO4 | `wo4-manifests` | All 17 manifests: `animated` out, `draw=` in on eight primitives | R2.5, R3.3, R3.4 | mechanical |
-| WO5 | `wo5-schema-merge` | `Component`/`ComponentProp` → `WidgetManifest` + `PropDef`; props gain `help` | R2.1 | standard |
-| WO6 | `wo6-validator` | Drop `TIER1_PRIMITIVES`; composite tag validation; cycle detection; geometry vs container | R2.2, R2.3, R2.4 | standard |
-| WO7 | `wo7-capacities` | `MAX_BINDINGS_PER_OBJ` default → 8; hard 254-object validator error | [D-21] | standard |
-| WO8 | `wo8-schema-04` | Schema 0.3 → 0.4, §15.4 refusal path, integration, sizeof report | R2.6 | standard |
+- [ ] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
+- [ ] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** · base WO1 · standard · R1.3, R3.1, R3.2
+- [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2 · standard · new work, required by WO4
+- [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
+- [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
+- [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
+- [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
+- [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
+
+**WO4 was re-graded `mechanical` → `standard`.** Stripping `animated` from 17
+XML files is rote, but the same work order changes `widget-manifest.ts`, the
+manifest parser and the cross-test, and the cross-test must end *meaningful*
+rather than merely green. That is judgement, not transcription.
 
 **Ordering rationale.** WO1 and WO2 are runtime-only and unblock nothing else, so
 they go first and can be reviewed while the schema work proceeds. WO3 must

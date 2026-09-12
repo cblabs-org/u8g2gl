@@ -4,7 +4,7 @@ project: pr-3r-remediation
 title: "Manifests: animated out, draw= in"
 branch: u8g2gl-remediation/wo4-manifests
 base: wo3-draw-functions
-complexity: mechanical
+complexity: standard
 status: pending
 ---
 
