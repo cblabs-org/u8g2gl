@@ -29,8 +29,9 @@ serially. PR head is the last branch in the stack.
 ## Work Order Decomposition
 
 - [x] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** ✅ `4ca9e01` · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
-- [ ] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** · base WO1 · standard · R1.3, R3.1, R3.2
-- [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2 · standard · new work, required by WO4
+- [x] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** ✅ `4e649cf` · base WO1 · standard · R1.3, R3.1, R3.2
+- [ ] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** · base WO2 · standard · defect surfaced by WO2 (PA-added)
+- [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2b · standard · new work, required by WO4
 - [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
 - [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
 - [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
@@ -139,3 +140,66 @@ style delegations, `apply_style()`, and `set_parent_index()`. Verified:
 repaints. Folded into WO2 rather than given its own order because WO2 already
 edits that delegation block to delete `set_truncate`; separating them means
 touching the same lines twice.
+
+### WO2 — complete (`4e649cf`)
+
+Verified: C++ 175 → **207 tests**, zero warnings, boundary respected.
+`u8g2gl_scrolling_label` deleted, `truncate` gone from style and obj, and the
+eleven surfaced `mark_dirty()` gaps fixed.
+
+**The worker improved on the pattern it was told to copy.** WO1's guard compares
+the value; for style setters that broke `Button.RenderAlignmentOverride`, because
+setting `align` to its already-default value must still update the style's
+set_mask. The guard now checks `style_.has(PROP)` as well. Caught by an existing
+test, documented at the guard site, regression test added. This is the right
+failure mode — the suite caught a plausible-looking generalisation.
+
+**Cost correction.** `sizeof(u8g2gl_label)` is **80 bytes** on a 64-bit host, not
+the 72 that [D-19]'s +16 estimate implied — the real delta is +24, from
+`long_mode_` and an `overflow_` flag neither old class had. [D-19]'s cost section
+is amended rather than left standing, per §1.3.
+
+### Spec defect found by WO2 — resolved, and WO2b added
+
+The worker flagged that design_spec contradicted itself: the semantics table says
+`scroll` reverses at each end, while §15.4's migration table mapped the old
+`u8g2gl_scrolling_label` onto `scroll`. Checked the deleted source — it wrapped
+continuously ("wrap to re-enter smoothly from the right edge"), which is
+`scroll_circular`.
+
+**The migration table was the error.** Corrected in design_spec §15.4 and in the
+[D-19] record. The semantics table stands: it matches LVGL exactly, and §1.4
+makes that familiarity a goal.
+
+The worker followed the migration table as instructed, so `scroll` currently
+wraps and **nothing implements reversing**. That is a defect against [D-19],
+tracked as **WO2b**, inserted between WO2 and WO3. Redefining `scroll` as
+wrapping was considered and rejected — it diverges from LVGL silently, on the
+identifier an LVGL user is most likely to reach for, which is worse than a
+missing mode.
+
+The worker was right to flag this rather than invent bounce timing no document
+specified.
+
+### PA repair — the stack was left red
+
+WO2's deletion of the scrolling-label manifest broke
+`manifest-crosstest.test.ts`'s "at least 17 manifest files" assertion, correctly
+outside its boundary. Fixed by the PA rather than deferred to WO4, because
+leaving a red suite across WO2b and WO3 invites the next worker to either "fix"
+it out of scope or wonder whether they caused it.
+
+Fixed by removing the magic count rather than decrementing it to 16. The
+assertion's real purpose is guarding against a **vacuous suite** — if the
+manifest path resolves wrong, the file list is empty, the per-manifest loop
+generates no tests, and the cross-test passes while checking nothing. It now
+asserts that, and stops drifting every time a manifest is legitimately added or
+removed. A hardcoded count is the same failure mode `TIER1_PRIMITIVES` already
+demonstrated.
+
+### Carried to WO4
+
+- `include/u8g2gl/manifests/u8g2gl_obj.xml` still declares the deleted
+  `truncate` / `set_truncate`
+- The label manifest's `animated="false"` is questionable under scroll modes —
+  `animated` is being deleted wholesale, so this resolves itself

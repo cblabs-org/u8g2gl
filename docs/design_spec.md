@@ -1744,7 +1744,7 @@ This is the mechanism by which "diagnostics are the product" (§1.2) actually pa
 | `<component>` removed | Becomes `<widget>` with a `<view>`; move `components/x/` to `widgets/x/` | [D-18] |
 | `components/` directory removed | One `widgets/` directory for all user elements | [D-18] |
 | `truncate` removed | `long_mode="clip"` | [D-19] |
-| `<u8g2gl_scrolling_label>` removed | `<u8g2gl_label long_mode="scroll">` | [D-19] |
+| `<u8g2gl_scrolling_label>` removed | `<u8g2gl_label long_mode="scroll_circular">` — the old widget wrapped continuously, which is `scroll_circular`. `scroll` reverses at each end and is **not** what that widget did | [D-19] |
 | `animated` removed from manifests | Delete the attribute; realisation is per instance | [D-18] |
 | Manifest `setter=` naming a U8G2 call | Becomes `draw=` naming a runtime free function | [D-18] |
 

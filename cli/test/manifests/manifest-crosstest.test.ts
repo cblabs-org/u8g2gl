@@ -20,8 +20,14 @@ const MANIFESTS_DIR = resolve(__dirname, '../../../include/u8g2gl/manifests');
 describe('Widget Manifests', () => {
   const files = readdirSync(MANIFESTS_DIR).filter((f) => f.endsWith('.xml'));
 
-  it('should find at least 17 manifest files', () => {
-    expect(files.length).toBeGreaterThanOrEqual(17);
+  // Guards against a vacuous suite rather than against a manifest count. If
+  // MANIFESTS_DIR resolves wrong, `files` is empty, the loop below generates no
+  // tests at all, and the whole cross-test passes while checking nothing. A
+  // hardcoded count would also have to be edited every time a manifest is
+  // legitimately added or removed — drift of exactly the kind [D-17] exists to
+  // avoid, and which TIER1_PRIMITIVES already demonstrated.
+  it('resolves the manifest directory and finds manifests to check', () => {
+    expect(files.length).toBeGreaterThan(0);
   });
 
   for (const file of files) {
