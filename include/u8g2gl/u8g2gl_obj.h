@@ -33,6 +33,7 @@
  *
  *     Geometry:
  *     - set_coords():        Position and size in device pixels
+ *     - set_x/y/w/h():       Per-axis setters, for binding a single axis
  *     - get_x/y/w/h():       Individual accessors
  *
  *     Visibility & flags:
@@ -77,12 +78,56 @@ public:
      * and nothing recomputes them at runtime. The parent relationship affects
      * clipping and visibility only (see u8g2gl_tree.h), never position.
      *
+     * Marks the frame dirty if any of the four values actually changes.
+     *
      * @param x Left edge.
      * @param y Top edge.
      * @param w Width; the element occupies x .. x+w-1 inclusive.
      * @param h Height; the element occupies y .. y+h-1 inclusive.
      */
     void set_coords(int16_t x, int16_t y, int16_t w, int16_t h);
+
+    /**
+     * @brief Set the left edge alone, in device pixels.
+     *
+     * Exists so a `bind_width`-style observer bound to a single geometry
+     * subject ([D-20]) has a setter to call — it receives one value and has
+     * nothing sensible to pass for the other three axes that set_coords()
+     * requires. Marks the frame dirty if the value actually changes.
+     *
+     * @param x Left edge.
+     */
+    void set_x(int16_t x);
+
+    /**
+     * @brief Set the top edge alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param y Top edge.
+     */
+    void set_y(int16_t y);
+
+    /**
+     * @brief Set the width alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param w Width; the element occupies x .. x+w-1 inclusive.
+     */
+    void set_w(int16_t w);
+
+    /**
+     * @brief Set the height alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param h Height; the element occupies y .. y+h-1 inclusive.
+     */
+    void set_h(int16_t h);
 
     int16_t get_x() const;  ///< @brief Left edge in device pixels.
     int16_t get_y() const;  ///< @brief Top edge in device pixels.
@@ -117,9 +162,27 @@ public:
     bool has_flag(uint8_t flag) const;
 
     // Convenience wrappers over the two flags widgets use most
-    void set_hidden(bool h);      ///< @brief Set or clear U8G2GL_FLAG_HIDDEN.
+    /**
+     * @brief Set or clear U8G2GL_FLAG_HIDDEN.
+     *
+     * Public API called imperatively (`obj->set_hidden(true)`), not only via a
+     * binding — so unlike the flag-binding path, nothing else guarantees a
+     * repaint here. Marks the frame dirty if the flag's value actually changes.
+     *
+     * @param h true to hide the object, false to show it.
+     */
+    void set_hidden(bool h);
     bool is_hidden() const;       ///< @brief This object's own hidden flag; ignores ancestors.
-    void set_disabled(bool d);    ///< @brief Set or clear U8G2GL_FLAG_DISABLED.
+
+    /**
+     * @brief Set or clear U8G2GL_FLAG_DISABLED.
+     *
+     * Public API called imperatively, same reasoning as set_hidden(). Marks the
+     * frame dirty if the flag's value actually changes.
+     *
+     * @param d true to disable the object, false to enable it.
+     */
+    void set_disabled(bool d);
     bool is_disabled() const;     ///< @brief This object's own disabled flag.
 
     // --- Parent index ---

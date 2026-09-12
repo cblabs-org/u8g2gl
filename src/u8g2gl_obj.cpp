@@ -25,11 +25,53 @@
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_core.h"
 
+// Geometry setters — set_coords() and the four per-axis setters below all
+// guard mark_dirty() on the value actually changing. Without the guard, a
+// caller that re-sets an unchanged coordinate every tick (an animation, or a
+// binding observer re-notifying with the same value) would dirty the frame on
+// every call and defeat §11.2's gate — the exact cost the gate exists to
+// avoid. A real change is still marked immediately, so no repaint is lost.
 void u8g2gl_obj::set_coords(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (x == x_ && y == y_ && w == w_ && h == h_) {
+        return;
+    }
     x_ = x;
     y_ = y;
     w_ = w;
     h_ = h;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_x(int16_t x) {
+    if (x == x_) {
+        return;
+    }
+    x_ = x;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_y(int16_t y) {
+    if (y == y_) {
+        return;
+    }
+    y_ = y;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_w(int16_t w) {
+    if (w == w_) {
+        return;
+    }
+    w_ = w;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_h(int16_t h) {
+    if (h == h_) {
+        return;
+    }
+    h_ = h;
+    mark_dirty();
 }
 
 int16_t u8g2gl_obj::get_x() const {
@@ -60,24 +102,43 @@ bool u8g2gl_obj::has_flag(uint8_t flag) const {
     return (flags_ & flag) != 0;
 }
 
+// u8g2gl_obj::set_hidden
+// Live defect fix (PR-3R WO1): this is public API reachable from imperative
+// code (obj->set_hidden(true)), not only from the flag-binding path, where
+// u8g2gl_evaluate_binding() already calls mark_dirty() on every evaluation.
+// Without the guard below, hiding or showing a static object left the frame
+// dirty flag untouched, so §11.2's gate skipped sendBuffer() and the display
+// never updated.
+//   h — same value as is_hidden() would already report is a no-op: nothing
+//       visible changed, so no frame is scheduled
 void u8g2gl_obj::set_hidden(bool h) {
+    if (h == is_hidden()) {
+        return;
+    }
     if (h) {
         set_flag(U8G2GL_FLAG_HIDDEN);
     } else {
         clear_flag(U8G2GL_FLAG_HIDDEN);
     }
+    mark_dirty();
 }
 
 bool u8g2gl_obj::is_hidden() const {
     return has_flag(U8G2GL_FLAG_HIDDEN);
 }
 
+// u8g2gl_obj::set_disabled
+// Same live-defect fix and reasoning as set_hidden() above.
 void u8g2gl_obj::set_disabled(bool d) {
+    if (d == is_disabled()) {
+        return;
+    }
     if (d) {
         set_flag(U8G2GL_FLAG_DISABLED);
     } else {
         clear_flag(U8G2GL_FLAG_DISABLED);
     }
+    mark_dirty();
 }
 
 bool u8g2gl_obj::is_disabled() const {

@@ -68,6 +68,13 @@ TEST(Obj, Flags) {
     EXPECT_FALSE(obj.is_disabled());
     EXPECT_FALSE(obj.has_flag(U8G2GL_FLAG_DISABLED));
 
+    // PR-3R WO1: set_hidden()/set_disabled() above now mark the frame dirty on
+    // every actual change (see Obj.SetHiddenMarksDirty / SetDisabledMarksDirty),
+    // so DIRTY is left set from those calls. Clear it here — this block is
+    // testing that the raw set_flag()/clear_flag() primitives below leave
+    // unrelated flags alone, which is a separate question from dirty tracking.
+    obj.clear_dirty();
+
     // Multiple flags independent
     obj.set_flag(U8G2GL_FLAG_HIDDEN);
     obj.set_flag(U8G2GL_FLAG_DISABLED);
@@ -91,6 +98,99 @@ TEST(Obj, DirtyTracking) {
     obj.clear_dirty();
     EXPECT_FALSE(obj.is_dirty());
     EXPECT_FALSE(obj.has_flag(U8G2GL_FLAG_DIRTY));
+}
+
+// --- PR-3R WO1: every mutator that changes what is drawn marks the frame
+// dirty. These are the tests whose absence let set_hidden()/set_disabled()
+// ship without the call (see docs/decisions and WORKORDER.md for wo1).
+
+TEST(Obj, SetCoordsMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_coords(10, 20, 100, 50);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetCoordsUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_coords(10, 20, 100, 50);
+    obj.clear_dirty();
+    obj.set_coords(10, 20, 100, 50);  // same values — no visible change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetHiddenMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_hidden(true);
+    EXPECT_TRUE(obj.is_dirty());
+
+    obj.clear_dirty();
+    obj.set_hidden(false);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetHiddenUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    EXPECT_FALSE(obj.is_hidden());
+    obj.clear_dirty();
+    obj.set_hidden(false);  // already not hidden — no visible change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetDisabledMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_disabled(true);
+    EXPECT_TRUE(obj.is_dirty());
+
+    obj.clear_dirty();
+    obj.set_disabled(false);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetDisabledUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    EXPECT_FALSE(obj.is_disabled());
+    obj.clear_dirty();
+    obj.set_disabled(false);  // already not disabled — no visible change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, PerAxisSettersMarkDirty) {
+    u8g2gl_obj obj;
+
+    obj.clear_dirty();
+    obj.set_x(5);
+    EXPECT_EQ(obj.get_x(), 5);
+    EXPECT_TRUE(obj.is_dirty());
+
+    obj.clear_dirty();
+    obj.set_y(6);
+    EXPECT_EQ(obj.get_y(), 6);
+    EXPECT_TRUE(obj.is_dirty());
+
+    obj.clear_dirty();
+    obj.set_w(7);
+    EXPECT_EQ(obj.get_w(), 7);
+    EXPECT_TRUE(obj.is_dirty());
+
+    obj.clear_dirty();
+    obj.set_h(8);
+    EXPECT_EQ(obj.get_h(), 8);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, PerAxisSettersUnchangedDoNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_coords(1, 2, 3, 4);
+    obj.clear_dirty();
+
+    obj.set_x(1);
+    obj.set_y(2);
+    obj.set_w(3);
+    obj.set_h(4);
+    EXPECT_FALSE(obj.is_dirty());
 }
 
 TEST(Obj, TickReturnsIdle) {
