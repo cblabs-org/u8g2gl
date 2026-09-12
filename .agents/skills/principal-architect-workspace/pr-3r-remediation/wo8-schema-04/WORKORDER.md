@@ -90,22 +90,16 @@ break wearing a version number.
 - [ ] Re-run `test/test_sizeof_report.cpp` and record every figure with the host
       width stated.
 
-### Optional — assess only, do not build
-
-The `--fix-names` write-back machinery from PR-03 WO9 (`SourceEdit`,
-location-anchored insertion in `cli/src/core/parser/name-policy.ts`) is close to
-what a `--migrate` command would need: `truncate` → `long_mode` and the
-scrolling-label rename are location-anchored rewrites. It currently supports
-**insertion only** and would need replace and delete.
-
-**Assess the gap in your Completion Report — perhaps ten lines. Do not implement
-it.** Whether to offer migration tooling or only a refusal message is the owner's
-call, and this note exists so the option is priced rather than forgotten.
-
 ## Strict Boundary Box
 
 **In scope:** `validate-schema.ts` and the refusal path, fixtures and tests
 declaring a schema version, `cli/package.json`, this WORKORDER.
+
+**Do NOT build migration tooling.** A `--migrate` command was considered and
+**rejected**: no 0.3 XML has ever been written, here or anywhere, so there is
+nothing to migrate. The refusal message is the whole requirement. If this comes
+up again, the answer is in `docs/design_spec.md` §1.5 — a feature earns inclusion
+by demonstrated need, and "we already have most of the machinery" is not need.
 
 **Do NOT touch:** anything WO1–WO7 owns. If one of them left something broken,
 report it — do not repair it here, where the fix would be invisible in review.
