@@ -31,8 +31,9 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** ✅ `4ca9e01` · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
 - [x] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** ✅ `4e649cf` · base WO1 · standard · R1.3, R3.1, R3.2
 - [x] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** ✅ `217473c` · base WO2 · standard · defect surfaced by WO2 (PA-added)
-- [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2b · standard · new work, required by WO4
-- [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
+- [x] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** ✅ `b13bdff` · base WO2b · standard · new work, required by WO4
+- [ ] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** · base WO3 · standard · defects surfaced by WO3 (PA-added)
+- [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3b · standard · R2.5, R3.3, R3.4
 - [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
 - [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
 - [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
@@ -223,3 +224,36 @@ deliberately instead of evaporating.
 latch-on-wrap to rotate messages would break. Nothing consumes it — no generated
 code, no application — so there is nothing to break yet. Worth remembering at
 PR-05, when a real app first drives these labels.
+
+### WO3 — complete (`b13bdff`), with three defects surfaced → WO3b
+
+Eight free functions delivered, C++ 210 → **233 tests**, zero warnings, boundary
+respected. The functions are free functions with the why-comment [D-18] needs, and
+the signatures were derived from the manifests rather than invented.
+
+The worker also found real depth: `u8g2gl_draw_box` dispatches across
+`drawBox`/`drawFrame`/`drawRBox`/`drawRFrame`, and it added a segment enum
+mirroring U8G2's actual `U8G2_DRAW_*` bit values rather than approximating them.
+
+**Three surfaced defects, all verified, all going to WO3b.** The worker was right
+to surface rather than fix in each case — every one sat outside its boundary — but
+none can ship.
+
+1. **`u8g2gl_draw_ellipse` is declared with no body.** The test double has no
+   `drawEllipse`, and defining against the real U8G2 API would break the shared
+   host build. Sound reasoning, unacceptable outcome: a declared symbol that
+   cannot link, invisible only because nothing calls it — and **WO4 is about to
+   point the ellipse manifest at it**. This is the one that had to be caught now.
+2. **The test double is a no-op for six of eight primitives.** `drawHLine`,
+   `drawVLine`, `drawLine`, `drawCircle`, `drawDisc`, `drawTriangle` are empty
+   bodies, so those tests assert only "does not crash". A rendering framework
+   whose draw path is largely unverified — and the root cause of (1).
+3. **`filled` on `u8g2gl_draw_triangle` does nothing.** The manifest declares it;
+   U8G2 has no unfilled-triangle primitive, so it is silently ignored. Same class
+   of defect as `long_mode="scroll"` silently wrapping, which this PR has already
+   had to correct once.
+
+**On (3) the worker was over-cautious and I have overruled it.** It declined to
+"invent an unspecified outline algorithm" — but three lines between three vertices
+is not an invention, it is what a triangle outline is. WO3b supplies the authority
+it correctly declined to assume on its own.
