@@ -12,8 +12,11 @@
  *          subjects, with overflow behaviour selected by `long_mode`
  *          ([D-19], design_spec.md §6.3) rather than by choosing between two
  *          widget classes. PR-3R WO2 absorbed the former
- *          u8g2gl_scrolling_label here: `long_mode="scroll"` is that widget's
- *          exact marquee behaviour, moved rather than reimplemented.
+ *          u8g2gl_scrolling_label here as `long_mode="scroll_circular"`'s
+ *          continuous-wrap marquee. PR-3R WO2b corrected `long_mode="scroll"`
+ *          itself to reverse at each end, per design_spec.md §6 and [D-19] —
+ *          it had inherited the wrap mechanic by mistake; see
+ *          set_long_mode() for the full account.
  *
  *          Designed without internal string buffers to eliminate RAM
  *          duplication on constrained microcontrollers; text is referenced by
@@ -120,19 +123,29 @@ public:
      * user arriving from LVGL Pro, where `long_mode` includes `LV_LABEL_LONG_WRAP`,
      * will meet this omission. It is deliberate, not an oversight.
      *
-     * `U8G2GL_LONG_SCROLL` is the former `u8g2gl_scrolling_label` widget's exact
-     * marquee, moved onto this property rather than reimplemented: it scrolls
-     * left, wraps to re-enter from the right once the text has fully exited,
-     * and is_scroll_finished() latches `true` on that first wrap — the signal
-     * a message-rotation controller (e.g. `wd_scrolling_message_pool`) uses to
-     * advance to the next message. `U8G2GL_LONG_SCROLL_CIRCULAR` runs the
-     * identical marquee but never latches that flag, because it is meant to
-     * loop forever with no external controller watching it — "wrapping
-     * continuously" with nothing to signal completion to. It does not
-     * additionally implement a *reversing* (bounce) marquee; no such timing
-     * was specified for this work order, and inventing one was judged a larger
-     * change than "move the existing behaviour" warranted. See WO2's
-     * Completion Report for the full reasoning.
+     * `U8G2GL_LONG_SCROLL` and `U8G2GL_LONG_SCROLL_CIRCULAR` share the same
+     * marquee mechanics but diverge in what happens once the text reaches an
+     * end — matching LVGL exactly (`LV_LABEL_LONG_SCROLL` bounces,
+     * `LV_LABEL_LONG_SCROLL_CIRCULAR` wraps continuously), because §1.4 makes
+     * that familiarity a goal:
+     *
+     * - `U8G2GL_LONG_SCROLL` **reverses**: it scrolls left until the text's
+     *   far edge reaches the widget's opposite bound, dwells there for
+     *   `static_dwell_ms` (the same property that governs the static-fit
+     *   dwell — one timing concept, not two), then scrolls back to the
+     *   origin, dwells again, and repeats indefinitely. Because it never
+     *   terminates, is_scroll_finished() always reports `false` for it — the
+     *   same answer as `U8G2GL_LONG_SCROLL_CIRCULAR`, for the same reason:
+     *   there is nothing for a message-rotation controller to wait on when a
+     *   mode is designed to run forever. (PR-3R WO2 originally moved
+     *   `u8g2gl_scrolling_label`'s continuous-wrap behaviour onto this value
+     *   and latched completion on the first wrap; WO2b corrected both — the
+     *   design spec's semantics table always specified reversing, and only
+     *   the old widget's wrap survives under `scroll_circular` below.)
+     * - `U8G2GL_LONG_SCROLL_CIRCULAR` **wraps**: it scrolls left continuously,
+     *   re-entering smoothly from the right edge once the text has fully
+     *   exited, and never signals completion — it is meant to loop forever
+     *   with no external controller watching it.
      *
      * Changing the mode marks the frame dirty and invalidates measured layout
      * if the value actually changes.
@@ -194,10 +207,11 @@ public:
     /**
      * @brief Query whether a scroll cycle or static dwell has completed.
      *
-     * Under U8G2GL_LONG_SCROLL: true once the text has fully exited the left
-     * edge and wrapped. Under U8G2GL_LONG_SCROLL_CIRCULAR: always false — see
-     * set_long_mode(). For text that fits (no scroll needed), true after the
-     * dwell timeout expires. Meaningless outside a scrolling long_mode.
+     * Under U8G2GL_LONG_SCROLL and U8G2GL_LONG_SCROLL_CIRCULAR alike: always
+     * false — both modes run their marquee indefinitely (one reversing, one
+     * wrapping; see set_long_mode()), so neither has a cycle to signal as
+     * finished. For text that fits (no scroll needed), true after the dwell
+     * timeout expires. Meaningless outside a scrolling long_mode.
      *
      * @return true if the cycle or dwell has finished, false otherwise.
      */
@@ -280,6 +294,9 @@ private:
     bool needs_layout_ = true;            ///< True if text measurement is required
     bool scroll_finished_ = false;        ///< True when cycle or dwell completes
     bool overflow_ = false;               ///< True if measured text is wider than the widget
+    bool scroll_forward_ = true;          ///< U8G2GL_LONG_SCROLL only: true while advancing away
+                                           ///< from the origin, false while reversing back to it
+                                           ///< (WO2b, [D-19]); unused by scroll_circular's wrap.
 };
 
 #endif // U8G2GL_LABEL_H

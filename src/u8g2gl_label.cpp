@@ -106,19 +106,24 @@ uint16_t u8g2gl_label::get_static_dwell_ms() const {
 }
 
 // u8g2gl_label::is_scroll_finished
-// Query whether the marquee has completed one cycle (U8G2GL_LONG_SCROLL only
-// — see set_long_mode()) or static-fit text finished dwelling.
+// Query whether static-fit text has finished dwelling. Neither marquee mode
+// (U8G2GL_LONG_SCROLL reversing, U8G2GL_LONG_SCROLL_CIRCULAR wrapping) ever
+// latches this for the marquee itself — both run indefinitely — see
+// set_long_mode().
 bool u8g2gl_label::is_scroll_finished() const {
     return scroll_finished_;
 }
 
 // u8g2gl_label::reset_scroll
 // Rewinds marquee offset to the starting coordinate and resets animation
-// timers. Moved unchanged from u8g2gl_scrolling_label.
+// timers. Moved unchanged from u8g2gl_scrolling_label, plus scroll_forward_
+// (WO2b): a rewound label always departs forward, regardless of which
+// direction it was travelling in when reset.
 void u8g2gl_label::reset_scroll() {
     scroll_x_ = 0;
     last_scroll_ms_ = 0;
     scroll_finished_ = false;
+    scroll_forward_ = true;
     mark_dirty();
 }
 
@@ -126,7 +131,9 @@ void u8g2gl_label::reset_scroll() {
 // Outside the two scrolling modes, labels are static text and never animate —
 // this is the original u8g2gl_label::tick() contract, preserved for clip and
 // dots. Under U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR, the state
-// machine below is u8g2gl_scrolling_label::tick() moved unchanged.
+// machine below is u8g2gl_scrolling_label::tick() moved largely unchanged;
+// Step 5 branches on long_mode_ because WO2b gave U8G2GL_LONG_SCROLL its own
+// reversing mechanic while leaving U8G2GL_LONG_SCROLL_CIRCULAR's wrap intact.
 //   now_ms — current system millisecond timestamp
 uint32_t u8g2gl_label::tick(uint32_t now_ms) {
     if (long_mode_ != U8G2GL_LONG_SCROLL && long_mode_ != U8G2GL_LONG_SCROLL_CIRCULAR) {
@@ -169,23 +176,64 @@ uint32_t u8g2gl_label::tick(uint32_t now_ms) {
 
     // --- Step 5: Advance scrolling marquee ---
     if (now_ms > last_scroll_ms_) {
-        scroll_x_++;
+        uint32_t interval_ms = (scroll_px_per_sec_ > 0) ? (1000 / scroll_px_per_sec_) : 40;
 
-        // When the string has fully exited screen left (plus 30px gap for visual
-        // polish), wrap to re-enter smoothly from the right edge. Only
-        // U8G2GL_LONG_SCROLL latches scroll_finished_ here — that is the signal
-        // a message-rotation controller (e.g. wd_scrolling_message_pool) waits
-        // on to advance to the next message. U8G2GL_LONG_SCROLL_CIRCULAR shares
-        // this exact wrap mechanic but never latches it, because it is meant to
-        // loop forever with no controller watching for a finished cycle.
-        if (scroll_x_ > message_width_ + 30) {
-            if (long_mode_ == U8G2GL_LONG_SCROLL) {
-                scroll_finished_ = true;
+        // U8G2GL_LONG_SCROLL reverses (LV_LABEL_LONG_SCROLL bounces);
+        // U8G2GL_LONG_SCROLL_CIRCULAR below wraps (LV_LABEL_LONG_SCROLL_CIRCULAR
+        // loops). These are LVGL's own semantics (§1.4), not a copy-paste split
+        // of one behaviour into two — do not collapse them back together.
+        if (long_mode_ == U8G2GL_LONG_SCROLL) {
+            // scroll_max is the offset at which the text's far (right) edge
+            // has just reached the widget's right bound: draw_x + message_width_
+            // = (x_ - scroll_max) + message_width_ = x_ + w_ when
+            // scroll_max = message_width_ - w_. needs_scroll_ guarantees
+            // message_width_ > w_ here, so scroll_max is always positive.
+            int16_t scroll_max = static_cast<int16_t>(message_width_ - w_);
+
+            if (scroll_forward_) {
+                scroll_x_++;
+                if (scroll_x_ >= scroll_max) {
+                    // Far edge reached: clamp exactly (a wide interval could
+                    // otherwise overshoot by more than one pixel), dwell using
+                    // the same static_dwell_ms_ that governs the static-fit
+                    // pause, and flip direction so the tick after the dwell
+                    // steps back toward the origin.
+                    scroll_x_ = scroll_max;
+                    scroll_forward_ = false;
+                    last_scroll_ms_ = now_ms + static_dwell_ms_;
+                    mark_dirty();
+                    return static_dwell_ms_;
+                }
+            } else {
+                scroll_x_--;
+                if (scroll_x_ <= 0) {
+                    // Back at the origin: clamp, dwell, flip to depart forward
+                    // again. Reversing is endless (no controller watches for a
+                    // finished cycle — see is_scroll_finished()), so this pair
+                    // of dwells repeats indefinitely rather than latching.
+                    scroll_x_ = 0;
+                    scroll_forward_ = true;
+                    last_scroll_ms_ = now_ms + static_dwell_ms_;
+                    mark_dirty();
+                    return static_dwell_ms_;
+                }
             }
+
+            last_scroll_ms_ = now_ms + interval_ms;
+            mark_dirty();
+            return interval_ms;
+        }
+
+        // U8G2GL_LONG_SCROLL_CIRCULAR: unchanged from WO2. When the string has
+        // fully exited screen left (plus 30px gap for visual polish), wrap to
+        // re-enter smoothly from the right edge. Never latches
+        // scroll_finished_ — it is meant to loop forever with no controller
+        // watching for a finished cycle.
+        scroll_x_++;
+        if (scroll_x_ > message_width_ + 30) {
             scroll_x_ = static_cast<int16_t>(-w_);
         }
 
-        uint32_t interval_ms = (scroll_px_per_sec_ > 0) ? (1000 / scroll_px_per_sec_) : 40;
         last_scroll_ms_ = now_ms + interval_ms;
         mark_dirty();
         return interval_ms;

@@ -5,7 +5,7 @@ title: "Reversing scroll — make long_mode=scroll match its specification"
 branch: u8g2gl-remediation/wo2b-scroll-semantics
 base: u8g2gl-remediation/wo2-label-long-mode
 complexity: standard
-status: pending
+status: complete
 ---
 
 # WO2b — Reversing scroll
@@ -133,3 +133,126 @@ do not file an issue. The architect triages and files.
 ## Completion Report
 
 <!-- Written by the worker at task completion -->
+
+**Status: complete.**
+
+### What changed
+
+- **`include/u8g2gl/u8g2gl_label.h`**: rewrote `set_long_mode()`'s Doxygen to
+  state the corrected LVGL-matching semantics — `scroll` reverses, `scroll_circular`
+  wraps — and to record why (WO2 had wired the absorbed
+  `u8g2gl_scrolling_label`'s continuous wrap onto `scroll` by mistake; the
+  design spec's semantics table always specified reversing). Updated
+  `is_scroll_finished()`'s doc to say neither marquee mode ever latches, since
+  reversing is endless the same way wrapping is. Added one new private member,
+  `scroll_forward_` (bool), documented and placed in the existing trailing
+  bool group so no new padding is introduced. Updated the file-header
+  `Purpose` block to mention WO2b.
+- **`src/u8g2gl_label.cpp`**: `tick()`'s Step 5 now branches on `long_mode_`.
+  `U8G2GL_LONG_SCROLL_CIRCULAR`'s branch is the original code, moved but not
+  altered — same `message_width_ + 30` wrap gap, same `-w_` re-entry, same
+  never-latches behaviour. `U8G2GL_LONG_SCROLL`'s new branch walks `scroll_x_`
+  from `0` up to `scroll_max = message_width_ - w_` (the offset at which the
+  text's far edge exactly reaches the widget's opposite bound), clamps and
+  dwells there for `static_dwell_ms_` (reusing the existing property, no new
+  schema surface), flips `scroll_forward_`, then walks back down to `0` and
+  dwells again, indefinitely — `scroll_finished_` is never set by this path,
+  matching `scroll_circular`'s "endless, so never finishes" contract.
+  `reset_scroll()` now also resets `scroll_forward_ = true` so a rewound label
+  always departs forward. `render_scroll()` needed no changes: it already
+  draws at `x_ - scroll_x_`, which is correct for both the wrap range
+  (`-w_..message_width_+30`) and the new bounce range (`0..scroll_max`).
+- **`test/test_label.cpp`**: replaced `LabelScroll.WrapAroundSignalsFinished`
+  (which asserted exactly the wrap-and-latch behaviour this work order
+  removes from `scroll`) with `LabelScroll.ReversesAtFarEdgeAndReturnsToOrigin`,
+  which drives the marquee to the far edge, asserts the offset there, asserts
+  `is_scroll_finished()` stays `false`, then drives it through the dwell and
+  back to the origin, asserting the offset genuinely decreases and returns to
+  `10`. Added `LabelScroll.DwellsAtFarEndForStaticDwellMs` (asserts the tick
+  that reaches the far edge reports `static_dwell_ms_`, not the usual
+  per-pixel interval, and that position holds steady mid-dwell). Added
+  `Label.ScrollAndScrollCircularAreObservablyDifferent`, run against both
+  modes side by side with identical setup, asserting `scroll`'s offset stays
+  bounded (`<= x_`) while `scroll_circular`'s goes past it after wrapping —
+  this is the test the Objective's line item 1 required, so the two modes can
+  never be silently collapsed again. Added `Label.ShortTextDoesNotScrollInEitherMode`,
+  parameterised over both scrolling modes, confirming the no-scroll dwell path
+  (Step 4) governs both and neither moves `scroll_x_`.
+
+### Not touched
+
+`scroll_circular`'s implementation and its two existing tests
+(`LabelScrollCircular.WrapsWithoutSignalingFinished`,
+`LabelScrollCircular.StillMarquees`) are byte-for-byte unchanged and pass
+without modification, as required. No other widget, the style system, the
+WO1/WO2 dirty-flag work, the CLI, or `docs/` were touched. The manifest XML's
+`long_mode` property descriptions already read generically ("scroll and
+scroll_circular marquee the text") and did not misstate wrap-vs-reverse
+semantics, so `include/u8g2gl/manifests/u8g2gl_label.xml` needed no edit.
+
+### is_scroll_finished() decision (line item explicitly requiring a stated choice)
+
+WO2 latched `scroll_finished_ = true` for `long_mode="scroll"` on its first
+wrap. Reversing has no equivalent "cycle complete" moment — it runs forever,
+bouncing between the two ends — so I made it behave exactly as
+`scroll_circular` already does: `is_scroll_finished()` always reports `false`
+for the marquee itself under `U8G2GL_LONG_SCROLL` now, same as under
+`U8G2GL_LONG_SCROLL_CIRCULAR`. This is a deliberate choice, not an oversight:
+a message-rotation controller that was relying on WO2's old latch-on-wrap
+signal for `scroll` will need to move to a fixed-duration rotation or to
+`scroll_circular` plus its own timer — see Issue Surfacing below.
+
+### Test counts
+
+- **Before** (WO2 baseline, `git show HEAD:test/test_label.cpp`): **32 tests**
+  in `test_label.cpp`.
+- **After**: **35 tests** — `LabelScroll.WrapAroundSignalsFinished` was
+  replaced by `LabelScroll.ReversesAtFarEdgeAndReturnsToOrigin` (net 0), and
+  three new tests were added: `LabelScroll.DwellsAtFarEndForStaticDwellMs`,
+  `Label.ScrollAndScrollCircularAreObservablyDifferent`, and
+  `Label.ShortTextDoesNotScrollInEitherMode` (net +3). All 35 pass.
+- Full project `ctest --test-dir build`: **210 tests, 100% pass** (one
+  pre-existing, unrelated `SizeOfReport.ThirtyTwoBitTarget` skip, present
+  before this work order too — it is gated on a 32-bit build that this host
+  doesn't run).
+- CLI: `npx vitest run` — **220 tests, 26 files, all pass**, untouched by this
+  change (no CLI files were in scope).
+
+### Measured sizeof(u8g2gl_label)
+
+**80 bytes**, unchanged from WO2's baseline, on this 64-bit host
+(`sizeof(u8g2gl_obj)` is 48 bytes on the same host). The new
+`scroll_forward_` bool landed inside the existing trailing group of four
+`bool` members with no new padding introduced — confirmed by
+`test/test_label.cpp`'s `Label.SizeOf` (`RecordProperty` + `EXPECT_LE(...,
+80u)`), which passed without needing its ceiling raised.
+
+### Verification
+
+- `cmake --build build` — clean, zero warnings under `-Wall -Wextra -Wpedantic`.
+- `ctest --test-dir build` — 210/210 pass (1 pre-existing skip, unrelated).
+- `cd cli && npx vitest run` — 220/220 pass.
+- `git diff --stat` — touches only `include/u8g2gl/u8g2gl_label.h`,
+  `src/u8g2gl_label.cpp`, `test/test_label.cpp`, and this `WORKORDER.md`.
+
+### Issue Surfacing (not fixed, per instructions)
+
+- **Behavioural break for any consumer relying on WO2's old `scroll`
+  latch-on-wrap signal.** WO2's Completion Report (referenced in this
+  WORKORDER's Background) noted `u8g2gl_scrolling_label`'s
+  `is_scroll_finished()` was the signal `wd_scrolling_message_pool`-style
+  controllers use to advance to the next message. That controller pattern, if
+  it exists anywhere downstream targeting `long_mode="scroll"` specifically
+  (as opposed to the always-was-non-latching `scroll_circular`), will now
+  never see `is_scroll_finished()` become true for the marquee itself.
+  Nothing in this WORKORDER's boundary box (`include/`, `src/`, `test/` for
+  `u8g2gl_label` only) surfaced such a consumer, but I did not search outside
+  it — the architect should confirm no in-tree or documented example wires a
+  message-rotation controller to `scroll`'s old latching behaviour, and if one
+  does, decide whether it should move to `scroll_circular` plus its own timer,
+  or whether a rotation needs a different signal altogether.
+- **No separate return-speed property was requested or added** —
+  `scroll_px_per_sec` governs both directions, per the WORKORDER's explicit
+  instruction not to add one. Flagging only because it is the one place a
+  future request for "faster snap-back" would most likely land, and it should
+  be a deliberate schema decision, not a reflexive addition.

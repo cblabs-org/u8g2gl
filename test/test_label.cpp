@@ -427,33 +427,173 @@ TEST(LabelScroll, ConfigurableScrollSpeed) {
     EXPECT_EQ(label.tick(501), 20u);
 }
 
-TEST(LabelScroll, WrapAroundSignalsFinished) {
+// WO2b: long_mode="scroll" must reverse at each end rather than wrap
+// continuously — the design spec's semantics table always specified this;
+// WO2 had wired the absorbed u8g2gl_scrolling_label's continuous wrap onto
+// this value by mistake (that mechanic is scroll_circular's, and stays
+// there — see LabelScrollCircular below). This test replaces WO2's
+// WrapAroundSignalsFinished, which asserted exactly the wrapping behaviour
+// this work order corrects.
+TEST(LabelScroll, ReversesAtFarEdgeAndReturnsToOrigin) {
     u8g2gl_label label;
     label.set_long_mode(U8G2GL_LONG_SCROLL);
     label.set_coords(10, 5, 50, 16);
     label.set_text("Short text");
 
     U8G2 display;
-    display.utf8_width_val = 60; // message_width = 60
+    display.utf8_width_val = 60; // message_width = 60; scroll_max = 60 - 50 = 10
     label.render(display);
 
-    // Initial tick establishes pause
+    // Initial tick establishes the initial-delay pause.
     label.tick(0);
 
-    // Step until scroll_x exceeds message_width + 30 = 90
+    // Step well past the point where the far edge (scroll_max = 10 px) is
+    // reached; each interval advances the offset by exactly 1 px.
     uint32_t t = 3001;
-    for (int i = 0; i < 91; ++i) {
+    for (int i = 0; i < 15; ++i) {
         label.tick(t);
         t += 41;
     }
 
-    // Now scroll_x should wrap to -w_ (-50) and scroll_finished becomes true —
-    // only long_mode="scroll" latches this; see LabelScrollCircular below.
-    EXPECT_TRUE(label.is_scroll_finished());
-
-    // Next render should draw at x - scroll_x = 10 - (-50) = 60 (right edge)
+    // Far edge reached and clamped: draw_x = x_ - scroll_max = 10 - 10 = 0,
+    // putting the text's right edge (0 + message_width 60 = 60) exactly on
+    // the widget's right bound (x_ + w_ = 10 + 50 = 60).
     label.render(display);
-    EXPECT_EQ(display.last_draw_utf8_x, 60);
+    EXPECT_EQ(display.last_draw_utf8_x, 0);
+
+    // Reversing is endless — see set_long_mode() — so it must never latch,
+    // unlike WO2's old wrap-based implementation.
+    EXPECT_FALSE(label.is_scroll_finished());
+
+    // Dwell at the far end for static_dwell_ms (default 5000ms), then the
+    // offset must begin DECREASING again. This is the assertion that fails
+    // against WO2's continuous-wrap implementation and is the whole point of
+    // this work order.
+    t += 5001; // clear the far-end dwell
+    label.tick(t);
+    t += 41;
+    label.tick(t);
+    label.render(display);
+    EXPECT_GT(display.last_draw_utf8_x, 0); // moved back off the far edge
+    EXPECT_LT(display.last_draw_utf8_x, 10);
+
+    // Keep stepping until the marquee returns fully to the origin.
+    for (int i = 0; i < 15; ++i) {
+        t += 41;
+        label.tick(t);
+    }
+    label.render(display);
+    EXPECT_EQ(display.last_draw_utf8_x, 10); // back at x_ - scroll_x(0) = 10
+    EXPECT_FALSE(label.is_scroll_finished()); // still never latches
+}
+
+// WO2b: dwell at both ends uses static_dwell_ms — no second timing property.
+TEST(LabelScroll, DwellsAtFarEndForStaticDwellMs) {
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(10, 5, 50, 16);
+    label.set_text("Short text");
+    label.set_static_dwell_ms(2000);
+
+    U8G2 display;
+    display.utf8_width_val = 60; // scroll_max = 10
+    label.render(display);
+
+    label.tick(0);
+    uint32_t t = 3001;
+    uint32_t deadline = 0;
+    // Exactly scroll_max (10) movement ticks are needed to walk scroll_x_
+    // from 0 to the far edge; the 10th is the one that clamps and dwells.
+    for (int i = 0; i < 10; ++i) {
+        deadline = label.tick(t);
+        t += 41;
+    }
+    // The tick that reached the far edge must report the configured dwell,
+    // not the usual per-pixel scroll interval.
+    EXPECT_EQ(deadline, 2000u);
+
+    // Position must hold steady while still inside the dwell window.
+    label.render(display);
+    int16_t x_during_dwell = display.last_draw_utf8_x;
+    label.tick(t); // still short of the 2000ms dwell
+    label.render(display);
+    EXPECT_EQ(display.last_draw_utf8_x, x_during_dwell);
+}
+
+// WO2b: scroll and scroll_circular must remain observably different so they
+// can never be silently collapsed back into one behaviour again. scroll's
+// offset is bounded to [0, scroll_max] by reversing; scroll_circular's wrap
+// drives it negative once the text has fully exited.
+TEST(Label, ScrollAndScrollCircularAreObservablyDifferent) {
+    U8G2 display;
+    display.utf8_width_val = 60; // message_width = 60
+
+    u8g2gl_label scroll_label;
+    scroll_label.set_long_mode(U8G2GL_LONG_SCROLL);
+    scroll_label.set_coords(10, 5, 50, 16);
+    scroll_label.set_text("Short text");
+    scroll_label.render(display);
+
+    u8g2gl_label circular_label;
+    circular_label.set_long_mode(U8G2GL_LONG_SCROLL_CIRCULAR);
+    circular_label.set_coords(10, 5, 50, 16);
+    circular_label.set_text("Short text");
+    circular_label.render(display);
+
+    scroll_label.tick(0);
+    circular_label.tick(0);
+
+    uint32_t t = 3001;
+    for (int i = 0; i < 100; ++i) {
+        scroll_label.tick(t);
+        circular_label.tick(t);
+        t += 41;
+    }
+
+    scroll_label.render(display);
+    int16_t scroll_x = display.last_draw_utf8_x;
+    circular_label.render(display);
+    int16_t circular_x = display.last_draw_utf8_x;
+
+    // scroll never advances past the origin (draw_x <= x_ = 10): it bounces
+    // between 0 and the far edge and back.
+    EXPECT_LE(scroll_x, 10);
+    // scroll_circular, having wrapped at least once by now, draws with
+    // draw_x = x_ - scroll_x_ where scroll_x_ went negative (-w_ = -50),
+    // producing an offset scroll can never reach.
+    EXPECT_GT(circular_x, 10);
+
+    EXPECT_FALSE(scroll_label.is_scroll_finished());
+    EXPECT_FALSE(circular_label.is_scroll_finished());
+}
+
+// WO2b line-item: text shorter than the widget does not scroll in either
+// mode — the marquee state machine's Step 4 (no-scroll dwell path) governs
+// both, and neither should move scroll_x_ off the origin.
+TEST(Label, ShortTextDoesNotScrollInEitherMode) {
+    U8G2 display;
+    display.utf8_width_val = 20; // fits well within w=50
+
+    for (u8g2gl_long_mode_t mode : {U8G2GL_LONG_SCROLL, U8G2GL_LONG_SCROLL_CIRCULAR}) {
+        u8g2gl_label label;
+        label.set_long_mode(mode);
+        label.set_coords(10, 5, 50, 16);
+        label.set_text("Fits");
+        label.render(display);
+
+        // Establish the initial-delay deadline (default 3000ms), then jump
+        // straight past the static dwell deadline that follows it (default
+        // 5000ms more) — this is the no-scroll path (Step 4), which never
+        // touches scroll_x_.
+        label.tick(0);
+        EXPECT_TRUE(label.tick(8001) == U8G2GL_IDLE);
+
+        label.render(display);
+        // No marquee offset applied: render_scroll's static-fit centering
+        // path draws at the centered x, not x_ - scroll_x_, but scroll_x_
+        // itself must never have moved off 0 regardless.
+        EXPECT_TRUE(label.is_scroll_finished()); // static-fit dwell elapsed
+    }
 }
 
 TEST(LabelScroll, StaticTextDwell) {
