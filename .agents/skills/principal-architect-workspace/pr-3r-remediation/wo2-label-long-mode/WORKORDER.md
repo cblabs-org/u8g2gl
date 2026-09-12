@@ -68,6 +68,32 @@ and the correct one.
 `truncate` lives on the **style**, not the label, so its removal is wider than it
 looks.
 
+## Added by the Principal Architect after WO1 — the same defect, eleven more times
+
+WO1 fixed `mark_dirty()` on the geometry and flag mutators and **surfaced that the
+style delegations have the identical omission**. Verified: `set_font()`
+(`src/u8g2gl_obj.cpp:195`) calls `style_.set_font(font)` and returns. Changing a
+font, colour, padding or alignment at runtime therefore produces no repaint.
+
+This is folded into WO2 rather than given its own work order because WO2 already
+owns these exact functions — it deletes `set_truncate` from the same delegation
+block. Splitting them means editing the same lines twice, which is the reasoning
+that merged R1.1 and R1.2.
+
+- [ ] Every `u8g2gl_obj` style delegation calls `mark_dirty()`: `set_font`,
+      `set_draw_color`, `set_invert`, `set_padding`, `set_border`, `set_radius`,
+      `set_align`, `set_font_mode`, `set_bitmap_mode`. (`set_truncate` is deleted
+      by this work order, so it needs no fix.)
+- [ ] `apply_style()` likewise — it changes everything at once.
+- [ ] `set_parent_index()` too. Its gap is latent rather than live, as
+      `set_coords()`'s was, and the reason to fix it now is that WO1 established
+      the rule and an exception nobody documented will read as an oversight.
+- [ ] Use the **same change-guard pattern WO1 established** — early return when
+      the value is unchanged, so a setter called every tick does not defeat
+      §11.2's gate. Match it; do not invent a second idiom.
+- [ ] A test per setter asserting the frame is dirty afterwards. These are the
+      tests whose absence let the omission survive WO1's audit.
+
 ## Line-Item Instructions
 
 - [ ] Add `long_mode` to `u8g2gl_label` with values `clip` (default), `dots`,
@@ -97,7 +123,8 @@ looks.
 ## Strict Boundary Box
 
 **In scope:** the label and scrolling-label sources and headers, the style
-sources and headers, `u8g2gl_obj.cpp`'s `set_truncate` forward, the label and
+sources and headers, **all `u8g2gl_obj` style delegations plus `apply_style()`
+and `set_parent_index()`**, the label and
 scrolling-label manifests, the affected tests, both `CMakeLists.txt`, this
 WORKORDER.
 

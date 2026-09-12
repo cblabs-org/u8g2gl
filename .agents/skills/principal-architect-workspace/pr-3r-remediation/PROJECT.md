@@ -28,7 +28,7 @@ serially. PR head is the last branch in the stack.
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
+- [x] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** ✅ `4ca9e01` · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
 - [ ] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** · base WO1 · standard · R1.3, R3.1, R3.2
 - [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2 · standard · new work, required by WO4
 - [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
@@ -116,3 +116,26 @@ recorded in WO8's boundary box.
 - 2026-09-12 — Decomposition drafted by the Chief Architect. [D-21] recorded in
   `docs/decisions/d21-generated-capacities.md`, design_spec §3/§13.7/§18.1, and
   the plan ledger as PR-3R.
+
+### WO1 — complete (`4ca9e01`)
+
+Verified independently: boundary respected exactly, C++ 166 → **175 tests**, zero
+warnings, CLI 224 untouched. `set_coords`, `set_hidden`, `set_disabled` and the
+four new per-axis setters all mark dirty, each guarded on the value actually
+changing so a setter called from a tick loop cannot defeat §11.2's gate.
+
+**Cross-cutting decision — the change-guard is now the house pattern.** WO1
+applied it consistently rather than only to the new setters. Later work orders
+match it rather than inventing a second idiom.
+
+**Correct by design, deliberately not "fixed":** `set_flag`/`clear_flag` do not
+auto-mark, because `clear_dirty()` *is* `clear_flag(DIRTY)` and would immediately
+re-set the flag it clears. Good catch by the worker — a mechanical application of
+the rule would have broken the gate.
+
+**Surfaced and triaged into WO2:** eleven more instances of the same defect — nine
+style delegations, `apply_style()`, and `set_parent_index()`. Verified:
+`set_font()` calls `style_.set_font()` and returns, so a runtime font change never
+repaints. Folded into WO2 rather than given its own order because WO2 already
+edits that delegation block to delete `set_truncate`; separating them means
+touching the same lines twice.
