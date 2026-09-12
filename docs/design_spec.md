@@ -269,6 +269,16 @@ A generated per-container `layout()` function was considered and rejected — it
 
 *Trigger to revisit:* hand-written relayout appearing as friction across three or more real screens — the same trigger [D-7] sets for `<row>`/`<col>`.
 
+### [D-21] Static capacities are generated from the document, not configured by hand
+
+**The generator computes every static capacity — objects per screen, bindings per object, total bindings, styles — from the document it is compiling, and emits them as a generated header. Exceeding a capacity is an arithmetic fact at build time, never a silent failure on the device.**
+
+*Full record:* [decisions/d21-generated-capacities.md](decisions/d21-generated-capacities.md).
+
+*Rationale:* [D-20] makes `U8G2GL_MAX_BINDINGS_PER_OBJ = 4` insufficient by construction — binding `x`, `y`, `width` and `height` exhausts the budget with nothing left for `text`. [D-18] makes object counts rise structurally, because composites are now real objects. Neither ceiling was validated, and `add_binding()` fails by returning `false` — a value generated code can ignore, producing a screen that compiles, boots, and silently fails to update one widget. The generator holds the whole document and can count exactly, so it emits the numbers instead of inheriting a guess.
+
+*Consequences:* a generated config header included ahead of `u8g2gl_config.h`, whose `#ifndef` defaults survive for hand-written use; a hard validator error at **254** objects per screen, which is where `uint8_t` parent indices run out ([A-3]); capacities reported in the §18 budget. Generated code need not check binding returns, because the pool was sized from the very bindings being added — the failure stops existing rather than moving earlier.
+
 ### [D-10] The CLI is TypeScript on Node, distributed via npm
 
 *Rationale:* `npx u8g2gl generate` is the lowest-friction install for the target audience and works identically on macOS, Linux, and Windows. It shares the schema, the XML parser, and the Wasm host with the browser preview — one codebase, not two. The alternative (Python) has a worse Windows story and cannot share code with the preview.
@@ -1473,6 +1483,9 @@ concrete elements.
 
 ### 13.7 Emitted files and functions
 
+**`u8g2gl_generated_config.h` is emitted alongside the screens** ([D-21]). It carries the static capacities computed from this document — objects per screen, bindings per object, total bindings, styles — and is included ahead of `u8g2gl_config.h`, whose `#ifndef` defaults then apply only to anything the generator did not set. `U8G2GL_MAX_TOTAL_BINDINGS` is the true sum across objects, not `objects × bindings`, which over-allocates whenever the worst-case object is not the typical one.
+
+
 Per screen, one `.cpp`. Plus one `ui.hpp` umbrella, and one unit each for subjects, fonts, and images.
 
 ```cpp
@@ -1820,6 +1833,26 @@ Within that, the report exists to catch cases where a *project* wanders into tro
 Each of those is invisible in XML and obvious in a budget table, which is the point. Reporting also keeps §1.3's honesty enforced by tooling rather than by good intentions.
 
 ---
+
+### 18.1 Capacity reporting — [D-21]
+
+The budget also reports how much of each static pool the project uses, because a
+capacity is the same class of fact as a size and is discovered too late if it is
+only discovered on hardware:
+
+```
+  CAPACITY (generated — see u8g2gl_generated_config.h)
+    objects, busiest screen              47 / 254   screen_departures
+    bindings, busiest object              6         lbl_next_service
+    bindings, total                      91
+    styles                                5
+```
+
+The object ceiling of 254 is structural — `parent_index_` is a `uint8_t` and one
+value is the root sentinel ([A-3]) — so the validator rejects a screen that
+exceeds it, naming the screen and its count. The other figures have no fixed
+ceiling: they are what the generator emitted, and they exist in the report so a
+project can see itself approaching a limit rather than meeting one.
 
 ## 19. Naming Conventions
 

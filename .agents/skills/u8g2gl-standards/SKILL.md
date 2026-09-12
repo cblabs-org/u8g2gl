@@ -149,6 +149,41 @@ These come from the design spec and are enforced in review:
 - **Honest cost reporting** — §1.3 forbids claims the budget cannot substantiate.
   If a change makes the §18 report inaccurate, the change is wrong.
 - **Zero warnings** under `-Wall -Wextra -Wpedantic`. Not "few". Zero.
+- **Every mutator that changes what is drawn calls `mark_dirty()`.** §11.2 gates
+  `sendBuffer()` on the frame dirty flag, so a setter that mutates state and
+  returns leaves the display stale until something unrelated forces a frame. This
+  has already shipped once — `set_hidden()` and `set_disabled()` had it — and it
+  is the worst kind of defect, because it works on any screen with an animation
+  running and fails silently on a static one.
+- **Element knowledge is data, never code** ([D-17]). No hardcoded list of element
+  names anywhere in the CLI. The manifests are the source. A hardcoded set drifts
+  from them, and one already did: `TIER1_PRIMITIVES` named three elements that do
+  not exist and omitted four that do, so three phantom tags validated cleanly.
+- **Static capacities are generated, never guessed** ([D-21]). The generator
+  counts objects and bindings from the document and emits the constants.
+  `u8g2gl_config.h`'s defaults exist for hand-written use only. Do not respond to
+  a capacity problem by raising a default in generated-code paths.
+
+## 4.1 Current design baseline — read before writing any element code
+
+Four decisions taken on 2026-09-11/12 changed the element model. Code written
+against the older shape will look plausible and be wrong:
+
+- **[D-18]** — there is **one element vocabulary**. No Tier 1 / Tier 2 split, no
+  `components/`, no `<component>`. Whether an instance becomes a C++ object or
+  draw calls is a generator outcome, never an authoring category. Primitives that
+  need no object compile to `u8g2gl_draw_*` **free functions**, not classes — if
+  you find yourself tidying those into a class, you are reintroducing the split.
+- **[D-19]** — overflow is `long_mode` on `u8g2gl_label`. `truncate` and
+  `u8g2gl_scrolling_label` are gone. `wrap` is deliberately not offered.
+- **[D-20]** — `x`, `y`, `width`, `height` are bindable. Per-axis setters exist
+  because a `bind_width` observer has one value and nothing to pass for the other
+  three. There is no runtime layout pass.
+- **[D-21]** — capacities are generated from the document.
+
+Full records under `docs/decisions/`. `docs/design_spec.md` is normative; where
+this skill and the spec disagree, the spec wins and the skill is stale — say so
+rather than following it.
 
 ## 5. Reference
 

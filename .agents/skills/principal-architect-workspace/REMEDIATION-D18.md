@@ -8,6 +8,23 @@ longer matches the design, and in what order it should be corrected.
 
 **No code has been changed.** This is an assessment only.
 
+> **Chief Architect, 2026-09-12.** Assessment accepted; every claim in it was
+> verified against the code. Three amendments, recorded in
+> [pr-3r-remediation/PROJECT.md](pr-3r-remediation/PROJECT.md):
+> **R1.1 is a live defect, not a latent one** — `set_hidden()` and
+> `set_disabled()` are public API and fail to mark dirty today;
+> **`TIER1_PRIMITIVES` has already drifted**, so three phantom tags validate
+> cleanly (tested), which makes R2.2 a live hole rather than a design smell; and
+> **the static pools no longer fit the design**, now recorded as
+> [`[D-21]`](../../../docs/decisions/d21-generated-capacities.md) — `[D-20]`'s
+> four geometry bindings exhaust `MAX_BINDINGS_PER_OBJ = 4` by construction, and
+> nothing validates it.
+>
+> Sequencing follows the recommendation with one change: R1.1 and R1.2 are one
+> work order, since the per-axis setters are the same functions that need the
+> dirty call. The eight `u8g2gl_draw_*` functions are pulled **into** scope,
+> because the manifests name them and the cross-test would otherwise be red.
+
 ---
 
 ## Headline

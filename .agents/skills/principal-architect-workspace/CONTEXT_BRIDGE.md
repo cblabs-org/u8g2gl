@@ -54,7 +54,11 @@ Wasm preview not a JS reimplementation `[D-9]`; TypeScript CLI on npm `[D-10]`;
 prefixes, no namespaces `[D-13]`; display catalogue generated from U8G2's own
 tables `[D-14]`; `ui_handler()` returns ms-until-next-work `[D-15]`; `--json` on
 every command `[D-16]`; build-time `<api>` manifests, no runtime property table
-`[D-17]`.
+`[D-17]`; **one element vocabulary, tiers collapsed `[D-18]`; `long_mode` on the
+label `[D-19]`; bindable geometry, no runtime layout `[D-20]`; generated
+capacities `[D-21]`**. The last four were taken 2026-09-11/12 and **invalidate
+parts of merged PR-01/02/03** — see PR-3R below. Full records under
+`docs/decisions/`.
 
 **`[A-n]` architecture stance** (plan §1): heritage rejected — `modules/U8G2Display`
 is an integration reference, not a basis `[A-1]`; parallel LVGL 9's *decomposition*
@@ -100,6 +104,18 @@ otherwise skips loudly, so §18 still cannot cite a target figure but the harnes
 ready.
 
 Versions after PR-03: schema **0.3** (unchanged), CLI/generator **0.5.0**.
+
+**PR-3R — remediation. AWAITING APPROVAL.** Eight work orders realigning the
+merged runtime, CLI and widgets to `[D-18]`–`[D-21]` and schema 0.4. **It blocks
+PR-04**, which consumes the schema model and manifests directly. Assessment in
+`REMEDIATION-D18.md`, decomposition in `pr-3r-remediation/PROJECT.md`.
+
+Three things found while assessing it, all verified against the code:
+`set_hidden()`/`set_disabled()` fail to mark the frame dirty **today**, not
+latently; `TIER1_PRIMITIVES` has drifted so `<u8g2gl_frame>` validates cleanly
+with no manifest behind it; and `MAX_BINDINGS_PER_OBJ = 4` is exceeded by
+`[D-20]`'s four geometry bindings alone, with no validation and a silent runtime
+failure — which is why `[D-21]` exists.
 
 **Next:** PR-04 generator, PR-05 foundation integration, PR-06 Wasm preview, then
 **PR-07 — the GO/NO-GO gate**. Ledger in plan §5.

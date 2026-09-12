@@ -271,7 +271,8 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | **PR-01** ✅ | **U8G2GL** | **MERGED (#1).** Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
 | **PR-02** ✅ | **U8G2GL** | **MERGED (#2).** CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
 | **PR-03** ✅ | **U8G2GL** | **MERGED (#3).** Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Each ships its `<api>` manifest. Also settled `[U-1]` element identity (ui_spec §16.1) | PR-01 | — |
-| **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, composite expansion, build-time layout ([D-7], [D-20]), identifier mangling, realisation ([D-18]) | PR-02, PR-03 | — |
+| **PR-3R** | **U8G2GL** | **★ INTERIM — remediation.** Realigns merged PR-01/02/03 to [D-18], [D-19], [D-20], [D-21] and schema 0.4. Dirty-flag defect, per-axis geometry setters, `long_mode` absorbing `u8g2gl_scrolling_label`, manifest `draw=`/`animated`, composite schema merge, capacity generation groundwork, 0.3→0.4 refusal path. See `.agents/skills/principal-architect-workspace/REMEDIATION-D18.md` | PR-03 | — |
+| **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, composite expansion, build-time layout ([D-7], [D-20]), identifier mangling, realisation ([D-18]), generated capacities ([D-21]) | **PR-3R** | — |
 | **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
 | **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
@@ -313,6 +314,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | Pair | Overlap | Guidance |
 |---|---|---|
 | PR-01 ∥ PR-02 | None — different repos | **Safe. Recommended** — the critical path |
+| PR-3R → PR-04 | PR-04 consumes the schema model and manifests directly, so it must not start until PR-3R lands — otherwise the generator is written twice |
 | PR-03 ∥ PR-04 | Contract dependency: PR-04 generates against PR-03's widget manifests | **Resolved.** The contract is now written — [design_spec.md §13](design_spec.md), normative, with [D-17] fixing the manifest mechanism. Both sides build against §13 rather than against each other, so they may proceed in parallel |
 | PR-04 ∥ PR-06 | Both consume PR-03; different repos | Safe, same caveat |
 | PR-08 ∥ PR-09 | Both touch `modules/U8G2GL` | **Conflict likely.** Serialise or split by directory |

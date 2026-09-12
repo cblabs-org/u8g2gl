@@ -481,3 +481,69 @@ itself.
 collection. Q-8 is the one with teeth: it is the difference between a designer
 being able to draw a list row and list rows being a C++ job permanently. Schema
 surface, so §1.5 applies — deferred until a real screen demonstrates the need.
+
+---
+
+## Session — 2026-09-12 · [D-21] recorded, PR-3R decomposed
+
+The tier-collapse decisions ([D-18]/[D-19]/[D-20], `245f9be`) invalidated parts
+of merged PR-01/02/03. The PA's assessment (`REMEDIATION-D18.md`) was verified
+claim by claim and accepted, with three amendments.
+
+### [D-21] Static capacities are generated, not configured
+
+`docs/decisions/d21-generated-capacities.md`, design_spec §3, §13.7, §18.1.
+
+The pools were sized before the design changed under them.
+`U8G2GL_MAX_BINDINGS_PER_OBJ` is 4, and [D-20] makes `x`/`y`/`width`/`height`
+bindable — so one element binding its geometry has nothing left for `text`. Not
+a tight fit; a ceiling the design's own examples cross. [D-18] raises object
+counts structurally by making composites real objects. Neither is validated, and
+`add_binding()` fails by returning `false`, which generated code can ignore: the
+screen compiles, links, boots, and silently fails to update one widget.
+
+The generator holds the whole document, so it emits the numbers instead of
+inheriting a guess. The point is not that the failure moves earlier — it stops
+existing for generated projects, because the pool is sized from the very bindings
+being added.
+
+Rejected: raising the defaults (a bigger guess, and static pools mean every
+project pays the worst case), dynamic allocation (violates [D-1]), runtime assert
+(discovered on hardware).
+
+### Three findings the assessment did not have
+
+1. **R1.1 is live, not latent.** `set_hidden()` and `set_disabled()` are public
+   API and mark nothing dirty today. The bound path is safe — the observer marks
+   dirty — so only imperative callers are affected, which is why no test caught
+   it and why it works on any screen with an animation running.
+2. **`TIER1_PRIMITIVES` has already drifted.** It names `frame`, `disc`,
+   `bitmap` — no manifests — and omits `ellipse`, `pixel`, `triangle`, `xbm`.
+   Tested: `<u8g2gl_frame>` passes validation, `<u8g2gl_nonsense>` is rejected.
+   Three phantom tags would reach PR-04's generator with nothing behind them.
+3. **The capacity gap above**, now [D-21].
+
+All three came from writing a throwaway test rather than reading harder. That is
+now twice in two reviews that a five-minute reproduction found something reading
+did not.
+
+### PR-3R decomposed — eight work orders, awaiting approval
+
+`pr-3r-remediation/PROJECT.md`. Deviations from the assessment: R1.1+R1.2 merged
+(the per-axis setters are the same functions needing the dirty call); the eight
+`u8g2gl_draw_*` functions pulled into scope (WO4's manifests name them and the
+cross-test would be red between work orders).
+
+### Documentation carried forward
+
+The standards skill gained three non-negotiables — mutators mark dirty, element
+knowledge is data not code, capacities are generated — plus a §4.1 design
+baseline naming [D-18]–[D-21], because code written against the old element model
+looks plausible and is wrong.
+
+**Correction to a note made mid-session:** `.claude` looked like a duplicate of
+`.agents` and is in fact a symlink to it, documented in `.gitignore:54`. Writing
+"both copies" through the two paths duplicated every insertion into the one file;
+caught by counting the inserted markers, reverted, reapplied once. The check that
+found it — count what you inserted — is cheaper than the reasoning that would
+have avoided it.
