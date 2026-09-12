@@ -114,25 +114,6 @@ target_compile_options(test_label PRIVATE
 
 gtest_discover_tests(test_label)
 
-add_executable(test_scrolling_label
-    test_scrolling_label.cpp
-)
-
-target_include_directories(test_scrolling_label PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
-)
-
-target_link_libraries(test_scrolling_label PRIVATE
-    u8g2gl
-    GTest::gtest_main
-)
-
-target_compile_options(test_scrolling_label PRIVATE
-    -Wall -Wextra -Wpedantic
-)
-
-gtest_discover_tests(test_scrolling_label)
-
 add_executable(test_xbm
     test_xbm.cpp
 )

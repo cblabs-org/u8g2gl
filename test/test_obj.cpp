@@ -193,6 +193,220 @@ TEST(Obj, PerAxisSettersUnchangedDoNotMarkDirty) {
     EXPECT_FALSE(obj.is_dirty());
 }
 
+// --- PR-3R WO2: the style delegations, apply_style() and set_parent_index()
+// had the identical mark_dirty() omission WO1 fixed for geometry and flags —
+// surfaced by the Chief Architect after WO1 (see PROJECT.md) and folded into
+// WO2 because it already edits this delegation block to delete set_truncate().
+// Same change-guard pattern as above: mark dirty only on an actual change.
+
+static const uint8_t s_font_a[] = { 0x01, 0x02 };
+static const uint8_t s_font_b[] = { 0x03, 0x04 };
+
+TEST(Obj, SetFontMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_font(s_font_a);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetFontUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_font(s_font_a);
+    obj.clear_dirty();
+    obj.set_font(s_font_a);  // same pointer — no visible change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetDrawColorMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_draw_color(U8G2GL_COLOR_0);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetDrawColorUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    // A fresh object's draw_color equals the default (U8G2GL_COLOR_1) without
+    // ever being explicitly set, so the first call is a real change to the
+    // mask even though the value matches — establish it, then repeat.
+    obj.set_draw_color(U8G2GL_COLOR_1);
+    obj.clear_dirty();
+    obj.set_draw_color(U8G2GL_COLOR_1);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetInvertMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_invert(true);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetInvertUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_invert(false);  // establish explicit state before guarding
+    obj.clear_dirty();
+    obj.set_invert(false);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetPaddingMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_padding(4);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetPaddingUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_padding(0);  // establish explicit state before guarding
+    obj.clear_dirty();
+    obj.set_padding(0);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetBorderMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_border(true);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetBorderUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_border(false);  // establish explicit state before guarding
+    obj.clear_dirty();
+    obj.set_border(false);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetRadiusMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_radius(3);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetRadiusUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_radius(0);  // establish explicit state before guarding
+    obj.clear_dirty();
+    obj.set_radius(0);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetAlignMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_align(U8G2GL_ALIGN_CENTER);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetAlignUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_align(U8G2GL_ALIGN_LEFT);  // establish explicit state before guarding
+    obj.clear_dirty();
+    obj.set_align(U8G2GL_ALIGN_LEFT);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+// The value alone equalling the default is NOT enough to skip the guard: a
+// fresh object's align equals U8G2GL_ALIGN_LEFT without ever being set, and
+// u8g2gl_button's render() (and the label's moved scroll-render path) branch
+// on style_.has(U8G2GL_STYLE_ALIGN) to tell "explicitly LEFT" apart from
+// "unset" — see u8g2gl_obj.cpp's set_align() for the defect this test guards
+// against (Button.RenderAlignmentOverride caught it during WO2).
+TEST(Obj, SetAlignFirstCallMarksDirtyEvenAtDefaultValue) {
+    u8g2gl_obj obj;
+    EXPECT_FALSE(obj.get_resolved_style().has(U8G2GL_STYLE_ALIGN));
+    obj.clear_dirty();
+    obj.set_align(U8G2GL_ALIGN_LEFT);  // matches the default value, but is new
+    EXPECT_TRUE(obj.is_dirty());
+    EXPECT_TRUE(obj.get_resolved_style().has(U8G2GL_STYLE_ALIGN));
+}
+
+TEST(Obj, SetFontModeMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetFontModeUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_font_mode(U8G2GL_FONT_MODE_SOLID);  // establish explicit state first
+    obj.clear_dirty();
+    obj.set_font_mode(U8G2GL_FONT_MODE_SOLID);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, SetBitmapModeMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetBitmapModeUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID);  // establish explicit state first
+    obj.clear_dirty();
+    obj.set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID);  // already explicitly set — no change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, ApplyStyleMarksDirty) {
+    u8g2gl_obj obj;
+    u8g2gl_style s;
+    s.set_font(s_font_a);
+    s.set_align(U8G2GL_ALIGN_CENTER);
+
+    obj.clear_dirty();
+    obj.apply_style(s);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, ApplyStyleUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    u8g2gl_style s;
+    s.set_font(s_font_a);
+    obj.apply_style(s);
+    obj.clear_dirty();
+
+    // Applying the identical style again changes nothing the resolved style
+    // reports — merge_from() re-copies the same values, so no repaint is due.
+    obj.apply_style(s);
+    EXPECT_FALSE(obj.is_dirty());
+}
+
+TEST(Obj, ApplyStyleSecondDifferentStyleMarksDirty) {
+    u8g2gl_obj obj;
+    u8g2gl_style base;
+    base.set_font(s_font_a);
+    obj.apply_style(base);
+    obj.clear_dirty();
+
+    u8g2gl_style overlay;
+    overlay.set_font(s_font_b);
+    obj.apply_style(overlay);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetParentIndexMarksDirty) {
+    u8g2gl_obj obj;
+    obj.clear_dirty();
+    obj.set_parent_index(3);
+    EXPECT_TRUE(obj.is_dirty());
+}
+
+TEST(Obj, SetParentIndexUnchangedDoesNotMarkDirty) {
+    u8g2gl_obj obj;
+    obj.set_parent_index(3);
+    obj.clear_dirty();
+    obj.set_parent_index(3);  // same index — no visible change
+    EXPECT_FALSE(obj.is_dirty());
+}
+
 TEST(Obj, TickReturnsIdle) {
     u8g2gl_obj obj;
     EXPECT_EQ(obj.tick(0), U8G2GL_IDLE);

@@ -15,9 +15,12 @@
  *          reader assume the two are the same. §1.3 forbids a figure the
  *          measurement cannot substantiate.
  *
- * Description: Prints sizeof for u8g2gl_obj and the 8 concrete widgets (label,
- *              scrolling_label, xbm, glyph, progress_bar, clock, switch, button)
- *              and asserts upper bounds that hold on any supported pointer width.
+ * Description: Prints sizeof for u8g2gl_obj and the 7 concrete widgets (label,
+ *              xbm, glyph, progress_bar, clock, switch, button) and asserts
+ *              upper bounds that hold on any supported pointer width.
+ *              u8g2gl_scrolling_label was absorbed into u8g2gl_label as
+ *              long_mode="scroll" (PR-3R WO2, [D-19]) and no longer exists as
+ *              a separate type.
  *              A second test measures the 32-bit target width; it runs only in a
  *              build whose pointers are 4 bytes, and skips with an explanation
  *              otherwise, so an unmeasured width is visible as a skip rather than
@@ -30,7 +33,6 @@
 
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_label.h"
-#include "u8g2gl/u8g2gl_scrolling_label.h"
 #include "u8g2gl/u8g2gl_xbm.h"
 #include "u8g2gl/u8g2gl_glyph.h"
 #include "u8g2gl/u8g2gl_progress_bar.h"
@@ -64,7 +66,6 @@ void report_all_sizes() {
 
     U8G2GL_REPORT_SIZE(u8g2gl_obj);
     U8G2GL_REPORT_SIZE(u8g2gl_label);
-    U8G2GL_REPORT_SIZE(u8g2gl_scrolling_label);
     U8G2GL_REPORT_SIZE(u8g2gl_xbm);
     U8G2GL_REPORT_SIZE(u8g2gl_glyph);
     U8G2GL_REPORT_SIZE(u8g2gl_progress_bar);
@@ -84,8 +85,7 @@ TEST(SizeOfReport, AllWidgets) {
 
     // --- Ceilings for the widest supported pointer width (64-bit) ---
     EXPECT_LE(sizeof(u8g2gl_obj), 64u);
-    EXPECT_LE(sizeof(u8g2gl_label), 72u);
-    EXPECT_LE(sizeof(u8g2gl_scrolling_label), 96u);
+    EXPECT_LE(sizeof(u8g2gl_label), 80u);
     EXPECT_LE(sizeof(u8g2gl_xbm), 80u);
     EXPECT_LE(sizeof(u8g2gl_glyph), 72u);
     EXPECT_LE(sizeof(u8g2gl_progress_bar), 88u);
@@ -118,8 +118,7 @@ TEST(SizeOfReport, ThirtyTwoBitTarget) {
     // from the first real 32-bit run; the printed table above is that run's
     // evidence.
     EXPECT_LE(sizeof(u8g2gl_obj), 64u);
-    EXPECT_LE(sizeof(u8g2gl_label), 72u);
-    EXPECT_LE(sizeof(u8g2gl_scrolling_label), 96u);
+    EXPECT_LE(sizeof(u8g2gl_label), 80u);
     EXPECT_LE(sizeof(u8g2gl_xbm), 80u);
     EXPECT_LE(sizeof(u8g2gl_glyph), 72u);
     EXPECT_LE(sizeof(u8g2gl_progress_bar), 88u);

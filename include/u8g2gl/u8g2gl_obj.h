@@ -194,6 +194,14 @@ public:
      * a tree — see the design note in u8g2gl_tree.h for why. Generated code sets
      * this during init; U8G2GL_NO_PARENT marks a root.
      *
+     * Marks the frame dirty if the index actually changes — reparenting affects
+     * effective visibility and clipping (u8g2gl_tree.h), so it is a mutator that
+     * changes what is drawn just as much as set_hidden() is (§11.2). This gap
+     * was latent rather than live (generated init() code sets this once, before
+     * the first frame), but PR-3R WO2 closes it anyway: WO1 established the rule
+     * for every such mutator, and an undocumented exception here would read as
+     * an oversight.
+     *
      * @param idx Index of the parent within the same screen's object array, or
      *            U8G2GL_NO_PARENT for a top-level element.
      */
@@ -290,10 +298,30 @@ public:
     u8g2gl_subject_type_t get_bound_text_type() const;
 
     // --- Style (§10, §13.7) ---
+
+    /**
+     * @brief Layer a named style's explicitly-set properties over this object's
+     *        resolved style.
+     *
+     * Changes everything the style sets at once, so — like the setters below —
+     * this marks the frame dirty whenever the resulting resolved style actually
+     * differs from what it was before the merge. Re-applying an identical style
+     * (a generated screen re-running init(), or a rebind to an unchanged named
+     * style) is therefore not a repaint.
+     *
+     * @param style Style to merge in; only its explicitly-set properties apply.
+     */
     void apply_style(const u8g2gl_style& style);
     const u8g2gl_style& get_resolved_style() const;
 
-    // Individual style setters that generated code calls as inline overrides:
+    // Individual style setters that generated code calls as inline overrides.
+    // Each delegates to the embedded u8g2gl_style and marks the frame dirty,
+    // guarded on the value actually changing — the same change-guard pattern
+    // WO1 established for geometry and flags (§11.2). This was a live defect,
+    // not a latent one: before PR-3R WO2 these called the style setter and
+    // returned, so changing a font, colour, padding or alignment at runtime
+    // produced no repaint on a static screen (surfaced by the Chief Architect
+    // after WO1 — see PROJECT.md).
     void set_font(const uint8_t* font);
     void set_draw_color(u8g2gl_color_t c);
     void set_invert(bool v);
@@ -301,7 +329,6 @@ public:
     void set_border(bool b);
     void set_radius(int16_t r);
     void set_align(u8g2gl_align_t a);
-    void set_truncate(bool t);
     void set_font_mode(u8g2gl_font_mode_t m);
     void set_bitmap_mode(u8g2gl_bitmap_mode_t m);
 

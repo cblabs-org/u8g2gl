@@ -64,11 +64,6 @@ void u8g2gl_style::set_align(u8g2gl_align_t a) {
     set_mask |= U8G2GL_STYLE_ALIGN;
 }
 
-void u8g2gl_style::set_truncate(bool t) {
-    truncate = t;
-    set_mask |= U8G2GL_STYLE_TRUNCATE;
-}
-
 void u8g2gl_style::set_font_mode(u8g2gl_font_mode_t m) {
     font_mode = m;
     set_mask |= U8G2GL_STYLE_FONT_MODE;
@@ -122,10 +117,6 @@ void u8g2gl_style::merge_from(const u8g2gl_style& other) {
         align = other.align;
         set_mask |= U8G2GL_STYLE_ALIGN;
     }
-    if (other.has(U8G2GL_STYLE_TRUNCATE)) {
-        truncate = other.truncate;
-        set_mask |= U8G2GL_STYLE_TRUNCATE;
-    }
     if (other.has(U8G2GL_STYLE_FONT_MODE)) {
         font_mode = other.font_mode;
         set_mask |= U8G2GL_STYLE_FONT_MODE;
@@ -144,7 +135,6 @@ void u8g2gl_style::clear() {
     border = false;
     radius = 0;
     align = U8G2GL_ALIGN_LEFT;
-    truncate = false;
     font_mode = U8G2GL_FONT_MODE_SOLID;
     bitmap_mode = U8G2GL_BITMAP_MODE_SOLID;
     set_mask = 0;

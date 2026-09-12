@@ -11,7 +11,6 @@ add_library(u8g2gl STATIC
     src/u8g2gl.cpp
     src/u8g2gl_obj.cpp
     src/u8g2gl_label.cpp
-    src/u8g2gl_scrolling_label.cpp
     src/u8g2gl_xbm.cpp
     src/u8g2gl_glyph.cpp
     src/u8g2gl_progress_bar.cpp
