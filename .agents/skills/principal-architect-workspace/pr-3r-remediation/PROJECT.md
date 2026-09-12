@@ -92,10 +92,24 @@ is PR-04.
 <!-- Record the owner's own words and the timestamp. A worker verifies this as
      its authorization, so it must be genuine. -->
 
-**Status: AWAITING APPROVAL.**
+**APPROVED by the human (Matt McNeill) on 2026-09-13.**
+
+The owner's own words, verbatim:
+
+> "ok please can you give me a md bridget prompt to ask an implementation
+> architect to start work on the PR3R please ?"
+
+Context: the owner had the eight-work-order decomposition, the three deviations
+from the assessment and the `[D-21]` record in front of them, and separately
+directed that migration tooling be dropped ("no need for migration we have never
+written any xml yet never mind having downstream users"). That direction is
+recorded in WO8's boundary box.
 
 ## Status Log
 
+- 2026-09-13 — Approved by the owner; handed to a Principal Architect to execute.
+- 2026-09-12 — `--migrate` tooling rejected by the owner; WO8 trimmed and the
+  rejection recorded in its boundary box.
 - 2026-09-12 — Decomposition drafted by the Chief Architect. [D-21] recorded in
   `docs/decisions/d21-generated-capacities.md`, design_spec §3/§13.7/§18.1, and
   the plan ledger as PR-3R.
