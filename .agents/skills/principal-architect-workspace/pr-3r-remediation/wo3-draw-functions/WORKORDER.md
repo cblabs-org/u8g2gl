@@ -26,7 +26,7 @@ owner's own words with a timestamp. If it is absent or reads as a placeholder,
 ## Branch
 
 **Branch**: `u8g2gl-remediation/wo3-draw-functions`
-**Base**: `u8g2gl-remediation/wo2-label-long-mode`
+**Base**: `u8g2gl-remediation/wo2b-scroll-semantics`
 
 Verify with `git branch --show-current` **as its own command immediately before
 every commit** — never batched into the same command as the commit. A check that

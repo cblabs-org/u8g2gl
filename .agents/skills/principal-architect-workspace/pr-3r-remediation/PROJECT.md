@@ -30,7 +30,7 @@ serially. PR head is the last branch in the stack.
 
 - [x] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** ✅ `4ca9e01` · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
 - [x] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** ✅ `4e649cf` · base WO1 · standard · R1.3, R3.1, R3.2
-- [ ] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** · base WO2 · standard · defect surfaced by WO2 (PA-added)
+- [x] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** ✅ `217473c` · base WO2 · standard · defect surfaced by WO2 (PA-added)
 - [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2b · standard · new work, required by WO4
 - [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
 - [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
@@ -203,3 +203,23 @@ demonstrated.
   `truncate` / `set_truncate`
 - The label manifest's `animated="false"` is questionable under scroll modes —
   `animated` is being deleted wholesale, so this resolves itself
+
+### WO2b — complete (`217473c`)
+
+Verified: 4 files, all inside the box; C++ 207 → **210 tests**; zero warnings;
+`sizeof(u8g2gl_label)` still **80 bytes** on a 64-bit host — the direction flag
+landed in existing padding and cost nothing. `scroll_circular`'s tests pass
+unchanged, which was the condition for believing its behaviour was preserved.
+
+`scroll` now reverses, dwelling at each end on the existing `static_dwell_ms`
+rather than a second timing property.
+
+**Checked rather than assumed:** with neither scrolling mode latching
+`is_scroll_finished()`, the obvious worry is that the method is now dead API. It
+is not — it still latches for the static-dwell case, so its meaning narrowed
+deliberately instead of evaporating.
+
+**Surfaced, triaged as a non-issue today:** a consumer relying on the old
+latch-on-wrap to rotate messages would break. Nothing consumes it — no generated
+code, no application — so there is nothing to break yet. Worth remembering at
+PR-05, when a real app first drives these labels.
