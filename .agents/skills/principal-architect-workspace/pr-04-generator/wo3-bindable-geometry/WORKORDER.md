@@ -77,6 +77,23 @@ validator rejects `bind_width` as an unknown attribute.
       `COMMON_ATTRIBUTES` and effective manifests, per the PA's revision of this
       line item.
 
+## Carried from WO1 (PA triage — refined again against WO2 before dispatch)
+
+- [ ] **F4 — prop-check composite interiors.** `validate-widget-props.ts` walks
+      only screens, so elements inside a composite's `<view>` are never
+      prop-checked. §13.11 requires composite interiors to be validated on the same
+      path as screens. `$prop` values are template placeholders and are skipped, as
+      the other passes already do.
+- [ ] **F6 — type-check the tests.** `cli/tsconfig.json` covers only `src/`; four
+      type errors already exist (`element-identity.test.ts:230/375/376`,
+      `geometry.test.ts:44`). Add a test type-check (a `tsconfig.test.json` run by
+      the lint or test script) and fix those four.
+- [ ] **F7 — duplicate plain-widget manifests.** Two project manifests declaring
+      the same tag are diagnosed only when both are composites. Diagnose it for
+      every manifest, naming both files.
+- [ ] **F11 — retire "component" wording** remaining in the schema, references and
+      identifiers passes, updating the assertions that pin it.
+
 ## Strict Boundary Box
 
 **In scope:** `include/u8g2gl/u8g2gl_obj.h`, `src/u8g2gl_obj.cpp` (geometry

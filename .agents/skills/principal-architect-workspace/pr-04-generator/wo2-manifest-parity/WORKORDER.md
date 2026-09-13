@@ -5,7 +5,7 @@ title: "Manifest ↔ runtime parity: every manifest target exists with the right
 branch: u8g2gl-generator/wo2-manifest-parity
 base: u8g2gl-generator/wo1-manifest-registry
 complexity: standard
-status: draft — PA revises against WO1's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO2 — Manifest ↔ runtime parity
@@ -99,10 +99,43 @@ refused.
       manifest naming behaviour the class cannot sensibly have), **stop and
       report** it rather than choosing.
 
+## Added by the Principal Architect after WO1
+
+WO1 built the manifest registry (`cli/src/core/manifest/`) that resolves
+`extends`, and surfaced three findings that belong here. Use the registry's
+effective manifests for every cross-test above rather than re-walking `extends`
+yourself — a second walk is exactly the duplication this PR is avoiding.
+
+- [ ] **F1 — base-object manifest carries label-only props.**
+      `include/u8g2gl/manifests/u8g2gl_obj.xml` declares `font`, `align`,
+      `bind_text`, `bind_text_int` (and `bind_text_fmt` via `fmt`). Now that
+      `extends` resolves, every element inheriting the base accepts them. Move
+      each declaration to the manifests of the classes that actually implement it.
+      **Decide membership from the C++, not from intent:** a prop belongs on
+      `u8g2gl_obj.xml` only if `u8g2gl_obj` itself declares the setter. The
+      setter cross-test is the proof. Record what moved where.
+- [ ] **F2 — make the implicit `extends` default explicit.** The parser
+      (`parse-widget-manifest.ts`) fills a missing `extends` with `u8g2gl_obj`, so
+      the schema pass's "Missing required attribute 'extends'" can never fire and
+      a genuine self-extends cannot be told apart. **PA decision:** remove the
+      parser default; the registry applies it instead, **only to a manifest with a
+      `<view>`** (a composite realises as `u8g2gl_obj`, design_spec §13.12). A plain
+      widget without `extends` then produces the existing schema error. Add a test
+      for each branch; keep WO1's self-extends-as-root handling only if the
+      framework's own `u8g2gl_obj.xml` still needs it, and say which.
+- [ ] **F10 — tests must not run a stale build.** `cli/test/integration/` runs
+      `dist/node/cli.js`, and nothing rebuilds it before `vitest run`, so a stale
+      `dist/` silently tests old code. Make the test run build first (a `pretest`
+      script or a vitest `globalSetup`), whichever keeps `npx vitest run` honest
+      for a worker who never ran `npm run build`.
+
 ## Strict Boundary Box
 
 **In scope:** `cli/test/manifests/manifest-crosstest.test.ts` (and helpers beside
-it); `include/u8g2gl/manifests/*.xml` (setter, type and bind corrections only);
+it); `include/u8g2gl/manifests/*.xml` (setter, type and bind corrections, and F1's
+moves); `cli/src/core/parser/parse-widget-manifest.ts` and
+`cli/src/core/manifest/` (F2 only); `cli/package.json` / `cli/vitest.config.ts`
+(F10 only); tests affected by F1/F2;
 `include/u8g2gl/u8g2gl_clock.h`, `u8g2gl_progress_bar.h`, `u8g2gl_switch.h`,
 `u8g2gl_obj.h` and their `src/` counterparts (binding methods only);
 `cli/src/data/manifests.json` (rebuilt); `test/` C++ tests; this WORKORDER.

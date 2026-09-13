@@ -62,7 +62,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — manifest registry](wo1-manifest-registry/WORKORDER.md)** · `u8g2gl-generator/wo1-manifest-registry` · base `main` @ `f693aab` · standard · finding 1; widget/composite prop-check unification (inherited)
+- [x] **[WO1 — manifest registry](wo1-manifest-registry/WORKORDER.md)** ✅ `6c71715` · `u8g2gl-generator/wo1-manifest-registry` · base `main` @ `f693aab` · standard · finding 1; widget/composite prop-check unification (inherited)
 - [ ] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** · base WO1 · standard · finding 2; `bind_time`, `bind_value`
 - [ ] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** · base WO2 · standard · finding 3
 - [ ] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** · base WO3 · standard · finding 4; runtime 0.4.0
@@ -136,6 +136,52 @@ with the manifest's bind type corrected to `time`. Reasons:
 `<bind>` setters. PR-03's cross-test checked only `<prop>` targets, which is how
 this got through.
 
+## Work Order Reviews
+
+### WO1 — complete (`6c71715`)
+
+**Verified independently, not from the report:** commits only on the WO1 branch;
+nothing under `include/`, `src/` or `docs/` changed; C++ zero warnings and `ctest`
+green (240, one known 32-bit skip); CLI 266 → **293**, `tsc` and lint clean. End to
+end through the built CLI: a project using `<u8g2gl_label>` with no local manifest
+copy now validates, and a copied framework manifest produces
+`U8G2GL_SHADOWED_FRAMEWORK_MANIFEST`.
+
+**The merge found what PR-3R said it would.** Seven asymmetries between the
+widget and composite paths (A1–A7), including a tag declared as both being
+double-reported (A3) and image references never checked inside composites (A7).
+That makes four for four on the unification pattern.
+
+**Decisions accepted:** `ValidateInput.manifests` is the registry; a manifest whose
+`extends` names itself is a root; per-file schema checks run on the manifest as
+declared, not the effective one, so an inherited defect is reported once against
+its owner; composite messages now read "on <x>".
+
+**Triage of the eleven findings:**
+
+| # | Finding | Placed |
+|---|---|---|
+| F1 | `u8g2gl_obj.xml` declares label-only props (`font`, `align`, `bind_text`) on the base, so with `extends` resolved a `<u8g2gl_pixel>` accepts `bind_text` | **WO2** — manifest data correctness, and WO2's cross-test is the tool that should catch it |
+| F2 | The parser defaults a missing `extends` to `u8g2gl_obj`, so "missing required `extends`" can never fire and a real self-extends is undetectable | **WO2** — PA decision below |
+| F3 | design_spec §6.5 example extends `u8g2gl_widget`, which does not exist | **Chief Architect** — spec defect |
+| F4 | Prop checking walks only screens, never a composite's `<view>` (§13.11 requires it) | **WO3** — attribute acceptance |
+| F5 | `validate` on a single framework manifest file reports shadowing | **WO5** — single-file path moves into `loadProject()` |
+| F6 | `tsconfig` covers only `src/`; four type errors already exist in tests | **WO3** — it rewrites those validator tests |
+| F7 | Duplicate plain-widget manifests are not diagnosed; duplicate composites are | **WO3** |
+| F8 | Should collection `<element>`s be inherited? | **PA decision below** |
+| F9 | Diagnostics against a bundled framework manifest print without a source line | **WO5** — the file map is built in `loadProject()` |
+| F10 | Integration tests run `dist/`, which nothing rebuilds before `vitest` | **WO2** — first work order after this; a stale build silently tests old code |
+| F11 | "component" wording remains in schema/references/identifiers passes | **WO3** |
+
+**PA decision — F2.** The default moves out of the parser and into the registry,
+where it is visible: a manifest with a `<view>` and no `extends` inherits
+`u8g2gl_obj`, because that is what it realises as (§13.12, corrected); a plain
+widget with no `extends` is the error the schema check already describes.
+
+**PA decision — F8.** Collection `<element>`s are **not** inherited. Collections
+are refused until PR-08 (decision 1), so nothing in PR-04 reads them; inheriting
+them now would decide PR-08's semantics by accident.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -155,6 +201,9 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-13 — **WO1 complete** (`6c71715`, report `984aff2`). Verified independently;
+  findings triaged below. WO2 revised and dispatched on
+  `u8g2gl-generator/wo2-manifest-parity`.
 - 2026-09-13T19:59Z — **Approved by the owner.** WO1 branch cut from `f693aab`;
   WO1 dispatched.
 - 2026-09-13 — Chief Architect answered the five decisions and four spec reports;

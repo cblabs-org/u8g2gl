@@ -78,6 +78,13 @@ It emits only stamped headers here; content arrives in WO9–WO10.
       change (§16's CI check).
 - [ ] **Header stamp** on every generated file: source path, schema version,
       generator version, target. **No timestamp** (§13.9).
+- [ ] **Carried from WO1 — F5:** `validate` pointed at a single framework manifest
+      file (e.g. `include/u8g2gl/manifests/u8g2gl_label.xml`) reports a spurious
+      shadowing error. A single file that *is* the bundled framework manifest is
+      not a project copy.
+- [ ] **Carried from WO1 — F9:** diagnostics located in a bundled framework
+      manifest print with no source line, because the file map holds only project
+      files. `loadProject()` builds the map; include the bundled manifest text.
 - [ ] `--json` contract documented in `printUsage` and TSDoc:
       `{ files, diagnostics, errors, warnings }` (budget arrives in WO12).
 
