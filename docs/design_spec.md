@@ -1918,7 +1918,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 
 - Composite elements: `<widget>` with a `<view>`, `<api>`, `<prop>`, expansion ([D-18])
 - Custom widget system: `<widget>` + C++ inheritance
-- Animated built-ins: `u8g2gl_scrolling_label`, `u8g2gl_clock`, `u8g2gl_progress_bar`
+- Animated built-ins: `u8g2gl_clock`, `u8g2gl_progress_bar`. Scrolling text is `long_mode` on `u8g2gl_label`, not a separate widget ([D-19])
 - Collection API (§9)
 - `<row>` / `<col>` stacking sugar
 - Image pipeline: XBM and PNG→XBM

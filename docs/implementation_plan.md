@@ -271,7 +271,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | **PR-01** ✅ | **U8G2GL** | **MERGED (#1).** Runtime core: `u8g2gl_obj`, class system with `base_class`, `<api>` manifests ([D-17]), subject/observer, style, frame gate + `ui_handler()` deadlines ([D-15]). Native unit tests, no ESP32 required | PR-00 | — |
 | **PR-02** ✅ | **U8G2GL** | **MERGED (#2).** CLI: schema, validator with §15 diagnostics, display catalogue from U8G2 ([D-14]), `find` modes (§5.2), `--json` ([D-16]) | — | — |
 | **PR-03** ✅ | **U8G2GL** | **MERGED (#3).** Widget set on the object model: label, scrolling label, xbm, glyph, primitives, progress bar, clock. Each ships its `<api>` manifest. Also settled `[U-1]` element identity (ui_spec §16.1) | PR-01 | — |
-| **PR-3R** | **U8G2GL** | **★ INTERIM — remediation.** Realigns merged PR-01/02/03 to [D-18], [D-19], [D-20], [D-21] and schema 0.4. Dirty-flag defect, per-axis geometry setters, `long_mode` absorbing `u8g2gl_scrolling_label`, manifest `draw=`/`animated`, composite schema merge, capacity generation groundwork, 0.3→0.4 refusal path. See `.agents/skills/principal-architect-workspace/REMEDIATION-D18.md` | PR-03 | — |
+| **PR-3R** ✅ | **U8G2GL** | **MERGED (#4).** **★ INTERIM — remediation.** Realigns merged PR-01/02/03 to [D-18], [D-19], [D-20], [D-21] and schema 0.4. Dirty-flag defect, per-axis geometry setters, `long_mode` absorbing `u8g2gl_scrolling_label`, manifest `draw=`/`animated`, composite schema merge, capacity generation groundwork, 0.3→0.4 refusal path. See `.agents/skills/principal-architect-workspace/REMEDIATION-D18.md` | PR-03 | — |
 | **PR-04** | **U8G2GL** | Generator XML → C++ per §13: property emission, composite expansion, build-time layout ([D-7], [D-20]), identifier mangling, realisation ([D-18]), generated capacities ([D-21]) | **PR-3R** | — |
 | **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04 | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
@@ -281,9 +281,31 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-08** | both | Composites (§6.4), custom elements via `extends` (§6.5), collection API (§9) | PR-07 |
+| **PR-08** | both | **Re-scoped 2026-09-13:** custom elements via `extends` (§6.5), collection API (§9). Composites (§6.4) are no longer here — PR-3R made a composite a `WidgetManifest` with a `view`, and PR-04 expands them (§13.6) | PR-07 |
 | **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
 | **PR-08b** | U8G2GL | `<row>`/`<col>` stacking sugar (§7.2), *if real usage has shown the need* | PR-08 |
+
+### Editor track — design_spec §20 Phase 3 (not yet decomposed)
+
+**Added 2026-09-13 by the Chief Architect.** Until today this ledger had no PR for
+the editor, even though [design_spec.md §20](design_spec.md) Phase 3 calls it
+"the programme's destination (§1.2), not an optional extra" and [ui_spec.md](ui_spec.md)
+specifies it in full. PR-02's validator and PR-04's resolver were listed as inputs
+to the editor, but nothing delivered the editor itself — so it would have been
+deferred by omission, which the owner explicitly rejected.
+
+**These are placeholders.** Their number, their boundaries and their order
+relative to PR-07's gate are owner decision CA-1 (`PROGRAM-PLAN.md`).
+
+| PR | Repo | Scope | Depends |
+|---|---|---|---|
+| **E-1** | U8G2GL | Designer shell — Monaco plus a custom shell ([UD-1]), project filesystem API, lossless XML round-trip ([UD-3]) | PR-04, PR-06 |
+| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]) | E-1 |
+| **E-3** | U8G2GL | Sample data for binding preview; screen navigation design | E-2 · blocked by [U-6] |
+
+*Naming: §20's "Phase 3" is this editor track. The Phase 3 heading below is this
+ledger's consolidation phase. The labels are left as they are rather than
+renumbered across three documents.*
 
 ### Phase 3 — Consolidation and stretch
 

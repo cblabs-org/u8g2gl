@@ -1,45 +1,95 @@
 # PROGRAM-PLAN — U8G2GL PR Sequence
 
-Tier-1 dependency graph. Each row is one PR delegated to a Tier-2 Principal Architect.
-Full rationale: [implementation_plan.md](../../../docs/implementation_plan.md)
+Tier-1 dependency graph. Each row is one PR delegated to a Tier-2 Principal
+Architect by bridge prompt. Full rationale: [implementation_plan.md](../../../docs/implementation_plan.md).
+Normative scope: [design_spec.md](../../../docs/design_spec.md) §20; editor:
+[ui_spec.md](../../../docs/ui_spec.md).
 
-## Gating decisions (human)
-| ID | Decision | Blocks | Recommendation |
-|---|---|---|---|
-| ~~PD-1~~ | Licence | — | **RESOLVED: MIT** |
-| ~~PD-2~~ | CLI home | — | **RESOLVED: U8G2GL repo ships runtime + CLI; generated code in app repo** |
-| PD-3 | Ratify core object model (A-2 LVGL parallel, A-3 flat runtime) | PR-00/01 | As proposed |
-| PD-4 | Legacy U8G2Display migration | PR-05 | Strangler-fig, retire at PR-10 |
+<!-- Rewritten 2026-09-13. The previous version still showed PR-01/02 as blocked,
+     placed the runtime in the foundation repo, named a "property table" ([D-17]
+     rejected it) and "component inlining" ([D-18] removed it), had no PR-3R, and
+     contained no PR for the editor. -->
 
-## PR sequence
+## Programme decisions
+
+All four closed: **PD-1** MIT · **PD-2** U8G2GL repo ships runtime and CLI;
+foundation gets an integration module · **PD-3** virtual base, flat parent-index
+hierarchy · **PD-4** strangler-fig migration of the legacy display module.
+
+## Open — owner decisions needed
+
+| ID | Question | Blocks |
+|---|---|---|
+| **CA-1** | **Shape of the editor track** — how many PRs, and does it sit behind the PR-07 gate or run alongside it? See "Editor track" below | E-1 |
+| **CA-2** | **The gate does not measure the editor.** All four PR-07 criteria are firmware-side. The programme could pass or fail GO/NO-GO without testing the thing it exists to build | PR-07 |
+| U-6 | Where sample data lives | E-3 |
+| Q-1 | Multi-target layout overrides — needs two real targets | — |
+
+## Phase 1 — Prove the loop
 
 | PR | Repo | Scope | Base | Status |
 |---|---|---|---|---|
-| PR-00 | U8G2GL+fnd | Spec core-architecture section + foundation ADR + §22 licence | main | Blocked PD-1/PD-3 |
-| PR-01 | foundation | modules/U8G2GL core: obj, class+base_class, property table, observer, style, frame gate | PR-00 | Blocked PD-3/PD-4 |
-| PR-02 | CLI | Schema, validator, display catalogue, find modes, --json | main | Blocked PD-1/PD-2 |
-| PR-03 | foundation | Widget set rebuilt on the object model (behaviour ported from legacy) | PR-01 | Pending |
-| PR-04 | CLI | Generator XML→C++, property emission, component inlining, layout resolution | PR-02+PR-03 | Pending |
-| PR-05 | foundation | uidesign/<board>/u8g2gl + build hooks + first board migrated | PR-04 | Blocked PD-4 |
-| PR-06 | CLI+fnd | Wasm preview + snapshot harness (port layoutsim) | PR-03 | Pending |
-| PR-07 | foundation | ★ GO/NO-GO GATE — pixel-diff, budget, ergonomics | PR-05+PR-06 | Pending |
-| PR-08 | both | Components, custom widgets via extends, collections | PR-07 | Phase 2 |
-| PR-09 | foundation | Focus groups + Button/Encoder indev | PR-07 | Phase 2 |
-| PR-10 | foundation | Migrate remaining boards; retire modules/U8G2Display | PR-08+PR-09 | Phase 3 |
-| PR-11 | v3 | Advance framework.lock; retarget application boards | PR-10 | Stretch |
+| PR-01 | U8G2GL | Runtime core: object model, subjects, styles, frame gate | main | ✅ **MERGED #1** |
+| PR-02 | U8G2GL | CLI: schema, validator, display catalogue, `find`, `--json` | main | ✅ **MERGED #2** |
+| PR-03 | U8G2GL | Widget set + `[U-1]` element identity | PR-01 | ✅ **MERGED #3** |
+| PR-3R | U8G2GL | ★ Interim remediation to `[D-18]`–`[D-21]`, schema 0.4 | PR-03 | ✅ **MERGED #4** |
+| **PR-04** | U8G2GL | Generator XML→C++ per §13: realisation, composite expansion, build-time layout, mangling, generated capacities `[D-21]`, **editor-target registry `[UD-4]`** | PR-3R | **NEXT — awaiting PA handoff** |
+| PR-05 | foundation | Integration module, build hooks, first board migrated | PR-04 | Pending |
+| PR-06 | U8G2GL | Wasm renderer + snapshot harness | PR-3R | Pending — may run ∥ PR-04 |
+| PR-07 | foundation | ★ **GO/NO-GO GATE** | PR-05 + PR-06 | Pending — see CA-2 |
+
+## Editor track — the programme's destination (design_spec §20 Phase 3)
+
+**Not yet decomposed. Placeholders only, so the editor cannot fall out of the
+graph again.** The shape below is a starting proposal for CA-1, not a decision.
+
+| PR | Repo | Scope | Depends | Status |
+|---|---|---|---|---|
+| E-1 | U8G2GL | Designer shell: Monaco + custom shell `[UD-1]`, project filesystem API, lossless XML round-trip `[UD-3]` | PR-04, PR-06 | Placeholder |
+| E-2 | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests `[D-17]` | E-1 | Placeholder |
+| E-3 | U8G2GL | Sample data for binding preview; screen navigation design | E-2 | Placeholder — blocked U-6 |
+
+## Phase 2 — Composition
+
+| PR | Repo | Scope | Depends |
+|---|---|---|---|
+| PR-08 | both | **Re-scoped:** custom C++ elements via `extends` (§6.5), collection API (§9). *Composites are no longer here* — PR-3R put them in the type model and PR-04 expands them | PR-07 |
+| PR-09 | foundation | Focus groups, input dispatch. *`u8g2gl_button` and `u8g2gl_switch` already shipped in PR-03* | PR-07 |
+| PR-08b | U8G2GL | `<row>`/`<col>` stacking sugar, only if real usage has shown the need | PR-08 |
+
+## Phase 3 — Consolidation and stretch
+
+| PR | Repo | Scope | Depends |
+|---|---|---|---|
+| PR-10 | foundation | Migrate remaining boards; retire the legacy display module | PR-08 + PR-09 |
+| PR-11 | departures-board-v3 | Advance `framework.lock`; retarget application boards | PR-10 |
+
+*Naming note: design_spec §20 calls its Phase 3 "Interaction & the Editor"; this
+ledger's Phase 3 is consolidation. The editor track above is §20's Phase 3. The
+phase labels are left unaligned rather than renumbered across three documents.*
 
 ## Parallelism
-- **PR-00 ∥ PR-02** — PR-02 is independent of the object model. Recommended, shortens critical path.
-- **PR-01 ∥ PR-02** — different repos, no overlap.
-- **PR-03 ∥ PR-04** — contract dependency on property-descriptor format. Freeze that format
-  in PR-01 so both proceed against it.
-- **PR-08 ∥ PR-09** — both touch modules/U8G2GL. Serialise or split by directory.
-- **PR-10** — strictly last; it deletes the legacy module.
+
+- **PR-04 ∥ PR-06** — both build against §13 and `[UD-4]`. PR-06's dynamic
+  construction consumes PR-04's editor registry, so **agree the registry's shape
+  before either PA starts**, or one of them writes it twice.
+- **PR-05** strictly after PR-04.
+- **Editor track** after PR-04 and PR-06. Its relation to PR-07 is CA-1.
+- **PR-08 ∥ PR-09** — both touch the runtime; serialise or split by directory.
+- **PR-10** strictly last in consolidation — it deletes the legacy module.
 
 ## Gate criteria (PR-07) — all four required
-1. Pixel-identical to the legacy board by automated diff (not by eye)
-2. XML materially shorter and clearer than the C++ replaced
-3. Measured budget comfortable on esp32dev alongside WiFi/TLS (§18, Q-4)
-4. Edit→regenerate→rebuild faster in practice than editing C++
 
-NO-GO is legitimate. PR-01..PR-06 are additive; legacy U8G2Display still runs under PD-4.
+1. Pixel-identical to the legacy board by automated diff, not by eye
+2. XML materially shorter and clearer than the C++ it replaces
+3. Measured budget comfortable on `esp32dev` alongside WiFi/TLS (§18, Q-4)
+4. Edit → regenerate → rebuild faster in practice than editing C++
+
+**Chief Architect note (CA-2):** every criterion is firmware-side. None asks
+whether the editor is viable, so a GO says nothing about the programme's stated
+purpose and a NO-GO could kill the editor without it ever being tested. Owner
+decision whether to add an editor criterion, or to state explicitly that the gate
+tests the framework only.
+
+NO-GO is legitimate. PR-01..PR-06 are additive; the legacy display module keeps
+running under PD-4.

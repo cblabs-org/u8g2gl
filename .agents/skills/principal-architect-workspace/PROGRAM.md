@@ -547,3 +547,77 @@ looks plausible and is wrong.
 caught by counting the inserted markers, reverted, reapplied once. The check that
 found it — count what you inserted — is cheaper than the reasoning that would
 have avoided it.
+
+---
+
+## Session — 2026-09-13 · PR-3R merged; role corrected; the editor was missing from the plan
+
+### PR-3R ingested — merged as #4
+
+Twelve work orders (eight planned, four added during execution). The merged
+runtime, CLI and widgets now match `[D-18]`–`[D-21]`. C++ 240 tests, CLI 266, zero
+warnings, schema **0.4**, CLI **0.6.0**; readability review over the full 89-file
+diff found no P1s. Full record: `pr-3r-remediation/PROJECT.md`, Project Wrap-Up.
+
+**Cross-PR lesson, carried into PR-04's bridge:** three of the four substantive
+defects were found by merging duplicated logic — the manifest cross-test, the
+draw-layer test double, and the widget/composite prop paths. In each case the
+duplication was where a defect had been hiding. PR-04 decides how much firmware
+and editor generation share, and now has evidence to decide with.
+
+**Architecture evolution:** `Component` no longer exists as a type — a composite
+is a `WidgetManifest` with a `view`; `<component>` and `components/` are removed,
+and using them gives an error naming the migration. Primitives that need no
+object compile to `u8g2gl_draw_*` free functions. `long_mode="scroll"` reverses at
+each end and `scroll_circular` wraps, matching LVGL.
+
+**Escalated and still open:** there is no 32-bit measurement, because this host
+can't build one, so §18 still can't quote a target figure; the interim binding
+default costs a measured +5,120 bytes on 64-bit until PR-04 emits exact
+capacities; the widget and composite prop checks are now nearly identical and
+should be unified; manifest/runtime parity has never been audited as a whole.
+
+### Role correction
+
+The owner corrected this: the Chief Architect had been acting as PR-3R's PA —
+decomposing it, briefing every worker, checking every diff, running the test
+suites. The owner did ask for that, then withdrew the request as poor protection
+for Tier-1 context, and they were right. Twelve work orders of `nm` output and
+boundary-box diffs is exactly the detail the three tiers exist to keep out of
+Tier 1.
+
+**From PR-04 on:** each PR goes to a PA by bridge prompt. The Chief Architect
+takes the result from `PROJECT.md` and does not check individual work orders.
+
+### Chief Architect finding — no PR delivered the editor
+
+With the role corrected, the first job was the Tier-1 artifacts — and they were
+stale. `PROGRAM-PLAN.md` still showed PR-01 and PR-02 as blocked, put the runtime
+in the wrong repo, named a property table (`[D-17]` rejected it) and component
+inlining (`[D-18]` removed it), and had no PR-3R. It has been rewritten.
+
+**The rewrite exposed the more serious problem.** `design_spec` §20 Phase 3 is
+headed "Interaction & the Editor" and calls the editor "the programme's
+destination, not an optional extra". The PR ledger's own Phase 3 is
+"Consolidation and stretch" — migrating boards, retargeting departures-board —
+and **no PR anywhere carried the editor**. Following the plan as written, the
+editor would never have been built. That is the deferral-by-omission the owner
+explicitly rejected in September, sitting in the dependency graph where nobody was
+looking.
+
+Checked, not assumed: the plan and the UI spec treat PR-02's validator and PR-04's
+resolver as *inputs* to the editor, and push the glyph editor to "after the first
+editor release" — but nothing schedules that release.
+
+**Action:** an editor track (E-1 shell and round-trip, E-2 canvas and property
+panel, E-3 sample data and navigation) is now in both ledgers **as placeholders
+only**, so it can't drop out again. Its shape is owner decision **CA-1**.
+
+**A second finding, CA-2:** all four PR-07 gate criteria are firmware-side, and
+none measures the editor. A GO would say nothing about the programme's purpose,
+and a NO-GO could end the editor without it ever being tested. Owner decision.
+
+**Smaller fixes:** PR-08 no longer covers composites (PR-3R and PR-04 deliver
+them); §20 no longer lists the removed `u8g2gl_scrolling_label`; and PR-04 ∥ PR-06
+now has a stated condition — agree the editor registry's shape before either PA
+starts, or one of them writes it twice.

@@ -105,9 +105,17 @@ ready.
 
 Versions after PR-03: schema **0.3** (unchanged), CLI/generator **0.5.0**.
 
-**PR-3R — remediation. AWAITING APPROVAL.** Eight work orders realigning the
-merged runtime, CLI and widgets to `[D-18]`–`[D-21]` and schema 0.4. **It blocks
-PR-04**, which consumes the schema model and manifests directly. Assessment in
+**PR-3R — remediation. MERGED (`#4`), 2026-09-13.** Twelve work orders (eight
+planned, four added during execution) realigned the merged runtime, CLI and
+widgets to `[D-18]`–`[D-21]`. Final: C++ 240 tests, CLI 266, zero warnings,
+schema **0.4**, CLI **0.6.0**. Full wrap-up in `pr-3r-remediation/PROJECT.md` —
+read it before briefing PR-04's PA; its lesson is that three of four real defects
+were found by unifying duplicated logic.
+
+**Role note.** PR-3R was executed with the Chief Architect acting as its PA, at
+the owner's request, later withdrawn: it spent Tier-1 context on Tier-2 detail.
+From PR-04 on, the Chief Architect hands each PR to a PA by bridge prompt and
+ingests the result from `PROJECT.md` — no work-order verification at Tier 1. Assessment in
 `REMEDIATION-D18.md`, decomposition in `pr-3r-remediation/PROJECT.md`.
 
 Three things found while assessing it, all verified against the code:
@@ -116,6 +124,13 @@ latently; `TIER1_PRIMITIVES` has drifted so `<u8g2gl_frame>` validates cleanly
 with no manifest behind it; and `MAX_BINDINGS_PER_OBJ = 4` is exceeded by
 `[D-20]`'s four geometry bindings alone, with no validation and a silent runtime
 failure — which is why `[D-21]` exists.
+
+**⚠ The editor had no PR until 2026-09-13.** design_spec §20 Phase 3 makes the
+editor the programme's destination, but the PR ledger's Phase 3 was consolidation
+work only. An editor track (E-1 to E-3) is now in both ledgers **as placeholders**;
+its shape is owner decision **CA-1**. Separately, **CA-2**: none of PR-07's gate
+criteria measures the editor. Both are in `PROGRAM-PLAN.md`. Don't let a refresh
+of either ledger quietly drop the track again.
 
 **Next:** PR-04 generator, PR-05 foundation integration, PR-06 Wasm preview, then
 **PR-07 — the GO/NO-GO gate**. Ledger in plan §5.

@@ -4,7 +4,7 @@
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — all PDs closed; PR-01 ∥ PR-02 dispatched |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — PR-01/02/03/3R merged; PR-04 generator next, awaiting PA handoff |
 
 ## Active Projects
 | Project | Status | Modules | Context |
