@@ -72,11 +72,16 @@ container.
       error naming both sources** — never a silent rename.
 - [ ] Provenance: every expanded node keeps its original source location and the
       instantiation chain, so later diagnostics can point at both.
+- [ ] **Carried from WO3 — type-check composite interiors.** `validate-types.ts`
+      walks only screens. Binding types inside a composite's `<view>` can only be
+      checked after `$subject` substitution, so run the types pass over the expanded
+      tree, reporting at the interior element with the instantiation site attached.
 
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/resolver/` (expansion and mangling modules);
 `cli/src/core/validator/validate-geometry.ts` (composite top-level gap only);
+`cli/src/core/validator/validate-types.ts` (expanded-tree walk only);
 `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** realisation, flattening, capacities (WO8); emission; runtime;

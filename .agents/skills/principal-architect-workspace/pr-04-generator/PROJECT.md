@@ -64,7 +64,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 
 - [x] **[WO1 — manifest registry](wo1-manifest-registry/WORKORDER.md)** ✅ `6c71715` · `u8g2gl-generator/wo1-manifest-registry` · base `main` @ `f693aab` · standard · finding 1; widget/composite prop-check unification (inherited)
 - [x] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** ✅ `33cd27b`, `0257d57` · base WO1 · standard · finding 2; `bind_time`, `bind_value`
-- [ ] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** · base WO2 · standard · finding 3
+- [x] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** ✅ `a652fd6` (partial by design — one stop-and-report, resolved by the PA) · base WO2 · standard · finding 3
 - [ ] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** · base WO3 · standard · finding 4; runtime 0.4.0
 - **Owner checkpoint** — WO1–4 repair merged code; WO2 is the likeliest to grow
 - [ ] **[WO5 — `generate` command and shared load path](wo5-generate-command/WORKORDER.md)** · base WO4 · standard · constraint 4; NOT_YET_SUPPORTED severity split
@@ -241,6 +241,57 @@ declared order. Neither alternative is needed: C++ parameters stay as they are.
 | W7 | A full subject asserts in debug before `false` is observable | **Accepted, by design.** The header documents it; generated capacities are exact, so it cannot fire in generated code |
 | W8 | `test_subject.cpp` placeholder header, stale comment | **WO4** |
 
+### WO3 — complete (`a652fd6`), `partial` by design
+
+**Verified independently:** commits only on the WO3 branch; `docs/` untouched; C++
+260 → **266**, zero warnings; CLI 383 → **406**; `tsc` clean; `npm run lint` clean and
+now also type-checks the tests. Only the seven class-backed manifests declare
+`extends`; `u8g2gl_obj` is the root through one documented constant; the cross-test
+exception list is gone.
+
+[D-20] is now real end to end: `bind_x/y/width/height` on objects (one slot, one
+observer, per-axis setters so dirty only on change), four geometry `<bind>`s on
+`u8g2gl_obj.xml` and each drawing manifest, binding types checked from manifests,
+and `U8G2GL_BOUND_GEOMETRY_ANCHORED_CHILD`. `COMMON_ATTRIBUTES` now holds only
+identity/anchor/style attributes; geometry and `hidden` come from manifests.
+`focusStyle` stays because the parser writes and references reads it.
+
+**F6 was four times worse than recorded** — sixteen test type errors, three of them
+`@ts-expect-error` over commented-out code checking nothing. This is the vacuous-test
+pattern again, and the test type-check now in `lint` is what stops its return.
+
+**Decisions accepted:** drawing elements bind only the four [D-20] axes (§1.5 — no
+demonstrated need for bindable `radius`); `hcenter="false"` is not an anchor; a
+composite's `<view>` children count as its children for the [D-20] rule.
+
+**The stop-and-report — PA decision: no new vocabulary for flags.** The worker could
+not declare `hidden` for drawing elements because `BindDef` describes attributes,
+not `<bind_flag_if_*>` children. None is needed. §8.4 fixes the flag set at
+`hidden` and `disabled`, so it is not per-element data. `hidden` applies to every
+element (realised as an object flag or as a draw-time guard, §13.5); `disabled` on a
+`draw=`-only element is an error, because there is nothing to disable. That rule
+follows from "has no class", which the registry already knows — not from an element
+list. → WO5.
+
+**Worker decision overruled — binding overloads.** It accepted every type declared
+on the same C++ method, so `bind_text` accepts an int subject (§8.4's own example)
+but `bind_text_int` now also accepts a string. `bind_text_int` appears nowhere in the
+spec. **Decision:** delete `bind_text_int`; declare `bind_text` once per subject type
+(`<bind name="bind_text" type="string" …/>` and `type="int"`); the validator accepts
+a subject type if any binding of that name declares it; the registry merges bindings
+by (name, type). This is existing vocabulary used twice, not new vocabulary, and it
+removes the inference. → WO5.
+
+**Remaining findings:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 3 | On drawing manifests `<bind setter="width">` names a prop, not a method — the two-meanings ambiguity §13.1 criticises | **Owner, at the WO4 checkpoint.** A dedicated attribute is new vocabulary. Interim: as built, documented |
+| 4 | Composite interiors are prop-checked but not type-checked | **WO7** — a `$subject` resolves only after expansion, so types are checked on the expanded tree |
+| 5 | `CommonAttributes` in `schema/widget-node.ts` still lists geometry and `hidden` | **WO6** — the resolver reads geometry off nodes |
+| 6 | A manifest with both `setter=` and `draw=` props is undefined | **WO5** — an error: [D-18] says a manifest declares one or the other |
+| 7 | `vitest run` alone does not catch test type errors | **Accepted** — every WORKORDER's green definition already includes `lint` |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -260,6 +311,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-13 — **WO3 complete** (`a652fd6`, report `d2b79ca`), status `partial` by
+  design. Verified independently; stop-and-report resolved by the PA; one question
+  held for the owner checkpoint. WO4 revised and dispatched on
+  `u8g2gl-generator/wo4-runtime-support`.
 - 2026-09-13 — **WO2 complete** (`33cd27b`, `0257d57`, report `400cf1b`). Verified
   independently; two design questions answered by the PA, consistent with the Chief
   Architect's F3 ruling on `main` @ `4e4b992`. WO3 revised and dispatched on

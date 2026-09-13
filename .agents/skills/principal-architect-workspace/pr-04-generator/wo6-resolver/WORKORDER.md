@@ -69,10 +69,15 @@ skips anything with an expression.
       expressions. Composite internals keep WO6-of-PR-3R's "no absolute check at a
       composite's top level" until WO7 supplies the instantiation size.
 - [ ] Expose the resolver from core for `generate` (and, later, the editor).
+- [ ] **Carried from WO3:** `CommonAttributes` in `cli/src/core/schema/widget-node.ts`
+      still types `x`, `y`, `width`, `height` and `hidden` as common to every
+      element, which WO3 made untrue — they come from the effective manifest. Align
+      the type so the resolver cannot read geometry off a node that has none.
 
 ## Strict Boundary Box
 
 **In scope:** new `cli/src/core/resolver/`; `cli/src/core/validator/validate-geometry.ts`;
+`cli/src/core/schema/widget-node.ts` (`CommonAttributes` only);
 `cli/src/core/generator/` (wiring only); `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** composite expansion (WO7); realisation (WO8); emission; runtime.

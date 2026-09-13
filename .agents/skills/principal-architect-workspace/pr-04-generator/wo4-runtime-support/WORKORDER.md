@@ -5,7 +5,7 @@ title: "Runtime support for generated code: render wrapper, version guard, frame
 branch: u8g2gl-generator/wo4-runtime-support
 base: u8g2gl-generator/wo3-bindable-geometry
 complexity: standard
-status: draft — PA revises against WO3's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO4 — Runtime support for generated code

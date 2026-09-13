@@ -85,6 +85,20 @@ It emits only stamped headers here; content arrives in WO9–WO10.
 - [ ] **Carried from WO1 — F9:** diagnostics located in a bundled framework
       manifest print with no source line, because the file map holds only project
       files. `loadProject()` builds the map; include the bundled manifest text.
+- [ ] **Carried from WO3 — flags on drawing elements.** `<bind_flag_if_*>` flags are
+      fixed by §8.4 (`hidden`, `disabled`), not declared per element. `hidden` is
+      valid on every element. `flag="disabled"` on a `draw=`-only element is an
+      error — nothing to disable. Decide "drawing element" through the registry,
+      never a tag list.
+- [ ] **Carried from WO3 — binding overloads.** Delete `bind_text_int` from the
+      manifests. Declare `bind_text` once per accepted subject type
+      (`type="string"` and `type="int"`, same `setter` and `fmt`). The registry
+      merges bindings by (name, type); the validator accepts a subject type if any
+      binding of that name declares it; remove WO3's same-setter inference. A string
+      subject on an int-only binding must fail again.
+- [ ] **Carried from WO3 — mixed manifests.** A manifest declaring both `setter=`
+      and `draw=` props is an error in the schema pass ([D-18]: a manifest declares
+      one emission target or the other), naming one prop of each kind.
 - [ ] `--json` contract documented in `printUsage` and TSDoc:
       `{ files, diagnostics, errors, warnings }` (budget arrives in WO12).
 
@@ -92,8 +106,10 @@ It emits only stamped headers here; content arrives in WO9–WO10.
 
 **In scope:** `cli/src/node/cli.ts`, new `cli/src/node/load-project.ts` and
 writer module, new `cli/src/core/generator/`, `cli/src/core/validator/` (policy
-parameter and the not-yet-supported checks only), `schema/diagnostic.ts`, tests,
-this WORKORDER.
+parameter, the not-yet-supported checks, and the three WO3 carries),
+`cli/src/core/manifest/` (bindings merge by name and type), `include/u8g2gl/manifests/*.xml`
+and `cli/src/data/manifests.json` (`bind_text` overloads only),
+`cli/test/manifests/`, `schema/diagnostic.ts`, tests, this WORKORDER.
 
 **Do NOT touch:** runtime; manifests; resolution or emitted content (WO6+).
 
