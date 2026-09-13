@@ -479,13 +479,28 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           ),
         );
       }
-      if (!prop.setter) {
+      // A property reaches the display through exactly one of two emission
+      // targets ([D-18], §13.1): `setter` for a method on the element's own
+      // class, or `draw` for a free `u8g2gl_draw_*` function on a drawing
+      // element with no class. WO4 made `setter` optional and added `draw`
+      // as its alternative; requiring `setter` unconditionally here (as
+      // before WO4) meant every `draw=` prop drew a spurious diagnostic.
+      if (!prop.setter && !prop.draw) {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'setter' on prop '${prop.name}' in widget '${manifest.name}'.`,
+            `Prop '${prop.name}' in widget '${manifest.name}' must declare exactly one of 'setter' or 'draw'; neither is present.`,
             prop.loc,
             'setter',
+          ),
+        );
+      } else if (prop.setter && prop.draw) {
+        diagnostics.push(
+          createDiagnostic(
+            DIAGNOSTIC_CODES.OVERCONSTRAINED,
+            `Prop '${prop.name}' in widget '${manifest.name}' must declare exactly one of 'setter' or 'draw'; both are present.`,
+            prop.loc,
+            'setter, draw',
           ),
         );
       }
