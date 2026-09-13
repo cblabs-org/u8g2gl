@@ -206,4 +206,99 @@ describe('validateGeometry', () => {
 
     expect(diagnostics).toHaveLength(0);
   });
+
+  // --- [D-20]: bounds are checked against the containing element, which is
+  // the display only at screen level; nested elements measure against their
+  // immediate parent's own declared geometry, and a composite's own template
+  // has no display to check against at all. ---
+
+  it('catches an element overflowing its composite parent container, even though the same size would fit the display', () => {
+    const diagnostics = validateGeometry({
+      ...baseInput,
+      components: [
+        {
+          name: 'status_bar',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              {
+                tag: 'u8g2gl_box',
+                attributes: { name: 'container', x: '0', y: '0', width: '40', height: '16' },
+                styleOverrides: {},
+                children: [
+                  {
+                    tag: 'u8g2gl_label',
+                    attributes: { name: 'inner', x: '10', y: '0', width: '50', height: '10' },
+                    children: [],
+                    styleOverrides: {},
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const oobDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS);
+    expect(oobDiag).toBeDefined();
+    expect(oobDiag?.message).toContain("containing element '<u8g2gl_box>'");
+    expect(oobDiag?.message).toContain('extends to x=60');
+  });
+
+  it('does not flag a composite template top-level child against any display, since a composite has no display', () => {
+    const diagnostics = validateGeometry({
+      ...baseInput,
+      components: [
+        {
+          name: 'status_bar',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              {
+                tag: 'u8g2gl_label',
+                // Larger than the 128x64 display in baseInput's catalogue —
+                // irrelevant, since a composite's top-level children have no
+                // known instantiated size to check against.
+                attributes: { name: 'huge', x: '0', y: '0', width: '9999', height: '9999' },
+                children: [],
+                styleOverrides: {},
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS)).toBe(false);
+  });
+
+  it('checks a screen-nested element against its immediate parent container, not the display', () => {
+    const screen: Screen = {
+      name: 'screen_home',
+      view: {
+        children: [
+          {
+            tag: 'u8g2gl_box',
+            attributes: { name: 'outer', x: '0', y: '0', width: '30', height: '20' },
+            styleOverrides: {},
+            children: [
+              {
+                tag: 'u8g2gl_label',
+                // Fits the 128x64 display easily, but overflows its 30px-wide parent.
+                attributes: { name: 'inner', x: '0', y: '0', width: '50', height: '10' },
+                children: [],
+                styleOverrides: {},
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const diagnostics = validateGeometry({ ...baseInput, screens: [screen] });
+    const oobDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS);
+    expect(oobDiag).toBeDefined();
+    expect(oobDiag?.message).toContain("containing element '<u8g2gl_box>'");
+  });
 });
