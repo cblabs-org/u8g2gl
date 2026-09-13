@@ -123,14 +123,18 @@ function mergeByName<T extends { readonly name: string }>(
 }
 
 /**
- * The class every element ultimately realises as: the base a composite inherits
- * when its manifest names none (§13.12 emits `static u8g2gl_obj bar;`), and the
- * one manifest allowed to name itself in `extends`.
+ * The root class manifest: the base every generated object is reached through
+ * (§13.7's `u8g2gl_obj* const` object arrays), so the one class-backed manifest
+ * that declares no `extends`. It is also what a composite inherits, since a
+ * composite has no class of its own and realises as a `u8g2gl_obj` (§13.12).
+ * A contract constant, not an element list: the schema pass uses it to exempt
+ * the root from the `extends` requirement, and nothing else is special-cased.
  */
-const IMPLICIT_BASE = 'u8g2gl_obj';
+export const ROOT_CLASS_MANIFEST = 'u8g2gl_obj';
 
 // parentTagOf
-// The tag a manifest inherits from, or undefined for a root.
+// The tag a manifest inherits from, or undefined for a root. A manifest that
+// names itself is not a root — it falls through to the cycle diagnostic.
 //   manifest     — a declared manifest
 //   isRegistered — whether a tag has a registered manifest
 function parentTagOf(
@@ -139,24 +143,19 @@ function parentTagOf(
 ): string | undefined {
   if (manifest.extends === undefined) {
     // A composite has no class of its own but realises as a u8g2gl_obj, so it
-    // inherits that manifest (PR-04 WO2, F2). Only a composite: a plain widget
-    // without `extends` is a root here and the schema pass reports the missing
-    // attribute. When no u8g2gl_obj is registered — hand-built registries in
-    // unit tests; never a real project, which always has the framework bundle —
-    // the default is skipped rather than reported, because the author wrote no
-    // `extends` for a diagnostic to point at.
-    if (manifest.view !== undefined && manifest.name !== IMPLICIT_BASE && isRegistered(IMPLICIT_BASE)) {
-      return IMPLICIT_BASE;
+    // inherits that manifest (PR-04 WO2, F2). Only a composite: a drawing
+    // element has no class to inherit ([D-18]), and a class-backed widget
+    // without `extends` is reported by the schema pass. When no u8g2gl_obj is
+    // registered — hand-built registries in unit tests; never a real project,
+    // which always has the framework bundle — the default is skipped rather
+    // than reported, because the author wrote no `extends` to point at.
+    if (
+      manifest.view !== undefined &&
+      manifest.name !== ROOT_CLASS_MANIFEST &&
+      isRegistered(ROOT_CLASS_MANIFEST)
+    ) {
+      return ROOT_CLASS_MANIFEST;
     }
-    return undefined;
-  }
-  // u8g2gl_obj.xml must declare `extends` like every plain widget, and it has no
-  // parent to name, so it names itself: the root of the hierarchy. Any other
-  // manifest naming itself is a genuine one-element cycle and falls through to
-  // the cycle diagnostic. WO1 treated every self-extends as a root because the
-  // parser default made the two indistinguishable; with the default gone, only
-  // u8g2gl_obj still needs it.
-  if (manifest.extends === manifest.name && manifest.name === IMPLICIT_BASE) {
     return undefined;
   }
   return manifest.extends;

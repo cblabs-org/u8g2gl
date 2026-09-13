@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_line" extends="u8g2gl_obj">
+<widget name="u8g2gl_line">
   <api>
     <prop name="x1" type="int" draw="u8g2gl_draw_line" required="true" help="Start X coordinate" />
     <prop name="y1" type="int" draw="u8g2gl_draw_line" required="true" help="Start Y coordinate" />

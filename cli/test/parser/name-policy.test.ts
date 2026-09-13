@@ -22,7 +22,7 @@ import {
   tokenizeXml,
   type ParseOptions,
 } from '../../src/core/parser/index.js';
-import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnostic.js';
 
 const GENERATE: ParseOptions = { missingNamePolicy: 'generate' };
 const ERROR: ParseOptions = { missingNamePolicy: 'error' };
@@ -30,7 +30,7 @@ const ERROR: ParseOptions = { missingNamePolicy: 'error' };
 const SCREEN_FILE = 'screens/screen_home.xml';
 
 /** Counts U8G2GL_MISSING_NAME diagnostics of any severity. */
-function missingNameDiagnostics(diagnostics: readonly { code: string }[]) {
+function missingNameDiagnostics(diagnostics: readonly Diagnostic[]) {
   return diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.MISSING_NAME);
 }
 

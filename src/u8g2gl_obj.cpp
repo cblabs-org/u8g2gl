@@ -705,6 +705,78 @@ bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8
     return true;
 }
 
+// Geometry bindings ([D-20]). Each is one add_value_binding() call, so each
+// consumes exactly one pool slot and one observer — the invariant the
+// generator counts capacities against ([D-21]). The callbacks route through
+// the per-axis setters rather than writing x_/y_/w_/h_ directly, so the change
+// guard and mark_dirty() stay in one place.
+bool u8g2gl_obj::bind_x(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_x_bound);
+}
+
+bool u8g2gl_obj::bind_y(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_y_bound);
+}
+
+bool u8g2gl_obj::bind_width(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_width_bound);
+}
+
+bool u8g2gl_obj::bind_height(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_height_bound);
+}
+
+// u8g2gl_bound_coord
+// Reads an int subject for a geometry axis. Subjects are int32_t and geometry
+// is int16_t; clamping rather than truncating means an out-of-range value pins
+// the element at the edge of the coordinate space instead of wrapping it to
+// the opposite side of the display.
+//   obj     — binding_object() of the handle; nullptr once the slot is inactive
+//   subject — binding_subject() of the handle, an int subject by construction
+//   out     — receives the clamped value
+// Returns obj, or nullptr if the binding is no longer active.
+static u8g2gl_obj* u8g2gl_bound_coord(u8g2gl_obj* obj, void* subject, int16_t& out) {
+    if (!obj || !subject) {
+        return nullptr;
+    }
+    int32_t v = static_cast<u8g2gl_subject_int_base*>(subject)->get();
+    if (v > INT16_MAX) {
+        v = INT16_MAX;
+    } else if (v < INT16_MIN) {
+        v = INT16_MIN;
+    }
+    out = static_cast<int16_t>(v);
+    return obj;
+}
+
+void u8g2gl_obj::on_x_bound(void* binding) {
+    int16_t v = 0;
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+        obj->set_x(v);
+    }
+}
+
+void u8g2gl_obj::on_y_bound(void* binding) {
+    int16_t v = 0;
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+        obj->set_y(v);
+    }
+}
+
+void u8g2gl_obj::on_width_bound(void* binding) {
+    int16_t v = 0;
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+        obj->set_w(v);
+    }
+}
+
+void u8g2gl_obj::on_height_bound(void* binding) {
+    int16_t v = 0;
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+        obj->set_h(v);
+    }
+}
+
 // u8g2gl_obj::binding_object / binding_subject
 // Undo the handle's type erasure for a widget's observer callback. Both return
 // nullptr for an inactive slot, which is how a notification arriving after the

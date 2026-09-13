@@ -490,9 +490,16 @@ describe('Schema Types', () => {
   describe('Compile-time immutability (readonly assertions)', () => {
     it('ensures interfaces enforce readonly constraints at compile time', () => {
       const loc: SourceLocation = { file: 'test.xml', line: 1, column: 1 };
-      // Verify properties cannot be reassigned (compile-time type safety):
-      // @ts-expect-error - readonly property cannot be reassigned
-      // loc.file = 'other.xml';
+      // Verify properties cannot be reassigned (compile-time type safety). The
+      // closures below are never called: each exists only so that its
+      // expect-error directive fails `npm run lint` (tsconfig.test.json) if the
+      // property ever stops being readonly. Commented-out assignments, as these
+      // were before PR-04 WO3, checked nothing.
+      const reassignLoc = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        loc.file = 'other.xml';
+      };
+      expect(typeof reassignLoc).toBe('function');
       expect(loc.file).toBe('test.xml');
 
       const project: U8g2glProject = {
@@ -501,8 +508,11 @@ describe('Schema Types', () => {
         version: '1.0',
         targets: [],
       };
-      // @ts-expect-error - readonly property cannot be reassigned
-      // project.schema = '0.5';
+      const reassignProject = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        project.schema = '0.5';
+      };
+      expect(typeof reassignProject).toBe('function');
       expect(project.schema).toBe('0.4');
 
       const diag: Diagnostic = {
@@ -513,8 +523,11 @@ describe('Schema Types', () => {
         column: 1,
         message: 'missing attribute',
       };
-      // @ts-expect-error - readonly property cannot be reassigned
-      // diag.code = 'OTHER';
+      const reassignDiag = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        diag.code = 'OTHER';
+      };
+      expect(typeof reassignDiag).toBe('function');
       expect(diag.code).toBe(DIAGNOSTIC_CODES.MISSING_REQUIRED);
     });
   });

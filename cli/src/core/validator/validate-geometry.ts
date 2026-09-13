@@ -13,7 +13,9 @@
  *              the reference only for a screen's top-level children; a node nested
  *              inside another node (a plain container or a composite's own template)
  *              is checked against that immediate parent's own literal bounds instead.
- *              Best-effort evaluation for literal integer coordinates.
+ *              Best-effort evaluation for literal integer coordinates. Also
+ *              rejects anchor-positioned children of a container whose own
+ *              geometry is bound ([D-20], §8.4), which would require reflow.
  *
  * Exports:
  * - validateGeometry(input): Runs Pass 6 geometry and bounding validation
@@ -190,6 +192,78 @@ function checkNodes(
 }
 
 /**
+ * Geometry binding attributes ([D-20]) and the anchor attributes (§7.2) that
+ * resolve against a container at build time. These name the layout contract,
+ * not elements, so they are not element knowledge in [D-17]'s sense.
+ */
+const GEOMETRY_BINDINGS: readonly string[] = ['bind_x', 'bind_y', 'bind_width', 'bind_height'];
+const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vcenter'];
+
+// anchorOf
+// The first anchor attribute positioning a node, or undefined. `hcenter` and
+// `vcenter` are boolean switches, so an explicit "false" anchors nothing.
+//   node — the candidate child
+function anchorOf(node: WidgetNode): string | undefined {
+  return ANCHOR_ATTRIBUTES.find((attr) => {
+    const value = node.attributes[attr];
+    if (value === undefined) {
+      return false;
+    }
+    return !((attr === 'hcenter' || attr === 'vcenter') && value === 'false');
+  });
+}
+
+// checkBoundContainers
+// [D-20]: a container whose own geometry is bound may not have anchor-positioned
+// children, because anchors resolve once at build time and re-resolving them on
+// every binding change would be reflow. A container's children are its nested
+// elements and, for a composite instance, the top-level elements of its <view>.
+//   nodes       — the elements to check, recursively
+//   manifests   — registry, to find a composite instance's <view>
+//   diagnostics — output
+function checkBoundContainers(
+  nodes: readonly WidgetNodeChild[],
+  manifests: ValidateInput['manifests'],
+  diagnostics: Diagnostic[],
+): void {
+  for (const child of nodes) {
+    if (!('tag' in child) || typeof child.tag !== 'string') {
+      continue;
+    }
+    const node: WidgetNode = child;
+    const boundAttr = GEOMETRY_BINDINGS.find((attr) => node.attributes[attr] !== undefined);
+
+    if (boundAttr !== undefined) {
+      const nested = node.children.filter((c): c is WidgetNode => 'tag' in c);
+      const templated = (manifests.get(node.tag)?.view?.children ?? []).filter(
+        (c): c is WidgetNode => 'tag' in c,
+      );
+      for (const inner of [...nested, ...templated]) {
+        const anchor = anchorOf(inner);
+        if (anchor === undefined) {
+          continue;
+        }
+        const containerName = node.attributes.name || node.tag;
+        const childName = inner.attributes.name || inner.tag;
+        diagnostics.push(
+          createGeomDiagnostic(
+            DIAGNOSTIC_CODES.BOUND_GEOMETRY_ANCHORED_CHILD,
+            `Container '${containerName}' <${node.tag}> binds its geometry with '${boundAttr}', ` +
+              `so child '${childName}' <${inner.tag}> may not be anchor-positioned with '${anchor}'. ` +
+              `Anchors resolve at build time and are not re-resolved when a binding changes ([D-20]); ` +
+              `use absolute coordinates.`,
+            inner.attributeLocs?.[anchor] ?? inner.loc,
+            anchor,
+          ),
+        );
+      }
+    }
+
+    checkBoundContainers(node.children, manifests, diagnostics);
+  }
+}
+
+/**
  * Validates layout geometry constraints and containing-element boundary limits.
  */
 export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
@@ -227,8 +301,16 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   // does not know. Its top-level children therefore get no absolute bounds
   // check, but anything nested inside one of them still measures against
   // that element's own literal bounds, exactly as it would inside a screen.
-  for (const component of manifests.declaredComposites) {
-    checkNodes(component.view?.children ?? [], undefined, diagnostics);
+  for (const composite of manifests.declaredComposites) {
+    checkNodes(composite.view?.children ?? [], undefined, diagnostics);
+  }
+
+  // [D-20] bound-geometry containers, in screens and in composite templates.
+  for (const screen of screens ?? []) {
+    checkBoundContainers(screen.view?.children ?? [], manifests, diagnostics);
+  }
+  for (const composite of manifests.declaredComposites) {
+    checkBoundContainers(composite.view?.children ?? [], manifests, diagnostics);
   }
 
   return diagnostics;

@@ -196,6 +196,27 @@ TEST(BindingInvariant, BindFlagIfNotEqBoolBoolRef) {
         [](u8g2gl_obj& o, bool_subject& s) { return o.bind_flag_if_not_eq(&s, false, U8G2GL_FLAG_HIDDEN); });
 }
 
+// [D-20] geometry bindings (PR-04 WO3).
+TEST(BindingInvariant, BindX) {
+    expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_x(&s); });
+}
+
+TEST(BindingInvariant, BindY) {
+    expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_y(&s); });
+}
+
+TEST(BindingInvariant, BindWidth) {
+    expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_width(&s); });
+}
+
+TEST(BindingInvariant, BindHeight) {
+    expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_height(&s); });
+}
+
 TEST(BindingInvariant, ClockBindTime) {
     expect_one_slot_one_observer<u8g2gl_clock, time_subject>(
         [](u8g2gl_clock& o, time_subject& s) { return o.bind_time(&s); });

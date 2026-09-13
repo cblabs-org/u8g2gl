@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_ellipse" extends="u8g2gl_obj">
+<widget name="u8g2gl_ellipse">
   <api>
     <prop name="x" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Center X coordinate" />
     <prop name="y" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Center Y coordinate" />
@@ -7,5 +7,7 @@
     <prop name="ry" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Vertical radius in pixels" />
     <prop name="filled" type="bool" draw="u8g2gl_draw_ellipse" default="false" help="Whether ellipse is filled" />
     <prop name="segments" type="enum" draw="u8g2gl_draw_ellipse" values="all,upper_left,upper_right,lower_left,lower_right" default="all" help="Ellipse segments to draw" />
+    <bind name="bind_x" type="int" setter="x" />
+    <bind name="bind_y" type="int" setter="y" />
   </api>
 </widget>

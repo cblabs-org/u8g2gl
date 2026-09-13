@@ -29,6 +29,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseWidgetManifestFile } from '../../src/core/parser/parse-widget-manifest.js';
 import { buildManifestRegistry, parseFrameworkManifests } from '../../src/core/manifest/index.js';
+import { ROOT_CLASS_MANIFEST } from '../../src/core/manifest/manifest-registry.js';
 import type { EffectiveManifest } from '../../src/core/manifest/index.js';
 import type { PropDef } from '../../src/core/schema/widget-manifest.js';
 import { type CppFunction, freeFunctionsOf, publicMethodsOf, subjectTypesOf } from './cpp-header.js';
@@ -73,12 +74,13 @@ function drawProps(props: readonly PropDef[]): PropDef[] {
   return props.filter((p) => p.draw !== undefined);
 }
 
-// Draw-argument order read from the *effective* (inherited) prop list disagrees
-// with the draw function for these elements. Recorded, not chosen: see the
-// PR-04 WO2 Completion Report, "draw= argument order". `it.fails` keeps the
-// mismatch visible and turns red the moment it is resolved either way, so this
-// list cannot silently outlive the question.
-const OPEN_EFFECTIVE_ORDER_MISMATCHES: ReadonlySet<string> = new Set(['u8g2gl_box']);
+/**
+ * A drawing element: a manifest with `draw=` props and no `setter=` props. It
+ * has no class ([D-18]), so its bindings cannot name a C++ method.
+ */
+function isDrawingElement(props: readonly PropDef[]): boolean {
+  return props.some((p) => p.draw !== undefined) && !props.some((p) => p.setter !== undefined);
+}
 
 describe('Widget Manifests', () => {
   // --- Guards against a vacuous suite ---
@@ -158,10 +160,17 @@ describe('Widget Manifests', () => {
         expect(result.value!.api).toBeDefined();
       });
 
-      it('should declare extends explicitly', () => {
-        // PR-04 WO2 F2: the parser no longer defaults `extends`, so a framework
-        // widget without it would fail the schema pass on every project.
-        expect(result.value!.extends).toBeTruthy();
+      it('declares extends if and only if it is a class-backed element other than the root', () => {
+        // PR-04 WO3: `extends` is real C++ inheritance (§6.5). A drawing
+        // element has no class ([D-18]) and the root class manifest is the base,
+        // so neither declares one; every other class-backed element must.
+        const manifest = result.value!;
+        const classBacked = manifest.api.props.some((p) => p.setter !== undefined);
+        if (classBacked && manifest.name !== ROOT_CLASS_MANIFEST) {
+          expect(manifest.extends).toBeTruthy();
+        } else {
+          expect(manifest.extends).toBeUndefined();
+        }
       });
 
       it('should carry no [D-18] fossil `animated` attribute', () => {
@@ -219,7 +228,18 @@ describe('Widget Manifests', () => {
           expect(missing).toEqual([]);
         });
 
-        it('every <bind setter=> has a public overload taking the declared subject type', () => {
+        if (isDrawingElement(manifest.declared.api.props)) {
+          // PR-04 WO3: a drawing element's <bind setter=> names the draw= prop
+          // whose argument the bound subject supplies at draw time (§13.5,
+          // "Bindings without an object"), since there is no method to name.
+          it('every <bind setter=> names one of its draw= props, of the bound type', () => {
+            const drawn = new Map(drawProps(manifest.api.props).map((p) => [p.name, p]));
+            const wrong = manifest.api.bindings
+              .filter((b) => drawn.get(b.setter)?.type !== b.type)
+              .map((b) => `${b.name} -> ${b.setter}: ${b.type}`);
+            expect(wrong).toEqual([]);
+          });
+        } else it('every <bind setter=> has a public overload taking the declared subject type', () => {
           const methods = methodsAlongChain(manifest);
           const missing = manifest.api.bindings
             .filter((b) => {
@@ -248,8 +268,7 @@ describe('Widget Manifests', () => {
             expect(params.slice(1).map((p) => p.name)).toEqual(ownDraw.map((p) => p.name));
           });
 
-          const effectiveOrder = OPEN_EFFECTIVE_ORDER_MISMATCHES.has(tag) ? it.fails : it;
-          effectiveOrder('draw= props in effective (inherited) order match the draw function', () => {
+          it('draw= props in effective (inherited) order match the draw function', () => {
             const params = drawFunctions.get(target)?.params ?? [];
             expect(params.slice(1).map((p) => p.name)).toEqual(drawProps(manifest.api.props).map((p) => p.name));
           });

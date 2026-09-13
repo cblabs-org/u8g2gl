@@ -77,7 +77,10 @@ describe('validateWidgetProps', () => {
     catalogue: [],
   };
 
-  it('permits common attributes and inline style overrides without diagnostics', () => {
+  it('permits common and manifest-declared geometry attributes and inline style overrides', () => {
+    // Against the real framework label: since PR-04 WO3 `x`, `y`, `width`,
+    // `height` and `hidden` are accepted because u8g2gl_obj declares them, not
+    // because COMMON_ATTRIBUTES lists them.
     const screen: Screen = {
       name: 'screen_home',
       view: {
@@ -111,6 +114,7 @@ describe('validateWidgetProps', () => {
 
     const diagnostics = validateWidgetProps({
       ...baseInput,
+      manifests: frameworkRegistry(),
       screens: [screen],
     });
 
@@ -194,9 +198,11 @@ describe('validateWidgetProps', () => {
   describe('one code path for widgets and composites', () => {
     it('suggests common layout attributes for a composite instance, as it always did for a widget', () => {
       // Before WO1 only the widget path put COMMON_ATTRIBUTES into its
-      // suggestion pool; a composite's `widht` got no suggestion at all.
+      // suggestion pool; a composite's `widht` got no suggestion at all. Since
+      // PR-04 WO3 `width` comes from the u8g2gl_obj a composite inherits.
       const diagnostics = validateWidgetProps({
         ...baseInput,
+        manifests: frameworkRegistry([STATUS_BAR]),
         screens: [
           screenWith({
             tag: 'status_bar',
@@ -234,6 +240,93 @@ describe('validateWidgetProps', () => {
       expect(diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.MISSING_REQUIRED)).toHaveLength(
         1,
       );
+    });
+  });
+
+  // --- PR-04 WO3: attribute acceptance comes from the manifests ---
+  describe('manifest-sourced attribute acceptance', () => {
+    const run = (node: Omit<WidgetNode, 'children' | 'styleOverrides'>) =>
+      validateWidgetProps({ ...baseInput, manifests: frameworkRegistry(), screens: [screenWith(node)] });
+
+    it('rejects x on <u8g2gl_line>, whose manifest declares x1/y1/x2/y2 instead', () => {
+      const diagnostics = run({
+        tag: 'u8g2gl_line',
+        attributes: { name: 'ln', x1: '0', y1: '0', x2: '9', y2: '9', x: '3' },
+      });
+      expect(diagnostics.map((d) => [d.code, d.offendingText])).toEqual([
+        [DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE, 'x'],
+      ]);
+    });
+
+    it('rejects a literal hidden on a drawing element, which hides through a <bind_flag_if_*> child', () => {
+      const diagnostics = run({
+        tag: 'u8g2gl_box',
+        attributes: { name: 'bx', x: '0', y: '0', width: '4', height: '4', hidden: true },
+      });
+      expect(diagnostics.map((d) => [d.code, d.offendingText])).toEqual([
+        [DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE, 'hidden'],
+      ]);
+    });
+
+    it('accepts bind_width on <u8g2gl_box> ([D-20], §6.2 example)', () => {
+      const diagnostics = run({
+        tag: 'u8g2gl_box',
+        attributes: { name: 'level_bar', x: '4', y: '20', width: '0', height: '6', bind_width: 'level' },
+      });
+      expect(diagnostics).toEqual([]);
+    });
+
+    it('accepts identity and anchor attributes on any element', () => {
+      const diagnostics = run({
+        tag: 'u8g2gl_pixel',
+        attributes: { name: 'px', x: '0', y: '0', right: '1', bottom: '1', hcenter: 'true', vcenter: 'true', style: 's' },
+      });
+      expect(diagnostics).toEqual([]);
+    });
+  });
+
+  // --- PR-04 WO3 F4: composite interiors are prop-checked like screens ---
+  describe('composite interiors (§13.11)', () => {
+    const compositeWith = (child: WidgetNode): WidgetManifest => ({
+      name: 'wd_panel',
+      api: {
+        props: [{ name: 'mode', type: 'enum', values: 'left,right', default: 'left' }],
+        bindings: [],
+        elements: [],
+      },
+      view: { children: [child] },
+    });
+
+    it('reports an unknown attribute on an element inside a <view>', () => {
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry([
+          compositeWith({
+            tag: 'u8g2gl_label',
+            attributes: { name: 'inner', font: '$font', txt: 'x' },
+            children: [],
+            styleOverrides: {},
+          }),
+        ]),
+      });
+      expect(diagnostics.map((d) => [d.code, d.offendingText])).toEqual([
+        [DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE, 'txt'],
+      ]);
+    });
+
+    it('skips a $prop placeholder value where an enum value is expected', () => {
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry([
+          compositeWith({
+            tag: 'u8g2gl_label',
+            attributes: { name: 'inner', font: '$font', align: '$mode' },
+            children: [],
+            styleOverrides: {},
+          }),
+        ]),
+      });
+      expect(diagnostics).toEqual([]);
     });
   });
 

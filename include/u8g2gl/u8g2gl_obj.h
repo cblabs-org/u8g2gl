@@ -45,6 +45,7 @@
  *
  *     Data binding:
  *     - bind_text():         Bind display text to a subject
+ *     - bind_x/y/width/height(): Bind one geometry axis to an int subject ([D-20])
  *     - bind_flag_if_*():    Conditional flag from a subject's value
  *     - add_value_binding(): (protected) pool slot + observer for a widget's
  *                            own bind_* method
@@ -284,6 +285,31 @@ public:
     bool bind_text(u8g2gl_subject_string_base* subject);
 
     /**
+     * @brief Bind the left edge to an int subject ([D-20]).
+     *
+     * Each change calls set_x(), so the frame is marked dirty only when the
+     * position actually changes — a moved element on an otherwise static
+     * screen is redrawn (§11.2). The current value is applied immediately.
+     * This is the whole of runtime layout: nothing re-resolves anchors, so the
+     * generator rejects anchor-positioned children of a geometry-bound container.
+     * Values outside the int16_t range are clamped to it.
+     *
+     * @param subject Subject to observe. Must outlive this object.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
+     */
+    bool bind_x(u8g2gl_subject_int_base* subject);
+
+    /** @brief Bind the top edge to an int subject; see bind_x(). */
+    bool bind_y(u8g2gl_subject_int_base* subject);
+
+    /** @brief Bind the width to an int subject; see bind_x(). */
+    bool bind_width(u8g2gl_subject_int_base* subject);
+
+    /** @brief Bind the height to an int subject; see bind_x(). */
+    bool bind_height(u8g2gl_subject_int_base* subject);
+
+    /**
      * @brief Conditionally set or clear a flag based on a subject's value.
      *
      * Evaluated once immediately, so the flag is correct before the first frame.
@@ -468,6 +494,13 @@ private:
      *         exhausted, in which case no binding is registered.
      */
     bool add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_binding_op_t op, int32_t ref_value, uint8_t flag);
+
+    // Observer callbacks behind bind_x/y/width/height(); each forwards the
+    // subject's value to the matching per-axis setter.
+    static void on_x_bound(void* binding);
+    static void on_y_bound(void* binding);
+    static void on_width_bound(void* binding);
+    static void on_height_bound(void* binding);
 };
 
 #endif // U8G2GL_OBJ_H

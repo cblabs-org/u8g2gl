@@ -28,23 +28,27 @@ import { findClosest } from '../catalogue/edit-distance.js';
 import type { ValidateInput } from './validate.js';
 
 /**
- * Layout and identity attributes valid on every visual node (§7.2, §10),
- * whether or not a manifest declares them. Kept deliberately separate from the
- * manifests: several of these (`right`, `hcenter`, `style`, …) are resolved by
- * the build-time layout pass and have no setter to declare. Which attributes
- * belong here is WO3's to settle.
+ * Identity, anchor and style attributes valid on every element, which no
+ * manifest declares because none reaches a setter or a draw call: `name` is
+ * identity ([U-1]); the anchors are resolved to literal coordinates at build
+ * time ([D-7]); styles are applied by the generator (§10, §12.2).
+ *
+ * Deliberately **not** here: `x`, `y`, `width`, `height` and `hidden`. Those
+ * are real properties, accepted only where the effective manifest declares
+ * them (PR-04 WO3) — so `x` on a `<u8g2gl_line>` or a literal `hidden` on a
+ * drawing element is an unknown attribute, not silently ignored. A drawing
+ * element is hidden through a `<bind_flag_if_*>` child (§6.2).
+ *
+ * `focusStyle` is not an authored attribute: the parser mirrors `focus_style`
+ * into it (parse-widget-tree.ts) and validate-references.ts reads it, so it
+ * must be admitted or every `focus_style` would report a phantom attribute.
  */
 const COMMON_ATTRIBUTES: ReadonlySet<string> = new Set([
   'name',
-  'x',
-  'y',
-  'width',
-  'height',
   'right',
   'bottom',
   'hcenter',
   'vcenter',
-  'hidden',
   'style',
   'focus_style',
   'focusStyle',
@@ -175,23 +179,35 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
 }
 
 /**
- * Validates element instance attributes in every screen against the effective
- * manifests in `input.manifests`.
+ * Validates element instance attributes in every screen, and inside every
+ * composite's `<view>`, against the effective manifests in `input.manifests`.
+ *
+ * Composite interiors are checked on the same path as screens because §13.11
+ * validates composite instantiation "inside composites as well as screens";
+ * before PR-04 WO3 an element inside a `<view>` was never prop-checked.
+ * `$prop` placeholder values are unknowable here and are skipped by the enum
+ * check already; attribute *names* inside a template are literal and checked.
  *
  * @param input Validator input; only `screens` and `manifests` are read.
- * @return Diagnostics in screen and document order.
+ * @return Diagnostics in screen order, then declared-composite order, each in
+ *         document order.
  */
 export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const { screens, manifests } = input;
 
+  const visit = (node: WidgetNode): void => {
+    const manifest = manifests.get(node.tag);
+    if (manifest) {
+      diagnostics.push(...checkInstanceProps(node, manifest));
+    }
+  };
+
   for (const screen of screens ?? []) {
-    walkNodes(screen.view?.children ?? [], (node) => {
-      const manifest = manifests.get(node.tag);
-      if (manifest) {
-        diagnostics.push(...checkInstanceProps(node, manifest));
-      }
-    });
+    walkNodes(screen.view?.children ?? [], visit);
+  }
+  for (const composite of manifests.declaredComposites) {
+    walkNodes(composite.view?.children ?? [], visit);
   }
 
   return diagnostics;

@@ -40,8 +40,44 @@ describe('validateSchema — required extends on a plain widget', () => {
     expect(missing[0]?.message).toBe("Missing required attribute 'extends' on widget 'wd_meter'.");
   });
 
-  it('reports nothing for the framework manifests, which all declare extends', () => {
+  it('reports nothing for the framework manifests: root and drawing elements declare none, the rest do', () => {
     expect(validateSchema(input(frameworkRegistry()))).toEqual([]);
+  });
+
+  // --- PR-04 WO3: the `extends` rule, one test per branch ---
+  it('reports a drawing manifest (draw= props only) that declares extends', () => {
+    const parsed = parseWidgetManifestFile(
+      '<widget name="wd_dot" extends="u8g2gl_obj"><api><prop name="x" type="int" draw="u8g2gl_draw_pixel" /></api></widget>',
+      'widgets/wd_dot/wd_dot.xml',
+    );
+    const diagnostics = validateSchema(input(frameworkRegistry([parsed.value!])));
+    expect(diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.DRAWING_ELEMENT_EXTENDS]);
+    expect(diagnostics[0]?.message).toContain("Drawing element 'wd_dot' declares extends=\"u8g2gl_obj\"");
+  });
+
+  it('accepts a drawing manifest that declares no extends', () => {
+    const parsed = parseWidgetManifestFile(
+      '<widget name="wd_dot"><api><prop name="x" type="int" draw="u8g2gl_draw_pixel" /></api></widget>',
+      'widgets/wd_dot/wd_dot.xml',
+    );
+    expect(validateSchema(input(frameworkRegistry([parsed.value!])))).toEqual([]);
+  });
+
+  it('accepts a composite with no extends, because the registry supplies u8g2gl_obj', () => {
+    const composite: WidgetManifest = {
+      name: 'status_bar',
+      api: { props: [{ name: 'title', type: 'string' }], bindings: [], elements: [] },
+      view: { children: [] },
+    };
+    expect(validateSchema(input(frameworkRegistry([composite])))).toEqual([]);
+  });
+
+  it('exempts the root class manifest, u8g2gl_obj, from the requirement', () => {
+    const root: WidgetManifest = {
+      name: 'u8g2gl_obj',
+      api: { props: [{ name: 'x', type: 'int', setter: 'set_x' }], bindings: [], elements: [] },
+    };
+    expect(validateSchema(input(registryOf([root])))).toEqual([]);
   });
 });
 
@@ -60,7 +96,9 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   }): WidgetManifest {
     return {
       name: 'u8g2gl_widget',
-      extends: 'u8g2gl_obj',
+      // A draw-only manifest must not declare `extends` (PR-04 WO3), so only a
+      // prop with a setter gets one; this suite is about setter/draw, not extends.
+      ...(prop.setter !== undefined ? { extends: 'u8g2gl_obj' } : {}),
       api: {
         props: [{ name: 'value', type: 'int', ...prop }],
         bindings: [],

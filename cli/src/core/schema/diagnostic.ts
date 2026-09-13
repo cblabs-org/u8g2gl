@@ -99,6 +99,20 @@ export const DIAGNOSTIC_CODES = {
    * defect this code exists to prevent.
    */
   SHADOWED_FRAMEWORK_MANIFEST: 'U8G2GL_SHADOWED_FRAMEWORK_MANIFEST',
+  /**
+   * A drawing element's manifest — every prop `draw=`, none `setter=` —
+   * declares `extends` ([D-18], §6.2). A drawing element compiles to a free
+   * `u8g2gl_draw_*` call and has no class, and `extends` names real C++
+   * inheritance (§6.5), so there is nothing for it to inherit from.
+   */
+  DRAWING_ELEMENT_EXTENDS: 'U8G2GL_DRAWING_ELEMENT_EXTENDS',
+  /**
+   * A container whose own `x`, `y`, `width` or `height` is bound has an
+   * anchor-positioned child (`right`, `bottom`, `hcenter`, `vcenter`) —
+   * [D-20], §8.4. Anchors resolve at build time; re-resolving them whenever
+   * the binding changed would be reflow, which U8G2GL does not have.
+   */
+  BOUND_GEOMETRY_ANCHORED_CHILD: 'U8G2GL_BOUND_GEOMETRY_ANCHORED_CHILD',
 } as const;
 
 /**

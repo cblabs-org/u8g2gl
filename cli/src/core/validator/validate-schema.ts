@@ -24,7 +24,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
 import type { PropType } from '../schema/widget-manifest.js';
-import type { ManifestRegistry } from '../manifest/manifest-registry.js';
+import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
@@ -501,7 +501,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     }
   }
 
-  // --- 4. Component schema validation ---
+  // --- 4. Composite schema validation ---
   // Declared, not effective, manifests: these checks are about what a file
   // itself declares, so an inherited prop is reported once, against its owner.
   for (const component of manifests.declaredComposites) {
@@ -509,20 +509,19 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.MISSING_REQUIRED,
-          "Missing required attribute 'name' on <component>.",
+          "Missing required attribute 'name' on composite <widget>.",
           component.loc,
           'name',
         ),
       );
     }
-    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
-    // not a retired `Component`) — reach through `.props`. No behaviour change.
+
     for (const prop of component.api?.props ?? []) {
       if (!prop.name) {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'name' on <prop> in component '${component.name}'.`,
+            `Missing required attribute 'name' on <prop> in composite '${component.name}'.`,
             prop.loc,
             'name',
           ),
@@ -532,7 +531,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'type' on prop '${prop.name}' in component '${component.name}'.`,
+            `Missing required attribute 'type' on prop '${prop.name}' in composite '${component.name}'.`,
             prop.loc,
             'type',
           ),
@@ -541,7 +540,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid type '${prop.type}' on prop '${prop.name}' in component '${component.name}'. Expected one of: ${Array.from(VALID_PROP_TYPES).join(', ')}.`,
+            `Invalid type '${prop.type}' on prop '${prop.name}' in composite '${component.name}'. Expected one of: ${Array.from(VALID_PROP_TYPES).join(', ')}.`,
             prop.loc,
             prop.type,
             Array.from(VALID_PROP_TYPES),
@@ -563,11 +562,33 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         ),
       );
     }
-    if (!manifest.extends) {
+    // The `extends` rule (PR-04 WO3). `extends` names real C++ inheritance
+    // (§6.5), so whether it is required follows from whether there is a class:
+    //   - `setter=` props mean a class, which must name its base — except the
+    //     root class manifest, which is the base;
+    //   - `draw=` props only mean a drawing element with no class ([D-18]),
+    //     which therefore has nothing to extend;
+    //   - a composite (declaredComposites, not this loop) needs none, because
+    //     the registry supplies u8g2gl_obj.
+    // A manifest with neither kind of prop is left alone: an `<api>` with no
+    // new props is how §6.5 says to give an existing class a manifest.
+    const hasSetterProp = (manifest.api?.props ?? []).some((p) => p.setter !== undefined);
+    const hasDrawProp = (manifest.api?.props ?? []).some((p) => p.draw !== undefined);
+    if (hasSetterProp && !manifest.extends && manifest.name !== ROOT_CLASS_MANIFEST) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.MISSING_REQUIRED,
           `Missing required attribute 'extends' on widget '${manifest.name}'.`,
+          manifest.loc,
+          'extends',
+        ),
+      );
+    } else if (hasDrawProp && !hasSetterProp && manifest.extends !== undefined) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.DRAWING_ELEMENT_EXTENDS,
+          `Drawing element '${manifest.name}' declares extends="${manifest.extends}", but a ` +
+            `drawing element (draw= props only) has no class to inherit from; remove 'extends'.`,
           manifest.loc,
           'extends',
         ),

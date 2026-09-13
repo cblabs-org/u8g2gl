@@ -16,6 +16,7 @@
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_config.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_helpers.h"
@@ -179,6 +180,51 @@ TEST(Obj, PerAxisSettersMarkDirty) {
     obj.set_h(8);
     EXPECT_EQ(obj.get_h(), 8);
     EXPECT_TRUE(obj.is_dirty());
+}
+
+// --- PR-04 WO3: geometry bindings ([D-20]) ---
+// A bound axis must reach the display on a static screen: nothing animates to
+// force a frame, so the binding itself has to gate it via the frame dirty flag
+// (§11.2). This is the failure mode set_coords() had before PR-3R WO1.
+TEST(Obj, BindWidthUpdatesGeometryAndGatesStaticFrame) {
+    u8g2gl_screen screen{};
+    u8g2gl_set_active_screen(&screen);
+
+    u8g2gl_subject_int level;
+    level.set(10);
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_width(&level));
+    EXPECT_EQ(obj.get_w(), 10);   // current value applied immediately
+
+    screen.dirty = false;
+    obj.clear_dirty();
+    level.set(42);
+    EXPECT_EQ(obj.get_w(), 42);
+    EXPECT_TRUE(obj.is_dirty());
+    EXPECT_TRUE(screen.dirty);
+
+    // Same value again: no change, no frame.
+    screen.dirty = false;
+    obj.clear_dirty();
+    level.set(42);
+    EXPECT_FALSE(screen.dirty);
+
+    u8g2gl_set_active_screen(nullptr);
+}
+
+TEST(Obj, BindEachAxisDrivesItsSetter) {
+    u8g2gl_subject_int sx, sy, sh;
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_x(&sx));
+    ASSERT_TRUE(obj.bind_y(&sy));
+    ASSERT_TRUE(obj.bind_height(&sh));
+    sx.set(3);
+    sy.set(-4);
+    sh.set(70000);   // outside int16_t: clamped, not wrapped
+    EXPECT_EQ(obj.get_x(), 3);
+    EXPECT_EQ(obj.get_y(), -4);
+    EXPECT_EQ(obj.get_h(), INT16_MAX);
+    EXPECT_FALSE(obj.bind_x(nullptr));
 }
 
 TEST(Obj, PerAxisSettersUnchangedDoNotMarkDirty) {

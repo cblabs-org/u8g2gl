@@ -227,7 +227,7 @@ describe('[U-1] Element Identity', () => {
     );
     expect(missingNameDiag).toBeDefined();
     expect(missingNameDiag?.severity).toBe('warning');
-    expect(parseResult.value!.view.children[0]!.attributes.name).toBe('label_0');
+    expect(parseResult.value!.view!.children[0]!.attributes.name).toBe('label_0');
   });
 
   describe('WO8: synthesised names are unique within the document namespace', () => {
@@ -372,8 +372,8 @@ describe('[U-1] Element Identity', () => {
       expect(parseResult.value).toBeDefined();
 
       const comp = parseResult.value!;
-      const left = comp.view.children[0]!;
-      const right = comp.view.children[1]!;
+      const left = comp.view!.children[0]!;
+      const right = comp.view!.children[1]!;
       expect((left.children[0] as WidgetNode).attributes.name).toBe('label_0');
       expect((right.children[0] as WidgetNode).attributes.name).toBe('label_1');
 

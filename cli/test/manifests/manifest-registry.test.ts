@@ -102,6 +102,13 @@ describe('buildManifestRegistry', () => {
         message: "Manifest 'extends' cycle: wd_a -> wd_a.",
       });
     });
+
+    it('reports u8g2gl_obj naming itself as a cycle too: the root declares no extends (PR-04 WO3)', () => {
+      // WO1/WO2 read u8g2gl_obj's self-extends as "root". With the root
+      // recognised by declaring nothing, no self-extends is special.
+      const registry = registryOf([widget('u8g2gl_obj', { extends: 'u8g2gl_obj' })]);
+      expect(registry.diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.CIRCULAR_REFERENCE]);
+    });
   });
 
   describe('extends resolution', () => {
@@ -209,9 +216,9 @@ describe('buildManifestRegistry', () => {
 
   describe('framework manifests', () => {
     it('resolves the bundled framework manifests with no diagnostics', () => {
-      // u8g2gl_obj.xml declares extends="u8g2gl_obj" (every plain widget must
-      // declare `extends`, PR-04 WO2 F2), which must read as the root of the
-      // hierarchy, not a self-cycle.
+      // u8g2gl_obj.xml declares no `extends` — it is the root class manifest —
+      // and the eight drawing manifests declare none because they have no
+      // class (PR-04 WO3). Each resolves to a one-element chain.
       const registry = frameworkRegistry();
       expect(registry.diagnostics).toEqual([]);
       expect(registry.get('u8g2gl_obj')?.chain).toEqual(['u8g2gl_obj']);

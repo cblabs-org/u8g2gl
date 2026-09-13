@@ -287,6 +287,53 @@ describe('validateIdentifiers', () => {
     expect(collisionDiag).toBeDefined();
     expect(collisionDiag?.severity).toBe('error');
     expect(collisionDiag?.offendingText).toBe('bar_title');
-    expect(collisionDiag?.message).toContain('Component-inlining name collision');
+    expect(collisionDiag?.message).toContain('Composite-inlining name collision');
+  });
+
+  // --- PR-04 WO3 F7: duplicate manifests are diagnosed for every element ---
+  describe('duplicate manifest declarations', () => {
+    const plain = (file: string) => ({
+      name: 'wd_meter',
+      extends: 'u8g2gl_obj',
+      api: { props: [], bindings: [], elements: [] },
+      loc: { file, line: 2, column: 1 },
+    });
+    const composite = (file: string) => ({
+      name: 'status_bar',
+      api: { props: [], bindings: [], elements: [] },
+      view: { children: [] },
+      loc: { file, line: 2, column: 1 },
+    });
+
+    it('reports two plain widget manifests declaring one tag, naming both files', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([plain('widgets/a/wd_meter.xml'), plain('widgets/b/wd_meter.xml')]),
+      });
+      const dup = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME);
+      expect(dup).toHaveLength(1);
+      expect(dup[0]?.message).toBe(
+        "Duplicate manifest for element <wd_meter>: declared by 'widgets/a/wd_meter.xml' and 'widgets/b/wd_meter.xml'.",
+      );
+      expect(dup[0]?.file).toBe('widgets/b/wd_meter.xml');
+    });
+
+    it('still reports two composites declaring one tag, on the same path', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([composite('widgets/a/bar.xml'), composite('widgets/b/bar.xml')]),
+      });
+      const dup = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME);
+      expect(dup).toHaveLength(1);
+      expect(dup[0]?.message).toContain("'widgets/a/bar.xml' and 'widgets/b/bar.xml'");
+    });
+
+    it('reports nothing for distinct tags', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([plain('widgets/a/wd_meter.xml'), composite('widgets/b/bar.xml')]),
+      });
+      expect(diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME)).toEqual([]);
+    });
   });
 });

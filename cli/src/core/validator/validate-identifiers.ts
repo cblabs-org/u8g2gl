@@ -5,13 +5,13 @@
  *
  * File: src/core/validator/validate-identifiers.ts
  * Purpose: Pass 7 — Validates naming rules, reserved identifiers, C++ keywords,
- *          duplicate names, and component-inlining collisions (§13.4, §15.1).
+ *          duplicate names, duplicate manifests, and composite-inlining collisions (§13.4, §15.1).
  * Description: Checks that identifier names conform to [a-z][a-z0-9_]*, contain no
  *              double underscores, avoid reserved prefixes (u8g2gl_, ui_, wd_),
  *              and do not collide with C++ keywords. Enforces [U-1] element identity
  *              (every widget element must possess a valid, non-empty name).
- *              Detects duplicate identifiers within screen/component scopes and flags
- *              component-inlining collisions.
+ *              Detects duplicate identifiers within screen/composite scopes, duplicate manifest declarations, and flags
+ *              composite-inlining collisions.
  *
  * Exports:
  * - validateIdentifiers(input): Runs Pass 7 identifier validation
@@ -391,7 +391,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
       }
     });
 
-    // 3a. Component inlining collision check (§13.4)
+    // 3a. Composite inlining collision check (§13.4)
     for (const inst of componentInstances) {
       const comp = manifests.get(inst.componentName);
       if (comp?.view?.children) {
@@ -403,7 +403,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
               diagnostics.push(
                 createIdDiagnostic(
                   DIAGNOSTIC_CODES.NAME_COLLISION,
-                  `Component-inlining name collision: inlined element '${inlinedName}' from component '${inst.componentName}' (instance '${inst.instanceName}') collides with element '${inlinedName}' in screen '${screen.name}'.`,
+                  `Composite-inlining name collision: inlined element '${inlinedName}' from composite '${inst.componentName}' (instance '${inst.instanceName}') collides with element '${inlinedName}' in screen '${screen.name}'.`,
                   inst.loc,
                   inlinedName,
                 ),
@@ -415,32 +415,43 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
     }
   }
 
-  // --- 4. Validate components ---
-  const seenComponentNames = new Set<string>();
+  // --- 4. Duplicate manifest declarations of one tag (F7, PR-04 WO3) ---
+  // Every declared manifest, plain widget or composite: [D-18] has one element
+  // vocabulary, and before WO3 only two composites sharing a tag were caught,
+  // so two plain widgets did not even warn and the registry silently kept the
+  // first. Framework shadowing is excluded upstream and reported by the
+  // registry itself.
+  const firstDeclaration = new Map<string, (typeof manifests.declaredWidgets)[number]>();
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    if (!manifest.name) {
+      continue;
+    }
+    const first = firstDeclaration.get(manifest.name);
+    if (first === undefined) {
+      firstDeclaration.set(manifest.name, manifest);
+      continue;
+    }
+    const firstFile = first.loc?.file ?? '(unknown file)';
+    const secondFile = manifest.loc?.file ?? '(unknown file)';
+    diagnostics.push(
+      createIdDiagnostic(
+        DIAGNOSTIC_CODES.DUPLICATE_NAME,
+        `Duplicate manifest for element <${manifest.name}>: declared by '${firstFile}' and '${secondFile}'.`,
+        manifest.loc,
+        manifest.name,
+      ),
+    );
+  }
 
+  // --- 5. Validate composites ---
   for (const comp of manifests.declaredComposites) {
-    const compDiag = checkNameRule(comp.name, comp.loc, 'component');
+    const compDiag = checkNameRule(comp.name, comp.loc, 'composite');
     if (compDiag) {
       diagnostics.push(compDiag);
     }
-    if (comp.name && seenComponentNames.has(comp.name)) {
-      diagnostics.push(
-        createIdDiagnostic(
-          DIAGNOSTIC_CODES.DUPLICATE_NAME,
-          `Duplicate component name '${comp.name}'.`,
-          comp.loc,
-          comp.name,
-        ),
-      );
-    } else if (comp.name) {
-      seenComponentNames.add(comp.name);
-    }
 
-    // `comp.api` is an ApiBlock post-WO5b (comp is a WidgetManifest, not a
-    // retired `Component`) — reach through `.props` for the same bare list
-    // this loop has always walked. No behaviour change.
     for (const prop of comp.api?.props ?? []) {
-      const propDiag = checkNameRule(prop.name, prop.loc, 'component property');
+      const propDiag = checkNameRule(prop.name, prop.loc, 'composite property');
       if (propDiag) {
         diagnostics.push(propDiag);
       }
@@ -453,7 +464,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         diagnostics.push(
           createIdDiagnostic(
             DIAGNOSTIC_CODES.MISSING_NAME,
-            `Element <${node.tag}> in component '${comp.name}' is missing a required 'name' attribute.`,
+            `Element <${node.tag}> in composite '${comp.name}' is missing a required 'name' attribute.`,
             node.loc,
             node.tag,
           ),
@@ -471,7 +482,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         diagnostics.push(
           createIdDiagnostic(
             DIAGNOSTIC_CODES.DUPLICATE_NAME,
-            `Duplicate element name '${name}' in component '${comp.name}'.`,
+            `Duplicate element name '${name}' in composite '${comp.name}'.`,
             nameLoc,
             name,
           ),

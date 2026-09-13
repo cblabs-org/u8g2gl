@@ -5,7 +5,7 @@
  *
  * File: src/core/validator/validate-references.ts
  * Purpose: Pass 2 — Validates cross-file and intra-screen symbol references (§15.1).
- * Description: Checks fonts, images, subjects, styles, component instances, and focus
+ * Description: Checks fonts, images, subjects, styles, composite instances, and focus
  *              ring targets against declared definitions. Employs Levenshtein edit
  *              distance (findClosest) to provide structured replacement suggestions.
  *              Image-ness is derived from the manifest's `type="image"` prop
@@ -124,7 +124,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         screenElementNames.add(node.attributes.name);
       }
 
-      // 2a. Check component tag or widget tag. Element knowledge is data,
+      // 2a. Check the element tag. Element knowledge is data,
       // never code ([D-17]): a tag validates if and only if a manifest
       // declares it — there is no hardcoded primitives set to fall back on.
       if (!manifests.has(node.tag)) {
@@ -144,7 +144,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
-              `Unknown component '<${node.tag}>' instantiated in screen '${screen.name}'.`,
+              `Unknown element '<${node.tag}>' instantiated in screen '${screen.name}'.`,
               node.loc,
               node.tag,
               findClosest(node.tag, knownTags),
@@ -315,10 +315,12 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
     }
   }
 
-  // --- 3. Validate references inside components (excluding $prop templates) ---
+  // --- 3. Validate references inside composites (excluding $prop templates) ---
   for (const component of manifests.declaredComposites) {
-    // Declared props only: a composite has no `extends`, so declared and
-    // effective props are the same list.
+    // Declared props only, deliberately: a `$name` placeholder may name only a
+    // prop this composite declares itself. Its effective manifest also carries
+    // props inherited from u8g2gl_obj (PR-04 WO2), which are attributes of the
+    // container, not template parameters.
     const propNames = new Set(component.api.props.map((p) => `$${p.name}`));
 
     walkNodes(component.view?.children ?? [], (node) => {
@@ -330,7 +332,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
-              `Unknown widget '<${node.tag}>' in component '${component.name}'.`,
+              `Unknown widget '<${node.tag}>' in composite '${component.name}'.`,
               node.loc,
               node.tag,
               findClosest(node.tag, knownTags),
@@ -340,7 +342,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
-              `Unknown component '<${node.tag}>' instantiated in component '${component.name}'.`,
+              `Unknown element '<${node.tag}>' instantiated in composite '${component.name}'.`,
               node.loc,
               node.tag,
               findClosest(node.tag, knownTags),
@@ -356,7 +358,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_FONT,
-              `Unknown font '${fontAttr}' referenced in component '${component.name}'.`,
+              `Unknown font '${fontAttr}' referenced in composite '${component.name}'.`,
               node.attributeLocs?.font ?? node.loc,
               fontAttr,
               findClosest(fontAttr, declaredFonts),
@@ -382,7 +384,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_IMAGE,
-              `Unknown image '${imageAttr}' referenced in component '${component.name}'.`,
+              `Unknown image '${imageAttr}' referenced in composite '${component.name}'.`,
               node.attributeLocs?.image ?? node.attributeLocs?.src ?? node.loc,
               imageAttr,
               findClosest(imageAttr, declaredImages),
@@ -404,7 +406,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
             diagnostics.push(
               createRefDiagnostic(
                 DIAGNOSTIC_CODES.UNKNOWN_SUBJECT,
-                `Unknown subject '${attrVal}' in binding '${attrName}' in component '${component.name}'.`,
+                `Unknown subject '${attrVal}' in binding '${attrName}' in composite '${component.name}'.`,
                 node.attributeLocs?.[attrName] ?? node.loc,
                 attrVal,
                 findClosest(attrVal, declaredSubjects),
@@ -425,7 +427,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
             diagnostics.push(
               createRefDiagnostic(
                 DIAGNOSTIC_CODES.UNKNOWN_SUBJECT,
-                `Unknown subject '${child.subject}' in <${child.type}> in component '${component.name}'.`,
+                `Unknown subject '${child.subject}' in <${child.type}> in composite '${component.name}'.`,
                 child.loc ?? node.loc,
                 child.subject,
                 findClosest(child.subject, declaredSubjects),
