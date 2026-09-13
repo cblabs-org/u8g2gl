@@ -536,36 +536,41 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
     return true;
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_EQ, ref_value, flag);
+// The public bind_flag_if_* overloads below are type-safe entry points onto
+// add_flag_binding(). They return its result rather than discarding it: before
+// PR-04 WO2 they returned void, so a binding lost to an exhausted pool or
+// subject was undetectable by the caller — including by tests, which had to
+// infer success from a flag's value.
+bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
+bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_GT, ref_value, flag);
+bool u8g2gl_obj::bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_GT, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_LT, ref_value, flag);
+bool u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_LT, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value, flag);
+bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
-    bind_flag_if_eq(subject, ref_value ? 1 : 0, flag);
+bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
+    return bind_flag_if_eq(subject, static_cast<int32_t>(ref_value ? 1 : 0), flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
-    add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
+bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
+    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
 }
 
-void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
-    bind_flag_if_not_eq(subject, ref_value ? 1 : 0, flag);
+bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
+    return bind_flag_if_not_eq(subject, static_cast<int32_t>(ref_value ? 1 : 0), flag);
 }
 
 // u8g2gl_obj::bind_text (int subject)
@@ -575,9 +580,9 @@ void u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref
 // be scheduled when the value changes.
 //   subject — subject to observe; must outlive this object
 //   fmt     — printf format applied at render time, or nullptr for the raw value
-void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
+bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject) {
-        return;
+        return false;
     }
     u8g2gl_binding_desc* slot = nullptr;
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
@@ -590,7 +595,7 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
         slot = u8g2gl_allocate_binding(this);
     }
     if (!slot) {
-        return;
+        return false;
     }
 
     slot->obj = this;
@@ -603,9 +608,10 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
         slot->active = false;
         slot->obj = nullptr;
-        return;
+        return false;
     }
     mark_dirty();
+    return true;
 }
 
 // u8g2gl_obj::bind_text (string subject)
@@ -613,9 +619,9 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
 // object — binding one replaces the other, because an object has a single text
 // source.
 //   subject — subject to observe; must outlive this object
-void u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
+bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject) {
-        return;
+        return false;
     }
     u8g2gl_binding_desc* slot = nullptr;
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
@@ -628,7 +634,7 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
         slot = u8g2gl_allocate_binding(this);
     }
     if (!slot) {
-        return;
+        return false;
     }
 
     slot->obj = this;
@@ -641,9 +647,77 @@ void u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
         slot->active = false;
         slot->obj = nullptr;
-        return;
+        return false;
     }
     mark_dirty();
+    return true;
+}
+
+// u8g2gl_obj::add_value_binding
+// Claims one pool slot and one observer slot for a widget's own value binding,
+// rolling the pool slot back if the subject has no observer capacity, then runs
+// the widget's callback once so the current value is shown from the first frame.
+//   subject — the subject, type-erased; `type` says what it really is
+//   type    — which subject type `subject` points to, for the add_observer cast
+//   cb      — the widget's observer callback, called with the slot as its handle
+bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_observer_cb cb) {
+    if (!subject || !cb) {
+        return false;
+    }
+
+    // --- Step 1: Claim a slot in the shared pool ---
+    u8g2gl_binding_desc* slot = u8g2gl_allocate_binding(this);
+    if (!slot) {
+        return false;
+    }
+    slot->subject = subject;
+    slot->subject_type = type;
+    slot->is_text = false;
+
+    // --- Step 2: Register with the subject, casting back via the type tag ---
+    bool added = false;
+    switch (type) {
+        case U8G2GL_SUBJECT_INT:
+            added = static_cast<u8g2gl_subject_int_base*>(subject)->add_observer(slot, cb);
+            break;
+        case U8G2GL_SUBJECT_STRING:
+            added = static_cast<u8g2gl_subject_string_base*>(subject)->add_observer(slot, cb);
+            break;
+        case U8G2GL_SUBJECT_BOOL:
+            added = static_cast<u8g2gl_subject_bool_base*>(subject)->add_observer(slot, cb);
+            break;
+        case U8G2GL_SUBJECT_TIME:
+            added = static_cast<u8g2gl_subject_time_base*>(subject)->add_observer(slot, cb);
+            break;
+    }
+
+    // --- Step 3: Roll the slot back if the subject had no observer capacity ---
+    // Same reasoning as add_flag_binding(): a claimed-but-unobserved slot would
+    // leak pool capacity permanently and break the one-slot-one-observer count.
+    if (!added) {
+        slot->active = false;
+        slot->obj = nullptr;
+        return false;
+    }
+
+    // --- Step 4: Apply the current value immediately ---
+    cb(slot);
+    return true;
+}
+
+// u8g2gl_obj::binding_object / binding_subject
+// Undo the handle's type erasure for a widget's observer callback. Both return
+// nullptr for an inactive slot, which is how a notification arriving after the
+// widget was destroyed (the destructor deactivates its slots) becomes a no-op.
+//   binding — the u8g2gl_binding_desc registered with the subject
+u8g2gl_obj* u8g2gl_obj::binding_object(void* binding) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(binding);
+    return (b && b->active) ? b->obj : nullptr;
+}
+
+void* u8g2gl_obj::binding_subject(void* binding) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(binding);
+    return (b && b->active) ? b->subject : nullptr;
 }
 
 void* u8g2gl_obj::get_bound_text_subject() const {

@@ -237,6 +237,49 @@ TEST(ProgressBar, InheritsFromObj) {
     EXPECT_EQ(display.draw_frame_count, 1);
 }
 
+// PR-04 WO2: bind_value was declared by the manifest but never implemented.
+TEST(ProgressBar, BindValueUpdatesFromSubjectAndMarksDirty) {
+    u8g2gl_subject_int subject(40);
+    u8g2gl_progress_bar bar;
+    ASSERT_TRUE(bar.bind_value(&subject));
+
+    // Applied at bind time; animate_duration_ms is 0, so it snaps.
+    EXPECT_EQ(bar.get_value(), 40u);
+    EXPECT_TRUE(bar.is_dirty());
+
+    bar.clear_dirty();
+    subject.set(75);
+    EXPECT_EQ(bar.get_value(), 75u);
+    EXPECT_TRUE(bar.is_dirty());
+
+    // Out-of-range ints clamp before narrowing to a percentage, rather than
+    // wrapping (300 would otherwise become 44, -1 would become 255 -> 100).
+    subject.set(300);
+    EXPECT_EQ(bar.get_value(), 100u);
+    subject.set(-1);
+    EXPECT_EQ(bar.get_value(), 0u);
+
+    // A notification that leaves the clamped target unchanged is not a repaint.
+    bar.clear_dirty();
+    subject.set(-50);
+    EXPECT_EQ(bar.get_value(), 0u);
+    EXPECT_FALSE(bar.is_dirty());
+}
+
+TEST(ProgressBar, BindValueAnimatesLikeSetValue) {
+    u8g2gl_subject_int subject(0);
+    u8g2gl_progress_bar bar;
+    bar.set_animate_duration_ms(100);
+    ASSERT_TRUE(bar.bind_value(&subject));
+
+    subject.set(100);
+    EXPECT_EQ(bar.get_target_value(), 100u);
+    EXPECT_EQ(bar.get_value(), 0u);
+    bar.tick(0);
+    bar.tick(100);
+    EXPECT_EQ(bar.get_value(), 100u);
+}
+
 TEST(ProgressBar, SizeOf) {
     std::cout << "\n================ u8g2gl_progress_bar SIZEOF REPORT ================" << std::endl;
     std::cout << "sizeof(u8g2gl_obj):          " << sizeof(u8g2gl_obj) << " bytes" << std::endl;

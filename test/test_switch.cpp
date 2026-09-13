@@ -147,6 +147,33 @@ TEST(Switch, InheritsFromObj) {
     EXPECT_EQ(display.draw_rbox_count, 1);
 }
 
+// PR-04 WO2: bind_value was declared by the manifest but never implemented.
+TEST(Switch, BindValueUpdatesFromSubjectAndMarksDirty) {
+    u8g2gl_subject_bool subject(true);
+    u8g2gl_switch sw;
+    ASSERT_TRUE(sw.bind_value(&subject));
+
+    // Applied at bind time, not on the first change.
+    EXPECT_TRUE(sw.get_value());
+    EXPECT_TRUE(sw.is_dirty());
+
+    sw.clear_dirty();
+    subject.set(false);
+    EXPECT_FALSE(sw.get_value());
+    EXPECT_TRUE(sw.is_dirty());
+
+    // The rendered handle follows the bound state (thumb left when OFF).
+    sw.set_coords(0, 0, 20, 10);
+    U8G2 display;
+    sw.render(display);
+    EXPECT_EQ(display.last_draw_rbox_x, 1);
+
+    // A re-notification of an unchanged value is not a repaint (§11.2).
+    sw.clear_dirty();
+    subject.notify();
+    EXPECT_FALSE(sw.is_dirty());
+}
+
 TEST(Switch, SizeOf) {
     std::cout << "\n================ u8g2gl_switch SIZEOF REPORT ================" << std::endl;
     std::cout << "sizeof(u8g2gl_obj):    " << sizeof(u8g2gl_obj) << " bytes" << std::endl;

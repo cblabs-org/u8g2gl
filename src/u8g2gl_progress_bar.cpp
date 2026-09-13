@@ -84,6 +84,39 @@ void u8g2gl_progress_bar::set_show_percent_text(bool show) {
     }
 }
 
+// u8g2gl_progress_bar::bind_value
+// Binds the target percentage to an int subject through the base object's
+// shared pool, so it is counted like every other binding ([D-21]).
+//   subject — int subject to observe; must outlive this bar
+bool u8g2gl_progress_bar::bind_value(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_progress_bar::on_value_changed);
+}
+
+// u8g2gl_progress_bar::on_value_changed
+// Observer callback registered only by bind_value(), so the downcast is safe.
+// Clamps in int32_t before narrowing: set_value() takes uint8_t, and casting
+// first would turn -1 into 255 (clamped to 100) and 300 into 44. The change
+// guard lives here because set_value() marks dirty unconditionally, and a
+// subject re-notifying an unchanged value must not schedule a frame (§11.2).
+//   binding — handle from add_value_binding(); inactive after destruction
+void u8g2gl_progress_bar::on_value_changed(void* binding) {
+    auto* bar = static_cast<u8g2gl_progress_bar*>(binding_object(binding));
+    auto* subject = static_cast<u8g2gl_subject_int_base*>(binding_subject(binding));
+    if (!bar || !subject) {
+        return;
+    }
+    int32_t value = subject->get();
+    if (value < 0) {
+        value = 0;
+    } else if (value > 100) {
+        value = 100;
+    }
+    uint8_t percent = static_cast<uint8_t>(value);
+    if (percent != bar->target_percent_) {
+        bar->set_value(percent);
+    }
+}
+
 // u8g2gl_progress_bar::get_value
 // Queries current visual progress percentage (0..100).
 uint8_t u8g2gl_progress_bar::get_value() const {

@@ -13,6 +13,6 @@
           help="Secondary U8G2 font for seconds digits." />
     <prop name="blink" type="bool" setter="set_blink" default="true"
           help="Enable 1Hz colon blink animation." />
-    <bind name="bind_time" type="int" setter="bind_time" />
+    <bind name="bind_time" type="time" setter="bind_time" />
   </api>
 </widget>

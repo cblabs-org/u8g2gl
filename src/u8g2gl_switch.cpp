@@ -45,6 +45,27 @@ bool u8g2gl_switch::get_value() const {
     return value_;
 }
 
+// u8g2gl_switch::bind_value
+// Binds the toggle state to a bool subject through the base object's shared
+// pool, so it is counted like every other binding ([D-21]).
+//   subject — bool subject to observe; must outlive this switch
+bool u8g2gl_switch::bind_value(u8g2gl_subject_bool_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_BOOL, &u8g2gl_switch::on_value_changed);
+}
+
+// u8g2gl_switch::on_value_changed
+// Observer callback registered only by bind_value(), so the downcast is safe.
+// Delegates to set_value(), which already guards mark_dirty() on a change.
+//   binding — handle from add_value_binding(); inactive after destruction
+void u8g2gl_switch::on_value_changed(void* binding) {
+    auto* sw = static_cast<u8g2gl_switch*>(binding_object(binding));
+    auto* subject = static_cast<u8g2gl_subject_bool_base*>(binding_subject(binding));
+    if (!sw || !subject) {
+        return;
+    }
+    sw->set_value(subject->get());
+}
+
 // u8g2gl_switch::tick
 // Static widget lifecycle: returns U8G2GL_IDLE as the switch does not animate.
 // Returning U8G2GL_IDLE allows framework sleep-hinting to put the microcontroller

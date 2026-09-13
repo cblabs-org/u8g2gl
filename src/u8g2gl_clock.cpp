@@ -76,6 +76,28 @@ void u8g2gl_clock::set_time(uint32_t epoch_seconds) {
     }
 }
 
+// u8g2gl_clock::bind_time
+// Binds the displayed time to a time subject through the base object's shared
+// pool, so it is counted like every other binding ([D-21]).
+//   subject — time subject to observe; must outlive this clock
+bool u8g2gl_clock::bind_time(u8g2gl_subject_time_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_TIME, &u8g2gl_clock::on_time_changed);
+}
+
+// u8g2gl_clock::on_time_changed
+// Observer callback registered only by bind_time(), which is why the downcast
+// from the handle's u8g2gl_obj* to u8g2gl_clock* is safe. Delegates to
+// set_time() so the change guard and mark_dirty() live in one place.
+//   binding — handle from add_value_binding(); inactive after destruction
+void u8g2gl_clock::on_time_changed(void* binding) {
+    auto* clock = static_cast<u8g2gl_clock*>(binding_object(binding));
+    auto* subject = static_cast<u8g2gl_subject_time_base*>(binding_subject(binding));
+    if (!clock || !subject) {
+        return;
+    }
+    clock->set_time(subject->get());
+}
+
 // u8g2gl_clock::get_format
 // Queries active display format.
 u8g2gl_clock_format_t u8g2gl_clock::get_format() const {

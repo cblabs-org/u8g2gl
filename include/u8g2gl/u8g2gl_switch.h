@@ -25,6 +25,9 @@
  *     - set_value(): Set binary switch state (true = on, false = off)
  *     - get_value(): Retrieve current switch state
  *
+ *     Binding:
+ *     - bind_value(): Drive the state from a bool subject
+ *
  *     Lifecycle (overrides):
  *     - tick():   Advance animation state; always returns U8G2GL_IDLE
  *     - render(): Draw switch track and handle to U8G2 display buffer
@@ -74,6 +77,23 @@ public:
      */
     bool get_value() const;
 
+    // --- Binding ---
+
+    /**
+     * @brief Drive the switch state from a bool subject.
+     *
+     * The subject's current value is applied at once, and every later change
+     * goes through set_value(), so the frame is marked dirty only when the
+     * state actually changes.
+     *
+     * Consumes one binding-pool slot and one observer slot on @p subject.
+     *
+     * @param subject Bool subject. Must outlive this object.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
+     */
+    bool bind_value(u8g2gl_subject_bool_base* subject);
+
     // --- Lifecycle ---
 
     /**
@@ -100,6 +120,12 @@ public:
     void render(U8G2& display) override;
 
 private:
+    /**
+     * @brief Observer callback for bind_value(); applies the subject's value.
+     * @param binding Binding handle from u8g2gl_obj::add_value_binding().
+     */
+    static void on_value_changed(void* binding);
+
     bool value_ = false;  ///< Switch state: false = OFF, true = ON
 };
 

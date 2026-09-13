@@ -29,6 +29,9 @@
  *     - set_fill_style():          Choose between solid or stipple fill pattern
  *     - set_show_percent_text():   Toggle display of numeric percentage text
  *
+ *     Binding:
+ *     - bind_value():              Drive the target percentage from an int subject
+ *
  *     Query:
  *     - get_value():               Retrieve current interpolated percentage
  *     - get_target_value():        Retrieve target percentage
@@ -113,6 +116,25 @@ public:
      */
     void set_show_percent_text(bool show);
 
+    // --- Binding ---
+
+    /**
+     * @brief Drive the target percentage from an int subject.
+     *
+     * The subject's value is clamped to [0, 100] before it reaches set_value(),
+     * so an out-of-range int cannot wrap when narrowed to a percentage. The
+     * current value is applied at once; a notification whose clamped value
+     * equals the current target changes nothing and does not mark the frame
+     * dirty. A changed value animates exactly as set_value() does.
+     *
+     * Consumes one binding-pool slot and one observer slot on @p subject.
+     *
+     * @param subject Int subject. Must outlive this object.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
+     */
+    bool bind_value(u8g2gl_subject_int_base* subject);
+
     // --- Query ---
 
     /**
@@ -189,6 +211,12 @@ public:
     void render_animation_update(U8G2& display, uint32_t now_ms) override;
 
 private:
+    /**
+     * @brief Observer callback for bind_value(); applies the clamped value.
+     * @param binding Binding handle from u8g2gl_obj::add_value_binding().
+     */
+    static void on_value_changed(void* binding);
+
     // Members ordered largest-alignment-first to prevent struct padding holes:
     // uint32_t (4B) -> uint16_t (2B) -> uint8_t/bool/enum (1B)
     uint32_t anim_start_ms_ = 0;                          ///< Timestamp when active animation began

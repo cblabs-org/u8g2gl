@@ -46,6 +46,8 @@
  *     Data binding:
  *     - bind_text():         Bind display text to a subject
  *     - bind_flag_if_*():    Conditional flag from a subject's value
+ *     - add_value_binding(): (protected) pool slot + observer for a widget's
+ *                            own bind_* method
  *
  *     Lifecycle (virtual):
  *     - tick():              Advance animation; returns next deadline
@@ -244,6 +246,13 @@ public:
     // bound through this API — Finding B's per-subject sizing was otherwise
     // unreachable. Existing call sites using the default aliases still
     // compile unchanged.
+    // Binding capacity contract (PR-04 WO2): a successful first binding call
+    // consumes exactly one slot of the shared binding pool and exactly one
+    // observer slot on the subject, and a call that cannot have both consumes
+    // neither and returns false. The generator counts capacities against this
+    // invariant ([D-21]), so a method that consumed two of either would make
+    // generated capacities silently too small.
+
     /**
      * @brief Bind this object's text to an int subject.
      *
@@ -256,10 +265,10 @@ public:
      *                construction for generated screens.
      * @param fmt     Optional printf format applied to the value. nullptr uses the
      *                raw string.
-     *
-     * Note: Silently fails to register if observer capacity is exhausted.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
      */
-    void bind_text(u8g2gl_subject_int_base* subject, const char* fmt = nullptr);
+    bool bind_text(u8g2gl_subject_int_base* subject, const char* fmt = nullptr);
 
     /**
      * @brief Bind this object's text to a string subject.
@@ -269,29 +278,31 @@ public:
      * The two bind_text() overloads are mutually exclusive per object.
      *
      * @param subject Subject to observe. Must outlive this object.
-     *
-     * Note: Silently fails to register if observer capacity is exhausted.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
      */
-    void bind_text(u8g2gl_subject_string_base* subject);
+    bool bind_text(u8g2gl_subject_string_base* subject);
 
     /**
      * @brief Conditionally set or clear a flag based on a subject's value.
      *
+     * Evaluated once immediately, so the flag is correct before the first frame.
+     *
      * @param subject   Subject to observe. Must outlive this object.
      * @param ref_value Value to compare against.
      * @param flag      Flag to set/clear (e.g., U8G2GL_FLAG_HIDDEN).
-     *
-     * Note: Silently fails to register if observer capacity is exhausted.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
      */
-    void bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_not_eq(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
 
-    void bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
-    void bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+    bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+    bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
 
     void* get_bound_text_subject() const;
     const char* get_bound_text_fmt() const;
@@ -398,6 +409,45 @@ protected:
     uint8_t flags_ = 0;
     uint8_t parent_index_ = U8G2GL_NO_PARENT;
     u8g2gl_style style_;    ///< Resolved style — embedded, not referenced, so no indirection per draw
+
+    // --- Value bindings for subclasses (§8.4, PR-04 WO2) ---
+
+    /**
+     * @brief Register a value binding in the shared binding pool.
+     *
+     * The common implementation behind a widget's own bind_* method (for example
+     * u8g2gl_clock::bind_time()). The widget supplies the observer callback,
+     * which receives an opaque binding handle; binding_object() and
+     * binding_subject() turn that handle back into the widget and the subject.
+     * On success @p cb is invoked once immediately, so the widget shows the
+     * subject's current value on its first frame rather than after the first
+     * change.
+     *
+     * The handle, not the widget, is what the subject holds: the destructor
+     * deactivates the pool slot, so a subject notifying after the widget is
+     * destroyed reaches an inactive slot instead of freed memory.
+     *
+     * @param subject Subject to observe, type-erased. Must outlive this object.
+     * @param type    Which subject type @p subject actually points to.
+     * @param cb      Observer callback; called with the binding handle.
+     * @return false if @p subject or @p cb is null, or the binding pool or the
+     *         subject's observer capacity is exhausted. Nothing is consumed then.
+     */
+    bool add_value_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_observer_cb cb);
+
+    /**
+     * @brief The object a binding handle belongs to.
+     * @param binding Handle passed to a value-binding observer callback.
+     * @return The bound object, or nullptr if the binding is no longer active.
+     */
+    static u8g2gl_obj* binding_object(void* binding);
+
+    /**
+     * @brief The subject a binding handle observes, type-erased.
+     * @param binding Handle passed to a value-binding observer callback.
+     * @return The subject, or nullptr if the binding is no longer active.
+     */
+    static void* binding_subject(void* binding);
 
 private:
     /**
