@@ -324,4 +324,72 @@ describe('validateReferences', () => {
     expect(cycleDiags).toHaveLength(1);
     expect(cycleDiags[0]?.message).toContain('a -> b -> a');
   });
+
+  // --- PR-3R WO7: image-ness derived from the manifest, not a hardcoded tag
+  // list. `u8g2gl_bitmap` and `u8g2gl_icon` never had manifests; only
+  // `u8g2gl_xbm` does, via a `type="image"` prop named `src`. ---
+  describe('image references derived from the manifest', () => {
+    it('rejects <u8g2gl_bitmap> as an unknown widget rather than checking it for an image', () => {
+      const screen: Screen = {
+        name: 'main_screen',
+        view: {
+          children: [
+            {
+              tag: 'u8g2gl_bitmap',
+              attributes: { name: 'bmp', src: 'nonexistent.xbm' },
+              children: [],
+              styleOverrides: {},
+            },
+          ],
+        },
+      };
+
+      const diagnostics = validateReferences({ ...baseInput, screens: [screen] });
+
+      const widgetDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET);
+      expect(widgetDiag).toBeDefined();
+      expect(widgetDiag?.offendingText).toBe('u8g2gl_bitmap');
+
+      // No manifest means no `type="image"` prop to derive image-ness from,
+      // so the unknown `src` value produces no separate UNKNOWN_IMAGE noise
+      // on top of the UNKNOWN_WIDGET diagnostic that already names the defect.
+      expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_IMAGE)).toBe(false);
+    });
+
+    it("still checks u8g2gl_xbm's image reference via its manifest's type=\"image\" prop", () => {
+      const xbmManifest = {
+        name: 'u8g2gl_xbm',
+        extends: 'u8g2gl_obj',
+        api: {
+          props: [{ name: 'src', type: 'image' as const, setter: 'set_src' }],
+          bindings: [],
+          elements: [],
+        },
+      };
+
+      const screen: Screen = {
+        name: 'main_screen',
+        view: {
+          children: [
+            {
+              tag: 'u8g2gl_xbm',
+              attributes: { name: 'icon', src: 'icon_missing' },
+              children: [],
+              styleOverrides: {},
+            },
+          ],
+        },
+      };
+
+      const diagnostics = validateReferences({
+        ...baseInput,
+        screens: [screen],
+        widgetManifests: [...baseInput.widgetManifests, xbmManifest],
+      });
+
+      const imageDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_IMAGE);
+      expect(imageDiag).toBeDefined();
+      expect(imageDiag?.offendingText).toBe('icon_missing');
+    });
+  });
 });

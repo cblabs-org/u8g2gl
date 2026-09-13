@@ -8,6 +8,8 @@
  * Description: Checks fonts, images, subjects, styles, component instances, and focus
  *              ring targets against declared definitions. Employs Levenshtein edit
  *              distance (findClosest) to provide structured replacement suggestions.
+ *              Image-ness is derived from the manifest's `type="image"` prop
+ *              ([D-17], PR-3R WO7) rather than a hardcoded tag list.
  *
  * Exports:
  * - validateReferences(input): Runs Pass 2 cross-reference validation
@@ -185,19 +187,18 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         }
       }
 
-      // 2c. Check image references
+      // 2c. Check image references. Image-ness is derived from the manifest
+      // ([D-17]) — a `type="image"` prop named `src` or `image` — rather than
+      // a hardcoded tag list. Of the three tags this list once named, only
+      // `u8g2gl_xbm` ever had a manifest; `u8g2gl_bitmap` and `u8g2gl_icon`
+      // name elements that do not exist and are already rejected as
+      // UNKNOWN_WIDGET before this code runs (PR-3R WO7).
       const imageAttr = node.attributes.image ?? node.attributes.src;
       if (typeof imageAttr === 'string' && !imageAttr.startsWith('$')) {
-        // Only validate as image if tag is an image widget or manifest declares image prop
         const manifest = manifestMap.get(node.tag);
-        const hasImageProp = manifest?.api.props.some(
+        const isImageTag = manifest?.api.props.some(
           (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
         );
-        const isImageTag =
-          node.tag === 'u8g2gl_bitmap' ||
-          node.tag === 'u8g2gl_xbm' ||
-          node.tag === 'u8g2gl_icon' ||
-          hasImageProp;
 
         if (isImageTag && !imageSet.has(imageAttr)) {
           diagnostics.push(
@@ -371,17 +372,18 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         }
       }
 
-      // Check image references
+      // Check image references. Same manifest-derived signal as the screen
+      // walk above (PR-3R WO7) — no hardcoded tag list.
       const imageAttr = node.attributes.image ?? node.attributes.src;
       if (
         typeof imageAttr === 'string' &&
         !propNames.has(imageAttr) &&
         !imageAttr.startsWith('$')
       ) {
-        const isImageTag =
-          node.tag === 'u8g2gl_bitmap' ||
-          node.tag === 'u8g2gl_xbm' ||
-          node.tag === 'u8g2gl_icon';
+        const manifest = manifestMap.get(node.tag);
+        const isImageTag = manifest?.api.props.some(
+          (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
+        );
 
         if (isImageTag && !imageSet.has(imageAttr)) {
           diagnostics.push(
