@@ -120,6 +120,8 @@ recorded in WO8's boundary box.
   `docs/decisions/d21-generated-capacities.md`, design_spec §3/§13.7/§18.1, and
   the plan ledger as PR-3R.
 
+- [ ] **[WO9 — remove the component vocabulary, pay down debt](wo9-component-removal/WORKORDER.md)** · base WO8 · standard · owner-directed
+
 ### WO1 — complete (`4ca9e01`)
 
 Verified independently: boundary respected exactly, C++ 166 → **175 tests**, zero
@@ -476,3 +478,13 @@ wrote down.
 A refusal message making a claim the code does not honour is worse than not making
 it, so this cannot simply ship. Escalated to the owner rather than resolved by
 adding a twelfth work order on the Principal Architect's own judgement.
+
+**RESOLVED by the owner, 2026-09-13**, verbatim:
+
+> "clean it up and pay down the technical debt, that's my preferred approach, get
+> rid of the omponent code."
+
+Actioned as **WO9**, which removes the `<component>` vocabulary outright rather
+than softening the refusal message, and sweeps the remaining debt the readability
+review and WO8 surfaced. The owner also directed that the PR be staged for review
+once WO9 lands.
