@@ -747,7 +747,7 @@ widgets/wd_service_list/
 ```
 
 ```xml
-<widget name="wd_service_list" extends="u8g2gl_widget">
+<widget name="wd_service_list" extends="u8g2gl_obj">
     <api>
         <prop name="font"               type="font" />
         <prop name="max_rows"           type="int" default="16"
@@ -792,6 +792,16 @@ the bridge is dead weight.
 The `extends` attribute is real C++ inheritance, which is what makes
 `wd_scrolling_message_pool extends u8g2gl_label` work without reimplementing
 marquee rendering.
+
+**`extends` must name an element that has a manifest** — a built-in such as
+`u8g2gl_obj` or `u8g2gl_label`, or another custom element. This matters
+because the parent's `<api>` declares the properties a child inherits. It is
+`u8g2gl_obj`'s manifest that tells the generator a custom element accepts `x`,
+`hidden` and `font`, and that gives the editor's property panel something to show
+([D-17]). A C++ class with no manifest declares no API to inherit, so the
+generator could not emit its setters and the editor could not display them.
+Naming such a class in `extends` is a validation error. To extend one, give it a
+manifest — an `<api>` with no new props is enough.
 
 ### 6.6 Naming
 
@@ -1884,7 +1894,7 @@ This is settled now rather than after release, because the prefix appears in eve
 
 | Prefix | Owner | Contents | Configurable |
 |---|---|---|---|
-| `u8g2gl_` | Framework | Runtime classes, helpers, types — `u8g2gl_label`, `u8g2gl_clock`, `u8g2gl_widget`, `u8g2gl_state_saver`, `u8g2gl_partial_refresh()`, `u8g2gl_column_def` | No |
+| `u8g2gl_` | Framework | Runtime classes, helpers, types — `u8g2gl_label`, `u8g2gl_clock`, `u8g2gl_obj`, `u8g2gl_state_saver`, `u8g2gl_partial_refresh()`, `u8g2gl_column_def` | No |
 | `U8G2GL_` | Framework | Enumerators and macros — `U8G2GL_ALIGN_LEFT`, `U8G2GL_EVENT_ENCODER_CW`, `U8G2GL_FLAG_HIDDEN` | No |
 | `ui_` | Generated | Screens, subjects, setters, fonts, images, collection accessors — `ui_screen_home_init()`, `ui_set_temperature()`, `ui_subject_temperature`, `ui_font_small_9` | Yes, via `<output prefix="...">` |
 | `wd_` | User | Custom widget classes — `wd_service_list` | By the user |

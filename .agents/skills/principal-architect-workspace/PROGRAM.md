@@ -713,3 +713,40 @@ setters**, so no manifest binding can name a method that doesn't exist again.
 Removed a stale PR-02 scratch worktree. The PA is not working in this checkout —
 the tree was clean with no `pr-04` workspace — so Tier-1 documents were committed
 straight to `main` after checking that `origin/main` hadn't moved.
+
+---
+
+## Session — 2026-09-13 (cont.) · Ruling on F3: `extends` must name a manifest
+
+PR-04's PA reported that §6.5's example uses `extends="u8g2gl_widget"`, but no
+manifest or class by that name exists. Now that the generator resolves `extends`,
+the example fails validation. The PA put it to the Chief Architect: either change
+the example, or allow `extends` to name something that isn't a manifest.
+
+**Ruling: change the example. `extends` must name a manifest.** No new decision
+number, because this clarifies `[D-17]` and §13.1 rather than adding a decision.
+
+**Evidence, checked before ruling.** All seven class-backed built-in manifests
+extend `u8g2gl_obj`, and `u8g2gl_obj` has a manifest declaring the inherited
+properties with their setters — `x`, `y`, `width`, `height`, `hidden`, `font`,
+and so on. §13.1, the contract, already uses `extends="u8g2gl_obj"` in its own
+example, so §6.5 was the odd one out. `u8g2gl_widget` is a stale name for the
+base class. It appeared exactly twice, in the §6.5 example and the §19 naming
+table, and both now say `u8g2gl_obj`.
+
+**Why `extends` can't name something without a manifest.** The parent manifest
+is where inherited properties are declared. Without it the generator can't emit
+setters for `x` or `hidden` on a custom element, and the editor's property panel
+has nothing to show. Allowing it would move knowledge about elements back outside
+the manifests — the very thing PR-3R spent two work orders removing
+(`TIER1_PRIMITIVES`, the image-tag literals), and now a non-negotiable in the
+standards skill. Anyone who needs to extend a class that has no manifest can
+write one; an `<api>` with no new props is enough.
+
+§6.5 now states the rule explicitly, so the example can't drift back.
+
+**Process note.** The PA had moved into the main checkout, on
+`u8g2gl-generator/wo2-manifest-parity`, since the previous round, when the tree
+was free. Tier-1 edits therefore went through a worktree on `main`, and the PA's
+tree was not touched. Rule 04 again: check who holds the tree every time — last
+round's answer doesn't carry over.
