@@ -280,6 +280,11 @@ private:
 
     // Members ordered largest-alignment-first to prevent struct padding holes:
     // pointer (8B) -> uint32_t (4B) -> int16_t/uint16_t (2B) -> uint8_t/bool (1B).
+    // Measured, not estimated (§1.3): sizeof(u8g2gl_label) is 80 bytes on a
+    // 64-bit host, verified PR-3R WO9 — the ordering claim above is a
+    // rationale, not a substitute for checking it against a real build (see
+    // docs/decisions/d19-label-long-mode.md's cost correction, where an
+    // arithmetic-only +16-byte estimate had missed 8 of the actual +24).
     // last_scroll_ms_ through scroll_finished_ are the former
     // u8g2gl_scrolling_label's members, moved unchanged (PR-3R WO2, [D-19]).
     const char* text_ = nullptr;          ///< Zero-copy string pointer

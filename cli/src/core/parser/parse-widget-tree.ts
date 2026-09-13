@@ -9,8 +9,11 @@
  *          policy. The policy is passed in rather than decided here because the
  *          CLI must refuse to invent identity while the designer must invent it
  *          and show the author — see name-policy.ts for the reasoning.
- * Description: Recognises Tier 1 primitives (§6.1), Tier 2 built-in widgets (§6.2),
- *              Tier 4 custom widgets (§6.4), and potential Tier 3 component instances (§6.3).
+ * Description: Recognises one element vocabulary ([D-18]): a tag is either a
+ *              drawing primitive that compiles to a `u8g2gl_draw_*` free-function
+ *              call, a C++-backed widget, or a composite instance inlined at
+ *              build time — the distinction is a generator outcome, never an
+ *              authoring category, so this parser makes no tier decision at all.
  *              Extracts common layout coordinates, style overrides (`style_*`), reactive
  *              binding slots (`bind_*`), condition directives, and input event handlers.
  *              Under the `'generate'` policy an omitted name is synthesised as
