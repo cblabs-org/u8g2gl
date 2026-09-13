@@ -26,7 +26,7 @@ owner's own words with a timestamp. If it is absent or reads as a placeholder,
 ## Branch
 
 **Branch**: `u8g2gl-remediation/wo4-manifests`
-**Base**: `u8g2gl-remediation/wo3-draw-functions`
+**Base**: `u8g2gl-remediation/wo3b-draw-testability`
 
 Verify with `git branch --show-current` **as its own command immediately before
 every commit** — never batched into the same command as the commit. A check that
@@ -79,6 +79,10 @@ things: a U8G2 method on primitives (`drawBox`) and a runtime method on widgets.
 - [ ] Add `draw=` alongside `setter=` in `cli/src/core/schema/widget-manifest.ts`
       and drop `animated` from the type.
 - [ ] Update `cli/src/core/parser/parse-widget-manifest.ts` to read `draw=`.
+- [ ] **Surfaced by WO2:** `include/u8g2gl/manifests/u8g2gl_obj.xml` still
+      declares the deleted `truncate` / `set_truncate`. Remove it. A manifest
+      naming a setter that no longer exists is the same defect class as the
+      `draw=` targets you are fixing.
 - [ ] Update `cli/test/manifests/manifest-crosstest.test.ts`, which asserts
       against the current shape and must move with it — the cross-test is the
       thing that makes this change safe, so it must end green and meaningful, not

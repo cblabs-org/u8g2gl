@@ -32,7 +32,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** ✅ `4e649cf` · base WO1 · standard · R1.3, R3.1, R3.2
 - [x] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** ✅ `217473c` · base WO2 · standard · defect surfaced by WO2 (PA-added)
 - [x] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** ✅ `b13bdff` · base WO2b · standard · new work, required by WO4
-- [ ] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** · base WO3 · standard · defects surfaced by WO3 (PA-added)
+- [x] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** ✅ `07cfd2d` · base WO3 · standard · defects surfaced by WO3 (PA-added)
 - [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3b · standard · R2.5, R3.3, R3.4
 - [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
 - [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
@@ -257,3 +257,23 @@ none can ship.
 "invent an unspecified outline algorithm" — but three lines between three vertices
 is not an invention, it is what a triangle outline is. WO3b supplies the authority
 it correctly declined to assume on its own.
+
+### WO3b — complete (`07cfd2d`)
+
+C++ 233 → **238 tests**, zero warnings, boundary respected. All three defects
+closed. Verified independently with `nm` on the built archive: all eight
+`u8g2gl_draw_*` symbols are `T` (defined), none `U`. The link landmine is gone,
+confirmed at the binary level rather than by reading the source.
+
+**The worker verified its own claim the stronger way and said why** — a source
+grep proves the declarations match the definitions, `nm` proves the linker
+agrees. That is the distinction that mattered here, since the whole defect was a
+declaration that compiled cleanly and would only have failed at final link.
+
+**One disclosed extension to the test double**, and it is the right one: the
+triangle outline issues three `drawLine` calls, which a single last-call slot
+cannot prove. It added a small indexed call history rather than a second
+mechanism — the existing idiom indexed, exactly as instructed.
+
+The draw path is now genuinely verified rather than asserted not to crash, which
+matters considerably more once PR-04 starts generating calls into it.
