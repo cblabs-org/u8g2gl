@@ -38,7 +38,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** ✅ `00651d7` · base WO5 · standard · finishes R2.1 (PA-added)
 - [x] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** ✅ `c9cf2c8` · base WO5b · standard · R2.2, R2.3, R2.4
 - [x] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** ✅ · base WO6 · standard · [D-21]
-- [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
+- [x] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** ✅ `d05f32b` · base WO7 · standard · R2.6
 
 **WO4 was re-graded `mechanical` → `standard`.** Stripping `animated` from 17
 XML files is rote, but the same work order changes `widget-manifest.ts`, the
@@ -434,3 +434,45 @@ one that overflows silently on device.
 
 **Image-ness now derives from the manifests** (`type="image"`), so the last
 hardcoded element list in the CLI is gone.
+
+### WO8 — complete (`d05f32b`)
+
+Schema at **0.4**, CLI at **0.6.0**, CLI 263 → **266 tests**, C++ 240 unchanged,
+zero warnings. The refusal path exists and its tests assert on **message
+content**, so a `0.3` project is told what changed rather than failing obscurely.
+`U8G2GL_DEPRECATED_SCHEMA_VERSION` is distinct from
+`U8G2GL_UNKNOWN_SCHEMA_VERSION`, so "your version is old" and "your version is
+nonsense" are different diagnostics.
+
+**My error, correctly handled.** WO8's line-item text said the scrolling-label
+migration maps to `long_mode="scroll"`. I corrected design_spec §15.4 to
+`scroll_circular` after WO2 exposed the contradiction, and never went back to fix
+the work order I had written earlier. The worker followed the **normative spec**,
+implemented `scroll_circular`, and reported the disagreement loudly instead of
+picking one silently — exactly the instruction. A worker that had deferred to its
+own work order would have re-introduced the bug WO2b was written to fix.
+
+**Readability review over `main..HEAD`** (89 files): **P1 none.** One P2 — a stale
+"Tier 1–4" header comment in `parse-widget-tree.ts` describing the model [D-18]
+removed. One P3 — a struct-layout comment in `u8g2gl_label.h` justified by its own
+arithmetic rather than a measured `sizeof`. Neither actioned; the architect
+triages.
+
+### OPEN — `<component>` is still accepted, and the refusal message says it is not
+
+The reviewer found this independently and it is the one thing blocking a clean
+close. The new refusal message tells a `0.3` user that `<component>` and
+`components/` are removed per [D-18]. **They are not.** `parse-component.ts:65`
+still requires a `component` root element, and `read-project.ts` still discovers
+`components/[name]/[name].xml`. A **0.4** project using `<component>` is accepted
+today with no diagnostic at all.
+
+This is not a worker failure and not scope creep — **the decomposition never
+covered it.** R2.1 in the assessment said "merge the component schema into the
+widget manifest", and WO5/WO5b did exactly that: they merged the *types*. Removing
+`<component>` from the accepted *vocabulary* is a different change that nobody
+wrote down.
+
+A refusal message making a claim the code does not honour is worse than not making
+it, so this cannot simply ship. Escalated to the owner rather than resolved by
+adding a twelfth work order on the Principal Architect's own judgement.
