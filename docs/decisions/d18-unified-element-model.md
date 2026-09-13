@@ -114,3 +114,35 @@ untyped access. [D-6]'s target survives; its over-broad phrasing does not.
   does not exist yet, only the schema model and parser touch components, and no
   user XML exists in the field. It is the cheapest moment this change will ever
   have.
+
+## Amendment — 2026-09-13: classed elements are not yet demoted in PR-04
+
+**The realisation rule is unchanged.** What changes is how much of it the first
+generator delivers.
+
+PR-04 applies the rule fully to elements declared only with `draw=`, which
+compile to draw calls. **Elements backed by a class are always realised as
+objects for now**, even when the rule says they need not be — a static label with
+no bindings and no references, for example.
+
+The reason is that demoting a classed element needs two things that do not yet
+exist:
+
+- Per-property knowledge of which values require state between frames.
+  `long_mode="scroll"` does; `long_mode="clip"` does not. The manifest cannot
+  currently express that difference, and adding it is new vocabulary — a
+  schema-minor change reserved to the owner.
+- A stateless `u8g2gl_draw_label` to demote to.
+
+**Deferred under §1.5: a feature is added when need is shown, not predicted.**
+The cost is known and visible — a static label is an 80-byte object on a 64-bit
+host, rather than no object at all. §18's budget report must state explicitly
+that classed-element demotion is not yet delivered, so nobody reads the report as
+the rule's full saving.
+
+**Trigger to deliver:** gate criterion 3 (the measured budget on `esp32dev`)
+showing that object overhead matters, or measured pressure on a real screen.
+
+This follows the same pattern as [D-21]'s interim binding default: the decision
+stays in force, the gap in the implementation is written down with its cost, and
+nothing relies on the gap going unnoticed.

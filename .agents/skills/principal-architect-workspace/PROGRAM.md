@@ -621,3 +621,95 @@ and a NO-GO could end the editor without it ever being tested. Owner decision.
 them); §20 no longer lists the removed `u8g2gl_scrolling_label`; and PR-04 ∥ PR-06
 now has a stated condition — agree the editor registry's shape before either PA
 starts, or one of them writes it twice.
+
+---
+
+## Session — 2026-09-13 (cont.) · PR-04 PA questions answered; spec defects fixed
+
+PR-04's PA raised five decisions and four spec defects. The decisions went back
+through the owner. The spec is a Tier-1 document, so the Chief Architect fixed it
+directly after checking each report.
+
+### Decisions for PR-04
+
+1. **Focus rings, events and screen navigation — deferred to PR-09.** APPROVED.
+   `generate` refuses them with `U8G2GL_NOT_YET_SUPPORTED`, and the realisation
+   analysis still models them, so the rule stays complete and PR-09 won't have to
+   reopen it. Collections (§9) and composites that also have C++ are deferred to
+   PR-08 in the same way. **One condition:** `validate` has to report the same
+   thing as a *warning*. Otherwise the editor, which runs validation, would show a
+   document as valid that `generate` then refuses. That is the same journey split
+   `[U-1]` uses — the build errors, authoring warns. None of this blocks the gate,
+   because the PR-07 status-bar screen needs no focus, events or collections.
+
+2. **Classed elements always become objects for now.** APPROVED as an interim
+   measure, and recorded against `[D-18]` as an amendment. The alternative — a
+   per-property marker saying when an instance needs no state, plus
+   `u8g2gl_draw_label` — was declined: it is new manifest vocabulary (schema-minor,
+   and schema surface is the costly kind of complexity under §1.5), and nobody has
+   shown the need yet. Gate criterion 3 will show whether it matters. The §18
+   budget report must say that label demotion is not yet delivered.
+
+3. **Fonts and images — deferred out of PR-04, but moved onto the critical
+   path.** Approved in part. PR-04 refuses `<bdf>` and PNG `<convert>` with a named
+   error. **Checking showed that departures-board-v3 uses custom BDF fonts
+   throughout** — `NatRailTall12`, `RailClockMega13`, `NatRailClockLarge9` and
+   others — so PR-05 can't migrate a real board without `bdfconv`. **New PR-04b**
+   (font and image pipeline, `[Q-2]`) sits between PR-04 and PR-05. `[Q-2]` was
+   recorded as "work, not risk"; it is now on the critical path.
+
+4. **`[U-6]` does not gate PR-04.** CONFIRMED — build no sample-data hooks.
+   **Correcting the PA, and myself:** it doesn't gate PR-06 either. PR-06's
+   snapshot harness supplies fixture values without deciding where authored
+   samples live. `[U-6]` gates editor track **E-3**. The `CONTEXT_BRIDGE` note that
+   said "PR-04's sample-data hooks" was mine and wrong, and has been corrected.
+
+5. **Versions.** CLI goes to **0.7.0**. **Runtime 0.3.0 → 0.4.0: APPROVED.** New
+   runtime API is a minor bump before 1.0, and it's within Chief Architect authority
+   — `rules/03-versioning.md` reserves only schema bumps and releases for the owner.
+   **No schema bump:** confirmed that `[D-20]`'s geometry bindings were already part
+   of 0.4.
+
+`[Q-1]` doesn't gate anything: `generate` builds one `<target>` per run.
+
+### Spec defects — all four checked against the spec and the runtime
+
+- **§13.3 vs `[D-21]`.** FIXED. The text said the parent index widens to `uint16_t`
+  above 255, but `[D-21]` makes 254 a hard ceiling and rejected widening. The
+  old text was also off by one — 255 ignores the `U8G2GL_NO_PARENT` sentinel.
+- **§12.4 vs §13.7.** FIXED. One §12.4 example declared `tick` as `void`.
+  Everywhere else in the spec, and in the runtime, it returns the next deadline
+  (`[D-15]`).
+- **§13.5.** FIXED. One frame-dirty observer per subject is enough, rather than
+  one per subject per screen, because `u8g2gl_mark_dirty()` marks the active
+  screen and activating a screen marks it dirty anyway. The cost is an
+  occasional extra frame, accepted for the saving.
+- **§13.12.** **Half fixed — the PA was half right.** `static status_bar bar;` is
+  a real defect: after `[D-18]` a composite has no class, so it is now
+  `static u8g2gl_obj bar;`. **But the spec's `bind_time` call is correct.** The
+  clock is specified to bind time, in §6's widget table and through §8's `time`
+  subject type. The defect is in merged code, not the spec. See below.
+
+### Finding — the clock manifest names a method that doesn't exist
+
+`include/u8g2gl/manifests/u8g2gl_clock.xml` declares
+`<bind name="bind_time" type="int" setter="bind_time" />`. **There is no
+`bind_time` anywhere in `include/` or `src/`.** The manifest points at a setter
+that doesn't exist, and gives it the type `int` although the runtime has a
+`u8g2gl_subject_time`.
+
+This is the manifest/runtime parity gap PR-3R listed as never audited, now
+showing up for real. It slipped through because PR-03's cross-test checked
+`<prop>` setters (and PR-3R added `draw=`), but **never checked `<bind>`
+setters**. PR-04 would hit it the first time it generated a clock binding.
+
+**Sent back to the PA** with two options: implement `bind_time` on the clock
+against the time subject and fix the manifest type, or refuse the binding with
+`U8G2GL_NOT_YET_SUPPORTED`. **Either way, the cross-test must now check `<bind>`
+setters**, so no manifest binding can name a method that doesn't exist again.
+
+### Housekeeping
+
+Removed a stale PR-02 scratch worktree. The PA is not working in this checkout —
+the tree was clean with no `pr-04` workspace — so Tier-1 documents were committed
+straight to `main` after checking that `origin/main` hadn't moved.

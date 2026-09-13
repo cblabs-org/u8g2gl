@@ -78,7 +78,7 @@ of `ui_spec.md`.
 **Still open:** `[Q-1]` multi-target layout overrides (needs two real targets);
 `[Q-2]` `bdfconv` packaging (work, not risk — Wasm recommended); `[Q-4]` measured
 runtime budget on `esp32dev`; `[Q-5]` frame-loop ownership; `[U-3]` multi-target
-canvas; `[U-6]` where sample data lives **(gates PR-04's sample-data hooks)**;
+canvas; `[U-6]` where sample data lives **(gates editor track E-3, not PR-04 — PR-04 builds no sample-data hooks; corrected 2026-09-13)**;
 `[U-7]` palette taxonomy.
 
 ---

@@ -1240,7 +1240,7 @@ Triggers on focusable elements: `press`, `long_press`. Triggers on any element: 
 void ui_screen_home_init();       // once, at boot
 void ui_screen_home_activate();   // on becoming active
 void ui_screen_home_deactivate(); // on switching away
-void ui_screen_home_tick(uint32_t ms);
+uint32_t ui_screen_home_tick(uint32_t ms);   // returns next deadline ([D-15])
 void ui_screen_home_render(U8G2& d);
 ```
 
@@ -1352,7 +1352,7 @@ static const uint8_t ui_screen_home_parents[] = {
 };
 ```
 
-The parent index is `uint8_t` while a screen holds ≤ 255 objects and widens to `uint16_t` above that; the generator picks the narrower type and the runtime reads it through a typedef. Effective visibility and clipping are computed by walking *up* the parent chain at render time — depth is 2–4 in practice, so the walk is a handful of comparisons and no child lists are stored.
+The parent index is `uint8_t`, and `U8G2GL_NO_PARENT` takes one of its values, so a screen holds at most **254** objects. Exceeding that is a hard validator error; the index does not widen. [D-21] considered `uint16_t` and rejected it: it would cost a byte on every object to serve screens nobody authors for a 128×64 display. Effective visibility and clipping are computed by walking *up* the parent chain at render time — depth is 2–4 in practice, so the walk is a handful of comparisons and no child lists are stored.
 
 ### 13.4 Identifier mangling
 
@@ -1409,7 +1409,7 @@ u8g2gl_draw_box(d, 4, 20, ui_subject_level.value, 6, true, 0);  // bound width
 Two consequences:
 
 1. **Frame-dirty tracking moves to the subject.** With no object observing, the
-   generator registers one frame-dirty observer per subject a screen references
+   generator registers one frame-dirty observer per subject, not one per subject per screen. `u8g2gl_mark_dirty()` marks whichever screen is active, and activating a screen marks it dirty anyway; the only cost is an occasional extra frame when a subject changes that only an inactive screen uses
    — which is *fewer* observers than one per binding whenever two elements share
    a subject, and is what §11.2 already describes ("dirty tracking gates the
    frame, not the widget").
@@ -1578,7 +1578,7 @@ XML → parse → validate → resolve → flatten → compile assets → emit �
 
 #include "ui.hpp"
 
-static status_bar      bar;              // 0  composite container
+static u8g2gl_obj      bar;              // 0  composite container
 static u8g2gl_label    bar_location;     // 1  child of bar
 static u8g2gl_xbm      bar_wifi_icon;    // 2  child of bar
 static u8g2gl_clock    bar_clock;        // 3  child of bar

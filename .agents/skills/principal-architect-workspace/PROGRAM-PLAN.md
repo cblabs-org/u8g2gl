@@ -34,7 +34,8 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 | PR-03 | U8G2GL | Widget set + `[U-1]` element identity | PR-01 | ✅ **MERGED #3** |
 | PR-3R | U8G2GL | ★ Interim remediation to `[D-18]`–`[D-21]`, schema 0.4 | PR-03 | ✅ **MERGED #4** |
 | **PR-04** | U8G2GL | Generator XML→C++ per §13: realisation, composite expansion, build-time layout, mangling, generated capacities `[D-21]`, **editor-target registry `[UD-4]`** | PR-3R | **NEXT — awaiting PA handoff** |
-| PR-05 | foundation | Integration module, build hooks, first board migrated | PR-04 | Pending |
+| PR-04b | U8G2GL | **Font and image pipeline:** `<bdf>` through `bdfconv` in Wasm [Q-2], PNG→XBM `<convert>`. Split out of PR-04, which refuses both with a named error | PR-04 | Pending — **on the critical path** |
+| PR-05 | foundation | Integration module, build hooks, first board migrated | PR-04 + **PR-04b** | Pending |
 | PR-06 | U8G2GL | Wasm renderer + snapshot harness | PR-3R | Pending — may run ∥ PR-04 |
 | PR-07 | foundation | ★ **GO/NO-GO GATE** | PR-05 + PR-06 | Pending — see CA-2 |
 
@@ -73,7 +74,13 @@ phase labels are left unaligned rather than renumbered across three documents.*
 - **PR-04 ∥ PR-06** — both build against §13 and `[UD-4]`. PR-06's dynamic
   construction consumes PR-04's editor registry, so **agree the registry's shape
   before either PA starts**, or one of them writes it twice.
-- **PR-05** strictly after PR-04.
+- **PR-05** strictly after PR-04 **and PR-04b**. departures-board-v3's screens use
+  custom BDF fonts (`NatRailTall12`, `RailClockMega13`, `NatRailClockLarge9` and
+  others), so the first board migration can't finish without `bdfconv`. [Q-2]
+  moved from "work, not risk" onto the critical path on 2026-09-13.
+- **PR-04b** extends `generate`'s asset handling, so it follows PR-04 rather than
+  running alongside it — two PAs editing the generator at once is the conflict to
+  avoid.
 - **Editor track** after PR-04 and PR-06. Its relation to PR-07 is CA-1.
 - **PR-08 ∥ PR-09** — both touch the runtime; serialise or split by directory.
 - **PR-10** strictly last in consolidation — it deletes the legacy module.
