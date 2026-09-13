@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_ellipse">
+<widget name="u8g2gl_ellipse" extends="u8g2gl_obj">
   <api>
     <prop name="x" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Center X coordinate" />
     <prop name="y" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Center Y coordinate" />

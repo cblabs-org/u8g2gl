@@ -59,7 +59,7 @@ describe('buildManifestRegistry', () => {
       expect(registry.declaredWidgets.map((m) => m.name)).toEqual(['wd_meter']);
     });
 
-    it('treats a composite with no extends as a root', () => {
+    it('treats a composite with no extends as a root when no u8g2gl_obj is registered', () => {
       const composite: WidgetManifest = {
         name: 'status_bar',
         api: { props: [prop('title')], bindings: [], elements: [] },
@@ -68,6 +68,39 @@ describe('buildManifestRegistry', () => {
       const registry = registryOf([composite]);
       expect(registry.get('status_bar')?.chain).toEqual(['status_bar']);
       expect(registry.diagnostics).toEqual([]);
+    });
+  });
+
+  // --- PR-04 WO2 F2: the implicit `extends` default lives here, not in the parser ---
+  describe('implicit extends', () => {
+    it('gives a composite with no extends u8g2gl_obj as its parent (§13.12)', () => {
+      const composite: WidgetManifest = {
+        name: 'status_bar',
+        api: { props: [prop('title')], bindings: [], elements: [] },
+        view: { children: [] },
+      };
+      const registry = frameworkRegistry([composite]);
+      const effective = registry.get('status_bar')!;
+      expect(effective.chain).toEqual(['status_bar', 'u8g2gl_obj']);
+      expect(effective.api.props.map((p) => p.name)).toContain('draw_color');
+      expect(effective.api.props.at(-1)?.name).toBe('title');
+      expect(registry.diagnostics).toEqual([]);
+    });
+
+    it('gives a plain widget with no extends no parent, leaving the schema pass to report it', () => {
+      const registry = frameworkRegistry([widget('wd_meter', { props: [prop('level')] })]);
+      expect(registry.get('wd_meter')?.chain).toEqual(['wd_meter']);
+      expect(registry.get('wd_meter')?.api.props.map((p) => p.name)).toEqual(['level']);
+      expect(registry.diagnostics).toEqual([]);
+    });
+
+    it('reports a project manifest that extends itself as a cycle, not a root', () => {
+      const registry = registryOf([widget('wd_a', { extends: 'wd_a' })]);
+      expect(registry.diagnostics).toHaveLength(1);
+      expect(registry.diagnostics[0]).toMatchObject({
+        code: DIAGNOSTIC_CODES.CIRCULAR_REFERENCE,
+        message: "Manifest 'extends' cycle: wd_a -> wd_a.",
+      });
     });
   });
 
@@ -176,8 +209,9 @@ describe('buildManifestRegistry', () => {
 
   describe('framework manifests', () => {
     it('resolves the bundled framework manifests with no diagnostics', () => {
-      // u8g2gl_obj has no `extends`; the parser defaults it to 'u8g2gl_obj',
-      // which must read as the root of the hierarchy, not a self-cycle.
+      // u8g2gl_obj.xml declares extends="u8g2gl_obj" (every plain widget must
+      // declare `extends`, PR-04 WO2 F2), which must read as the root of the
+      // hierarchy, not a self-cycle.
       const registry = frameworkRegistry();
       expect(registry.diagnostics).toEqual([]);
       expect(registry.get('u8g2gl_obj')?.chain).toEqual(['u8g2gl_obj']);

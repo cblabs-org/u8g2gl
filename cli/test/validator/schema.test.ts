@@ -11,11 +11,39 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { registryOf } from '../helpers/manifest-registry.js';
+import { frameworkRegistry, registryOf } from '../helpers/manifest-registry.js';
+import { parseWidgetManifestFile } from '../../src/core/parser/parse-widget-manifest.js';
 import { validateSchema } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
+
+// PR-04 WO2 F2: before WO2 the parser defaulted a missing `extends` to
+// 'u8g2gl_obj', so this diagnostic could never fire through the real pipeline.
+describe('validateSchema — required extends on a plain widget', () => {
+  const input = (manifests: ValidateInput['manifests']): ValidateInput => ({
+    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
+    globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
+    screens: [],
+    manifests,
+    catalogue: [],
+  });
+
+  it('reports a parsed plain widget manifest that omits extends', () => {
+    const parsed = parseWidgetManifestFile(
+      '<widget name="wd_meter"><api><prop name="level" type="int" setter="set_level" /></api></widget>',
+      'widgets/wd_meter/wd_meter.xml',
+    );
+    const diagnostics = validateSchema(input(registryOf([parsed.value!])));
+    const missing = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.MISSING_REQUIRED);
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.message).toBe("Missing required attribute 'extends' on widget 'wd_meter'.");
+  });
+
+  it('reports nothing for the framework manifests, which all declare extends', () => {
+    expect(validateSchema(input(frameworkRegistry()))).toEqual([]);
+  });
+});
 
 describe('validateSchema — setter/draw mutual exclusion', () => {
   const baseInput: ValidateInput = {

@@ -122,17 +122,41 @@ function mergeByName<T extends { readonly name: string }>(
   return merged;
 }
 
+/**
+ * The class every element ultimately realises as: the base a composite inherits
+ * when its manifest names none (§13.12 emits `static u8g2gl_obj bar;`), and the
+ * one manifest allowed to name itself in `extends`.
+ */
+const IMPLICIT_BASE = 'u8g2gl_obj';
+
 // parentTagOf
 // The tag a manifest inherits from, or undefined for a root.
-//   manifest — a declared manifest
-function parentTagOf(manifest: WidgetManifest): string | undefined {
-  // The parser defaults a missing `extends` to 'u8g2gl_obj' (parse-widget-
-  // manifest.ts), so u8g2gl_obj's own manifest arrives claiming to extend
-  // itself. That is the root of the hierarchy, not a cycle; treating it as one
-  // would put a cycle error on every project. The cost: an explicit
-  // `extends` naming the element itself is indistinguishable and also reads
-  // as a root.
-  if (manifest.extends === undefined || manifest.extends === manifest.name) {
+//   manifest     — a declared manifest
+//   isRegistered — whether a tag has a registered manifest
+function parentTagOf(
+  manifest: WidgetManifest,
+  isRegistered: (tag: string) => boolean,
+): string | undefined {
+  if (manifest.extends === undefined) {
+    // A composite has no class of its own but realises as a u8g2gl_obj, so it
+    // inherits that manifest (PR-04 WO2, F2). Only a composite: a plain widget
+    // without `extends` is a root here and the schema pass reports the missing
+    // attribute. When no u8g2gl_obj is registered — hand-built registries in
+    // unit tests; never a real project, which always has the framework bundle —
+    // the default is skipped rather than reported, because the author wrote no
+    // `extends` for a diagnostic to point at.
+    if (manifest.view !== undefined && manifest.name !== IMPLICIT_BASE && isRegistered(IMPLICIT_BASE)) {
+      return IMPLICIT_BASE;
+    }
+    return undefined;
+  }
+  // u8g2gl_obj.xml must declare `extends` like every plain widget, and it has no
+  // parent to name, so it names itself: the root of the hierarchy. Any other
+  // manifest naming itself is a genuine one-element cycle and falls through to
+  // the cycle diagnostic. WO1 treated every self-extends as a root because the
+  // parser default made the two indistinguishable; with the default gone, only
+  // u8g2gl_obj still needs it.
+  if (manifest.extends === manifest.name && manifest.name === IMPLICIT_BASE) {
     return undefined;
   }
   return manifest.extends;
@@ -237,7 +261,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
     }
     const { manifest, origin } = registration;
     const path = [...inProgress, tag];
-    const parentTag = parentTagOf(manifest);
+    const parentTag = parentTagOf(manifest, (candidate) => registrations.has(candidate));
 
     let parent: EffectiveManifest | undefined;
     if (parentTag !== undefined) {

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_triangle">
+<widget name="u8g2gl_triangle" extends="u8g2gl_obj">
   <api>
     <prop name="x0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 X coordinate" />
     <prop name="y0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 Y coordinate" />

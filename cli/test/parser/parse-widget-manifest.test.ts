@@ -25,6 +25,15 @@ describe('parseWidgetManifestFile', () => {
   );
   const fixtureXml = readFileSync(fixturePath, 'utf-8');
 
+  it('leaves extends unset on a plain widget that omits it, rather than defaulting it', () => {
+    // PR-04 WO2 F2: a parser default made the schema pass's "missing required
+    // 'extends'" unreachable. The only default — a composite realising as
+    // u8g2gl_obj — is the manifest registry's.
+    const result = parseWidgetManifestFile('<widget name="wd_meter"><api></api></widget>', 'wd_meter.xml');
+    expect(result.diagnostics).toEqual([]);
+    expect(result.value).not.toHaveProperty('extends');
+  });
+
   it('parses valid-widget-manifest.xml into a typed WidgetManifest model', () => {
     const result = parseWidgetManifestFile(fixtureXml, 'wd_service_list.xml');
 

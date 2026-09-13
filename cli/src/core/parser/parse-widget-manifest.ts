@@ -237,15 +237,21 @@ export function parseWidgetManifest(
   // --- Composite view (§6.4, [D-18]) ---
   // One element vocabulary means a composite is this same `<widget>` root
   // with a `<view>` child, not a second tag. A plain widget manifest has no
-  // `<view>` and keeps its `extends` (defaulting to 'u8g2gl_obj'); a
-  // composite has no C++ class of its own, so `extends` is left unset for
-  // exactly the reason widget-manifest.ts documents on the field.
+  // `<view>` and keeps its `extends` exactly as written; a composite has no
+  // C++ class of its own, so `extends` is left unset for exactly the reason
+  // widget-manifest.ts documents on the field.
+  //
+  // No default is filled in here (PR-04 WO2, F2). Defaulting a missing
+  // `extends` to 'u8g2gl_obj' made validate-schema.ts's "missing required
+  // 'extends'" diagnostic unreachable and made u8g2gl_obj appear to extend
+  // itself. The one legitimate default — a composite realises as u8g2gl_obj
+  // (§13.12) — is applied by the manifest registry, where it is visible.
   const viewEl = getChild(root, 'view');
   if (!viewEl) {
-    const extendsVal = getAttributeValue(root, 'extends') ?? 'u8g2gl_obj';
+    const extendsVal = getAttributeValue(root, 'extends');
     return {
       name,
-      extends: extendsVal,
+      ...(extendsVal !== undefined ? { extends: extendsVal } : {}),
       api: apiBlock,
       loc: root.loc,
     };
