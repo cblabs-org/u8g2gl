@@ -9,7 +9,10 @@
  * Description: Checks that all required attributes are present across project,
  *              globals, screens, components, and widget manifests. Validates that
  *              attribute values match expected primitive types and enum sets.
- *              Enforces schema version "0.3".
+ *              Enforces schema version "0.3". Also enforces the 254-object
+ *              structural ceiling per screen ([A-3], [D-21], PR-3R WO7) — a
+ *              hard error, not a tunable, since it comes from `parent_index_`
+ *              being a `uint8_t`.
  *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
@@ -18,10 +21,18 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropType } from '../schema/widget-manifest.js';
+import type { PropType, WidgetManifest } from '../schema/widget-manifest.js';
+import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
 const VALID_SCHEMA_VERSION = '0.3';
+
+/**
+ * Structural object ceiling ([A-3], [D-21]). `parent_index_` is a `uint8_t`
+ * and `U8G2GL_NO_PARENT` consumes one value, so a screen can hold at most
+ * this many objects — a property of the object model, not a tunable.
+ */
+const MAX_OBJECTS_PER_SCREEN = 254;
 
 const VALID_PROP_TYPES: ReadonlySet<PropType> = new Set([
   'int',
@@ -56,6 +67,53 @@ const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   '180',
   '270',
 ]);
+
+/**
+ * Counts the elements a screen's tree structurally contributes toward the
+ * 254-object ceiling ([A-3]).
+ *
+ * This is a conservative over-count, not the generator's future exact
+ * accounting (PR-04's half of [D-21]): every ordinary widget node counts as
+ * one, even a `draw=`-only primitive that will ultimately compile to a free
+ * function and consume no object slot at all (design_spec.md line ~246). A
+ * composite instantiation (found in `composites`) is not itself counted —
+ * [D-18] inlines it, so its own template's children are counted in its place
+ * — which is what actually lands in the generated object array. Counting
+ * every ordinary node can only over-flag a screen relative to the
+ * generator's later, more precise count; it can never miss a real overflow,
+ * which is the property this hard error exists to guarantee before PR-04
+ * exists to compute the exact figure.
+ *
+ * Composite cycles are guarded against here independently of Pass 2's own
+ * cycle detector (`validateReferences`), since Pass 1 runs first and a cycle
+ * would otherwise recurse forever; `visiting` breaks the loop and lets the
+ * dedicated diagnostic in Pass 2 report it properly.
+ */
+function countScreenObjects(
+  nodes: readonly WidgetNodeChild[],
+  composites: ReadonlyMap<string, WidgetManifest>,
+  visiting: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const child of nodes) {
+    if (!('tag' in child) || typeof child.tag !== 'string') {
+      continue;
+    }
+    const composite = composites.get(child.tag);
+    if (composite) {
+      if (visiting.has(child.tag)) {
+        continue; // Cycle — reported by Pass 2, not double-counted here.
+      }
+      const nextVisiting = new Set(visiting);
+      nextVisiting.add(child.tag);
+      count += countScreenObjects(composite.view?.children ?? [], composites, nextVisiting);
+    } else {
+      count += 1;
+      count += countScreenObjects(child.children ?? [], composites, visiting);
+    }
+  }
+  return count;
+}
 
 function createDiagnostic(
   code: string,
@@ -341,6 +399,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 3. Screen schema validation ---
+  const compositeMap = new Map((components ?? []).map((c) => [c.name, c]));
   for (const screen of screens ?? []) {
     if (!screen.name) {
       diagnostics.push(
@@ -375,6 +434,23 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           );
         }
       }
+    }
+
+    // The structural object ceiling ([A-3], [D-21]): `parent_index_` is a
+    // `uint8_t` and `U8G2GL_NO_PARENT` consumes one value, so 254 objects is
+    // where the object model runs out, not a tunable a project can raise.
+    const objectCount = countScreenObjects(screen.view?.children ?? [], compositeMap, new Set());
+    if (objectCount > MAX_OBJECTS_PER_SCREEN) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.TOO_MANY_OBJECTS,
+          `Screen '${screen.name}' has ${objectCount} objects, exceeding the structural ` +
+            `ceiling of ${MAX_OBJECTS_PER_SCREEN} (parent_index_ is a uint8_t and ` +
+            `U8G2GL_NO_PARENT consumes one value).`,
+          screen.loc,
+          screen.name,
+        ),
+      );
     }
   }
 

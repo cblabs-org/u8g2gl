@@ -70,6 +70,14 @@ export const DIAGNOSTIC_CODES = {
   MALFORMED_XML: 'U8G2GL_MALFORMED_XML',
   MISSING_FILE: 'U8G2GL_MISSING_FILE',
   CIRCULAR_REFERENCE: 'U8G2GL_CIRCULAR_REFERENCE',
+  /**
+   * A screen's element tree exceeds the structural object ceiling ([A-3],
+   * [D-21]). `parent_index_` is a `uint8_t` and `U8G2GL_NO_PARENT` consumes
+   * one value, so a screen can hold at most 254 objects — this is a property
+   * of the object model, not a tunable capacity like the ones in
+   * `u8g2gl_config.h`. See `docs/decisions/d21-generated-capacities.md`.
+   */
+  TOO_MANY_OBJECTS: 'U8G2GL_TOO_MANY_OBJECTS',
 } as const;
 
 /**
