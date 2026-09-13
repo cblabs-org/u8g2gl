@@ -34,8 +34,9 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** ✅ `b13bdff` · base WO2b · standard · new work, required by WO4
 - [x] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** ✅ `07cfd2d` · base WO3 · standard · defects surfaced by WO3 (PA-added)
 - [x] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** ✅ `ac02684` · base WO3b · standard · R2.5, R3.3, R3.4
-- [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
-- [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
+- [x] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** ✅ `2bd7082` · base WO4 · standard · R2.1 — *prop half only*
+- [ ] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** · base WO5 · standard · finishes R2.1 (PA-added)
+- [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5b · standard · R2.2, R2.3, R2.4
 - [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
 - [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
 
@@ -310,3 +311,33 @@ strictness here; regression tests pin the choice.
    WO5, which is rewriting that file anyway.
 3. WO4's own prose said "17 manifests" when 16 exist. Corrected — the count was
    stale, not the instruction.
+
+### WO5 — partially complete (`2bd7082`), remainder → WO5b
+
+CLI 239 → **240 tests**, `tsc` clean, boundary respected. `ComponentProp` is
+merged into `PropDef` and `help` now round-trips on a composite prop — the defect
+nobody had logged, with a test that fails without the fix.
+
+**`Component` itself was not retired, and the worker was right to stop.** Five
+call sites across four validator files read `comp.api` as a bare `PropDef[]` while
+a widget's props come through an `ApiBlock`. Unifying the type means unifying
+those reads, and those files were reserved for WO6.
+
+It built the literal version the checklist asked for, found it did not compile,
+and surfaced the conflict rather than either reaching into reserved files or
+picking a shape that compiled but encoded the wrong thing. That is precisely what
+a boundary box is for, and the alternative — a silent reading that happened to
+build — would have been much harder to spot in review.
+
+**My scoping error, not the worker's.** I wrote WO5 as though the merge were
+confined to the schema types. It is not: the type *is* how the validators reach
+composite props, so the merge always reached into WO6's files. The boundary was
+drawn in the wrong place and the worker found the seam.
+
+**WO5b takes the remainder and runs before WO6**, deliberately: a type migration
+and four behaviour changes in one diff is not reviewable. WO5b does the migration
+with no behaviour change; WO6 then changes behaviour on a settled shape.
+
+WO5b also deletes the `@deprecated ComponentProp` alias WO5 left behind. A
+deprecation alias buys downstream consumers time to migrate, and there are none —
+the same reasoning that rejected `--migrate`.
