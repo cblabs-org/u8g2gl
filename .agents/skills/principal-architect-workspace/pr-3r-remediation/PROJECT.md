@@ -37,7 +37,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** ✅ `2bd7082` · base WO4 · standard · R2.1 — *prop half only*
 - [x] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** ✅ `00651d7` · base WO5 · standard · finishes R2.1 (PA-added)
 - [x] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** ✅ `c9cf2c8` · base WO5b · standard · R2.2, R2.3, R2.4
-- [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
+- [x] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** ✅ · base WO6 · standard · [D-21]
 - [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
 
 **WO4 was re-graded `mechanical` → `standard`.** Stripping `animated` from 17
@@ -403,3 +403,34 @@ and the same smell.
 identical after item 6. Noted rather than actioned — a unification pass is
 worthwhile but it is not remediation, and this PR has already grown three work
 orders.
+
+### WO7 — complete
+
+C++ 238 → **240**, CLI 256 → **263**, zero warnings. All three items closed.
+
+**It verified the [D-21] override structure the hard way, which is what I asked
+for and rarely get:** it compiled a throwaway translation unit with a fake
+generated header included first and `static_assert`ed that all six constants take
+the generated value, including the `MAX_TOTAL_BINDINGS` formula fallback. PR-04
+depends on that mechanism, and it is now demonstrated rather than assumed.
+
+**The RAM cost is real and is recorded in [D-21]: +5,120 bytes on a 64-bit host**,
+measured rather than estimated. No 32-bit figure exists — this host cannot build
+ILP32 — so the target number is still open, and §1.3 forbids quoting an estimate
+as if it were a measurement.
+
+That cost argues *for* [D-21] rather than against it: the pool is
+objects × bindings, so a project with three bound objects now pays for 256
+slots exactly as one with two hundred would. The raised default is interim and
+correct only for hand-written use; PR-04's generated capacities are what remove
+the waste.
+
+**The object-count check is deliberately a conservative over-count** of every
+node, rather than an attempt to replicate the realisation rule's per-instance
+object/draw-call decision. That decision is PR-04's, and a validator that guessed
+at it would be wrong in both directions. Over-counting can only reject a screen
+that would have fitted — visible and arguable — where under-counting would admit
+one that overflows silently on device.
+
+**Image-ness now derives from the manifests** (`type="image"`), so the last
+hardcoded element list in the CLI is gone.
