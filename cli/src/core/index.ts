@@ -13,9 +13,12 @@
  * - Schema types and diagnostic codes from ./schema/index.js
  * - XML parser APIs and models from ./parser/index.js
  * - Display catalogue query APIs from ./catalogue/index.js
+ * - Element manifest registry from ./manifest/index.js
+ * - Validator APIs from ./validator/index.js
  */
 
 export * from './schema/index.js';
 export * from './parser/index.js';
 export * from './catalogue/index.js';
+export * from './manifest/index.js';
 export * from './validator/index.js';

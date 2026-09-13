@@ -10,6 +10,8 @@
  * Description: Command parser and subcommand router supporting global flags
  *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue),
  *              including validate's --fix-names write-back of generated element names.
+ *              validate checks a project against the bundled framework manifests plus
+ *              the project's own widgets/, through one manifest registry ([D-17], [D-18]).
  *              Wires the isomorphic display catalogue query engine and schema validator
  *              into human-readable compiler-style diagnostics (§15.1) and JSON output (§15.3, [D-16]).
  *
@@ -21,6 +23,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
+import { FRAMEWORK_MANIFESTS } from '../data/manifests.js';
+import { buildManifestRegistry, parseFrameworkManifests } from '../core/manifest/index.js';
 import {
   parseProjectFile,
   parseGlobalsFile,
@@ -425,22 +429,9 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     images: [],
   };
   const parsedScreens: Screen[] = [];
-  const parsedComponents: WidgetManifest[] = [];
-  const parsedWidgets: WidgetManifest[] = [];
-
-  // [D-18]: one element vocabulary — a composite is a WidgetManifest whose
-  // `<api>` carries a `<view>` (PR-3R WO9). `parseWidgetManifestFile` parses
-  // both shapes through the one `<widget>` root; this is the single place
-  // that sorts a parsed manifest into the `components` or `widgetManifests`
-  // bucket `validate()` still expects, matching pre-WO9 discovery
-  // (`components/` vs `widgets/`) without reviving a second parse path.
-  function bucketWidgetManifest(manifest: WidgetManifest): void {
-    if (manifest.view) {
-      parsedComponents.push(manifest);
-    } else {
-      parsedWidgets.push(manifest);
-    }
-  }
+  // [D-18]: one element vocabulary. Plain widgets and composites go into one
+  // list and from there into one registry — never sorted into two buckets.
+  const projectManifests: WidgetManifest[] = [];
 
   if (stat.isDirectory()) {
     // --- Directory: Load standard project structure via readProjectFiles ---
@@ -511,7 +502,7 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
       const widRes = parseWidgetManifestFile(widget.content, widget.filename);
       allDiagnostics.push(...widRes.diagnostics);
       if (widRes.value) {
-        bucketWidgetManifest(widRes.value);
+        projectManifests.push(widRes.value);
       }
     }
   } else {
@@ -548,23 +539,33 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
       const res = parseWidgetManifestFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
-        bucketWidgetManifest(res.value);
+        projectManifests.push(res.value);
       }
     }
   }
 
-  // --- Step 2: Execute Schema & Semantic Validation ---
+  // --- Step 2: Build the element registry — framework manifests plus the project's ---
+  // The framework manifests come from the bundle, not from include/: an
+  // npm-installed CLI has no include/ to read ([D-17]).
+  const framework = parseFrameworkManifests(FRAMEWORK_MANIFESTS);
+  allDiagnostics.push(...framework.diagnostics);
+  const manifests = buildManifestRegistry({
+    framework: framework.manifests,
+    project: projectManifests,
+  });
+
+  // --- Step 3: Execute Schema & Semantic Validation ---
+  // validate() reports the registry's own diagnostics (shadowing, extends).
   const valResult = validate({
     project: parsedProject,
     globals: parsedGlobals,
     screens: parsedScreens,
-    components: parsedComponents,
-    widgetManifests: parsedWidgets,
+    manifests,
     catalogue: CATALOGUE,
   });
   allDiagnostics.push(...valResult.diagnostics);
 
-  // --- Step 3: Deduplicate and sort deterministically ---
+  // --- Step 4: Deduplicate and sort deterministically ---
   const seen = new Set<string>();
   const uniqueDiagnostics: Diagnostic[] = [];
 
@@ -599,7 +600,7 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     }
   }
 
-  // --- Step 4: Emit JSON or Human-Readable Output ---
+  // --- Step 5: Emit JSON or Human-Readable Output ---
   if (json) {
     // Machine-readable contract (§15.3, [D-16]). `fixedNames` is present only
     // when --fix-names was requested, so the existing contract is unchanged for

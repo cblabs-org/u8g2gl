@@ -5,9 +5,11 @@
  *
  * File: src/core/validator/validate.ts
  * Purpose: Main validation orchestrator running multi-pass validation (§15.1, §15.2).
- * Description: Coordinates 7 sequential validation passes across project configurations,
- *              globals, screen views, component definitions, and widget manifests.
- *              Deterministically sorts all diagnostics by file, line, and column.
+ * Description: Reports the manifest registry's own diagnostics, then coordinates 7
+ *              sequential validation passes across project configuration, globals,
+ *              screen views and element manifests — every pass reading elements from
+ *              the one registry ([D-17], [D-18]). Deterministically sorts all
+ *              diagnostics by file, line, and column.
  *
  * Exports:
  * - ValidateInput: Complete project input model passed to the validator
@@ -18,7 +20,7 @@
 import type { U8g2glProject } from '../schema/project.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
-import type { WidgetManifest } from '../schema/widget-manifest.js';
+import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { DisplayRecord } from '../schema/display-record.js';
 import type { Diagnostic } from '../schema/diagnostic.js';
 
@@ -38,14 +40,14 @@ export interface ValidateInput {
   readonly globals: Globals;
   readonly screens: readonly Screen[];
   /**
-   * Composite elements — a `WidgetManifest` whose `api` carries a `view`
-   * ([D-18]). Retired as a separate `Component` type by WO5b; still a
-   * distinct array from `widgetManifests` because the two are validated by
-   * different passes (composite tag/prop rules here, real `<widget>` schema
-   * rules there) — unifying that is WO6's, not this migration's, concern.
+   * Every element the document may instantiate — framework and project
+   * manifests, plain widgets and composites alike, `extends` resolved — built
+   * once by `buildManifestRegistry` ([D-17], [D-18]). One registry rather than
+   * separate widget and composite lists: [D-18] leaves one element vocabulary,
+   * and a split here only splits it back into two at the door. `validate()`
+   * reports the registry's own diagnostics; the individual passes do not.
    */
-  readonly components: readonly WidgetManifest[];
-  readonly widgetManifests: readonly WidgetManifest[];
+  readonly manifests: ManifestRegistry;
   readonly catalogue: readonly DisplayRecord[];
 }
 
@@ -62,6 +64,7 @@ export interface ValidateResult {
  * Runs all validation passes in order and produces sorted diagnostics.
  *
  * Execution sequence:
+ * 0. Manifest registry diagnostics — shadowing, unknown `extends`, cycles
  * 1. Schema structure & required attributes (validateSchema)
  * 2. Cross-file & symbol references (validateReferences)
  * 3. Display setup & catalogue verification (validateDisplay)
@@ -75,6 +78,11 @@ export interface ValidateResult {
  */
 export function validate(input: ValidateInput): ValidateResult {
   const allDiagnostics: Diagnostic[] = [];
+
+  // Pass 0: The registry's own diagnostics. Reported here rather than left to
+  // each caller, so the CLI and the designer cannot disagree about whether a
+  // shadowing manifest is an error.
+  allDiagnostics.push(...input.manifests.diagnostics);
 
   // Pass 1: Schema structure & versions
   allDiagnostics.push(...validateSchema(input));

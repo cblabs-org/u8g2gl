@@ -22,6 +22,7 @@ import {
 import { validate, type ValidateInput } from '../../src/core/validator/index.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
+import { frameworkRegistry } from '../helpers/manifest-registry.js';
 
 describe('validate orchestrator integration', () => {
   const validDir = resolve(__dirname, 'fixtures', 'valid');
@@ -37,10 +38,6 @@ describe('validate orchestrator integration', () => {
       resolve(validDir, 'widgets', 'status_bar', 'status_bar.xml'),
       'utf-8',
     );
-    const widgetXml = readFileSync(
-      resolve(validDir, 'widgets', 'u8g2gl_label', 'u8g2gl_label.xml'),
-      'utf-8',
-    );
 
     const project = parseProjectFile(projectXml, 'u8g2gl.xml').value!;
     const globals = parseGlobalsFile(globalsXml, 'globals.xml').value!;
@@ -51,17 +48,14 @@ describe('validate orchestrator integration', () => {
       componentXml,
       'widgets/status_bar/status_bar.xml',
     ).value!;
-    const widget = parseWidgetManifestFile(
-      widgetXml,
-      'widgets/u8g2gl_label/u8g2gl_label.xml',
-    ).value!;
 
+    // The fixture ships no copy of u8g2gl_label's manifest (PR-04 WO1): the
+    // label comes from the bundled framework manifests, as it does in the CLI.
     return {
       project,
       globals,
       screens: [screen],
-      components: [component],
-      widgetManifests: [widget],
+      manifests: frameworkRegistry([component]),
       catalogue: CATALOGUE,
     };
   }

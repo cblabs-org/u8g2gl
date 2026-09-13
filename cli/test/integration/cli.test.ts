@@ -105,6 +105,82 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(codes).toContain('U8G2GL_INVALID_NAME');
   });
 
+  // --- PR-04 WO1: the framework manifests reach the CLI ---
+  describe('framework manifests (PR-04 WO1)', () => {
+    const tempDirs: string[] = [];
+
+    /** A minimal project with one <u8g2gl_label> screen and no widgets/ at all. */
+    function createLabelProject(): string {
+      mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+      const dir = mkdtempSync(resolve(__dirname, '../../tmp/framework-manifests-'));
+      tempDirs.push(dir);
+      mkdirSync(join(dir, 'screens'), { recursive: true });
+      writeFileSync(
+        join(dir, 'u8g2gl.xml'),
+        `<u8g2gl schema="0.4" name="label_only" version="1.0.0">
+    <targets>
+        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
+    </targets>
+</u8g2gl>
+`,
+      );
+      writeFileSync(
+        join(dir, 'globals.xml'),
+        '<globals><fonts><bdf name="small_9" src="fonts/small_9.bdf" /></fonts></globals>\n',
+      );
+      // `draw_color` is declared only on u8g2gl_obj: it validates only if
+      // `extends` is resolved, not merely if u8g2gl_label's manifest is found.
+      writeFileSync(
+        join(dir, 'screens/screen_home.xml'),
+        `<screen name="home">
+    <view>
+        <u8g2gl_label name="title" x="0" y="0" width="128" height="12" font="small_9"
+                      text="Hi" long_mode="dots" draw_color="1" />
+    </view>
+</screen>
+`,
+      );
+      return dir;
+    }
+
+    afterAll(() => {
+      for (const dir of tempDirs) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('validates a project using <u8g2gl_label> with no local copy of its manifest', async () => {
+      const res = await runCliSubprocess(['validate', createLabelProject(), '--json']);
+      const parsed = JSON.parse(res.stdout) as { diagnostics: unknown[]; errors: number };
+
+      expect(parsed.diagnostics).toEqual([]);
+      expect(res.code).toBe(0);
+    });
+
+    it('rejects a project copy of a framework manifest, naming both sources', async () => {
+      const dir = createLabelProject();
+      mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
+      writeFileSync(
+        join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
+        readFileSync(resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml'), 'utf-8'),
+      );
+
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; file: string; message: string }>;
+      };
+      const shadow = parsed.diagnostics.find(
+        (d) => d.code === 'U8G2GL_SHADOWED_FRAMEWORK_MANIFEST',
+      );
+
+      expect(res.code).toBe(1);
+      expect(shadow).toBeDefined();
+      expect(shadow?.file).toBe('widgets/u8g2gl_label/u8g2gl_label.xml');
+      expect(shadow?.message).toContain('widgets/u8g2gl_label/u8g2gl_label.xml');
+      expect(shadow?.message).toContain('u8g2gl/manifests/u8g2gl_label.xml');
+    });
+  });
+
   it('u8g2gl find "SSD1306 128x64 i2c" -> output contains "SSD1306"', async () => {
     const res = await runCliSubprocess(['find', 'SSD1306 128x64 i2c']);
 
@@ -195,21 +271,11 @@ describe('WO9: validate --fix-names end-to-end', () => {
   function createTempProject(): string {
     const dir = mkdtempSync(resolve(__dirname, '../../tmp/fix-names-'));
     mkdirSync(join(dir, 'screens'), { recursive: true });
-    mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
     writeFileSync(join(dir, 'u8g2gl.xml'), projectXml, 'utf-8');
     writeFileSync(join(dir, 'globals.xml'), globalsXml, 'utf-8');
     writeFileSync(join(dir, 'screens/screen_home.xml'), unnamedScreenXml, 'utf-8');
-    // Reuse the committed label manifest: without it the rewritten screen would
-    // still fail on U8G2GL_UNKNOWN_WIDGET and the revalidation assertions would
-    // be measuring the wrong thing.
-    writeFileSync(
-      join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
-      readFileSync(
-        join(validProjectDir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
-        'utf-8',
-      ),
-      'utf-8',
-    );
+    // No widgets/ copy of u8g2gl_label's manifest: since PR-04 WO1 the CLI
+    // bundles the framework manifests, and a project copy is a hard error.
     return dir;
   }
 

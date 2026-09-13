@@ -62,7 +62,7 @@ function walkNodes(
  */
 export function validateReferences(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { globals, screens, components, widgetManifests } = input;
+  const { globals, screens, manifests } = input;
 
   const declaredFonts = (globals?.fonts ?? []).map((f) => f.name);
   const fontSet = new Set(declaredFonts);
@@ -74,10 +74,11 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   const subjectSet = new Set(declaredSubjects);
 
   const globalStyles = (globals?.styles ?? []).map((s) => s.name);
-  const declaredComponents = (components ?? []).map((c) => c.name);
-  const componentSet = new Set(declaredComponents);
 
-  const manifestMap = new Map((widgetManifests ?? []).map((m) => [m.name, m]));
+  // One namespace for every element ([D-18]). The `u8g2gl_` prefix still picks
+  // the diagnostic code below — a stable API — but whether a tag is known, and
+  // what to suggest for one that is not, comes from the one registry.
+  const knownTags = manifests.tags;
 
   // --- 1. Validate font references in styles (globals and screen-local) ---
   for (const style of globals?.styles ?? []) {
@@ -126,31 +127,27 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
       // 2a. Check component tag or widget tag. Element knowledge is data,
       // never code ([D-17]): a tag validates if and only if a manifest
       // declares it — there is no hardcoded primitives set to fall back on.
-      const isManifestWidget = manifestMap.has(node.tag);
-      const isComponent = componentSet.has(node.tag);
-
-      if (!isManifestWidget) {
+      if (!manifests.has(node.tag)) {
         if (node.tag.startsWith('u8g2gl_')) {
           // Unknown built-in widget
-          const manifestNames = Array.from(manifestMap.keys());
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
               `Unknown widget '<${node.tag}>' in screen '${screen.name}'.`,
               node.loc,
               node.tag,
-              findClosest(node.tag, manifestNames),
+              findClosest(node.tag, knownTags),
             ),
           );
-        } else if (!isComponent) {
-          // Unknown component
+        } else {
+          // Unknown user element
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
               `Unknown component '<${node.tag}>' instantiated in screen '${screen.name}'.`,
               node.loc,
               node.tag,
-              findClosest(node.tag, declaredComponents),
+              findClosest(node.tag, knownTags),
             ),
           );
         }
@@ -195,7 +192,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
       // UNKNOWN_WIDGET before this code runs (PR-3R WO7).
       const imageAttr = node.attributes.image ?? node.attributes.src;
       if (typeof imageAttr === 'string' && !imageAttr.startsWith('$')) {
-        const manifest = manifestMap.get(node.tag);
+        const manifest = manifests.get(node.tag);
         const isImageTag = manifest?.api.props.some(
           (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
         );
@@ -319,38 +316,34 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   }
 
   // --- 3. Validate references inside components (excluding $prop templates) ---
-  for (const component of components ?? []) {
-    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
-    // not a retired `Component`) — reach through `.props`. No behaviour change.
-    const propNames = new Set((component.api?.props ?? []).map((p) => `$${p.name}`));
+  for (const component of manifests.declaredComposites) {
+    // Declared props only: a composite has no `extends`, so declared and
+    // effective props are the same list.
+    const propNames = new Set(component.api.props.map((p) => `$${p.name}`));
 
     walkNodes(component.view?.children ?? [], (node) => {
       // Check the tag itself. Pass 2a runs only over screens, so without this
       // a misspelled element inside a composite's own template passed today —
       // the walk here checked fonts, images, and subjects but never the tag.
-      const isManifestWidget = manifestMap.has(node.tag);
-      const isComponent = componentSet.has(node.tag);
-
-      if (!isManifestWidget) {
+      if (!manifests.has(node.tag)) {
         if (node.tag.startsWith('u8g2gl_')) {
-          const manifestNames = Array.from(manifestMap.keys());
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
               `Unknown widget '<${node.tag}>' in component '${component.name}'.`,
               node.loc,
               node.tag,
-              findClosest(node.tag, manifestNames),
+              findClosest(node.tag, knownTags),
             ),
           );
-        } else if (!isComponent) {
+        } else {
           diagnostics.push(
             createRefDiagnostic(
               DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
               `Unknown component '<${node.tag}>' instantiated in component '${component.name}'.`,
               node.loc,
               node.tag,
-              findClosest(node.tag, declaredComponents),
+              findClosest(node.tag, knownTags),
             ),
           );
         }
@@ -380,7 +373,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         !propNames.has(imageAttr) &&
         !imageAttr.startsWith('$')
       ) {
-        const manifest = manifestMap.get(node.tag);
+        const manifest = manifests.get(node.tag);
         const isImageTag = manifest?.api.props.some(
           (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
         );
@@ -449,7 +442,7 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   // instantiating A is not merely wasteful, it recurses forever at expansion
   // time. This must be a hard error, and the diagnostic must name the full
   // cycle path (e.g. "a -> b -> a") rather than just report that one exists.
-  diagnostics.push(...detectCompositeCycles(components ?? []));
+  diagnostics.push(...detectCompositeCycles(manifests));
 
   return diagnostics;
 }
@@ -459,9 +452,9 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
  * each composite, and reports every cycle exactly once via its lexicographically
  * smallest rotation, so `a -> b -> a` isn't also reported starting from `b`.
  */
-function detectCompositeCycles(components: ValidateInput['components']): Diagnostic[] {
+function detectCompositeCycles(manifests: ValidateInput['manifests']): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const componentMap = new Map(components.map((c) => [c.name, c]));
+  const components = manifests.declaredComposites;
   const reportedCycles = new Set<string>();
 
   /** Tags directly instantiated inside a composite's own template. */
@@ -479,8 +472,8 @@ function detectCompositeCycles(components: ValidateInput['components']): Diagnos
 
     const visit = (current: (typeof components)[number]): void => {
       for (const childTag of directChildTags(current)) {
-        const child = componentMap.get(childTag);
-        if (!child) {
+        const child = manifests.get(childTag);
+        if (!child?.view) {
           continue; // Not a composite reference — validated elsewhere.
         }
 

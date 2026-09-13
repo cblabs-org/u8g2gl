@@ -4,24 +4,36 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/validator/validate-widget-props.ts
- * Purpose: Pass 4 — Validates widget attributes against <api> manifests and component
- *          parameters (§13.1, §13.2).
- * Description: For each widget or component instance, checks that supplied attributes
- *              match declared property names, mandatory props are present, and enum
- *              values belong to the declared enumeration set. Skips common layout
- *              attributes and inline style overrides.
+ * Purpose: Pass 4 — checks every element instance's attributes against the
+ *          effective manifest of its tag (§13.1, §13.2). One body for plain
+ *          widgets and composites alike, because [D-18] leaves one element
+ *          vocabulary: two copies of this logic had already drifted apart
+ *          twice (PR-3R WO5b, WO6), and unifying them is how those were found.
+ * Description: For each instance with a known tag, reports attributes the
+ *              effective manifest (inherited props and bindings included) does
+ *              not declare, missing required props, and enum values outside the
+ *              declared set. Layout and identity attributes in
+ *              COMMON_ATTRIBUTES and `style_*` overrides are always accepted.
+ *              Unknown tags are Pass 2's concern and are skipped here.
  *
  * Exports:
- * - validateWidgetProps(input): Runs Pass 4 widget property validation
+ * - validateWidgetProps(input): Runs Pass 4 element property validation
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import type { EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { ValidateInput } from './validate.js';
 
-/** Standard common attributes valid on all visual nodes (§7.2, §10). */
+/**
+ * Layout and identity attributes valid on every visual node (§7.2, §10),
+ * whether or not a manifest declares them. Kept deliberately separate from the
+ * manifests: several of these (`right`, `hcenter`, `style`, …) are resolved by
+ * the build-time layout pass and have no setter to declare. Which attributes
+ * belong here is WO3's to settle.
+ */
 const COMMON_ATTRIBUTES: ReadonlySet<string> = new Set([
   'name',
   'x',
@@ -71,201 +83,113 @@ function walkNodes(
   }
 }
 
+// checkInstanceProps
+// Checks one element instance against its tag's effective manifest: unknown
+// attributes, missing required props, out-of-range enum values — in that order.
+//   node     — the instance as parsed from a screen
+//   manifest — effective manifest for node.tag, inheritance already merged
+function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const { props, bindings } = manifest.api;
+
+  // --- Step 1: Collect every attribute name the element accepts ---
+  const declaredNames = new Set<string>();
+  for (const prop of props) {
+    declaredNames.add(prop.name);
+  }
+  for (const binding of bindings) {
+    declaredNames.add(binding.name);
+    // A binding's format companion (e.g. bind_text_fmt) is an attribute too.
+    if (binding.fmt) {
+      declaredNames.add(binding.fmt);
+    }
+  }
+  const suggestionPool = [...COMMON_ATTRIBUTES, ...declaredNames];
+
+  // --- Step 2: Reject attributes nothing declares ---
+  for (const [attrName, attrVal] of Object.entries(node.attributes)) {
+    if (attrVal === undefined) {
+      continue;
+    }
+    if (COMMON_ATTRIBUTES.has(attrName) || attrName.startsWith('style_')) {
+      continue;
+    }
+    if (declaredNames.has(attrName)) {
+      continue;
+    }
+    diagnostics.push(
+      createPropDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+        `Unknown attribute '${attrName}' on <${node.tag}>.`,
+        node.attributeLocs?.[attrName] ?? node.loc,
+        attrName,
+        findClosest(attrName, suggestionPool),
+      ),
+    );
+  }
+
+  // --- Step 3: Require mandatory props ---
+  for (const prop of props) {
+    if (!prop.required) {
+      continue;
+    }
+    const val = node.attributes[prop.name];
+    if (val === undefined || val === '') {
+      diagnostics.push(
+        createPropDiagnostic(
+          DIAGNOSTIC_CODES.MISSING_REQUIRED,
+          `Missing required attribute '${prop.name}' on <${node.tag}>.`,
+          node.loc,
+          prop.name,
+        ),
+      );
+    }
+  }
+
+  // --- Step 4: Check enum values against the declared set ---
+  for (const prop of props) {
+    if (prop.type !== 'enum' || !prop.values) {
+      continue;
+    }
+    const rawVal = node.attributes[prop.name];
+    // A `$`-prefixed value is a composite template parameter, resolved at
+    // expansion time; its value is not knowable here.
+    if (typeof rawVal !== 'string' || rawVal === '' || rawVal.startsWith('$')) {
+      continue;
+    }
+    const allowedValues = prop.values.split(',').map((v) => v.trim());
+    if (!allowedValues.includes(rawVal)) {
+      diagnostics.push(
+        createPropDiagnostic(
+          DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
+          `Invalid value '${rawVal}' for enum property '${prop.name}' on <${node.tag}>. Expected one of: ${allowedValues.join(', ')}.`,
+          node.attributeLocs?.[prop.name] ?? node.loc,
+          rawVal,
+          findClosest(rawVal, allowedValues),
+        ),
+      );
+    }
+  }
+
+  return diagnostics;
+}
+
 /**
- * Validates widget and component attributes against declared manifests.
+ * Validates element instance attributes in every screen against the effective
+ * manifests in `input.manifests`.
+ *
+ * @param input Validator input; only `screens` and `manifests` are read.
+ * @return Diagnostics in screen and document order.
  */
 export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { screens, components, widgetManifests } = input;
-
-  const manifestMap = new Map((widgetManifests ?? []).map((m) => [m.name, m]));
-  const componentMap = new Map((components ?? []).map((c) => [c.name, c]));
+  const { screens, manifests } = input;
 
   for (const screen of screens ?? []) {
     walkNodes(screen.view?.children ?? [], (node) => {
-      const manifest = manifestMap.get(node.tag);
-      const component = componentMap.get(node.tag);
-
-      // --- Case 1: Widget with manifest ---
+      const manifest = manifests.get(node.tag);
       if (manifest) {
-        const declaredProps = new Map(manifest.api?.props?.map((p) => [p.name, p]) ?? []);
-        const declaredBindings = new Set(
-          manifest.api?.bindings?.map((b) => b.name) ?? [],
-        );
-        for (const b of manifest.api?.bindings ?? []) {
-          if (b.fmt) {
-            declaredBindings.add(b.fmt);
-          }
-        }
-
-        const allowedNames = [
-          ...Array.from(COMMON_ATTRIBUTES),
-          ...Array.from(declaredProps.keys()),
-          ...Array.from(declaredBindings),
-        ];
-
-        // 1a. Check attributes on this widget instance
-        for (const [attrName, attrVal] of Object.entries(node.attributes)) {
-          if (attrVal === undefined) {
-            continue;
-          }
-
-          if (COMMON_ATTRIBUTES.has(attrName) || attrName.startsWith('style_')) {
-            continue;
-          }
-
-          if (declaredProps.has(attrName) || declaredBindings.has(attrName)) {
-            continue;
-          }
-
-          // Unrecognized attribute
-          const loc = node.attributeLocs?.[attrName] ?? node.loc;
-          diagnostics.push(
-            createPropDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
-              `Unknown attribute '${attrName}' on <${node.tag}>.`,
-              loc,
-              attrName,
-              findClosest(attrName, allowedNames),
-            ),
-          );
-        }
-
-        // 1b. Check required properties
-        for (const prop of manifest.api?.props ?? []) {
-          if (prop.required) {
-            const val = node.attributes[prop.name];
-            if (val === undefined || val === '') {
-              diagnostics.push(
-                createPropDiagnostic(
-                  DIAGNOSTIC_CODES.MISSING_REQUIRED,
-                  `Missing required attribute '${prop.name}' on <${node.tag}>.`,
-                  node.loc,
-                  prop.name,
-                ),
-              );
-            }
-          }
-        }
-
-        // 1c. Check enum values
-        for (const prop of manifest.api?.props ?? []) {
-          if (prop.type === 'enum' && prop.values) {
-            const rawVal = node.attributes[prop.name];
-            if (typeof rawVal === 'string' && rawVal !== '' && !rawVal.startsWith('$')) {
-              const allowedEnumValues = prop.values.split(',').map((v) => v.trim());
-              if (!allowedEnumValues.includes(rawVal)) {
-                const loc = node.attributeLocs?.[prop.name] ?? node.loc;
-                diagnostics.push(
-                  createPropDiagnostic(
-                    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-                    `Invalid value '${rawVal}' for enum property '${prop.name}' on <${node.tag}>. Expected one of: ${allowedEnumValues.join(', ')}.`,
-                    loc,
-                    rawVal,
-                    findClosest(rawVal, allowedEnumValues),
-                  ),
-                );
-              }
-            }
-          }
-        }
-      }
-
-      // --- Case 2: Component instance ---
-      if (component) {
-        // `component.api` is an ApiBlock post-WO5b (component is a
-        // WidgetManifest, not a retired `Component`) — reach through
-        // `.props`, matching the widget path above. No behaviour change.
-        const declaredProps = new Map(
-          component.api?.props.map((p) => [p.name, p]) ?? [],
-        );
-        // Latent, closed while in this file per WO6: the composite path never
-        // considered `bindings` in its unknown-attribute check, unlike the
-        // widget path above. Harmless while a composite's `bindings` is
-        // always empty, but it would misfire silently the moment one isn't.
-        const declaredBindings = new Set(
-          (component.api?.bindings ?? []).map((b) => b.name),
-        );
-        for (const b of component.api?.bindings ?? []) {
-          if (b.fmt) {
-            declaredBindings.add(b.fmt);
-          }
-        }
-
-        const allowedNames = [
-          ...Array.from(declaredProps.keys()),
-          ...Array.from(declaredBindings),
-        ];
-
-        // 2a. Check attributes on component instance
-        for (const [attrName, attrVal] of Object.entries(node.attributes)) {
-          if (attrVal === undefined) {
-            continue;
-          }
-
-          if (COMMON_ATTRIBUTES.has(attrName) || attrName.startsWith('style_')) {
-            continue;
-          }
-
-          if (declaredProps.has(attrName) || declaredBindings.has(attrName)) {
-            continue;
-          }
-
-          // Unrecognized attribute
-          const loc = node.attributeLocs?.[attrName] ?? node.loc;
-          diagnostics.push(
-            createPropDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
-              `Unknown attribute '${attrName}' on component <${node.tag}>.`,
-              loc,
-              attrName,
-              findClosest(attrName, allowedNames),
-            ),
-          );
-        }
-
-        // 2b. Check required properties
-        for (const prop of component.api?.props ?? []) {
-          if (prop.required) {
-            const val = node.attributes[prop.name];
-            if (val === undefined || val === '') {
-              diagnostics.push(
-                createPropDiagnostic(
-                  DIAGNOSTIC_CODES.MISSING_REQUIRED,
-                  `Missing required attribute '${prop.name}' on component <${node.tag}>.`,
-                  node.loc,
-                  prop.name,
-                ),
-              );
-            }
-          }
-        }
-
-        // 2c. Check enum values — a widget prop with type="enum" and an
-        // out-of-range value produces INVALID_ENUM_VALUE (case 1c above);
-        // under [D-18] a composite is a WidgetManifest like any other, so
-        // there is no longer even a nominal reason for the composite path
-        // to lack the equivalent check ([WO5b] finding, closed by WO6).
-        for (const prop of component.api?.props ?? []) {
-          if (prop.type === 'enum' && prop.values) {
-            const rawVal = node.attributes[prop.name];
-            if (typeof rawVal === 'string' && rawVal !== '' && !rawVal.startsWith('$')) {
-              const allowedEnumValues = prop.values.split(',').map((v) => v.trim());
-              if (!allowedEnumValues.includes(rawVal)) {
-                const loc = node.attributeLocs?.[prop.name] ?? node.loc;
-                diagnostics.push(
-                  createPropDiagnostic(
-                    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-                    `Invalid value '${rawVal}' for enum property '${prop.name}' on component <${node.tag}>. Expected one of: ${allowedEnumValues.join(', ')}.`,
-                    loc,
-                    rawVal,
-                    findClosest(rawVal, allowedEnumValues),
-                  ),
-                );
-              }
-            }
-          }
-        }
+        diagnostics.push(...checkInstanceProps(node, manifest));
       }
     });
   }

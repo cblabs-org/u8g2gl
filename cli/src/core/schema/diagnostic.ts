@@ -90,6 +90,15 @@ export const DIAGNOSTIC_CODES = {
    * `u8g2gl_config.h`. See `docs/decisions/d21-generated-capacities.md`.
    */
   TOO_MANY_OBJECTS: 'U8G2GL_TOO_MANY_OBJECTS',
+  /**
+   * A project manifest declares a tag a framework manifest already declares
+   * ([D-17], [D-18]). Framework manifests ship with the CLI, so a project copy
+   * can only go stale — the diagnostic names both files and tells the author
+   * to delete the copy. Deliberately a hard error, not "project wins": an
+   * override that silently diverges from the runtime class it describes is the
+   * defect this code exists to prevent.
+   */
+  SHADOWED_FRAMEWORK_MANIFEST: 'U8G2GL_SHADOWED_FRAMEWORK_MANIFEST',
 } as const;
 
 /**

@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { parseScreenFile, parseWidgetManifestFile } from '../../src/core/parser/index.js';
 import type { ParseOptions } from '../../src/core/parser/index.js';
 import { validateIdentifiers } from '../../src/core/validator/index.js';
@@ -43,8 +44,7 @@ describe('[U-1] Element Identity', () => {
     },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: CATALOGUE,
   };
 
@@ -377,7 +377,7 @@ describe('[U-1] Element Identity', () => {
       expect((left.children[0] as WidgetNode).attributes.name).toBe('label_0');
       expect((right.children[0] as WidgetNode).attributes.name).toBe('label_1');
 
-      const diagnostics = validateIdentifiers({ ...baseInput, components: [comp] });
+      const diagnostics = validateIdentifiers({ ...baseInput, manifests: registryOf([comp]) });
       expect(
         diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME),
       ).toHaveLength(0);

@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { validateGeometry } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
@@ -31,8 +32,7 @@ describe('validateGeometry', () => {
     },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: [
       {
         setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
@@ -215,7 +215,7 @@ describe('validateGeometry', () => {
   it('catches an element overflowing its composite parent container, even though the same size would fit the display', () => {
     const diagnostics = validateGeometry({
       ...baseInput,
-      components: [
+      manifests: registryOf([
         {
           name: 'status_bar',
           api: { props: [], bindings: [], elements: [] },
@@ -237,7 +237,7 @@ describe('validateGeometry', () => {
             ],
           },
         },
-      ],
+      ]),
     });
 
     const oobDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS);
@@ -249,7 +249,7 @@ describe('validateGeometry', () => {
   it('does not flag a composite template top-level child against any display, since a composite has no display', () => {
     const diagnostics = validateGeometry({
       ...baseInput,
-      components: [
+      manifests: registryOf([
         {
           name: 'status_bar',
           api: { props: [], bindings: [], elements: [] },
@@ -267,7 +267,7 @@ describe('validateGeometry', () => {
             ],
           },
         },
-      ],
+      ]),
     });
 
     expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS)).toBe(false);

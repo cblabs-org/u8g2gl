@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { validateSchema } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
@@ -21,8 +22,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
     project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: [],
   };
 
@@ -44,7 +44,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   it('passes when only setter is present', () => {
     const diagnostics = validateSchema({
       ...baseInput,
-      widgetManifests: [manifestWithProp({ setter: 'set_value' })],
+      manifests: registryOf([manifestWithProp({ setter: 'set_value' })]),
     });
     expect(diagnostics).toHaveLength(0);
   });
@@ -52,7 +52,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   it('passes when only draw is present', () => {
     const diagnostics = validateSchema({
       ...baseInput,
-      widgetManifests: [manifestWithProp({ draw: 'u8g2gl_draw_value' })],
+      manifests: registryOf([manifestWithProp({ draw: 'u8g2gl_draw_value' })]),
     });
     expect(diagnostics).toHaveLength(0);
   });
@@ -60,7 +60,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   it('is an error when neither setter nor draw is present', () => {
     const diagnostics = validateSchema({
       ...baseInput,
-      widgetManifests: [manifestWithProp({})],
+      manifests: registryOf([manifestWithProp({})]),
     });
     const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.MISSING_REQUIRED);
     expect(diag).toBeDefined();
@@ -70,9 +70,9 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   it('is an error when both setter and draw are present', () => {
     const diagnostics = validateSchema({
       ...baseInput,
-      widgetManifests: [
+      manifests: registryOf([
         manifestWithProp({ setter: 'set_value', draw: 'u8g2gl_draw_value' }),
-      ],
+      ]),
     });
     const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.OVERCONSTRAINED);
     expect(diag).toBeDefined();
@@ -89,8 +89,7 @@ describe('validateSchema — 254-object structural ceiling', () => {
     project: { schema: '0.4', name: 'ceiling_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: [],
   };
 
@@ -152,7 +151,7 @@ describe('validateSchema — 254-object structural ceiling', () => {
     };
     const diagnostics = validateSchema({
       ...baseInput,
-      components: [composite],
+      manifests: registryOf([composite]),
       screens: [
         {
           name: 'host_screen',
@@ -180,7 +179,7 @@ describe('validateSchema — 254-object structural ceiling', () => {
     expect(() =>
       validateSchema({
         ...baseInput,
-        components: [cyclic],
+        manifests: registryOf([cyclic]),
         screens: [
           {
             name: 'host_screen',

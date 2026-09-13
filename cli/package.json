@@ -22,11 +22,13 @@
   "files": [
     "dist/",
     "src/data/catalogue.json",
+    "src/data/manifests.json",
     "src/data/page-mode-map.json"
   ],
   "scripts": {
     "build": "tsc",
     "build:catalogue": "tsx src/node/build-catalogue.ts",
+    "build:manifests": "tsx src/node/build-manifests.ts",
     "test": "vitest run",
     "lint": "eslint ."
   },

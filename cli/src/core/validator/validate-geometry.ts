@@ -194,7 +194,7 @@ function checkNodes(
  */
 export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { project, screens, catalogue, components } = input;
+  const { project, screens, catalogue, manifests } = input;
 
   // Resolve target display dimensions if available
   let displayWidth: number | undefined;
@@ -227,7 +227,7 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   // does not know. Its top-level children therefore get no absolute bounds
   // check, but anything nested inside one of them still measures against
   // that element's own literal bounds, exactly as it would inside a screen.
-  for (const component of components ?? []) {
+  for (const component of manifests.declaredComposites) {
     checkNodes(component.view?.children ?? [], undefined, diagnostics);
   }
 

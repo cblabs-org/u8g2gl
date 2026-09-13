@@ -23,7 +23,8 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropType, WidgetManifest } from '../schema/widget-manifest.js';
+import type { PropType } from '../schema/widget-manifest.js';
+import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
@@ -120,7 +121,7 @@ const VALID_ROTATIONS: ReadonlySet<string> = new Set([
  */
 function countScreenObjects(
   nodes: readonly WidgetNodeChild[],
-  composites: ReadonlyMap<string, WidgetManifest>,
+  manifests: ManifestRegistry,
   visiting: ReadonlySet<string>,
 ): number {
   let count = 0;
@@ -128,17 +129,17 @@ function countScreenObjects(
     if (!('tag' in child) || typeof child.tag !== 'string') {
       continue;
     }
-    const composite = composites.get(child.tag);
-    if (composite) {
+    const composite = manifests.get(child.tag);
+    if (composite?.view) {
       if (visiting.has(child.tag)) {
         continue; // Cycle — reported by Pass 2, not double-counted here.
       }
       const nextVisiting = new Set(visiting);
       nextVisiting.add(child.tag);
-      count += countScreenObjects(composite.view?.children ?? [], composites, nextVisiting);
+      count += countScreenObjects(composite.view.children, manifests, nextVisiting);
     } else {
       count += 1;
-      count += countScreenObjects(child.children ?? [], composites, visiting);
+      count += countScreenObjects(child.children ?? [], manifests, visiting);
     }
   }
   return count;
@@ -168,7 +169,7 @@ function createDiagnostic(
  */
 export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { project, globals, screens, components, widgetManifests } = input;
+  const { project, globals, screens, manifests } = input;
 
   // --- 1. Project-level schema validation ---
   if (project) {
@@ -446,7 +447,6 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 3. Screen schema validation ---
-  const compositeMap = new Map((components ?? []).map((c) => [c.name, c]));
   for (const screen of screens ?? []) {
     if (!screen.name) {
       diagnostics.push(
@@ -486,7 +486,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     // The structural object ceiling ([A-3], [D-21]): `parent_index_` is a
     // `uint8_t` and `U8G2GL_NO_PARENT` consumes one value, so 254 objects is
     // where the object model runs out, not a tunable a project can raise.
-    const objectCount = countScreenObjects(screen.view?.children ?? [], compositeMap, new Set());
+    const objectCount = countScreenObjects(screen.view?.children ?? [], manifests, new Set());
     if (objectCount > MAX_OBJECTS_PER_SCREEN) {
       diagnostics.push(
         createDiagnostic(
@@ -502,7 +502,9 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 4. Component schema validation ---
-  for (const component of components ?? []) {
+  // Declared, not effective, manifests: these checks are about what a file
+  // itself declares, so an inherited prop is reported once, against its owner.
+  for (const component of manifests.declaredComposites) {
     if (!component.name) {
       diagnostics.push(
         createDiagnostic(
@@ -550,7 +552,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 5. Widget manifest schema validation ---
-  for (const manifest of widgetManifests ?? []) {
+  for (const manifest of manifests.declaredWidgets) {
     if (!manifest.name) {
       diagnostics.push(
         createDiagnostic(

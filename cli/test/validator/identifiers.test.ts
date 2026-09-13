@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { validateIdentifiers } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
@@ -32,8 +33,7 @@ describe('validateIdentifiers', () => {
       images: [{ name: 'logo_img', kind: 'xbm', src: 'logo.xbm' }],
     },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: [],
   };
 
@@ -277,7 +277,7 @@ describe('validateIdentifiers', () => {
 
     const diagnostics = validateIdentifiers({
       ...baseInput,
-      components: [statusBarComponent],
+      manifests: registryOf([statusBarComponent]),
       screens: [screenWithCollision],
     });
 

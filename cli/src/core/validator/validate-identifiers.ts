@@ -211,9 +211,7 @@ function walkNodes(
  */
 export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { globals, screens, components, project } = input;
-
-  const componentMap = new Map((components ?? []).map((c) => [c.name, c]));
+  const { globals, screens, manifests, project } = input;
 
   // --- 1. Validate targets in project ---
   for (const target of project?.targets ?? []) {
@@ -384,7 +382,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         directElementMap.set(name, nameLoc);
       }
 
-      if (componentMap.has(node.tag)) {
+      if (manifests.get(node.tag)?.view) {
         componentInstances.push({
           instanceName: name,
           componentName: node.tag,
@@ -395,7 +393,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
 
     // 3a. Component inlining collision check (§13.4)
     for (const inst of componentInstances) {
-      const comp = componentMap.get(inst.componentName);
+      const comp = manifests.get(inst.componentName);
       if (comp?.view?.children) {
         walkNodes(comp.view.children, (child) => {
           const childName = child.attributes.name;
@@ -420,7 +418,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
   // --- 4. Validate components ---
   const seenComponentNames = new Set<string>();
 
-  for (const comp of components ?? []) {
+  for (const comp of manifests.declaredComposites) {
     const compDiag = checkNameRule(comp.name, comp.loc, 'component');
     if (compDiag) {
       diagnostics.push(compDiag);
