@@ -88,10 +88,27 @@ would reach PR-04's generator with nothing behind them.
       [D-20] the reference is the containing element, which is the display only at
       screen level. Inside a composite it is the composite's declared geometry.
 
+## Added by the Principal Architect after WO4 — a live gap with no failing test
+
+`cli/src/core/validator/validate-schema.ts` (around line 480) requires a `setter`
+attribute on every `<prop>`. WO4 made `setter` optional and added `draw=` as the
+alternative for primitives, so **every `draw=` prop will draw a spurious "missing
+required attribute 'setter'"** once real primitive manifests go through the full
+validate pipeline.
+
+No test triggers it today, which is exactly why it needs writing down — it is a
+defect with no failing test to announce it, and the first person to meet it will
+be whoever wires the pipeline together in PR-04.
+
+- [ ] Accept `draw=` as satisfying the requirement, and require **exactly one** of
+      `setter` or `draw` — neither absent nor both present.
+- [ ] A test per branch: `setter` alone passes, `draw` alone passes, neither is an
+      error, both is an error.
+
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/validator/validate-references.ts`,
-`validate-geometry.ts`, their tests, fixtures, this WORKORDER.
+`validate-geometry.ts`, `validate-schema.ts` (the `setter`/`draw` rule only), their tests, fixtures, this WORKORDER.
 
 **Do NOT touch:** the schema types (WO5), the manifests (WO4), the missing-name
 policy from PR-03 — that is settled, see ui_spec §16.1.

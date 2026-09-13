@@ -33,7 +33,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** ✅ `217473c` · base WO2 · standard · defect surfaced by WO2 (PA-added)
 - [x] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** ✅ `b13bdff` · base WO2b · standard · new work, required by WO4
 - [x] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** ✅ `07cfd2d` · base WO3 · standard · defects surfaced by WO3 (PA-added)
-- [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3b · standard · R2.5, R3.3, R3.4
+- [x] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** ✅ `ac02684` · base WO3b · standard · R2.5, R3.3, R3.4
 - [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
 - [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
 - [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
@@ -277,3 +277,36 @@ mechanism — the existing idiom indexed, exactly as instructed.
 
 The draw path is now genuinely verified rather than asserted not to crash, which
 matters considerably more once PR-04 starts generating calls into it.
+
+### WO4 — complete (`ac02684`)
+
+CLI 220 → **239 tests**, C++ 238 unchanged, zero warnings. Verified: zero
+manifests carry `animated`, zero `setter="drawX"` remain, `truncate` is gone from
+`u8g2gl_obj.xml`.
+
+**The cross-test is now the good kind.** It parses `u8g2gl_draw.h` and builds the
+set of declared free functions from the header itself, then asserts every `draw=`
+value is a member — rather than checking against a hand-copied list. It also
+carries a self-check that the extractor did not silently return empty. That is
+[D-17]'s "data, not code" applied to the test as well as the generator, and it
+picked the anti-vacuous guard up from the count assertion I rewrote in WO2 rather
+than being told to.
+
+A typo'd `draw=` now fails before it ever reaches a linker.
+
+**Decision recorded — a lingering `animated` is ignored, not a parse error.** Four
+fixtures outside WO4's boundary still carry it, and erroring would fail those
+suites for a reason unrelated to their own concern. It also matches the parser's
+existing behaviour of never diagnosing unrecognised *attributes*, only
+unrecognised child elements. Consistency with the surrounding parser beats
+strictness here; regression tests pin the choice.
+
+**Three findings, all placed:**
+1. `validate-schema.ts` will emit a spurious "missing required attribute
+   'setter'" for every `draw=` prop once real manifests run the full pipeline —
+   **a defect with no failing test to announce it**. Folded into WO6, which owns
+   the validator.
+2. `types.test.ts` still names the deleted `u8g2gl_scrolling_label` — folded into
+   WO5, which is rewriting that file anyway.
+3. WO4's own prose said "17 manifests" when 16 exist. Corrected — the count was
+   stale, not the instruction.

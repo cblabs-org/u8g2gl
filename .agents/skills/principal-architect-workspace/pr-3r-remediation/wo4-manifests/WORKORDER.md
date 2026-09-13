@@ -70,7 +70,7 @@ things: a U8G2 method on primitives (`drawBox`) and a runtime method on widgets.
 
 ## Line-Item Instructions
 
-- [x] Remove `animated` from all 17 manifests in `include/u8g2gl/manifests/`.
+- [x] Remove `animated` from every manifest in `include/u8g2gl/manifests/`. *(This WORKORDER was written when there were 17; WO2 deleted `u8g2gl_scrolling_label.xml`, so there are 16. Corrected after WO4 flagged it — the count was stale, not the instruction.)*
 - [x] For the eight primitives — `box`, `circle`, `ellipse`, `hline`, `line`,
       `pixel`, `triangle`, `vline` — replace `setter="drawX"` with
       `draw="u8g2gl_draw_x"`, naming the functions WO3 added. Verify each symbol

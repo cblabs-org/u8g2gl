@@ -80,6 +80,10 @@ the types fixes it for free, and the merged `PropDef` must carry `help`.
       barrel exports.
 - [ ] Update `cli/test/parser/parse-component.test.ts`,
       `cli/test/schema/types.test.ts` and the parser fixtures.
+- [ ] **Surfaced by WO4:** `cli/test/schema/types.test.ts` still references the
+      deleted `u8g2gl_scrolling_label` tag in a Component-schema fixture. You are
+      rewriting that file's Component types anyway; correct the fixture while you
+      are there.
 - [ ] This is a **type merge, not a behaviour change**. If you find yourself
       changing what the parser accepts, stop — that is a schema change and it
       belongs to WO8.
