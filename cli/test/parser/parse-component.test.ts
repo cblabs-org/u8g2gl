@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/parser/parse-component.test.ts
- * Purpose: Verification tests for parsing Tier 3 pure-XML components (§6.3).
+ * Purpose: Verification tests for parsing composite elements (§6.3, §6.4).
  * Description: Asserts that valid-component.xml is parsed into a typed Component model
- *              with parameterised <api> properties (types, defaults, required flags) and
- *              templated <view> widget tree with nested binding directives.
+ *              with parameterised <api> properties (types, defaults, required flags, and —
+ *              since WO5's merge onto PropDef — help text) and a templated <view> widget
+ *              tree with nested binding directives.
  */
 
 import { readFileSync } from 'node:fs';
@@ -60,6 +61,7 @@ describe('parseComponentFile', () => {
       type: 'font',
       default: 'small_9',
       required: true,
+      help: 'Font used for the scrolling location label.',
     });
 
     // View widget tree
@@ -67,10 +69,11 @@ describe('parseComponentFile', () => {
     expect(component.view.children).toHaveLength(3);
 
     const scrollingLabel = component.view.children[0]!;
-    expect(scrollingLabel.tag).toBe('u8g2gl_scrolling_label');
+    expect(scrollingLabel.tag).toBe('u8g2gl_label');
     expect(scrollingLabel.attributes.name).toBe('location');
     expect(scrollingLabel.attributes.bind_text).toBe('$title_subject');
     expect(scrollingLabel.attributes.font).toBe('$font');
+    expect(scrollingLabel.attributes.long_mode).toBe('scroll');
 
     const xbmWidget = component.view.children[1] as WidgetNode;
     expect(xbmWidget.tag).toBe('u8g2gl_xbm');
@@ -81,6 +84,25 @@ describe('parseComponentFile', () => {
     const clockWidget = component.view.children[2]!;
     expect(clockWidget.tag).toBe('u8g2gl_clock');
     expect(clockWidget.attributes.format).toBe('HH:MM');
+  });
+
+  it('round-trips help text on a composite prop (WO5, [D-18] merge onto PropDef)', () => {
+    // ComponentProp had no `help` field before this merge, so a composite's
+    // props could carry no description text at all — this is the defect the
+    // WO5 merge exists to fix (ui_spec.md §9). Without `help` read out of the
+    // <prop> element and copied onto the parsed PropDef, this assertion fails.
+    const xml = `<component name="labelled">
+    <api>
+        <prop name="title" type="string" help="Shown at the top of the screen." />
+    </api>
+    <view>
+        <u8g2gl_label name="lbl" text="Test" />
+    </view>
+</component>`;
+    const result = parseComponentFile(xml, 'labelled.xml');
+
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.value?.api[0]?.help).toBe('Shown at the top of the screen.');
   });
 
   it('infers component name from file path if name attribute is absent', () => {

@@ -4,17 +4,24 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/parser/parse-component.ts
- * Purpose: Transforms raw XML AST into typed Component models (§6.3).
- * Description: Extracts parameterised API property declarations and template
- *              widget subtree for Tier 3 pure-XML inlined components.
+ * Purpose: Transforms raw XML AST into typed Component models (§6.3). This
+ *          file still parses the `<component>` root tag exactly as before —
+ *          accepting a different root tag (e.g. `<widget>`, per design_spec
+ *          §6.4) is a schema change reserved for WO8, not this merge.
+ * Description: WO5 retired the separate `ComponentProp` type in favour of
+ *              `PropDef` (see schema/component.ts for why `Component` itself
+ *              stays a distinct interface rather than a literal `WidgetManifest`
+ *              alias): extracts parameterised API property declarations, now
+ *              typed as `PropDef` and therefore able to carry `help`, plus the
+ *              template widget subtree for a composite element.
  *
  * Exports:
  * - parseComponent: Transform a parsed RawXmlElement into a Component model
  * - parseComponentFile: Parse a raw XML string into a ParseResult<Component>
  */
 
-import type { Component, ComponentProp } from '../schema/component.js';
-import type { PropType } from '../schema/widget-manifest.js';
+import type { Component } from '../schema/component.js';
+import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
@@ -66,7 +73,7 @@ export function parseComponent(
   const name = getAttributeValue(root, 'name') ?? inferComponentName(filename);
 
   // Parse <api> parameter declarations
-  const apiProps: ComponentProp[] = [];
+  const apiProps: PropDef[] = [];
   const apiEl = getChild(root, 'api');
   if (apiEl) {
     for (const child of apiEl.children) {
@@ -75,12 +82,18 @@ export function parseComponent(
         const typeAttr = requireAttribute(child, 'type', filename, diagnostics);
         const defaultVal = getAttributeValue(child, 'default');
         const required = getBooleanAttribute(child, 'required');
+        // [D-18]/WO5: a composite prop is now a PropDef like any other, so it
+        // can carry `help` — this is the defect the merge fixes (§9 of
+        // ui_spec.md calls description text on props the editor's
+        // differentiator, and the pre-merge ComponentProp had no such field).
+        const help = getAttributeValue(child, 'help');
 
         apiProps.push({
           name: nameAttr?.value ?? '',
           type: (typeAttr?.value ?? 'string') as PropType,
           default: defaultVal,
           required,
+          help,
           loc: child.loc,
         });
       } else {

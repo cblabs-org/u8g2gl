@@ -60,12 +60,17 @@
  *   - EventChild: Action handler attached to an element
  *   - StyleChild: Inline style reference element
  *
- * - Components (§6.3):
- *   - Component: Document model for pure-XML components
- *   - ComponentProp: Parameter declaration accepted by a component
+ * - Components (§6.3, §6.4):
+ *   - Component: Composite element descriptor model (name, api, view) — a
+ *     composite is conceptually a WidgetManifest whose `<api>` carries a
+ *     `view` ([D-18]); see component.ts for why it is not yet that literal
+ *     type.
+ *   - ComponentProp: @deprecated alias for PropDef — WO5 retired the type
+ *     outright so a composite prop can carry `help` like any other
  *
  * - Widget manifests (§6.4, §13.1):
- *   - WidgetManifest: Document model for `<widget>` API declarations
+ *   - WidgetManifest: Document model for `<widget>` API declarations. Carries
+ *     an optional `view` for the composite case ([D-18]).
  *   - ApiBlock: Public API declaration block
  *   - PropType: Widget property data type union
  *   - PropDef: Property descriptor mapping to C++ setter method

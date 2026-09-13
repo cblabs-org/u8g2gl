@@ -335,14 +335,25 @@ describe('Schema Types', () => {
     });
   });
 
-  describe('Component types (components/*/*.xml)', () => {
+  describe('Component types (§6.3, §6.4) — merged onto PropDef by WO5', () => {
     it('creates valid Component matching design_spec §6.3', () => {
+      // `u8g2gl_scrolling_label` no longer exists (WO2 folded it into
+      // `u8g2gl_label`'s `long_mode`) — this fixture was surfaced by WO4 as
+      // still referencing the deleted tag and is corrected here.
       const componentProps: readonly ComponentProp[] = [
         { name: 'title_subject', type: 'subject' as PropType, default: 'station_name' },
         { name: 'wifi_subject', type: 'subject' as PropType, default: 'wifi_connected' },
         { name: 'width', type: 'int' as PropType, default: '#screen_width' },
         { name: 'height', type: 'int' as PropType, default: '11' },
-        { name: 'font', type: 'font' as PropType, default: 'small_9', required: true },
+        {
+          name: 'font',
+          type: 'font' as PropType,
+          default: 'small_9',
+          required: true,
+          // ComponentProp had no `help` field before WO5 merged it onto
+          // PropDef — asserted below, this is the defect the merge fixes.
+          help: 'Font used for the scrolling location label.',
+        },
       ];
 
       const component: Component = {
@@ -351,7 +362,7 @@ describe('Schema Types', () => {
         view: {
           children: [
             {
-              tag: 'u8g2gl_scrolling_label',
+              tag: 'u8g2gl_label',
               attributes: {
                 name: 'location',
                 x: '0',
@@ -360,6 +371,7 @@ describe('Schema Types', () => {
                 height: '$height',
                 bind_text: '$title_subject',
                 font: '$font',
+                long_mode: 'scroll',
               },
               styleOverrides: {},
               children: [],
@@ -371,7 +383,8 @@ describe('Schema Types', () => {
       expect(component.name).toBe('status_bar');
       expect(component.api).toHaveLength(5);
       expect(component.api[4]?.required).toBe(true);
-      expect(component.view.children[0]?.tag).toBe('u8g2gl_scrolling_label');
+      expect(component.api[4]?.help).toBe('Font used for the scrolling location label.');
+      expect(component.view.children[0]?.tag).toBe('u8g2gl_label');
     });
   });
 

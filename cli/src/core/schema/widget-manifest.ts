@@ -13,6 +13,11 @@
  *          `u8g2gl_draw_*` function for a drawing element with no class, §13.1) — and the
  *          widget-level `animated` flag is gone: realisation is decided per instance by the
  *          generator, not declared by the manifest.
+ *          [D-18] also removes the separate `components/`/`<component>` tier: there is one
+ *          element vocabulary, and a composite is simply a `WidgetManifest` whose `<api>`
+ *          carries a `<view>` (§6.4). WO5 folded the pre-[D-18] `Component`/`ComponentProp`
+ *          pair into this file rather than leaving a second type shape for the same concept
+ *          — see `component.ts` for the deprecated aliases kept for callers not yet migrated.
  * Description: Immutable interfaces for WidgetManifest, ApiBlock, property definitions,
  *              binding slots, and collection element arguments.
  *
@@ -27,6 +32,7 @@
  */
 
 import type { SourceLocation } from './source-location.js';
+import type { View } from './screen.js';
 
 /**
  * Root `<widget>` descriptor model for built-in and custom C++-backed widgets (§6.4, §13.1).
@@ -38,6 +44,15 @@ export interface WidgetManifest {
   readonly extends: string;
   /** Public API manifest defining accepted properties, bindings, and elements. */
   readonly api: ApiBlock;
+  /**
+   * Template subtree instantiated when this manifest is a composite (§6.4,
+   * [D-18]). Present if and only if the element is a composite — a plain
+   * C++-backed widget with no `<view>` leaves this undefined. This is the
+   * field that used to live on the separate, now-removed `Component` type;
+   * folding it in here is what makes a composite "just a `WidgetManifest`
+   * with a `<view>`" rather than a second concept.
+   */
+  readonly view?: View;
   /** Source location where the widget manifest was declared. */
   readonly loc?: SourceLocation;
 }

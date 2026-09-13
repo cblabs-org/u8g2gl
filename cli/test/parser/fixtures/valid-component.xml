@@ -6,13 +6,14 @@
         <prop name="wifi_subject"  type="subject" default="wifi_connected" />
         <prop name="width"         type="int"     default="#screen_width" />
         <prop name="height"        type="int"     default="11" />
-        <prop name="font"          type="font"    default="small_9" required="true" />
+        <prop name="font"          type="font"    default="small_9" required="true"
+              help="Font used for the scrolling location label." />
     </api>
 
     <view width="$width" height="$height">
-        <u8g2gl_scrolling_label name="location"
+        <u8g2gl_label name="location"
             x="0" y="0" right="52" height="$height"
-            bind_text="$title_subject" font="$font" />
+            bind_text="$title_subject" font="$font" long_mode="scroll" />
 
         <u8g2gl_xbm name="wifi_icon"
             right="40" y="0" width="12" height="$height"
