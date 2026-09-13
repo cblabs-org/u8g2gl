@@ -19,7 +19,7 @@ import type { Screen } from '../../src/core/schema/screen.js';
 describe('validateTypes', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'types_test',
       version: '1.0.0',
       targets: [],

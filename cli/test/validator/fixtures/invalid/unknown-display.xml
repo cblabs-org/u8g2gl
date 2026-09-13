@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<u8g2gl schema="0.3" name="bad_display" version="1.0.0">
+<u8g2gl schema="0.4" name="bad_display" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_NONEXISTENT_999X999_HW_I2C" />
     </targets>

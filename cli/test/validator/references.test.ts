@@ -18,7 +18,7 @@ import type { Screen } from '../../src/core/schema/screen.js';
 describe('validateReferences', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'ref_test',
       version: '1.0.0',
       targets: [],

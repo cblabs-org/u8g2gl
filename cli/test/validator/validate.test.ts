@@ -176,7 +176,75 @@ describe('validate orchestrator integration', () => {
 
     expect(schemaDiag).toBeDefined();
     expect(schemaDiag?.severity).toBe('error');
-    expect(schemaDiag?.suggestions).toEqual(['0.3']);
-    expect(schemaDiag?.message).toContain("Expected '0.3'");
+    expect(schemaDiag?.suggestions).toEqual(['0.4']);
+    expect(schemaDiag?.message).toContain("Expected '0.4'");
+  });
+
+  // --- PR-3R WO8: the §15.4 refusal path — 0.3 is superseded, not merely
+  // unknown, so it must be refused with the specific migration table rather
+  // than the generic "unknown version" message an unrecognised string gets.
+  describe('schema version refusal (§15.4, PR-3R WO8)', () => {
+    it('refuses schema="0.3" with a diagnostic naming specific migrations, not a generic mismatch', () => {
+      const input = loadValidProject();
+      const legacyInput: ValidateInput = {
+        ...input,
+        project: { ...input.project, schema: '0.3' },
+      };
+
+      const result = validate(legacyInput);
+      const schemaDiag = result.diagnostics.find(
+        (d) => d.code === DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION,
+      );
+
+      expect(schemaDiag).toBeDefined();
+      expect(schemaDiag?.severity).toBe('error');
+      // Assert on message *content* — a test only checking the diagnostic
+      // code would pass against the obscure "unknown version" failure this
+      // refusal path exists to prevent (WORKORDER testing requirement).
+      expect(schemaDiag?.message).toContain('long_mode="clip"');
+      expect(schemaDiag?.message).toContain('scroll_circular');
+      expect(schemaDiag?.message).toContain("'animated' is removed");
+      expect(schemaDiag?.message).toContain("'<component>' is removed");
+      expect(schemaDiag?.message).toContain("'draw='");
+      // Must not be reported under the generic unknown-version code.
+      expect(
+        result.diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION),
+      ).toBe(false);
+    });
+
+    it('validates cleanly at schema="0.4" (the fixture default)', () => {
+      const input = loadValidProject();
+      expect(input.project.schema).toBe('0.4');
+
+      const result = validate(input);
+      expect(
+        result.diagnostics.some(
+          (d) =>
+            d.code === DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION ||
+            d.code === DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
+        ),
+      ).toBe(false);
+    });
+
+    it('refuses an unrecognised version (0.9) distinctly from the known-old 0.3', () => {
+      const input = loadValidProject();
+      const futureInput: ValidateInput = {
+        ...input,
+        project: { ...input.project, schema: '0.9' },
+      };
+
+      const result = validate(futureInput);
+      const unknownDiag = result.diagnostics.find(
+        (d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
+      );
+      const deprecatedDiag = result.diagnostics.find(
+        (d) => d.code === DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION,
+      );
+
+      expect(unknownDiag).toBeDefined();
+      expect(deprecatedDiag).toBeUndefined();
+      expect(unknownDiag?.message).toContain("Expected '0.4'");
+      expect(unknownDiag?.message).not.toContain('long_mode');
+    });
   });
 });

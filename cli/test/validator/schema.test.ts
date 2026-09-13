@@ -18,7 +18,7 @@ import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
 
 describe('validateSchema — setter/draw mutual exclusion', () => {
   const baseInput: ValidateInput = {
-    project: { schema: '0.3', name: 'schema_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     components: [],
@@ -86,7 +86,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
 // tunable capacity.
 describe('validateSchema — 254-object structural ceiling', () => {
   const baseInput: ValidateInput = {
-    project: { schema: '0.3', name: 'ceiling_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.4', name: 'ceiling_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     components: [],

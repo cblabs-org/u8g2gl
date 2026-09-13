@@ -183,7 +183,7 @@ describe('Schema Types', () => {
       };
 
       const project: U8g2glProject = {
-        schema: '0.3',
+        schema: '0.4',
         name: 'departures-board',
         version: '1.0',
         targets,
@@ -191,7 +191,7 @@ describe('Schema Types', () => {
         loc: { file: 'u8g2gl.xml', line: 1, column: 1 },
       };
 
-      expect(project.schema).toBe('0.3');
+      expect(project.schema).toBe('0.4');
       expect(project.name).toBe('departures-board');
       expect(project.targets).toHaveLength(2);
       expect(project.targets[0]?.setup).toBe('U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI');
@@ -496,14 +496,14 @@ describe('Schema Types', () => {
       expect(loc.file).toBe('test.xml');
 
       const project: U8g2glProject = {
-        schema: '0.3',
+        schema: '0.4',
         name: 'test',
         version: '1.0',
         targets: [],
       };
       // @ts-expect-error - readonly property cannot be reassigned
-      // project.schema = '0.4';
-      expect(project.schema).toBe('0.3');
+      // project.schema = '0.5';
+      expect(project.schema).toBe('0.4');
 
       const diag: Diagnostic = {
         code: DIAGNOSTIC_CODES.MISSING_REQUIRED,

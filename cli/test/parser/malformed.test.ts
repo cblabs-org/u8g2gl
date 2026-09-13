@@ -69,7 +69,7 @@ describe('Parser Error Handling & Diagnostics', () => {
   });
 
   it('detects missing setup attribute on hardware targets', () => {
-    const xml = `<u8g2gl schema="0.3" name="test" version="1.0">
+    const xml = `<u8g2gl schema="0.4" name="test" version="1.0">
     <targets>
         <target name="broken_target" />
     </targets>
