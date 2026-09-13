@@ -5,7 +5,7 @@ title: "[D-20] bindable geometry: runtime, manifests, validator"
 branch: u8g2gl-generator/wo3-bindable-geometry
 base: u8g2gl-generator/wo2-manifest-parity
 complexity: standard
-status: draft — PA revises against WO2's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO3 — [D-20] bindable geometry
@@ -73,11 +73,51 @@ validator rejects `bind_width` as an unknown attribute.
 - [ ] **[D-20] diagnostic:** a container whose own geometry is bound may not have
       anchor-positioned children (`right`, `bottom`, `hcenter`, `vcenter`). Name
       the container, the bound attribute and the anchored child.
-- [ ] Resolve the attribute-acceptance mismatches WO1 recorded between
-      `COMMON_ATTRIBUTES` and effective manifests, per the PA's revision of this
-      line item.
+- [ ] **Attribute acceptance — manifests are the source.** WO1 recorded that
+      `COMMON_ATTRIBUTES` (`validate-widget-props.ts`) admits `name`, `right`,
+      `bottom`, `hcenter`, `vcenter`, `style`, `focus_style` and `focusStyle`,
+      none of which any manifest declares, and also repeats geometry and `hidden`,
+      which manifests do declare. Reduce `COMMON_ATTRIBUTES` to **identity and
+      anchor/style attributes only** — `name`, `right`, `bottom`, `hcenter`,
+      `vcenter`, `style`, `focus_style` — so `x`, `y`, `width`, `height` and
+      `hidden` are accepted only where the effective manifest declares them.
+      Remove `focusStyle` unless something reads it; say which. A drawing element
+      is hidden through `<bind_flag_if_*>` children (§6.2's own example), not a
+      literal `hidden`. **If a spec example or fixture puts a literal `hidden` on a
+      drawing element, stop and report** rather than choosing.
 
-## Carried from WO1 (PA triage — refined again against WO2 before dispatch)
+## Added by the Principal Architect after WO2 — do these first
+
+WO2 removed the parser's implicit `extends` default and, to keep the schema check
+quiet, added `extends="u8g2gl_obj"` to the eight drawing manifests. It said plainly
+that this conflicts with design_spec §6.2 and §6.5. The PA's decision, consistent
+with the Chief Architect's ruling on `main` (`4e4b992`: `extends` must name a
+manifest, and names real C++ inheritance), is recorded in PROJECT.md under
+"WO2 — complete". Implement it:
+
+- [ ] **Drawing manifests declare no `extends`.** Remove it from `u8g2gl_box`,
+      `circle`, `ellipse`, `hline`, `line`, `pixel`, `triangle`, `vline`. A drawing
+      element has no class ([D-18]).
+- [ ] **`u8g2gl_obj` is the single root.** Remove its self-referencing
+      `extends="u8g2gl_obj"`. The registry treats `u8g2gl_obj` as the root class
+      manifest because §13.7 names it as the base every generated object is reached
+      through — one documented contract constant, with a why-comment, not an
+      element list. Remove WO1/WO2's self-extends-as-root handling if nothing else
+      needs it.
+- [ ] **The `extends` rule in the schema pass (`validate-schema.ts`):**
+      a manifest with any `setter=` prop, other than the root, requires `extends`
+      (the existing "missing required attribute" error, now reachable); a `draw=`-only
+      manifest that declares `extends` is an error (a drawing element has no class
+      to inherit from); a manifest with a `<view>` needs none, since the registry
+      supplies `u8g2gl_obj`. A test for each branch.
+- [ ] **Remove the `it.fails` marker** for `u8g2gl_box` in
+      `manifest-crosstest.test.ts` (`OPEN_EFFECTIVE_ORDER_MISMATCHES`). With no
+      inherited `radius`, box's effective draw order is its declared order. The set
+      should be empty; delete it rather than leave an empty exception list.
+- [ ] **W5 — stale comments** left by WO2's F2 change in
+      `validate-references.ts` and `schema/widget-manifest.ts`.
+
+## Carried from WO1 (PA triage)
 
 - [ ] **F4 — prop-check composite interiors.** `validate-widget-props.ts` walks
       only screens, so elements inside a composite's `<view>` are never
@@ -97,10 +137,15 @@ validator rejects `bind_width` as an unknown attribute.
 ## Strict Boundary Box
 
 **In scope:** `include/u8g2gl/u8g2gl_obj.h`, `src/u8g2gl_obj.cpp` (geometry
-bindings only); `include/u8g2gl/manifests/*.xml` (`<bind>` additions only);
-`cli/src/data/manifests.json` (rebuilt); `cli/src/core/validator/validate-types.ts`,
-`validate-widget-props.ts`, `validate-geometry.ts` (the [D-20] diagnostic);
-`schema/diagnostic.ts` (new codes); tests; this WORKORDER.
+bindings only); `include/u8g2gl/manifests/*.xml` (`<bind>` additions, and removal
+of `extends` from drawing manifests and from `u8g2gl_obj.xml`);
+`cli/src/data/manifests.json` (rebuilt); `cli/src/core/manifest/` (root handling
+only); `cli/src/core/validator/` — `validate-types.ts`, `validate-widget-props.ts`,
+`validate-geometry.ts` (the [D-20] diagnostic), `validate-schema.ts` (the `extends`
+rule, F7, F11), `validate-references.ts` and `validate-identifiers.ts` (F7, F11, W5);
+`cli/src/core/schema/widget-manifest.ts` (comments only), `schema/diagnostic.ts`
+(new codes); `cli/test/manifests/manifest-crosstest.test.ts`; `cli/tsconfig*.json`
+and `cli/package.json` scripts (F6 only); tests; this WORKORDER.
 
 **Do NOT touch:** the resolver or generator (WO5+); render path (WO4); parser;
 schema vocabulary.

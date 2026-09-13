@@ -63,7 +63,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 ## Work Order Decomposition
 
 - [x] **[WO1 — manifest registry](wo1-manifest-registry/WORKORDER.md)** ✅ `6c71715` · `u8g2gl-generator/wo1-manifest-registry` · base `main` @ `f693aab` · standard · finding 1; widget/composite prop-check unification (inherited)
-- [ ] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** · base WO1 · standard · finding 2; `bind_time`, `bind_value`
+- [x] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** ✅ `33cd27b`, `0257d57` · base WO1 · standard · finding 2; `bind_time`, `bind_value`
 - [ ] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** · base WO2 · standard · finding 3
 - [ ] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** · base WO3 · standard · finding 4; runtime 0.4.0
 - **Owner checkpoint** — WO1–4 repair merged code; WO2 is the likeliest to grow
@@ -182,6 +182,65 @@ widget with no `extends` is the error the schema check already describes.
 are refused until PR-08 (decision 1), so nothing in PR-04 reads them; inheriting
 them now would decide PR-08's semantics by accident.
 
+### WO2 — complete (`33cd27b`, `0257d57`)
+
+**Verified independently:** commits only on the WO2 branch; `docs/` untouched; C++
+240 → **260**, zero warnings (one known 32-bit skip); CLI 293 → **383** starting
+from a deleted `dist/`, which is itself the proof F10 works; `tsc` clean.
+
+`bind_time` (typed `time`) and `bind_value` exist and are tested. **Every object
+binding method now returns `bool`** and a runtime test holds all thirteen to one
+pool slot and one observer, including on exhaustion — the invariant WO8 counts
+against. The cross-tests check prop setters, bind setters with subject type, bind
+types and draw-parameter order, through WO1's registry rather than a second
+`extends` walk.
+
+**F1 resolved as no move, correctly.** `u8g2gl_obj` itself declares `set_font`,
+`set_align` and both `bind_text` overloads, so by the "decide from the C++" rule
+they belong on its manifest. The real cause is C++ placement — see W2.
+
+**Testing box left unticked, accepted.** Against WO1's tip only the bind-setter
+check had a real manifest to catch; the other three found nothing wrong. The worker
+proved each non-vacuous by breaking a manifest in a throwaway worktree. That meets
+the intent.
+
+**Checked against the Chief Architect's F3 ruling (`4e4b992`):** `extends` must name
+a manifest; every class-backed built-in extends `u8g2gl_obj`.
+
+**PA decision — the worker's question 2: drawing manifests do not `extends`.**
+WO2 added `extends="u8g2gl_obj"` to the eight drawing manifests to keep the schema
+check quiet once F2 removed the parser default, and said plainly that this
+conflicts with §6.2 and §6.5. It does: a drawing element has no class ([D-18]),
+and §6.5 now states `extends` is real C++ inheritance. The ruling concerns
+class-backed elements and gives no licence to claim a class that does not exist.
+Resolved in WO3:
+
+- A `draw=`-only manifest declares **no** `extends`, and declaring one is an error.
+- `u8g2gl_obj` is the single root class manifest — the base §13.7 names as the
+  contract — and drops its self-referencing `extends`.
+- A manifest with `setter=` props and no `extends`, other than that root, is the
+  existing schema error. A composite still inherits `u8g2gl_obj` via the registry.
+
+**PA decision — the worker's question 1: draw-argument order.** This dissolves
+with question 2. Box's `radius`-before-`filled` order came from inheriting
+`u8g2gl_obj`'s style `radius`; without `extends`, the box's effective order is its
+declared order, which matches `u8g2gl_draw_box`. WO3 removes the `it.fails`
+marker, and the generator uses effective order, which for drawing elements is
+declared order. Neither alternative is needed: C++ parameters stay as they are.
+
+**Triage of W1–W8:**
+
+| # | Finding | Placed |
+|---|---|---|
+| W1 | Re-binding stacks a second observer; a failed re-bind loses the original | **Carried forward, not PR-04.** Generated code binds each attribute once per element, and the validator rejects a duplicate attribute. A hand-written-use defect; for PR-05, when an application first drives the runtime directly |
+| W2 | `font`, `align`, text binding live on `u8g2gl_obj` in C++, so every element inherits them | **Carried forward.** A standards §3 ISP concern on merged runtime, not a PR-04 defect; moving them is a runtime redesign. Reported to the Chief Architect |
+| W3 | `u8g2gl_progress_bar::set_value()` marks dirty without a change guard | **WO4** — runtime, house pattern |
+| W4 | Composites inherit `u8g2gl_obj`'s props | **Accepted, intended.** A composite realises as `u8g2gl_obj` (§13.12), so its container has those setters |
+| W5 | Comments stale after F2 in `validate-references.ts`, `schema/widget-manifest.ts` | **WO3** |
+| W6 | §6.3 lists `bind_src` (xbm), `bind_glyph` (glyph); no manifest or runtime declares them | **Chief Architect** — spec lists bindings that do not exist. Today they fail honestly as unknown attributes |
+| W7 | A full subject asserts in debug before `false` is observable | **Accepted, by design.** The header documents it; generated capacities are exact, so it cannot fire in generated code |
+| W8 | `test_subject.cpp` placeholder header, stale comment | **WO4** |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -201,6 +260,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-13 — **WO2 complete** (`33cd27b`, `0257d57`, report `400cf1b`). Verified
+  independently; two design questions answered by the PA, consistent with the Chief
+  Architect's F3 ruling on `main` @ `4e4b992`. WO3 revised and dispatched on
+  `u8g2gl-generator/wo3-bindable-geometry`.
 - 2026-09-13 — **WO1 complete** (`6c71715`, report `984aff2`). Verified independently;
   findings triaged below. WO2 revised and dispatched on
   `u8g2gl-generator/wo2-manifest-parity`.

@@ -76,6 +76,12 @@ emitters in WO9–WO10 generate calls rather than inline boilerplate.
       configure-time check).
 - [ ] **Frame-dirty observer:** a free function matching `u8g2gl_observer_cb` that
       calls `u8g2gl_mark_dirty()`.
+- [ ] **Carried from WO2 — W3:** `u8g2gl_progress_bar::set_value()` marks dirty
+      even when the value is unchanged. Apply the house change-guard; a test that a
+      same-value set leaves the frame clean.
+- [ ] **Carried from WO2 — W8:** `test/test_subject.cpp` has a placeholder file
+      header and a comment claiming binds discard their result, which WO2 made
+      untrue (they return `bool`). Correct both.
 - [ ] Document the generated-config inclusion order ([D-21]) in
       `u8g2gl_config.h`'s header comment against the real generated file name.
 
@@ -83,7 +89,7 @@ emitters in WO9–WO10 generate calls rather than inline boilerplate.
 
 **In scope:** `include/u8g2gl/u8g2gl_tree.h`, `u8g2gl_core.h`, `u8g2gl_config.h`
 (comment only), new `u8g2gl_version.h`, matching `src/` files, `CMakeLists.txt`
-(version), `test/`, this WORKORDER.
+(version), `src/u8g2gl_progress_bar.cpp` (W3 only), `test/`, this WORKORDER.
 
 **Do NOT touch:** editor types (WO11); widgets; manifests; CLI.
 
