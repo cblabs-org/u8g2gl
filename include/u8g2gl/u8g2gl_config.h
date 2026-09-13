@@ -56,9 +56,15 @@
 #define U8G2GL_MAX_STRING_LEN 32
 #endif
 
-// Override at compile time via -D flag
+// [D-20] made `x`, `y`, `width` and `height` bindable, so an element binding
+// all four geometry properties now needs a fifth slot free for `text` or
+// `hidden` — four geometry bindings are ordinary, not a worst case. Raised
+// from 4 to 8 (PR-3R WO7, [D-21]) so a hand-written element does not exhaust
+// its budget on geometry alone. The generator emits an exact per-project
+// value once it exists (PR-04); this default only covers hand-written use.
+// Override at compile time via -D flag.
 #ifndef U8G2GL_MAX_BINDINGS_PER_OBJ
-#define U8G2GL_MAX_BINDINGS_PER_OBJ 4
+#define U8G2GL_MAX_BINDINGS_PER_OBJ 8
 #endif
 
 // Override at compile time via -D flag

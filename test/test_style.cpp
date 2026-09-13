@@ -25,6 +25,11 @@ static const uint8_t dummy_font_b[] = { 0x03, 0x04 };
 // a 64-bit host (pointer 8 + two int16_t 4 + uint16_t set_mask 2 + four
 // uint8_t enums 4 + three bool 3 = 21, padded to 24). Guard against silent
 // regrowth.
+//
+// PR-3R WO2 dropped `truncate` ([D-19]: long_mode="clip" on u8g2gl_label
+// replaces it), removing one of the three bools — the packed size does not
+// shrink below 24 because the struct was already padded to its 8-byte pointer
+// alignment, so one fewer bool still rounds up to the same total.
 static_assert(sizeof(u8g2gl_style) <= 24,
               "sizeof(u8g2gl_style) grew past the WO6 Finding C packed size; "
               "check member ordering and enum base types");
@@ -39,7 +44,6 @@ TEST(Style, DefaultState) {
     EXPECT_FALSE(s.has(U8G2GL_STYLE_BORDER));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_RADIUS));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_ALIGN));
-    EXPECT_FALSE(s.has(U8G2GL_STYLE_TRUNCATE));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_FONT_MODE));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_BITMAP_MODE));
 }
@@ -58,7 +62,6 @@ TEST(Style, SetMarksFlag) {
     EXPECT_FALSE(s.has(U8G2GL_STYLE_BORDER));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_RADIUS));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_ALIGN));
-    EXPECT_FALSE(s.has(U8G2GL_STYLE_TRUNCATE));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_FONT_MODE));
     EXPECT_FALSE(s.has(U8G2GL_STYLE_BITMAP_MODE));
 }
@@ -72,7 +75,6 @@ TEST(Style, SetAllProperties) {
     s.set_border(true);
     s.set_radius(3);
     s.set_align(U8G2GL_ALIGN_RIGHT);
-    s.set_truncate(true);
     s.set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT);
     s.set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT);
 
@@ -83,7 +85,6 @@ TEST(Style, SetAllProperties) {
                              U8G2GL_STYLE_BORDER |
                              U8G2GL_STYLE_RADIUS |
                              U8G2GL_STYLE_ALIGN |
-                             U8G2GL_STYLE_TRUNCATE |
                              U8G2GL_STYLE_FONT_MODE |
                              U8G2GL_STYLE_BITMAP_MODE;
 
@@ -95,7 +96,6 @@ TEST(Style, SetAllProperties) {
     EXPECT_TRUE(s.has(U8G2GL_STYLE_BORDER));
     EXPECT_TRUE(s.has(U8G2GL_STYLE_RADIUS));
     EXPECT_TRUE(s.has(U8G2GL_STYLE_ALIGN));
-    EXPECT_TRUE(s.has(U8G2GL_STYLE_TRUNCATE));
     EXPECT_TRUE(s.has(U8G2GL_STYLE_FONT_MODE));
     EXPECT_TRUE(s.has(U8G2GL_STYLE_BITMAP_MODE));
 
@@ -106,7 +106,6 @@ TEST(Style, SetAllProperties) {
     EXPECT_TRUE(s.border);
     EXPECT_EQ(s.radius, 3);
     EXPECT_EQ(s.align, U8G2GL_ALIGN_RIGHT);
-    EXPECT_TRUE(s.truncate);
     EXPECT_EQ(s.font_mode, U8G2GL_FONT_MODE_TRANSPARENT);
     EXPECT_EQ(s.bitmap_mode, U8G2GL_BITMAP_MODE_TRANSPARENT);
 }
@@ -128,7 +127,6 @@ TEST(Style, Clear) {
     EXPECT_FALSE(s.border);
     EXPECT_EQ(s.radius, 0);
     EXPECT_EQ(s.align, U8G2GL_ALIGN_LEFT);
-    EXPECT_FALSE(s.truncate);
     EXPECT_EQ(s.font_mode, U8G2GL_FONT_MODE_SOLID);
     EXPECT_EQ(s.bitmap_mode, U8G2GL_BITMAP_MODE_SOLID);
     EXPECT_FALSE(s.has(U8G2GL_STYLE_FONT));

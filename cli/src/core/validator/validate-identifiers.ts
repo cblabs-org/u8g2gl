@@ -438,7 +438,10 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
       seenComponentNames.add(comp.name);
     }
 
-    for (const prop of comp.api ?? []) {
+    // `comp.api` is an ApiBlock post-WO5b (comp is a WidgetManifest, not a
+    // retired `Component`) — reach through `.props` for the same bare list
+    // this loop has always walked. No behaviour change.
+    for (const prop of comp.api?.props ?? []) {
       const propDiag = checkNameRule(prop.name, prop.loc, 'component property');
       if (propDiag) {
         diagnostics.push(propDiag);

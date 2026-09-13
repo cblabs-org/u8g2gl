@@ -8,6 +8,20 @@
  *          Per [D-17], the `<api>` manifest is the generator's build-time contract:
  *          it declares accepted properties, binding slots, and child collection elements,
  *          allowing built-in and custom widgets to be handled uniformly without generator changes.
+ *          Per [D-18] a property reaches the display through exactly one of two emission
+ *          targets — `setter=` (a method on the element's own class) or `draw=` (a free
+ *          `u8g2gl_draw_*` function for a drawing element with no class, §13.1) — and the
+ *          widget-level `animated` flag is gone: realisation is decided per instance by the
+ *          generator, not declared by the manifest.
+ *          [D-18] also removes the separate `components/`/`<component>` tier: there is one
+ *          element vocabulary, and a composite is simply a `WidgetManifest` whose `<api>`
+ *          carries a `<view>` (§6.4). WO5 folded the pre-[D-18] `Component`/`ComponentProp`
+ *          pair's *prop* half into this file; WO5b finishes the merge by retiring `Component`
+ *          itself — a composite is now literally a `WidgetManifest`, not a second interface
+ *          with the same shape. `extends` becomes optional for exactly this reason: a real
+ *          widget names the C++ class it extends, but a composite has no class of its own —
+ *          it is inlined into its constituent elements at build time (§13.4) — so nothing is
+ *          gained by inventing a placeholder value where [D-18] never asked for one.
  * Description: Immutable interfaces for WidgetManifest, ApiBlock, property definitions,
  *              binding slots, and collection element arguments.
  *
@@ -22,6 +36,7 @@
  */
 
 import type { SourceLocation } from './source-location.js';
+import type { View } from './screen.js';
 
 /**
  * Root `<widget>` descriptor model for built-in and custom C++-backed widgets (§6.4, §13.1).
@@ -29,15 +44,25 @@ import type { SourceLocation } from './source-location.js';
 export interface WidgetManifest {
   /** Widget class tag name (e.g. "u8g2gl_label", "wd_service_list"). */
   readonly name: string;
-  /** C++ base class extended by this widget (e.g. "u8g2gl_obj"). */
-  readonly extends: string;
   /**
-   * If false, licenses static demotion to inline U8G2 draw calls when no
-   * bindings, name, or focus hooks are active (§13.5).
+   * C++ base class extended by this widget (e.g. "u8g2gl_obj"). Optional
+   * because a composite (this manifest carrying a `view`, [D-18]) has no C++
+   * class of its own to extend — it is inlined into its constituent elements
+   * rather than compiled to a class. Always present on a real widget manifest;
+   * `validate-schema.ts` still enforces that for the `<widget>` path.
    */
-  readonly animated: boolean;
+  readonly extends?: string;
   /** Public API manifest defining accepted properties, bindings, and elements. */
   readonly api: ApiBlock;
+  /**
+   * Template subtree instantiated when this manifest is a composite (§6.4,
+   * [D-18]). Present if and only if the element is a composite — a plain
+   * C++-backed widget with no `<view>` leaves this undefined. This is the
+   * field that used to live on the separate, now-removed `Component` type;
+   * folding it in here is what makes a composite "just a `WidgetManifest`
+   * with a `<view>`" rather than a second concept.
+   */
+  readonly view?: View;
   /** Source location where the widget manifest was declared. */
   readonly loc?: SourceLocation;
 }
@@ -71,15 +96,31 @@ export type PropType =
   | 'color';
 
 /**
- * Widget property definition mapping an XML attribute to a C++ setter method (§13.1).
+ * Widget property definition mapping an XML attribute to its emission target (§13.1).
+ *
+ * Exactly one of `setter` and `draw` applies to a given property ([D-18]):
+ * `setter` names a method on the element's own class; `draw` names a free
+ * `u8g2gl_draw_*` function for a drawing element that has no class at all
+ * (§6.2). A manifest that specifies neither defaults to `set_<name>`, so
+ * both fields are optional on the type even though every real property
+ * resolves to one of them.
  */
 export interface PropDef {
   /** Attribute name used in XML. */
   readonly name: string;
   /** Data type of the property. */
   readonly type: PropType;
-  /** C++ setter method name called during initialization (e.g. "set_font"). */
-  readonly setter: string;
+  /**
+   * C++ setter method name called during initialization (e.g. "set_font").
+   * Mutually exclusive with `draw` — see design_spec §13.1.
+   */
+  readonly setter?: string;
+  /**
+   * Free function name handling this property via a direct draw call rather
+   * than a class setter (e.g. "u8g2gl_draw_box", §6.2). Mutually exclusive
+   * with `setter` — design_spec §13.1, [D-18].
+   */
+  readonly draw?: string;
   /** Optional default value when the attribute is omitted. */
   readonly default?: string;
   /** If true, the attribute is mandatory on every instance. */

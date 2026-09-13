@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/schema/index.ts
- * Purpose: Central barrel export for the U8G2GL schema version 0.3 document model.
+ * Purpose: Central barrel export for the U8G2GL schema version 0.4 document model.
  *          Provides the complete TypeScript type system used across parser, validator,
  *          resolver, code generator, and visual designer tooling.
  * Description: Re-exports all immutable AST types, manifest contracts, display catalogue
@@ -60,12 +60,13 @@
  *   - EventChild: Action handler attached to an element
  *   - StyleChild: Inline style reference element
  *
- * - Components (§6.3):
- *   - Component: Document model for pure-XML components
- *   - ComponentProp: Parameter declaration accepted by a component
- *
- * - Widget manifests (§6.4, §13.1):
- *   - WidgetManifest: Document model for `<widget>` API declarations
+ * - Widget manifests (§6.4, §13.1) — also the composite model (§6.3, §6.4):
+ *   - WidgetManifest: Document model for `<widget>` API declarations. Carries
+ *     an optional `view` for the composite case ([D-18]). WO5b retired the
+ *     separate `Component`/`ComponentProp` pair: a composite is now literally
+ *     a `WidgetManifest` whose `<api>` carries a `view`, not a second type
+ *     with the same shape — see widget-manifest.ts for why `extends` is
+ *     optional as a result.
  *   - ApiBlock: Public API declaration block
  *   - PropType: Widget property data type union
  *   - PropDef: Property descriptor mapping to C++ setter method
@@ -135,11 +136,6 @@ export type {
   EventChild,
   StyleChild,
 } from './widget-node.js';
-
-export type {
-  Component,
-  ComponentProp,
-} from './component.js';
 
 export type {
   WidgetManifest,

@@ -17,7 +17,6 @@ import {
   parseProjectFile,
   parseScreenFile,
   parseGlobalsFile,
-  parseComponentFile,
   parseWidgetManifestFile,
 } from '../../src/core/parser/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
@@ -69,7 +68,7 @@ describe('Parser Error Handling & Diagnostics', () => {
   });
 
   it('detects missing setup attribute on hardware targets', () => {
-    const xml = `<u8g2gl schema="0.3" name="test" version="1.0">
+    const xml = `<u8g2gl schema="0.4" name="test" version="1.0">
     <targets>
         <target name="broken_target" />
     </targets>
@@ -121,16 +120,26 @@ describe('Parser Error Handling & Diagnostics', () => {
     expect(unclosed?.line).toBe(2);
   });
 
-  it('reports missing required <view> element in components', () => {
-    const xml = `<component name="no_view"><api></api></component>`;
-    const result = parseComponentFile(xml, 'comp.xml');
+  it('reports a <component> root as a hard error naming the [D-18] migration, not a generic mismatch (PR-3R WO9)', () => {
+    // §15.4: '<component>' is removed in schema 0.4. This must be a named,
+    // diagnosable error — not a silently-accepted tag and not a generic
+    // "unexpected root element" message a migrating author has to decode.
+    const xml = `<component name="status_bar"><api></api><view></view></component>`;
+    const result = parseWidgetManifestFile(xml, 'status_bar.xml');
     expect(result.value).toBeUndefined();
-    const missingView = result.diagnostics.find(
-      (d) =>
-        d.code === DIAGNOSTIC_CODES.MISSING_REQUIRED &&
-        d.message.includes('<view>'),
+
+    const removed = result.diagnostics.find(
+      (d) => d.code === DIAGNOSTIC_CODES.MALFORMED_XML,
     );
-    expect(missingView).toBeDefined();
+    expect(removed).toBeDefined();
+    // Assert on message *content*, per the WORKORDER testing requirement — a
+    // test only checking the diagnostic code would pass against the generic
+    // "expected <widget>, found <component>" message this specific diagnostic
+    // exists to replace.
+    expect(removed?.message).toContain("'<component>' is removed");
+    expect(removed?.message).toContain("'<widget>'");
+    expect(removed?.message).toContain("'<view>'");
+    expect(removed?.message).toContain("'components/x/' to 'widgets/x/'");
   });
 
   it('reports missing required attributes on widget manifests', () => {

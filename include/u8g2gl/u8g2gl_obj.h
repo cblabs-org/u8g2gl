@@ -33,6 +33,7 @@
  *
  *     Geometry:
  *     - set_coords():        Position and size in device pixels
+ *     - set_x/y/w/h():       Per-axis setters, for binding a single axis
  *     - get_x/y/w/h():       Individual accessors
  *
  *     Visibility & flags:
@@ -77,12 +78,56 @@ public:
      * and nothing recomputes them at runtime. The parent relationship affects
      * clipping and visibility only (see u8g2gl_tree.h), never position.
      *
+     * Marks the frame dirty if any of the four values actually changes.
+     *
      * @param x Left edge.
      * @param y Top edge.
      * @param w Width; the element occupies x .. x+w-1 inclusive.
      * @param h Height; the element occupies y .. y+h-1 inclusive.
      */
     void set_coords(int16_t x, int16_t y, int16_t w, int16_t h);
+
+    /**
+     * @brief Set the left edge alone, in device pixels.
+     *
+     * Exists so a `bind_width`-style observer bound to a single geometry
+     * subject ([D-20]) has a setter to call — it receives one value and has
+     * nothing sensible to pass for the other three axes that set_coords()
+     * requires. Marks the frame dirty if the value actually changes.
+     *
+     * @param x Left edge.
+     */
+    void set_x(int16_t x);
+
+    /**
+     * @brief Set the top edge alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param y Top edge.
+     */
+    void set_y(int16_t y);
+
+    /**
+     * @brief Set the width alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param w Width; the element occupies x .. x+w-1 inclusive.
+     */
+    void set_w(int16_t w);
+
+    /**
+     * @brief Set the height alone, in device pixels.
+     *
+     * See set_x() for why a per-axis setter exists ([D-20]). Marks the frame
+     * dirty if the value actually changes.
+     *
+     * @param h Height; the element occupies y .. y+h-1 inclusive.
+     */
+    void set_h(int16_t h);
 
     int16_t get_x() const;  ///< @brief Left edge in device pixels.
     int16_t get_y() const;  ///< @brief Top edge in device pixels.
@@ -117,9 +162,27 @@ public:
     bool has_flag(uint8_t flag) const;
 
     // Convenience wrappers over the two flags widgets use most
-    void set_hidden(bool h);      ///< @brief Set or clear U8G2GL_FLAG_HIDDEN.
+    /**
+     * @brief Set or clear U8G2GL_FLAG_HIDDEN.
+     *
+     * Public API called imperatively (`obj->set_hidden(true)`), not only via a
+     * binding — so unlike the flag-binding path, nothing else guarantees a
+     * repaint here. Marks the frame dirty if the flag's value actually changes.
+     *
+     * @param h true to hide the object, false to show it.
+     */
+    void set_hidden(bool h);
     bool is_hidden() const;       ///< @brief This object's own hidden flag; ignores ancestors.
-    void set_disabled(bool d);    ///< @brief Set or clear U8G2GL_FLAG_DISABLED.
+
+    /**
+     * @brief Set or clear U8G2GL_FLAG_DISABLED.
+     *
+     * Public API called imperatively, same reasoning as set_hidden(). Marks the
+     * frame dirty if the flag's value actually changes.
+     *
+     * @param d true to disable the object, false to enable it.
+     */
+    void set_disabled(bool d);
     bool is_disabled() const;     ///< @brief This object's own disabled flag.
 
     // --- Parent index ---
@@ -130,6 +193,14 @@ public:
      * The hierarchy is a flat array with one parent index per object rather than
      * a tree — see the design note in u8g2gl_tree.h for why. Generated code sets
      * this during init; U8G2GL_NO_PARENT marks a root.
+     *
+     * Marks the frame dirty if the index actually changes — reparenting affects
+     * effective visibility and clipping (u8g2gl_tree.h), so it is a mutator that
+     * changes what is drawn just as much as set_hidden() is (§11.2). This gap
+     * was latent rather than live (generated init() code sets this once, before
+     * the first frame), but PR-3R WO2 closes it anyway: WO1 established the rule
+     * for every such mutator, and an undocumented exception here would read as
+     * an oversight.
      *
      * @param idx Index of the parent within the same screen's object array, or
      *            U8G2GL_NO_PARENT for a top-level element.
@@ -227,10 +298,30 @@ public:
     u8g2gl_subject_type_t get_bound_text_type() const;
 
     // --- Style (§10, §13.7) ---
+
+    /**
+     * @brief Layer a named style's explicitly-set properties over this object's
+     *        resolved style.
+     *
+     * Changes everything the style sets at once, so — like the setters below —
+     * this marks the frame dirty whenever the resulting resolved style actually
+     * differs from what it was before the merge. Re-applying an identical style
+     * (a generated screen re-running init(), or a rebind to an unchanged named
+     * style) is therefore not a repaint.
+     *
+     * @param style Style to merge in; only its explicitly-set properties apply.
+     */
     void apply_style(const u8g2gl_style& style);
     const u8g2gl_style& get_resolved_style() const;
 
-    // Individual style setters that generated code calls as inline overrides:
+    // Individual style setters that generated code calls as inline overrides.
+    // Each delegates to the embedded u8g2gl_style and marks the frame dirty,
+    // guarded on the value actually changing — the same change-guard pattern
+    // WO1 established for geometry and flags (§11.2). This was a live defect,
+    // not a latent one: before PR-3R WO2 these called the style setter and
+    // returned, so changing a font, colour, padding or alignment at runtime
+    // produced no repaint on a static screen (surfaced by the Chief Architect
+    // after WO1 — see PROJECT.md).
     void set_font(const uint8_t* font);
     void set_draw_color(u8g2gl_color_t c);
     void set_invert(bool v);
@@ -238,7 +329,6 @@ public:
     void set_border(bool b);
     void set_radius(int16_t r);
     void set_align(u8g2gl_align_t a);
-    void set_truncate(bool t);
     void set_font_mode(u8g2gl_font_mode_t m);
     void set_bitmap_mode(u8g2gl_bitmap_mode_t m);
 

@@ -25,6 +25,7 @@
  * - u8g2gl_color_t: Draw color (0, 1, XOR)
  * - u8g2gl_font_mode_t: Font rendering mode
  * - u8g2gl_bitmap_mode_t: Bitmap rendering mode
+ * - u8g2gl_long_mode_t: Label overflow behaviour ([D-19])
  * - u8g2gl_event_t: Event types for focus/input
  */
 #ifndef U8G2GL_TYPES_H
@@ -66,6 +67,24 @@ enum u8g2gl_font_mode_t : uint8_t {
 enum u8g2gl_bitmap_mode_t : uint8_t {
     U8G2GL_BITMAP_MODE_SOLID = 0,
     U8G2GL_BITMAP_MODE_TRANSPARENT = 1
+};
+
+// u8g2gl_label overflow behaviour ([D-19], design_spec.md §6.3). Replaces the
+// deleted `truncate` bool and the deleted u8g2gl_scrolling_label widget — one
+// enum property expresses what used to need a second class.
+//
+// `wrap` is deliberately NOT offered, unlike LVGL's long_mode. U8G2GL labels
+// are single-line by design (no runtime layout pass, [D-7]); a user arriving
+// from LVGL Pro will look for it, so the omission is documented here rather
+// than left to be discovered as a missing enumerator.
+//
+// Enumerator spelling matches the manifest's `emit="U8G2GL_LONG_{VALUE^^}"`
+// (design_spec.md §13.7) — U8G2GL_LONG_*, not U8G2GL_LONG_MODE_*.
+enum u8g2gl_long_mode_t : uint8_t {
+    U8G2GL_LONG_CLIP = 0,      ///< Hard clip at the widget bounds. Default.
+    U8G2GL_LONG_DOTS,          ///< Truncate with an ellipsis when text overflows.
+    U8G2GL_LONG_SCROLL,        ///< Marquee; see u8g2gl_label::set_long_mode().
+    U8G2GL_LONG_SCROLL_CIRCULAR, ///< Marquee that never signals a finished cycle.
 };
 
 // Inline helper

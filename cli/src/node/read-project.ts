@@ -7,9 +7,14 @@
  * Purpose: Discovers and loads all XML source documents for a U8G2GL project
  *          from the local filesystem according to standard project layout conventions.
  * Description: Reads the project manifest (u8g2gl.xml), global symbol declarations (globals.xml),
- *              screen views (screens/screen_*.xml), reusable components (components/[name]/[name].xml),
- *              and custom widget manifests (widgets/[name]/[name].xml). Throws a descriptive error
- *              if the root u8g2gl.xml is missing.
+ *              screen views (screens/screen_*.xml), and widget manifests
+ *              (widgets/[name]/[name].xml) — both plain widgets and composites, since [D-18]
+ *              leaves one element vocabulary and a composite is simply a widget manifest
+ *              carrying a `<view>`. Throws a descriptive error if the root u8g2gl.xml is
+ *              missing, and — PR-3R WO9 — throws the same kind of descriptive error if a
+ *              `components/` directory exists at all: that layout was removed in schema 0.4
+ *              ([D-18], design_spec §15.4), and a silently-ignored directory would leave a
+ *              migrating author's composites simply missing with no explanation.
  *
  * Exports:
  * - ProjectFileEntry: Paired relative filename and XML content
@@ -20,6 +25,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { COMPONENT_REMOVED_MIGRATION } from '../core/parser/parse-widget-manifest.js';
 
 /**
  * An XML file loaded from a project directory, preserving its relative path.
@@ -41,9 +47,10 @@ export interface ProjectFiles {
   readonly globalsXml: string;
   /** Discovered screen definition files (screens/screen_*.xml). */
   readonly screenXmls: readonly ProjectFileEntry[];
-  /** Discovered reusable component files (components/[name]/[name].xml). */
-  readonly componentXmls: readonly ProjectFileEntry[];
-  /** Discovered widget manifest files (widgets/[name]/[name].xml). */
+  /**
+   * Discovered widget manifest files (widgets/[name]/[name].xml) — both plain
+   * widgets and composites (a `<widget>` carrying a `<view>`, [D-18]).
+   */
   readonly widgetManifestXmls: readonly ProjectFileEntry[];
 }
 
@@ -54,12 +61,14 @@ export interface ProjectFiles {
  * - `u8g2gl.xml` at project root (throws if missing)
  * - `globals.xml` at project root (optional, defaults to empty string)
  * - `screens/screen_*.xml`
- * - `components/[name]/[name].xml` (or `components/*.xml`)
- * - `widgets/[name]/[name].xml` (or `widgets/*.xml`)
+ * - `widgets/[name]/[name].xml` (or `widgets/*.xml`) — plain widgets and composites alike
  *
  * @param dir Path to the project root directory.
  * @return ProjectFiles structure containing loaded XML contents.
  * @throws Error if u8g2gl.xml is not found in dir.
+ * @throws Error if a `components/` directory exists in dir (removed in schema
+ *         0.4, [D-18]; PR-3R WO9) — named rather than silently ignored, per
+ *         design_spec §15.4's diagnosability requirement.
  */
 export function readProjectFiles(dir: string): ProjectFiles {
   const projectRoot = resolve(dir);
@@ -70,6 +79,17 @@ export function readProjectFiles(dir: string): ProjectFiles {
     throw new Error(`Project file 'u8g2gl.xml' not found in: ${dir}`);
   }
   const projectXml = readFileSync(projectPath, 'utf-8');
+
+  // --- Step 1b: A components/ directory is a removed layout, not silently
+  // ignored (§15.4, [D-18], PR-3R WO9). Checked immediately after the
+  // mandatory-file check above so a migrating author gets this before any
+  // other discovery runs. ---
+  const componentsDir = join(projectRoot, 'components');
+  if (existsSync(componentsDir)) {
+    throw new Error(
+      `The 'components/' directory is removed: ${COMPONENT_REMOVED_MIGRATION}.`,
+    );
+  }
 
   // --- Step 2: Read optional globals.xml ---
   const globalsPath = join(projectRoot, 'globals.xml');
@@ -95,36 +115,7 @@ export function readProjectFiles(dir: string): ProjectFiles {
     screenXmls.sort((a, b) => a.filename.localeCompare(b.filename));
   }
 
-  // --- Step 4: Glob components/*/[name].xml ---
-  const componentsDir = join(projectRoot, 'components');
-  const componentXmls: ProjectFileEntry[] = [];
-  if (existsSync(componentsDir)) {
-    const entries = readdirSync(componentsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const subDir = join(componentsDir, entry.name);
-        const subEntries = readdirSync(subDir, { withFileTypes: true });
-        for (const subEntry of subEntries) {
-          if (subEntry.isFile() && subEntry.name.endsWith('.xml')) {
-            const fullPath = join(subDir, subEntry.name);
-            componentXmls.push({
-              filename: `components/${entry.name}/${subEntry.name}`,
-              content: readFileSync(fullPath, 'utf-8'),
-            });
-          }
-        }
-      } else if (entry.isFile() && entry.name.endsWith('.xml')) {
-        const fullPath = join(componentsDir, entry.name);
-        componentXmls.push({
-          filename: `components/${entry.name}`,
-          content: readFileSync(fullPath, 'utf-8'),
-        });
-      }
-    }
-    componentXmls.sort((a, b) => a.filename.localeCompare(b.filename));
-  }
-
-  // --- Step 5: Glob widgets/*/[name].xml ---
+  // --- Step 4: Glob widgets/*/[name].xml (plain widgets and composites alike) ---
   const widgetsDir = join(projectRoot, 'widgets');
   const widgetManifestXmls: ProjectFileEntry[] = [];
   if (existsSync(widgetsDir)) {
@@ -157,7 +148,6 @@ export function readProjectFiles(dir: string): ProjectFiles {
     projectXml,
     globalsXml,
     screenXmls,
-    componentXmls,
     widgetManifestXmls,
   };
 }
@@ -178,9 +168,6 @@ export function getProjectFileMap(projectFiles: ProjectFiles): Map<string, strin
   }
   for (const screen of projectFiles.screenXmls) {
     map.set(screen.filename, screen.content);
-  }
-  for (const component of projectFiles.componentXmls) {
-    map.set(component.filename, component.content);
   }
   for (const widget of projectFiles.widgetManifestXmls) {
     map.set(widget.filename, widget.content);

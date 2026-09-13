@@ -336,6 +336,30 @@ TEST_F(Core, ObjMarkDirtyGatesFrame) {
     EXPECT_FALSE(screen.dirty);
 }
 
+// --- PR-3R WO1: imperative set_hidden() must gate the frame same as
+// mark_dirty() does above — this is the defect itself. Before the fix, calling
+// set_hidden() on a static object left screen.dirty false and §11.2's gate
+// skipped sendBuffer(), so the display never updated.
+TEST_F(Core, ObjSetHiddenGatesFrame) {
+    U8G2 display;
+    mock_widget w;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+    u8g2gl_set_active_screen(&screen);
+
+    ui_handler(display); // Clears dirty from activation
+    EXPECT_FALSE(screen.dirty);
+    EXPECT_EQ(s_render_count, 1);
+
+    // Imperative call, not a binding — nothing else marks the frame dirty.
+    w.set_hidden(true);
+    EXPECT_TRUE(screen.dirty); // set_hidden() must gate the screen, like mark_dirty()
+
+    ui_handler(display);
+    EXPECT_EQ(s_render_count, 2);
+    EXPECT_FALSE(screen.dirty);
+}
+
 // --- Elapsed Time and Period Wrapper Tests ---
 
 TEST_F(Core, ElapsedSubtractedFromDeadline) {

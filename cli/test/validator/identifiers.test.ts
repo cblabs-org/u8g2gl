@@ -19,7 +19,7 @@ import type { Screen } from '../../src/core/schema/screen.js';
 describe('validateIdentifiers', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'id_test',
       version: '1.0.0',
       targets: [{ name: 'primary', setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C' }],
@@ -242,7 +242,7 @@ describe('validateIdentifiers', () => {
     // Screen also contains element "bar_title"
     const statusBarComponent = {
       name: 'status_bar',
-      api: [],
+      api: { props: [], bindings: [], elements: [] },
       view: {
         children: [
           {

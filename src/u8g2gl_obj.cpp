@@ -25,11 +25,53 @@
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_core.h"
 
+// Geometry setters — set_coords() and the four per-axis setters below all
+// guard mark_dirty() on the value actually changing. Without the guard, a
+// caller that re-sets an unchanged coordinate every tick (an animation, or a
+// binding observer re-notifying with the same value) would dirty the frame on
+// every call and defeat §11.2's gate — the exact cost the gate exists to
+// avoid. A real change is still marked immediately, so no repaint is lost.
 void u8g2gl_obj::set_coords(int16_t x, int16_t y, int16_t w, int16_t h) {
+    if (x == x_ && y == y_ && w == w_ && h == h_) {
+        return;
+    }
     x_ = x;
     y_ = y;
     w_ = w;
     h_ = h;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_x(int16_t x) {
+    if (x == x_) {
+        return;
+    }
+    x_ = x;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_y(int16_t y) {
+    if (y == y_) {
+        return;
+    }
+    y_ = y;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_w(int16_t w) {
+    if (w == w_) {
+        return;
+    }
+    w_ = w;
+    mark_dirty();
+}
+
+void u8g2gl_obj::set_h(int16_t h) {
+    if (h == h_) {
+        return;
+    }
+    h_ = h;
+    mark_dirty();
 }
 
 int16_t u8g2gl_obj::get_x() const {
@@ -60,24 +102,43 @@ bool u8g2gl_obj::has_flag(uint8_t flag) const {
     return (flags_ & flag) != 0;
 }
 
+// u8g2gl_obj::set_hidden
+// Live defect fix (PR-3R WO1): this is public API reachable from imperative
+// code (obj->set_hidden(true)), not only from the flag-binding path, where
+// u8g2gl_evaluate_binding() already calls mark_dirty() on every evaluation.
+// Without the guard below, hiding or showing a static object left the frame
+// dirty flag untouched, so §11.2's gate skipped sendBuffer() and the display
+// never updated.
+//   h — same value as is_hidden() would already report is a no-op: nothing
+//       visible changed, so no frame is scheduled
 void u8g2gl_obj::set_hidden(bool h) {
+    if (h == is_hidden()) {
+        return;
+    }
     if (h) {
         set_flag(U8G2GL_FLAG_HIDDEN);
     } else {
         clear_flag(U8G2GL_FLAG_HIDDEN);
     }
+    mark_dirty();
 }
 
 bool u8g2gl_obj::is_hidden() const {
     return has_flag(U8G2GL_FLAG_HIDDEN);
 }
 
+// u8g2gl_obj::set_disabled
+// Same live-defect fix and reasoning as set_hidden() above.
 void u8g2gl_obj::set_disabled(bool d) {
+    if (d == is_disabled()) {
+        return;
+    }
     if (d) {
         set_flag(U8G2GL_FLAG_DISABLED);
     } else {
         clear_flag(U8G2GL_FLAG_DISABLED);
     }
+    mark_dirty();
 }
 
 bool u8g2gl_obj::is_disabled() const {
@@ -85,7 +146,11 @@ bool u8g2gl_obj::is_disabled() const {
 }
 
 void u8g2gl_obj::set_parent_index(uint8_t idx) {
+    if (idx == parent_index_) {
+        return;
+    }
     parent_index_ = idx;
+    mark_dirty();
 }
 
 uint8_t u8g2gl_obj::get_parent_index() const {
@@ -119,56 +184,137 @@ void u8g2gl_obj::render_animation_update(U8G2& /*display*/, uint32_t /*now_ms*/)
 
 // --- Style (§10, §13.7) ---
 
+// u8g2gl_style_fields_equal
+// Field-by-field equality over the properties that actually affect rendering,
+// used only by apply_style()'s change guard below. Not memcmp: u8g2gl_style is
+// laid out for packing (WO6 Finding C), which leaves compiler-inserted padding
+// bytes between members whose contents are unspecified, so comparing the raw
+// bytes of two independently-constructed instances is not reliable even when
+// every named field matches.
+//   a, b — styles to compare
+static bool u8g2gl_style_fields_equal(const u8g2gl_style& a, const u8g2gl_style& b) {
+    return a.font == b.font &&
+           a.padding == b.padding &&
+           a.radius == b.radius &&
+           a.set_mask == b.set_mask &&
+           a.draw_color == b.draw_color &&
+           a.align == b.align &&
+           a.font_mode == b.font_mode &&
+           a.bitmap_mode == b.bitmap_mode &&
+           a.invert == b.invert &&
+           a.border == b.border;
+}
+
+// u8g2gl_obj::apply_style
+// Merges a named style's explicitly-set properties over the resolved style,
+// guarded on the merge actually changing anything — same change-guard pattern
+// as the geometry and flag mutators (WO1) and the setters below (WO2). Without
+// the guard, generated code re-running init() or rebinding to an unchanged
+// named style would dirty the frame every time.
+//   style — style to merge in; only its explicitly-set properties apply
 void u8g2gl_obj::apply_style(const u8g2gl_style& style) {
+    u8g2gl_style before = style_;
     style_.merge_from(style);
+    if (!u8g2gl_style_fields_equal(before, style_)) {
+        mark_dirty();
+    }
 }
 
 const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
     return style_;
 }
 
-// The style setters below are one-line delegations to the embedded u8g2gl_style.
-// They exist so generated code can emit an inline override without constructing
-// a whole style object, and carry no logic of their own — their contracts are on
-// the declarations in u8g2gl_obj.h.
+// The style setters below delegate to the embedded u8g2gl_style, each guarded
+// on the call actually changing something before marking the frame dirty —
+// the same change-guard pattern WO1 established for geometry and flags.
+// Without the guard, a setter re-applied every tick (an animation, or a
+// binding observer re-notifying with an unchanged value) would dirty the
+// frame on every call and defeat §11.2's gate; a real change is still marked
+// immediately, so no repaint is lost.
+//
+// The guard checks style_.has(PROP) as well as the value: a property's value
+// can equal the struct's default (e.g. align defaulting to LEFT) without ever
+// having been explicitly set, and u8g2gl_button and the label's scroll render
+// path both branch on has(U8G2GL_STYLE_ALIGN) to tell "explicitly LEFT" apart
+// from "never specified" (Button.RenderAlignmentOverride caught a
+// value-only guard skipping the mask update entirely). Comparing the value
+// alone would therefore have been a second, self-inflicted correctness bug
+// while fixing the first one.
+//
+// This was a live defect, not a latent one: before PR-3R WO2 these called the
+// style setter and returned, so changing a font, colour, padding or alignment
+// at runtime produced no repaint on a static screen (surfaced by the Chief
+// Architect after WO1 — see PROJECT.md).
 void u8g2gl_obj::set_font(const uint8_t* font) {
+    if (style_.has(U8G2GL_STYLE_FONT) && font == style_.font) {
+        return;
+    }
     style_.set_font(font);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_draw_color(u8g2gl_color_t c) {
+    if (style_.has(U8G2GL_STYLE_DRAW_COLOR) && c == style_.draw_color) {
+        return;
+    }
     style_.set_draw_color(c);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_invert(bool v) {
+    if (style_.has(U8G2GL_STYLE_INVERT) && v == style_.invert) {
+        return;
+    }
     style_.set_invert(v);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_padding(int16_t p) {
+    if (style_.has(U8G2GL_STYLE_PADDING) && p == style_.padding) {
+        return;
+    }
     style_.set_padding(p);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_border(bool b) {
+    if (style_.has(U8G2GL_STYLE_BORDER) && b == style_.border) {
+        return;
+    }
     style_.set_border(b);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_radius(int16_t r) {
+    if (style_.has(U8G2GL_STYLE_RADIUS) && r == style_.radius) {
+        return;
+    }
     style_.set_radius(r);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_align(u8g2gl_align_t a) {
+    if (style_.has(U8G2GL_STYLE_ALIGN) && a == style_.align) {
+        return;
+    }
     style_.set_align(a);
-}
-
-void u8g2gl_obj::set_truncate(bool t) {
-    style_.set_truncate(t);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_font_mode(u8g2gl_font_mode_t m) {
+    if (style_.has(U8G2GL_STYLE_FONT_MODE) && m == style_.font_mode) {
+        return;
+    }
     style_.set_font_mode(m);
+    mark_dirty();
 }
 
 void u8g2gl_obj::set_bitmap_mode(u8g2gl_bitmap_mode_t m) {
+    if (style_.has(U8G2GL_STYLE_BITMAP_MODE) && m == style_.bitmap_mode) {
+        return;
+    }
     style_.set_bitmap_mode(m);
+    mark_dirty();
 }
 
 // ---------------------------------------------------------------------------

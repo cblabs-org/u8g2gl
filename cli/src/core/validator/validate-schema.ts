@@ -9,7 +9,12 @@
  * Description: Checks that all required attributes are present across project,
  *              globals, screens, components, and widget manifests. Validates that
  *              attribute values match expected primitive types and enum sets.
- *              Enforces schema version "0.3".
+ *              Enforces schema version "0.4", refusing the superseded "0.3"
+ *              with a specific migration diagnostic rather than a generic
+ *              mismatch (§15.4, PR-3R WO8). Also enforces the 254-object
+ *              structural ceiling per screen ([A-3], [D-21], PR-3R WO7) — a
+ *              hard error, not a tunable, since it comes from `parent_index_`
+ *              being a `uint8_t`.
  *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
@@ -18,10 +23,45 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropType } from '../schema/widget-manifest.js';
+import type { PropType, WidgetManifest } from '../schema/widget-manifest.js';
+import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
-const VALID_SCHEMA_VERSION = '0.3';
+const VALID_SCHEMA_VERSION = '0.4';
+
+/**
+ * The §15.4 migration table for the one superseded schema version this CLI
+ * still recognises by name. Each entry is a change landed by PR-3R (WO1–WO7)
+ * that a `schema="0.3"` project must apply verbatim; the refusal path below
+ * renders these into a single diagnostic message so the break is described,
+ * not just detected.
+ *
+ * design_spec §15.4 is the source of truth for this table; do not edit the
+ * wording here without also updating there; they document the same contract
+ * from two directions (spec: normative table, code: enforcement).
+ */
+const SCHEMA_0_3_MIGRATIONS: readonly string[] = [
+  "'<component>' is removed: use '<widget>' with a '<view>', and move " +
+    "'components/x/' to 'widgets/x/' ([D-18])",
+  "the 'components/' directory is removed: use one 'widgets/' directory " +
+    'for all user elements ([D-18])',
+  "'truncate' is removed: use long_mode=\"clip\" ([D-19])",
+  "'<u8g2gl_scrolling_label>' is removed: use " +
+    '\'<u8g2gl_label long_mode="scroll_circular">\' — the old widget wrapped ' +
+    "continuously, which is 'scroll_circular'; 'scroll' reverses at each end " +
+    'and is not what that widget did ([D-19])',
+  "'animated' is removed from manifests: delete the attribute; realisation " +
+    'is per instance ([D-18])',
+  "manifest 'setter=' naming a U8G2 call becomes 'draw=' naming a runtime " +
+    'free function ([D-18])',
+];
+
+/**
+ * Structural object ceiling ([A-3], [D-21]). `parent_index_` is a `uint8_t`
+ * and `U8G2GL_NO_PARENT` consumes one value, so a screen can hold at most
+ * this many objects — a property of the object model, not a tunable.
+ */
+const MAX_OBJECTS_PER_SCREEN = 254;
 
 const VALID_PROP_TYPES: ReadonlySet<PropType> = new Set([
   'int',
@@ -57,6 +97,53 @@ const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   '270',
 ]);
 
+/**
+ * Counts the elements a screen's tree structurally contributes toward the
+ * 254-object ceiling ([A-3]).
+ *
+ * This is a conservative over-count, not the generator's future exact
+ * accounting (PR-04's half of [D-21]): every ordinary widget node counts as
+ * one, even a `draw=`-only primitive that will ultimately compile to a free
+ * function and consume no object slot at all (design_spec.md line ~246). A
+ * composite instantiation (found in `composites`) is not itself counted —
+ * [D-18] inlines it, so its own template's children are counted in its place
+ * — which is what actually lands in the generated object array. Counting
+ * every ordinary node can only over-flag a screen relative to the
+ * generator's later, more precise count; it can never miss a real overflow,
+ * which is the property this hard error exists to guarantee before PR-04
+ * exists to compute the exact figure.
+ *
+ * Composite cycles are guarded against here independently of Pass 2's own
+ * cycle detector (`validateReferences`), since Pass 1 runs first and a cycle
+ * would otherwise recurse forever; `visiting` breaks the loop and lets the
+ * dedicated diagnostic in Pass 2 report it properly.
+ */
+function countScreenObjects(
+  nodes: readonly WidgetNodeChild[],
+  composites: ReadonlyMap<string, WidgetManifest>,
+  visiting: ReadonlySet<string>,
+): number {
+  let count = 0;
+  for (const child of nodes) {
+    if (!('tag' in child) || typeof child.tag !== 'string') {
+      continue;
+    }
+    const composite = composites.get(child.tag);
+    if (composite) {
+      if (visiting.has(child.tag)) {
+        continue; // Cycle — reported by Pass 2, not double-counted here.
+      }
+      const nextVisiting = new Set(visiting);
+      nextVisiting.add(child.tag);
+      count += countScreenObjects(composite.view?.children ?? [], composites, nextVisiting);
+    } else {
+      count += 1;
+      count += countScreenObjects(child.children ?? [], composites, visiting);
+    }
+  }
+  return count;
+}
+
 function createDiagnostic(
   code: string,
   message: string,
@@ -85,7 +172,25 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
 
   // --- 1. Project-level schema validation ---
   if (project) {
-    if (!project.schema || project.schema !== VALID_SCHEMA_VERSION) {
+    if (project.schema === '0.3') {
+      // §15.4: 0.3 is a known-superseded version, not merely an unknown one —
+      // the CLI can name exactly what changed, so it must, rather than
+      // failing with the same generic message an unrecognised string would
+      // get. This is the refusal path the schema bump exists to justify
+      // (rules/03-versioning.md: "a bump without the migration message is a
+      // silent break wearing a version number").
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION,
+          `Schema version '0.3' is no longer supported (now '${VALID_SCHEMA_VERSION}'). ` +
+            `Required changes:\n` +
+            SCHEMA_0_3_MIGRATIONS.map((m, i) => `  ${i + 1}. ${m}`).join('\n'),
+          project.loc,
+          project.schema,
+          [VALID_SCHEMA_VERSION],
+        ),
+      );
+    } else if (!project.schema || project.schema !== VALID_SCHEMA_VERSION) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
@@ -341,6 +446,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 3. Screen schema validation ---
+  const compositeMap = new Map((components ?? []).map((c) => [c.name, c]));
   for (const screen of screens ?? []) {
     if (!screen.name) {
       diagnostics.push(
@@ -376,6 +482,23 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         }
       }
     }
+
+    // The structural object ceiling ([A-3], [D-21]): `parent_index_` is a
+    // `uint8_t` and `U8G2GL_NO_PARENT` consumes one value, so 254 objects is
+    // where the object model runs out, not a tunable a project can raise.
+    const objectCount = countScreenObjects(screen.view?.children ?? [], compositeMap, new Set());
+    if (objectCount > MAX_OBJECTS_PER_SCREEN) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.TOO_MANY_OBJECTS,
+          `Screen '${screen.name}' has ${objectCount} objects, exceeding the structural ` +
+            `ceiling of ${MAX_OBJECTS_PER_SCREEN} (parent_index_ is a uint8_t and ` +
+            `U8G2GL_NO_PARENT consumes one value).`,
+          screen.loc,
+          screen.name,
+        ),
+      );
+    }
   }
 
   // --- 4. Component schema validation ---
@@ -390,7 +513,9 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         ),
       );
     }
-    for (const prop of component.api ?? []) {
+    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
+    // not a retired `Component`) — reach through `.props`. No behaviour change.
+    for (const prop of component.api?.props ?? []) {
       if (!prop.name) {
         diagnostics.push(
           createDiagnostic(
@@ -477,13 +602,28 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           ),
         );
       }
-      if (!prop.setter) {
+      // A property reaches the display through exactly one of two emission
+      // targets ([D-18], §13.1): `setter` for a method on the element's own
+      // class, or `draw` for a free `u8g2gl_draw_*` function on a drawing
+      // element with no class. WO4 made `setter` optional and added `draw`
+      // as its alternative; requiring `setter` unconditionally here (as
+      // before WO4) meant every `draw=` prop drew a spurious diagnostic.
+      if (!prop.setter && !prop.draw) {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'setter' on prop '${prop.name}' in widget '${manifest.name}'.`,
+            `Prop '${prop.name}' in widget '${manifest.name}' must declare exactly one of 'setter' or 'draw'; neither is present.`,
             prop.loc,
             'setter',
+          ),
+        );
+      } else if (prop.setter && prop.draw) {
+        diagnostics.push(
+          createDiagnostic(
+            DIAGNOSTIC_CODES.OVERCONSTRAINED,
+            `Prop '${prop.name}' in widget '${manifest.name}' must declare exactly one of 'setter' or 'draw'; both are present.`,
+            prop.loc,
+            'setter, draw',
           ),
         );
       }

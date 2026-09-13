@@ -50,8 +50,6 @@ import {
   type EventTrigger,
   type EventChild,
   type StyleChild,
-  type Component,
-  type ComponentProp,
   type WidgetManifest,
   type ApiBlock,
   type PropType,
@@ -185,7 +183,7 @@ describe('Schema Types', () => {
       };
 
       const project: U8g2glProject = {
-        schema: '0.3',
+        schema: '0.4',
         name: 'departures-board',
         version: '1.0',
         targets,
@@ -193,7 +191,7 @@ describe('Schema Types', () => {
         loc: { file: 'u8g2gl.xml', line: 1, column: 1 },
       };
 
-      expect(project.schema).toBe('0.3');
+      expect(project.schema).toBe('0.4');
       expect(project.name).toBe('departures-board');
       expect(project.targets).toHaveLength(2);
       expect(project.targets[0]?.setup).toBe('U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI');
@@ -335,23 +333,37 @@ describe('Schema Types', () => {
     });
   });
 
-  describe('Component types (components/*/*.xml)', () => {
-    it('creates valid Component matching design_spec §6.3', () => {
-      const componentProps: readonly ComponentProp[] = [
+  describe('Composite WidgetManifest (§6.3, §6.4) — Component retired onto WidgetManifest by WO5b', () => {
+    it('creates a valid composite WidgetManifest matching design_spec §6.3', () => {
+      // `u8g2gl_scrolling_label` no longer exists (WO2 folded it into
+      // `u8g2gl_label`'s `long_mode`) — this fixture was surfaced by WO4 as
+      // still referencing the deleted tag and is corrected here.
+      const compositeProps: readonly PropDef[] = [
         { name: 'title_subject', type: 'subject' as PropType, default: 'station_name' },
         { name: 'wifi_subject', type: 'subject' as PropType, default: 'wifi_connected' },
         { name: 'width', type: 'int' as PropType, default: '#screen_width' },
         { name: 'height', type: 'int' as PropType, default: '11' },
-        { name: 'font', type: 'font' as PropType, default: 'small_9', required: true },
+        {
+          name: 'font',
+          type: 'font' as PropType,
+          default: 'small_9',
+          required: true,
+          // ComponentProp had no `help` field before WO5 merged it onto
+          // PropDef — asserted below, this is the defect the merge fixes.
+          help: 'Font used for the scrolling location label.',
+        },
       ];
 
-      const component: Component = {
+      // A composite is now literally a WidgetManifest whose `api` carries a
+      // `view` ([D-18], WO5b) — no `extends`, because it has no C++ class of
+      // its own to extend.
+      const composite: WidgetManifest = {
         name: 'status_bar',
-        api: componentProps,
+        api: { props: compositeProps, bindings: [], elements: [] },
         view: {
           children: [
             {
-              tag: 'u8g2gl_scrolling_label',
+              tag: 'u8g2gl_label',
               attributes: {
                 name: 'location',
                 x: '0',
@@ -360,6 +372,7 @@ describe('Schema Types', () => {
                 height: '$height',
                 bind_text: '$title_subject',
                 font: '$font',
+                long_mode: 'scroll',
               },
               styleOverrides: {},
               children: [],
@@ -368,10 +381,12 @@ describe('Schema Types', () => {
         },
       };
 
-      expect(component.name).toBe('status_bar');
-      expect(component.api).toHaveLength(5);
-      expect(component.api[4]?.required).toBe(true);
-      expect(component.view.children[0]?.tag).toBe('u8g2gl_scrolling_label');
+      expect(composite.name).toBe('status_bar');
+      expect(composite.extends).toBeUndefined();
+      expect(composite.api.props).toHaveLength(5);
+      expect(composite.api.props[4]?.required).toBe(true);
+      expect(composite.api.props[4]?.help).toBe('Font used for the scrolling location label.');
+      expect(composite.view?.children[0]?.tag).toBe('u8g2gl_label');
     });
   });
 
@@ -421,17 +436,27 @@ describe('Schema Types', () => {
       const manifest: WidgetManifest = {
         name: 'wd_service_list',
         extends: 'u8g2gl_widget',
-        animated: true,
         api: apiBlock,
       };
 
       expect(manifest.name).toBe('wd_service_list');
       expect(manifest.extends).toBe('u8g2gl_widget');
-      expect(manifest.animated).toBe(true);
       expect(manifest.api.props).toHaveLength(3);
       expect(manifest.api.bindings).toHaveLength(1);
       expect(manifest.api.elements).toHaveLength(1);
       expect(manifest.api.elements[0]?.args).toHaveLength(2);
+    });
+
+    it('creates a valid PropDef using draw= instead of setter= ([D-18], §6.2)', () => {
+      const boxProp: PropDef = {
+        name: 'x',
+        type: 'int' as PropType,
+        draw: 'u8g2gl_draw_box',
+        required: true,
+      };
+
+      expect(boxProp.draw).toBe('u8g2gl_draw_box');
+      expect(boxProp.setter).toBeUndefined();
     });
   });
 
@@ -471,14 +496,14 @@ describe('Schema Types', () => {
       expect(loc.file).toBe('test.xml');
 
       const project: U8g2glProject = {
-        schema: '0.3',
+        schema: '0.4',
         name: 'test',
         version: '1.0',
         targets: [],
       };
       // @ts-expect-error - readonly property cannot be reassigned
-      // project.schema = '0.4';
-      expect(project.schema).toBe('0.3');
+      // project.schema = '0.5';
+      expect(project.schema).toBe('0.4');
 
       const diag: Diagnostic = {
         code: DIAGNOSTIC_CODES.MISSING_REQUIRED,

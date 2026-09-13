@@ -23,7 +23,7 @@ import type { SourceLocation } from './source-location.js';
  * Root project descriptor model parsed from `u8g2gl.xml` per design_spec §5.1.
  */
 export interface U8g2glProject {
-  /** Schema specification version (e.g. "0.3"). */
+  /** Schema specification version (e.g. "0.4"). */
   readonly schema: string;
   /** Human-readable project identifier (e.g. "departures-board"). */
   readonly name: string;

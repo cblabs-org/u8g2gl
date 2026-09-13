@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<component name="status_bar">
+<widget name="status_bar">
     <api>
         <prop name="title" type="string" default="Title" />
         <prop name="font"  type="font"   required="true" />
@@ -7,4 +7,4 @@
     <view>
         <u8g2gl_label name="bar_label" x="0" y="0" width="128" height="12" font="$font" text="$title" />
     </view>
-</component>
+</widget>

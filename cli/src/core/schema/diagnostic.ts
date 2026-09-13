@@ -64,12 +64,32 @@ export const DIAGNOSTIC_CODES = {
   NAME_COLLISION: 'U8G2GL_NAME_COLLISION',
   INVALID_NAME: 'U8G2GL_INVALID_NAME',
   UNKNOWN_SCHEMA_VERSION: 'U8G2GL_UNKNOWN_SCHEMA_VERSION',
+  /**
+   * A project declares a schema version this CLI once supported but no
+   * longer does — `0.3`, superseded by `0.4` (design_spec §15.4, PR-3R WO8).
+   *
+   * Deliberately a distinct code from `UNKNOWN_SCHEMA_VERSION`: an unknown
+   * version (never issued) gets a generic "expected X" message, but a known
+   * superseded version gets the specific migration table, because the CLI
+   * can name exactly what changed. Collapsing the two into one code would
+   * let a consumer branch on "bad version" without ever learning there was
+   * a migration to make — the failure this diagnostic exists to prevent.
+   */
+  DEPRECATED_SCHEMA_VERSION: 'U8G2GL_DEPRECATED_SCHEMA_VERSION',
   DUPLICATE_NAME: 'U8G2GL_DUPLICATE_NAME',
   INVALID_ENUM_VALUE: 'U8G2GL_INVALID_ENUM_VALUE',
   FORMAT_MISMATCH: 'U8G2GL_FORMAT_MISMATCH',
   MALFORMED_XML: 'U8G2GL_MALFORMED_XML',
   MISSING_FILE: 'U8G2GL_MISSING_FILE',
   CIRCULAR_REFERENCE: 'U8G2GL_CIRCULAR_REFERENCE',
+  /**
+   * A screen's element tree exceeds the structural object ceiling ([A-3],
+   * [D-21]). `parent_index_` is a `uint8_t` and `U8G2GL_NO_PARENT` consumes
+   * one value, so a screen can hold at most 254 objects — this is a property
+   * of the object model, not a tunable capacity like the ones in
+   * `u8g2gl_config.h`. See `docs/decisions/d21-generated-capacities.md`.
+   */
+  TOO_MANY_OBJECTS: 'U8G2GL_TOO_MANY_OBJECTS',
 } as const;
 
 /**

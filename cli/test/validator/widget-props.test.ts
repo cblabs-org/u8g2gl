@@ -19,7 +19,7 @@ import type { Screen } from '../../src/core/schema/screen.js';
 describe('validateWidgetProps', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'widget_props_test',
       version: '1.0.0',
       targets: [],
@@ -184,5 +184,45 @@ describe('validateWidgetProps', () => {
     expect(invalidEnum).toBeDefined();
     expect(invalidEnum?.offendingText).toBe('middle');
     expect(invalidEnum?.message).toContain('Expected one of: left, center, right');
+  });
+
+  // --- Item 6: composite props previously got no enum validation at all ---
+  it('flags invalid enum value on a composite prop with U8G2GL_INVALID_ENUM_VALUE', () => {
+    const screen: Screen = {
+      name: 'screen_home',
+      view: {
+        children: [
+          {
+            tag: 'status_bar',
+            attributes: { name: 'bar', mode: 'sideways' }, // invalid: allowed is left, right
+            children: [],
+            styleOverrides: {},
+          },
+        ],
+      },
+    };
+
+    const diagnostics = validateWidgetProps({
+      ...baseInput,
+      components: [
+        {
+          name: 'status_bar',
+          api: {
+            props: [{ name: 'mode', type: 'enum', values: 'left,right', default: 'left' }],
+            bindings: [],
+            elements: [],
+          },
+          view: { children: [] },
+        },
+      ],
+      screens: [screen],
+    });
+
+    const invalidEnum = diagnostics.find(
+      (d) => d.code === DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
+    );
+    expect(invalidEnum).toBeDefined();
+    expect(invalidEnum?.offendingText).toBe('sideways');
+    expect(invalidEnum?.message).toContain('Expected one of: left, right');
   });
 });

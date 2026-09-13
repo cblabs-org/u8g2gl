@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { parseScreenFile, parseComponentFile } from '../../src/core/parser/index.js';
+import { parseScreenFile, parseWidgetManifestFile } from '../../src/core/parser/index.js';
 import type { ParseOptions } from '../../src/core/parser/index.js';
 import { validateIdentifiers } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
@@ -36,7 +36,7 @@ const GENERATE: ParseOptions = { missingNamePolicy: 'generate' };
 describe('[U-1] Element Identity', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'identity_test',
       version: '1.0.0',
       targets: [{ name: 'primary', setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C' }],
@@ -211,15 +211,15 @@ describe('[U-1] Element Identity', () => {
     expect(missingNameDiag?.message).toContain("Element <u8g2gl_box> in screen 'home' is missing a required 'name' attribute.");
   });
 
-  it('component view elements also auto-generate names and emit warnings when missing', () => {
-    const xml = `<component name="badge">
+  it('composite view elements also auto-generate names and emit warnings when missing', () => {
+    const xml = `<widget name="badge">
     <api></api>
     <view>
         <u8g2gl_label text="badge" />
     </view>
-</component>`;
+</widget>`;
 
-    const parseResult = parseComponentFile(xml, 'components/badge/badge.xml', GENERATE);
+    const parseResult = parseWidgetManifestFile(xml, 'widgets/badge/badge.xml', GENERATE);
     expect(parseResult.value).toBeDefined();
 
     const missingNameDiag = parseResult.diagnostics.find(
@@ -355,8 +355,8 @@ describe('[U-1] Element Identity', () => {
       ).toHaveLength(0);
     });
 
-    it('component views get their own document-scoped namespace', () => {
-      const xml = `<component name="badge">
+    it('composite views get their own document-scoped namespace', () => {
+      const xml = `<widget name="badge">
     <api></api>
     <view>
         <u8g2gl_box name="left" x="0" y="0" width="10" height="10">
@@ -366,9 +366,9 @@ describe('[U-1] Element Identity', () => {
             <u8g2gl_label text="b" />
         </u8g2gl_box>
     </view>
-</component>`;
+</widget>`;
 
-      const parseResult = parseComponentFile(xml, 'components/badge/badge.xml', GENERATE);
+      const parseResult = parseWidgetManifestFile(xml, 'widgets/badge/badge.xml', GENERATE);
       expect(parseResult.value).toBeDefined();
 
       const comp = parseResult.value!;

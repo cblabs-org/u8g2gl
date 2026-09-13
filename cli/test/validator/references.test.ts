@@ -18,7 +18,7 @@ import type { Screen } from '../../src/core/schema/screen.js';
 describe('validateReferences', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.3',
+      schema: '0.4',
       name: 'ref_test',
       version: '1.0.0',
       targets: [],
@@ -43,12 +43,12 @@ describe('validateReferences', () => {
     components: [
       {
         name: 'status_bar',
-        api: [],
+        api: { props: [], bindings: [], elements: [] },
         view: { children: [] },
       },
       {
         name: 'battery_badge',
-        api: [],
+        api: { props: [], bindings: [], elements: [] },
         view: { children: [] },
       },
     ],
@@ -189,5 +189,207 @@ describe('validateReferences', () => {
     expect(compDiag).toBeDefined();
     expect(compDiag?.offendingText).toBe('status_baar');
     expect(compDiag?.suggestions).toContain('status_bar');
+  });
+
+  // --- Item 1: TIER1_PRIMITIVES removed — a tag validates iff a manifest ---
+  it('rejects <u8g2gl_frame>: it has no manifest and is not a hardcoded primitive', () => {
+    const screen: Screen = {
+      name: 'main_screen',
+      view: {
+        children: [
+          {
+            tag: 'u8g2gl_frame',
+            attributes: { name: 'f1' },
+            children: [],
+            styleOverrides: {},
+          },
+        ],
+      },
+    };
+
+    const diagnostics = validateReferences({ ...baseInput, screens: [screen] });
+    const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET);
+    expect(diag).toBeDefined();
+    expect(diag?.offendingText).toBe('u8g2gl_frame');
+  });
+
+  it.each(['u8g2gl_ellipse', 'u8g2gl_pixel', 'u8g2gl_triangle', 'u8g2gl_xbm'])(
+    'still validates %s once a manifest declares it',
+    (tag) => {
+      const screen: Screen = {
+        name: 'main_screen',
+        view: {
+          children: [
+            { tag, attributes: { name: 'el1' }, children: [], styleOverrides: {} },
+          ],
+        },
+      };
+
+      const diagnostics = validateReferences({
+        ...baseInput,
+        screens: [screen],
+        widgetManifests: [
+          ...baseInput.widgetManifests,
+          {
+            name: tag,
+            extends: 'u8g2gl_obj',
+            api: { props: [], bindings: [], elements: [] },
+          },
+        ],
+      });
+
+      expect(
+        diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET),
+      ).toBe(false);
+    },
+  );
+
+  // --- Item 2: a misspelled element inside a composite's own template ---
+  it('flags a misspelled element tag nested inside a composite template', () => {
+    const diagnostics = validateReferences({
+      ...baseInput,
+      components: [
+        {
+          name: 'status_bar',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              {
+                tag: 'u8g2gl_labl', // typo for u8g2gl_label
+                attributes: { name: 'inner' },
+                children: [],
+                styleOverrides: {},
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET);
+    expect(diag).toBeDefined();
+    expect(diag?.offendingText).toBe('u8g2gl_labl');
+  });
+
+  // --- Item 3: composite instantiation cycles, direct and transitive ---
+  it('reports a direct self-cycle (A -> A) naming the path', () => {
+    const diagnostics = validateReferences({
+      ...baseInput,
+      components: [
+        {
+          name: 'a',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              { tag: 'a', attributes: { name: 'self' }, children: [], styleOverrides: {} },
+            ],
+          },
+        },
+      ],
+    });
+
+    const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.CIRCULAR_REFERENCE);
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain('a -> a');
+  });
+
+  it('reports an indirect cycle (A -> B -> A) naming the full path, once', () => {
+    const diagnostics = validateReferences({
+      ...baseInput,
+      components: [
+        {
+          name: 'a',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              { tag: 'b', attributes: { name: 'child_b' }, children: [], styleOverrides: {} },
+            ],
+          },
+        },
+        {
+          name: 'b',
+          api: { props: [], bindings: [], elements: [] },
+          view: {
+            children: [
+              { tag: 'a', attributes: { name: 'child_a' }, children: [], styleOverrides: {} },
+            ],
+          },
+        },
+      ],
+    });
+
+    const cycleDiags = diagnostics.filter(
+      (d) => d.code === DIAGNOSTIC_CODES.CIRCULAR_REFERENCE,
+    );
+    expect(cycleDiags).toHaveLength(1);
+    expect(cycleDiags[0]?.message).toContain('a -> b -> a');
+  });
+
+  // --- PR-3R WO7: image-ness derived from the manifest, not a hardcoded tag
+  // list. `u8g2gl_bitmap` and `u8g2gl_icon` never had manifests; only
+  // `u8g2gl_xbm` does, via a `type="image"` prop named `src`. ---
+  describe('image references derived from the manifest', () => {
+    it('rejects <u8g2gl_bitmap> as an unknown widget rather than checking it for an image', () => {
+      const screen: Screen = {
+        name: 'main_screen',
+        view: {
+          children: [
+            {
+              tag: 'u8g2gl_bitmap',
+              attributes: { name: 'bmp', src: 'nonexistent.xbm' },
+              children: [],
+              styleOverrides: {},
+            },
+          ],
+        },
+      };
+
+      const diagnostics = validateReferences({ ...baseInput, screens: [screen] });
+
+      const widgetDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET);
+      expect(widgetDiag).toBeDefined();
+      expect(widgetDiag?.offendingText).toBe('u8g2gl_bitmap');
+
+      // No manifest means no `type="image"` prop to derive image-ness from,
+      // so the unknown `src` value produces no separate UNKNOWN_IMAGE noise
+      // on top of the UNKNOWN_WIDGET diagnostic that already names the defect.
+      expect(diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_IMAGE)).toBe(false);
+    });
+
+    it("still checks u8g2gl_xbm's image reference via its manifest's type=\"image\" prop", () => {
+      const xbmManifest = {
+        name: 'u8g2gl_xbm',
+        extends: 'u8g2gl_obj',
+        api: {
+          props: [{ name: 'src', type: 'image' as const, setter: 'set_src' }],
+          bindings: [],
+          elements: [],
+        },
+      };
+
+      const screen: Screen = {
+        name: 'main_screen',
+        view: {
+          children: [
+            {
+              tag: 'u8g2gl_xbm',
+              attributes: { name: 'icon', src: 'icon_missing' },
+              children: [],
+              styleOverrides: {},
+            },
+          ],
+        },
+      };
+
+      const diagnostics = validateReferences({
+        ...baseInput,
+        screens: [screen],
+        widgetManifests: [...baseInput.widgetManifests, xbmManifest],
+      });
+
+      const imageDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_IMAGE);
+      expect(imageDiag).toBeDefined();
+      expect(imageDiag?.offendingText).toBe('icon_missing');
+    });
   });
 });

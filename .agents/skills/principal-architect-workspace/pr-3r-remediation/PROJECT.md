@@ -28,14 +28,17 @@ serially. PR head is the last branch in the stack.
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
-- [ ] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** · base WO1 · standard · R1.3, R3.1, R3.2
-- [ ] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** · base WO2 · standard · new work, required by WO4
-- [ ] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** · base WO3 · standard · R2.5, R3.3, R3.4
-- [ ] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** · base WO4 · standard · R2.1
-- [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5 · standard · R2.2, R2.3, R2.4
-- [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
-- [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
+- [x] **[WO1 — dirty-flag correctness and per-axis geometry](wo1-dirty-geometry/WORKORDER.md)** ✅ `4ca9e01` · `u8g2gl-remediation/wo1-dirty-geometry` · base `main` · standard · R1.1, R1.2
+- [x] **[WO2 — label `long_mode` absorbs `u8g2gl_scrolling_label`](wo2-label-long-mode/WORKORDER.md)** ✅ `4e649cf` · base WO1 · standard · R1.3, R3.1, R3.2
+- [x] **[WO2b — reversing scroll](wo2b-scroll-semantics/WORKORDER.md)** ✅ `217473c` · base WO2 · standard · defect surfaced by WO2 (PA-added)
+- [x] **[WO3 — `u8g2gl_draw_*` free functions](wo3-draw-functions/WORKORDER.md)** ✅ `b13bdff` · base WO2b · standard · new work, required by WO4
+- [x] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** ✅ `07cfd2d` · base WO3 · standard · defects surfaced by WO3 (PA-added)
+- [x] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** ✅ `ac02684` · base WO3b · standard · R2.5, R3.3, R3.4
+- [x] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** ✅ `2bd7082` · base WO4 · standard · R2.1 — *prop half only*
+- [x] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** ✅ `00651d7` · base WO5 · standard · finishes R2.1 (PA-added)
+- [x] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** ✅ `c9cf2c8` · base WO5b · standard · R2.2, R2.3, R2.4
+- [x] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** ✅ · base WO6 · standard · [D-21]
+- [x] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** ✅ `d05f32b` · base WO7 · standard · R2.6
 
 **WO4 was re-graded `mechanical` → `standard`.** Stripping `animated` from 17
 XML files is rote, but the same work order changes `widget-manifest.ts`, the
@@ -116,3 +119,465 @@ recorded in WO8's boundary box.
 - 2026-09-12 — Decomposition drafted by the Chief Architect. [D-21] recorded in
   `docs/decisions/d21-generated-capacities.md`, design_spec §3/§13.7/§18.1, and
   the plan ledger as PR-3R.
+
+- [x] **[WO9 — remove the component vocabulary, pay down debt](wo9-component-removal/WORKORDER.md)** ✅ `a184253` · base WO8 · standard · owner-directed
+
+### WO1 — complete (`4ca9e01`)
+
+Verified independently: boundary respected exactly, C++ 166 → **175 tests**, zero
+warnings, CLI 224 untouched. `set_coords`, `set_hidden`, `set_disabled` and the
+four new per-axis setters all mark dirty, each guarded on the value actually
+changing so a setter called from a tick loop cannot defeat §11.2's gate.
+
+**Cross-cutting decision — the change-guard is now the house pattern.** WO1
+applied it consistently rather than only to the new setters. Later work orders
+match it rather than inventing a second idiom.
+
+**Correct by design, deliberately not "fixed":** `set_flag`/`clear_flag` do not
+auto-mark, because `clear_dirty()` *is* `clear_flag(DIRTY)` and would immediately
+re-set the flag it clears. Good catch by the worker — a mechanical application of
+the rule would have broken the gate.
+
+**Surfaced and triaged into WO2:** eleven more instances of the same defect — nine
+style delegations, `apply_style()`, and `set_parent_index()`. Verified:
+`set_font()` calls `style_.set_font()` and returns, so a runtime font change never
+repaints. Folded into WO2 rather than given its own order because WO2 already
+edits that delegation block to delete `set_truncate`; separating them means
+touching the same lines twice.
+
+### WO2 — complete (`4e649cf`)
+
+Verified: C++ 175 → **207 tests**, zero warnings, boundary respected.
+`u8g2gl_scrolling_label` deleted, `truncate` gone from style and obj, and the
+eleven surfaced `mark_dirty()` gaps fixed.
+
+**The worker improved on the pattern it was told to copy.** WO1's guard compares
+the value; for style setters that broke `Button.RenderAlignmentOverride`, because
+setting `align` to its already-default value must still update the style's
+set_mask. The guard now checks `style_.has(PROP)` as well. Caught by an existing
+test, documented at the guard site, regression test added. This is the right
+failure mode — the suite caught a plausible-looking generalisation.
+
+**Cost correction.** `sizeof(u8g2gl_label)` is **80 bytes** on a 64-bit host, not
+the 72 that [D-19]'s +16 estimate implied — the real delta is +24, from
+`long_mode_` and an `overflow_` flag neither old class had. [D-19]'s cost section
+is amended rather than left standing, per §1.3.
+
+### Spec defect found by WO2 — resolved, and WO2b added
+
+The worker flagged that design_spec contradicted itself: the semantics table says
+`scroll` reverses at each end, while §15.4's migration table mapped the old
+`u8g2gl_scrolling_label` onto `scroll`. Checked the deleted source — it wrapped
+continuously ("wrap to re-enter smoothly from the right edge"), which is
+`scroll_circular`.
+
+**The migration table was the error.** Corrected in design_spec §15.4 and in the
+[D-19] record. The semantics table stands: it matches LVGL exactly, and §1.4
+makes that familiarity a goal.
+
+The worker followed the migration table as instructed, so `scroll` currently
+wraps and **nothing implements reversing**. That is a defect against [D-19],
+tracked as **WO2b**, inserted between WO2 and WO3. Redefining `scroll` as
+wrapping was considered and rejected — it diverges from LVGL silently, on the
+identifier an LVGL user is most likely to reach for, which is worse than a
+missing mode.
+
+The worker was right to flag this rather than invent bounce timing no document
+specified.
+
+### PA repair — the stack was left red
+
+WO2's deletion of the scrolling-label manifest broke
+`manifest-crosstest.test.ts`'s "at least 17 manifest files" assertion, correctly
+outside its boundary. Fixed by the PA rather than deferred to WO4, because
+leaving a red suite across WO2b and WO3 invites the next worker to either "fix"
+it out of scope or wonder whether they caused it.
+
+Fixed by removing the magic count rather than decrementing it to 16. The
+assertion's real purpose is guarding against a **vacuous suite** — if the
+manifest path resolves wrong, the file list is empty, the per-manifest loop
+generates no tests, and the cross-test passes while checking nothing. It now
+asserts that, and stops drifting every time a manifest is legitimately added or
+removed. A hardcoded count is the same failure mode `TIER1_PRIMITIVES` already
+demonstrated.
+
+### Carried to WO4
+
+- `include/u8g2gl/manifests/u8g2gl_obj.xml` still declares the deleted
+  `truncate` / `set_truncate`
+- The label manifest's `animated="false"` is questionable under scroll modes —
+  `animated` is being deleted wholesale, so this resolves itself
+
+### WO2b — complete (`217473c`)
+
+Verified: 4 files, all inside the box; C++ 207 → **210 tests**; zero warnings;
+`sizeof(u8g2gl_label)` still **80 bytes** on a 64-bit host — the direction flag
+landed in existing padding and cost nothing. `scroll_circular`'s tests pass
+unchanged, which was the condition for believing its behaviour was preserved.
+
+`scroll` now reverses, dwelling at each end on the existing `static_dwell_ms`
+rather than a second timing property.
+
+**Checked rather than assumed:** with neither scrolling mode latching
+`is_scroll_finished()`, the obvious worry is that the method is now dead API. It
+is not — it still latches for the static-dwell case, so its meaning narrowed
+deliberately instead of evaporating.
+
+**Surfaced, triaged as a non-issue today:** a consumer relying on the old
+latch-on-wrap to rotate messages would break. Nothing consumes it — no generated
+code, no application — so there is nothing to break yet. Worth remembering at
+PR-05, when a real app first drives these labels.
+
+### WO3 — complete (`b13bdff`), with three defects surfaced → WO3b
+
+Eight free functions delivered, C++ 210 → **233 tests**, zero warnings, boundary
+respected. The functions are free functions with the why-comment [D-18] needs, and
+the signatures were derived from the manifests rather than invented.
+
+The worker also found real depth: `u8g2gl_draw_box` dispatches across
+`drawBox`/`drawFrame`/`drawRBox`/`drawRFrame`, and it added a segment enum
+mirroring U8G2's actual `U8G2_DRAW_*` bit values rather than approximating them.
+
+**Three surfaced defects, all verified, all going to WO3b.** The worker was right
+to surface rather than fix in each case — every one sat outside its boundary — but
+none can ship.
+
+1. **`u8g2gl_draw_ellipse` is declared with no body.** The test double has no
+   `drawEllipse`, and defining against the real U8G2 API would break the shared
+   host build. Sound reasoning, unacceptable outcome: a declared symbol that
+   cannot link, invisible only because nothing calls it — and **WO4 is about to
+   point the ellipse manifest at it**. This is the one that had to be caught now.
+2. **The test double is a no-op for six of eight primitives.** `drawHLine`,
+   `drawVLine`, `drawLine`, `drawCircle`, `drawDisc`, `drawTriangle` are empty
+   bodies, so those tests assert only "does not crash". A rendering framework
+   whose draw path is largely unverified — and the root cause of (1).
+3. **`filled` on `u8g2gl_draw_triangle` does nothing.** The manifest declares it;
+   U8G2 has no unfilled-triangle primitive, so it is silently ignored. Same class
+   of defect as `long_mode="scroll"` silently wrapping, which this PR has already
+   had to correct once.
+
+**On (3) the worker was over-cautious and I have overruled it.** It declined to
+"invent an unspecified outline algorithm" — but three lines between three vertices
+is not an invention, it is what a triangle outline is. WO3b supplies the authority
+it correctly declined to assume on its own.
+
+### WO3b — complete (`07cfd2d`)
+
+C++ 233 → **238 tests**, zero warnings, boundary respected. All three defects
+closed. Verified independently with `nm` on the built archive: all eight
+`u8g2gl_draw_*` symbols are `T` (defined), none `U`. The link landmine is gone,
+confirmed at the binary level rather than by reading the source.
+
+**The worker verified its own claim the stronger way and said why** — a source
+grep proves the declarations match the definitions, `nm` proves the linker
+agrees. That is the distinction that mattered here, since the whole defect was a
+declaration that compiled cleanly and would only have failed at final link.
+
+**One disclosed extension to the test double**, and it is the right one: the
+triangle outline issues three `drawLine` calls, which a single last-call slot
+cannot prove. It added a small indexed call history rather than a second
+mechanism — the existing idiom indexed, exactly as instructed.
+
+The draw path is now genuinely verified rather than asserted not to crash, which
+matters considerably more once PR-04 starts generating calls into it.
+
+### WO4 — complete (`ac02684`)
+
+CLI 220 → **239 tests**, C++ 238 unchanged, zero warnings. Verified: zero
+manifests carry `animated`, zero `setter="drawX"` remain, `truncate` is gone from
+`u8g2gl_obj.xml`.
+
+**The cross-test is now the good kind.** It parses `u8g2gl_draw.h` and builds the
+set of declared free functions from the header itself, then asserts every `draw=`
+value is a member — rather than checking against a hand-copied list. It also
+carries a self-check that the extractor did not silently return empty. That is
+[D-17]'s "data, not code" applied to the test as well as the generator, and it
+picked the anti-vacuous guard up from the count assertion I rewrote in WO2 rather
+than being told to.
+
+A typo'd `draw=` now fails before it ever reaches a linker.
+
+**Decision recorded — a lingering `animated` is ignored, not a parse error.** Four
+fixtures outside WO4's boundary still carry it, and erroring would fail those
+suites for a reason unrelated to their own concern. It also matches the parser's
+existing behaviour of never diagnosing unrecognised *attributes*, only
+unrecognised child elements. Consistency with the surrounding parser beats
+strictness here; regression tests pin the choice.
+
+**Three findings, all placed:**
+1. `validate-schema.ts` will emit a spurious "missing required attribute
+   'setter'" for every `draw=` prop once real manifests run the full pipeline —
+   **a defect with no failing test to announce it**. Folded into WO6, which owns
+   the validator.
+2. `types.test.ts` still names the deleted `u8g2gl_scrolling_label` — folded into
+   WO5, which is rewriting that file anyway.
+3. WO4's own prose said "17 manifests" when 16 exist. Corrected — the count was
+   stale, not the instruction.
+
+### WO5 — partially complete (`2bd7082`), remainder → WO5b
+
+CLI 239 → **240 tests**, `tsc` clean, boundary respected. `ComponentProp` is
+merged into `PropDef` and `help` now round-trips on a composite prop — the defect
+nobody had logged, with a test that fails without the fix.
+
+**`Component` itself was not retired, and the worker was right to stop.** Five
+call sites across four validator files read `comp.api` as a bare `PropDef[]` while
+a widget's props come through an `ApiBlock`. Unifying the type means unifying
+those reads, and those files were reserved for WO6.
+
+It built the literal version the checklist asked for, found it did not compile,
+and surfaced the conflict rather than either reaching into reserved files or
+picking a shape that compiled but encoded the wrong thing. That is precisely what
+a boundary box is for, and the alternative — a silent reading that happened to
+build — would have been much harder to spot in review.
+
+**My scoping error, not the worker's.** I wrote WO5 as though the merge were
+confined to the schema types. It is not: the type *is* how the validators reach
+composite props, so the merge always reached into WO6's files. The boundary was
+drawn in the wrong place and the worker found the seam.
+
+**WO5b takes the remainder and runs before WO6**, deliberately: a type migration
+and four behaviour changes in one diff is not reviewable. WO5b does the migration
+with no behaviour change; WO6 then changes behaviour on a settled shape.
+
+WO5b also deletes the `@deprecated ComponentProp` alias WO5 left behind. A
+deprecation alias buys downstream consumers time to migrate, and there are none —
+the same reasoning that rejected `--migrate`.
+
+### WO5b — complete (`00651d7`)
+
+`component.ts` deleted outright. A composite is now literally a `WidgetManifest`
+whose `api` carries a `view`, so [D-18]'s one element vocabulary is finally in the
+types rather than only in the prose. CLI **240 tests, count unchanged, assertions
+intact** — which was the safety property: a type migration needing the tests
+rewritten would have changed behaviour. C++ 238 untouched, `tsc` and lint clean.
+
+**`WidgetManifest.extends` became optional**, which is the piece I had not seen: a
+composite has no C++ class to extend because it is inlined (§13.4). Without that,
+true type identity was impossible — and it costs nothing behaviourally, since only
+real widgets are checked for it and they always supply it.
+
+Three files beyond the named boundary needed type-only fixes to compile
+(`validate.ts`, `cli.ts`, a stale doc-comment in `parser/index.ts`), all disclosed.
+That is the boundary working as intended: I told it to trust `tsc` over my
+grep-gathered list, and `tsc` found what grep missed.
+
+**Two findings, both pre-existing, both to WO6.** Putting the widget and composite
+paths side by side exposed that widget props get `INVALID_ENUM_VALUE` validation
+and composite props never have — so a bad enum in a composite's `<api>` passes
+silently. Under [D-18] there is no longer even a nominal reason for the two to
+differ. The second is latent: the composite path ignores `bindings` in its
+unknown-attribute check, harmless while that list is always empty.
+
+**Third time in this PR that unifying duplicated logic has surfaced a real
+defect** — after the manifest cross-test and the draw-layer test double. Worth
+remembering when PR-04 decides how much to share between the firmware and editor
+generation paths.
+
+### WO6 — complete (`c9cf2c8`)
+
+CLI 240 → **256 tests**, C++ 238 unchanged, zero warnings, boundary respected.
+All six items closed, plus the optional `bindings` one — which it took only
+because it genuinely was a couple of lines, exactly the condition set.
+
+`TIER1_PRIMITIVES` is gone: a tag now validates if and only if a manifest
+declares it, and `<u8g2gl_frame>` correctly fails. Cycle detection names the full
+path and dedupes per distinct cycle. The `setter`/`draw` rule distinguishes
+`MISSING_REQUIRED` from `OVERCONSTRAINED`, in a new `schema.test.ts` — **there
+had been no validator schema test file at all**, which is why the spurious
+diagnostic had nothing to announce it.
+
+**The geometry decision is the interesting one.** Container-relative checking
+needed a container's size, and a composite manifest does not know the size it
+will be instantiated at. Rather than invent one or add a width/height to `View` —
+which would have reached into schema types WO5b had just settled — it gives a
+composite's top-level children **no absolute check**, and documented why. That is
+the right call: a wrong check is worse than an absent one, and the alternative
+crossed a boundary that had just been drawn.
+
+**Surfaced, folded into WO7:** the last hardcoded tag list — three image-tag
+literals at two sites, of which only `u8g2gl_xbm` has a manifest. The worker
+called it the same class as `TIER1_PRIMITIVES`; checked, and it is milder,
+because item 1 already closed the phantom-tag hole. What remains is dead branches
+and the same smell.
+
+**Also surfaced:** the widget and composite prop-checking blocks are now nearly
+identical after item 6. Noted rather than actioned — a unification pass is
+worthwhile but it is not remediation, and this PR has already grown three work
+orders.
+
+### WO7 — complete
+
+C++ 238 → **240**, CLI 256 → **263**, zero warnings. All three items closed.
+
+**It verified the [D-21] override structure the hard way, which is what I asked
+for and rarely get:** it compiled a throwaway translation unit with a fake
+generated header included first and `static_assert`ed that all six constants take
+the generated value, including the `MAX_TOTAL_BINDINGS` formula fallback. PR-04
+depends on that mechanism, and it is now demonstrated rather than assumed.
+
+**The RAM cost is real and is recorded in [D-21]: +5,120 bytes on a 64-bit host**,
+measured rather than estimated. No 32-bit figure exists — this host cannot build
+ILP32 — so the target number is still open, and §1.3 forbids quoting an estimate
+as if it were a measurement.
+
+That cost argues *for* [D-21] rather than against it: the pool is
+objects × bindings, so a project with three bound objects now pays for 256
+slots exactly as one with two hundred would. The raised default is interim and
+correct only for hand-written use; PR-04's generated capacities are what remove
+the waste.
+
+**The object-count check is deliberately a conservative over-count** of every
+node, rather than an attempt to replicate the realisation rule's per-instance
+object/draw-call decision. That decision is PR-04's, and a validator that guessed
+at it would be wrong in both directions. Over-counting can only reject a screen
+that would have fitted — visible and arguable — where under-counting would admit
+one that overflows silently on device.
+
+**Image-ness now derives from the manifests** (`type="image"`), so the last
+hardcoded element list in the CLI is gone.
+
+### WO8 — complete (`d05f32b`)
+
+Schema at **0.4**, CLI at **0.6.0**, CLI 263 → **266 tests**, C++ 240 unchanged,
+zero warnings. The refusal path exists and its tests assert on **message
+content**, so a `0.3` project is told what changed rather than failing obscurely.
+`U8G2GL_DEPRECATED_SCHEMA_VERSION` is distinct from
+`U8G2GL_UNKNOWN_SCHEMA_VERSION`, so "your version is old" and "your version is
+nonsense" are different diagnostics.
+
+**My error, correctly handled.** WO8's line-item text said the scrolling-label
+migration maps to `long_mode="scroll"`. I corrected design_spec §15.4 to
+`scroll_circular` after WO2 exposed the contradiction, and never went back to fix
+the work order I had written earlier. The worker followed the **normative spec**,
+implemented `scroll_circular`, and reported the disagreement loudly instead of
+picking one silently — exactly the instruction. A worker that had deferred to its
+own work order would have re-introduced the bug WO2b was written to fix.
+
+**Readability review over `main..HEAD`** (89 files): **P1 none.** One P2 — a stale
+"Tier 1–4" header comment in `parse-widget-tree.ts` describing the model [D-18]
+removed. One P3 — a struct-layout comment in `u8g2gl_label.h` justified by its own
+arithmetic rather than a measured `sizeof`. Neither actioned; the architect
+triages.
+
+### OPEN — `<component>` is still accepted, and the refusal message says it is not
+
+The reviewer found this independently and it is the one thing blocking a clean
+close. The new refusal message tells a `0.3` user that `<component>` and
+`components/` are removed per [D-18]. **They are not.** `parse-component.ts:65`
+still requires a `component` root element, and `read-project.ts` still discovers
+`components/[name]/[name].xml`. A **0.4** project using `<component>` is accepted
+today with no diagnostic at all.
+
+This is not a worker failure and not scope creep — **the decomposition never
+covered it.** R2.1 in the assessment said "merge the component schema into the
+widget manifest", and WO5/WO5b did exactly that: they merged the *types*. Removing
+`<component>` from the accepted *vocabulary* is a different change that nobody
+wrote down.
+
+A refusal message making a claim the code does not honour is worse than not making
+it, so this cannot simply ship. Escalated to the owner rather than resolved by
+adding a twelfth work order on the Principal Architect's own judgement.
+
+**RESOLVED by the owner, 2026-09-13**, verbatim:
+
+> "clean it up and pay down the technical debt, that's my preferred approach, get
+> rid of the omponent code."
+
+Actioned as **WO9**, which removes the `<component>` vocabulary outright rather
+than softening the refusal message, and sweeps the remaining debt the readability
+review and WO8 surfaced. The owner also directed that the PR be staged for review
+once WO9 lands.
+
+### WO9 — complete (`a184253`)
+
+`parse-component.ts` deleted, its logic folded into the widget-manifest parser. A
+composite is now the same `<widget>` root as any widget, distinguished only by an
+optional `<view>`. CLI **266 tests** (net unchanged — `<component>`-authoring
+tests were replaced one-for-one), C++ 240, zero warnings.
+
+Verified end to end rather than from the report: a project with a `components/`
+directory now fails with
+
+> The 'components/' directory is removed: move 'components/x/' to 'widgets/x/',
+> change its root element to '`<widget>`', and give it a '`<view>`' ([D-18]).
+
+which is the whole point — the removal tells you what to do instead of silently
+ignoring your files.
+
+The `status_bar` fixtures moved to `widgets/` with content otherwise identical,
+which is the proof the capability moved rather than being deleted.
+
+---
+
+## Project Wrap-Up
+
+**Twelve work orders. Merged runtime, CLI and widget set realigned to [D-18],
+[D-19], [D-20], [D-21] and schema 0.4.**
+
+Final: **C++ 240 tests, CLI 266 tests, zero warnings** under `-Wall -Wextra
+-Wpedantic`. Schema **0.4**, CLI **0.6.0**. Readability review over the full
+89-file diff returned **no P1s**.
+
+### The pattern worth carrying into PR-04
+
+**Three of the four real defects were found by unifying duplicated logic** — the
+manifest cross-test, the draw-layer test double, and the widget/composite prop
+paths. In each case the duplication was not merely maintenance cost; it was where
+a defect had been hiding, invisible because nobody had put the two paths side by
+side. PR-04 decides how much to share between firmware and editor generation.
+That decision is now informed.
+
+### What execution found that planning did not
+
+- `set_hidden()`/`set_disabled()` never marked the frame dirty — **live**, in
+  merged code, invisible on any screen with an animation running
+- `long_mode="scroll"` wrapped instead of reversing, because design_spec's own
+  migration table contradicted its semantics table
+- `u8g2gl_draw_ellipse` was declared with no body — a symbol that could not link,
+  about to be named by a manifest
+- The draw-layer test double was a no-op for six of eight primitives
+- Composite props had never received enum validation
+- `<component>` was still accepted while the refusal message said it was removed
+
+### Where the plan was wrong, and how
+
+Three work orders were added during execution. **WO2b and WO3b were genuine
+discoveries** — the spec contradiction and the unlinkable symbol. **WO5b was my
+scoping error**: I wrote WO5 as though the component merge lived in the schema
+types, when the type *is* how validators reach composite props, so the merge
+always reached into WO6's files. The worker found the seam by building the literal
+version and watching it fail to compile.
+
+**WO9 was a planning gap of a different kind** — not a boundary drawn wrongly but
+a requirement never written. R2.1 said "merge the component schema"; nobody wrote
+"stop accepting the old vocabulary". It surfaced only because WO8's refusal
+message made a claim, and the reviewer checked whether the code honoured it.
+
+### What the workers did that the work orders did not ask for
+
+Worth recording, because it is the argument for tight boundaries plus explicit
+surfacing rather than loose ones:
+
+- WO1 **declined** to apply the dirty rule to `set_flag`/`clear_flag`, correctly:
+  `clear_dirty()` *is* `clear_flag(DIRTY)` and would have re-set the flag it clears
+- WO2 improved the guard it was told to copy, after the existing suite caught a
+  plausible generalisation
+- WO3 refused to invent a triangle-outline algorithm on its own authority
+- WO4's cross-test derived its function list from the header rather than a copy
+- WO7 proved the [D-21] override mechanism with a `static_assert` build instead of
+  reasoning about it
+- WO8 followed the **normative spec** over its own stale line-item, and said so —
+  a worker deferring to the work order would have silently undone WO2b
+
+### Open, carried forward
+
+- **No 32-bit measurement exists.** The host cannot build ILP32, so §18 still
+  cannot cite a target figure. The harness skips loudly rather than passing.
+- **The interim binding default costs +5,120 bytes** on a 64-bit host. Correct for
+  hand-written use; PR-04's generated capacities are what remove the waste.
+- **Widget and composite prop-checking blocks are now nearly identical** — a
+  unification pass is worthwhile, and on this PR's evidence is where the next
+  defect is hiding.
+- **`u8g2gl_obj.xml`'s `filled` on triangle** and similar manifest/runtime
+  parity remain unaudited as a whole; only the cases touched here were checked.

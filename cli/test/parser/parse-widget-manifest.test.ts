@@ -6,8 +6,10 @@
  * File: test/parser/parse-widget-manifest.test.ts
  * Purpose: Verification tests for parsing widget manifests (<widget>, §6.4, §13.1).
  * Description: Asserts that valid-widget-manifest.xml parses into a typed WidgetManifest
- *              model with extends inheritance, animation license flags, and <api> block
- *              containing properties, reactive binding slots, and child collection elements.
+ *              model with extends inheritance and an <api> block containing properties,
+ *              reactive binding slots, and child collection elements. Also asserts the
+ *              [D-18] fossil `animated` attribute is silently ignored rather than read
+ *              into the model or rejected (WO4).
  */
 
 import { readFileSync } from 'node:fs';
@@ -32,7 +34,7 @@ describe('parseWidgetManifestFile', () => {
     const manifest = result.value!;
     expect(manifest.name).toBe('wd_service_list');
     expect(manifest.extends).toBe('u8g2gl_widget');
-    expect(manifest.animated).toBe(true);
+    expect(manifest).not.toHaveProperty('animated');
 
     // API block
     const api = manifest.api;
@@ -88,7 +90,13 @@ describe('parseWidgetManifestFile', () => {
     });
   });
 
-  it('correctly handles animated="false" for static demotion (§13.5)', () => {
+  it('ignores a lingering `animated` attribute rather than erroring or modelling it ([D-18], WO4)', () => {
+    // [D-18] removed `animated` from the widget-level contract: realisation is now
+    // decided per instance by the generator (§6.1), never declared by the manifest.
+    // A manifest that still carries the attribute — a pre-[D-18] fixture, or a
+    // hand-authored widget nobody has migrated — is not a parse error: WO4 chose
+    // "ignored" over "parse error" specifically so fixtures owned by other work
+    // orders do not go red the moment this attribute stops being read.
     const xml = `<widget name="u8g2gl_label" extends="u8g2gl_obj" animated="false">
     <api>
         <prop name="text" type="string" setter="set_text" />
@@ -96,6 +104,21 @@ describe('parseWidgetManifestFile', () => {
 </widget>`;
     const result = parseWidgetManifestFile(xml, 'u8g2gl_label.xml');
     expect(result.diagnostics).toHaveLength(0);
-    expect(result.value?.animated).toBe(false);
+    expect(result.value).not.toHaveProperty('animated');
+  });
+
+  it('parses a primitive prop with draw= and no setter= ([D-18])', () => {
+    const xml = `<widget name="u8g2gl_box">
+    <api>
+        <prop name="x" type="int" draw="u8g2gl_draw_box" required="true" />
+    </api>
+</widget>`;
+    const result = parseWidgetManifestFile(xml, 'u8g2gl_box.xml');
+    expect(result.diagnostics).toHaveLength(0);
+    expect(result.value?.api.props[0]).toMatchObject({
+      name: 'x',
+      draw: 'u8g2gl_draw_box',
+    });
+    expect(result.value?.api.props[0]?.setter).toBeUndefined();
   });
 });

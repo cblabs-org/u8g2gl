@@ -18,7 +18,6 @@
 import type { U8g2glProject } from '../schema/project.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
-import type { Component } from '../schema/component.js';
 import type { WidgetManifest } from '../schema/widget-manifest.js';
 import type { DisplayRecord } from '../schema/display-record.js';
 import type { Diagnostic } from '../schema/diagnostic.js';
@@ -38,7 +37,14 @@ export interface ValidateInput {
   readonly project: U8g2glProject;
   readonly globals: Globals;
   readonly screens: readonly Screen[];
-  readonly components: readonly Component[];
+  /**
+   * Composite elements — a `WidgetManifest` whose `api` carries a `view`
+   * ([D-18]). Retired as a separate `Component` type by WO5b; still a
+   * distinct array from `widgetManifests` because the two are validated by
+   * different passes (composite tag/prop rules here, real `<widget>` schema
+   * rules there) — unifying that is WO6's, not this migration's, concern.
+   */
+  readonly components: readonly WidgetManifest[];
   readonly widgetManifests: readonly WidgetManifest[];
   readonly catalogue: readonly DisplayRecord[];
 }

@@ -16,8 +16,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyTextEdits,
-  parseComponentFile,
   parseScreenFile,
+  parseWidgetManifestFile,
   parseWidgetTree,
   tokenizeXml,
   type ParseOptions,
@@ -83,19 +83,19 @@ describe('WO9: missing-name policy', () => {
     expect(result.diagnostics.filter((d) => d.severity === 'error')).toHaveLength(0);
   });
 
-  it('component files honour the policy too', () => {
-    const xml = `<component name="badge">
+  it('composite widget manifests (a <widget> with a <view>) honour the policy too', () => {
+    const xml = `<widget name="badge">
     <api></api>
     <view>
         <u8g2gl_label text="badge" />
     </view>
-</component>`;
+</widget>`;
 
-    const errored = parseComponentFile(xml, 'components/badge/badge.xml');
+    const errored = parseWidgetManifestFile(xml, 'widgets/badge/badge.xml');
     expect(missingNameDiagnostics(errored.diagnostics)[0]!.severity).toBe('error');
     expect(errored.value).toBeUndefined();
 
-    const generated = parseComponentFile(xml, 'components/badge/badge.xml', GENERATE);
+    const generated = parseWidgetManifestFile(xml, 'widgets/badge/badge.xml', GENERATE);
     expect(missingNameDiagnostics(generated.diagnostics)[0]!.severity).toBe('warning');
     expect(generated.nameEdits).toHaveLength(1);
   });

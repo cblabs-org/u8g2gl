@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_circle" animated="false">
+<widget name="u8g2gl_circle">
   <api>
-    <prop name="x" type="int" setter="drawCircle" required="true" help="Center X coordinate" />
-    <prop name="y" type="int" setter="drawCircle" required="true" help="Center Y coordinate" />
-    <prop name="radius" type="int" setter="drawCircle" required="true" help="Circle radius in pixels" />
-    <prop name="filled" type="bool" setter="drawDisc" default="false" help="Whether circle is filled disc" />
-    <prop name="segments" type="enum" setter="drawCircle" values="all,upper_left,upper_right,lower_left,lower_right" default="all" help="Circle segments to draw" />
+    <prop name="x" type="int" draw="u8g2gl_draw_circle" required="true" help="Center X coordinate" />
+    <prop name="y" type="int" draw="u8g2gl_draw_circle" required="true" help="Center Y coordinate" />
+    <prop name="radius" type="int" draw="u8g2gl_draw_circle" required="true" help="Circle radius in pixels" />
+    <prop name="filled" type="bool" draw="u8g2gl_draw_circle" default="false" help="Whether circle is filled disc" />
+    <prop name="segments" type="enum" draw="u8g2gl_draw_circle" values="all,upper_left,upper_right,lower_left,lower_right" default="all" help="Circle segments to draw" />
   </api>
 </widget>

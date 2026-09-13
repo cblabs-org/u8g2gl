@@ -6,16 +6,20 @@
  * File: src/core/parser/index.ts
  * Purpose: Public API barrel for the U8G2GL XML parser toolkit.
  * Description: Exports file-level parsing functions for all U8G2GL document types
- *              (project, globals, screens, components, widget manifests) and the
- *              generic ParseResult<T> container with diagnostic reporting.
+ *              (project, globals, screens, widget manifests) and the generic
+ *              ParseResult<T> container with diagnostic reporting. Per [D-18]
+ *              there is one element vocabulary: `parseWidgetManifestFile`
+ *              parses both a plain widget and a composite (a `<widget>` with
+ *              a `<view>`) — PR-3R WO9 retired the separate `<component>`
+ *              root and its `parseComponentFile` entry point.
  *
  * Exports:
  * - ParseResult: Standard outcome envelope carrying parsed AST and diagnostics
  * - parseProjectFile: Parse u8g2gl.xml files into U8g2glProject
  * - parseGlobalsFile: Parse globals.xml files into Globals
  * - parseScreenFile: Parse screen_*.xml files into Screen
- * - parseComponentFile: Parse component XML files into Component
  * - parseWidgetManifestFile: Parse widget manifest XML files into WidgetManifest
+ *   (plain widget or composite, per [D-18])
  * - tokenizeXml: Low-level XML scanner producing raw element tree
  * - RawXmlAttribute, RawXmlElement, RawXmlDocument: Low-level untyped XML types
  * - MissingNamePolicy, ParseOptions, SourceEdit, applyTextEdits: [U-1] name policy and write-back
@@ -62,5 +66,8 @@ export {
   createNameInsertion,
 } from './name-policy.js';
 export type { MissingNamePolicy, ParseOptions, SourceEdit } from './name-policy.js';
-export { parseComponent, parseComponentFile } from './parse-component.js';
-export { parseWidgetManifest, parseWidgetManifestFile } from './parse-widget-manifest.js';
+export {
+  parseWidgetManifest,
+  parseWidgetManifestFile,
+  COMPONENT_REMOVED_MIGRATION,
+} from './parse-widget-manifest.js';

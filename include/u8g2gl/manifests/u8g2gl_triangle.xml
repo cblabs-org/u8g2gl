@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_triangle" animated="false">
+<widget name="u8g2gl_triangle">
   <api>
-    <prop name="x0" type="int" setter="drawTriangle" required="true" help="Vertex 0 X coordinate" />
-    <prop name="y0" type="int" setter="drawTriangle" required="true" help="Vertex 0 Y coordinate" />
-    <prop name="x1" type="int" setter="drawTriangle" required="true" help="Vertex 1 X coordinate" />
-    <prop name="y1" type="int" setter="drawTriangle" required="true" help="Vertex 1 Y coordinate" />
-    <prop name="x2" type="int" setter="drawTriangle" required="true" help="Vertex 2 X coordinate" />
-    <prop name="y2" type="int" setter="drawTriangle" required="true" help="Vertex 2 Y coordinate" />
-    <prop name="filled" type="bool" setter="drawTriangle" default="true" help="Whether triangle is filled" />
+    <prop name="x0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 X coordinate" />
+    <prop name="y0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 Y coordinate" />
+    <prop name="x1" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 1 X coordinate" />
+    <prop name="y1" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 1 Y coordinate" />
+    <prop name="x2" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 2 X coordinate" />
+    <prop name="y2" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 2 Y coordinate" />
+    <prop name="filled" type="bool" draw="u8g2gl_draw_triangle" default="true" help="Whether triangle is filled" />
   </api>
 </widget>

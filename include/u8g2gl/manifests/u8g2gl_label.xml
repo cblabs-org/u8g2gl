@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_label" extends="u8g2gl_obj" animated="false">
+<widget name="u8g2gl_label" extends="u8g2gl_obj">
   <api>
     <prop name="text" type="string" setter="set_text" default=""
           help="Static display text. Overridden when bind_text is active." />
@@ -9,8 +9,25 @@
           values="left,center,right" default="left"
           emit="U8G2GL_ALIGN_{VALUE^^}"
           help="Horizontal text alignment within bounds." />
-    <prop name="truncate" type="bool" setter="set_truncate" default="false"
-          help="Clip text exceeding widget width." />
+    <prop name="long_mode" type="enum" setter="set_long_mode"
+          values="clip,dots,scroll,scroll_circular" default="clip"
+          emit="U8G2GL_LONG_{VALUE^^}"
+          help="Overflow behaviour when text exceeds the widget width ([D-19]).
+                clip hard-clips at the bounds; dots truncates with an
+                ellipsis; scroll and scroll_circular marquee the text.
+                wrap is not offered — U8G2GL labels are single-line, so a
+                user arriving from LVGL Pro will meet this omission
+                deliberately rather than find it missing silently." />
+    <prop name="scroll_px_per_sec" type="int" setter="set_scroll_px_per_sec" default="25"
+          help="Marquee scroll speed in pixels per second. Meaningless unless
+                long_mode is scroll or scroll_circular." />
+    <prop name="initial_delay_ms" type="int" setter="set_initial_delay_ms" default="3000"
+          help="Initial pause delay in milliseconds before scrolling starts.
+                Meaningless unless long_mode is scroll or scroll_circular." />
+    <prop name="static_dwell_ms" type="int" setter="set_static_dwell_ms" default="5000"
+          help="Dwell duration in milliseconds for text that fits within
+                bounds before signalling completion. Meaningless unless
+                long_mode is scroll or scroll_circular." />
     <bind name="bind_text" type="string" setter="bind_text"
           fmt="bind_text_fmt" />
     <bind name="bind_text_int" type="int" setter="bind_text"

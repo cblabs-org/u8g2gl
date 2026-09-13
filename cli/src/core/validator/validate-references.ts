@@ -8,6 +8,8 @@
  * Description: Checks fonts, images, subjects, styles, component instances, and focus
  *              ring targets against declared definitions. Employs Levenshtein edit
  *              distance (findClosest) to provide structured replacement suggestions.
+ *              Image-ness is derived from the manifest's `type="image"` prop
+ *              ([D-17], PR-3R WO7) rather than a hardcoded tag list.
  *
  * Exports:
  * - validateReferences(input): Runs Pass 2 cross-reference validation
@@ -18,18 +20,6 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { ValidateInput } from './validate.js';
-
-/** Standard Tier 1 primitive elements (§6.1). */
-const TIER1_PRIMITIVES: ReadonlySet<string> = new Set([
-  'u8g2gl_box',
-  'u8g2gl_frame',
-  'u8g2gl_circle',
-  'u8g2gl_disc',
-  'u8g2gl_hline',
-  'u8g2gl_vline',
-  'u8g2gl_line',
-  'u8g2gl_bitmap',
-]);
 
 function createRefDiagnostic(
   code: string,
@@ -133,12 +123,13 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         screenElementNames.add(node.attributes.name);
       }
 
-      // 2a. Check component tag or widget tag
+      // 2a. Check component tag or widget tag. Element knowledge is data,
+      // never code ([D-17]): a tag validates if and only if a manifest
+      // declares it — there is no hardcoded primitives set to fall back on.
       const isManifestWidget = manifestMap.has(node.tag);
-      const isPrimitive = TIER1_PRIMITIVES.has(node.tag);
       const isComponent = componentSet.has(node.tag);
 
-      if (!isManifestWidget && !isPrimitive) {
+      if (!isManifestWidget) {
         if (node.tag.startsWith('u8g2gl_')) {
           // Unknown built-in widget
           const manifestNames = Array.from(manifestMap.keys());
@@ -196,19 +187,18 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         }
       }
 
-      // 2c. Check image references
+      // 2c. Check image references. Image-ness is derived from the manifest
+      // ([D-17]) — a `type="image"` prop named `src` or `image` — rather than
+      // a hardcoded tag list. Of the three tags this list once named, only
+      // `u8g2gl_xbm` ever had a manifest; `u8g2gl_bitmap` and `u8g2gl_icon`
+      // name elements that do not exist and are already rejected as
+      // UNKNOWN_WIDGET before this code runs (PR-3R WO7).
       const imageAttr = node.attributes.image ?? node.attributes.src;
       if (typeof imageAttr === 'string' && !imageAttr.startsWith('$')) {
-        // Only validate as image if tag is an image widget or manifest declares image prop
         const manifest = manifestMap.get(node.tag);
-        const hasImageProp = manifest?.api.props.some(
+        const isImageTag = manifest?.api.props.some(
           (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
         );
-        const isImageTag =
-          node.tag === 'u8g2gl_bitmap' ||
-          node.tag === 'u8g2gl_xbm' ||
-          node.tag === 'u8g2gl_icon' ||
-          hasImageProp;
 
         if (isImageTag && !imageSet.has(imageAttr)) {
           diagnostics.push(
@@ -330,9 +320,42 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
 
   // --- 3. Validate references inside components (excluding $prop templates) ---
   for (const component of components ?? []) {
-    const propNames = new Set((component.api ?? []).map((p) => `$${p.name}`));
+    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
+    // not a retired `Component`) — reach through `.props`. No behaviour change.
+    const propNames = new Set((component.api?.props ?? []).map((p) => `$${p.name}`));
 
     walkNodes(component.view?.children ?? [], (node) => {
+      // Check the tag itself. Pass 2a runs only over screens, so without this
+      // a misspelled element inside a composite's own template passed today —
+      // the walk here checked fonts, images, and subjects but never the tag.
+      const isManifestWidget = manifestMap.has(node.tag);
+      const isComponent = componentSet.has(node.tag);
+
+      if (!isManifestWidget) {
+        if (node.tag.startsWith('u8g2gl_')) {
+          const manifestNames = Array.from(manifestMap.keys());
+          diagnostics.push(
+            createRefDiagnostic(
+              DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
+              `Unknown widget '<${node.tag}>' in component '${component.name}'.`,
+              node.loc,
+              node.tag,
+              findClosest(node.tag, manifestNames),
+            ),
+          );
+        } else if (!isComponent) {
+          diagnostics.push(
+            createRefDiagnostic(
+              DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
+              `Unknown component '<${node.tag}>' instantiated in component '${component.name}'.`,
+              node.loc,
+              node.tag,
+              findClosest(node.tag, declaredComponents),
+            ),
+          );
+        }
+      }
+
       // Check font references
       const fontAttr = node.attributes.font;
       if (typeof fontAttr === 'string' && !propNames.has(fontAttr) && !fontAttr.startsWith('$')) {
@@ -349,17 +372,18 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         }
       }
 
-      // Check image references
+      // Check image references. Same manifest-derived signal as the screen
+      // walk above (PR-3R WO7) — no hardcoded tag list.
       const imageAttr = node.attributes.image ?? node.attributes.src;
       if (
         typeof imageAttr === 'string' &&
         !propNames.has(imageAttr) &&
         !imageAttr.startsWith('$')
       ) {
-        const isImageTag =
-          node.tag === 'u8g2gl_bitmap' ||
-          node.tag === 'u8g2gl_xbm' ||
-          node.tag === 'u8g2gl_icon';
+        const manifest = manifestMap.get(node.tag);
+        const isImageTag = manifest?.api.props.some(
+          (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
+        );
 
         if (isImageTag && !imageSet.has(imageAttr)) {
           diagnostics.push(
@@ -420,5 +444,96 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
     });
   }
 
+  // --- 4. Detect composite instantiation cycles (direct or transitive) ---
+  // A composite is a real container object ([D-18]), so A instantiating B
+  // instantiating A is not merely wasteful, it recurses forever at expansion
+  // time. This must be a hard error, and the diagnostic must name the full
+  // cycle path (e.g. "a -> b -> a") rather than just report that one exists.
+  diagnostics.push(...detectCompositeCycles(components ?? []));
+
   return diagnostics;
+}
+
+/**
+ * Walks the composite instantiation graph looking for a cycle reachable from
+ * each composite, and reports every cycle exactly once via its lexicographically
+ * smallest rotation, so `a -> b -> a` isn't also reported starting from `b`.
+ */
+function detectCompositeCycles(components: ValidateInput['components']): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const componentMap = new Map(components.map((c) => [c.name, c]));
+  const reportedCycles = new Set<string>();
+
+  /** Tags directly instantiated inside a composite's own template. */
+  function directChildTags(component: (typeof components)[number]): string[] {
+    const tags: string[] = [];
+    walkNodes(component.view?.children ?? [], (node) => {
+      tags.push(node.tag);
+    });
+    return tags;
+  }
+
+  for (const start of components) {
+    const path: string[] = [start.name];
+    const onPath = new Set<string>([start.name]);
+
+    const visit = (current: (typeof components)[number]): void => {
+      for (const childTag of directChildTags(current)) {
+        const child = componentMap.get(childTag);
+        if (!child) {
+          continue; // Not a composite reference — validated elsewhere.
+        }
+
+        if (onPath.has(childTag)) {
+          // Found a cycle; report the path from its first occurrence, deduped
+          // by its canonical (lexicographically smallest) rotation so the
+          // same cycle is not reported once per composite that reaches it.
+          const cycleStart = path.indexOf(childTag);
+          const cyclePath = [...path.slice(cycleStart), childTag];
+          const canonical = canonicalCycleKey(cyclePath);
+          if (!reportedCycles.has(canonical)) {
+            reportedCycles.add(canonical);
+            diagnostics.push(
+              createRefDiagnostic(
+                DIAGNOSTIC_CODES.CIRCULAR_REFERENCE,
+                `Composite instantiation cycle detected: ${cyclePath.join(' -> ')}.`,
+                current.loc,
+                childTag,
+                [],
+              ),
+            );
+          }
+          continue;
+        }
+
+        path.push(childTag);
+        onPath.add(childTag);
+        visit(child);
+        onPath.delete(childTag);
+        path.pop();
+      }
+    };
+
+    visit(start);
+  }
+
+  return diagnostics;
+}
+
+/**
+ * Produces a rotation- and direction-stable key for a cycle's node sequence
+ * (excluding the repeated closing node), so `a -> b -> a` and `b -> a -> b`
+ * dedupe to the same reported cycle regardless of which composite in the
+ * cycle the search started from.
+ */
+function canonicalCycleKey(cycleWithClosingNode: readonly string[]): string {
+  const nodes = cycleWithClosingNode.slice(0, -1);
+  let best = nodes.join(',');
+  for (let i = 1; i < nodes.length; i++) {
+    const rotated = [...nodes.slice(i), ...nodes.slice(0, i)].join(',');
+    if (rotated < best) {
+      best = rotated;
+    }
+  }
+  return best;
 }

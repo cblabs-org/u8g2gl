@@ -8,9 +8,11 @@
  *
  * File: include/u8g2gl/u8g2gl_style.h
  * Purpose: The complete visual vocabulary for a 1-bit display. Monochrome
- *          collapses styling to about ten properties — there is no colour, no
+ *          collapses styling to nine properties — there is no colour, no
  *          gradient, no opacity and no shadow to describe — so this is a flat
- *          struct rather than the cascade a colour framework needs.
+ *          struct rather than the cascade a colour framework needs. (`truncate`
+ *          was the tenth; PR-3R WO2 deleted it — [D-19]'s long_mode="clip" on
+ *          u8g2gl_label replaces what it did.)
  *
  *          A set_mask bitfield records which properties were explicitly set, so
  *          merging a named style over an object's own overrides can tell "set to
@@ -21,7 +23,7 @@
  *              merge_from() which composes a style over another
  *
  * Exported Classes:
- * - u8g2gl_style: struct holding the 10 style properties
+ * - u8g2gl_style: struct holding the 9 style properties
  *
  *     Style API:
  *     - u8g2gl_style_cascade(): Merge two styles
@@ -42,7 +44,10 @@ enum u8g2gl_style_prop_t : uint16_t {
     U8G2GL_STYLE_BORDER       = (1 << 4),
     U8G2GL_STYLE_RADIUS       = (1 << 5),
     U8G2GL_STYLE_ALIGN        = (1 << 6),
-    U8G2GL_STYLE_TRUNCATE     = (1 << 7),
+    // (1 << 7) was U8G2GL_STYLE_TRUNCATE, deleted by [D-19] — long_mode="clip"
+    // on u8g2gl_label replaces it (PR-3R WO2). Bit left unused rather than
+    // renumbered so a stale serialized set_mask from before this change reads
+    // as harmless noise instead of silently meaning a different property.
     U8G2GL_STYLE_FONT_MODE    = (1 << 8),
     U8G2GL_STYLE_BITMAP_MODE  = (1 << 9),
 };
@@ -64,7 +69,6 @@ struct u8g2gl_style {
     u8g2gl_bitmap_mode_t bitmap_mode = U8G2GL_BITMAP_MODE_SOLID;
     bool invert = false;
     bool border = false;
-    bool truncate = false;
 
     // --- Setters that also mark the property as set ---
     void set_font(const uint8_t* f);
@@ -74,7 +78,6 @@ struct u8g2gl_style {
     void set_border(bool b);
     void set_radius(int16_t r);
     void set_align(u8g2gl_align_t a);
-    void set_truncate(bool t);
     void set_font_mode(u8g2gl_font_mode_t m);
     void set_bitmap_mode(u8g2gl_bitmap_mode_t m);
 

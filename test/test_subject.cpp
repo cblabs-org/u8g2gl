@@ -408,6 +408,43 @@ TEST(Binding, RightSizedStringSubjectBindsAndPropagates) {
     EXPECT_STREQ(subject.get(), "Paris"); // value actually propagated
 }
 
+// --- PR-3R WO7: U8G2GL_MAX_BINDINGS_PER_OBJ raised 4 -> 8 ([D-20], [D-21]) ---
+
+// [D-20] made x, y, width and height bindable; an element binding all four
+// geometry properties plus its text needs 5 concurrent binding slots on one
+// object. At the old default of 4 the 5th binding here silently failed —
+// u8g2gl_allocate_binding() returns nullptr on exhaustion and every public
+// bind_* wrapper discards that bool (see u8g2gl_obj.cpp). The runtime has no
+// bind_x/y/w/h-to-subject entry point yet (wiring geometry to a subject is
+// generator-side, PR-04); this test stands in with four flag bindings, since
+// the shared pool caps by object, not by what a slot conceptually represents.
+TEST(Binding, FourGeometryBindingsPlusTextFitTheDefaultBudget) {
+    u8g2gl_obj obj;
+    u8g2gl_subject_int geom_x(5), geom_y(5), geom_w(5), geom_h(5);
+    u8g2gl_subject_int text_subject(42);
+
+    constexpr uint8_t flag_x = 0x08;
+    constexpr uint8_t flag_y = 0x10;
+    constexpr uint8_t flag_w = 0x20;
+    constexpr uint8_t flag_h = 0x40;
+
+    obj.bind_flag_if_eq(&geom_x, 5, flag_x);
+    obj.bind_flag_if_eq(&geom_y, 5, flag_y);
+    obj.bind_flag_if_eq(&geom_w, 5, flag_w);
+    obj.bind_flag_if_eq(&geom_h, 5, flag_h);
+    obj.bind_text(&text_subject, "%d");
+
+    // Every flag binding evaluates immediately (add_flag_binding Step 4), so
+    // a slot that failed to allocate leaves its flag at its default (clear)
+    // rather than merely deferring — this distinguishes "bound and true" from
+    // "never bound" without needing add_flag_binding's discarded return value.
+    EXPECT_TRUE(obj.has_flag(flag_x));
+    EXPECT_TRUE(obj.has_flag(flag_y));
+    EXPECT_TRUE(obj.has_flag(flag_w));
+    EXPECT_TRUE(obj.has_flag(flag_h));
+    EXPECT_EQ(obj.get_bound_text_subject(), &text_subject);
+}
+
 // --- Observer Pool Tests ---
 
 TEST(ObserverPool, FullPoolReturnsFalse) {

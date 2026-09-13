@@ -173,7 +173,29 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
 
       // --- Case 2: Component instance ---
       if (component) {
-        const declaredProps = new Map(component.api?.map((p) => [p.name, p]) ?? []);
+        // `component.api` is an ApiBlock post-WO5b (component is a
+        // WidgetManifest, not a retired `Component`) — reach through
+        // `.props`, matching the widget path above. No behaviour change.
+        const declaredProps = new Map(
+          component.api?.props.map((p) => [p.name, p]) ?? [],
+        );
+        // Latent, closed while in this file per WO6: the composite path never
+        // considered `bindings` in its unknown-attribute check, unlike the
+        // widget path above. Harmless while a composite's `bindings` is
+        // always empty, but it would misfire silently the moment one isn't.
+        const declaredBindings = new Set(
+          (component.api?.bindings ?? []).map((b) => b.name),
+        );
+        for (const b of component.api?.bindings ?? []) {
+          if (b.fmt) {
+            declaredBindings.add(b.fmt);
+          }
+        }
+
+        const allowedNames = [
+          ...Array.from(declaredProps.keys()),
+          ...Array.from(declaredBindings),
+        ];
 
         // 2a. Check attributes on component instance
         for (const [attrName, attrVal] of Object.entries(node.attributes)) {
@@ -185,7 +207,7 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
             continue;
           }
 
-          if (declaredProps.has(attrName)) {
+          if (declaredProps.has(attrName) || declaredBindings.has(attrName)) {
             continue;
           }
 
@@ -197,13 +219,13 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
               `Unknown attribute '${attrName}' on component <${node.tag}>.`,
               loc,
               attrName,
-              findClosest(attrName, Array.from(declaredProps.keys())),
+              findClosest(attrName, allowedNames),
             ),
           );
         }
 
         // 2b. Check required properties
-        for (const prop of component.api ?? []) {
+        for (const prop of component.api?.props ?? []) {
           if (prop.required) {
             const val = node.attributes[prop.name];
             if (val === undefined || val === '') {
@@ -215,6 +237,32 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
                   prop.name,
                 ),
               );
+            }
+          }
+        }
+
+        // 2c. Check enum values — a widget prop with type="enum" and an
+        // out-of-range value produces INVALID_ENUM_VALUE (case 1c above);
+        // under [D-18] a composite is a WidgetManifest like any other, so
+        // there is no longer even a nominal reason for the composite path
+        // to lack the equivalent check ([WO5b] finding, closed by WO6).
+        for (const prop of component.api?.props ?? []) {
+          if (prop.type === 'enum' && prop.values) {
+            const rawVal = node.attributes[prop.name];
+            if (typeof rawVal === 'string' && rawVal !== '' && !rawVal.startsWith('$')) {
+              const allowedEnumValues = prop.values.split(',').map((v) => v.trim());
+              if (!allowedEnumValues.includes(rawVal)) {
+                const loc = node.attributeLocs?.[prop.name] ?? node.loc;
+                diagnostics.push(
+                  createPropDiagnostic(
+                    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
+                    `Invalid value '${rawVal}' for enum property '${prop.name}' on component <${node.tag}>. Expected one of: ${allowedEnumValues.join(', ')}.`,
+                    loc,
+                    rawVal,
+                    findClosest(rawVal, allowedEnumValues),
+                  ),
+                );
+              }
             }
           }
         }

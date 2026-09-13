@@ -118,6 +118,25 @@ generator already understands — busywork the tool can do exactly.
 - Determinism (§13.9) applies: the header is derived from the document, so an
   unchanged project regenerates it byte-identically
 
+## Measured cost of the interim default — PR-3R WO7
+
+Raising `U8G2GL_MAX_BINDINGS_PER_OBJ` from 4 to 8 costs **+5,120 bytes of static
+RAM on a 64-bit host**, measured: 32 objects × 4 additional slots × a 40-byte
+`u8g2gl_binding_desc`. No 32-bit figure exists — this host cannot produce an
+ILP32 build — so the target number is still unmeasured, and §1.3 forbids quoting
+an estimate as though it were one.
+
+**That cost is the argument for this decision, not against it.** The whole pool
+is `MAX_OBJECTS_PER_SCREEN × MAX_BINDINGS_PER_OBJ`, so a project with three bound
+objects pays for 256 binding slots exactly as one with two hundred does. Every
+project now carries the worst case, which is precisely what a static default
+sized by guesswork does — and precisely what the generator emitting exact
+capacities removes.
+
+The raised default is therefore **interim**, correct only for hand-written use.
+Once PR-04 emits the real numbers, a generated project should pay for the
+bindings it actually declares and no more.
+
 ## Trigger to revisit
 
 A real screen approaching 200 objects, which would make `uint8_t` parent indices
