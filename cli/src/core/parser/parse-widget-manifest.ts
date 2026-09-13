@@ -5,8 +5,13 @@
  *
  * File: src/core/parser/parse-widget-manifest.ts
  * Purpose: Transforms raw XML AST into typed WidgetManifest models (§6.4, §13.1).
- * Description: Parses widget metadata (`name`, `extends`, `animated`), public property
- *              descriptors, reactive binding slots, and child collection element definitions.
+ * Description: Parses widget metadata (`name`, `extends`), public property descriptors —
+ *              each resolving to a `setter=` or `draw=` emission target ([D-18]) — reactive
+ *              binding slots, and child collection element definitions. A manifest's
+ *              widget-level `animated` attribute is a [D-18] fossil: recognised for backward
+ *              compatibility but silently ignored, not read into the model and never a parse
+ *              error, since realisation is now decided per instance by the generator (§6.1)
+ *              rather than declared by the manifest.
  *
  * Exports:
  * - parseWidgetManifest: Transform a parsed RawXmlElement into a WidgetManifest model
@@ -24,7 +29,6 @@ import type {
 } from '../schema/widget-manifest.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
-  getAttribute,
   getAttributeValue,
   getBooleanAttribute,
   getChild,
@@ -60,8 +64,12 @@ export function parseWidgetManifest(
   const name = nameAttr?.value ?? '';
 
   const extendsVal = getAttributeValue(root, 'extends') ?? 'u8g2gl_obj';
-  const animatedAttr = getAttribute(root, 'animated');
-  const animated = animatedAttr ? animatedAttr.value !== 'false' : true;
+  // [D-18]: `animated` is gone from the widget-level contract — realisation is
+  // decided per instance by the generator (§6.1), not declared by the
+  // manifest. A manifest still carrying the attribute (pre-[D-18] fixtures,
+  // or a hand-authored widget nobody has migrated yet) is not an error: the
+  // attribute is simply not read into the model. See WO4 Completion Report
+  // for why "ignored" was chosen over "parse error".
 
   const props: PropDef[] = [];
   const bindings: BindDef[] = [];
@@ -75,7 +83,14 @@ export function parseWidgetManifest(
         const propTypeAttr = requireAttribute(child, 'type', filename, diagnostics);
         const propName = propNameAttr?.value ?? '';
         const propType = (propTypeAttr?.value ?? 'string') as PropType;
-        const setter = getAttributeValue(child, 'setter') ?? `set_${propName}`;
+        // [D-18]: a property reaches the display through exactly one emission
+        // target — `setter=` (a method on the element's class) or `draw=` (a
+        // free `u8g2gl_draw_*` function for a classless drawing element,
+        // §6.2). A manifest naming neither keeps the pre-[D-18] `set_<name>`
+        // default rather than silently becoming a draw call.
+        const setterAttr = getAttributeValue(child, 'setter');
+        const drawAttr = getAttributeValue(child, 'draw');
+        const setter = setterAttr ?? (drawAttr ? undefined : `set_${propName}`);
         const defaultVal = getAttributeValue(child, 'default');
         const required = getBooleanAttribute(child, 'required');
         const isAnimated = getBooleanAttribute(child, 'animated');
@@ -87,6 +102,7 @@ export function parseWidgetManifest(
           name: propName,
           type: propType,
           setter,
+          draw: drawAttr,
           default: defaultVal,
           required,
           animated: isAnimated,
@@ -175,7 +191,6 @@ export function parseWidgetManifest(
   return {
     name,
     extends: extendsVal,
-    animated,
     api: apiBlock,
     loc: root.loc,
   };

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_obj" animated="false">
+<widget name="u8g2gl_obj">
   <api>
     <prop name="x" type="int" setter="set_coords" help="Left edge in device pixels." />
     <prop name="y" type="int" setter="set_coords" help="Top edge in device pixels." />
@@ -14,7 +14,6 @@
     <prop name="border" type="bool" setter="set_border" default="false" help="Render outer border." />
     <prop name="radius" type="int" setter="set_radius" default="0" help="Corner rounding radius in pixels." />
     <prop name="align" type="enum" setter="set_align" values="left,center,right" default="left" emit="U8G2GL_ALIGN_{VALUE^^}" help="Horizontal text alignment." />
-    <prop name="truncate" type="bool" setter="set_truncate" default="false" help="Clip overflowing text." />
     <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
     <bind name="bind_text_int" type="int" setter="bind_text" fmt="bind_text_fmt" />
   </api>

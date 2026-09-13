@@ -8,6 +8,11 @@
  *          Per [D-17], the `<api>` manifest is the generator's build-time contract:
  *          it declares accepted properties, binding slots, and child collection elements,
  *          allowing built-in and custom widgets to be handled uniformly without generator changes.
+ *          Per [D-18] a property reaches the display through exactly one of two emission
+ *          targets — `setter=` (a method on the element's own class) or `draw=` (a free
+ *          `u8g2gl_draw_*` function for a drawing element with no class, §13.1) — and the
+ *          widget-level `animated` flag is gone: realisation is decided per instance by the
+ *          generator, not declared by the manifest.
  * Description: Immutable interfaces for WidgetManifest, ApiBlock, property definitions,
  *              binding slots, and collection element arguments.
  *
@@ -31,11 +36,6 @@ export interface WidgetManifest {
   readonly name: string;
   /** C++ base class extended by this widget (e.g. "u8g2gl_obj"). */
   readonly extends: string;
-  /**
-   * If false, licenses static demotion to inline U8G2 draw calls when no
-   * bindings, name, or focus hooks are active (§13.5).
-   */
-  readonly animated: boolean;
   /** Public API manifest defining accepted properties, bindings, and elements. */
   readonly api: ApiBlock;
   /** Source location where the widget manifest was declared. */
@@ -71,15 +71,31 @@ export type PropType =
   | 'color';
 
 /**
- * Widget property definition mapping an XML attribute to a C++ setter method (§13.1).
+ * Widget property definition mapping an XML attribute to its emission target (§13.1).
+ *
+ * Exactly one of `setter` and `draw` applies to a given property ([D-18]):
+ * `setter` names a method on the element's own class; `draw` names a free
+ * `u8g2gl_draw_*` function for a drawing element that has no class at all
+ * (§6.2). A manifest that specifies neither defaults to `set_<name>`, so
+ * both fields are optional on the type even though every real property
+ * resolves to one of them.
  */
 export interface PropDef {
   /** Attribute name used in XML. */
   readonly name: string;
   /** Data type of the property. */
   readonly type: PropType;
-  /** C++ setter method name called during initialization (e.g. "set_font"). */
-  readonly setter: string;
+  /**
+   * C++ setter method name called during initialization (e.g. "set_font").
+   * Mutually exclusive with `draw` — see design_spec §13.1.
+   */
+  readonly setter?: string;
+  /**
+   * Free function name handling this property via a direct draw call rather
+   * than a class setter (e.g. "u8g2gl_draw_box", §6.2). Mutually exclusive
+   * with `setter` — design_spec §13.1, [D-18].
+   */
+  readonly draw?: string;
   /** Optional default value when the attribute is omitted. */
   readonly default?: string;
   /** If true, the attribute is mandatory on every instance. */

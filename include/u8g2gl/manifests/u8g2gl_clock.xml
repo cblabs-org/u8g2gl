@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget name="u8g2gl_clock" extends="u8g2gl_obj" animated="true">
+<widget name="u8g2gl_clock" extends="u8g2gl_obj">
   <api>
     <prop name="time" type="int" setter="set_time" default="0"
           help="Initial epoch time in seconds." />

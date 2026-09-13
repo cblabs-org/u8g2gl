@@ -421,17 +421,27 @@ describe('Schema Types', () => {
       const manifest: WidgetManifest = {
         name: 'wd_service_list',
         extends: 'u8g2gl_widget',
-        animated: true,
         api: apiBlock,
       };
 
       expect(manifest.name).toBe('wd_service_list');
       expect(manifest.extends).toBe('u8g2gl_widget');
-      expect(manifest.animated).toBe(true);
       expect(manifest.api.props).toHaveLength(3);
       expect(manifest.api.bindings).toHaveLength(1);
       expect(manifest.api.elements).toHaveLength(1);
       expect(manifest.api.elements[0]?.args).toHaveLength(2);
+    });
+
+    it('creates a valid PropDef using draw= instead of setter= ([D-18], §6.2)', () => {
+      const boxProp: PropDef = {
+        name: 'x',
+        type: 'int' as PropType,
+        draw: 'u8g2gl_draw_box',
+        required: true,
+      };
+
+      expect(boxProp.draw).toBe('u8g2gl_draw_box');
+      expect(boxProp.setter).toBeUndefined();
     });
   });
 
