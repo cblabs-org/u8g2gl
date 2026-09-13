@@ -44,12 +44,11 @@
  * Exported Functions:
  * - u8g2gl_draw_box():      Filled or outline rectangle, optionally rounded
  * - u8g2gl_draw_circle():   Circle outline or filled disc
- * - u8g2gl_draw_ellipse():  Ellipse outline or filled — see @note, not yet
- *                           implemented (declared only; see Completion Report)
+ * - u8g2gl_draw_ellipse():  Ellipse outline or filled
  * - u8g2gl_draw_hline():    Horizontal line
  * - u8g2gl_draw_line():     Arbitrary line between two points
  * - u8g2gl_draw_pixel():    Single pixel
- * - u8g2gl_draw_triangle(): Filled triangle
+ * - u8g2gl_draw_triangle(): Filled triangle, or a three-line outline
  * - u8g2gl_draw_vline():    Vertical line
  */
 #ifndef U8G2GL_DRAW_H
@@ -120,20 +119,6 @@ void u8g2gl_draw_circle(U8G2& display, int16_t x, int16_t y, int16_t radius,
  * Matches `include/u8g2gl/manifests/u8g2gl_ellipse.xml`: `filled` selects
  * between U8G2's `drawEllipse`/`drawFilledEllipse`.
  *
- * @note DECLARED, NOT DEFINED. `test/stubs/U8G2lib.h` — the single
- *       authoritative U8G2 test double (cpp.md §3) — has no `drawEllipse` or
- *       `drawFilledEllipse` member at all (unlike `drawCircle`/`drawDisc`,
- *       which exist there as no-ops). A definition that calls them would
- *       compile against real U8G2 firmware but would break the host test
- *       build, which compiles this translation unit against that same stub.
- *       Extending the stub is outside this work order's boundary box.
- *       Reported in the WO3 Completion Report rather than fixed here or
- *       worked around with a silently-wrong implementation. The symbol is
- *       declared so WO4 can still name it in `u8g2gl_ellipse.xml`; the
- *       architect must authorize the stub addition (a two-line mirror of the
- *       existing `drawCircle`/`drawDisc` entries) before this function can be
- *       defined and tested.
- *
  * @param display  U8G2 display context to draw into.
  * @param x        Center X coordinate.
  * @param y        Center Y coordinate.
@@ -186,17 +171,14 @@ void u8g2gl_draw_line(U8G2& display, int16_t x1, int16_t y1, int16_t x2,
 void u8g2gl_draw_pixel(U8G2& display, int16_t x, int16_t y);
 
 /**
- * @brief Draw a filled triangle.
+ * @brief Draw a triangle, filled or as a three-line outline.
  *
  * Matches `include/u8g2gl/manifests/u8g2gl_triangle.xml`.
  *
  * @note U8G2 has no unfilled-triangle primitive — `drawTriangle` is always
- *       filled. `filled` is accepted here because the manifest declares it,
- *       but it currently has no effect; passing `false` still draws a filled
- *       triangle. Surfaced in the WO3 Completion Report for the architect to
- *       triage (drop the property in WO4, or add an outline path later) —
- *       not fixed here, since inventing a three-line outline algorithm is
- *       outside what this manifest or design_spec.md asks for.
+ *       filled. `filled=false` is therefore composed from three
+ *       `drawLine()` calls, one per edge, rather than dispatched to a U8G2
+ *       outline primitive that does not exist.
  *
  * @param display U8G2 display context to draw into.
  * @param x0      Vertex 0 X coordinate.
@@ -205,7 +187,8 @@ void u8g2gl_draw_pixel(U8G2& display, int16_t x, int16_t y);
  * @param y1      Vertex 1 Y coordinate.
  * @param x2      Vertex 2 X coordinate.
  * @param y2      Vertex 2 Y coordinate.
- * @param filled  Accepted for manifest parity; see @note above.
+ * @param filled  Whether the triangle is filled (single `drawTriangle` call)
+ *                or an outline (three `drawLine` calls between the vertices).
  */
 void u8g2gl_draw_triangle(U8G2& display, int16_t x0, int16_t y0, int16_t x1,
                            int16_t y1, int16_t x2, int16_t y2,

@@ -69,6 +69,66 @@ public:
     int last_draw_pixel_x = 0;
     int last_draw_pixel_y = 0;
 
+    int draw_hline_count = 0;
+    int last_draw_hline_x = 0;
+    int last_draw_hline_y = 0;
+    int last_draw_hline_w = 0;
+
+    int draw_vline_count = 0;
+    int last_draw_vline_x = 0;
+    int last_draw_vline_y = 0;
+    int last_draw_vline_h = 0;
+
+    // drawLine is the only instrumented call issued more than once by a
+    // single u8g2gl_draw_* function (the triangle outline composes three of
+    // them — see u8g2gl_draw_triangle), so it keeps a small fixed-size call
+    // history alongside the last_* fields every other member uses, rather
+    // than only the most recent call.
+    static constexpr int kDrawLineHistory = 4;
+    int draw_line_count = 0;
+    int draw_line_x1[kDrawLineHistory] = {};
+    int draw_line_y1[kDrawLineHistory] = {};
+    int draw_line_x2[kDrawLineHistory] = {};
+    int draw_line_y2[kDrawLineHistory] = {};
+    int last_draw_line_x1 = 0;
+    int last_draw_line_y1 = 0;
+    int last_draw_line_x2 = 0;
+    int last_draw_line_y2 = 0;
+
+    int draw_circle_count = 0;
+    int last_draw_circle_x = 0;
+    int last_draw_circle_y = 0;
+    int last_draw_circle_r = 0;
+    uint8_t last_draw_circle_option = 0;
+
+    int draw_disc_count = 0;
+    int last_draw_disc_x = 0;
+    int last_draw_disc_y = 0;
+    int last_draw_disc_r = 0;
+    uint8_t last_draw_disc_option = 0;
+
+    int draw_triangle_count = 0;
+    int last_draw_triangle_x0 = 0;
+    int last_draw_triangle_y0 = 0;
+    int last_draw_triangle_x1 = 0;
+    int last_draw_triangle_y1 = 0;
+    int last_draw_triangle_x2 = 0;
+    int last_draw_triangle_y2 = 0;
+
+    int draw_ellipse_count = 0;
+    int last_draw_ellipse_x = 0;
+    int last_draw_ellipse_y = 0;
+    int last_draw_ellipse_rx = 0;
+    int last_draw_ellipse_ry = 0;
+    uint8_t last_draw_ellipse_option = 0;
+
+    int draw_filled_ellipse_count = 0;
+    int last_draw_filled_ellipse_x = 0;
+    int last_draw_filled_ellipse_y = 0;
+    int last_draw_filled_ellipse_rx = 0;
+    int last_draw_filled_ellipse_ry = 0;
+    uint8_t last_draw_filled_ellipse_option = 0;
+
     int set_clip_window_count = 0;
     int last_clip_x0 = 0;
     int last_clip_y0 = 0;
@@ -84,9 +144,31 @@ public:
         send_count++;
     }
 
-    void drawHLine(int, int, int) {}
-    void drawVLine(int, int, int) {}
-    void drawLine(int, int, int, int) {}
+    void drawHLine(int x, int y, int w) {
+        draw_hline_count++;
+        last_draw_hline_x = x;
+        last_draw_hline_y = y;
+        last_draw_hline_w = w;
+    }
+    void drawVLine(int x, int y, int h) {
+        draw_vline_count++;
+        last_draw_vline_x = x;
+        last_draw_vline_y = y;
+        last_draw_vline_h = h;
+    }
+    void drawLine(int x1, int y1, int x2, int y2) {
+        if (draw_line_count < kDrawLineHistory) {
+            draw_line_x1[draw_line_count] = x1;
+            draw_line_y1[draw_line_count] = y1;
+            draw_line_x2[draw_line_count] = x2;
+            draw_line_y2[draw_line_count] = y2;
+        }
+        draw_line_count++;
+        last_draw_line_x1 = x1;
+        last_draw_line_y1 = y1;
+        last_draw_line_x2 = x2;
+        last_draw_line_y2 = y2;
+    }
     void drawBox(int x, int y, int w, int h) {
         draw_box_count++;
         last_draw_box_x = x;
@@ -132,9 +214,45 @@ public:
         last_draw_pixel_x = x;
         last_draw_pixel_y = y;
     }
-    void drawCircle(int, int, int, uint8_t = 0x0F) {}
-    void drawDisc(int, int, int, uint8_t = 0x0F) {}
-    void drawTriangle(int, int, int, int, int, int) {}
+    void drawCircle(int x, int y, int r, uint8_t option = 0x0F) {
+        draw_circle_count++;
+        last_draw_circle_x = x;
+        last_draw_circle_y = y;
+        last_draw_circle_r = r;
+        last_draw_circle_option = option;
+    }
+    void drawDisc(int x, int y, int r, uint8_t option = 0x0F) {
+        draw_disc_count++;
+        last_draw_disc_x = x;
+        last_draw_disc_y = y;
+        last_draw_disc_r = r;
+        last_draw_disc_option = option;
+    }
+    void drawTriangle(int x0, int y0, int x1, int y1, int x2, int y2) {
+        draw_triangle_count++;
+        last_draw_triangle_x0 = x0;
+        last_draw_triangle_y0 = y0;
+        last_draw_triangle_x1 = x1;
+        last_draw_triangle_y1 = y1;
+        last_draw_triangle_x2 = x2;
+        last_draw_triangle_y2 = y2;
+    }
+    void drawEllipse(int x, int y, int rx, int ry, uint8_t option = 0x0F) {
+        draw_ellipse_count++;
+        last_draw_ellipse_x = x;
+        last_draw_ellipse_y = y;
+        last_draw_ellipse_rx = rx;
+        last_draw_ellipse_ry = ry;
+        last_draw_ellipse_option = option;
+    }
+    void drawFilledEllipse(int x, int y, int rx, int ry, uint8_t option = 0x0F) {
+        draw_filled_ellipse_count++;
+        last_draw_filled_ellipse_x = x;
+        last_draw_filled_ellipse_y = y;
+        last_draw_filled_ellipse_rx = rx;
+        last_draw_filled_ellipse_ry = ry;
+        last_draw_filled_ellipse_option = option;
+    }
     void drawRBox(int x, int y, int w, int h, int r) {
         draw_rbox_count++;
         last_draw_rbox_x = x;

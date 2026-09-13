@@ -17,9 +17,7 @@
  *          size passed through unguarded would wrap to a very large unsigned
  *          value rather than draw nothing.
  *
- * Description: One function body per primitive, plus u8g2gl_draw_ellipse's
- *              deliberately absent body — see the @note on its declaration in
- *              u8g2gl_draw.h and the WO3 Completion Report.
+ * Description: One function body per primitive.
  */
 #include "u8g2gl/u8g2gl_draw.h"
 
@@ -75,14 +73,21 @@ void u8g2gl_draw_circle(U8G2& display, int16_t x, int16_t y, int16_t radius,
 }
 
 // u8g2gl_draw_ellipse
-// Deliberately not defined — see the @note on the declaration in
-// u8g2gl_draw.h. test/stubs/U8G2lib.h (the single authoritative U8G2 test
-// double) has no drawEllipse/drawFilledEllipse member to call, and extending
-// it is outside WO3's boundary box. Defining this against the real U8G2 API
-// would compile for firmware but break the shared host test build, which
-// compiles this file against that same stub. Left undeclared-but-unused is
-// safe: nothing calls it yet (WO4 wires the manifest to it), so there is no
-// link error, only a reservation of the symbol name.
+// Dispatches to drawEllipse (outline) or drawFilledEllipse (filled), after
+// rejecting a non-positive radius on either axis. `segments` is forwarded as
+// U8G2's raw option byte, exactly as u8g2gl_draw_circle does.
+void u8g2gl_draw_ellipse(U8G2& display, int16_t x, int16_t y, int16_t rx,
+                          int16_t ry, bool filled,
+                          u8g2gl_draw_segment_t segments) {
+    if (rx <= 0 || ry <= 0) {
+        return;
+    }
+    if (filled) {
+        display.drawFilledEllipse(x, y, rx, ry, static_cast<uint8_t>(segments));
+    } else {
+        display.drawEllipse(x, y, rx, ry, static_cast<uint8_t>(segments));
+    }
+}
 
 // u8g2gl_draw_hline
 // Rejects a non-positive length, then forwards directly — U8G2 has no
@@ -109,12 +114,18 @@ void u8g2gl_draw_pixel(U8G2& display, int16_t x, int16_t y) {
 }
 
 // u8g2gl_draw_triangle
-// U8G2's drawTriangle is always filled — `filled` is accepted for manifest
-// parity but currently unused; see the @note on the declaration.
+// `filled` selects U8G2's single drawTriangle call, or a composed outline.
+// U8G2 has no unfilled-triangle primitive, so the outline is not a U8G2 call
+// at all — it is three drawLine calls, one per edge, in vertex order.
 void u8g2gl_draw_triangle(U8G2& display, int16_t x0, int16_t y0, int16_t x1,
                            int16_t y1, int16_t x2, int16_t y2, bool filled) {
-    (void)filled;
-    display.drawTriangle(x0, y0, x1, y1, x2, y2);
+    if (filled) {
+        display.drawTriangle(x0, y0, x1, y1, x2, y2);
+    } else {
+        display.drawLine(x0, y0, x1, y1);
+        display.drawLine(x1, y1, x2, y2);
+        display.drawLine(x2, y2, x0, y0);
+    }
 }
 
 // u8g2gl_draw_vline
