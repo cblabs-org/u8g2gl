@@ -35,7 +35,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO3b — complete the draw layer](wo3b-draw-testability/WORKORDER.md)** ✅ `07cfd2d` · base WO3 · standard · defects surfaced by WO3 (PA-added)
 - [x] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** ✅ `ac02684` · base WO3b · standard · R2.5, R3.3, R3.4
 - [x] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** ✅ `2bd7082` · base WO4 · standard · R2.1 — *prop half only*
-- [ ] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** · base WO5 · standard · finishes R2.1 (PA-added)
+- [x] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** ✅ `00651d7` · base WO5 · standard · finishes R2.1 (PA-added)
 - [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5b · standard · R2.2, R2.3, R2.4
 - [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
 - [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
@@ -341,3 +341,33 @@ with no behaviour change; WO6 then changes behaviour on a settled shape.
 WO5b also deletes the `@deprecated ComponentProp` alias WO5 left behind. A
 deprecation alias buys downstream consumers time to migrate, and there are none —
 the same reasoning that rejected `--migrate`.
+
+### WO5b — complete (`00651d7`)
+
+`component.ts` deleted outright. A composite is now literally a `WidgetManifest`
+whose `api` carries a `view`, so [D-18]'s one element vocabulary is finally in the
+types rather than only in the prose. CLI **240 tests, count unchanged, assertions
+intact** — which was the safety property: a type migration needing the tests
+rewritten would have changed behaviour. C++ 238 untouched, `tsc` and lint clean.
+
+**`WidgetManifest.extends` became optional**, which is the piece I had not seen: a
+composite has no C++ class to extend because it is inlined (§13.4). Without that,
+true type identity was impossible — and it costs nothing behaviourally, since only
+real widgets are checked for it and they always supply it.
+
+Three files beyond the named boundary needed type-only fixes to compile
+(`validate.ts`, `cli.ts`, a stale doc-comment in `parser/index.ts`), all disclosed.
+That is the boundary working as intended: I told it to trust `tsc` over my
+grep-gathered list, and `tsc` found what grep missed.
+
+**Two findings, both pre-existing, both to WO6.** Putting the widget and composite
+paths side by side exposed that widget props get `INVALID_ENUM_VALUE` validation
+and composite props never have — so a bad enum in a composite's `<api>` passes
+silently. Under [D-18] there is no longer even a nominal reason for the two to
+differ. The second is latent: the composite path ignores `bindings` in its
+unknown-attribute check, harmless while that list is always empty.
+
+**Third time in this PR that unifying duplicated logic has surfaced a real
+defect** — after the manifest cross-test and the draw-layer test double. Worth
+remembering when PR-04 decides how much to share between the firmware and editor
+generation paths.

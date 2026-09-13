@@ -105,6 +105,29 @@ be whoever wires the pipeline together in PR-04.
 - [ ] A test per branch: `setter` alone passes, `draw` alone passes, neither is an
       error, both is an error.
 
+## Added by the Principal Architect after WO5b — an asymmetry unification exposed
+
+Unifying the widget and composite prop-validation reads put the two paths side by
+side for the first time and revealed a **pre-existing** difference:
+
+- [ ] **Composite props get no enum validation.** A widget prop with
+      `type="enum"` and an out-of-range value produces `INVALID_ENUM_VALUE`; the
+      composite path has never had an equivalent check, so the same mistake in a
+      composite's `<api>` passes silently. Under [D-18] a composite is a
+      `WidgetManifest` like any other, so there is no longer even a nominal reason
+      for the two to differ. Give composite props the same check, and add a test
+      that fails without it.
+- [ ] **Latent, fix only if genuinely small:** the composite path does not
+      consider `bindings` in its unknown-attribute check. Harmless today, because
+      a composite's `bindings` is always empty — but it will misfire silently the
+      moment a composite `<api>` can declare them. If closing it is a couple of
+      lines while you are in the file, close it; if it turns out to need real
+      work, **leave it and say so** rather than expanding this work order.
+
+Neither was caused by the remediation. Both were found because merging two code
+paths shows you what one does and the other does not — which is the third time in
+this PR that unifying duplicated logic has surfaced a real defect.
+
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/validator/validate-references.ts`,
