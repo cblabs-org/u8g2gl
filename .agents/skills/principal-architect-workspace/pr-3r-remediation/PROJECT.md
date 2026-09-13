@@ -120,7 +120,7 @@ recorded in WO8's boundary box.
   `docs/decisions/d21-generated-capacities.md`, design_spec §3/§13.7/§18.1, and
   the plan ledger as PR-3R.
 
-- [ ] **[WO9 — remove the component vocabulary, pay down debt](wo9-component-removal/WORKORDER.md)** · base WO8 · standard · owner-directed
+- [x] **[WO9 — remove the component vocabulary, pay down debt](wo9-component-removal/WORKORDER.md)** ✅ `a184253` · base WO8 · standard · owner-directed
 
 ### WO1 — complete (`4ca9e01`)
 
@@ -488,3 +488,96 @@ Actioned as **WO9**, which removes the `<component>` vocabulary outright rather
 than softening the refusal message, and sweeps the remaining debt the readability
 review and WO8 surfaced. The owner also directed that the PR be staged for review
 once WO9 lands.
+
+### WO9 — complete (`a184253`)
+
+`parse-component.ts` deleted, its logic folded into the widget-manifest parser. A
+composite is now the same `<widget>` root as any widget, distinguished only by an
+optional `<view>`. CLI **266 tests** (net unchanged — `<component>`-authoring
+tests were replaced one-for-one), C++ 240, zero warnings.
+
+Verified end to end rather than from the report: a project with a `components/`
+directory now fails with
+
+> The 'components/' directory is removed: move 'components/x/' to 'widgets/x/',
+> change its root element to '`<widget>`', and give it a '`<view>`' ([D-18]).
+
+which is the whole point — the removal tells you what to do instead of silently
+ignoring your files.
+
+The `status_bar` fixtures moved to `widgets/` with content otherwise identical,
+which is the proof the capability moved rather than being deleted.
+
+---
+
+## Project Wrap-Up
+
+**Twelve work orders. Merged runtime, CLI and widget set realigned to [D-18],
+[D-19], [D-20], [D-21] and schema 0.4.**
+
+Final: **C++ 240 tests, CLI 266 tests, zero warnings** under `-Wall -Wextra
+-Wpedantic`. Schema **0.4**, CLI **0.6.0**. Readability review over the full
+89-file diff returned **no P1s**.
+
+### The pattern worth carrying into PR-04
+
+**Three of the four real defects were found by unifying duplicated logic** — the
+manifest cross-test, the draw-layer test double, and the widget/composite prop
+paths. In each case the duplication was not merely maintenance cost; it was where
+a defect had been hiding, invisible because nobody had put the two paths side by
+side. PR-04 decides how much to share between firmware and editor generation.
+That decision is now informed.
+
+### What execution found that planning did not
+
+- `set_hidden()`/`set_disabled()` never marked the frame dirty — **live**, in
+  merged code, invisible on any screen with an animation running
+- `long_mode="scroll"` wrapped instead of reversing, because design_spec's own
+  migration table contradicted its semantics table
+- `u8g2gl_draw_ellipse` was declared with no body — a symbol that could not link,
+  about to be named by a manifest
+- The draw-layer test double was a no-op for six of eight primitives
+- Composite props had never received enum validation
+- `<component>` was still accepted while the refusal message said it was removed
+
+### Where the plan was wrong, and how
+
+Three work orders were added during execution. **WO2b and WO3b were genuine
+discoveries** — the spec contradiction and the unlinkable symbol. **WO5b was my
+scoping error**: I wrote WO5 as though the component merge lived in the schema
+types, when the type *is* how validators reach composite props, so the merge
+always reached into WO6's files. The worker found the seam by building the literal
+version and watching it fail to compile.
+
+**WO9 was a planning gap of a different kind** — not a boundary drawn wrongly but
+a requirement never written. R2.1 said "merge the component schema"; nobody wrote
+"stop accepting the old vocabulary". It surfaced only because WO8's refusal
+message made a claim, and the reviewer checked whether the code honoured it.
+
+### What the workers did that the work orders did not ask for
+
+Worth recording, because it is the argument for tight boundaries plus explicit
+surfacing rather than loose ones:
+
+- WO1 **declined** to apply the dirty rule to `set_flag`/`clear_flag`, correctly:
+  `clear_dirty()` *is* `clear_flag(DIRTY)` and would have re-set the flag it clears
+- WO2 improved the guard it was told to copy, after the existing suite caught a
+  plausible generalisation
+- WO3 refused to invent a triangle-outline algorithm on its own authority
+- WO4's cross-test derived its function list from the header rather than a copy
+- WO7 proved the [D-21] override mechanism with a `static_assert` build instead of
+  reasoning about it
+- WO8 followed the **normative spec** over its own stale line-item, and said so —
+  a worker deferring to the work order would have silently undone WO2b
+
+### Open, carried forward
+
+- **No 32-bit measurement exists.** The host cannot build ILP32, so §18 still
+  cannot cite a target figure. The harness skips loudly rather than passing.
+- **The interim binding default costs +5,120 bytes** on a 64-bit host. Correct for
+  hand-written use; PR-04's generated capacities are what remove the waste.
+- **Widget and composite prop-checking blocks are now nearly identical** — a
+  unification pass is worthwhile, and on this PR's evidence is where the next
+  defect is hiding.
+- **`u8g2gl_obj.xml`'s `filled` on triangle** and similar manifest/runtime
+  parity remain unaudited as a whole; only the cases touched here were checked.
