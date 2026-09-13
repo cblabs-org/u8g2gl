@@ -13,6 +13,15 @@
  *              error, since realisation is now decided per instance by the generator (§6.1)
  *              rather than declared by the manifest.
  *
+ *              PR-3R WO9 folded the former `parse-component.ts` in here: [D-18]
+ *              leaves one element vocabulary, so a composite is parsed by this
+ *              same function, distinguished only by an optional `<view>` child
+ *              — not by a second root tag or a second parser. A `<component>`
+ *              root (the tag this replaces) is a hard, named error rather than
+ *              a generic "unexpected root element" diagnostic, because the
+ *              fix is always the same three-step migration and the CLI can
+ *              say so instead of making the author work it out.
+ *
  * Exports:
  * - parseWidgetManifest: Transform a parsed RawXmlElement into a WidgetManifest model
  * - parseWidgetManifestFile: Parse a raw XML string into a ParseResult<WidgetManifest>
@@ -27,6 +36,7 @@ import type {
   PropType,
   WidgetManifest,
 } from '../schema/widget-manifest.js';
+import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
   getAttributeValue,
@@ -36,17 +46,54 @@ import {
   requireAttribute,
   type RawXmlElement,
 } from './raw-xml.js';
+import { parseWidgetTree } from './parse-widget-tree.js';
+import type { ParseOptions, SourceEdit } from './name-policy.js';
+import { parseFocusRing } from './parse-screen.js';
 import { tokenizeXml } from './xml-tokeniser.js';
 import type { ParseResult } from './index.js';
 
 /**
+ * The specific, named fix for both `<component>`-removal hard errors ([D-18],
+ * design_spec §15.4). Shared by the root-tag check below and by
+ * `read-project.ts`'s `components/`-directory check, so the two diagnostics
+ * a migrating author can hit read as one instruction rather than two
+ * independently-worded guesses.
+ */
+export const COMPONENT_REMOVED_MIGRATION =
+  "move 'components/x/' to 'widgets/x/', change its root element to " +
+  "'<widget>', and give it a '<view>' ([D-18])";
+
+/**
  * Transforms a raw XML root element into a typed WidgetManifest model.
+ *
+ * A composite (§6.4) is not a second parse path: it is this same function,
+ * recognising an optional `<view>` child on the `<widget>` root. `extends`
+ * is left unset when a `<view>` is present, because a composite has no C++
+ * class of its own to extend (widget-manifest.ts) — `validate-schema.ts`
+ * still requires `extends` on the plain-widget path only.
  */
 export function parseWidgetManifest(
   root: RawXmlElement,
   filename: string,
   diagnostics: Diagnostic[],
+  options?: ParseOptions,
 ): WidgetManifest | undefined {
+  if (root.name === 'component') {
+    // Named hard error, not a generic "unexpected root" — §15.4 requires the
+    // 0.4 vocabulary's removal to be diagnosable at the point of use, not
+    // just in the one-time 0.3 schema-version refusal (validate-schema.ts).
+    diagnostics.push({
+      code: DIAGNOSTIC_CODES.MALFORMED_XML,
+      severity: 'error',
+      file: filename,
+      line: root.loc.line,
+      column: root.loc.column,
+      message: `'<component>' is removed: ${COMPONENT_REMOVED_MIGRATION}.`,
+      offendingText: root.name,
+    });
+    return undefined;
+  }
+
   if (root.name !== 'widget') {
     diagnostics.push({
       code: DIAGNOSTIC_CODES.MALFORMED_XML,
@@ -63,7 +110,6 @@ export function parseWidgetManifest(
   const nameAttr = requireAttribute(root, 'name', filename, diagnostics);
   const name = nameAttr?.value ?? '';
 
-  const extendsVal = getAttributeValue(root, 'extends') ?? 'u8g2gl_obj';
   // [D-18]: `animated` is gone from the widget-level contract — realisation is
   // decided per instance by the generator (§6.1), not declared by the
   // manifest. A manifest still carrying the attribute (pre-[D-18] fixtures,
@@ -188,37 +234,80 @@ export function parseWidgetManifest(
     loc: apiEl?.loc,
   };
 
+  // --- Composite view (§6.4, [D-18]) ---
+  // One element vocabulary means a composite is this same `<widget>` root
+  // with a `<view>` child, not a second tag. A plain widget manifest has no
+  // `<view>` and keeps its `extends` (defaulting to 'u8g2gl_obj'); a
+  // composite has no C++ class of its own, so `extends` is left unset for
+  // exactly the reason widget-manifest.ts documents on the field.
+  const viewEl = getChild(root, 'view');
+  if (!viewEl) {
+    const extendsVal = getAttributeValue(root, 'extends') ?? 'u8g2gl_obj';
+    return {
+      name,
+      extends: extendsVal,
+      api: apiBlock,
+      loc: root.loc,
+    };
+  }
+
+  const viewFocusRingEl = getChild(viewEl, 'focus_ring');
+  const focusRing = viewFocusRingEl
+    ? parseFocusRing(viewFocusRingEl, filename, diagnostics)
+    : undefined;
+
+  const visualChildren = viewEl.children.filter((child) => child.name !== 'focus_ring');
+  const widgetChildren = parseWidgetTree(visualChildren, filename, diagnostics, options);
+
+  const view: View = {
+    children: widgetChildren,
+    focusRing,
+    loc: viewEl.loc,
+  };
+
   return {
     name,
-    extends: extendsVal,
     api: apiBlock,
+    view,
     loc: root.loc,
   };
 }
 
 /**
  * Parses a widget manifest XML file from raw text into a ParseResult<WidgetManifest>.
+ *
+ * `options` matters only for a composite's `<view>` tree — a plain widget
+ * manifest has no instantiated elements to name — but is threaded through
+ * unconditionally so a caller need not know in advance which shape a file
+ * will turn out to be, the same reasoning `parseScreenFile` uses.
  */
 export function parseWidgetManifestFile(
   xml: string,
   filename: string,
+  options?: ParseOptions,
 ): ParseResult<WidgetManifest> {
   const rawDoc = tokenizeXml(xml, filename);
   const diagnostics = [...rawDoc.diagnostics];
 
+  const nameEdits: SourceEdit[] = options?.nameEdits ?? [];
+
   if (!rawDoc.root) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
-  const manifest = parseWidgetManifest(rawDoc.root, filename, diagnostics);
+  const manifest = parseWidgetManifest(rawDoc.root, filename, diagnostics, {
+    ...options,
+    nameEdits,
+  });
   const hasError = diagnostics.some((d) => d.severity === 'error');
 
   if (hasError || !manifest) {
-    return { diagnostics };
+    return { diagnostics, nameEdits };
   }
 
   return {
     value: manifest,
     diagnostics,
+    nameEdits,
   };
 }

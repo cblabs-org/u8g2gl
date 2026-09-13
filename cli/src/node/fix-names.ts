@@ -10,10 +10,12 @@
  *          designer performs the identical operation against an in-memory
  *          buffer in the browser, where nothing under `src/core/` may import
  *          `node:` anything.
- * Description: Re-parses screen and component documents under the `'generate'`
- *              missing-name policy, applies the resulting insertions to their
- *              source files, and reports which names landed in which file. It
- *              never re-serialises XML — every change is a text insertion at a
+ * Description: Re-parses screen and widget-manifest documents (the latter
+ *              covers composites too, per [D-18] — PR-3R WO9 retired the
+ *              separate `<component>` root) under the `'generate'` missing-name
+ *              policy, applies the resulting insertions to their source files,
+ *              and reports which names landed in which file. It never
+ *              re-serialises XML — every change is a text insertion at a
  *              recorded source location, so comments, attribute order and
  *              indentation are preserved by construction.
  *
@@ -26,8 +28,8 @@ import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   applyTextEdits,
-  parseComponentFile,
   parseScreenFile,
+  parseWidgetManifestFile,
   type SourceEdit,
 } from '../core/parser/index.js';
 import { readProjectFiles } from './read-project.js';
@@ -44,8 +46,11 @@ export interface NameFixRecord {
  * Parses one document under the `'generate'` policy and returns its insertions.
  *
  * The root tag decides the parser, matching the dispatch `validate` already does
- * for a single file. Anything else — a project manifest, globals, a widget
- * manifest — has no element-identity namespace, so it has nothing to fix.
+ * for a single file. A `<widget>` root covers both a plain widget and a
+ * composite ([D-18]) — `parseWidgetManifestFile` returns edits only when a
+ * `<view>` was actually present, so a plain widget manifest costs nothing
+ * extra here. Anything else — a project manifest, globals — has no
+ * element-identity namespace, so it has nothing to fix.
  */
 function computeNameEdits(content: string, filename: string): readonly SourceEdit[] {
   const rootTag = content.match(/<([a-zA-Z0-9_]+)/)?.[1] ?? '';
@@ -54,8 +59,8 @@ function computeNameEdits(content: string, filename: string): readonly SourceEdi
   if (rootTag === 'screen') {
     return parseScreenFile(content, filename, options).nameEdits ?? [];
   }
-  if (rootTag === 'component') {
-    return parseComponentFile(content, filename, options).nameEdits ?? [];
+  if (rootTag === 'widget') {
+    return parseWidgetManifestFile(content, filename, options).nameEdits ?? [];
   }
   return [];
 }
@@ -89,8 +94,9 @@ function writeNameEdits(absolutePath: string, edits: readonly SourceEdit[]): voi
  * @return One record per file actually modified, ordered by file name. Files
  *         with nothing to fix are omitted entirely, so an empty array means the
  *         project already names every element.
- * @throws Error if a project directory has no u8g2gl.xml — propagated from
- *         readProjectFiles so the caller reports it the same way `validate` does.
+ * @throws Error if a project directory has no u8g2gl.xml, or still has a
+ *         `components/` directory ([D-18], PR-3R WO9) — both propagated from
+ *         readProjectFiles so the caller reports them the same way `validate` does.
  */
 export function fixMissingNames(
   targetPath: string,
@@ -102,7 +108,10 @@ export function fixMissingNames(
   if (statSync(targetPath).isDirectory()) {
     const projectRoot = resolve(targetPath);
     const projectFiles = readProjectFiles(projectRoot);
-    for (const entry of [...projectFiles.screenXmls, ...projectFiles.componentXmls]) {
+    // Widget manifests carry composites too ([D-18]) — a plain widget's
+    // computeNameEdits() call below returns no edits, so including them here
+    // costs nothing.
+    for (const entry of [...projectFiles.screenXmls, ...projectFiles.widgetManifestXmls]) {
       documents.push({
         relativePath: entry.filename,
         absolutePath: join(projectRoot, entry.filename),

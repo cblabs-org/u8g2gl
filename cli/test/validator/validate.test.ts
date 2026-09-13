@@ -17,7 +17,6 @@ import {
   parseProjectFile,
   parseGlobalsFile,
   parseScreenFile,
-  parseComponentFile,
   parseWidgetManifestFile,
 } from '../../src/core/parser/index.js';
 import { validate, type ValidateInput } from '../../src/core/validator/index.js';
@@ -35,7 +34,7 @@ describe('validate orchestrator integration', () => {
       'utf-8',
     );
     const componentXml = readFileSync(
-      resolve(validDir, 'components', 'status_bar', 'status_bar.xml'),
+      resolve(validDir, 'widgets', 'status_bar', 'status_bar.xml'),
       'utf-8',
     );
     const widgetXml = readFileSync(
@@ -46,9 +45,11 @@ describe('validate orchestrator integration', () => {
     const project = parseProjectFile(projectXml, 'u8g2gl.xml').value!;
     const globals = parseGlobalsFile(globalsXml, 'globals.xml').value!;
     const screen = parseScreenFile(screenXml, 'screens/screen_home.xml').value!;
-    const component = parseComponentFile(
+    // Composite: a <widget> root carrying a <view> ([D-18], PR-3R WO9) — same
+    // parser as a plain widget, distinguished only by the fixture's content.
+    const component = parseWidgetManifestFile(
       componentXml,
-      'components/status_bar/status_bar.xml',
+      'widgets/status_bar/status_bar.xml',
     ).value!;
     const widget = parseWidgetManifestFile(
       widgetXml,

@@ -25,7 +25,6 @@ import {
   parseProjectFile,
   parseGlobalsFile,
   parseScreenFile,
-  parseComponentFile,
   parseWidgetManifestFile,
 } from '../core/parser/index.js';
 import { validate } from '../core/validator/index.js';
@@ -410,7 +409,10 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   const fileContentMap = new Map<string, string>();
 
   let parsedProject: U8g2glProject = {
-    schema: '0.3',
+    // Not a version literal: an unparsed project has no schema to name, and
+    // hardcoding one of our own only rots the next time the schema bumps
+    // (PR-3R WO9 removed a stale '0.3' default for exactly this reason).
+    schema: '',
     name: 'unnamed',
     version: '1.0.0',
     targets: [],
@@ -425,6 +427,20 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   const parsedScreens: Screen[] = [];
   const parsedComponents: WidgetManifest[] = [];
   const parsedWidgets: WidgetManifest[] = [];
+
+  // [D-18]: one element vocabulary — a composite is a WidgetManifest whose
+  // `<api>` carries a `<view>` (PR-3R WO9). `parseWidgetManifestFile` parses
+  // both shapes through the one `<widget>` root; this is the single place
+  // that sorts a parsed manifest into the `components` or `widgetManifests`
+  // bucket `validate()` still expects, matching pre-WO9 discovery
+  // (`components/` vs `widgets/`) without reviving a second parse path.
+  function bucketWidgetManifest(manifest: WidgetManifest): void {
+    if (manifest.view) {
+      parsedComponents.push(manifest);
+    } else {
+      parsedWidgets.push(manifest);
+    }
+  }
 
   if (stat.isDirectory()) {
     // --- Directory: Load standard project structure via readProjectFiles ---
@@ -490,21 +506,12 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
       }
     }
 
-    // 4. Parse components
-    for (const comp of projectFiles.componentXmls) {
-      const compRes = parseComponentFile(comp.content, comp.filename);
-      allDiagnostics.push(...compRes.diagnostics);
-      if (compRes.value) {
-        parsedComponents.push(compRes.value);
-      }
-    }
-
-    // 5. Parse widget manifests
+    // 4. Parse widget manifests — plain widgets and composites alike ([D-18])
     for (const widget of projectFiles.widgetManifestXmls) {
       const widRes = parseWidgetManifestFile(widget.content, widget.filename);
       allDiagnostics.push(...widRes.diagnostics);
       if (widRes.value) {
-        parsedWidgets.push(widRes.value);
+        bucketWidgetManifest(widRes.value);
       }
     }
   } else {
@@ -533,17 +540,15 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
       if (res.value) {
         parsedScreens.push(res.value);
       }
-    } else if (rootTag === 'component') {
-      const res = parseComponentFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedComponents.push(res.value);
-      }
-    } else if (rootTag === 'widget') {
+    } else if (rootTag === 'widget' || rootTag === 'component') {
+      // A '<component>' root is a hard error, not a dead end: dispatching it
+      // here (rather than silently matching nothing) lets
+      // parseWidgetManifestFile raise its named [D-18] migration diagnostic
+      // the same way the directory-mode path does.
       const res = parseWidgetManifestFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
       if (res.value) {
-        parsedWidgets.push(res.value);
+        bucketWidgetManifest(res.value);
       }
     }
   }

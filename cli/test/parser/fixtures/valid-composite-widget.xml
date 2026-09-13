@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- U8G2GL Component Fixture per design_spec §6.3 -->
-<component name="status_bar">
+<!-- U8G2GL composite fixture per design_spec §6.4 — a <widget> with a <view>
+     ([D-18], PR-3R WO9). Formerly valid-component.xml's <component> root;
+     content otherwise unchanged, which is the proof the capability moved
+     rather than being deleted. -->
+<widget name="status_bar">
     <api>
         <prop name="title_subject" type="subject" default="station_name" />
         <prop name="wifi_subject"  type="subject" default="wifi_connected" />
@@ -26,4 +29,4 @@
             format="HH:MM" font="clock_small_7" blink="true"
             bind_time="system_time" />
     </view>
-</component>
+</widget>
