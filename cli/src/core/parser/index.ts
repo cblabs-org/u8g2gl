@@ -14,7 +14,7 @@
  * - parseProjectFile: Parse u8g2gl.xml files into U8g2glProject
  * - parseGlobalsFile: Parse globals.xml files into Globals
  * - parseScreenFile: Parse screen_*.xml files into Screen
- * - parseComponentFile: Parse component XML files into Component
+ * - parseComponentFile: Parse component XML files into a composite WidgetManifest
  * - parseWidgetManifestFile: Parse widget manifest XML files into WidgetManifest
  * - tokenizeXml: Low-level XML scanner producing raw element tree
  * - RawXmlAttribute, RawXmlElement, RawXmlDocument: Low-level untyped XML types

@@ -4,24 +4,29 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/parser/parse-component.ts
- * Purpose: Transforms raw XML AST into typed Component models (§6.3). This
- *          file still parses the `<component>` root tag exactly as before —
- *          accepting a different root tag (e.g. `<widget>`, per design_spec
- *          §6.4) is a schema change reserved for WO8, not this merge.
+ * Purpose: Transforms raw XML AST into typed WidgetManifest models for the
+ *          composite case (§6.3). This file still parses the `<component>`
+ *          root tag exactly as before — accepting a different root tag (e.g.
+ *          `<widget>`, per design_spec §6.4) is a schema change reserved for
+ *          WO8, not this merge.
  * Description: WO5 retired the separate `ComponentProp` type in favour of
- *              `PropDef` (see schema/component.ts for why `Component` itself
- *              stays a distinct interface rather than a literal `WidgetManifest`
- *              alias): extracts parameterised API property declarations, now
- *              typed as `PropDef` and therefore able to carry `help`, plus the
- *              template widget subtree for a composite element.
+ *              `PropDef`; WO5b finishes the merge by retiring `Component`
+ *              itself (see schema/widget-manifest.ts) — a composite is now a
+ *              `WidgetManifest` whose `api` is a full `ApiBlock`. This parser
+ *              only ever populates `api.props` from `<prop>` children, now
+ *              typed as `PropDef` and therefore able to carry `help`; `api.
+ *              bindings` and `api.elements` are always empty here because a
+ *              `<component>` document has never declared either — no
+ *              behaviour changes, the shape is just made explicit.
  *
  * Exports:
- * - parseComponent: Transform a parsed RawXmlElement into a Component model
- * - parseComponentFile: Parse a raw XML string into a ParseResult<Component>
+ * - parseComponent: Transform a parsed RawXmlElement into a composite
+ *   WidgetManifest model
+ * - parseComponentFile: Parse a raw XML string into a
+ *   ParseResult<WidgetManifest>
  */
 
-import type { Component } from '../schema/component.js';
-import type { PropDef, PropType } from '../schema/widget-manifest.js';
+import type { WidgetManifest, PropDef, PropType } from '../schema/widget-manifest.js';
 import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
@@ -49,14 +54,14 @@ function inferComponentName(filename: string): string {
 }
 
 /**
- * Transforms a raw XML root element into a typed Component model.
+ * Transforms a raw XML root element into a typed composite WidgetManifest.
  */
 export function parseComponent(
   root: RawXmlElement,
   filename: string,
   diagnostics: Diagnostic[],
   options?: ParseOptions,
-): Component | undefined {
+): WidgetManifest | undefined {
   if (root.name !== 'component') {
     diagnostics.push({
       code: DIAGNOSTIC_CODES.MALFORMED_XML,
@@ -143,20 +148,22 @@ export function parseComponent(
 
   return {
     name,
-    api: apiProps,
+    // No `extends`: a composite has no C++ class of its own (see
+    // widget-manifest.ts) — the field is optional for exactly this case.
+    api: { props: apiProps, bindings: [], elements: [], loc: apiEl?.loc },
     view,
     loc: root.loc,
   };
 }
 
 /**
- * Parses a component XML file from raw text into a ParseResult<Component>.
+ * Parses a component XML file from raw text into a ParseResult<WidgetManifest>.
  */
 export function parseComponentFile(
   xml: string,
   filename: string,
   options?: ParseOptions,
-): ParseResult<Component> {
+): ParseResult<WidgetManifest> {
   const rawDoc = tokenizeXml(xml, filename);
   const diagnostics = [...rawDoc.diagnostics];
 

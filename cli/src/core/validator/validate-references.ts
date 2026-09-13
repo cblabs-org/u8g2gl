@@ -330,7 +330,9 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
 
   // --- 3. Validate references inside components (excluding $prop templates) ---
   for (const component of components ?? []) {
-    const propNames = new Set((component.api ?? []).map((p) => `$${p.name}`));
+    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
+    // not a retired `Component`) — reach through `.props`. No behaviour change.
+    const propNames = new Set((component.api?.props ?? []).map((p) => `$${p.name}`));
 
     walkNodes(component.view?.children ?? [], (node) => {
       // Check font references

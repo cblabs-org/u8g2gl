@@ -33,7 +33,6 @@ import type { Diagnostic } from '../core/schema/diagnostic.js';
 import type { U8g2glProject } from '../core/schema/project.js';
 import type { Globals } from '../core/schema/globals.js';
 import type { Screen } from '../core/schema/screen.js';
-import type { Component } from '../core/schema/component.js';
 import type { WidgetManifest } from '../core/schema/widget-manifest.js';
 import {
   identifyDisplay,
@@ -424,7 +423,7 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     images: [],
   };
   const parsedScreens: Screen[] = [];
-  const parsedComponents: Component[] = [];
+  const parsedComponents: WidgetManifest[] = [];
   const parsedWidgets: WidgetManifest[] = [];
 
   if (stat.isDirectory()) {

@@ -173,7 +173,12 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
 
       // --- Case 2: Component instance ---
       if (component) {
-        const declaredProps = new Map(component.api?.map((p) => [p.name, p]) ?? []);
+        // `component.api` is an ApiBlock post-WO5b (component is a
+        // WidgetManifest, not a retired `Component`) — reach through
+        // `.props`, matching the widget path above. No behaviour change.
+        const declaredProps = new Map(
+          component.api?.props.map((p) => [p.name, p]) ?? [],
+        );
 
         // 2a. Check attributes on component instance
         for (const [attrName, attrVal] of Object.entries(node.attributes)) {
@@ -203,7 +208,7 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
         }
 
         // 2b. Check required properties
-        for (const prop of component.api ?? []) {
+        for (const prop of component.api?.props ?? []) {
           if (prop.required) {
             const val = node.attributes[prop.name];
             if (val === undefined || val === '') {

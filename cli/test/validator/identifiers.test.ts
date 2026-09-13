@@ -242,7 +242,7 @@ describe('validateIdentifiers', () => {
     // Screen also contains element "bar_title"
     const statusBarComponent = {
       name: 'status_bar',
-      api: [],
+      api: { props: [], bindings: [], elements: [] },
       view: {
         children: [
           {

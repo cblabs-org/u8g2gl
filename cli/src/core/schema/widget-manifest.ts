@@ -16,8 +16,12 @@
  *          [D-18] also removes the separate `components/`/`<component>` tier: there is one
  *          element vocabulary, and a composite is simply a `WidgetManifest` whose `<api>`
  *          carries a `<view>` (§6.4). WO5 folded the pre-[D-18] `Component`/`ComponentProp`
- *          pair into this file rather than leaving a second type shape for the same concept
- *          — see `component.ts` for the deprecated aliases kept for callers not yet migrated.
+ *          pair's *prop* half into this file; WO5b finishes the merge by retiring `Component`
+ *          itself — a composite is now literally a `WidgetManifest`, not a second interface
+ *          with the same shape. `extends` becomes optional for exactly this reason: a real
+ *          widget names the C++ class it extends, but a composite has no class of its own —
+ *          it is inlined into its constituent elements at build time (§13.4) — so nothing is
+ *          gained by inventing a placeholder value where [D-18] never asked for one.
  * Description: Immutable interfaces for WidgetManifest, ApiBlock, property definitions,
  *              binding slots, and collection element arguments.
  *
@@ -40,8 +44,14 @@ import type { View } from './screen.js';
 export interface WidgetManifest {
   /** Widget class tag name (e.g. "u8g2gl_label", "wd_service_list"). */
   readonly name: string;
-  /** C++ base class extended by this widget (e.g. "u8g2gl_obj"). */
-  readonly extends: string;
+  /**
+   * C++ base class extended by this widget (e.g. "u8g2gl_obj"). Optional
+   * because a composite (this manifest carrying a `view`, [D-18]) has no C++
+   * class of its own to extend — it is inlined into its constituent elements
+   * rather than compiled to a class. Always present on a real widget manifest;
+   * `validate-schema.ts` still enforces that for the `<widget>` path.
+   */
+  readonly extends?: string;
   /** Public API manifest defining accepted properties, bindings, and elements. */
   readonly api: ApiBlock;
   /**

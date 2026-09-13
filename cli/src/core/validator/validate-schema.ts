@@ -390,7 +390,9 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         ),
       );
     }
-    for (const prop of component.api ?? []) {
+    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
+    // not a retired `Component`) — reach through `.props`. No behaviour change.
+    for (const prop of component.api?.props ?? []) {
       if (!prop.name) {
         diagnostics.push(
           createDiagnostic(

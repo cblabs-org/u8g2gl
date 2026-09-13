@@ -50,8 +50,6 @@ import {
   type EventTrigger,
   type EventChild,
   type StyleChild,
-  type Component,
-  type ComponentProp,
   type WidgetManifest,
   type ApiBlock,
   type PropType,
@@ -335,12 +333,12 @@ describe('Schema Types', () => {
     });
   });
 
-  describe('Component types (§6.3, §6.4) — merged onto PropDef by WO5', () => {
-    it('creates valid Component matching design_spec §6.3', () => {
+  describe('Composite WidgetManifest (§6.3, §6.4) — Component retired onto WidgetManifest by WO5b', () => {
+    it('creates a valid composite WidgetManifest matching design_spec §6.3', () => {
       // `u8g2gl_scrolling_label` no longer exists (WO2 folded it into
       // `u8g2gl_label`'s `long_mode`) — this fixture was surfaced by WO4 as
       // still referencing the deleted tag and is corrected here.
-      const componentProps: readonly ComponentProp[] = [
+      const compositeProps: readonly PropDef[] = [
         { name: 'title_subject', type: 'subject' as PropType, default: 'station_name' },
         { name: 'wifi_subject', type: 'subject' as PropType, default: 'wifi_connected' },
         { name: 'width', type: 'int' as PropType, default: '#screen_width' },
@@ -356,9 +354,12 @@ describe('Schema Types', () => {
         },
       ];
 
-      const component: Component = {
+      // A composite is now literally a WidgetManifest whose `api` carries a
+      // `view` ([D-18], WO5b) — no `extends`, because it has no C++ class of
+      // its own to extend.
+      const composite: WidgetManifest = {
         name: 'status_bar',
-        api: componentProps,
+        api: { props: compositeProps, bindings: [], elements: [] },
         view: {
           children: [
             {
@@ -380,11 +381,12 @@ describe('Schema Types', () => {
         },
       };
 
-      expect(component.name).toBe('status_bar');
-      expect(component.api).toHaveLength(5);
-      expect(component.api[4]?.required).toBe(true);
-      expect(component.api[4]?.help).toBe('Font used for the scrolling location label.');
-      expect(component.view.children[0]?.tag).toBe('u8g2gl_label');
+      expect(composite.name).toBe('status_bar');
+      expect(composite.extends).toBeUndefined();
+      expect(composite.api.props).toHaveLength(5);
+      expect(composite.api.props[4]?.required).toBe(true);
+      expect(composite.api.props[4]?.help).toBe('Font used for the scrolling location label.');
+      expect(composite.view?.children[0]?.tag).toBe('u8g2gl_label');
     });
   });
 

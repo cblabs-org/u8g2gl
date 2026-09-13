@@ -5,10 +5,11 @@
  *
  * File: test/parser/parse-component.test.ts
  * Purpose: Verification tests for parsing composite elements (§6.3, §6.4).
- * Description: Asserts that valid-component.xml is parsed into a typed Component model
- *              with parameterised <api> properties (types, defaults, required flags, and —
- *              since WO5's merge onto PropDef — help text) and a templated <view> widget
- *              tree with nested binding directives.
+ * Description: Asserts that valid-component.xml is parsed into a typed composite
+ *              WidgetManifest (§6.3, [D-18]; WO5b retired the separate `Component`
+ *              type) with parameterised <api> properties (types, defaults, required
+ *              flags, and — since WO5's merge onto PropDef — help text) and a
+ *              templated <view> widget tree with nested binding directives.
  */
 
 import { readFileSync } from 'node:fs';
@@ -25,7 +26,7 @@ describe('parseComponentFile', () => {
   );
   const fixtureXml = readFileSync(fixturePath, 'utf-8');
 
-  it('parses valid-component.xml into a typed Component model with API and view', () => {
+  it('parses valid-component.xml into a typed composite WidgetManifest with API and view', () => {
     const result = parseComponentFile(fixtureXml, 'status_bar.xml');
 
     expect(result.diagnostics).toHaveLength(0);
@@ -34,29 +35,29 @@ describe('parseComponentFile', () => {
     const component = result.value!;
     expect(component.name).toBe('status_bar');
 
-    // API props
-    expect(component.api).toHaveLength(5);
-    expect(component.api[0]).toMatchObject({
+    // API props — `api` is an ApiBlock post-WO5b, so props live under `.props`.
+    expect(component.api.props).toHaveLength(5);
+    expect(component.api.props[0]).toMatchObject({
       name: 'title_subject',
       type: 'subject',
       default: 'station_name',
     });
-    expect(component.api[1]).toMatchObject({
+    expect(component.api.props[1]).toMatchObject({
       name: 'wifi_subject',
       type: 'subject',
       default: 'wifi_connected',
     });
-    expect(component.api[2]).toMatchObject({
+    expect(component.api.props[2]).toMatchObject({
       name: 'width',
       type: 'int',
       default: '#screen_width',
     });
-    expect(component.api[3]).toMatchObject({
+    expect(component.api.props[3]).toMatchObject({
       name: 'height',
       type: 'int',
       default: '11',
     });
-    expect(component.api[4]).toMatchObject({
+    expect(component.api.props[4]).toMatchObject({
       name: 'font',
       type: 'font',
       default: 'small_9',
@@ -66,22 +67,22 @@ describe('parseComponentFile', () => {
 
     // View widget tree
     expect(component.view).toBeDefined();
-    expect(component.view.children).toHaveLength(3);
+    expect(component.view?.children).toHaveLength(3);
 
-    const scrollingLabel = component.view.children[0]!;
+    const scrollingLabel = component.view!.children[0]!;
     expect(scrollingLabel.tag).toBe('u8g2gl_label');
     expect(scrollingLabel.attributes.name).toBe('location');
     expect(scrollingLabel.attributes.bind_text).toBe('$title_subject');
     expect(scrollingLabel.attributes.font).toBe('$font');
     expect(scrollingLabel.attributes.long_mode).toBe('scroll');
 
-    const xbmWidget = component.view.children[1] as WidgetNode;
+    const xbmWidget = component.view!.children[1] as WidgetNode;
     expect(xbmWidget.tag).toBe('u8g2gl_xbm');
     expect(xbmWidget.attributes.src).toBe('icon_wifi');
     expect(xbmWidget.children).toHaveLength(1);
     expect(xbmWidget.children[0]?.kind).toBe('binding');
 
-    const clockWidget = component.view.children[2]!;
+    const clockWidget = component.view!.children[2]!;
     expect(clockWidget.tag).toBe('u8g2gl_clock');
     expect(clockWidget.attributes.format).toBe('HH:MM');
   });
@@ -102,7 +103,7 @@ describe('parseComponentFile', () => {
     const result = parseComponentFile(xml, 'labelled.xml');
 
     expect(result.diagnostics).toHaveLength(0);
-    expect(result.value?.api[0]?.help).toBe('Shown at the top of the screen.');
+    expect(result.value?.api.props[0]?.help).toBe('Shown at the top of the screen.');
   });
 
   it('infers component name from file path if name attribute is absent', () => {

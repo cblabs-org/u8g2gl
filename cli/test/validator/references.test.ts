@@ -43,12 +43,12 @@ describe('validateReferences', () => {
     components: [
       {
         name: 'status_bar',
-        api: [],
+        api: { props: [], bindings: [], elements: [] },
         view: { children: [] },
       },
       {
         name: 'battery_badge',
-        api: [],
+        api: { props: [], bindings: [], elements: [] },
         view: { children: [] },
       },
     ],

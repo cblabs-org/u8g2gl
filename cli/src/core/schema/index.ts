@@ -60,17 +60,13 @@
  *   - EventChild: Action handler attached to an element
  *   - StyleChild: Inline style reference element
  *
- * - Components (§6.3, §6.4):
- *   - Component: Composite element descriptor model (name, api, view) — a
- *     composite is conceptually a WidgetManifest whose `<api>` carries a
- *     `view` ([D-18]); see component.ts for why it is not yet that literal
- *     type.
- *   - ComponentProp: @deprecated alias for PropDef — WO5 retired the type
- *     outright so a composite prop can carry `help` like any other
- *
- * - Widget manifests (§6.4, §13.1):
+ * - Widget manifests (§6.4, §13.1) — also the composite model (§6.3, §6.4):
  *   - WidgetManifest: Document model for `<widget>` API declarations. Carries
- *     an optional `view` for the composite case ([D-18]).
+ *     an optional `view` for the composite case ([D-18]). WO5b retired the
+ *     separate `Component`/`ComponentProp` pair: a composite is now literally
+ *     a `WidgetManifest` whose `<api>` carries a `view`, not a second type
+ *     with the same shape — see widget-manifest.ts for why `extends` is
+ *     optional as a result.
  *   - ApiBlock: Public API declaration block
  *   - PropType: Widget property data type union
  *   - PropDef: Property descriptor mapping to C++ setter method
@@ -140,11 +136,6 @@ export type {
   EventChild,
   StyleChild,
 } from './widget-node.js';
-
-export type {
-  Component,
-  ComponentProp,
-} from './component.js';
 
 export type {
   WidgetManifest,
