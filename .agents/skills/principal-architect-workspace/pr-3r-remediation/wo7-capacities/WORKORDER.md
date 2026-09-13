@@ -93,10 +93,36 @@ adds the ceiling the object model actually has.
       the host width. Doubling a per-object pool is not free and §1.3 forbids
       claims the budget cannot substantiate.
 
+## Added by the Principal Architect after WO6 — the last hardcoded tag list
+
+`cli/src/core/validator/validate-references.ts` still tests
+`node.tag === 'u8g2gl_bitmap' || node.tag === 'u8g2gl_xbm' || node.tag ===
+'u8g2gl_icon'` at two sites (around lines 197 and 382) to decide whether a node
+references an image. Of those three, **only `u8g2gl_xbm` has a manifest.**
+
+WO6 surfaced this as "the same class of defect as `TIER1_PRIMITIVES`". Checked,
+and it is milder than that: WO6's own first item already closed the phantom-tag
+hole, so `<u8g2gl_bitmap>` and `<u8g2gl_icon>` now fail `UNKNOWN_WIDGET` before
+these branches are reached. What remains is **dead branches plus the same
+tag-knowledge-in-code smell**, not a live validation hole.
+
+It is still worth closing here, because WO7 is the last work order before WO8's
+integration pass and this is the last hardcoded element list in the CLI.
+
+- [ ] Derive image-ness from the manifest rather than a tag literal — a prop of
+      `type="image"` is the natural signal, but check what the manifests actually
+      declare rather than assuming. If no manifest field supports it, **say so and
+      leave the literals**, reduced to the tags that actually exist.
+- [ ] Either way, `u8g2gl_bitmap` and `u8g2gl_icon` must not remain as literals:
+      they name elements that do not exist.
+- [ ] A test that a tag with no manifest is rejected, and that `u8g2gl_xbm`'s
+      image reference is still checked.
+
 ## Strict Boundary Box
 
 **In scope:** `include/u8g2gl/u8g2gl_config.h`, the validator file you add the
-ceiling check to, their tests, `test/test_sizeof_report.cpp`, this WORKORDER.
+ceiling check to, `cli/src/core/validator/validate-references.ts` (the image-tag
+literals only), their tests, `test/test_sizeof_report.cpp`, this WORKORDER.
 
 **Do NOT touch:** the binding pool implementation, the generator (it does not
 exist yet), the schema version (WO8).

@@ -36,7 +36,7 @@ serially. PR head is the last branch in the stack.
 - [x] **[WO4 — manifests: `animated` out, `draw=` in](wo4-manifests/WORKORDER.md)** ✅ `ac02684` · base WO3b · standard · R2.5, R3.3, R3.4
 - [x] **[WO5 — merge component schema into widget manifest](wo5-schema-merge/WORKORDER.md)** ✅ `2bd7082` · base WO4 · standard · R2.1 — *prop half only*
 - [x] **[WO5b — retire the `Component` type](wo5b-component-retire/WORKORDER.md)** ✅ `00651d7` · base WO5 · standard · finishes R2.1 (PA-added)
-- [ ] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** · base WO5b · standard · R2.2, R2.3, R2.4
+- [x] **[WO6 — validator: primitives, composite tags, cycles, container geometry](wo6-validator/WORKORDER.md)** ✅ `c9cf2c8` · base WO5b · standard · R2.2, R2.3, R2.4
 - [ ] **[WO7 — capacity defaults and the structural object ceiling](wo7-capacities/WORKORDER.md)** · base WO6 · standard · [D-21]
 - [ ] **[WO8 — schema 0.4, the 0.3 refusal path, integration](wo8-schema-04/WORKORDER.md)** · base WO7 · standard · R2.6
 
@@ -371,3 +371,35 @@ unknown-attribute check, harmless while that list is always empty.
 defect** — after the manifest cross-test and the draw-layer test double. Worth
 remembering when PR-04 decides how much to share between the firmware and editor
 generation paths.
+
+### WO6 — complete (`c9cf2c8`)
+
+CLI 240 → **256 tests**, C++ 238 unchanged, zero warnings, boundary respected.
+All six items closed, plus the optional `bindings` one — which it took only
+because it genuinely was a couple of lines, exactly the condition set.
+
+`TIER1_PRIMITIVES` is gone: a tag now validates if and only if a manifest
+declares it, and `<u8g2gl_frame>` correctly fails. Cycle detection names the full
+path and dedupes per distinct cycle. The `setter`/`draw` rule distinguishes
+`MISSING_REQUIRED` from `OVERCONSTRAINED`, in a new `schema.test.ts` — **there
+had been no validator schema test file at all**, which is why the spurious
+diagnostic had nothing to announce it.
+
+**The geometry decision is the interesting one.** Container-relative checking
+needed a container's size, and a composite manifest does not know the size it
+will be instantiated at. Rather than invent one or add a width/height to `View` —
+which would have reached into schema types WO5b had just settled — it gives a
+composite's top-level children **no absolute check**, and documented why. That is
+the right call: a wrong check is worse than an absent one, and the alternative
+crossed a boundary that had just been drawn.
+
+**Surfaced, folded into WO7:** the last hardcoded tag list — three image-tag
+literals at two sites, of which only `u8g2gl_xbm` has a manifest. The worker
+called it the same class as `TIER1_PRIMITIVES`; checked, and it is milder,
+because item 1 already closed the phantom-tag hole. What remains is dead branches
+and the same smell.
+
+**Also surfaced:** the widget and composite prop-checking blocks are now nearly
+identical after item 6. Noted rather than actioned — a unification pass is
+worthwhile but it is not remediation, and this PR has already grown three work
+orders.
