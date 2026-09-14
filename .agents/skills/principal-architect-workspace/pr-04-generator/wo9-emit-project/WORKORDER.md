@@ -69,6 +69,16 @@ WO10 and WO11 reuse.
       `ui_set_*` setters.
 - [ ] **Styles unit** (`ui_style_*`), **fonts** (`<builtin>` only — `<bdf>` is
       refused in WO5), **images** (`<xbm>` from file, `PROGMEM`; `<convert>` refused).
+- [ ] **Carried from WO5b — the generator version must never be guessed.**
+      `getPackageVersion()` in `cli/src/node/cli.ts` falls back to `'0.3.0'` when
+      `package.json` cannot be read, which would stamp a wrong generator version into
+      committed output. Fail with a clear error instead; a test covers the unreadable
+      case.
+- [ ] **Carried from WO5b — `<output prefix>`.** It is parsed but nothing reads it,
+      and §13.4 fixes generated identifiers as `ui_*`. Decide from §13.4 whether it can
+      mean anything (e.g. file names only). If it cannot, diagnose it rather than
+      accept it silently; if it can, implement it and say what it controls. Record the
+      reasoning.
 - [ ] **Carried from WO4 — F5: generated capacities must reach the library build.**
       The binding pool is sized in `src/u8g2gl_obj.cpp` from `u8g2gl_config.h`.
       Including `u8g2gl_generated_config.h` only from generated translation units
@@ -81,6 +91,8 @@ WO10 and WO11 reuse.
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/generator/emit/` (project units and shared helpers);
+`cli/src/node/cli.ts` (version lookup only); `cli/src/core/parser/parse-project.ts`
+and `cli/src/core/validator/` (`<output prefix>` only);
 `cli/src/node/` only if the writer needs asset file reads passed in; golden
 fixtures and tests; this WORKORDER.
 

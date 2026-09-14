@@ -80,12 +80,28 @@ container.
       `flag="hiden"`, or with no `flag` at all, validates silently. §8.4 fixes the set at
       `hidden` and `disabled`; an unknown or missing flag is an error with a near-miss
       suggestion. Check it in the same types-pass walk.
+- [ ] **Carried from WO5b — the parser drops `extends` on a composite.**
+      `parse-widget-manifest.ts` sets `extends` only when a manifest has no `<view>`,
+      so `<widget extends="…"><view>` silently loses it and WO5b's PR-08 refusal for a
+      composite with its own C++ class cannot fire from real XML. Keep `extends` as
+      written on a `<view>` manifest. The registry still supplies `u8g2gl_obj` to a
+      composite that declares none. Add an end-to-end test: that XML now produces
+      `U8G2GL_NOT_YET_SUPPORTED`, a warning in `validate` and an error in `generate`.
+- [ ] **Carried from WO5b — collections must warn, not error, in `validate`.** Pass 2
+      of `validate-references.ts` reports a declared collection child such as
+      `<column>` as `U8G2GL_UNKNOWN_COMPONENT`, so decision 1's journey split does not
+      hold for collections. A child tag that the parent's effective manifest declares
+      as an `<element>` is known; only the not-yet-supported policy reports it. An
+      undeclared child tag is still unknown.
 
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/resolver/` (expansion and mangling modules);
 `cli/src/core/validator/validate-geometry.ts` (composite top-level gap only);
 `cli/src/core/validator/validate-types.ts` (expanded-tree walk only);
+`cli/src/core/parser/parse-widget-manifest.ts` (keep `extends` on `<view>` manifests
+only); `cli/src/core/validator/validate-references.ts` (declared collection children
+only);
 `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** realisation, flattening, capacities (WO8); emission; runtime;

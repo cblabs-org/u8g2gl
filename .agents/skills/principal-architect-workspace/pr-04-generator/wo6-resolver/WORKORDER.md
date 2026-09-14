@@ -5,7 +5,7 @@ title: "Resolver: constant arithmetic and anchors to literals"
 branch: u8g2gl-generator/wo6-resolver
 base: u8g2gl-generator/wo5b-generate-command
 complexity: standard
-status: draft — PA revises against WO5's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO6 — Resolver: arithmetic and anchors
@@ -69,6 +69,9 @@ skips anything with an expression.
       expressions. Composite internals keep WO6-of-PR-3R's "no absolute check at a
       composite's top level" until WO7 supplies the instantiation size.
 - [ ] Expose the resolver from core for `generate` (and, later, the editor).
+- [ ] **Carried from WO5b:** `cli/src/core/index.ts` does not export the generator
+      WO5b added under `src/core/generator/`. Export it alongside the resolver, so the
+      browser build ([UD-2]) can reach both through core.
 - [ ] **Carried from WO3:** `CommonAttributes` in `cli/src/core/schema/widget-node.ts`
       still types `x`, `y`, `width`, `height` and `hidden` as common to every
       element, which WO3 made untrue — they come from the effective manifest. Align
@@ -78,6 +81,7 @@ skips anything with an expression.
 
 **In scope:** new `cli/src/core/resolver/`; `cli/src/core/validator/validate-geometry.ts`;
 `cli/src/core/schema/widget-node.ts` (`CommonAttributes` only);
+`cli/src/core/index.ts` (exports only);
 `cli/src/core/generator/` (wiring only); `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** composite expansion (WO7); realisation (WO8); emission; runtime.

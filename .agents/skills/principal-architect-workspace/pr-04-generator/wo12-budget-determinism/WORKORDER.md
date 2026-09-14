@@ -70,6 +70,18 @@ by test rather than asserted.
       contract unchanged.
 - [ ] **Determinism tests:** generate twice → identical bytes; shuffle file
       discovery order → identical bytes; diagnostics ordered file, line, column.
+- [ ] **Carried from WO5b — locale-independent diagnostic order.** `validate.ts` and
+      `check-project.ts` sort with `localeCompare`, so the order can differ between
+      machines. §13.9 orders diagnostics by file, then line, then column; compare by
+      code unit, not locale. Keep both paths on one comparator.
+- [ ] **Carried from WO5b — validate `<output dir>`.** `dir="../src"` is accepted. An
+      output directory resolving outside the project root is an error (§13.10:
+      generation writes only to the configured output directory, never the app's own
+      sources).
+- [ ] **Carried from WO5b — empty directories.** Deleting stale generated files leaves
+      empty directories behind; remove a directory only when the writer emptied it.
+- [ ] **Carried from WO5b — usage errors under `--json`.** `generate` usage errors are
+      prose on stderr even with `--json`. Under [D-16] they are JSON with a stable code.
 - [ ] **CLI 0.7.0** in `package.json`; generated headers carry it; regenerate and
       commit the WO10 fixture and golden files — that version change is the only
       diff, which is the proof the bump is the only output change.
@@ -77,7 +89,9 @@ by test rather than asserted.
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/generator/report/` (new); `cli/src/node/cli.ts` and
-formatters; `cli/package.json` (version); regenerated fixture and golden files;
+formatters; `cli/package.json` (version); `cli/src/node/write-generated.ts`,
+`cli/src/core/generator/check-project.ts` and `cli/src/core/validator/validate.ts`
+(the four WO5b carries only); regenerated fixture and golden files;
 tests; this WORKORDER.
 
 **Do NOT touch:** emission logic (a determinism defect found here is a **stop and

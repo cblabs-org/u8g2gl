@@ -69,7 +69,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - **Owner checkpoint** — reached 2026-09-14; rulings below. WO4b added, WO5 split
 - [x] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** ✅ `4094489` · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
 - [x] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
-- [ ] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
+- [x] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5b · standard · [D-7], [D-20]
 - [ ] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** · base WO6 · standard · §13.4, §13.6
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7 · standard · [D-18], [D-21], `_n<N>`
@@ -516,6 +516,45 @@ reverses.
 | 6 | Single-file mode reports `UNKNOWN_SCHEMA_VERSION ''` for any non-project file | **WO5b** — the single-file path moves into `loadProject()` |
 | 7 | WORKORDERs said "stop and report"; dispatch prompts said "record and continue" | **Resolved** — defined once under Standing instructions |
 
+### WO5b — complete (`dc82dea`)
+
+**Verified independently:** commits only on the WO5b branch; runtime, manifests and
+`docs/` untouched; C++ 284 unchanged, zero warnings; CLI 418 → **458**, `tsc` and lint
+clean. **End to end through the built CLI**, on a throwaway project:
+
+- a clean `generate` writes six stamped files (`// source`, `// schema`, `// generator`,
+  `// target`) with no timestamp anywhere;
+- `--check` exits 0 on an up-to-date directory and 1 after a hand edit, naming the file;
+- with a `<bdf>` font, `validate` exits 0 with `U8G2GL_NOT_YET_SUPPORTED` as a
+  **warning** and `generate` exits 1 with the same code as an **error**, naming PR-04b,
+  and writes nothing — decision 1's journey split and decision 3's refusal, as required.
+
+**Decisions accepted:** `validate()` defaults the policy to `'warning'` and `generate()`
+fixes `'error'` with no override; `--out` is relative to the working directory while
+`<output dir>` is relative to the project; unknown `generate` options exit 2; new code
+`U8G2GL_UNKNOWN_TARGET` with suggestions; `--json` `files` carries
+`created | updated | unchanged | deleted`. Existing `validate` fixture assertions moved
+from 0 to 3 and 2 warnings, correctly — those fixtures use `<bdf>` and `<focus_ring>`.
+
+**S1 — spec disagreement, resolved for the header.** §13.9 says the header carries
+source path, schema version and generator version "only"; §13.12's worked example shows
+a `Target:` line. The spec contradicts itself; the worker included the target, which
+§13.12 and the WORKORDER both require. Kept. §13.9's "only" → **Chief Architect**.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | **The parser drops `extends` on a composite** (`parse-widget-manifest.ts:240–257` sets it only when there is no `<view>`). An author who writes `<widget extends="…"><view>` has `extends` silently ignored, so the PR-08 refusal for a composite with C++ can never fire from real XML. **Checked by the PA against the source** | **WO7** — the parser keeps `extends` on a `<view>` manifest; the refusal fires; a composite without `extends` still inherits `u8g2gl_obj` via the registry |
+| 2 | Collections already **error** in `validate`: pass 2 reports a declared collection child such as `<column>` as `U8G2GL_UNKNOWN_COMPONENT`, so decision 1's "warning in `validate`" does not hold for collections | **WO7** — a child tag the parent's effective manifest declares as an `<element>` is known; only the not-yet-supported policy reports it |
+| 3 | `src/core/index.ts` does not export the generator | **WO6** — it exposes the resolver from core anyway |
+| 4 | `<output prefix>` is parsed but unused; unit names are hardcoded `ui_*` | **WO9** — decide against §13.4's fixed `ui_` identifiers; if it cannot mean anything, diagnose it rather than silently accept it |
+| 5 | Diagnostics sort with locale-dependent `localeCompare` (pre-existing in `validate.ts`) | **WO12** — determinism: §13.9 orders diagnostics by file, line, column, and locale must not change that |
+| 6 | `getPackageVersion()` falls back to `'0.3.0'`, which would stamp a wrong generator version into committed output | **WO9** — the first work order emitting real content; fail loudly instead |
+| 7 | `<output dir>` is never validated; `dir="../src"` is accepted | **WO12** |
+| 8 | Deleting stale generated files leaves empty directories | **WO12** |
+| 9 | `generate` usage errors are prose on stderr, not JSON (matching `find`) | **WO12** — the [D-16] `--json` contract |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -535,6 +574,9 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO5b complete** (`dc82dea`, report `7038a16`). Verified
+  independently, including end to end through the built CLI. WO6 dispatched on
+  `u8g2gl-generator/wo6-resolver`. WO4c still awaiting the owner.
 - 2026-09-14 — **WO5a complete** (`a31527c`, report `1ebbae3`). Verified
   independently. WO5b dispatched on `u8g2gl-generator/wo5b-generate-command`. WO4c
   still awaiting the owner.
