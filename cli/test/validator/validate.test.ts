@@ -60,13 +60,18 @@ describe('validate orchestrator integration', () => {
     };
   }
 
-  it('valid project fixture produces 0 errors and 0 warnings', () => {
+  it('valid project fixture produces 0 errors, and warns only about constructs generate does not build yet', () => {
     const input = loadValidProject();
     const result = validate(input);
 
+    // PR-04 WO5b: the fixture's <bdf> fonts are valid as authored but refused by
+    // `generate` until PR-04b, so validation reports them as warnings (decision 3).
     expect(result.errors).toBe(0);
-    expect(result.warnings).toBe(0);
-    expect(result.diagnostics).toHaveLength(0);
+    expect(result.warnings).toBe(2);
+    expect(result.diagnostics.map((d) => d.code)).toEqual([
+      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
+      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
+    ]);
   });
 
   it('collects multiple errors across files without early bail', () => {

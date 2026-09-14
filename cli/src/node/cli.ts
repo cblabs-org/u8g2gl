@@ -6,41 +6,27 @@
  *
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
- *          for XML validation, display queries, and display catalogue enumeration.
+ *          for XML validation, code generation, display queries, and display
+ *          catalogue enumeration.
  * Description: Command parser and subcommand router supporting global flags
- *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue),
- *              including validate's --fix-names write-back of generated element names.
- *              validate checks a project against the bundled framework manifests plus
- *              the project's own widgets/, through one manifest registry ([D-17], [D-18]).
- *              Wires the isomorphic display catalogue query engine and schema validator
- *              into human-readable compiler-style diagnostics (§15.1) and JSON output (§15.3, [D-16]).
+ *              (--json, --no-color, --version, --help) and subcommands (validate,
+ *              generate, find, catalogue). `validate` and `generate` share one load
+ *              path (load-project.ts) and one validation (checkProject), differing
+ *              only in the not-yet-supported severity: `validate` warns, `generate`
+ *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
+ *              element names back; `generate` never invents identity (ui_spec §16.1).
+ *              Output is compiler-style diagnostics (§15.1) or JSON (§15.3, [D-16]).
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
-import { FRAMEWORK_MANIFESTS } from '../data/manifests.js';
-import {
-  buildManifestRegistry,
-  parseFrameworkManifests,
-  FRAMEWORK_MANIFEST_PATH,
-} from '../core/manifest/index.js';
-import {
-  parseProjectFile,
-  parseGlobalsFile,
-  parseScreenFile,
-  parseWidgetManifestFile,
-} from '../core/parser/index.js';
-import { validate } from '../core/validator/index.js';
+import { checkProject, generate } from '../core/generator/index.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
-import type { U8g2glProject } from '../core/schema/project.js';
-import type { Globals } from '../core/schema/globals.js';
-import type { Screen } from '../core/schema/screen.js';
-import type { WidgetManifest } from '../core/schema/widget-manifest.js';
 import {
   identifyDisplay,
   sourceDisplay,
@@ -57,11 +43,15 @@ import {
   formatCompareResult,
   formatCatalogueSummary,
 } from './format-display.js';
-import { readProjectFiles, getProjectFileMap } from './read-project.js';
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
+import { loadProject, type LoadedProject } from './load-project.js';
+import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
-const KNOWN_COMMANDS = ['validate', 'find', 'catalogue'] as const;
+const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate'] as const;
+
+/** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
+const DEFAULT_OUTPUT_DIR = 'generated';
 
 /**
  * Standard microcontroller internal SRAM budgets in bytes (§5.2, §18).
@@ -107,6 +97,7 @@ function printUsage(): void {
 
 Commands:
   validate   Validate a U8G2GL XML project or file against the schema
+  generate   Validate a project and write its generated C++ files
   find       Query the display catalogue for matching displays
   catalogue  Display summary from the display catalogue
 
@@ -121,6 +112,23 @@ Validate Options:
     --fix-names   Generate names for unnamed elements, write them into the
                   source files, then re-validate. Without it, an unnamed
                   element is an error: the build never invents identity.
+  Constructs 'generate' does not build yet are reported as warnings.
+  --json: { "diagnostics": [...], "errors": N, "warnings": N }
+          (+ "fixedNames": [{ "file", "names" }] with --fix-names)
+
+Generate Options:
+  u8g2gl generate [path]                       Generate from a project directory (default: .)
+    --target <name>  Target to generate for (default: the first <target>)
+    --out <dir>      Output directory (default: the project's <output dir>,
+                     else generated/ in the project)
+    --check          Write nothing; exit 1 if any file would change (CI check)
+  Runs the same validation as 'validate', but constructs not built yet are
+  errors, and any error means nothing is written. Only files inside the output
+  directory are written, and only files carrying the GENERATED header are
+  deleted. An unnamed element is an error: use 'validate --fix-names'.
+  --json: { "files": [{ "path", "action" }], "diagnostics": [...], "errors": N, "warnings": N }
+          action is created | updated | unchanged | deleted — what was done,
+          or with --check what would be done. "files" is [] when refused.
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -318,20 +326,48 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
   console.log(formatIdentifyResult(result, { color: useColor }));
 }
 
-// bundledFrameworkFilename
-// The bundled framework manifest a single file *is*, by filename, or undefined.
-// A file is the framework manifest when it sits at `<…>/u8g2gl/manifests/<file>`
-// — the include path FRAMEWORK_MANIFEST_PATH names, where the manifests ship —
-// and the bundle carries a manifest of that filename. The same file copied into
-// a project's widgets/ is a project copy, and still shadows (PR-04 WO1 F5).
-//   filePath — the path given to `validate`, relative or absolute
-function bundledFrameworkFilename(filePath: string): string | undefined {
-  const segments = resolve(filePath).split(sep);
-  const filename = segments[segments.length - 1] ?? '';
-  if (segments.slice(-3, -1).join('/') !== FRAMEWORK_MANIFEST_PATH) {
-    return undefined;
+// exitWithFatal
+// Reports a failure that stops a command before any diagnostics exist — a
+// missing path, a project the loader cannot read — in the command's own JSON
+// shape or as one error line, then exits 1.
+//   json      — whether --json was given
+//   file      — the path the failure concerns, as the user typed it
+//   message   — what went wrong
+//   jsonExtra — command-specific fields the JSON contract always carries
+function exitWithFatal(
+  json: boolean,
+  file: string,
+  message: string,
+  jsonExtra: Record<string, unknown> = {},
+): never {
+  if (json) {
+    const diagnostic: Diagnostic = { code: 'U8G2GL_MISSING_FILE', severity: 'error', file, line: 1, column: 1, message };
+    console.log(
+      JSON.stringify({ ...jsonExtra, diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2),
+    );
+  } else {
+    console.error(`Error: ${message}`);
   }
-  return FRAMEWORK_MANIFESTS.some((m) => m.filename === filename) ? filename : undefined;
+  process.exit(1);
+}
+
+// loadOrExit
+// Loads a project through the shared load path, or reports why it cannot be
+// loaded and exits. `validate` and `generate` both come through here, so they
+// read the same files the same way.
+//   targetArg — path as the user typed it
+//   json      — whether --json was given
+//   jsonExtra — command-specific JSON fields for a failure report
+function loadOrExit(targetArg: string, json: boolean, jsonExtra: Record<string, unknown>): LoadedProject {
+  const targetPath = resolve(process.cwd(), targetArg);
+  if (!existsSync(targetPath)) {
+    exitWithFatal(json, targetArg, `Path does not exist: ${targetArg}`, jsonExtra);
+  }
+  try {
+    return loadProject(targetPath, { label: targetArg });
+  } catch (err) {
+    exitWithFatal(json, 'u8g2gl.xml', err instanceof Error ? err.message : String(err), jsonExtra);
+  }
 }
 
 /**
@@ -343,11 +379,12 @@ function bundledFrameworkFilename(filePath: string): string | undefined {
  * - Default human-readable output renders compiler-style diagnostics with source lines and carets.
  * - Exits 0 on clean (no errors), 1 on errors.
  *
- * Parsing uses the default `'error'` missing-name policy: an unnamed element is
+ * Loading uses the default `'error'` missing-name policy: an unnamed element is
  * an error and no identity is invented. `--fix-names` runs a `'generate'` pass
  * first, writes the names into the source files, and then validates the
  * rewritten files through this same path — so the fixed project is genuinely
- * re-validated rather than assumed clean.
+ * re-validated rather than assumed clean. Constructs `generate` does not build
+ * yet are warnings here (`U8G2GL_NOT_YET_SUPPORTED`), and errors under `generate`.
  *
  * @param args Subcommand arguments.
  * @param json Whether to output JSON.
@@ -359,299 +396,37 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   // a path, or `validate --fix-names` alone would look for a file called
   // '--fix-names'.
   const targetArg = args.find((a) => !a.startsWith('-')) ?? '.';
-  const targetPath = resolve(process.cwd(), targetArg);
+  const failureExtra = fixNames ? { fixedNames: [] } : {};
 
-  if (!existsSync(targetPath)) {
-    const notFoundMsg = `Path does not exist: ${targetArg}`;
-    if (json) {
-      console.log(
-        JSON.stringify(
-          {
-            diagnostics: [
-              {
-                code: 'U8G2GL_MISSING_FILE',
-                severity: 'error',
-                file: targetArg,
-                line: 1,
-                column: 1,
-                message: notFoundMsg,
-              },
-            ],
-            errors: 1,
-            warnings: 0,
-          },
-          null,
-          2,
-        ),
-      );
-      process.exit(1);
-    }
-    console.error(`Error: ${notFoundMsg}`);
-    process.exit(1);
+  if (!existsSync(resolve(process.cwd(), targetArg))) {
+    exitWithFatal(json, targetArg, `Path does not exist: ${targetArg}`);
   }
 
-  // --- Step 1b: Optional write-back pass, before anything is loaded ---
+  // --- Step 1: Optional write-back pass, before anything is loaded ---
   // The fix runs first and writes to disk, so the load below reads the
   // rewritten files and the validation that follows is a genuine re-validation.
   let fixedNames: readonly NameFixRecord[] = [];
   if (fixNames) {
     try {
-      fixedNames = fixMissingNames(targetPath, targetArg);
+      fixedNames = fixMissingNames(resolve(process.cwd(), targetArg), targetArg);
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (json) {
-        console.log(
-          JSON.stringify(
-            {
-              diagnostics: [
-                {
-                  code: 'U8G2GL_MISSING_FILE',
-                  severity: 'error',
-                  file: targetArg,
-                  line: 1,
-                  column: 1,
-                  message: errMsg,
-                },
-              ],
-              errors: 1,
-              warnings: 0,
-              fixedNames: [],
-            },
-            null,
-            2,
-          ),
-        );
-        process.exit(1);
-      }
-      console.error(`Error: ${errMsg}`);
-      process.exit(1);
+      exitWithFatal(json, targetArg, err instanceof Error ? err.message : String(err), failureExtra);
     }
   }
 
-  const stat = statSync(targetPath);
-  const allDiagnostics: Diagnostic[] = [];
-  const fileContentMap = new Map<string, string>();
+  // --- Step 2: Load and validate through the path `generate` shares ---
+  const loaded = loadOrExit(targetArg, json, failureExtra);
+  const { diagnostics, errors, warnings } = checkProject(loaded.model, 'warning');
 
-  let parsedProject: U8g2glProject = {
-    // Not a version literal: an unparsed project has no schema to name, and
-    // hardcoding one of our own only rots the next time the schema bumps
-    // (PR-3R WO9 removed a stale '0.3' default for exactly this reason).
-    schema: '',
-    name: 'unnamed',
-    version: '1.0.0',
-    targets: [],
-  };
-  let parsedGlobals: Globals = {
-    consts: [],
-    subjects: [],
-    styles: [],
-    fonts: [],
-    images: [],
-  };
-  const parsedScreens: Screen[] = [];
-  // [D-18]: one element vocabulary. Plain widgets and composites go into one
-  // list and from there into one registry — never sorted into two buckets.
-  const projectManifests: WidgetManifest[] = [];
-  // Set only when a single file validated is itself a bundled framework manifest.
-  let frameworkStandIn: { readonly filename: string; readonly manifest: WidgetManifest } | undefined;
-
-  if (stat.isDirectory()) {
-    // --- Directory: Load standard project structure via readProjectFiles ---
-    let projectFiles;
-    try {
-      projectFiles = readProjectFiles(targetPath);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (json) {
-        console.log(
-          JSON.stringify(
-            {
-              diagnostics: [
-                {
-                  code: 'U8G2GL_MISSING_FILE',
-                  severity: 'error',
-                  file: 'u8g2gl.xml',
-                  line: 1,
-                  column: 1,
-                  message: errMsg,
-                },
-              ],
-              errors: 1,
-              warnings: 0,
-            },
-            null,
-            2,
-          ),
-        );
-        process.exit(1);
-      }
-      console.error(`error: u8g2gl.xml:1:1\n   ${errMsg}`);
-      process.exit(1);
-    }
-
-    const loadedMap = getProjectFileMap(projectFiles);
-    for (const [k, v] of loadedMap.entries()) {
-      fileContentMap.set(k, v);
-    }
-
-    // 1. Parse project manifest
-    const projRes = parseProjectFile(projectFiles.projectXml, 'u8g2gl.xml');
-    allDiagnostics.push(...projRes.diagnostics);
-    if (projRes.value) {
-      parsedProject = projRes.value;
-    }
-
-    // 2. Parse globals
-    if (projectFiles.globalsXml) {
-      const globRes = parseGlobalsFile(projectFiles.globalsXml, 'globals.xml');
-      allDiagnostics.push(...globRes.diagnostics);
-      if (globRes.value) {
-        parsedGlobals = globRes.value;
-      }
-    }
-
-    // 3. Parse screens
-    for (const screen of projectFiles.screenXmls) {
-      const scrRes = parseScreenFile(screen.content, screen.filename);
-      allDiagnostics.push(...scrRes.diagnostics);
-      if (scrRes.value) {
-        parsedScreens.push(scrRes.value);
-      }
-    }
-
-    // 4. Parse widget manifests — plain widgets and composites alike ([D-18])
-    for (const widget of projectFiles.widgetManifestXmls) {
-      const widRes = parseWidgetManifestFile(widget.content, widget.filename);
-      allDiagnostics.push(...widRes.diagnostics);
-      if (widRes.value) {
-        projectManifests.push(widRes.value);
-      }
-    }
-  } else {
-    // --- Single file validation ---
-    const fileXml = readFileSync(targetPath, 'utf-8');
-    fileContentMap.set(targetArg, fileXml);
-
-    const match = fileXml.match(/<([a-zA-Z0-9_]+)/);
-    const rootTag = match ? match[1] : '';
-
-    if (rootTag === 'u8g2gl') {
-      const res = parseProjectFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedProject = res.value;
-      }
-    } else if (rootTag === 'globals') {
-      const res = parseGlobalsFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedGlobals = res.value;
-      }
-    } else if (rootTag === 'screen') {
-      const res = parseScreenFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedScreens.push(res.value);
-      }
-    } else if (rootTag === 'widget' || rootTag === 'component') {
-      // A '<component>' root is a hard error, not a dead end: dispatching it
-      // here (rather than silently matching nothing) lets
-      // parseWidgetManifestFile raise its named [D-18] migration diagnostic
-      // the same way the directory-mode path does.
-      const res = parseWidgetManifestFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      const frameworkFilename = bundledFrameworkFilename(targetPath);
-      if (res.value && frameworkFilename !== undefined) {
-        frameworkStandIn = { filename: frameworkFilename, manifest: res.value };
-      } else if (res.value) {
-        projectManifests.push(res.value);
-      }
-    }
-  }
-
-  // --- Step 2: Build the element registry — framework manifests plus the project's ---
-  // The framework manifests come from the bundle, not from include/: an
-  // npm-installed CLI has no include/ to read ([D-17]).
-  const framework = parseFrameworkManifests(FRAMEWORK_MANIFESTS);
-  allDiagnostics.push(...framework.diagnostics);
-  // A single file that is a bundled framework manifest takes its bundled copy's
-  // place rather than joining the project list, where it would be reported as
-  // shadowing itself (PR-04 WO1 F5). Standing in rather than being dropped
-  // means the file's own content is what gets validated: a framework author
-  // checking an edit sees that edit's diagnostics, located in the real file.
-  const standInFile = frameworkStandIn && `${FRAMEWORK_MANIFEST_PATH}/${frameworkStandIn.filename}`;
-  const frameworkManifests = framework.manifests.map((m) =>
-    frameworkStandIn && m.loc?.file === standInFile ? frameworkStandIn.manifest : m,
-  );
-  const manifests = buildManifestRegistry({
-    framework: frameworkManifests,
-    project: projectManifests,
-  });
-
-  // --- Step 3: Execute Schema & Semantic Validation ---
-  // validate() reports the registry's own diagnostics (shadowing, extends).
-  const valResult = validate({
-    project: parsedProject,
-    globals: parsedGlobals,
-    screens: parsedScreens,
-    manifests,
-    catalogue: CATALOGUE,
-  });
-  allDiagnostics.push(...valResult.diagnostics);
-
-  // --- Step 4: Deduplicate and sort deterministically ---
-  const seen = new Set<string>();
-  const uniqueDiagnostics: Diagnostic[] = [];
-
-  for (const d of allDiagnostics) {
-    const key = `${d.file}:${d.line}:${d.column}:${d.code}:${d.message}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueDiagnostics.push(d);
-    }
-  }
-
-  uniqueDiagnostics.sort((a, b) => {
-    if (a.file !== b.file) {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    if (a.column !== b.column) {
-      return a.column - b.column;
-    }
-    return a.code.localeCompare(b.code);
-  });
-
-  let errorCount = 0;
-  let warningCount = 0;
-  for (const d of uniqueDiagnostics) {
-    if (d.severity === 'error') {
-      errorCount++;
-    } else if (d.severity === 'warning') {
-      warningCount++;
-    }
-  }
-
-  // --- Step 5: Emit JSON or Human-Readable Output ---
+  // --- Step 3: Emit JSON or human-readable output ---
   if (json) {
     // Machine-readable contract (§15.3, [D-16]). `fixedNames` is present only
     // when --fix-names was requested, so the existing contract is unchanged for
     // every caller that does not ask for the fix.
     console.log(
-      JSON.stringify(
-        {
-          diagnostics: uniqueDiagnostics,
-          errors: errorCount,
-          warnings: warningCount,
-          ...(fixNames ? { fixedNames } : {}),
-        },
-        null,
-        2,
-      ),
+      JSON.stringify({ diagnostics, errors, warnings, ...(fixNames ? { fixedNames } : {}) }, null, 2),
     );
-    process.exit(errorCount > 0 ? 1 : 0);
+    process.exit(errors > 0 ? 1 : 0);
   }
 
   if (fixNames) {
@@ -667,30 +442,163 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     }
   }
 
-  if (errorCount > 0) {
-    const formatted = formatDiagnostics(
-      uniqueDiagnostics,
-      (f) => fileContentMap.get(f),
-      { color: useColor },
-    );
+  const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
+  if (errors > 0) {
     console.error(formatted);
-    console.error(`\nValidation failed: ${errorCount} error(s), ${warningCount} warning(s).`);
+    console.error(`\nValidation failed: ${errors} error(s), ${warnings} warning(s).`);
+    process.exit(1);
+  }
+  if (warnings > 0) {
+    console.log(formatted);
+    console.log(`\nValidation passed: 0 errors, ${warnings} warning(s).`);
+    process.exit(0);
+  }
+  console.log('Validation passed: 0 errors, 0 warnings.');
+  process.exit(0);
+}
+
+/** Parsed `generate` arguments. */
+interface GenerateArgs {
+  readonly path: string;
+  readonly target?: string;
+  readonly out?: string;
+  readonly check: boolean;
+}
+
+// parseGenerateArgs
+// Parses `generate [path] --target <name> --out <dir> --check`, or reports a
+// usage error and exits 2. Strict, unlike `validate`: a mistyped flag on a
+// command that writes files must not be silently ignored.
+//   args — subcommand arguments, global flags already removed
+function parseGenerateArgs(args: readonly string[]): GenerateArgs {
+  let path: string | undefined;
+  let target: string | undefined;
+  let out: string | undefined;
+  let check = false;
+
+  const usageError = (message: string): never => {
+    console.error(`Error: ${message}`);
+    console.error("Run 'u8g2gl --help' for generate's options.");
+    process.exit(2);
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? '';
+    if (arg === '--check') {
+      check = true;
+    } else if (arg === '--target' || arg === '--out') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        usageError(`${arg} requires a value.`);
+      }
+      i++;
+      if (arg === '--target') {
+        target = value;
+      } else {
+        out = value;
+      }
+    } else if (arg.startsWith('-')) {
+      usageError(`Unknown option for generate: ${arg}`);
+    } else if (path === undefined) {
+      path = arg;
+    } else {
+      usageError(`generate takes one path; got '${path}' and '${arg}'.`);
+    }
+  }
+
+  return { path: path ?? '.', ...(target !== undefined ? { target } : {}), ...(out !== undefined ? { out } : {}), check };
+}
+
+/** Output-relative change list as the user reads it, one line per file. */
+function formatChanges(changes: readonly FileChange[], check: boolean): string {
+  const verb: Record<FileChange['action'], string> = check
+    ? { created: 'would create', updated: 'would update', unchanged: 'unchanged', deleted: 'would delete' }
+    : { created: 'created', updated: 'updated', unchanged: 'unchanged', deleted: 'deleted' };
+  return changes.map((c) => `  ${verb[c.action]}: ${c.path}`).join('\n');
+}
+
+/**
+ * @brief Executes the `generate` subcommand.
+ *
+ * Loads the project through the path `validate` uses and validates it the same
+ * way, but with not-yet-supported constructs as errors. Any error refuses the
+ * build: nothing is written.
+ *
+ * `--json` contract (§15.3, [D-16]), on stdout:
+ * `{ "files": FileChange[], "diagnostics": Diagnostic[], "errors": N, "warnings": N }`,
+ * where each `FileChange` is `{ "path", "action" }`, `path` is relative to the
+ * output directory, and `action` is `created | updated | unchanged | deleted` —
+ * what was done or, under `--check`, what would be done. `files` is `[]` when
+ * the build is refused. The §18 budget joins this object in PR-04 WO12.
+ *
+ * Exit status: 0 on success (under `--check`, only if nothing would change);
+ * 1 if refused, or under `--check` if any file would change; 2 on a usage error.
+ *
+ * @param args Subcommand arguments.
+ * @param json Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
+ */
+function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
+  const options = parseGenerateArgs(args);
+
+  // --- Step 1: Load, validate and lay out — all or nothing ---
+  const loaded = loadOrExit(options.path, json, { files: [] });
+  const result = generate({
+    ...loaded.model,
+    ...(options.target !== undefined ? { target: options.target } : {}),
+    generatorVersion: getPackageVersion(),
+  });
+  const { diagnostics, errors, warnings } = result;
+  const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
+
+  if (errors > 0 || loaded.projectRoot === undefined) {
+    if (json) {
+      console.log(JSON.stringify({ files: [], diagnostics, errors, warnings }, null, 2));
+    } else {
+      console.error(formatted);
+      console.error(`\nGeneration refused: ${errors} error(s), ${warnings} warning(s). Nothing was written.`);
+    }
     process.exit(1);
   }
 
-  if (warningCount > 0) {
-    const formatted = formatDiagnostics(
-      uniqueDiagnostics,
-      (f) => fileContentMap.get(f),
-      { color: useColor },
-    );
-    console.log(formatted);
-    console.log(`\nValidation passed: 0 errors, ${warningCount} warning(s).`);
-    process.exit(0);
-  }
+  // --- Step 2: Decide the output directory ---
+  // --out is relative to where the command runs; <output dir> is relative to
+  // the project, because the project file is what declares it.
+  const outDir = options.out !== undefined
+    ? resolve(process.cwd(), options.out)
+    : resolve(loaded.projectRoot, loaded.model.project.output?.dir ?? DEFAULT_OUTPUT_DIR);
+  const outLabel = relative(process.cwd(), outDir).split(sep).join('/') || '.';
 
-  console.log('Validation passed: 0 errors, 0 warnings.');
-  process.exit(0);
+  // --- Step 3: Check or write ---
+  let changes: readonly FileChange[];
+  try {
+    changes = options.check ? planGeneratedWrite(outDir, result.files) : writeGenerated(outDir, result);
+  } catch (err) {
+    exitWithFatal(json, outLabel, err instanceof Error ? err.message : String(err), { files: [] });
+  }
+  const drift = changes.filter((c) => c.action !== 'unchanged');
+
+  // --- Step 4: Report ---
+  if (json) {
+    console.log(JSON.stringify({ files: changes, diagnostics, errors, warnings }, null, 2));
+  } else {
+    if (warnings > 0) {
+      console.log(`${formatted}\n`);
+    }
+    if (options.check) {
+      console.log(
+        drift.length === 0
+          ? `Generated files in ${outLabel} are up to date (target '${result.target}').`
+          : `Generated files in ${outLabel} are out of date (target '${result.target}'):\n${formatChanges(drift, true)}`,
+      );
+    } else {
+      console.log(
+        `Generated ${result.files.length} file(s) in ${outLabel} for target '${result.target}':\n` +
+          formatChanges(changes, false),
+      );
+    }
+  }
+  process.exit(options.check && drift.length > 0 ? 1 : 0);
 }
 
 /**
@@ -771,6 +679,11 @@ export function runCli(rawArgs: readonly string[]): void {
 
   if (subcommand === 'validate') {
     handleValidateCommand(subcommandArgs, json, useColor);
+    return;
+  }
+
+  if (subcommand === 'generate') {
+    handleGenerateCommand(subcommandArgs, json, useColor);
     return;
   }
 

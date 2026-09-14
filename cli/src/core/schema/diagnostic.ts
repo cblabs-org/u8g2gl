@@ -127,6 +127,25 @@ export const DIAGNOSTIC_CODES = {
    * the binding changed would be reflow, which U8G2GL does not have.
    */
   BOUND_GEOMETRY_ANCHORED_CHILD: 'U8G2GL_BOUND_GEOMETRY_ANCHORED_CHILD',
+  /**
+   * The document uses a construct the schema accepts but the generator does not
+   * build yet — focus rings, events and screen navigation (PR-09), collections
+   * and composites with their own C++ class (PR-08), `<bdf>` fonts and `<convert>`
+   * images (PR-04b). The message names the PR that delivers it.
+   *
+   * **Emitted at two severities, chosen by the caller's `NotYetSupportedPolicy`,
+   * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).
+   * `validate` (and the designer) report a `warning`, so the document is not shown
+   * as broken while it is being authored; `generate` reports an `error` and writes
+   * nothing, so a build never silently drops what it cannot emit. Code and location
+   * are identical under both, so a consumer can match one against the other.
+   */
+  NOT_YET_SUPPORTED: 'U8G2GL_NOT_YET_SUPPORTED',
+  /**
+   * `generate --target <name>` names a target the project does not declare.
+   * Suggestions carry the declared target names closest to the one given.
+   */
+  UNKNOWN_TARGET: 'U8G2GL_UNKNOWN_TARGET',
 } as const;
 
 /**

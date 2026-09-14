@@ -31,6 +31,10 @@ import { validateWidgetProps } from './validate-widget-props.js';
 import { validateTypes } from './validate-types.js';
 import { validateGeometry } from './validate-geometry.js';
 import { validateIdentifiers } from './validate-identifiers.js';
+import {
+  validateNotYetSupported,
+  type NotYetSupportedPolicy,
+} from './validate-not-yet-supported.js';
 
 /**
  * Full project and asset input structure supplied to the validator.
@@ -49,6 +53,14 @@ export interface ValidateInput {
    */
   readonly manifests: ManifestRegistry;
   readonly catalogue: readonly DisplayRecord[];
+  /**
+   * Severity of `U8G2GL_NOT_YET_SUPPORTED` (Pass 8): `'warning'` for authoring,
+   * `'error'` for the build. A parameter rather than a branch, like the [U-1]
+   * missing-name policy, so both journeys run this one validator. Defaults to
+   * `DEFAULT_NOT_YET_SUPPORTED_POLICY` (`'warning'`); `generate()` always passes
+   * `'error'`.
+   */
+  readonly notYetSupported?: NotYetSupportedPolicy;
 }
 
 /**
@@ -72,6 +84,7 @@ export interface ValidateResult {
  * 5. Data binding type compatibility (validateTypes)
  * 6. Layout geometry & display bounds (validateGeometry)
  * 7. Identifier naming rules & collisions (validateIdentifiers)
+ * 8. Constructs not yet generated, at `input.notYetSupported` (validateNotYetSupported)
  *
  * @param input The parsed project AST models and display catalogue.
  * @return Ordered diagnostics with error and warning totals.
@@ -104,6 +117,9 @@ export function validate(input: ValidateInput): ValidateResult {
 
   // Pass 7: Identifier rules & inlining collisions
   allDiagnostics.push(...validateIdentifiers(input));
+
+  // Pass 8: Constructs the generator does not build yet, at the caller's policy
+  allDiagnostics.push(...validateNotYetSupported(input));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
   allDiagnostics.sort((a, b) => {

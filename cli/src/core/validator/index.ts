@@ -24,3 +24,8 @@ export { validateWidgetProps } from './validate-widget-props.js';
 export { validateTypes } from './validate-types.js';
 export { validateGeometry } from './validate-geometry.js';
 export { validateIdentifiers } from './validate-identifiers.js';
+export {
+  validateNotYetSupported,
+  DEFAULT_NOT_YET_SUPPORTED_POLICY,
+  type NotYetSupportedPolicy,
+} from './validate-not-yet-supported.js';

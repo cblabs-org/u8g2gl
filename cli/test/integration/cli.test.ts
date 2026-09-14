@@ -50,12 +50,16 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
+  // PR-04 WO5b: valid-project's two <bdf> fonts (PR-04b) and its <focus_ring>
+  // (PR-09) are valid as authored but not generated yet, so `validate` passes
+  // with exactly those three warnings — and `generate` refuses the same project
+  // (test/integration/generate.test.ts).
   it('u8g2gl validate valid-project/ -> exit 0, no output on stderr', async () => {
     const res = await runCliSubprocess(['validate', validProjectDir]);
 
     expect(res.code).toBe(0);
     expect(res.stderr.trim()).toBe('');
-    expect(res.stdout).toContain('Validation passed: 0 errors, 0 warnings.');
+    expect(res.stdout).toContain('Validation passed: 0 errors, 3 warning(s).');
   });
 
   it('u8g2gl validate valid-project/ --json -> valid JSON, errors: 0', async () => {
@@ -63,14 +67,18 @@ describe('U8G2GL CLI End-to-End Integration', () => {
 
     expect(res.code).toBe(0);
     const parsed = JSON.parse(res.stdout) as {
-      diagnostics: unknown[];
+      diagnostics: Array<{ code: string; severity: string }>;
       errors: number;
       warnings: number;
     };
     expect(parsed.errors).toBe(0);
-    expect(parsed.warnings).toBe(0);
+    expect(parsed.warnings).toBe(3);
     expect(Array.isArray(parsed.diagnostics)).toBe(true);
-    expect(parsed.diagnostics).toHaveLength(0);
+    expect(parsed.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual([
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+    ]);
   });
 
   it('u8g2gl validate broken-project/ -> exit 1, diagnostics on stderr', async () => {
@@ -124,9 +132,11 @@ describe('U8G2GL CLI End-to-End Integration', () => {
 </u8g2gl>
 `,
       );
+      // A <builtin> font, not <bdf>: this project tests manifests, and a <bdf>
+      // font is a not-yet-supported warning since PR-04 WO5b.
       writeFileSync(
         join(dir, 'globals.xml'),
-        '<globals><fonts><bdf name="small_9" src="fonts/small_9.bdf" /></fonts></globals>\n',
+        '<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>\n',
       );
       // `draw_color` is declared only on u8g2gl_obj: it validates only if
       // `extends` is resolved, not merely if u8g2gl_label's manifest is found.
@@ -134,7 +144,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
         join(dir, 'screens/screen_home.xml'),
         `<screen name="home">
     <view>
-        <u8g2gl_label name="title" x="0" y="0" width="128" height="12" font="small_9"
+        <u8g2gl_label name="title" x="0" y="0" width="128" height="12" font="u8g2_font_6x10_mr"
                       text="Hi" long_mode="dots" draw_color="1" />
     </view>
 </screen>
@@ -274,10 +284,12 @@ describe('WO9: validate --fix-names end-to-end', () => {
 </u8g2gl>
 `;
 
+  // A <builtin> font, not <bdf>: these tests are about names, and a <bdf> font
+  // is a not-yet-supported warning since PR-04 WO5b.
   const globalsXml = `<?xml version="1.0" encoding="UTF-8"?>
 <globals>
     <fonts>
-        <bdf name="small_9" src="fonts/small_9.bdf" />
+        <builtin name="u8g2_font_6x10_mr" />
     </fonts>
 </globals>
 `;
@@ -286,8 +298,8 @@ describe('WO9: validate --fix-names end-to-end', () => {
 <screen name="home">
     <!-- keep this comment -->
     <view>
-        <u8g2gl_label y="0" x="0" width="128" height="12" font="small_9" text="a" />
-        <u8g2gl_label x="0" y="20" width="128" height="12" font="small_9" text="b" />
+        <u8g2gl_label y="0" x="0" width="128" height="12" font="u8g2_font_6x10_mr" text="a" />
+        <u8g2gl_label x="0" y="20" width="128" height="12" font="u8g2_font_6x10_mr" text="b" />
     </view>
 </screen>
 `;
