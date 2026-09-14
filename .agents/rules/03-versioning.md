@@ -14,8 +14,10 @@ consumed together.
 ## The compatibility rule
 
 Generated code records the schema version and generator version that produced it
-(design_spec §13.2). The runtime **refuses to compile against a mismatched major
-version** (§16). These are the guardrails that stop a stale `generated/` directory
+(design_spec §13.2). The runtime **refuses to compile against a mismatched schema
+version** (§16) — the major version, and **also the minor while the major is 0**,
+because before 1.0 breaking changes land in minor bumps. Checking only the major
+would let a 0.3 project compile against a 0.4 runtime without any error. These are the guardrails that stop a stale `generated/` directory
 from failing mysteriously — do not weaken them for convenience.
 
 ## Schema versions are expensive

@@ -750,3 +750,68 @@ write one; an `<api>` with no new props is enough.
 was free. Tier-1 edits therefore went through a worktree on `main`, and the PA's
 tree was not touched. Rule 04 again: check who holds the tree every time — last
 round's answer doesn't carry over.
+
+---
+
+## Session — 2026-09-14 · PR-04 rulings after WO4
+
+PR-04's PA brought four decisions and four spec findings after WO4. All four
+decisions were approved as the PA recommended. That grows the PR-04 ledger from
+12 work orders to 14; the owner saw this before approving.
+
+### Rulings
+
+**1. WO4b, clipping correctness — approved.** [D-18] made composites real
+containers so that clipping would mean something, and WO4 found three reasons it
+can't be trusted yet. F4 (the state saver doesn't save the clip window, though
+its header says it does) and F6 (a scrolling label resets the clip and draws
+outside its container) are ordinary defects and can be fixed now.
+
+**F1** (whether U8G2 excludes the clip window's far corner) **can't be settled
+from source on this machine.** There's no U8G2 checkout here, and the catalogue
+builder takes `--u8g2-path` without recording it (see Q-11). So instead of
+guessing: put the convention in exactly one function, write it down there as an
+*unverified* assumption, pin it with a test, and require PR-06's real-U8G2 Wasm
+build to include a pixel test at a container's edge. That test would show the
+one-pixel difference directly, so the question gets a verified answer rather than
+an assumed one, and WO4b isn't blocked.
+
+**2. Pre-1.0 version guard — approved.** It compares the minor version too while
+the major is 0, because that's where pre-1.0 breaking changes land. §16 and
+`rules/03-versioning.md` now say so; before, both said "major" only.
+
+**3. `setter=` naming a prop on `<bind>` — kept for PR-04, recorded as Q-9.**
+It's a third meaning of `setter=`, and §13.1 had said [D-18] fixed the double
+meaning. New manifest vocabulary still needs a demonstrated need, so the fix
+waits for the next schema bump, where `prop=` is the obvious candidate.
+
+**4. WO5 split into WO5a (findings) and WO5b (the `generate` command) —
+approved.** One diff carrying the whole command plus seven carried findings
+couldn't be reviewed properly.
+
+### Spec findings, fixed on main
+
+- **F2** — §16 said the runtime and CLI were "versioned in lockstep", which
+  contradicted `rules/03-versioning.md`. Now: versioned independently.
+- **F7** — §13.12's example called `render()` directly instead of the
+  `u8g2gl_render_object()` wrapper, which handles visibility, clipping and the
+  saved state. Example corrected.
+- **W6** — §6.3 listed `bind_src` and `bind_glyph`, which nothing declared or
+  implemented. Removed, and recorded as Q-12 in case a real need appears.
+- **W2** — every element inherits `font`, `align` and text binding from the base
+  object. That's a real design question rather than a typo, so it's Q-10, to
+  settle before E-2 builds the property panel on top of it.
+
+### Chief Architect finding — Q-11
+
+Checking where F1 could be verified showed that **the display catalogue doesn't
+record where it came from.** [D-14] derives it from U8G2's own tables, but
+nothing in `catalogue.json` says which U8G2 version, and the builder takes a path
+without recording it. It can be neither reproduced nor diffed against a U8G2
+upgrade. Not urgent; it should be fixed at the next rebuild.
+
+### Pattern
+
+The PA was in the main checkout again, this time on
+`u8g2gl-generator/wo4-runtime-support`. The edits went through a worktree on
+`main`.

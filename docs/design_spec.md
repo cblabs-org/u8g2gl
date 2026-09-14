@@ -649,8 +649,8 @@ C++.
 | XML Tag | Description | Key Properties |
 |---|---|---|
 | `<u8g2gl_label>` | Text with alignment and overflow handling | `text`, `bind_text`, `bind_text_fmt`, `font`, `align`, `long_mode`, `scroll_px_per_sec`, `initial_delay_ms`, `static_dwell_ms` |
-| `<u8g2gl_xbm>` | Monochrome bitmap | `src`, `bind_src`, `bitmap_mode` |
-| `<u8g2gl_glyph>` | Single glyph from an icon font | `glyph`, `bind_glyph`, `font` |
+| `<u8g2gl_xbm>` | Monochrome bitmap | `src`, `bitmap_mode` |
+| `<u8g2gl_glyph>` | Single glyph from an icon font | `glyph`, `font` |
 | `<u8g2gl_progress_bar>` | Animated progress indicator | `bind_value`, `bind_text`, `fill_style`, `animate_duration_ms` |
 | `<u8g2gl_clock>` | Time display with blinking colon | `format`, `font`, `secondary_font`, `blink`, `bind_time` |
 | `<u8g2gl_switch>` | Toggle indicator | `bind_value` |
@@ -1636,12 +1636,16 @@ uint32_t ui_screen_home_tick(uint32_t ms) {
 }
 
 void ui_screen_home_render(U8G2& d) {
-    bar.render(d);                        // container: clip window, no pixels
-    bar_location.render(d);
-    bar_wifi_icon.render(d);              // hidden flag checked by the object
-    bar_clock.render(d);
-    u8g2gl_draw_hline(d, 0, 11, 256);     // no object — §13.5
-    msg.render(d);
+    // Every object goes through u8g2gl_render_object(), never obj.render():
+    // the wrapper checks effective visibility, sets the effective clip window,
+    // and saves and restores draw state, so nothing paints outside its
+    // container. Calls stay in document order, draw calls included.
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 0);  // bar — container
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 1);  // bar_location
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 2);  // bar_wifi_icon — hidden checked by the wrapper
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 3);  // bar_clock
+    u8g2gl_draw_hline(d, 0, 11, 256);                                         // "rule" — no object (§13.5)
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 4);  // msg
 }
 ```
 
@@ -1775,7 +1779,7 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 | **Arduino IDE** | Run the CLI manually; commit `generated/`. Documented as the supported flow. |
 | **CI** | `u8g2gl validate` plus a check that `generated/` is current (regenerate, fail on diff) |
 
-The runtime library ships as a PlatformIO library and an Arduino library, versioned in lockstep with the CLI. A generated file records the generator version and the runtime refuses to compile against a mismatched major version.
+The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. The runtime refuses to compile against a mismatched **schema** version: the major version, and **also the minor version while the major is 0**. Before 1.0, breaking changes land in minor bumps (§15.4), so checking only the major would let a project generated for 0.3 compile against a 0.4 runtime without any error.
 
 ---
 
@@ -1964,6 +1968,10 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | ~~Q-6~~ | ~~Framework licence~~ | **Resolved** — MIT, see §22 |
 | **Q-7** | The property panel needs conditional visibility (`visible_when`) — `scroll_px_per_sec` and friends are meaningless unless `long_mode` is a scrolling value ([D-19]). Additive schema; LVGL Pro has the identical problem and does not solve it | Phase 3 |
 | **Q-8** | **Repeaters.** A `<view>` is a static structure, so it can express "three carriages" but not "N carriages" (§6.5). A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be *designed* rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not. Schema surface, so §1.5 applies: defer until a real screen demonstrates the need | Phase 2 |
+| **Q-9** | **`setter=` has a third meaning.** On a `<bind>`, `setter=` names a *prop*, not a method: `<bind name="bind_width" setter="width">`. §13.1 says [D-18] removed `setter=`'s double meaning by introducing `draw=`, and this is a third one. Kept as-is for PR-04, because new manifest vocabulary needs a demonstrated need (§1.5). Resolve at the next schema bump — `prop=` is the obvious candidate | Next schema bump |
+| **Q-10** | **Text properties live on the base object.** `font`, `align` and text binding are on `u8g2gl_obj`, so every element inherits them — including a box or a line that can't use them. The editor's property panel will show them. That conflicts with the standards' "do not grow `u8g2gl_obj` to serve one widget". Options: an intermediate text base class, or leave the C++ as it is and hide the properties per manifest. Decide before E-2 builds the property panel on top of it | E-2 |
+| **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue | Next catalogue rebuild |
+| **Q-12** | **`bind_src` / `bind_glyph`.** §6.3 used to list them, but no manifest declared them and nothing in the runtime implemented them, so they've been removed. Binding an image or icon glyph to a subject — a Wi-Fi strength icon, say — is the likely first real need. This is additive, a minor bump. Defer until a screen needs it | Phase 2 |
 
 ---
 
