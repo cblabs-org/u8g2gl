@@ -12,7 +12,8 @@
  * Description: For each instance with a known tag, reports attributes the
  *              effective manifest (inherited props and bindings included) does
  *              not declare, missing required props, and enum values outside the
- *              declared set. Layout and identity attributes in
+ *              declared set, and `flag="disabled"` on a drawing element, which
+ *              has no object to disable (§8.4). Layout and identity attributes in
  *              COMMON_ATTRIBUTES and `style_*` overrides are always accepted.
  *              Unknown tags are Pass 2's concern and are skipped here.
  *
@@ -175,7 +176,46 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
     }
   }
 
+  // --- Step 5: Flag directives must name a flag the element can carry ---
+  // §8.4 fixes the flag set at `hidden` and `disabled`, so it is not declared
+  // per element. `hidden` applies to every element — an object flag, or a
+  // draw-time guard on a drawing element (§13.5). `disabled` is interaction
+  // state on an object; a drawing element has no object, so there is nothing
+  // to disable (PR-04 WO5a).
+  if (isDrawingElement(manifest)) {
+    for (const child of node.children) {
+      if ('kind' in child && child.kind === 'binding' && child.flag === 'disabled') {
+        diagnostics.push(
+          createPropDiagnostic(
+            DIAGNOSTIC_CODES.INAPPLICABLE_FLAG,
+            `Flag 'disabled' in <${child.type}> cannot apply to <${node.tag}>: it is a drawing ` +
+              `element (draw= props only) with no object to disable. Only 'hidden' applies to a ` +
+              `drawing element (§8.4).`,
+            child.loc ?? node.loc,
+            'disabled',
+          ),
+        );
+      }
+    }
+  }
+
   return diagnostics;
+}
+
+// isDrawingElement
+// Whether an element is a drawing element: its own manifest declares draw= props
+// and no setter= props, so it has no class and never an object ([D-18], §6.2).
+// Decided from the registry's manifest, never from a list of tags ([D-17]), and
+// by the same test the schema pass uses for its `extends` rule. A composite is
+// never one: it realises as a container object.
+//   manifest — effective manifest for the instance's tag
+function isDrawingElement(manifest: EffectiveManifest): boolean {
+  const props = manifest.declared.api.props;
+  return (
+    manifest.view === undefined &&
+    props.some((p) => p.draw !== undefined) &&
+    !props.some((p) => p.setter !== undefined)
+  );
 }
 
 /**

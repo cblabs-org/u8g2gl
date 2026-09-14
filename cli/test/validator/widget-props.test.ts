@@ -386,4 +386,85 @@ describe('validateWidgetProps', () => {
       expect(missing?.offendingText).toBe('source');
     });
   });
+
+  // --- PR-04 WO5a: §8.4's fixed flags on drawing elements ---
+  describe('flag directives', () => {
+    /** A one-screen document holding `tag` with one <bind_flag_if_eq> for `flag`. */
+    const flaggedScreen = (tag: string, attributes: WidgetNode['attributes'], flag: string): Screen => ({
+      name: 'screen_home',
+      view: {
+        children: [
+          {
+            tag,
+            attributes,
+            children: [
+              {
+                kind: 'binding',
+                type: 'bind_flag_if_eq',
+                subject: 'compact_mode',
+                refValue: '1',
+                value: '1',
+                flag,
+                loc: { file: 'screens/screen_home.xml', line: 4, column: 9 },
+              },
+            ],
+            styleOverrides: {},
+          },
+        ],
+      },
+    });
+
+    it('rejects flag="disabled" on <u8g2gl_box>, a drawing element', () => {
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry(),
+        screens: [flaggedScreen('u8g2gl_box', { name: 'bar', x: '0', y: '0', width: '4', height: '4' }, 'disabled')],
+      });
+      expect(diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.INAPPLICABLE_FLAG]);
+      expect(diagnostics[0]?.message).toBe(
+        "Flag 'disabled' in <bind_flag_if_eq> cannot apply to <u8g2gl_box>: it is a drawing element " +
+          "(draw= props only) with no object to disable. Only 'hidden' applies to a drawing element (§8.4).",
+      );
+      expect(diagnostics[0]?.offendingText).toBe('disabled');
+      expect(diagnostics[0]?.line).toBe(4);
+    });
+
+    it('accepts flag="hidden" on <u8g2gl_box>', () => {
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry(),
+        screens: [flaggedScreen('u8g2gl_box', { name: 'bar', x: '0', y: '0', width: '4', height: '4' }, 'hidden')],
+      });
+      expect(diagnostics).toEqual([]);
+    });
+
+    it('accepts flag="disabled" on a class-backed element', () => {
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry(),
+        screens: [flaggedScreen('u8g2gl_label', { name: 'lbl', font: 'small_9' }, 'disabled')],
+      });
+      expect(diagnostics).toEqual([]);
+    });
+
+    it('decides "drawing element" from the manifest, so a custom draw= element is rejected too', () => {
+      const dot: WidgetManifest = {
+        name: 'wd_dot',
+        api: {
+          props: [
+            { name: 'x', type: 'int', draw: 'wd_draw_dot' },
+            { name: 'y', type: 'int', draw: 'wd_draw_dot' },
+          ],
+          bindings: [],
+          elements: [],
+        },
+      };
+      const diagnostics = validateWidgetProps({
+        ...baseInput,
+        manifests: frameworkRegistry([dot]),
+        screens: [flaggedScreen('wd_dot', { name: 'd', x: '1', y: '1' }, 'disabled')],
+      });
+      expect(diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.INAPPLICABLE_FLAG]);
+    });
+  });
 });

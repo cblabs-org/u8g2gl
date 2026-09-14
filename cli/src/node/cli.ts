@@ -20,11 +20,15 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
 import { FRAMEWORK_MANIFESTS } from '../data/manifests.js';
-import { buildManifestRegistry, parseFrameworkManifests } from '../core/manifest/index.js';
+import {
+  buildManifestRegistry,
+  parseFrameworkManifests,
+  FRAMEWORK_MANIFEST_PATH,
+} from '../core/manifest/index.js';
 import {
   parseProjectFile,
   parseGlobalsFile,
@@ -314,6 +318,22 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
   console.log(formatIdentifyResult(result, { color: useColor }));
 }
 
+// bundledFrameworkFilename
+// The bundled framework manifest a single file *is*, by filename, or undefined.
+// A file is the framework manifest when it sits at `<…>/u8g2gl/manifests/<file>`
+// — the include path FRAMEWORK_MANIFEST_PATH names, where the manifests ship —
+// and the bundle carries a manifest of that filename. The same file copied into
+// a project's widgets/ is a project copy, and still shadows (PR-04 WO1 F5).
+//   filePath — the path given to `validate`, relative or absolute
+function bundledFrameworkFilename(filePath: string): string | undefined {
+  const segments = resolve(filePath).split(sep);
+  const filename = segments[segments.length - 1] ?? '';
+  if (segments.slice(-3, -1).join('/') !== FRAMEWORK_MANIFEST_PATH) {
+    return undefined;
+  }
+  return FRAMEWORK_MANIFESTS.some((m) => m.filename === filename) ? filename : undefined;
+}
+
 /**
  * @brief Executes the `validate` subcommand across a project directory or single XML file.
  *
@@ -432,6 +452,8 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   // [D-18]: one element vocabulary. Plain widgets and composites go into one
   // list and from there into one registry — never sorted into two buckets.
   const projectManifests: WidgetManifest[] = [];
+  // Set only when a single file validated is itself a bundled framework manifest.
+  let frameworkStandIn: { readonly filename: string; readonly manifest: WidgetManifest } | undefined;
 
   if (stat.isDirectory()) {
     // --- Directory: Load standard project structure via readProjectFiles ---
@@ -538,7 +560,10 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
       // the same way the directory-mode path does.
       const res = parseWidgetManifestFile(fileXml, targetArg);
       allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
+      const frameworkFilename = bundledFrameworkFilename(targetPath);
+      if (res.value && frameworkFilename !== undefined) {
+        frameworkStandIn = { filename: frameworkFilename, manifest: res.value };
+      } else if (res.value) {
         projectManifests.push(res.value);
       }
     }
@@ -549,8 +574,17 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   // npm-installed CLI has no include/ to read ([D-17]).
   const framework = parseFrameworkManifests(FRAMEWORK_MANIFESTS);
   allDiagnostics.push(...framework.diagnostics);
+  // A single file that is a bundled framework manifest takes its bundled copy's
+  // place rather than joining the project list, where it would be reported as
+  // shadowing itself (PR-04 WO1 F5). Standing in rather than being dropped
+  // means the file's own content is what gets validated: a framework author
+  // checking an edit sees that edit's diagnostics, located in the real file.
+  const standInFile = frameworkStandIn && `${FRAMEWORK_MANIFEST_PATH}/${frameworkStandIn.filename}`;
+  const frameworkManifests = framework.manifests.map((m) =>
+    frameworkStandIn && m.loc?.file === standInFile ? frameworkStandIn.manifest : m,
+  );
   const manifests = buildManifestRegistry({
-    framework: framework.manifests,
+    framework: frameworkManifests,
     project: projectManifests,
   });
 

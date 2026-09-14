@@ -15,7 +15,7 @@
     <prop name="radius" type="int" setter="set_radius" default="0" help="Corner rounding radius in pixels." />
     <prop name="align" type="enum" setter="set_align" values="left,center,right" default="left" emit="U8G2GL_ALIGN_{VALUE^^}" help="Horizontal text alignment." />
     <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
-    <bind name="bind_text_int" type="int" setter="bind_text" fmt="bind_text_fmt" />
+    <bind name="bind_text" type="int" setter="bind_text" fmt="bind_text_fmt" />
     <bind name="bind_x" type="int" setter="bind_x" />
     <bind name="bind_y" type="int" setter="bind_y" />
     <bind name="bind_width" type="int" setter="bind_width" />

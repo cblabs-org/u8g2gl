@@ -13,9 +13,10 @@
  *          lookup and its own idea of inheritance ([D-17], §13.1).
  * Description: Registers declarations (framework first), rejects a project
  *              manifest that redeclares a framework tag, then resolves each
- *              element's `extends` chain — merging props and bindings by name,
- *              parent order first, a child's override keeping its parent's
- *              position — and diagnoses unknown `extends` targets and cycles.
+ *              element's `extends` chain — merging props by name and bindings by
+ *              (name, type), parent order first, a child's override keeping its
+ *              parent's position — and diagnoses unknown `extends` targets (with
+ *              §6.5's remedy) and cycles.
  *
  * Exports:
  * - ManifestOrigin:          Where a manifest came from ('framework' | 'project')
@@ -26,7 +27,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import type { WidgetManifest } from '../schema/widget-manifest.js';
+import type { BindDef, PropDef, WidgetManifest } from '../schema/widget-manifest.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 
 /**
@@ -42,7 +43,12 @@ export type ManifestOrigin = 'framework' | 'project';
  * Declaration order is a contract, not an accident — later stages emit setter
  * calls in this order. Inherited declarations come first in the parent's order;
  * a child's own additions follow in the child's order; a child declaration with
- * the same `name` as an inherited one replaces it **in the parent's position**.
+ * the same key as an inherited one replaces it **in the parent's position**.
+ * A prop's key is its `name`. A binding's key is its `name` **and** `type`: one
+ * binding attribute may accept several subject types (`bind_text` takes a
+ * string or an int subject, §8.4), each declared as its own `<bind>`, so the
+ * effective list can hold several bindings with one `name` — one per accepted
+ * type (PR-04 WO5a).
  * `api.elements` is the element's own list only; inheritance of collection
  * elements is not defined by this registry.
  */
@@ -97,23 +103,22 @@ interface Registration {
   readonly origin: ManifestOrigin;
 }
 
-// mergeByName
-// Merges inherited declarations with an element's own, by `name`. Inherited
-// order is kept; an own declaration either replaces its namesake in place or is
-// appended.
+// mergeByKey
+// Merges inherited declarations with an element's own, by a declaration key.
+// Inherited order is kept; an own declaration either replaces the inherited one
+// with the same key in place or is appended.
 //   inherited — the parent's effective list, already fully merged
 //   own       — the element's own declarations, in declaration order
-function mergeByName<T extends { readonly name: string }>(
-  inherited: readonly T[],
-  own: readonly T[],
-): T[] {
+//   keyOf     — the identity two declarations must share to be one declaration
+function mergeByKey<T>(inherited: readonly T[], own: readonly T[], keyOf: (decl: T) => string): T[] {
   const merged = [...inherited];
-  const indexByName = new Map<string, number>();
-  merged.forEach((decl, index) => indexByName.set(decl.name, index));
+  const indexByKey = new Map<string, number>();
+  merged.forEach((decl, index) => indexByKey.set(keyOf(decl), index));
   for (const decl of own) {
-    const index = indexByName.get(decl.name);
+    const key = keyOf(decl);
+    const index = indexByKey.get(key);
     if (index === undefined) {
-      indexByName.set(decl.name, merged.length);
+      indexByKey.set(key, merged.length);
       merged.push(decl);
     } else {
       merged[index] = decl;
@@ -121,6 +126,18 @@ function mergeByName<T extends { readonly name: string }>(
   }
   return merged;
 }
+
+/** A prop is identified by its attribute name. */
+const propKey = (prop: PropDef): string => prop.name;
+
+/**
+ * A binding is identified by its attribute name and subject type, so that
+ * `<bind name="bind_text" type="string">` and `type="int"` are two overloads of
+ * one attribute rather than one overriding the other (PR-04 WO5a). A child that
+ * redeclares `bind_text` as a string replaces only the inherited string form.
+ * Newline-separated because neither an XML name nor a type can contain one.
+ */
+const bindingKey = (binding: BindDef): string => `${binding.name}\n${binding.type}`;
 
 /**
  * The root class manifest: the base every generated object is reached through
@@ -281,10 +298,16 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
           );
         }
       } else if (!registrations.has(parentTag)) {
+        // The remedy is part of the message (Chief Architect ruling on WO1 F3):
+        // the likeliest cause is not a typo but a real C++ class that has no
+        // manifest, and §6.5 says exactly what fixes that. The near-miss
+        // suggestions still cover the typo case.
         diagnostics.push(
           manifestDiagnostic(
             DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
-            `Manifest <${tag}> extends unknown element '${parentTag}'.`,
+            `Manifest <${tag}> extends unknown element '${parentTag}'. 'extends' must name an ` +
+              `element that has a manifest (§6.5). If '${parentTag}' is a C++ class, give it a ` +
+              `manifest — an <api> with no new props is enough.`,
             manifest,
             parentTag,
             findClosest(parentTag, tags),
@@ -299,8 +322,8 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
       ...manifest,
       api: {
         ...manifest.api,
-        props: mergeByName(parent?.api.props ?? [], manifest.api.props),
-        bindings: mergeByName(parent?.api.bindings ?? [], manifest.api.bindings),
+        props: mergeByKey(parent?.api.props ?? [], manifest.api.props, propKey),
+        bindings: mergeByKey(parent?.api.bindings ?? [], manifest.api.bindings, bindingKey),
       },
       origin,
       declared: manifest,

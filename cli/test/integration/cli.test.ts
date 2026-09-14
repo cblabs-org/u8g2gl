@@ -179,6 +179,34 @@ describe('U8G2GL CLI End-to-End Integration', () => {
       expect(shadow?.message).toContain('widgets/u8g2gl_label/u8g2gl_label.xml');
       expect(shadow?.message).toContain('u8g2gl/manifests/u8g2gl_label.xml');
     });
+
+    // --- PR-04 WO5a: WO1 F5, single-file validation of a framework manifest ---
+    it('validates a single framework manifest file without reporting it as shadowing itself', async () => {
+      const labelManifest = resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml');
+      const res = await runCliSubprocess(['validate', labelManifest, '--json']);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; file: string }>;
+      };
+
+      expect(parsed.diagnostics.map((d) => d.code)).not.toContain('U8G2GL_SHADOWED_FRAMEWORK_MANIFEST');
+      // The file stands in for its bundled copy and is itself clean.
+      expect(parsed.diagnostics.filter((d) => d.file.endsWith('u8g2gl_label.xml'))).toEqual([]);
+    });
+
+    it('still reports a single-file project copy of a framework manifest as shadowing', async () => {
+      const dir = createLabelProject();
+      const copy = join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml');
+      mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
+      writeFileSync(
+        copy,
+        readFileSync(resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml'), 'utf-8'),
+      );
+
+      const res = await runCliSubprocess(['validate', copy, '--json']);
+      const parsed = JSON.parse(res.stdout) as { diagnostics: Array<{ code: string }> };
+
+      expect(parsed.diagnostics.map((d) => d.code)).toContain('U8G2GL_SHADOWED_FRAMEWORK_MANIFEST');
+    });
   });
 
   it('u8g2gl find "SSD1306 128x64 i2c" -> output contains "SSD1306"', async () => {

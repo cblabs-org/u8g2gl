@@ -279,6 +279,67 @@ describe('validateTypes', () => {
       expect(diagnostics[0]?.message).toContain("'%s' in 'level_fmt' expects string");
     });
 
+    // --- PR-04 WO5a: overloads are declared, never inferred from a shared setter ---
+    it('accepts a string subject on bind_text', () => {
+      const diagnostics = validateTypes({
+        ...baseInput,
+        screens: [
+          screenOf({ tag: 'u8g2gl_label', attributes: { name: 'st', font: 'small_9', bind_text: 'station_name' } }),
+        ],
+      });
+      expect(diagnostics).toEqual([]);
+    });
+
+    it('names every declared type of bind_text when neither matches', () => {
+      const diagnostics = validateTypes({
+        ...baseInput,
+        screens: [
+          screenOf({ tag: 'u8g2gl_label', attributes: { name: 'w', font: 'small_9', bind_text: 'wifi_connected' } }),
+        ],
+      });
+      expect(diagnostics.map((d) => d.message)).toEqual([
+        "Subject 'wifi_connected' has type 'bool', which is incompatible with 'bind_text' on <u8g2gl_label> (expected 'string' or 'int').",
+      ]);
+    });
+
+    it('reports a format mismatch once, not once per bind_text overload', () => {
+      const diagnostics = validateTypes({
+        ...baseInput,
+        screens: [
+          screenOf({
+            tag: 'u8g2gl_label',
+            attributes: { name: 't', font: 'small_9', bind_text: 'temperature', bind_text_fmt: '%s' },
+          }),
+        ],
+      });
+      expect(diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.FORMAT_MISMATCH]);
+    });
+
+    it('rejects a string subject on an int-only binding, even when a string binding shares its setter', () => {
+      // WO3 inferred accepted types from bindings sharing a `setter`, so the
+      // int-only `bind_count` below would have accepted a string subject.
+      const meter: WidgetManifest = {
+        name: 'wd_meter',
+        extends: 'u8g2gl_obj',
+        api: {
+          props: [],
+          bindings: [
+            { name: 'bind_caption', type: 'string', setter: 'bind_value' },
+            { name: 'bind_count', type: 'int', setter: 'bind_value' },
+          ],
+          elements: [],
+        },
+      };
+      const diagnostics = validateTypes({
+        ...baseInput,
+        manifests: frameworkRegistry([meter]),
+        screens: [screenOf({ tag: 'wd_meter', attributes: { name: 'm', bind_count: 'station_name' } })],
+      });
+      expect(diagnostics.map((d) => d.message)).toEqual([
+        "Subject 'station_name' has type 'string', which is incompatible with 'bind_count' on <wd_meter> (expected 'int').",
+      ]);
+    });
+
     it('ignores a subject bound to a $prop placeholder', () => {
       const diagnostics = validateTypes({
         ...baseInput,

@@ -153,17 +153,29 @@ describe('buildManifestRegistry', () => {
       expect(registry.get('wd_child')?.chain).toEqual(['wd_child', 'wd_mid', 'wd_root']);
     });
 
-    it('merges bindings by the same rule as props', () => {
+    // PR-04 WO5a: bindings merge by (name, type), not by name. Before WO5a this
+    // test had the child's string `bind_x` replace the parent's int `bind_x`;
+    // under the new key they are two overloads of one attribute.
+    it('merges bindings by name and type: same pair overrides in place, a new type is appended', () => {
       const registry = registryOf([
         widget('wd_base', { bindings: [bind('bind_x'), bind('bind_y')] }),
         widget('wd_child', {
           extends: 'wd_base',
-          bindings: [{ name: 'bind_x', type: 'string', setter: 'bind_x' }, bind('bind_z')],
+          bindings: [
+            { name: 'bind_y', type: 'int', setter: 'bind_y_child' },
+            { name: 'bind_x', type: 'string', setter: 'bind_x' },
+            bind('bind_z'),
+          ],
         }),
       ]);
       const bindings = registry.get('wd_child')!.api.bindings;
-      expect(bindings.map((b) => b.name)).toEqual(['bind_x', 'bind_y', 'bind_z']);
-      expect(bindings[0]?.type).toBe('string');
+      expect(bindings.map((b) => `${b.name}:${b.type}`)).toEqual([
+        'bind_x:int',
+        'bind_y:int',
+        'bind_x:string',
+        'bind_z:int',
+      ]);
+      expect(bindings[1]?.setter).toBe('bind_y_child');
     });
 
     it('diagnoses an unknown extends target, naming it, with a suggestion', () => {
@@ -176,6 +188,10 @@ describe('buildManifestRegistry', () => {
       expect(diag?.severity).toBe('error');
       expect(diag?.message).toContain('wd_child');
       expect(diag?.message).toContain("'wd_bse'");
+      // The §6.5 remedy (Chief Architect ruling on WO1 F3, PR-04 WO5a).
+      expect(diag?.message).toContain(
+        "If 'wd_bse' is a C++ class, give it a manifest — an <api> with no new props is enough.",
+      );
       expect(diag?.offendingText).toBe('wd_bse');
       expect(diag?.suggestions).toContain('wd_base');
       expect(diag?.file).toBe('widgets/wd_child/wd_child.xml');
@@ -237,6 +253,23 @@ describe('buildManifestRegistry', () => {
       // The label's `font` (required) replaces the object's in the object's position.
       const fontIndex = obj.api.props.findIndex((p) => p.name === 'font');
       expect(label.api.props[fontIndex]?.required).toBe(true);
+    });
+
+    // PR-04 WO5a: `bind_text_int` is deleted; `bind_text` is declared once per
+    // accepted subject type and both survive the (name, type) merge.
+    it('declares bind_text once per subject type, and no binding named bind_text_int exists', () => {
+      const registry = frameworkRegistry();
+      const withBindTextInt = registry.tags.filter((tag) =>
+        registry.get(tag)!.api.bindings.some((b) => b.name === 'bind_text_int'),
+      );
+      expect(withBindTextInt).toEqual([]);
+
+      for (const tag of ['u8g2gl_obj', 'u8g2gl_label', 'u8g2gl_button']) {
+        const bindText = registry.get(tag)!.api.bindings.filter((b) => b.name === 'bind_text');
+        expect(bindText.map((b) => b.type), tag).toEqual(['string', 'int']);
+        expect(new Set(bindText.map((b) => b.setter)), tag).toEqual(new Set(['bind_text']));
+        expect(new Set(bindText.map((b) => b.fmt)), tag).toEqual(new Set(['bind_text_fmt']));
+      }
     });
 
     it('makes a project manifest shadowing a framework tag a hard error naming both sources', () => {

@@ -107,6 +107,20 @@ export const DIAGNOSTIC_CODES = {
    */
   DRAWING_ELEMENT_EXTENDS: 'U8G2GL_DRAWING_ELEMENT_EXTENDS',
   /**
+   * A manifest declares both `setter=` props and `draw=` props ([D-18],
+   * §13.1). An element has one emission target: methods on its class, or a
+   * free draw function with no class. The message names one prop of each kind.
+   * Distinct from `OVERCONSTRAINED`, which is one prop declaring both.
+   */
+  MIXED_EMISSION_TARGETS: 'U8G2GL_MIXED_EMISSION_TARGETS',
+  /**
+   * A `<bind_flag_if_*>` directive names a flag the element cannot carry — today
+   * `flag="disabled"` on a drawing element (§8.4, [D-18]). The flag set is fixed
+   * at `hidden` and `disabled`; `hidden` applies to every element, but a drawing
+   * element has no object, so there is nothing to disable.
+   */
+  INAPPLICABLE_FLAG: 'U8G2GL_INAPPLICABLE_FLAG',
+  /**
    * A container whose own `x`, `y`, `width` or `height` is bound has an
    * anchor-positioned child (`right`, `bottom`, `hcenter`, `vcenter`) —
    * [D-20], §8.4. Anchors resolve at build time; re-resolving them whenever

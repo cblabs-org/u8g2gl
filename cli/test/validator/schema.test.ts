@@ -146,6 +146,33 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
   });
 });
 
+// --- PR-04 WO5a: one emission target per manifest ([D-18]) ---
+describe('validateSchema — mixed setter= and draw= manifests', () => {
+  const input = (manifests: ValidateInput['manifests']): ValidateInput => ({
+    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
+    globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
+    screens: [],
+    manifests,
+    catalogue: [],
+  });
+
+  it('is an error naming one setter= prop and one draw= prop, instead of either extends diagnostic', () => {
+    const parsed = parseWidgetManifestFile(
+      '<widget name="wd_hybrid"><api>' +
+        '<prop name="level" type="int" setter="set_level" />' +
+        '<prop name="x" type="int" draw="u8g2gl_draw_pixel" />' +
+        '</api></widget>',
+      'widgets/wd_hybrid/wd_hybrid.xml',
+    );
+    const diagnostics = validateSchema(input(frameworkRegistry([parsed.value!])));
+    expect(diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.MIXED_EMISSION_TARGETS]);
+    expect(diagnostics[0]?.message).toContain("prop 'level' declares setter=\"set_level\"");
+    expect(diagnostics[0]?.message).toContain("prop 'x' declares draw=\"u8g2gl_draw_pixel\"");
+    expect(diagnostics[0]?.offendingText).toBe('level, x');
+    expect(diagnostics[0]?.file).toBe('widgets/wd_hybrid/wd_hybrid.xml');
+  });
+});
+
 // --- PR-3R WO7: the 254-object structural ceiling ([A-3], [D-21]) ---
 // `parent_index_` is a `uint8_t` and `U8G2GL_NO_PARENT` consumes one value,
 // so a screen may hold at most 254 objects. This is a hard error, not a

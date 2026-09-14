@@ -572,9 +572,30 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     //     the registry supplies u8g2gl_obj.
     // A manifest with neither kind of prop is left alone: an `<api>` with no
     // new props is how §6.5 says to give an existing class a manifest.
-    const hasSetterProp = (manifest.api?.props ?? []).some((p) => p.setter !== undefined);
-    const hasDrawProp = (manifest.api?.props ?? []).some((p) => p.draw !== undefined);
-    if (hasSetterProp && !manifest.extends && manifest.name !== ROOT_CLASS_MANIFEST) {
+    //
+    // A manifest mixing the two kinds (PR-04 WO5a) is reported instead of either
+    // `extends` diagnostic: [D-18] gives an element one emission target or the
+    // other, so neither `extends` answer would be right until it picks one. A
+    // single prop carrying both is the per-prop OVERCONSTRAINED error below,
+    // not a mixed manifest, so each kind is found among props declaring only it.
+    const props = manifest.api?.props ?? [];
+    const hasSetterProp = props.some((p) => p.setter !== undefined);
+    const hasDrawProp = props.some((p) => p.draw !== undefined);
+    const setterOnlyProp = props.find((p) => p.setter !== undefined && p.draw === undefined);
+    const drawOnlyProp = props.find((p) => p.draw !== undefined && p.setter === undefined);
+    if (setterOnlyProp && drawOnlyProp) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.MIXED_EMISSION_TARGETS,
+          `Widget '${manifest.name}' mixes emission targets: prop '${setterOnlyProp.name}' declares ` +
+            `setter="${setterOnlyProp.setter}" and prop '${drawOnlyProp.name}' declares ` +
+            `draw="${drawOnlyProp.draw}". A manifest declares setter= props (an element with a ` +
+            `class) or draw= props (a drawing element), never both ([D-18], §13.1).`,
+          manifest.loc,
+          `${setterOnlyProp.name}, ${drawOnlyProp.name}`,
+        ),
+      );
+    } else if (hasSetterProp && !manifest.extends && manifest.name !== ROOT_CLASS_MANIFEST) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.MISSING_REQUIRED,

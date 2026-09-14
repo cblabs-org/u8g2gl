@@ -13,13 +13,14 @@
  *          exactly as `bind_text` is.
  * Description: For each element instance, each declared binding whose attribute
  *              is present and names a subject (not a `$prop` placeholder) must
- *              accept that subject's type. A binding's accepted types are its
- *              own `type` plus those of every binding sharing its `setter` —
- *              the C++ overload set the generator chooses from, so `bind_text`
- *              accepts an int subject because `bind_text_int` declares
- *              `setter="bind_text"` with `type="int"` (§8.4's own example binds
- *              an int to `bind_text`). Format checks are keyed off the
- *              binding's declared `fmt` attribute. Conditional flag directive
+ *              accept that subject's type. An attribute accepts a subject type
+ *              if any `<bind>` of that name declares it: `bind_text` is declared
+ *              once with `type="string"` and once with `type="int"` (§8.4's own
+ *              example binds an int to `bind_text`), and the registry keeps both
+ *              by merging bindings on (name, type). Nothing is inferred from a
+ *              shared `setter` (PR-04 WO5a), so a binding declared only for
+ *              `int` rejects a string subject. Format checks are keyed off the
+ *              bindings' declared `fmt` attribute. Conditional flag directive
  *              comparison values are checked against their subject's type.
  *
  * Exports:
@@ -64,19 +65,34 @@ function walkNodes(
   }
 }
 
-// acceptedTypes
-// The subject types one binding attribute accepts: its own declared type plus
-// those of every binding naming the same setter, in declaration order.
-//   binding  — the binding whose attribute is being checked
+// bindingsByAttribute
+// Groups an element's effective bindings by attribute name, so an attribute with
+// one `<bind>` per accepted subject type is checked once, not once per type.
+// Map order is first declaration order, so diagnostics stay deterministic.
 //   bindings — every binding on the element's effective manifest
-function acceptedTypes(binding: BindDef, bindings: readonly BindDef[]): string[] {
-  const types = [binding.type];
-  for (const other of bindings) {
-    if (other.setter === binding.setter && !types.includes(other.type)) {
-      types.push(other.type);
+function bindingsByAttribute(bindings: readonly BindDef[]): Map<string, BindDef[]> {
+  const grouped = new Map<string, BindDef[]>();
+  for (const binding of bindings) {
+    const overloads = grouped.get(binding.name);
+    if (overloads) {
+      overloads.push(binding);
+    } else {
+      grouped.set(binding.name, [binding]);
     }
   }
-  return types;
+  return grouped;
+}
+
+// distinct
+// The values of `items` with duplicates and undefined removed, in first order.
+function distinct(items: readonly (string | undefined)[]): string[] {
+  const seen: string[] = [];
+  for (const item of items) {
+    if (item !== undefined && !seen.includes(item)) {
+      seen.push(item);
+    }
+  }
+  return seen;
 }
 
 /** printf conversions taking an integer argument, and those taking a string. */
@@ -138,8 +154,8 @@ export function validateTypes(input: ValidateInput): readonly Diagnostic[] {
     walkNodes(screen.view?.children ?? [], (node) => {
       const bindings = manifests.get(node.tag)?.api.bindings ?? [];
 
-      for (const binding of bindings) {
-        const subjectName = node.attributes[binding.name];
+      for (const [attrName, overloads] of bindingsByAttribute(bindings)) {
+        const subjectName = node.attributes[attrName];
         if (typeof subjectName !== 'string' || subjectName.startsWith('$')) {
           continue;
         }
@@ -148,24 +164,26 @@ export function validateTypes(input: ValidateInput): readonly Diagnostic[] {
           continue; // Unknown subject: Pass 2's diagnostic, not a type error.
         }
 
-        // --- Step 1: The subject's type must be one the binding accepts ---
-        const accepted = acceptedTypes(binding, bindings);
+        // --- Step 1: Some <bind> of this name must declare the subject's type ---
+        const accepted = distinct(overloads.map((b) => b.type));
         if (!accepted.includes(subject.type)) {
           diagnostics.push(
             createTypeDiagnostic(
               DIAGNOSTIC_CODES.TYPE_MISMATCH,
-              `Subject '${subject.name}' has type '${subject.type}', which is incompatible with '${binding.name}' on <${node.tag}> (expected ${accepted.map((t) => `'${t}'`).join(' or ')}).`,
-              node.attributeLocs?.[binding.name] ?? node.loc,
+              `Subject '${subject.name}' has type '${subject.type}', which is incompatible with '${attrName}' on <${node.tag}> (expected ${accepted.map((t) => `'${t}'`).join(' or ')}).`,
+              node.attributeLocs?.[attrName] ?? node.loc,
               subjectName,
             ),
           );
         }
 
-        // --- Step 2: The binding's declared format attribute must fit the subject ---
-        if (binding.fmt) {
-          const fmt = node.attributes[binding.fmt];
+        // --- Step 2: The declared format attribute must fit the subject ---
+        // Overloads normally share one `fmt` attribute; each distinct one is
+        // checked once so a shared `bind_text_fmt` is not reported twice.
+        for (const fmtAttr of distinct(overloads.map((b) => b.fmt))) {
+          const fmt = node.attributes[fmtAttr];
           if (typeof fmt === 'string') {
-            diagnostics.push(...checkFormat(node, binding.fmt, fmt, subject));
+            diagnostics.push(...checkFormat(node, fmtAttr, fmt, subject));
           }
         }
       }
