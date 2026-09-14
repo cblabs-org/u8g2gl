@@ -10,13 +10,13 @@
  * Description: Re-exports check-project.ts, header.ts and generate.ts.
  *
  * Exports:
- * - checkProject, ProjectModel (check-project.ts)
+ * - checkProject, finaliseDiagnostics, ProjectModel (check-project.ts)
  * - GENERATED_MARKER, HeaderStamp, formatHeaderStamp, isGeneratedContent (header.ts)
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
  *   GENERATE_NOT_YET_SUPPORTED_POLICY (generate.ts)
  */
 
-export { checkProject, type ProjectModel } from './check-project.js';
+export { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 export {
   GENERATED_MARKER,
   formatHeaderStamp,

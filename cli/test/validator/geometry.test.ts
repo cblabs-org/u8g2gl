@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { registryOf } from '../helpers/manifest-registry.js';
+import { frameworkRegistry, registryOf } from '../helpers/manifest-registry.js';
 import { validateGeometry } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnostic.js';
@@ -33,7 +33,10 @@ describe('validateGeometry', () => {
     },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
-    manifests: registryOf([]),
+    // The framework manifests, because geometry is read only where an element's
+    // effective manifest declares it (PR-04 WO3, WO6): with an empty registry
+    // every tag here would have no x, y, width or height at all.
+    manifests: frameworkRegistry(),
     catalogue: [
       {
         setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
@@ -180,7 +183,7 @@ describe('validateGeometry', () => {
     expect(oobDiag?.message).toContain('extends to y=70, display is 64px high (0..63)');
   });
 
-  it('safely skips unresolvable symbolic expressions without errors', () => {
+  it('resolves symbolic expressions that fit the display without errors (PR-04 WO6)', () => {
     const screen: Screen = {
       name: 'screen_home',
       view: {
@@ -190,7 +193,7 @@ describe('validateGeometry', () => {
             attributes: {
               name: 'box_symbolic',
               x: '0',
-              width: '#screen_width', // Symbolic constant, should skip bounds check
+              width: '#screen_width', // Resolves to 128 — exactly the display's width
               y: '0',
               height: '#header_height',
             },
@@ -203,6 +206,7 @@ describe('validateGeometry', () => {
 
     const diagnostics = validateGeometry({
       ...baseInput,
+      globals: { ...baseInput.globals, consts: [{ name: 'header_height', type: 'int', value: '12' }] },
       screens: [screen],
     });
 
@@ -217,7 +221,7 @@ describe('validateGeometry', () => {
   it('catches an element overflowing its composite parent container, even though the same size would fit the display', () => {
     const diagnostics = validateGeometry({
       ...baseInput,
-      manifests: registryOf([
+      manifests: frameworkRegistry([
         {
           name: 'status_bar',
           api: { props: [], bindings: [], elements: [] },
@@ -251,7 +255,7 @@ describe('validateGeometry', () => {
   it('does not flag a composite template top-level child against any display, since a composite has no display', () => {
     const diagnostics = validateGeometry({
       ...baseInput,
-      manifests: registryOf([
+      manifests: frameworkRegistry([
         {
           name: 'status_bar',
           api: { props: [], bindings: [], elements: [] },

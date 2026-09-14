@@ -20,6 +20,7 @@
  * Exports:
  * - ProjectModel:     A loaded project, ready to validate or generate
  * - checkProject():   Validate a model under a not-yet-supported policy
+ * - finaliseDiagnostics(): Deduplicate, sort and count a diagnostic list
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
@@ -75,10 +76,26 @@ export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy)
     (d) => model.hasProjectManifest || d.code !== DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
   );
 
-  // --- Step 3: Deduplicate — a parser and a pass may report the same fact ---
+  // --- Step 3: Deduplicate, sort and count ---
+  return finaliseDiagnostics(merged);
+}
+
+/**
+ * @brief Deduplicates, sorts and counts diagnostics — the one ordering both
+ *        journeys report in.
+ *
+ * Exported so `generate()` can add what it raises after validation (resolution
+ * against a non-first target) without a second copy of the comparator.
+ *
+ * @param diagnostics Diagnostics in any order, possibly repeated.
+ * @return Unique diagnostics sorted by file, line, column and code (§13.9), with
+ *         error and warning counts.
+ */
+export function finaliseDiagnostics(diagnostics: readonly Diagnostic[]): ValidateResult {
+  // --- Step 1: Deduplicate — a parser and a pass may report the same fact ---
   const seen = new Set<string>();
   const unique: Diagnostic[] = [];
-  for (const d of merged) {
+  for (const d of diagnostics) {
     const key = `${d.file}:${d.line}:${d.column}:${d.code}:${d.message}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -86,7 +103,7 @@ export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy)
     }
   }
 
-  // --- Step 4: Sort deterministically (§13.9) and count ---
+  // --- Step 2: Sort deterministically (§13.9) and count ---
   // The same comparator validate() uses, so a merged list orders as it would.
   unique.sort((a, b) => {
     if (a.file !== b.file) {

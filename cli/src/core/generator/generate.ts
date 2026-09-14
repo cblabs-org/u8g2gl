@@ -27,7 +27,8 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
-import { checkProject, type ProjectModel } from './check-project.js';
+import { findTargetDisplay, resolveScreens, type ResolvedScreen } from '../resolver/index.js';
+import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { formatHeaderStamp } from './header.js';
 
 /**
@@ -75,6 +76,12 @@ export interface GenerateResult {
   readonly warnings: number;
   /** Name of the target built, when one was resolved. */
   readonly target?: string;
+  /**
+   * Every screen with its geometry resolved to literal integers against the
+   * built target's display (§13.11 step 3), in load order. Present only when
+   * files were produced; WO9 and WO10 emit from it.
+   */
+  readonly resolved?: readonly ResolvedScreen[];
 }
 
 // resolveTarget
@@ -188,6 +195,24 @@ export function generate(input: GenerateInput): GenerateResult {
     };
   }
 
-  // --- Step 3: Lay out the file set ---
-  return { files: layoutFiles(input, target), ...checked, target: target.name };
+  // --- Step 3: Resolve geometry against the built target's display ---
+  // Validation resolved against the *first* target. `--target` may name another,
+  // whose display can make an expression invalid — `64 / (#screen_width - 128)`
+  // is 1 on a 192-wide panel and a division by zero on a 128-wide one — so the
+  // chosen target is resolved again and any error refuses the build like any other.
+  const resolution = resolveScreens({
+    globals: input.globals,
+    screens: input.screens,
+    manifests: input.manifests,
+    display: findTargetDisplay(target, input.catalogue),
+  });
+  if (resolution.diagnostics.length > 0) {
+    const merged = finaliseDiagnostics([...checked.diagnostics, ...resolution.diagnostics]);
+    if (merged.errors > 0) {
+      return { files: [], ...merged, target: target.name };
+    }
+  }
+
+  // --- Step 4: Lay out the file set ---
+  return { files: layoutFiles(input, target), ...checked, target: target.name, resolved: resolution.screens };
 }

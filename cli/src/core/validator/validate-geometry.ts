@@ -6,16 +6,20 @@
  * File: src/core/validator/validate-geometry.ts
  * Purpose: Pass 6 — Validates element geometry, layout anchor constraints,
  *          and containing-element bounding box limits (§7.2, §15.1, [D-20]).
- * Description: Identifies over-constrained anchors (when x, width, and right are all
- *              simultaneously specified) and detects literal element bounds that
- *              exceed their containing element's resolved size. Per [D-20], anchors
- *              resolve against the containing element at build time — the display is
- *              the reference only for a screen's top-level children; a node nested
- *              inside another node (a plain container or a composite's own template)
- *              is checked against that immediate parent's own literal bounds instead.
- *              Best-effort evaluation for literal integer coordinates. Also
- *              rejects anchor-positioned children of a container whose own
- *              geometry is bound ([D-20], §8.4), which would require reflow.
+ * Description: Runs the resolver (src/core/resolver/) — the same evaluator and
+ *              anchor rules `generate` uses — against the project's first
+ *              target, and reports what it raises: over-constrained anchors,
+ *              malformed expressions, unknown or non-integer constants, division
+ *              by zero and int32 overflow. It then checks every resolved element
+ *              against its container: an element may not start before the
+ *              container's origin, extend past its far edge, or resolve to a
+ *              negative size. Per [D-20] the container is the display only for a
+ *              screen's top-level elements; a nested element is checked against
+ *              its parent's resolved size. A composite's own `<view>` top level
+ *              has no container size until WO7 instantiates it, so it gets no
+ *              absolute check; anything nested inside it still does. Also rejects
+ *              anchor-positioned children of a container whose own geometry is
+ *              bound ([D-20], §8.4), which would require reflow.
  *
  * Exports:
  * - validateGeometry(input): Runs Pass 6 geometry and bounding validation
@@ -24,6 +28,15 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import {
+  createResolverContext,
+  displayContainer,
+  findTargetDisplay,
+  isCentringOn,
+  resolveElements,
+  type ResolvedCoordinate,
+  type ResolvedElement,
+} from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
 
 function createGeomDiagnostic(
@@ -43,151 +56,92 @@ function createGeomDiagnostic(
   };
 }
 
-function isLiteralInteger(val: unknown): val is string {
-  if (typeof val !== 'string') {
-    return false;
-  }
-  return /^-?\d+$/.test(val.trim());
+// sourceText
+// What a resolved coordinate was written as: its expression, or the attributes
+// an anchor rule derived it from.
+function sourceText(coordinate: ResolvedCoordinate): string {
+  const { provenance } = coordinate;
+  return provenance.kind === 'attribute' ? provenance.expression : provenance.from.join(', ');
 }
 
-/**
- * The resolved size of the element a node's geometry is measured against
- * ([D-20]). `label` names it in diagnostics: "display" at screen level, or
- * the containing element's own tag once nested.
- */
-interface ContainingBounds {
-  readonly label: string;
-  readonly width: number;
-  readonly height: number;
+/** One axis's names, for bounds messages. */
+interface BoundsAxis {
+  readonly start: 'x' | 'y';
+  readonly size: 'width' | 'height';
+  /** Container dimension adjective: "wide" or "high". */
+  readonly extent: 'wide' | 'high';
 }
 
-/**
- * Checks one node's own anchors and bounds, then recurses into its children
- * with an updated containing-bounds context.
- *
- * The container passed in is *this* node's parent; the container passed to
- * this node's own children is a new one derived from this node's own literal
- * `width`/`height`, if it declares them. A node with no resolvable size of
- * its own (a symbolic expression, or none at all) contributes no container,
- * so bounds checks are silently skipped for its descendants — the same
- * best-effort behaviour §7.2 already applies to a single node's own bounds.
- */
-function checkNodes(
-  nodes: readonly WidgetNodeChild[],
-  container: ContainingBounds | undefined,
+// checkAxisBounds
+// Checks one axis of one element against its container's size along that axis.
+//   element     — resolved element
+//   axis        — names for this axis
+//   limit       — container size along the axis (known)
+//   diagnostics — output
+function checkAxisBounds(
+  element: ResolvedElement,
+  axis: BoundsAxis,
+  limit: number,
   diagnostics: Diagnostic[],
 ): void {
-  for (const child of nodes) {
-    if (!('tag' in child) || typeof child.tag !== 'string') {
-      continue;
+  const { node, container, geometry } = element;
+  const start = geometry[axis.start];
+  const size = geometry[axis.size];
+  if (start === undefined || size === undefined) {
+    return;
+  }
+  const range = `${container.label} is ${limit}px ${axis.extent} (0..${limit - 1})`;
+
+  // --- Step 1: A negative size — only an anchor rule or a negative expression gives one ---
+  if (size.value < 0) {
+    diagnostics.push(
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+        `Element '<${node.tag}>' resolves to ${axis.size}=${size.value}, which is negative; ${range}.`,
+        size.provenance.loc ?? node.loc,
+        sourceText(size),
+      ),
+    );
+    return;
+  }
+
+  // --- Step 2: Starts before the container's origin, or ends past its far edge ---
+  const farEdge = start.value + size.value;
+  if (start.value < 0) {
+    diagnostics.push(
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+        `Element '<${node.tag}>' extends to ${axis.start}=${start.value}, ${range}.`,
+        start.provenance.loc ?? node.loc,
+        sourceText(start),
+      ),
+    );
+  } else if (farEdge > limit) {
+    diagnostics.push(
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+        `Element '<${node.tag}>' extends to ${axis.start}=${farEdge}, ${range}.`,
+        size.provenance.loc ?? start.provenance.loc ?? node.loc,
+        sourceText(size),
+      ),
+    );
+  }
+}
+
+// checkBounds
+// Checks each resolved element against its own container, recursively. An axis
+// whose container size, start or size did not resolve is not checked — an
+// invalid expression has already been diagnosed, and a deferred one cannot be.
+function checkBounds(elements: readonly ResolvedElement[], diagnostics: Diagnostic[]): void {
+  for (const element of elements) {
+    const { container } = element;
+    if (container.width !== undefined) {
+      checkAxisBounds(element, { start: 'x', size: 'width', extent: 'wide' }, container.width, diagnostics);
     }
-    const node: WidgetNode = child;
-    const { x, y, width, height, right, bottom } = node.attributes;
-
-    // 1. Overconstrained horizontal anchors: x + width + right
-    if (x !== undefined && width !== undefined && right !== undefined) {
-      const loc =
-        node.attributeLocs?.right ?? node.attributeLocs?.width ?? node.attributeLocs?.x ?? node.loc;
-      diagnostics.push(
-        createGeomDiagnostic(
-          DIAGNOSTIC_CODES.OVERCONSTRAINED,
-          `Element '<${node.tag}>' has over-constrained horizontal anchors: 'x', 'width', and 'right' are all specified.`,
-          loc,
-          'x, width, right',
-        ),
-      );
+    if (container.height !== undefined) {
+      checkAxisBounds(element, { start: 'y', size: 'height', extent: 'high' }, container.height, diagnostics);
     }
-
-    // 2. Overconstrained vertical anchors: y + height + bottom
-    if (y !== undefined && height !== undefined && bottom !== undefined) {
-      const loc =
-        node.attributeLocs?.bottom ??
-        node.attributeLocs?.height ??
-        node.attributeLocs?.y ??
-        node.loc;
-      diagnostics.push(
-        createGeomDiagnostic(
-          DIAGNOSTIC_CODES.OVERCONSTRAINED,
-          `Element '<${node.tag}>' has over-constrained vertical anchors: 'y', 'height', and 'bottom' are all specified.`,
-          loc,
-          'y, height, bottom',
-        ),
-      );
-    }
-
-    // 3. Out-of-bounds checks against the containing element ([D-20]) — the
-    // display only when `container` is the screen-level one supplied by the
-    // caller; a parent node's own resolved size otherwise.
-    if (container !== undefined) {
-      if (isLiteralInteger(x) && isLiteralInteger(width)) {
-        const xVal = parseInt(x, 10);
-        const wVal = parseInt(width, 10);
-        const rightEdge = xVal + wVal;
-
-        if (xVal < 0) {
-          diagnostics.push(
-            createGeomDiagnostic(
-              DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-              `Element '<${node.tag}>' extends to x=${xVal}, ${container.label} is ${container.width}px wide (0..${container.width - 1}).`,
-              node.attributeLocs?.x ?? node.loc,
-              x,
-            ),
-          );
-        } else if (rightEdge > container.width) {
-          diagnostics.push(
-            createGeomDiagnostic(
-              DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-              `Element '<${node.tag}>' extends to x=${rightEdge}, ${container.label} is ${container.width}px wide (0..${container.width - 1}).`,
-              node.attributeLocs?.width ?? node.attributeLocs?.x ?? node.loc,
-              width,
-            ),
-          );
-        }
-      }
-
-      if (isLiteralInteger(y) && isLiteralInteger(height)) {
-        const yVal = parseInt(y, 10);
-        const hVal = parseInt(height, 10);
-        const bottomEdge = yVal + hVal;
-
-        if (yVal < 0) {
-          diagnostics.push(
-            createGeomDiagnostic(
-              DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-              `Element '<${node.tag}>' extends to y=${yVal}, ${container.label} is ${container.height}px high (0..${container.height - 1}).`,
-              node.attributeLocs?.y ?? node.loc,
-              y,
-            ),
-          );
-        } else if (bottomEdge > container.height) {
-          diagnostics.push(
-            createGeomDiagnostic(
-              DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-              `Element '<${node.tag}>' extends to y=${bottomEdge}, ${container.label} is ${container.height}px high (0..${container.height - 1}).`,
-              node.attributeLocs?.height ?? node.attributeLocs?.y ?? node.loc,
-              height,
-            ),
-          );
-        }
-      }
-    }
-
-    // This node becomes the containing element for its own children, if and
-    // only if its own size is a resolvable literal — otherwise its
-    // descendants get no absolute bounds check, the same best-effort
-    // deferral applied to this node's own unresolved bounds.
-    let childContainer: ContainingBounds | undefined;
-    if (isLiteralInteger(width) && isLiteralInteger(height)) {
-      childContainer = {
-        label: `containing element '<${node.tag}>'`,
-        width: parseInt(width, 10),
-        height: parseInt(height, 10),
-      };
-    }
-
-    if (node.children && node.children.length > 0) {
-      checkNodes(node.children, childContainer, diagnostics);
-    }
+    checkBounds(element.children, diagnostics);
   }
 }
 
@@ -201,15 +155,15 @@ const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vce
 
 // anchorOf
 // The first anchor attribute positioning a node, or undefined. `hcenter` and
-// `vcenter` are boolean switches, so an explicit "false" anchors nothing.
+// `vcenter` are boolean switches, decided by the resolver's own predicate.
 //   node — the candidate child
 function anchorOf(node: WidgetNode): string | undefined {
   return ANCHOR_ATTRIBUTES.find((attr) => {
     const value = node.attributes[attr];
-    if (value === undefined) {
-      return false;
+    if (attr === 'hcenter' || attr === 'vcenter') {
+      return isCentringOn(value);
     }
-    return !((attr === 'hcenter' || attr === 'vcenter') && value === 'false');
+    return value !== undefined;
   });
 }
 
@@ -268,44 +222,34 @@ function checkBoundContainers(
  */
 export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { project, screens, catalogue, manifests } = input;
+  const { project, globals, screens, catalogue, manifests } = input;
 
-  // Resolve target display dimensions if available
-  let displayWidth: number | undefined;
-  let displayHeight: number | undefined;
+  // --- Step 1: Resolve against the first target's display, as `validate` always has ---
+  // Without a catalogue record the display has no size: `#screen_*` stay
+  // deferred and screen-level bounds go unchecked, rather than guessed.
+  const display = findTargetDisplay(project?.targets?.[0], catalogue ?? []);
+  const context = createResolverContext(globals, manifests, display);
 
-  if (project?.targets && project.targets.length > 0 && catalogue) {
-    const firstTarget = project.targets[0];
-    if (firstTarget?.setup) {
-      const record = catalogue.find((d) => d.setup === firstTarget.setup);
-      if (record) {
-        displayWidth = record.width;
-        displayHeight = record.height;
-      }
-    }
-  }
-
-  const displayContainer: ContainingBounds | undefined =
-    displayWidth !== undefined && displayHeight !== undefined
-      ? { label: 'display', width: displayWidth, height: displayHeight }
-      : undefined;
-
-  // Screen top-level children are measured against the display ([D-20]);
-  // anything nested measures against its immediate parent's own bounds.
+  // --- Step 2: Screens — top-level elements measure against the display ([D-20]) ---
   for (const screen of screens ?? []) {
-    checkNodes(screen.view?.children ?? [], displayContainer, diagnostics);
+    const resolved = resolveElements(screen.view?.children ?? [], displayContainer(context), context);
+    diagnostics.push(...resolved.diagnostics);
+    checkBounds(resolved.elements, diagnostics);
   }
 
-  // A composite's own template has no display to check against — it is
-  // instantiated at whatever size its caller gives it, which this manifest
-  // does not know. Its top-level children therefore get no absolute bounds
-  // check, but anything nested inside one of them still measures against
-  // that element's own literal bounds, exactly as it would inside a screen.
+  // --- Step 3: Composite templates — the top level has no size until WO7 ---
+  // A composite is instantiated at whatever size its caller gives it, which this
+  // manifest does not know, so `#parent_*` at its top level stay deferred and
+  // those elements get no absolute check. Anything nested inside one of them
+  // still measures against that element's resolved size, exactly as in a screen.
   for (const composite of manifests.declaredComposites) {
-    checkNodes(composite.view?.children ?? [], undefined, diagnostics);
+    const container = { label: `composite '<${composite.name}>'` };
+    const resolved = resolveElements(composite.view?.children ?? [], container, context);
+    diagnostics.push(...resolved.diagnostics);
+    checkBounds(resolved.elements, diagnostics);
   }
 
-  // [D-20] bound-geometry containers, in screens and in composite templates.
+  // --- Step 4: [D-20] bound-geometry containers, in screens and in composite templates ---
   for (const screen of screens ?? []) {
     checkBoundContainers(screen.view?.children ?? [], manifests, diagnostics);
   }

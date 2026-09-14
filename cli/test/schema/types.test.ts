@@ -288,17 +288,27 @@ describe('Schema Types', () => {
 
       const commonAttrs: CommonAttributes = {
         name: 'btn_wifi',
-        x: '0',
-        y: '0',
-        width: '128',
-        height: '12',
         focusStyle: 'selected',
       };
+
+      // Geometry is a manifest property, not common to every element (PR-04 WO6),
+      // so it rides the index signature. Never called: it exists to fail
+      // type-checking if `x` is ever made common again.
+      const geometryIsNotCommon = (): CommonAttributes => ({
+        name: 'n',
+        // @ts-expect-error — `x` is not a CommonAttributes member
+        x: '0',
+      });
+      expect(typeof geometryIsNotCommon).toBe('function');
 
       const buttonNode: WidgetNode = {
         tag: 'u8g2gl_button',
         attributes: {
           ...commonAttrs,
+          x: '0',
+          y: '0',
+          width: '128',
+          height: '12',
           text: 'Wi-Fi',
         },
         styleOverrides: { invert: 'true' },

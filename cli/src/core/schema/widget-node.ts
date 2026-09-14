@@ -11,7 +11,7 @@
  *              slots, and input event handlers.
  *
  * Exports:
- * - CommonAttributes: Standard positioning, visibility, and style properties
+ * - CommonAttributes: Identity, anchor and style attributes every element accepts
  * - WidgetNode: Instantiated visual element in a view tree
  * - WidgetNodeChild: Union of valid child elements under a widget node
  * - BindingChild: Reactive data binding or conditional flag directive
@@ -23,8 +23,16 @@
 import type { SourceLocation } from './source-location.js';
 
 /**
- * Standard positioning, sizing, anchor, and style attributes common across widgets.
- * Per §7.2, coordinate values may be integers or compile-time arithmetic expressions.
+ * Identity, anchor and style attributes every element accepts (§7.2, §10, [U-1]).
+ *
+ * Deliberately **not** here: `x`, `y`, `width`, `height` and `hidden`. They are
+ * properties that exist only where an element's effective manifest declares
+ * them (PR-04 WO3) — `<u8g2gl_line>` has no `x`, and a drawing element has no
+ * literal `hidden`. Typing them as common let code read geometry off any node
+ * as if it were guaranteed; they are reached through the index signature on
+ * {@link WidgetNode.attributes} instead, so a reader must narrow, and the
+ * resolver reads them only where the manifest declares them (PR-04 WO6). This
+ * mirrors `COMMON_ATTRIBUTES` in validate-widget-props.ts.
  */
 export interface CommonAttributes {
   /** Required identifier for the instance. Used as C++ variable name by the
@@ -32,14 +40,6 @@ export interface CommonAttributes {
    *  Per [U-1], every element must have a name. The parser auto-generates
    *  one from {tag}_{index} if omitted, with a warning diagnostic. */
   readonly name: string;
-  /** X coordinate or expression relative to parent left edge. */
-  readonly x?: string;
-  /** Y coordinate or expression relative to parent top edge. */
-  readonly y?: string;
-  /** Width or expression in pixels. */
-  readonly width?: string;
-  /** Height or expression in pixels. */
-  readonly height?: string;
   /** Anchor offset from parent right edge (§7.2). */
   readonly right?: string;
   /** Anchor offset from parent bottom edge (§7.2). */
@@ -48,8 +48,6 @@ export interface CommonAttributes {
   readonly hcenter?: string;
   /** Vertically centre within parent bounds if "true" (§7.2). */
   readonly vcenter?: string;
-  /** Visibility toggle. Hidden elements are omitted from rendering. */
-  readonly hidden?: boolean;
   /** Name of a style defined in `<styles>`. */
   readonly style?: string;
   /** Style applied while this element holds focus (§12.2). */

@@ -146,6 +146,32 @@ export const DIAGNOSTIC_CODES = {
    * Suggestions carry the declared target names closest to the one given.
    */
   UNKNOWN_TARGET: 'U8G2GL_UNKNOWN_TARGET',
+  /**
+   * A coordinate expression names `#<constant>` that neither `globals.xml`
+   * `<consts>` nor the built-ins (`#screen_width`, `#screen_height`,
+   * `#parent_width`, `#parent_height`) declare (§7.2). Suggestions carry the
+   * closest known names, spelled with their `#`.
+   */
+  UNKNOWN_CONSTANT: 'U8G2GL_UNKNOWN_CONSTANT',
+  /**
+   * A coordinate expression uses a constant whose value is not an integer — a
+   * `<string>` constant, or an `<int>` whose `value` is not an integer literal.
+   * Coordinate arithmetic is integer-only (§7.2, §13.9). Reported at the use.
+   */
+  NON_INTEGER_CONSTANT: 'U8G2GL_NON_INTEGER_CONSTANT',
+  /** A coordinate expression divides by an operand that evaluates to zero (§7.2). */
+  DIVISION_BY_ZERO: 'U8G2GL_DIVISION_BY_ZERO',
+  /**
+   * A coordinate attribute is not a well-formed integer expression: an unknown
+   * character, a missing operand, or unbalanced parentheses (§7.2).
+   */
+  MALFORMED_EXPRESSION: 'U8G2GL_MALFORMED_EXPRESSION',
+  /**
+   * A coordinate expression's value leaves the `int32_t` range §13.2 emits
+   * integers as. Checked after every operation, so no value ever exceeds what
+   * JavaScript numbers hold exactly and no rounded result can reach output (§13.9).
+   */
+  INTEGER_OVERFLOW: 'U8G2GL_INTEGER_OVERFLOW',
 } as const;
 
 /**
