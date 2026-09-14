@@ -322,7 +322,7 @@ the riskier path, and this is the first time it has come up.
 
 | # | Finding | Placed |
 |---|---|---|
-| F1 | `setClipWindow(x, y, x+w-1, y+h-1)` — U8G2's second corner may be exclusive, clipping one column and row. **Unverified**: no U8G2 source exists on this host, checked | **Owner checkpoint** — proposed WO4b |
+| F1 | `setClipWindow(x, y, x+w-1, y+h-1)` clips away the last column and row. **Confirmed against U8G2 source** (`departures-board-v3/framework/.pio/libdeps/esp32dev/U8g2/src/clib/`): `u8g2_apply_clip_window` sets `user_x1 = min(user_x1, clip_x1)`, whose default is `width`; `u8g2_IsIntersection` states "upper limits are not included"; `u8g2_DrawHVLine` returns on `x >= user_x1`. So `clip_x1` is **exclusive** and the correct call is `setClipWindow(x, y, x+w, y+h)`. Affects WO4's `u8g2_render_object`, `u8g2gl_label`'s scroll clip, and design_spec §11.3's text | **Owner checkpoint** — proposed WO4b; §11.3 to the **Chief Architect** |
 | F2 | §16 says runtime and CLI are versioned "in lockstep"; they are not (CLI 0.6→0.7, runtime 0.4), and §16 does not say which major is compared | **Chief Architect** — spec defect; rules/03-versioning.md already describes the real, separate versioning |
 | F3 | The guard cannot catch 0.3 → 0.4, which §15.4 calls breaking, because both are major 0 | **Owner checkpoint** — pre-1.0 policy |
 | F4 | `u8g2gl_state_saver` does not save the clip window, though its header and §11.3 say it does; nor font or bitmap mode | **Owner checkpoint** — proposed WO4b |
@@ -342,13 +342,14 @@ WO1–WO4 finding is placed above. Four things need the owner before WO5 is disp
 **1. Add WO4b — clipping correctness (F1, F4, F6)?** Recommended. [D-18] made
 composites real containers precisely so that clipping would mean something, and the
 three findings together say framework clipping is not yet trustworthy: the clip
-corner may be off by one, the state saver does not save the clip it claims to, and a
-scrolling label escapes its container. WO10's compile layer runs against the U8G2
-stub, which cannot catch any of them. Scope: `u8g2gl_state_saver` saves and restores
-the clip (or the claim is removed), the label clips inside the effective clip rather
-than replacing it, and F1 is settled **against real U8G2 source** — which needs a
-checkout this host does not have. *Owner question: where is the U8G2 checkout PR-02's
-catalogue builder used, or should F1 wait for PR-06's real-U8G2 build?*
+corner **is** off by one (F1, confirmed against U8G2 source after the checkpoint was
+first written — the second corner is exclusive), the state saver does not save the
+clip it claims to, and a scrolling label escapes its container. WO10's compile layer
+runs against the U8G2 stub, which cannot catch any of them. Scope: correct every
+`setClipWindow` call to the exclusive form and add a stub test that pins it;
+`u8g2gl_state_saver` saves and restores the clip (or the claim is removed); the label
+clips inside the effective clip rather than replacing it. The stub should model
+U8G2's exclusive upper bound so the test means something.
 
 **2. Pre-1.0 version guard (F3).** The guard as built compares the schema major, so
 0.3 against 0.4 compiles. Recommended: while major is 0, compare major **and** minor,
