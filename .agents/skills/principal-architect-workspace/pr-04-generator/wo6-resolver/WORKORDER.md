@@ -3,7 +3,7 @@ work_order: WO6
 project: pr-04-generator
 title: "Resolver: constant arithmetic and anchors to literals"
 branch: u8g2gl-generator/wo6-resolver
-base: u8g2gl-generator/wo5-generate-command
+base: u8g2gl-generator/wo5b-generate-command
 complexity: standard
 status: draft — PA revises against WO5's Completion Report before dispatch
 ---
@@ -25,7 +25,7 @@ under "Human Approval" (owner's own words, timestamped) and that this WORKORDER'
 ## Branch
 
 **Branch**: `u8g2gl-generator/wo6-resolver`
-**Base**: `u8g2gl-generator/wo5-generate-command`
+**Base**: `u8g2gl-generator/wo5b-generate-command`
 
 `git branch --show-current` **as its own command immediately before every commit**.
 

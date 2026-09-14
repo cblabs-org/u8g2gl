@@ -66,9 +66,11 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** ✅ `33cd27b`, `0257d57` · base WO1 · standard · finding 2; `bind_time`, `bind_value`
 - [x] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** ✅ `a652fd6` (partial by design — one stop-and-report, resolved by the PA) · base WO2 · standard · finding 3
 - [x] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** ✅ `6a78247` · base WO3 · standard · finding 4; runtime 0.4.0
-- **Owner checkpoint** — WO1–4 repair merged code; WO2 is the likeliest to grow
-- [ ] **[WO5 — `generate` command and shared load path](wo5-generate-command/WORKORDER.md)** · base WO4 · standard · constraint 4; NOT_YET_SUPPORTED severity split
-- [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5 · standard · [D-7], [D-20]
+- **Owner checkpoint** — reached 2026-09-14; rulings below. WO4b added, WO5 split
+- [ ] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
+- [ ] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
+- [ ] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
+- [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5b · standard · [D-7], [D-20]
 - [ ] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** · base WO6 · standard · §13.4, §13.6
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7 · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
@@ -375,6 +377,59 @@ reasoning that split PR-3R's WO5 from WO5b.
 If all four are approved as recommended, the ledger goes from twelve work orders to
 fourteen (WO4b, WO5a/WO5b).
 
+### Checkpoint rulings — Chief Architect, delivered in the owner's session, 2026-09-14
+
+Recorded in PROGRAM.md; spec at `main` @ `ef73776`. **The ledger is now fourteen work
+orders.** Provenance: the rulings were pasted into this Principal Architect session by
+the owner, as the answer to the checkpoint the owner's approval established; they
+amend the approved decomposition within PR-04's mandate and do not replace the Human
+Approval below.
+
+1. **WO4b — APPROVED.** F4 and F6 are ordinary defects, fixed in WO4b. For F1: put the
+   clip-window corner convention in **exactly one function**, document it there as an
+   assumption **not verified by a pixel test**, pin the chosen convention with a test,
+   and **do not fetch U8G2 source**.
+2. **Version guard — APPROVED, in WO4b.** Compare major, and minor too while major is 0.
+   §16 and `rules/03-versioning.md` on `main` now say this.
+3. **`setter=` naming a prop on `<bind>` — KEEP for PR-04.** Recorded as **Q-9** for the
+   next schema bump. No `prop=`, no new manifest vocabulary.
+4. **WO5 split into WO5a (findings) and WO5b (`generate`) — APPROVED.**
+
+**Non-blocking findings, resolved on `main`:** F2 fixed (§16: runtime and CLI versioned
+independently). F7 fixed (§13.12 now calls `u8g2gl_render_object()` for every object,
+draw calls kept in document order — WO10 may follow the example). W2 recorded as
+**Q-10**, decided before E-2 — **do not** move `font`/`align`/text binding off
+`u8g2gl_obj` in PR-04. W6 removed from §6.3 and recorded as **Q-12** — **do not**
+implement `bind_src` or `bind_glyph`. **Q-11**: the PR-02 catalogue builder took
+`--u8g2-path` without recording it.
+
+**`bind_time` — confirmed shipping.** §13.12 calls it, correctly. For the record, it
+was delivered in **WO2** (`33cd27b`: the method, and `type="time"` on the manifest),
+not WO4; both are in the stack.
+
+**Rebase target is `main` @ `ef73776`** (§6.3, §13.12, §16, §21, rules/03 changed).
+
+### PA note on F1 — the ruling's premise and the evidence
+
+Ruling 1 was premised on there being no U8G2 checkout on this machine. After the
+checkpoint was first sent, a search completed and found U8G2 **2.36.18** already present
+in departures-board-v3's PlatformIO cache
+(`departures-board-v3/framework/.pio/libdeps/esp32dev/U8g2/src/clib/`). Nothing was
+fetched. Reading it shows the second clip corner is **exclusive**
+(`u8g2_apply_clip_window`, `u8g2_IsIntersection`, `u8g2_DrawHVLine`; commit `fcdce73`).
+
+The ruling's structure is followed exactly — one function, a pinning test, a PR-06
+pixel test — and WO4b chooses the exclusive form the source supports. The single
+adjustment is wording: the comment says the convention is **read from U8G2 source but
+not verified by a pixel test**, rather than an unsupported assumption, because the
+first is true and the second no longer is. Raised with the owner rather than applied
+silently.
+
+**Obligation on PR-06.** PR-06's real-U8G2 build must add a **pixel test at a container
+edge**: an object whose clip is exactly its bounds, drawing to its last column and row.
+Any one-pixel difference in the corner convention shows directly. If it disagrees, the
+fix is the one function WO4b creates, and the pinning test's comment points there.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -394,6 +449,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **Checkpoint rulings received** (Chief Architect, `main` @ `ef73776`):
+  WO4b approved, version guard approved, `setter=` kept (Q-9), WO5 split approved.
+  Ledger now fourteen. WO4b dispatched on `u8g2gl-generator/wo4b-clipping-version`;
+  WO5a/WO5b drafted; `wo5-generate-command/` retired in favour of the two.
 - 2026-09-14 — **WO4 complete** (`6a78247`, report `0a8a77f`). The worker was cut
   off by an API usage limit with its work uncommitted; the tree was left untouched
   and the same worker resumed with its context, finishing from that state. Verified
