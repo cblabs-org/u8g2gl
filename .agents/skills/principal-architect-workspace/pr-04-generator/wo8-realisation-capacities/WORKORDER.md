@@ -84,6 +84,18 @@ rewriting this pass.
       subject, plus **one** frame-dirty observer if any draw-call element binds it.
       String subjects also carry `max_len`. This is the PR-01 constraint nearly lost
       once — test it directly.
+- [ ] **Carried from WO7 — F1: wire mangling in.** `mangle.ts` (`mangleIdentifiers`)
+      raises `U8G2GL_NAME_COLLISION` naming both sources, but neither `validate` nor
+      `generate` calls it, and Pass 7's older one-level inlining-collision check still
+      runs. Call the mangler once on the single pipeline, retire the old check, and make
+      `generate` refuse on its errors. An end-to-end test: `a_b` at screen level beside
+      child `b` of instance `a` fails `validate` and `generate`, naming both.
+- [ ] **Carried from WO7 — F2/F3: expand once, then resolve.** `generate()` resolves
+      unexpanded screens, so its resolved model lacks composite interiors, and `validate`
+      expands twice (Passes 5 and 6). One expansion, shared by validation and generation,
+      followed by one resolution of the expanded tree.
+- [ ] **Carried from WO7 — F8: one flag set.** `hidden`/`disabled` is spelled in two
+      passes. Define it once beside the drawing-element predicate below.
 - [ ] **Carried from WO6 — resolve once.** `generate()` already resolves the first target
       twice (inside validation, then for the built target). Realisation consumes
       `GenerateResult.resolved` and the expanded tree WO7 produces; it must not resolve
@@ -105,7 +117,11 @@ rewriting this pass.
 **In scope:** new `cli/src/core/generator/realise/` (or equivalent) and the
 flattened model type; `cli/src/core/manifest/` (the drawing-element predicate only);
 `cli/src/core/validator/validate-schema.ts`, `validate-widget-props.ts` and
-`cli/test/manifests/manifest-crosstest.test.ts` (migrating to that predicate only); `schema/diagnostic.ts`; tests; this WORKORDER.
+`cli/test/manifests/manifest-crosstest.test.ts` (migrating to that predicate only);
+`cli/src/core/validator/validate.ts`, `validate-identifiers.ts` and the pass that holds
+the retired one-level collision check (F1 wiring only); `cli/src/core/generator/`
+(expand-once, resolve-once, mangling refusal); `cli/src/core/resolver/` (sharing one
+expansion result only); the validator passes spelling the flag set (F8 only); `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** emission (WO9+); validator (report the ceiling question
 instead); runtime; manifests.

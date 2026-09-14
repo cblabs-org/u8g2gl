@@ -71,7 +71,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
 - [x] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [x] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** ✅ `6b5d562` · base WO5b · standard · [D-7], [D-20]
-- [ ] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** · base WO6 · standard · §13.4, §13.6
+- [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7 · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
@@ -611,6 +611,65 @@ rules on `int16_t` versus `int32_t`. Validator and resolver only; no emission, n
 If the owner declines, the same items fold into WO8, which is the first consumer that
 cannot tolerate an absent coordinate.
 
+### WO7 — complete (`a19b65a`)
+
+**Verified independently:** commits only on the WO7 branch; runtime and `docs/`
+untouched; C++ 284 unchanged, zero warnings; CLI 550 → **596**, `tsc` and lint clean.
+**End to end through the built CLI** with a `card` composite whose label binds
+`$title_subject` and sizes against `#parent_width`:
+
+- a clean instance validates;
+- `title_subject="nope"` gives `U8G2GL_UNKNOWN_SUBJECT` at the instance — "Prop
+  'title_subject' of `<card>` 'c' is given 'nope' as a subject name, but globals.xml
+  declares no subject 'nope' (§6.4)";
+- a child of width `#parent_width + 20` gives `U8G2GL_OUT_OF_BOUNDS` measured against the
+  **instance**, not the display — "extends to x=120, containing element `<card>` is
+  100px wide (0..99)" — with the instantiation chain attached.
+
+The worker did not run its new tests against the base; the end-to-end run above is the
+substitute evidence that expansion changed behaviour.
+
+**Delivered:** `expand.ts` (argument binding, `$prop` and subject substitution,
+recursive prefixing, no invented names), `mangle.ts` (§13.4's full table, reserved
+prefixes, keywords, `U8G2GL_NAME_COLLISION` naming both sources), `provenance.ts`
+(original location plus instance chain, appended to messages so `Diagnostic` keeps its
+shape). §13.12's identifiers and geometry asserted on a 256-wide display. Composite top
+levels are bounds-checked per instance. All four carries closed: types pass on the
+expanded tree, flag values checked with near-miss suggestions, the parser keeps `extends`
+on `<view>` manifests (end-to-end: `validate` warns, `generate` refuses), declared
+collection children are no longer `UNKNOWN_COMPONENT`. New code `U8G2GL_UNKNOWN_PROP`.
+
+**PA scoping error — F1.** WO7's line item required a collision to be a hard error, and
+the module does exactly that, but I drew the boundary around the resolver and never
+named the two call sites. So **neither `validate` nor `generate` calls the mangler yet**,
+and Pass 7's older one-level check still runs. Same class of error as PR-3R's WO5:
+trace an objective to the surface that delivers it. → WO8.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| F1 | Mangling not wired into `validate` or `generate`; the older one-level collision check still runs, naming one source | **WO8** — one `mangleIdentifiers` call on the single pipeline; retire Pass 7's check; `generate` refuses on its errors |
+| F2 | `generate()` resolves unexpanded screens, so its resolved model has no composite interiors | **WO8** — expand once, then resolve |
+| F3 | Expansion runs twice per `validate` (Passes 5 and 6) because `ValidateInput` cannot carry one result | **WO8** — with F2: one expansion, shared |
+| F4/F5 | Font, image, style and enum arguments are not checked after substitution; `font="nope"` passed to a composite validates | **Proposed WO7b** |
+| F6 | `hidden="$p"` cannot be substituted: the parser makes `hidden` a boolean before expansion | **Proposed WO7b** |
+| F7 | The [D-20] bound-geometry container check still walks unexpanded trees, missing nested composites | **Proposed WO7b** |
+| F8 | The flag set (`hidden`, `disabled`) is spelled in two passes | **WO8** — with the registry predicate consolidation already there |
+| F9 | A string `$prop` inside longer text (`text="Hi $who"`) is not substituted; the spec is silent | **Chief Architect** — spec decision; interim in proposed WO7b: diagnose it rather than pass `$who` through literally |
+| F10 | A required prop that also has a default is reported missing; no schema rule rejects the declaration | **Proposed WO7b** — `required` with `default` is a schema error |
+| F11 | A `geometry.test.ts` title undersells the per-instance check | **End-of-PR readability review** |
+| F12 | §6.4's example uses `format="HH:MM"`; the clock manifest accepts `hh_mm` | **Chief Architect** |
+| S1 | §6.6 says user tags carry `wd_` by convention; §13.4 reserves `wd_`, so a composite named `wd_card` is rejected | **Chief Architect** — the spec contradicts itself on the recommended user prefix |
+
+**Proposed WO7b, enlarged.** WO7's evidence strengthens the case for it: the expansion
+it now runs makes silent deferral and under-determined axes judgeable, and it surfaced
+four more checks that only mean something after substitution (F4/F5, F6, F7, F10) plus an
+interim rule for F9. Recommended scope is now WO6's findings 1, 2+4, 3, 6, 7, 8 and WO7's
+F4/F5, F6, F7, F9-interim, F10 — every "validate the expanded tree" check in one place,
+which also answers WO7's note that these checks must run on the template or the expanded
+tree, never both.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -630,6 +689,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO7 complete** (`a19b65a`, report `7cbf909`). Interrupted once by
+  an API usage limit and resumed with its context. Verified independently, including
+  end to end through the built CLI. WO8 branch cut but **not dispatched**: its scope
+  depends on the owner's answer on WO7b. WO4c and WO7b await the owner.
 - 2026-09-14 — **WO6 complete** (`6b5d562`, report `e275f2f`). Verified
   independently, including end to end through the built CLI. WO7 dispatched on
   `u8g2gl-generator/wo7-composite-expansion`. **WO7b proposed to the owner, not
