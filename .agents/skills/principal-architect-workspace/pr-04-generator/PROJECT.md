@@ -67,7 +67,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** ✅ `a652fd6` (partial by design — one stop-and-report, resolved by the PA) · base WO2 · standard · finding 3
 - [x] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** ✅ `6a78247` · base WO3 · standard · finding 4; runtime 0.4.0
 - **Owner checkpoint** — reached 2026-09-14; rulings below. WO4b added, WO5 split
-- [ ] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
+- [x] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** ✅ `4094489` · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
 - [ ] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
 - [ ] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5b · standard · [D-7], [D-20]
@@ -430,6 +430,57 @@ edge**: an object whose clip is exactly its bounds, drawing to its last column a
 Any one-pixel difference in the corner convention shows directly. If it disagrees, the
 fix is the one function WO4b creates, and the pinning test's comment points there.
 
+### WO4b — complete (`4094489`)
+
+**Verified independently:** commits only on the WO4b branch; `docs/` and `cli/`
+untouched; C++ 277 → **284**, zero warnings after reconfigure; CLI 406 unchanged, `tsc`
+and lint clean. `grep setClipWindow include src` finds exactly one call, in
+`u8g2gl_apply_clip` (`src/u8g2gl_core.cpp:191`). All four version-guard compile tests
+pass, including `VersionGuard.StaleSchemaMinorFailsToCompile` — 0.3 against 0.4 now
+really fails to compile.
+
+**Delivered:** `bool u8g2gl_apply_clip(U8G2&, const u8g2gl_rect&)`, the exclusive
+`(x, y, x+w, y+h)` convention, documented there with the U8G2 2.36.18 evidence and the
+PR-06 pixel-test obligation, pinned by a test naming it; the state saver's header now
+states it does not save clip, font mode or bitmap mode (U8G2 has no getters for them),
+with clip lifetime the wrapper's job; `u8g2gl_label::render()` no longer touches the
+clip in any mode; the guard compares major, and minor while major is 0.
+
+**The worker proved its tests catch the defects** by building them against the old code
+in a throwaway worktree: the container test failed on the old label (two clips set,
+right edge 99 not 40), and `(0, 3)` compiled cleanly against the old macro.
+
+**Spec disagreement, correctly not resolved:** design_spec §11.3 on `main` still says
+`x+w-1, y+h-1` and that the state saver saves the clip. → **Chief Architect.**
+
+**Triage of G1–G7:**
+
+| # | Finding | Placed |
+|---|---|---|
+| G1 | **The runtime does not compile against real U8G2.** `u8g2gl_state_saver` calls `getFont()`, which U8G2 2.36.18's `U8g2lib.h` does not declare — only the stub does. **Verified by the PA:** every `U8G2` method the runtime calls was checked against the real header; `getFont` is the only one missing. Real U8G2 exposes the font as `getU8g2()->font` (`U8g2lib.h:70`, `u8g2.h:359`). Pre-dates PR-04; invisible because nothing has ever compiled the runtime against real U8G2 | **Owner — proposed WO4c** |
+| G2 | `render_animation_update()` cannot see ancestors, so a marquee redrawn while the loop is blocked is bounded by its own bounds, not its container's; the next full frame is correct | **Accepted** — [D-5]'s escape hatch runs outside the frame by design; the limitation is documented at the label |
+| G3 | Comments outside the box still overstate the state saver (`u8g2gl_obj.h:396`, `u8g2gl_button.cpp:85`) | **End-of-PR readability review** |
+| G4 | The far clip corner is not clamped to the display; `u8g2_uint_t` is 8-bit without `U8G2_16BIT` | **Downgraded, proposed WO4c.** `u8g2.h:74` forces `U8G2_16BIT` on every 32-bit environment, which is every supported target (§2.1); only AVR is exposed. A clamp in `u8g2gl_apply_clip` is cheap insurance, not a live defect |
+| G5 | The stub records clip calls but does not model U8G2's exclusive bound | **Accepted** — PR-06's container-edge pixel test is the real check |
+| G6 | The "major only from 1.0" branch of the guard has no test | **Accepted** — no runtime at major 1 exists to test against |
+| G7 | This branch's `rules/03-versioning.md` predates `main` @ `ef73776` | **Rebase before submission** |
+
+### Proposed WO4c — runtime compiles against real U8G2 (awaiting the owner)
+
+**Not added to the ledger on the PA's judgement** — the owner has just set it at
+fourteen. Recommended because G1 is a hard compile failure in merged code that PR-05's
+first real build would hit, and the cause — a test stub offering an API the real library
+lacks — will recur unless the stub is corrected:
+
+- the state saver reads the font via `display.getU8g2()->font`;
+- the stub stops declaring `getFont()` and gains `getU8g2()` returning a struct with a
+  `font` member, so the runtime can no longer compile against an API real U8G2 lacks;
+- G4's far-corner clamp in `u8g2gl_apply_clip`.
+
+Small, runtime-only, and independent of WO5a–WO12, so it can land anywhere in the stack
+before submission. Evidence: U8G2 2.36.18 in departures-board-v3's PlatformIO cache,
+read, nothing fetched.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -449,6 +500,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO4b complete** (`4094489`, report `084339c`). Verified
+  independently. G1 confirmed against real U8G2: the runtime does not compile against
+  it (`getFont()`). **WO4c proposed to the owner, not added.** WO5a dispatched on
+  `u8g2gl-generator/wo5a-validator-carries` — CLI-only, independent of G1.
 - 2026-09-14 — **Checkpoint rulings received** (Chief Architect, `main` @ `ef73776`):
   WO4b approved, version guard approved, `setter=` kept (Q-9), WO5 split approved.
   Ledger now fourteen. WO4b dispatched on `u8g2gl-generator/wo4b-clipping-version`;

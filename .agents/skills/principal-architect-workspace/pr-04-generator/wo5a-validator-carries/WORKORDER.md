@@ -5,7 +5,7 @@ title: "Manifest and validator carries: flags, bind overloads, mixed manifests, 
 branch: u8g2gl-generator/wo5a-validator-carries
 base: u8g2gl-generator/wo4b-clipping-version
 complexity: standard
-status: draft — PA revises against WO4b's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO5a — Manifest and validator carries
