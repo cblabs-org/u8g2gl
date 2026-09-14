@@ -172,6 +172,14 @@ export const DIAGNOSTIC_CODES = {
    * JavaScript numbers hold exactly and no rounded result can reach output (§13.9).
    */
   INTEGER_OVERFLOW: 'U8G2GL_INTEGER_OVERFLOW',
+  /**
+   * A `$name` inside a composite's `<view>` names no prop the composite declares
+   * in its `<api>` (§8.3, §13.6 step 2), so composite expansion has nothing to
+   * substitute. Located at the reference in the template and reported once,
+   * however many instances there are. Suggestions carry the closest declared
+   * props, spelled with their `$`.
+   */
+  UNKNOWN_PROP: 'U8G2GL_UNKNOWN_PROP',
 } as const;
 
 /**

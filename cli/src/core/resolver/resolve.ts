@@ -393,6 +393,7 @@ function resolveNode(
   container: Container,
   context: ResolverContext,
   diagnostics: Diagnostic[],
+  annotate: DiagnosticAnnotator | undefined,
 ): ResolvedElement {
   // --- Step 1: Resolve both axes against the container ---
   const scope: EvaluationScope = {
@@ -400,8 +401,15 @@ function resolveNode(
     screen: context.display,
     parent: { ...(container.width !== undefined ? { width: container.width } : {}), ...(container.height !== undefined ? { height: container.height } : {}) },
   };
-  const h = resolveAxis(node, HORIZONTAL, container.width, scope, context, diagnostics);
-  const v = resolveAxis(node, VERTICAL, container.height, scope, context, diagnostics);
+  const own: Diagnostic[] = [];
+  const h = resolveAxis(node, HORIZONTAL, container.width, scope, context, own);
+  const v = resolveAxis(node, VERTICAL, container.height, scope, context, own);
+  for (const diagnostic of own) {
+    const kept = annotate ? annotate(node, diagnostic) : diagnostic;
+    if (kept !== undefined) {
+      diagnostics.push(kept);
+    }
+  }
   const geometry: ResolvedGeometry = {
     ...(h.start ? { x: h.start } : {}),
     ...(v.start ? { y: v.start } : {}),
@@ -417,7 +425,7 @@ function resolveNode(
     ...(geometry.width ? { width: geometry.width.value } : {}),
     ...(geometry.height ? { height: geometry.height.value } : {}),
   };
-  const children = resolveChildren(node.children, childContainer, context, diagnostics);
+  const children = resolveChildren(node.children, childContainer, context, diagnostics, annotate);
 
   return { node, container, geometry, children };
 }
@@ -429,25 +437,37 @@ function resolveChildren(
   container: Container,
   context: ResolverContext,
   diagnostics: Diagnostic[],
+  annotate: DiagnosticAnnotator | undefined,
 ): ResolvedElement[] {
   const elements: ResolvedElement[] = [];
   for (const child of nodes) {
     if ('tag' in child && typeof child.tag === 'string') {
-      elements.push(resolveNode(child, container, context, diagnostics));
+      elements.push(resolveNode(child, container, context, diagnostics, annotate));
     }
   }
   return elements;
 }
 
 /**
+ * Rewrites, or suppresses by returning undefined, one diagnostic raised while
+ * resolving `node`'s own attributes. It lets a caller that knows where a node
+ * came from — composite expansion's instantiation chain — say so in the message
+ * without a second resolver.
+ */
+export type DiagnosticAnnotator = (node: WidgetNode, diagnostic: Diagnostic) => Diagnostic | undefined;
+
+/**
  * @brief Resolves a view subtree inside a given container.
  *
- * The building block for both screens and, in the validator, a composite's own
- * `<view>` — whose top-level container has no size until WO7 instantiates it.
+ * The building block for screens, for a composite's own `<view>` as declared —
+ * whose top-level container has no size — and for a screen after composite
+ * expansion (expand.ts), where an instance node's element children are its
+ * expanded template, so they measure against the instance's resolved size.
  *
  * @param nodes     The subtree's children; non-element children are skipped.
  * @param container What the top-level elements are measured against.
  * @param context   Shared context from {@link createResolverContext}.
+ * @param annotate  Optional: rewrites or drops each diagnostic, given the node it is about.
  * @return Elements in document order, and the diagnostics resolution raised:
  *         expression errors and over-constraint. Deferred values raise nothing.
  */
@@ -455,9 +475,10 @@ export function resolveElements(
   nodes: readonly WidgetNodeChild[],
   container: Container,
   context: ResolverContext,
+  annotate?: DiagnosticAnnotator,
 ): { readonly elements: readonly ResolvedElement[]; readonly diagnostics: readonly Diagnostic[] } {
   const diagnostics: Diagnostic[] = [];
-  const elements = resolveChildren(nodes, container, context, diagnostics);
+  const elements = resolveChildren(nodes, container, context, diagnostics, annotate);
   return { elements, diagnostics };
 }
 

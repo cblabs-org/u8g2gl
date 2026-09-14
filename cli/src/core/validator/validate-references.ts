@@ -57,6 +57,43 @@ function walkNodes(
   }
 }
 
+// walkNodesWithParent
+// Like walkNodes, but also passes each element's enclosing element (undefined at
+// the top of a view), which is what decides whether a tag is a collection child.
+function walkNodesWithParent(
+  children: readonly WidgetNodeChild[],
+  visitor: (node: WidgetNode, parent: WidgetNode | undefined) => void,
+  parent?: WidgetNode,
+): void {
+  for (const child of children) {
+    if ('tag' in child && typeof child.tag === 'string') {
+      visitor(child, parent);
+      walkNodesWithParent(child.children, visitor, child);
+    }
+  }
+}
+
+// isDeclaredCollectionChild
+// Whether a tag with no manifest of its own is a collection element its parent's
+// manifest declares (§9) — `<column>` inside `<wd_list>`. Such a child is known:
+// Pass 8 reports it as not yet supported (a warning in `validate`, PR-04 decision
+// 1), so reporting it here as unknown would make `validate` error on it (PR-04
+// WO5b F2). Read from the parent's own `api.elements`, never a tag list ([D-17]);
+// collection elements are not inherited (PR-04 WO1 F8).
+//   node      — the element whose tag has no manifest
+//   parent    — its enclosing element, if any
+//   manifests — the registry
+function isDeclaredCollectionChild(
+  node: WidgetNode,
+  parent: WidgetNode | undefined,
+  manifests: ValidateInput['manifests'],
+): boolean {
+  if (parent === undefined) {
+    return false;
+  }
+  return manifests.get(parent.tag)?.api.elements.some((element) => element.name === node.tag) ?? false;
+}
+
 /**
  * Validates cross-file and intra-file references against declared symbols.
  */
@@ -119,15 +156,16 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
 
     const screenElementNames = new Set<string>();
 
-    walkNodes(screen.view?.children ?? [], (node) => {
+    walkNodesWithParent(screen.view?.children ?? [], (node, parent) => {
       if (typeof node.attributes.name === 'string' && node.attributes.name) {
         screenElementNames.add(node.attributes.name);
       }
 
       // 2a. Check the element tag. Element knowledge is data,
       // never code ([D-17]): a tag validates if and only if a manifest
-      // declares it — there is no hardcoded primitives set to fall back on.
-      if (!manifests.has(node.tag)) {
+      // declares it, or its parent's manifest declares it as a collection
+      // element — there is no hardcoded primitives set to fall back on.
+      if (!manifests.has(node.tag) && !isDeclaredCollectionChild(node, parent, manifests)) {
         if (node.tag.startsWith('u8g2gl_')) {
           // Unknown built-in widget
           diagnostics.push(
@@ -323,11 +361,11 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
     // container, not template parameters.
     const propNames = new Set(component.api.props.map((p) => `$${p.name}`));
 
-    walkNodes(component.view?.children ?? [], (node) => {
+    walkNodesWithParent(component.view?.children ?? [], (node, parent) => {
       // Check the tag itself. Pass 2a runs only over screens, so without this
       // a misspelled element inside a composite's own template passed today —
       // the walk here checked fonts, images, and subjects but never the tag.
-      if (!manifests.has(node.tag)) {
+      if (!manifests.has(node.tag) && !isDeclaredCollectionChild(node, parent, manifests)) {
         if (node.tag.startsWith('u8g2gl_')) {
           diagnostics.push(
             createRefDiagnostic(

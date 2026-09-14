@@ -174,8 +174,9 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     expect(inCard[0]?.line).toBe(7);
   });
 
-  // The parser does not keep `extends` on a manifest with a <view> (reported in
-  // the WO5b Completion Report), so this is checked on the parsed model.
+  // Checked on the parsed model here; since PR-04 WO7 the parser keeps `extends`
+  // on a manifest with a <view>, and test/integration/classed-composite.test.ts
+  // proves the same refusal from real XML.
   it('reports a composite that also extends a C++ class (PR-08), from the declared manifest', () => {
     const card = parseWidgetManifestFile(CARD_COMPOSITE_XML, 'widgets/wd_card/wd_card.xml').value!;
     const classed: WidgetManifest = { ...card, extends: 'u8g2gl_obj' };
