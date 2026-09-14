@@ -285,3 +285,69 @@ target_compile_options(test_binding PRIVATE
 )
 
 gtest_discover_tests(test_binding)
+
+# --- Runtime version (u8g2gl_version.h, §16) ---
+
+add_executable(test_version
+    test_version.cpp
+)
+
+target_include_directories(test_version PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_version PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_version PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+# Hand the test CMake's own idea of the version, so it can compare the header
+# against it at run time as well as the configure-time check in the root file.
+target_compile_definitions(test_version PRIVATE
+    U8G2GL_CMAKE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    U8G2GL_CMAKE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    U8G2GL_CMAKE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
+
+gtest_discover_tests(test_version)
+
+# --- Schema major-version guard: proven by real compiles ---
+# A refusal to compile cannot be tested from inside a program that compiled. So
+# two throwaway targets, excluded from the normal build, are built by CTest:
+# one with a matching major must build, one with a mismatched major must fail
+# *with the guard's own message*. Matching the message rather than just a
+# non-zero exit means an unrelated break (a bad include path, a typo) fails the
+# test instead of passing it. The match target is the control that proves the
+# harness itself can build.
+
+foreach(_guard_case match mismatch)
+    add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
+        version_guard/${_guard_case}.cpp
+    )
+    target_include_directories(version_guard_${_guard_case} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+    )
+    target_compile_options(version_guard_${_guard_case} PRIVATE
+        -Wall -Wextra -Wpedantic
+    )
+endforeach()
+
+add_test(NAME VersionGuard.MatchingSchemaMajorCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_match
+)
+add_test(NAME VersionGuard.MismatchedSchemaMajorFailsToCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_mismatch
+)
+set_tests_properties(VersionGuard.MismatchedSchemaMajorFailsToCompile PROPERTIES
+    PASS_REGULAR_EXPRESSION "U8G2GL schema major version mismatch"
+)
+# Both invoke the build system on the same tree; never run them concurrently.
+set_tests_properties(
+    VersionGuard.MatchingSchemaMajorCompiles
+    VersionGuard.MismatchedSchemaMajorFailsToCompile
+    PROPERTIES RESOURCE_LOCK u8g2gl_build_tree
+)

@@ -1,5 +1,29 @@
 cmake_minimum_required(VERSION 3.16)
-project(u8g2gl VERSION 0.3.0 LANGUAGES CXX)
+project(u8g2gl VERSION 0.4.0 LANGUAGES CXX)
+
+# --- Runtime version agreement (§16, .agents/rules/03-versioning.md) ---
+# The runtime version is stated twice: here, for packaging, and in
+# u8g2gl_version.h, for the compile-time guard generated code relies on. Read
+# the header and refuse to configure if they differ, so a bump to one cannot
+# ship without the other. Re-configure whenever the header changes.
+set(_u8g2gl_version_header "${CMAKE_CURRENT_SOURCE_DIR}/include/u8g2gl/u8g2gl_version.h")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_u8g2gl_version_header}")
+file(STRINGS "${_u8g2gl_version_header}" _u8g2gl_version_lines
+    REGEX "^#define U8G2GL_VERSION_(MAJOR|MINOR|PATCH) +[0-9]+")
+foreach(_part MAJOR MINOR PATCH)
+    if(NOT _u8g2gl_version_lines MATCHES "#define U8G2GL_VERSION_${_part} +([0-9]+)")
+        message(FATAL_ERROR "u8g2gl_version.h does not define U8G2GL_VERSION_${_part}")
+    endif()
+    set(_u8g2gl_header_${_part} "${CMAKE_MATCH_1}")
+endforeach()
+set(_u8g2gl_header_version
+    "${_u8g2gl_header_MAJOR}.${_u8g2gl_header_MINOR}.${_u8g2gl_header_PATCH}")
+if(NOT _u8g2gl_header_version VERSION_EQUAL PROJECT_VERSION)
+    message(FATAL_ERROR
+        "Runtime version mismatch: CMakeLists.txt says ${PROJECT_VERSION}, "
+        "include/u8g2gl/u8g2gl_version.h says ${_u8g2gl_header_version}. "
+        "Bump both together.")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

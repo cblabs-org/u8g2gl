@@ -44,6 +44,14 @@ void u8g2gl_progress_bar::set_value(uint8_t percent) {
         percent = 100;
     }
 
+    // Change guard, compared after clamping so 150 and 200 are the same value.
+    // Compared against the target, not the displayed value: re-setting the
+    // current target mid-animation must not restart the interpolation, and
+    // must not schedule a frame for a picture that has not changed (§11.2).
+    if (percent == target_percent_) {
+        return;
+    }
+
     if (anim_duration_ms_ > 0) {
         start_percent_ = current_percent_;
         target_percent_ = percent;
@@ -96,8 +104,8 @@ bool u8g2gl_progress_bar::bind_value(u8g2gl_subject_int_base* subject) {
 // Observer callback registered only by bind_value(), so the downcast is safe.
 // Clamps in int32_t before narrowing: set_value() takes uint8_t, and casting
 // first would turn -1 into 255 (clamped to 100) and 300 into 44. The change
-// guard lives here because set_value() marks dirty unconditionally, and a
-// subject re-notifying an unchanged value must not schedule a frame (§11.2).
+// guard is set_value()'s own, so a subject re-notifying an unchanged value does
+// not schedule a frame (§11.2); it is not repeated here.
 //   binding — handle from add_value_binding(); inactive after destruction
 void u8g2gl_progress_bar::on_value_changed(void* binding) {
     auto* bar = static_cast<u8g2gl_progress_bar*>(binding_object(binding));
@@ -111,10 +119,7 @@ void u8g2gl_progress_bar::on_value_changed(void* binding) {
     } else if (value > 100) {
         value = 100;
     }
-    uint8_t percent = static_cast<uint8_t>(value);
-    if (percent != bar->target_percent_) {
-        bar->set_value(percent);
-    }
+    bar->set_value(static_cast<uint8_t>(value));
 }
 
 // u8g2gl_progress_bar::get_value

@@ -19,6 +19,7 @@
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_progress_bar.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "U8G2lib.h"
@@ -54,6 +55,55 @@ TEST(ProgressBar, SetValueClamped) {
     bar.clear_dirty();
     bar.set_value(200);
     EXPECT_EQ(bar.get_value(), 100);
+}
+
+// PR-04 WO4 (carried W3): set_value() used to mark dirty unconditionally, so
+// writing an unchanged value scheduled a frame (§11.2). Check the object's flag
+// and the active screen's frame flag: the frame flag is what gates sendBuffer().
+TEST(ProgressBar, SameValueSetLeavesFrameClean) {
+    u8g2gl_screen screen{};
+    u8g2gl_set_active_screen(&screen);
+    u8g2gl_progress_bar bar;
+
+    // --- Instant: an identical value ---
+    bar.set_value(50);
+    EXPECT_TRUE(bar.is_dirty());
+    EXPECT_TRUE(screen.dirty);
+    bar.clear_dirty();
+    screen.dirty = false;
+
+    bar.set_value(50);
+    EXPECT_FALSE(bar.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+
+    // --- Instant: different requests that clamp to the same value ---
+    bar.set_value(150);
+    EXPECT_TRUE(screen.dirty);
+    bar.clear_dirty();
+    screen.dirty = false;
+
+    bar.set_value(200);
+    EXPECT_FALSE(bar.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+
+    // --- Animated: re-setting the target neither dirties nor restarts ---
+    u8g2gl_progress_bar anim;
+    anim.set_animate_duration_ms(1000);
+    anim.set_value(100);
+    anim.tick(0);                     // animation starts at t=0
+    anim.tick(500);
+    uint8_t midway = anim.get_value();
+    anim.clear_dirty();
+    screen.dirty = false;
+
+    anim.set_value(100);
+    EXPECT_FALSE(anim.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+    anim.tick(1000);                  // a restart would still be mid-way here
+    EXPECT_GT(midway, 0);
+    EXPECT_EQ(anim.get_value(), 100);
+
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST(ProgressBar, InstantTransition) {

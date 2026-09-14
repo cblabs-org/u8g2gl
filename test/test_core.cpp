@@ -7,7 +7,14 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_core.cpp
- * Description: Implementation of test_core.cpp
+ *
+ * Purpose: Verifies the frame: tick-source registration, screen activation,
+ *          the dirty gate around sendBuffer(), deadline aggregation, and the
+ *          two calls generated code makes into the frame — the per-object
+ *          render wrapper (§11.3) and the frame-dirty subject observer (§13.5).
+ *
+ * Description: GoogleTest cases against the U8G2 stub, which records draw
+ *              state, clip calls and buffer operations.
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_core.h"
@@ -357,6 +364,195 @@ TEST_F(Core, ObjSetHiddenGatesFrame) {
 
     ui_handler(display);
     EXPECT_EQ(s_render_count, 2);
+    EXPECT_FALSE(screen.dirty);
+}
+
+// --- Per-object render wrapper: u8g2gl_render_object() (§11.3) ---
+
+// Captures, while render() runs, the display state the framework set up. Then
+// it deliberately changes font and draw colour, so the tests can prove the
+// wrapper restores them.
+class state_probe_widget : public u8g2gl_obj {
+public:
+    int render_count = 0;
+    int clip_x0 = -1;
+    int clip_y0 = -1;
+    int clip_x1 = -1;
+    int clip_y1 = -1;
+    int set_clip_count_during_render = 0;
+    int max_clip_count_during_render = 0;
+    const uint8_t* font_to_leave = nullptr;
+
+    void render(U8G2& display) override {
+        render_count++;
+        clip_x0 = display.last_clip_x0;
+        clip_y0 = display.last_clip_y0;
+        clip_x1 = display.last_clip_x1;
+        clip_y1 = display.last_clip_y1;
+        set_clip_count_during_render = display.set_clip_window_count;
+        max_clip_count_during_render = display.max_clip_window_count;
+        display.setFont(font_to_leave);
+        display.setDrawColor(0);
+    }
+};
+
+static const uint8_t s_font_before[1] = {0xA0};
+static const uint8_t s_font_widget[1] = {0xB0};
+
+// A render_fn the way a generated screen will write it: one wrapper call per
+// object, in document order, fed straight from the u8g2gl_screen arrays.
+static void cb_render_via_wrapper(U8G2& display) {
+    u8g2gl_screen* scr = u8g2gl_get_active_screen();
+    for (uint8_t i = 0; i < scr->obj_count; ++i) {
+        u8g2gl_render_object(display, scr->objs, scr->parents, i);
+    }
+}
+
+TEST_F(Core, RenderObjectHiddenAncestorSuppressesChild) {
+    state_probe_widget container;
+    state_probe_widget child;
+    container.set_coords(0, 0, 64, 32);
+    child.set_coords(4, 4, 10, 10);
+    container.set_hidden(true);   // the child itself is not hidden
+
+    u8g2gl_obj* const objs[] = { &container, &child };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    u8g2gl_screen screen{};
+    screen.objs = objs;
+    screen.parents = parents;
+    screen.obj_count = 2;
+    screen.render_fn = cb_render_via_wrapper;
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    ui_handler(display);
+    EXPECT_EQ(container.render_count, 0);
+    EXPECT_EQ(child.render_count, 0);
+    EXPECT_EQ(display.set_clip_window_count, 0);  // nothing was set up for it
+
+    // Control: un-hiding the ancestor alone makes the child draw.
+    container.set_hidden(false);
+    ui_handler(display);
+    EXPECT_EQ(container.render_count, 1);
+    EXPECT_EQ(child.render_count, 1);
+}
+
+TEST_F(Core, RenderObjectClipsChildToAncestorBounds) {
+    state_probe_widget container;
+    state_probe_widget child;
+    container.set_coords(0, 0, 20, 10);
+    child.set_coords(15, 5, 20, 20);   // overhangs the container right and below
+
+    u8g2gl_obj* const objs[] = { &container, &child };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    U8G2 display;
+    u8g2gl_render_object(display, objs, parents, 1);
+
+    // Intersection is x 15..19, y 5..9, as inclusive corners (§11.3:
+    // setClipWindow(x, y, x+w-1, y+h-1)), and it was in force during render().
+    EXPECT_EQ(child.render_count, 1);
+    EXPECT_EQ(child.set_clip_count_during_render, 1);
+    EXPECT_EQ(child.clip_x0, 15);
+    EXPECT_EQ(child.clip_y0, 5);
+    EXPECT_EQ(child.clip_x1, 19);
+    EXPECT_EQ(child.clip_y1, 9);
+}
+
+TEST_F(Core, RenderObjectWhollyClippedChildIsNotRendered) {
+    state_probe_widget container;
+    state_probe_widget child;
+    container.set_coords(0, 0, 10, 10);
+    child.set_coords(20, 20, 5, 5);
+
+    u8g2gl_obj* const objs[] = { &container, &child };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    U8G2 display;
+    u8g2gl_render_object(display, objs, parents, 1);
+    EXPECT_EQ(child.render_count, 0);
+    EXPECT_EQ(display.set_clip_window_count, 0);
+}
+
+TEST_F(Core, RenderObjectRestoresDisplayStateAfterRender) {
+    state_probe_widget widget;
+    widget.set_coords(2, 3, 10, 8);
+    widget.font_to_leave = s_font_widget;
+
+    u8g2gl_obj* const objs[] = { &widget };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT };
+
+    U8G2 display;
+    display.setFont(s_font_before);
+    display.setDrawColor(1);
+
+    u8g2gl_render_object(display, objs, parents, 0);
+
+    // The widget really did change both during its render...
+    EXPECT_EQ(widget.render_count, 1);
+    // ...and both are back afterwards.
+    EXPECT_EQ(display.last_font, s_font_before);
+    EXPECT_EQ(display.last_draw_color, 1);
+
+    // The clip was reset to the full display after render(), not before: the
+    // widget saw zero resets, and the wrapper made exactly one on the way out.
+    EXPECT_EQ(widget.max_clip_count_during_render, 0);
+    EXPECT_EQ(display.max_clip_window_count, 1);
+}
+
+TEST_F(Core, RenderObjectClampsNegativeClipOrigin) {
+    state_probe_widget widget;
+    widget.set_coords(-4, -2, 10, 8);   // partly off the top-left of the display
+
+    u8g2gl_obj* const objs[] = { &widget };
+
+    U8G2 display;
+    u8g2gl_render_object(display, objs, nullptr, 0);
+
+    // U8G2 takes unsigned coordinates; a negative origin would wrap, not clip.
+    EXPECT_EQ(widget.render_count, 1);
+    EXPECT_EQ(widget.clip_x0, 0);
+    EXPECT_EQ(widget.clip_y0, 0);
+    EXPECT_EQ(widget.clip_x1, 5);
+    EXPECT_EQ(widget.clip_y1, 5);
+}
+
+TEST_F(Core, RenderObjectNullArrayRendersNothing) {
+    U8G2 display;
+    u8g2gl_render_object(display, nullptr, nullptr, 0);
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
+// --- Frame-dirty observer: u8g2gl_frame_dirty_observer() (§13.5) ---
+
+TEST_F(Core, FrameDirtyObserverMarksActiveScreenDirty) {
+    U8G2 display;
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+    u8g2gl_set_active_screen(&screen);
+
+    // Registered exactly as generated code will: no user data, one per subject.
+    u8g2gl_subject_int level(0);
+    ASSERT_TRUE(level.add_observer(nullptr, u8g2gl_frame_dirty_observer));
+
+    ui_handler(display);   // clears the activation frame
+    EXPECT_FALSE(screen.dirty);
+
+    level.set(7);
+    EXPECT_TRUE(screen.dirty);
+    ui_handler(display);
+    EXPECT_EQ(s_render_count, 2);
+    EXPECT_FALSE(screen.dirty);
+
+    // The subject does not notify for an unchanged value, so no frame is due.
+    level.set(7);
+    EXPECT_FALSE(screen.dirty);
+
+    // With no active screen there is nothing to mark, and it must not fault.
+    u8g2gl_set_active_screen(nullptr);
+    level.set(8);
     EXPECT_FALSE(screen.dirty);
 }
 

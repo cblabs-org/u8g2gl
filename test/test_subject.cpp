@@ -7,7 +7,15 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_subject.cpp
- * Description: Implementation of test_subject.cpp
+ *
+ * Purpose: Verifies the four scalar subject types (§8.1) and the object
+ *          bindings built on them: set/get, notify-only-on-change, per-subject
+ *          observer capacity ([D-21]), string truncation at the declared length
+ *          (§8.2), and that conditional-flag, text and geometry bindings
+ *          propagate a subject's value into an object and mark it dirty.
+ *
+ * Description: GoogleTest cases for u8g2gl_subject_* and the u8g2gl_obj bind_*
+ *              entry points, including observer-pool exhaustion.
  */
 #include <gtest/gtest.h>
 #include <cstring>
@@ -412,36 +420,28 @@ TEST(Binding, RightSizedStringSubjectBindsAndPropagates) {
 
 // [D-20] made x, y, width and height bindable; an element binding all four
 // geometry properties plus its text needs 5 concurrent binding slots on one
-// object. At the old default of 4 the 5th binding here silently failed —
-// u8g2gl_allocate_binding() returns nullptr on exhaustion and every public
-// bind_* wrapper discards that bool (see u8g2gl_obj.cpp). The runtime has no
-// bind_x/y/w/h-to-subject entry point yet (wiring geometry to a subject is
-// generator-side, PR-04); this test stands in with four flag bindings, since
-// the shared pool caps by object, not by what a slot conceptually represents.
+// object. At the old default of 4 the 5th binding here failed, and at the time
+// nothing could tell: the bind_* wrappers discarded the pool's result. Since
+// PR-04 WO2 every object binding returns bool, and since WO3 the real geometry
+// bindings (bind_x/y/width/height) exist, so this test binds those directly and
+// checks every return rather than inferring success from side effects.
 TEST(Binding, FourGeometryBindingsPlusTextFitTheDefaultBudget) {
     u8g2gl_obj obj;
-    u8g2gl_subject_int geom_x(5), geom_y(5), geom_w(5), geom_h(5);
+    u8g2gl_subject_int geom_x(5), geom_y(6), geom_w(7), geom_h(8);
     u8g2gl_subject_int text_subject(42);
 
-    constexpr uint8_t flag_x = 0x08;
-    constexpr uint8_t flag_y = 0x10;
-    constexpr uint8_t flag_w = 0x20;
-    constexpr uint8_t flag_h = 0x40;
+    EXPECT_TRUE(obj.bind_x(&geom_x));
+    EXPECT_TRUE(obj.bind_y(&geom_y));
+    EXPECT_TRUE(obj.bind_width(&geom_w));
+    EXPECT_TRUE(obj.bind_height(&geom_h));
+    EXPECT_TRUE(obj.bind_text(&text_subject, "%d"));
 
-    obj.bind_flag_if_eq(&geom_x, 5, flag_x);
-    obj.bind_flag_if_eq(&geom_y, 5, flag_y);
-    obj.bind_flag_if_eq(&geom_w, 5, flag_w);
-    obj.bind_flag_if_eq(&geom_h, 5, flag_h);
-    obj.bind_text(&text_subject, "%d");
-
-    // Every flag binding evaluates immediately (add_flag_binding Step 4), so
-    // a slot that failed to allocate leaves its flag at its default (clear)
-    // rather than merely deferring — this distinguishes "bound and true" from
-    // "never bound" without needing add_flag_binding's discarded return value.
-    EXPECT_TRUE(obj.has_flag(flag_x));
-    EXPECT_TRUE(obj.has_flag(flag_y));
-    EXPECT_TRUE(obj.has_flag(flag_w));
-    EXPECT_TRUE(obj.has_flag(flag_h));
+    // Each binding applies the subject's current value at once, so all five
+    // slots are live, not merely registered.
+    EXPECT_EQ(obj.get_x(), 5);
+    EXPECT_EQ(obj.get_y(), 6);
+    EXPECT_EQ(obj.get_w(), 7);
+    EXPECT_EQ(obj.get_h(), 8);
     EXPECT_EQ(obj.get_bound_text_subject(), &text_subject);
 }
 

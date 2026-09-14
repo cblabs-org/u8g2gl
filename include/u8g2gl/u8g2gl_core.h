@@ -30,6 +30,10 @@
  *     - ui_handler(): The main handler for rendering and ticking
  *     - u8g2gl_mark_dirty(): Mark the active screen dirty
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
+ *
+ *     Support for generated code (§11.3, §13.5):
+ *     - u8g2gl_render_object():        Render one object with visibility, clip and state saved
+ *     - u8g2gl_frame_dirty_observer(): Subject observer that marks the active screen dirty
  */
 #ifndef U8G2GL_CORE_H
 #define U8G2GL_CORE_H
@@ -96,6 +100,66 @@ u8g2gl_screen* u8g2gl_get_active_screen();
  * dominates the cost of a frame.
  */
 void u8g2gl_mark_dirty();
+
+/**
+ * @brief Subject observer that marks the active screen dirty.
+ *
+ * Has the u8g2gl_observer_cb signature, so it registers directly on any subject:
+ *
+ * @code
+ * ui_subject_level.add_observer(nullptr, u8g2gl_frame_dirty_observer);
+ * @endcode
+ *
+ * It exists for elements the generator compiles to draw calls (§13.5). Those
+ * read a bound value at draw time and have no object observing the subject, so
+ * without this nothing would schedule a frame when the value changes. The
+ * generator registers it once per such subject — not once per binding, and not
+ * once per screen, because u8g2gl_mark_dirty() already targets whichever screen
+ * is active.
+ *
+ * @param user_data Ignored; pass nullptr. Present only to match
+ *                  u8g2gl_observer_cb.
+ */
+void u8g2gl_frame_dirty_observer(void* user_data);
+
+// --- Per-object rendering ---
+
+/**
+ * @brief Render one object of a screen's flat tree inside the framework's
+ *        containment (§11.3).
+ *
+ * In order: skips the object if it or any ancestor is hidden; skips it if its
+ * effective clip (own bounds intersected with every ancestor's) is empty;
+ * otherwise saves font and draw colour with u8g2gl_state_saver, sets the clip
+ * window to the effective clip, calls the object's render(), and resets the
+ * clip window to the full display.
+ *
+ * Generated screen render functions call this once per object in document
+ * order, and the editor build calls the same function, so the firmware and the
+ * editor cannot contain two versions of the rule. The arguments are exactly a
+ * u8g2gl_screen's arrays: `u8g2gl_render_object(d, s.objs, s.parents, i)`.
+ *
+ * @param display U8G2 instance to draw into.
+ * @param objs    The screen's object array, in document order. A null array or a
+ *                null entry on the ancestry chain renders nothing.
+ * @param parents The parallel parent-index array, or nullptr to use each
+ *                object's own parent index (as for u8g2gl_effective_clip()).
+ * @param index   Index of the object to render. Not bounds-checked — the arrays
+ *                carry no length — so it must be less than the screen's
+ *                object count.
+ *
+ * @note On return the clip window is the full display, not whatever it was
+ *       before the call. U8G2 has no getter for the clip window, so it cannot be
+ *       saved; and because each object's clip is computed from its ancestors
+ *       rather than nested inside a parent's active clip, the full display is
+ *       the correct state between objects.
+ */
+void u8g2gl_render_object(
+    U8G2& display,
+    u8g2gl_obj* const* objs,
+    const uint8_t* parents,
+    uint8_t index
+);
 
 // --- The main handler ---
 
