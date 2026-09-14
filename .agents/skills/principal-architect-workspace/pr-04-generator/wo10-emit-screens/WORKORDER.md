@@ -71,6 +71,9 @@ building it in the C++ test suite.
       as design_spec §13.12's example still shows. A direct call skips effective
       visibility and clipping, so a hidden object would draw. A test with a hidden
       object proves the generated code does not.
+- [ ] **Carried from WO5a — binding overloads.** Emit each binding from the declaration
+      whose `type` matches the bound subject (`bind_text` exists for `string` and `int`),
+      using WO8's recorded choice rather than re-selecting by name.
 - [ ] **Carried from WO4 — F5, the proof:** the compiled fixture's binding pool is the
       *generated* capacity, not the default — asserted from a translation unit inside
       the library build, not only from generated code.

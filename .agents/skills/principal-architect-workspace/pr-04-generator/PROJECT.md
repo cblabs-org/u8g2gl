@@ -68,7 +68,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** ✅ `6a78247` · base WO3 · standard · finding 4; runtime 0.4.0
 - **Owner checkpoint** — reached 2026-09-14; rulings below. WO4b added, WO5 split
 - [x] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** ✅ `4094489` · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
-- [ ] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
+- [x] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
 - [ ] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5b · standard · [D-7], [D-20]
 - [ ] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** · base WO6 · standard · §13.4, §13.6
@@ -91,6 +91,10 @@ the approved decomposition.
   commit.
 - Out-of-scope findings go in the Completion Report. Filing issues is the PA's
   authority, not the worker's.
+- **"Stop and report" means: do not choose — record it in the Completion Report,
+  then continue with the remaining line items.** It never means halt the work order
+  or ask for permission. (Clarified after WO5a noticed WORKORDERs said "stop" while
+  dispatch prompts said "record and continue".)
 
 ## Decisions — Chief Architect, 2026-09-13 (recorded in PROGRAM.md @ `f693aab`)
 
@@ -481,6 +485,37 @@ Small, runtime-only, and independent of WO5a–WO12, so it can land anywhere in 
 before submission. Evidence: U8G2 2.36.18 in departures-board-v3's PlatformIO cache,
 read, nothing fetched.
 
+### WO5a — complete (`a31527c`)
+
+**Verified independently:** commits only on the WO5a branch; runtime `src/` and
+`test/` untouched; C++ 284 unchanged, zero warnings; CLI 406 → **418**, `tsc` and lint
+clean. `bind_text_int` appears nowhere in the manifests or the bundle; `bind_text` is
+declared once per subject type on `u8g2gl_obj`, `u8g2gl_label` and `u8g2gl_button`.
+
+**Delivered:** `U8G2GL_INAPPLICABLE_FLAG` for `disabled` on a drawing element, decided
+from the effective manifest, never a tag; bindings merged by (name, type), with WO3's
+same-setter inference removed, so a string subject on an int-only binding fails again;
+`U8G2GL_MIXED_EMISSION_TARGETS`; the unknown-`extends` message now carries the §6.5
+remedy; single-file `validate` of a bundled framework manifest no longer reports
+shadowing, while a project copy still does.
+
+**The worker ran its new tests against the base** in a throwaway worktree: eight fail
+there, one or more per line item, and every control passes on both. One existing test
+changed, correctly — it pinned the replace-by-name binding merge this work order
+reverses.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | Flag values are never checked: `flag="hiden"`, or a directive with no `flag`, validates silently | **WO7** — its types pass already walks binding directives on the expanded tree |
+| 2 | "Is a drawing element" is spelled in three places (schema pass, prop checks, cross-test) | **WO8** — one registry helper, the three call sites migrated. Realisation needs the same predicate, and PR-3R's evidence says three copies is where the next defect hides |
+| 3 | `bind_text_int` still appears in `docs/ui_flows.md:174` and d19 | **Chief Architect** |
+| 4 | A binding name now appears once per type, so emission must choose the overload matching the subject, never the first by name | **WO8, WO10, WO11** |
+| 5 | Composites are not checked for mixed emission targets | **Accepted** — composite props carry neither `setter=` nor `draw=` |
+| 6 | Single-file mode reports `UNKNOWN_SCHEMA_VERSION ''` for any non-project file | **WO5b** — the single-file path moves into `loadProject()` |
+| 7 | WORKORDERs said "stop and report"; dispatch prompts said "record and continue" | **Resolved** — defined once under Standing instructions |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -500,6 +535,9 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO5a complete** (`a31527c`, report `1ebbae3`). Verified
+  independently. WO5b dispatched on `u8g2gl-generator/wo5b-generate-command`. WO4c
+  still awaiting the owner.
 - 2026-09-14 — **WO4b complete** (`4094489`, report `084339c`). Verified
   independently. G1 confirmed against real U8G2: the runtime does not compile against
   it (`getFont()`). **WO4c proposed to the owner, not added.** WO5a dispatched on

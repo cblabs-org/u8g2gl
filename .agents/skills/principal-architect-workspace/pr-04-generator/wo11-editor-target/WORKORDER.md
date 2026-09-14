@@ -70,6 +70,10 @@ evidence is that the second copy is where the defect hides.
       elements, set-by-name thunks, draw-by-name for `draw=`-only elements. Thunks
       spell setter calls through WO9's value helper; draw entries use WO9's
       draw-argument helper. **No second spelling of either.**
+- [ ] **Carried from WO5a — binding overloads.** A binding name may appear once per
+      subject type. Set-by-name for a binding must dispatch on the subject's type, and
+      the registry must not collapse `bind_text`'s `string` and `int` declarations into
+      one entry.
 - [ ] **Scene description JSON** from the same resolved, flattened model WO8
       produces (ui_spec §4.1 step 6): flat element list, resolved geometry and
       properties, parent table, realisation. Subjects are described, **values are

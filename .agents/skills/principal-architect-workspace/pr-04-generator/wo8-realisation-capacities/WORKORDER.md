@@ -84,13 +84,24 @@ rewriting this pass.
       subject, plus **one** frame-dirty observer if any draw-call element binds it.
       String subjects also carry `max_len`. This is the PR-01 constraint nearly lost
       once — test it directly.
+- [ ] **Carried from WO5a — one "drawing element" predicate.** Whether a manifest is a
+      drawing element (no `view`, declared `draw=` props, no `setter=` props) is spelled
+      in `validate-schema.ts`, `validate-widget-props.ts` and the manifest cross-test.
+      Realisation needs the same answer. Put it on the registry once, use it here, and
+      migrate the three existing call sites to it.
+- [ ] **Carried from WO5a — choose the binding overload by subject type.** A binding
+      name may appear once per subject type (`bind_text` for `string` and `int`). When
+      counting and recording bindings, select the declaration whose `type` matches the
+      bound subject — never the first match by name.
 - [ ] The 254-object ceiling: the validator's conservative over-count stays; report
       whether the exact count now available disagrees with it, as a finding.
 
 ## Strict Boundary Box
 
 **In scope:** new `cli/src/core/generator/realise/` (or equivalent) and the
-flattened model type; `schema/diagnostic.ts`; tests; this WORKORDER.
+flattened model type; `cli/src/core/manifest/` (the drawing-element predicate only);
+`cli/src/core/validator/validate-schema.ts`, `validate-widget-props.ts` and
+`cli/test/manifests/manifest-crosstest.test.ts` (migrating to that predicate only); `schema/diagnostic.ts`; tests; this WORKORDER.
 
 **Do NOT touch:** emission (WO9+); validator (report the ceiling question
 instead); runtime; manifests.

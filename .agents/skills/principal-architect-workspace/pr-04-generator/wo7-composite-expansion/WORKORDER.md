@@ -76,6 +76,10 @@ container.
       walks only screens. Binding types inside a composite's `<view>` can only be
       checked after `$subject` substitution, so run the types pass over the expanded
       tree, reporting at the interior element with the instantiation site attached.
+- [ ] **Carried from WO5a — flag values are never checked.** `<bind_flag_if_*>` with
+      `flag="hiden"`, or with no `flag` at all, validates silently. §8.4 fixes the set at
+      `hidden` and `disabled`; an unknown or missing flag is an error with a near-miss
+      suggestion. Check it in the same types-pass walk.
 
 ## Strict Boundary Box
 

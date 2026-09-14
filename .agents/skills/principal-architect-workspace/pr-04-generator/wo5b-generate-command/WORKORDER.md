@@ -5,7 +5,7 @@ title: "`generate` command, shared load path, not-yet-supported policy"
 branch: u8g2gl-generator/wo5b-generate-command
 base: u8g2gl-generator/wo5a-validator-carries
 complexity: standard
-status: draft — PA revises against WO5a's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO5b — `generate` command and shared load path
@@ -83,6 +83,11 @@ only stamped headers here; content arrives in WO9–WO10.
 - [ ] **F9 (from WO1):** diagnostics located in a bundled framework manifest print with
       no source line, because the file map holds only project files. `loadProject()`
       builds the map; include the bundled manifest text.
+- [ ] **Carried from WO5a — single-file schema version.** `validate` on any single
+      file that is not `u8g2gl.xml` reports `U8G2GL_UNKNOWN_SCHEMA_VERSION` with an
+      empty version, because no project manifest was parsed. A single screen, globals or
+      widget file has no schema to check; do not report one. `loadProject()` owns this
+      path now, so fix it there, for `validate` and `generate` alike.
 - [ ] `--json` contract documented in `printUsage` and TSDoc:
       `{ files, diagnostics, errors, warnings }` (budget arrives in WO12).
 
@@ -116,6 +121,10 @@ the not-yet-supported checks only), `schema/diagnostic.ts`, tests, this WORKORDE
 ## Issue Surfacing
 
 Out-of-scope findings go in the Completion Report. Do not fix, do not file.
+
+**"Stop and report" in this WORKORDER means:** do not choose — record it in the
+Completion Report, then continue with the remaining line items. It never means halt or
+ask for permission.
 
 ---
 
