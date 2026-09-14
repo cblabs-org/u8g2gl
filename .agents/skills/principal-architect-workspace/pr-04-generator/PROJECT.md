@@ -72,7 +72,9 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [x] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** ✅ `6b5d562` · base WO5b · standard · [D-7], [D-20]
 - [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
-- [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7 · standard · [D-18], [D-21], `_n<N>`
+- [ ] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
+- [ ] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
+- [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7b · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
@@ -670,6 +672,65 @@ F4/F5, F6, F7, F9-interim, F10 — every "validate the expanded tree" check in o
 which also answers WO7's note that these checks must run on the template or the expanded
 tree, never both.
 
+### Rulings on WO4c and WO7b — Chief Architect, delivered in the owner's session, 2026-09-14
+
+Recorded in PROGRAM.md; spec at `main` @ `5f2574f`. **Ledger is now sixteen.**
+
+Real U8G2 2.36.18 was also found in esp32-app-foundation's PlatformIO cache, so the
+following are checked against real source.
+
+1. **WO4c — APPROVED, extended.** Read the font through `getU8g2()->font` and drop
+   `getFont()` from the stub. **F1 is settled: the clip window's far corner is
+   exclusive** — `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", and
+   `u8g2_clip_intersection2` agrees; the one function holding the convention cites that
+   instead of an unverified note, and PR-06's edge test now guards it rather than
+   discovering it. **New finding:** the stub's coordinate types are wrong — the stub takes
+   `int`, real U8G2 takes `u8g2_uint_t` (`uint16_t`, `U8G2_16BIT` on), so on hardware a
+   negative origin wraps (−5 → 65531) and no degenerate-input test against the `int` stub
+   can catch it. Retype stub coordinates, make conversions explicit, clamp the clip window
+   at both corners.
+2. **WO7b — APPROVED.** The contract is normative in §7.2: anchors only where the manifest
+   declares `x`, `y`, `width`, `height` (the PA's interim rule, made permanent); every
+   element fully positioned, never a silent zero; `hcenter`/`vcenter` strict booleans;
+   `screen_width`, `screen_height`, `parent_width`, `parent_height` reserved; constants
+   validated where declared; bounds checked for the target being generated.
+3. **§13.2 — coordinates are `int16_t`**, matching `u8g2gl_obj`. Other `int` properties
+   stay `int32_t` (`set_time(uint32_t)` needs the width). "Fits `int16_t`" and "inside its
+   container" are separate checks; WO7b adds the first.
+
+### U8G2 dependency — decided
+
+**Owner decision (2026-09-14), verbatim, as relayed by the Chief Architect:**
+
+> "submodule approach is fine with pinned like the other example I gave you is fine"
+
+The "other example" is esp32-app-foundation's `modules/LVGLDisplay`, which declares a pinned
+`library.json` dependency rather than committing the library. The owner authorised fetching
+U8G2 into this repository as a submodule.
+
+**Version: U8G2 2.36.18.** The newest upstream tag is 2.37.1, but the PlatformIO registry
+stops at 2.36.18 (released 2026-03-08), applications install U8G2 from that registry, and
+esp32-app-foundation already builds 2.36.18 — so tests and firmware stay on one version.
+Because 2.36.18 is the chosen version, no "2.36.18" reference in PROGRAM.md, PROGRAM-PLAN.md
+or design_spec §21 changes.
+
+**In PR-04 (WO4c):** submodule at `extern/u8g2` pinned to tag 2.36.18; a host CMake target
+compiling the runtime against U8G2's real headers — WO4c's acceptance test, the check that
+would have caught `getFont()` and the `int`/`u8g2_uint_t` mismatch; `THIRD-PARTY-NOTICES.md`
+with a U8G2 row (code BSD-2-Clause; fonts licensed per font group, U8G2 wiki "fntgrp"); the
+catalogue builder defaults to the submodule and records the U8G2 commit — closing Q-11.
+
+**PR-05 (not PR-04, recorded only):** the integration module declares
+`olikraus/U8g2@^2.36.18` in `library.json`, and foundation's notices gain a row.
+
+**Record-keeping done in this PR:** PROGRAM.md's U8G2 decision section now carries the owner
+quote in place of "the owner hasn't confirmed it"; PROGRAM-PLAN.md's "*(CA recommendation,
+awaiting owner confirmation)*" now reads "confirmed by the owner 2026-09-14".
+
+**Stack position.** WO4c is numbered for its origin (G1 in WO4b's review) but sits after WO7
+in the stack: WO4c → WO7b → WO8. The stack is serial and WO4c touches no file WO5a–WO7 did,
+so placing it at the tip avoids rebasing finished work orders a second time.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -689,6 +750,12 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **Rulings on WO4c and WO7b received** (`main` @ `5f2574f`); owner's U8G2
+  dependency decision recorded. **Stack rebased onto `main` @ `5f2574f`** with
+  `--update-refs`: 40 commits, no conflicts (no file shared with `main`), all ten branches
+  moved; C++ 284 and CLI 596 green on the rebased tip. **Every commit SHA before this
+  entry predates the rebase**; the rebased WO7 review is `1393d26`. Ledger now sixteen.
+  WO4c dispatched on `u8g2gl-generator/wo4c-real-u8g2`; WO7b drafted; WO8 re-based on WO7b.
 - 2026-09-14 — **WO7 complete** (`a19b65a`, report `7cbf909`). Interrupted once by
   an API usage limit and resumed with its context. Verified independently, including
   end to end through the built CLI. WO8 branch cut but **not dispatched**: its scope

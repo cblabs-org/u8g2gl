@@ -914,10 +914,10 @@ row for it. PlatformIO fetches it at build time, pinned by version.
   **git submodule pinned to tag 2.36.18** (e.g. `extern/u8g2`). That downloads
   it into the repo without committing U8G2 into U8G2GL's history — 48 MB, 42 MB
   of it in `clib`, carried by every clone for good. The repo already uses
-  submodules, and U8G2 ships its own `CMakeLists.txt`. **This is the Chief
-  Architect's recommendation and the owner hasn't confirmed it.** If a committed
-  copy was meant literally, it's a one-line change here, and nothing has been
-  executed.
+  submodules, and U8G2 ships its own `CMakeLists.txt`. **Confirmed by the
+  owner, 2026-09-14:** "submodule approach is fine with pinned like the other
+  example I gave you is fine" — the other example being `LVGLDisplay`'s pinned
+  `library.json` dependency. Pinned to 2.36.18.
 - **Apps using the library or the designer** get U8G2 the `LVGLDisplay` way: a
   pinned dependency in the integration module's `library.json`
   (`olikraus/U8g2`, `^2.36.18`) plus a notices row. That's PR-05.

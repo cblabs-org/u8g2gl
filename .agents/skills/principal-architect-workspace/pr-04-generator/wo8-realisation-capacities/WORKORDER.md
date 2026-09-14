@@ -3,7 +3,7 @@ work_order: WO8
 project: pr-04-generator
 title: "Realisation, flattening and generated capacities"
 branch: u8g2gl-generator/wo8-realisation-capacities
-base: u8g2gl-generator/wo7-composite-expansion
+base: u8g2gl-generator/wo7b-geometry-contract
 complexity: standard
 status: draft — PA revises against WO7's Completion Report before dispatch
 ---
@@ -25,7 +25,7 @@ under "Human Approval" (owner's own words, timestamped) and that this WORKORDER'
 ## Branch
 
 **Branch**: `u8g2gl-generator/wo8-realisation-capacities`
-**Base**: `u8g2gl-generator/wo7-composite-expansion`
+**Base**: `u8g2gl-generator/wo7b-geometry-contract`
 
 `git branch --show-current` **as its own command immediately before every commit**.
 

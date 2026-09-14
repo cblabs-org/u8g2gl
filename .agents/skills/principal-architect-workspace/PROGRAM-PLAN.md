@@ -77,7 +77,7 @@ every app using U8G2GL or the designer, following `modules/LVGLDisplay`.
 
 | Consumer | Mechanism | Lands in |
 |---|---|---|
-| This repo — real-header compile check, catalogue builder | Git submodule pinned to the tag *(CA recommendation, awaiting owner confirmation)* | PR-04 (WO4c) |
+| This repo — real-header compile check, catalogue builder | Git submodule pinned to the tag confirmed by the owner 2026-09-14 | PR-04 (WO4c) |
 | Wasm renderer and designer | Compile U8G2's C source from the submodule | PR-06 |
 | Apps using the library | `library.json` dependency `olikraus/U8g2@^2.36.18`, as `LVGLDisplay` does for LVGL | PR-05 |
 
