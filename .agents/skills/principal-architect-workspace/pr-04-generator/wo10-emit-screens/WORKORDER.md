@@ -65,7 +65,15 @@ building it in the C++ test suite.
       subject at draw time. Adjacent siblings sharing an identical guard may be
       hoisted; **never reorder**.
 - [ ] **Frame-dirty observers** registered once per subject that draw-call bindings
-      read (§13.5).
+      read (§13.5), using WO4's `u8g2gl_frame_dirty_observer`.
+- [ ] **Carried from WO4 — F7:** objects render through
+      `u8g2gl_render_object(d, objs, parents, i)`, **never** `obj.render(d)` directly
+      as design_spec §13.12's example still shows. A direct call skips effective
+      visibility and clipping, so a hidden object would draw. A test with a hidden
+      object proves the generated code does not.
+- [ ] **Carried from WO4 — F5, the proof:** the compiled fixture's binding pool is the
+      *generated* capacity, not the default — asserted from a translation unit inside
+      the library build, not only from generated code.
 - [ ] **Generated code ignores `add_binding` returns** — capacities are exact
       ([D-21] §4) — and a `static_assert` in the fixture build proves the pool
       equals the counted total.

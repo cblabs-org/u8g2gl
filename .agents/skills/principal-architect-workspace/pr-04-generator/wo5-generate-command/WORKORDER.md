@@ -99,6 +99,13 @@ It emits only stamped headers here; content arrives in WO9–WO10.
 - [ ] **Carried from WO3 — mixed manifests.** A manifest declaring both `setter=`
       and `draw=` props is an error in the schema pass ([D-18]: a manifest declares
       one emission target or the other), naming one prop of each kind.
+- [ ] **Chief Architect ruling on F3 (`main` @ `4e4b992`) — unknown `extends` says
+      what to do.** `extends` must name an element that has a manifest; the error
+      the registry raises for one that does not is correct and stays. Its message
+      (`manifest-registry.ts`, currently "Manifest <tag> extends unknown element
+      'parent'.") must add the remedy design_spec §6.5 now states: give the class a
+      manifest — an `<api>` with no new props is enough. Keep the near-miss
+      suggestions. Assert the remedy text in a test.
 - [ ] `--json` contract documented in `printUsage` and TSDoc:
       `{ files, diagnostics, errors, warnings }` (budget arrives in WO12).
 

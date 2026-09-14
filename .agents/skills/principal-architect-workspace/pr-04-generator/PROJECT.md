@@ -65,7 +65,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO1 — manifest registry](wo1-manifest-registry/WORKORDER.md)** ✅ `6c71715` · `u8g2gl-generator/wo1-manifest-registry` · base `main` @ `f693aab` · standard · finding 1; widget/composite prop-check unification (inherited)
 - [x] **[WO2 — manifest ↔ runtime parity](wo2-manifest-parity/WORKORDER.md)** ✅ `33cd27b`, `0257d57` · base WO1 · standard · finding 2; `bind_time`, `bind_value`
 - [x] **[WO3 — [D-20] bindable geometry](wo3-bindable-geometry/WORKORDER.md)** ✅ `a652fd6` (partial by design — one stop-and-report, resolved by the PA) · base WO2 · standard · finding 3
-- [ ] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** · base WO3 · standard · finding 4; runtime 0.4.0
+- [x] **[WO4 — runtime support for generated code](wo4-runtime-support/WORKORDER.md)** ✅ `6a78247` · base WO3 · standard · finding 4; runtime 0.4.0
 - **Owner checkpoint** — WO1–4 repair merged code; WO2 is the likeliest to grow
 - [ ] **[WO5 — `generate` command and shared load path](wo5-generate-command/WORKORDER.md)** · base WO4 · standard · constraint 4; NOT_YET_SUPPORTED severity split
 - [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5 · standard · [D-7], [D-20]
@@ -292,6 +292,88 @@ removes the inference. → WO5.
 | 6 | A manifest with both `setter=` and `draw=` props is undefined | **WO5** — an error: [D-18] says a manifest declares one or the other |
 | 7 | `vitest run` alone does not catch test type errors | **Accepted** — every WORKORDER's green definition already includes `lint` |
 
+### WO4 — complete (`6a78247`)
+
+**Verified independently:** commits only on the WO4 branch; `docs/` and `cli/`
+untouched; C++ 266 → **277**, zero warnings after reconfigure; CLI 406 unchanged,
+`tsc` and lint clean. The version guard's refusal is proven by a real failing
+compile — `VersionGuard.MismatchedSchemaMajorFailsToCompile` passes only when the
+compiler stops with the guard's own message, with a matching-major control beside it.
+
+**Delivered:** `u8g2gl_render_object(U8G2&, objs, parents, index)` taking a screen's
+own arrays (effective visibility, empty-clip skip, state saver, clip, `render()`,
+reset); `u8g2gl_version.h` at runtime 0.4.0 / schema 0.4 with
+`U8G2GL_REQUIRE_SCHEMA_VERSION`, and a configure-time check that CMake and the header
+agree; `u8g2gl_frame_dirty_observer`, pinned to the observer type at library build
+time; W3 and W8 closed.
+
+**Decisions accepted:** the guard compares the **schema** major, not the generator
+major — the CLI and runtime are versioned separately, so a generator comparison
+would mean nothing (rules/03-versioning.md). Clip is reset to the full display after
+each object because U8G2 cannot read the clip back. Negative clip origins clamp to 0.
+
+**Interruption handled without loss.** The worker hit the API usage limit mid-flight
+with eleven files uncommitted. Nothing was committed, stashed or discarded on its
+behalf; the same worker was resumed with its context and re-derived its state from
+`git diff`. Recorded because a fresh worker reconstructing a half-finished diff is
+the riskier path, and this is the first time it has come up.
+
+**Triage of F1–F8:**
+
+| # | Finding | Placed |
+|---|---|---|
+| F1 | `setClipWindow(x, y, x+w-1, y+h-1)` — U8G2's second corner may be exclusive, clipping one column and row. **Unverified**: no U8G2 source exists on this host, checked | **Owner checkpoint** — proposed WO4b |
+| F2 | §16 says runtime and CLI are versioned "in lockstep"; they are not (CLI 0.6→0.7, runtime 0.4), and §16 does not say which major is compared | **Chief Architect** — spec defect; rules/03-versioning.md already describes the real, separate versioning |
+| F3 | The guard cannot catch 0.3 → 0.4, which §15.4 calls breaking, because both are major 0 | **Owner checkpoint** — pre-1.0 policy |
+| F4 | `u8g2gl_state_saver` does not save the clip window, though its header and §11.3 say it does; nor font or bitmap mode | **Owner checkpoint** — proposed WO4b |
+| F5 | Generated capacities do not reach the library: the pool is sized in `u8g2gl_obj.cpp`, compiled without the generated header | **WO9** (design) and **WO10** (proof). Without it [D-21] silently does not happen |
+| F6 | A scrolling `u8g2gl_label` sets its own clip and resets to full display, so it can draw outside its container | **Owner checkpoint** — proposed WO4b |
+| F7 | §13.12 calls `render()` directly; generated code copying it would draw hidden objects unclipped | **WO10** (must use the wrapper, with a test) and **Chief Architect** (example predates the wrapper) |
+| F8 | Other test files may still carry placeholder headers | **End-of-PR readability review** |
+
+---
+
+## Owner Checkpoint — after WO4 (2026-09-14)
+
+WO1–WO4 repaired merged code and are complete and verified: C++ 240 → **277**, CLI
+266 → **406**, zero warnings. Stack tip `u8g2gl-generator/wo4-runtime-support`. Every
+WO1–WO4 finding is placed above. Four things need the owner before WO5 is dispatched.
+
+**1. Add WO4b — clipping correctness (F1, F4, F6)?** Recommended. [D-18] made
+composites real containers precisely so that clipping would mean something, and the
+three findings together say framework clipping is not yet trustworthy: the clip
+corner may be off by one, the state saver does not save the clip it claims to, and a
+scrolling label escapes its container. WO10's compile layer runs against the U8G2
+stub, which cannot catch any of them. Scope: `u8g2gl_state_saver` saves and restores
+the clip (or the claim is removed), the label clips inside the effective clip rather
+than replacing it, and F1 is settled **against real U8G2 source** — which needs a
+checkout this host does not have. *Owner question: where is the U8G2 checkout PR-02's
+catalogue builder used, or should F1 wait for PR-06's real-U8G2 build?*
+
+**2. Pre-1.0 version guard (F3).** The guard as built compares the schema major, so
+0.3 against 0.4 compiles. Recommended: while major is 0, compare major **and** minor,
+matching §15.4's statement that 0.3 → 0.4 is breaking. A one-line change to the
+macro, which already takes the minor. Belongs in WO4b if approved, otherwise WO9.
+
+**3. `setter=` on drawing-element bindings (held from WO3).** `<bind name="bind_width"
+setter="width">` uses `setter=` to name a prop, not a method — the two-meanings
+ambiguity §13.1 says [D-18] resolved. Options: (a) keep, documented; (b) a dedicated
+attribute such as `prop=`, which is new manifest vocabulary, a schema-minor owner
+decision. Recommendation: **(a) for PR-04**, with the ambiguity recorded against the
+next schema bump. Nobody has shown the need, and §1.5 prices vocabulary highest.
+
+**4. WO5 has grown.** It now carries the `generate` command and shared load path, the
+not-yet-supported policy, F5 and F9 from WO1, three WO3 carries (flags, `bind_text`
+overloads, mixed manifests) and the `extends` message. Recommended split:
+**WO5a — manifest and validator carries** (flags, overloads, mixed manifests,
+`extends` message, F5 single-file shadowing) and **WO5b — `generate` command**
+(load path, policy, writer, `--check`, F9). The carries are validator behaviour
+changes; the command is new surface; one diff for both is not reviewable — the same
+reasoning that split PR-3R's WO5 from WO5b.
+
+If all four are approved as recommended, the ledger goes from twelve work orders to
+fourteen (WO4b, WO5a/WO5b).
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -311,6 +393,12 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO4 complete** (`6a78247`, report `0a8a77f`). The worker was cut
+  off by an API usage limit with its work uncommitted; the tree was left untouched
+  and the same worker resumed with its context, finishing from that state. Verified
+  independently. **Owner checkpoint reached — WO5 not dispatched.**
+- 2026-09-13 — Chief Architect ruling on F3 (`main` @ `4e4b992`): `extends` must name
+  a manifest. The registry's error stays; its message gains the remedy (→ WO5).
 - 2026-09-13 — **WO3 complete** (`a652fd6`, report `d2b79ca`), status `partial` by
   design. Verified independently; stop-and-report resolved by the PA; one question
   held for the owner checkpoint. WO4 revised and dispatched on

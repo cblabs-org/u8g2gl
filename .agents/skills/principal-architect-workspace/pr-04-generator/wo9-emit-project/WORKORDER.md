@@ -69,6 +69,13 @@ WO10 and WO11 reuse.
       `ui_set_*` setters.
 - [ ] **Styles unit** (`ui_style_*`), **fonts** (`<builtin>` only — `<bdf>` is
       refused in WO5), **images** (`<xbm>` from file, `PROGMEM`; `<convert>` refused).
+- [ ] **Carried from WO4 — F5: generated capacities must reach the library build.**
+      The binding pool is sized in `src/u8g2gl_obj.cpp` from `u8g2gl_config.h`.
+      Including `u8g2gl_generated_config.h` only from generated translation units
+      leaves the library compiled with the defaults, so the [D-21] capacities never
+      take effect and §18's report would be false. Emit the capacities in a form the
+      *library's* compilation also sees, and document the integration for CMake and
+      PlatformIO (§16). Design it here; WO10's compile layer proves it.
 - [ ] **Golden files** for a fixture project, compared byte-for-byte (§17.1).
 
 ## Strict Boundary Box
