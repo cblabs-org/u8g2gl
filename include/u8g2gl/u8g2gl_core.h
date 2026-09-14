@@ -34,12 +34,16 @@
  *     Support for generated code (§11.3, §13.5):
  *     - u8g2gl_render_object():        Render one object with visibility, clip and state saved
  *     - u8g2gl_frame_dirty_observer(): Subject observer that marks the active screen dirty
+ *
+ *     Clipping:
+ *     - u8g2gl_apply_clip():           The one place a rect becomes a setClipWindow() call
  */
 #ifndef U8G2GL_CORE_H
 #define U8G2GL_CORE_H
 
 #include "u8g2gl_types.h"
 #include "u8g2gl_obj.h"
+#include "u8g2gl_tree.h"
 #include <cstdint>
 
 // Forward declare
@@ -122,6 +126,47 @@ void u8g2gl_mark_dirty();
  */
 void u8g2gl_frame_dirty_observer(void* user_data);
 
+// --- Clipping ---
+
+/**
+ * @brief Set the display's clip window to a rectangle. The single owner of
+ *        U8G2's clip-corner convention; no other runtime code calls
+ *        setClipWindow().
+ *
+ * CLIP-CORNER CONVENTION — ASSUMPTION NOT VERIFIED BY A PIXEL TEST.
+ * The second corner is treated as exclusive: a rect {x, y, w, h} becomes
+ * setClipWindow(x, y, x + w, y + h), so the rect's last column (x + w - 1) and
+ * last row (y + h - 1) remain drawable. design_spec §11.3 writes x+w-1, y+h-1;
+ * that form would lose the last column and row if this assumption holds.
+ *
+ * Evidence: a reading of U8G2 2.36.18 source (not a render), in
+ * departures-board-v3's PlatformIO cache, src/clib/:
+ * - u8g2_apply_clip_window() (u8g2_setup.c) bounds user_x1 by clip_x1, and
+ *   user_x1 defaults to the display width — an exclusive bound;
+ * - u8g2_IsIntersection() (u8g2_intersection.c) states "upper limits are not
+ *   included";
+ * - u8g2_DrawHVLine() (u8g2_hvline.c) returns on x >= user_x1.
+ *
+ * Nothing on the host renders through real U8G2, so the stub cannot confirm
+ * this. PR-06's real-U8G2 build must add a pixel test at a container edge — an
+ * object whose clip is exactly its bounds, drawing its last column and row —
+ * which shows any one-pixel difference directly. If it disagrees, change this
+ * function and nothing else; Core.ApplyClipPinsExclusiveCornerConvention pins
+ * the current choice.
+ *
+ * U8G2 takes unsigned coordinates, so a negative origin would wrap to a huge
+ * value rather than clip. A negative x or y is clamped to 0, and a rect with no
+ * pixel at non-negative coordinates is rejected.
+ *
+ * @param display U8G2 instance whose clip window is set.
+ * @param clip    Region to allow drawing into, in device pixels.
+ * @return true if the clip window was set. false — and the display untouched —
+ *         if the rect is empty or lies wholly above or left of the display; the
+ *         caller must then draw nothing, because the previous clip is still in
+ *         force.
+ */
+bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip);
+
 // --- Per-object rendering ---
 
 /**
@@ -130,9 +175,14 @@ void u8g2gl_frame_dirty_observer(void* user_data);
  *
  * In order: skips the object if it or any ancestor is hidden; skips it if its
  * effective clip (own bounds intersected with every ancestor's) is empty;
- * otherwise saves font and draw colour with u8g2gl_state_saver, sets the clip
- * window to the effective clip, calls the object's render(), and resets the
- * clip window to the full display.
+ * otherwise saves draw colour and font with u8g2gl_state_saver, sets the clip
+ * window to the effective clip through u8g2gl_apply_clip(), calls the object's
+ * render(), and resets the clip window to the full display.
+ *
+ * Clip lifetime is this function's responsibility, not the state saver's: it
+ * sets the clip, renders, and resets it. U8G2 cannot report its clip window, so
+ * nothing can save and restore it, and a widget must not set one of its own —
+ * it would replace the ancestor-intersected clip rather than narrow it.
  *
  * Generated screen render functions call this once per object in document
  * order, and the editor build calls the same function, so the firmware and the

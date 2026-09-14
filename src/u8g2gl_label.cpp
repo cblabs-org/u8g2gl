@@ -19,7 +19,9 @@
  *              helpers, and render_animation_update for u8g2gl_label.
  */
 #include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_helpers.h"
+#include "u8g2gl/u8g2gl_tree.h"
 
 #if __has_include(<U8G2lib.h>)
 #include <U8G2lib.h>
@@ -309,12 +311,14 @@ void u8g2gl_label::render(U8G2& display) {
 //   draw_y  — vertically-centered top y, already computed by render()
 void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
     if (needs_scroll_) {
-        // Marquee scrolling: clip to widget bounds and draw with scroll offset.
-        if (w_ > 0 && h_ > 0) {
-            display.setClipWindow(x_, y_, x_ + w_ - 1, y_ + h_ - 1);
-        }
+        // Marquee scrolling: draw with the scroll offset and set no clip. The
+        // framework's clip (§11.3) — this label's bounds intersected with every
+        // ancestor's — is already in force. Setting a clip of the label's own
+        // bounds here, then resetting to the full display, used to replace that
+        // clip, so a scrolling label inside a narrower container painted outside
+        // the container (WO4 F6). U8G2 cannot report the clip, so a widget has
+        // no way to narrow it and put it back; it must leave it alone.
         display.drawUTF8(static_cast<int16_t>(x_ - scroll_x_), draw_y, text_);
-        display.setMaxClipWindow();
         return;
     }
 
@@ -423,8 +427,18 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
         display.setDrawColor(0);
         display.drawBox(x_, y_, w_, h_);
 
-        // Re-render text with active style and clip window
-        render(display);
+        // Re-render text inside the label's own bounds. This path runs outside
+        // u8g2gl_render_object(), while the main loop is blocked, so no
+        // framework clip is in force — render() no longer sets one — and the
+        // marquee would otherwise draw across the whole row. The label has no
+        // access to its ancestry here, so its own bounds are the best clip
+        // available; the reset matches what the render wrapper leaves between
+        // objects.
+        const u8g2gl_rect bounds = { x_, y_, w_, h_ };
+        if (u8g2gl_apply_clip(display, bounds)) {
+            render(display);
+            display.setMaxClipWindow();
+        }
 
         // Hardware partial update to avoid full frame transfer
         u8g2gl_partial_refresh(display, x_, y_, w_, h_);

@@ -30,10 +30,10 @@
  *
  *     Supported schema:
  *     - U8G2GL_SCHEMA_VERSION_MAJOR: the schema major generated code must match
- *     - U8G2GL_SCHEMA_VERSION_MINOR: the schema minor implemented; recorded, not enforced
+ *     - U8G2GL_SCHEMA_VERSION_MINOR: the schema minor; must also match while the major is 0
  *
  * Exported Macros:
- * - U8G2GL_REQUIRE_SCHEMA_VERSION(): compile-time refusal of a mismatched schema major
+ * - U8G2GL_REQUIRE_SCHEMA_VERSION(): compile-time refusal of a mismatched schema version
  */
 #ifndef U8G2GL_VERSION_H
 #define U8G2GL_VERSION_H
@@ -48,8 +48,15 @@
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements
 #define U8G2GL_SCHEMA_VERSION_MINOR 4  ///< Schema minor this runtime implements
 
+/// @cond INTERNAL
+// Two-level stringification so a macro argument is expanded before # applies:
+// the refusal message then shows "0.3", not "major.minor".
+#define U8G2GL_VERSION_STR_(x) #x
+#define U8G2GL_VERSION_STR(x) U8G2GL_VERSION_STR_(x)
+/// @endcond
+
 /**
- * @brief Refuse to compile if generated code targets a different schema major.
+ * @brief Refuse to compile if generated code targets a different schema version.
  *
  * A generated header invokes this once, at namespace scope, with the schema
  * version recorded in its own header comment (§13.9):
@@ -59,21 +66,32 @@
  * U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
  * @endcode
  *
- * Only the major is compared, as §16 specifies. The minor is accepted so that
- * generated code states its full version once and the runtime's policy can
- * tighten later without the generator changing what it emits.
+ * As §16 specifies, the runtime refuses to compile against a mismatched
+ * **schema** version: the major version, and **also the minor version while
+ * the major is 0**. Before 1.0, breaking changes land in minor bumps (§15.4), so
+ * checking only the major would let a project generated for 0.3 compile against
+ * a 0.4 runtime without any error. From 1.0 on, only the major is compared.
  *
- * Schema major rather than generator or runtime major: the schema and §13 are
- * the contract generated code is written against, and the CLI and runtime carry
- * different version numbers.
+ * Schema version rather than generator or runtime version: the schema and §13
+ * are the contract generated code is written against, and the CLI and runtime
+ * are versioned independently (.agents/rules/03-versioning.md).
+ *
+ * The refusal message names both versions — the one the code was generated for
+ * and the one this runtime implements.
  *
  * @param major Schema major version the generated code was produced for.
- * @param minor Schema minor version; currently not compared.
+ * @param minor Schema minor version the generated code was produced for.
+ *              Compared only while the major is 0.
  */
-#define U8G2GL_REQUIRE_SCHEMA_VERSION(major, minor)                              \
-    static_assert((major) == U8G2GL_SCHEMA_VERSION_MAJOR,                        \
-        "U8G2GL schema major version mismatch: this generated code was produced "\
-        "for a schema major version this runtime does not implement. Regenerate "\
-        "with a u8g2gl CLI matching the runtime, or use a matching runtime.")
+#define U8G2GL_REQUIRE_SCHEMA_VERSION(major, minor)                               \
+    static_assert((major) == U8G2GL_SCHEMA_VERSION_MAJOR &&                       \
+                  ((major) != 0 || (minor) == U8G2GL_SCHEMA_VERSION_MINOR),       \
+        "U8G2GL schema version mismatch: this code was generated for schema "     \
+        U8G2GL_VERSION_STR(major) "." U8G2GL_VERSION_STR(minor)                   \
+        ", but this runtime implements schema "                                   \
+        U8G2GL_VERSION_STR(U8G2GL_SCHEMA_VERSION_MAJOR) "."                       \
+        U8G2GL_VERSION_STR(U8G2GL_SCHEMA_VERSION_MINOR)                           \
+        ". Regenerate with a u8g2gl CLI matching the runtime, or use a matching " \
+        "runtime.")
 
 #endif // U8G2GL_VERSION_H

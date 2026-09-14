@@ -22,7 +22,9 @@
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "U8G2lib.h"
 #include <iostream>
@@ -623,22 +625,90 @@ TEST(LabelScroll, StaticTextDwell) {
     EXPECT_EQ(label.tick(9500), U8G2GL_IDLE);
 }
 
-TEST(LabelScroll, RenderSetsClipWindow) {
+// Replaces RenderSetsClipWindow (WO4b, F6). That test asserted the marquee set a
+// clip of its own bounds and reset to the full display — the behaviour that let
+// a scrolling label escape its container. The framework clip (§11.3) now bounds
+// it, so render() must set and reset nothing.
+TEST(LabelScroll, RenderSetsNoClipWindow) {
     u8g2gl_label label;
     label.set_long_mode(U8G2GL_LONG_SCROLL);
     label.set_coords(10, 20, 60, 16);
     label.set_text("Clipped marquee text");
 
     U8G2 display;
-    display.utf8_width_val = 120; // Requires scroll and clipping
+    display.utf8_width_val = 120; // Overflows: the marquee path
 
     label.render(display);
+
+    EXPECT_EQ(display.draw_utf8_count, 1);  // it did take the marquee path
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
+// Snapshots the clip state immediately after the label has drawn, while still
+// inside u8g2gl_render_object(), so the test sees what the label left in force.
+class clip_probe_label : public u8g2gl_label {
+public:
+    int set_clip_count_after_draw = -1;
+    int max_clip_count_after_draw = -1;
+    int clip_x1_after_draw = -1;
+
+    void render(U8G2& display) override {
+        u8g2gl_label::render(display);
+        set_clip_count_after_draw = display.set_clip_window_count;
+        max_clip_count_after_draw = display.max_clip_window_count;
+        clip_x1_after_draw = display.last_clip_x1;
+    }
+};
+
+TEST(LabelScroll, InsideNarrowerContainerNeverWidensClip) {
+    // A 40-px container holding a 100-px scrolling label: before WO4b the label
+    // replaced the container's clip with its own 100-px bounds.
+    u8g2gl_obj container;
+    container.set_coords(0, 0, 40, 16);
+    clip_probe_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(0, 0, 100, 16);
+    label.set_text("A marquee wider than its container");
+
+    u8g2gl_obj* const objs[] = { &container, &label };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    U8G2 display;
+    display.utf8_width_val = 200; // Overflows the label: the marquee path
+
+    u8g2gl_render_object(display, objs, parents, 1);
+
+    // The only clip ever set is the wrapper's, bounded by the container
+    // (x1 = 40, exclusive), and the label neither replaced nor reset it.
+    EXPECT_EQ(display.draw_utf8_count, 1);
+    EXPECT_EQ(label.set_clip_count_after_draw, 1);
+    EXPECT_EQ(label.max_clip_count_after_draw, 0);
+    EXPECT_EQ(label.clip_x1_after_draw, 40);
+    EXPECT_EQ(display.set_clip_window_count, 1);
+    EXPECT_EQ(display.max_clip_window_count, 1);  // the wrapper's reset only
+}
+
+TEST(LabelScroll, RenderAnimationUpdateClipsToOwnBounds) {
+    // Outside the render wrapper no framework clip exists, so the blocked-loop
+    // redraw bounds itself — through u8g2gl_apply_clip(), not its own arithmetic.
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(10, 20, 60, 16);
+    label.set_text("Blocked loop scrolling");
+
+    U8G2 display;
+    display.utf8_width_val = 120;
+    label.render(display);
+    label.tick(0);
+
+    label.render_animation_update(display, 3001);  // past the initial delay
 
     EXPECT_EQ(display.set_clip_window_count, 1);
     EXPECT_EQ(display.last_clip_x0, 10);
     EXPECT_EQ(display.last_clip_y0, 20);
-    EXPECT_EQ(display.last_clip_x1, 69); // 10 + 60 - 1
-    EXPECT_EQ(display.last_clip_y1, 35); // 20 + 16 - 1
+    EXPECT_EQ(display.last_clip_x1, 70);  // exclusive: 10 + 60
+    EXPECT_EQ(display.last_clip_y1, 36);  // exclusive: 20 + 16
     EXPECT_EQ(display.max_clip_window_count, 1);
 }
 

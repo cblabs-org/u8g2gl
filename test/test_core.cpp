@@ -450,14 +450,15 @@ TEST_F(Core, RenderObjectClipsChildToAncestorBounds) {
     U8G2 display;
     u8g2gl_render_object(display, objs, parents, 1);
 
-    // Intersection is x 15..19, y 5..9, as inclusive corners (§11.3:
-    // setClipWindow(x, y, x+w-1, y+h-1)), and it was in force during render().
+    // Intersection is x 15..19, y 5..9. Passed through u8g2gl_apply_clip(), the
+    // far corner is exclusive — (15, 5, 20, 10) — and it was in force during
+    // render(). The convention itself is pinned by ApplyClipPinsExclusive...
     EXPECT_EQ(child.render_count, 1);
     EXPECT_EQ(child.set_clip_count_during_render, 1);
     EXPECT_EQ(child.clip_x0, 15);
     EXPECT_EQ(child.clip_y0, 5);
-    EXPECT_EQ(child.clip_x1, 19);
-    EXPECT_EQ(child.clip_y1, 9);
+    EXPECT_EQ(child.clip_x1, 20);
+    EXPECT_EQ(child.clip_y1, 10);
 }
 
 TEST_F(Core, RenderObjectWhollyClippedChildIsNotRendered) {
@@ -511,11 +512,12 @@ TEST_F(Core, RenderObjectClampsNegativeClipOrigin) {
     u8g2gl_render_object(display, objs, nullptr, 0);
 
     // U8G2 takes unsigned coordinates; a negative origin would wrap, not clip.
+    // Far corner exclusive: -4 + 10 = 6, -2 + 8 = 6.
     EXPECT_EQ(widget.render_count, 1);
     EXPECT_EQ(widget.clip_x0, 0);
     EXPECT_EQ(widget.clip_y0, 0);
-    EXPECT_EQ(widget.clip_x1, 5);
-    EXPECT_EQ(widget.clip_y1, 5);
+    EXPECT_EQ(widget.clip_x1, 6);
+    EXPECT_EQ(widget.clip_y1, 6);
 }
 
 TEST_F(Core, RenderObjectNullArrayRendersNothing) {
@@ -523,6 +525,54 @@ TEST_F(Core, RenderObjectNullArrayRendersNothing) {
     u8g2gl_render_object(display, nullptr, nullptr, 0);
     EXPECT_EQ(display.set_clip_window_count, 0);
     EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
+// --- Clip-corner convention: u8g2gl_apply_clip() ---
+
+// PINS THE CLIP-CORNER CONVENTION. The exclusive far corner is read from U8G2
+// 2.36.18 source, not verified by a pixel test (see u8g2gl_apply_clip() in
+// u8g2gl_core.h for the evidence). If PR-06's real-U8G2 pixel test at a
+// container edge disagrees, u8g2gl_apply_clip() is the one function to change —
+// then update the expected corners here, and nothing else.
+TEST_F(Core, ApplyClipPinsExclusiveCornerConvention) {
+    U8G2 display;
+    const u8g2gl_rect rect = { 12, 7, 30, 9 };
+
+    EXPECT_TRUE(u8g2gl_apply_clip(display, rect));
+    EXPECT_EQ(display.set_clip_window_count, 1);
+    EXPECT_EQ(display.last_clip_x0, 12);
+    EXPECT_EQ(display.last_clip_y0, 7);
+    EXPECT_EQ(display.last_clip_x1, 42);   // x + w, not x + w - 1
+    EXPECT_EQ(display.last_clip_y1, 16);   // y + h, not y + h - 1
+}
+
+TEST_F(Core, ApplyClipClampsNegativeOrigin) {
+    U8G2 display;
+    const u8g2gl_rect rect = { -3, -5, 10, 8 };
+
+    EXPECT_TRUE(u8g2gl_apply_clip(display, rect));
+    EXPECT_EQ(display.last_clip_x0, 0);
+    EXPECT_EQ(display.last_clip_y0, 0);
+    EXPECT_EQ(display.last_clip_x1, 7);
+    EXPECT_EQ(display.last_clip_y1, 3);
+}
+
+TEST_F(Core, ApplyClipRejectsEmptyAndOffDisplayRects) {
+    U8G2 display;
+    const u8g2gl_rect empty = { 4, 4, 0, 6 };
+    const u8g2gl_rect left_of_display = { -10, 0, 10, 5 };   // last column is x = -1
+    const u8g2gl_rect above_display = { 0, -6, 5, 6 };        // last row is y = -1
+
+    EXPECT_FALSE(u8g2gl_apply_clip(display, empty));
+    EXPECT_FALSE(u8g2gl_apply_clip(display, left_of_display));
+    EXPECT_FALSE(u8g2gl_apply_clip(display, above_display));
+    EXPECT_EQ(display.set_clip_window_count, 0);
+
+    // Control: one pixel onto the display is accepted.
+    const u8g2gl_rect one_column_on = { -10, 0, 11, 5 };
+    EXPECT_TRUE(u8g2gl_apply_clip(display, one_column_on));
+    EXPECT_EQ(display.last_clip_x0, 0);
+    EXPECT_EQ(display.last_clip_x1, 1);
 }
 
 // --- Frame-dirty observer: u8g2gl_frame_dirty_observer() (§13.5) ---

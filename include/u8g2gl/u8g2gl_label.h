@@ -242,6 +242,11 @@ public:
      * vertical centering within widget bounds, and draws per the resolved
      * `long_mode` — see set_long_mode() for what each value does.
      *
+     * Sets no clip window in any mode, including the marquee: every mode relies
+     * on the clip u8g2gl_render_object() has already set (§11.3), which bounds
+     * the label by its ancestors as well as itself. Called directly, outside
+     * that wrapper, it draws unclipped.
+     *
      * @param display U8G2 display context to draw into.
      */
     void render(U8G2& display) override;
@@ -252,6 +257,11 @@ public:
      * No-op outside U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR. Advances
      * tick state, clears own bounding box, re-renders, and pushes updated
      * pixels via u8g2gl_partial_refresh().
+     *
+     * Runs outside u8g2gl_render_object(), so it clips the re-render to the
+     * label's **own** bounds (through u8g2gl_apply_clip()) and resets the clip
+     * to the full display afterwards. It cannot intersect with ancestors — it
+     * has no access to the screen's arrays.
      *
      * @param display U8G2 display context to draw into.
      * @param now_ms  Current timestamp in milliseconds.

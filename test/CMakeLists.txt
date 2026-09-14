@@ -315,16 +315,21 @@ target_compile_definitions(test_version PRIVATE
 
 gtest_discover_tests(test_version)
 
-# --- Schema major-version guard: proven by real compiles ---
+# --- Schema version guard: proven by real compiles ---
 # A refusal to compile cannot be tested from inside a program that compiled. So
-# two throwaway targets, excluded from the normal build, are built by CTest:
-# one with a matching major must build, one with a mismatched major must fail
-# *with the guard's own message*. Matching the message rather than just a
-# non-zero exit means an unrelated break (a bad include path, a typo) fails the
-# test instead of passing it. The match target is the control that proves the
+# throwaway targets, excluded from the normal build, are built by CTest. Those
+# that must be refused pass only if the build fails *with the guard's own
+# message*, naming the versions involved. Matching the message rather than just
+# a non-zero exit means an unrelated break (a bad include path, a typo) fails the
+# test instead of passing it. The compiling cases are the controls that prove the
 # harness itself can build.
+#
+#   match          — the runtime's own schema macros; must compile
+#   schema_0_4     — literal (0, 4), today's schema; must compile
+#   mismatch       — schema major + 1; must be refused
+#   stale_minor    — literal (0, 3) against 0.4: the pre-1.0 minor rule (§16)
 
-foreach(_guard_case match mismatch)
+foreach(_guard_case match schema_0_4 mismatch stale_minor)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
         version_guard/${_guard_case}.cpp
     )
@@ -339,15 +344,28 @@ endforeach()
 add_test(NAME VersionGuard.MatchingSchemaMajorCompiles
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_match
 )
+add_test(NAME VersionGuard.SchemaZeroFourCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_schema_0_4
+)
 add_test(NAME VersionGuard.MismatchedSchemaMajorFailsToCompile
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_mismatch
 )
 set_tests_properties(VersionGuard.MismatchedSchemaMajorFailsToCompile PROPERTIES
-    PASS_REGULAR_EXPRESSION "U8G2GL schema major version mismatch"
+    # mismatch.cpp passes an expression (major + 1), which the message spells
+    # as written, so match the shape of the message rather than the number.
+    PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema [^,]+, but this runtime implements schema [0-9]+\\.[0-9]+"
 )
-# Both invoke the build system on the same tree; never run them concurrently.
+add_test(NAME VersionGuard.StaleSchemaMinorFailsToCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_stale_minor
+)
+set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
+    PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.4"
+)
+# All invoke the build system on the same tree; never run them concurrently.
 set_tests_properties(
     VersionGuard.MatchingSchemaMajorCompiles
+    VersionGuard.SchemaZeroFourCompiles
     VersionGuard.MismatchedSchemaMajorFailsToCompile
+    VersionGuard.StaleSchemaMinorFailsToCompile
     PROPERTIES RESOURCE_LOCK u8g2gl_build_tree
 )

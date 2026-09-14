@@ -15,9 +15,11 @@
  *          widget's own deadline ([D-15]).
  *
  * Description: Tick-source registration, active-screen management, frame-level
- *              dirty gating, the ui_handler entry points, and the two calls
- *              generated code makes into the frame: the per-object render
- *              wrapper (§11.3) and the frame-dirty subject observer (§13.5)
+ *              dirty gating, the ui_handler entry points, the two calls
+ *              generated code makes into the frame — the per-object render
+ *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
+ *              and u8g2gl_apply_clip(), the single owner of the clip-corner
+ *              convention
  */
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
@@ -135,18 +137,49 @@ void u8g2gl_render_object(
         return;
     }
 
-    // Corners in int: x + w - 1 can leave int16_t. The inclusive right/bottom
-    // edge is §11.3's setClipWindow(x, y, x+w-1, y+h-1).
+    // --- Step 3: Draw inside saved state and the effective clip ---
+    // The saver is constructed before the clip is applied so its lifetime spans
+    // the whole render; it does not touch the clip either way.
+    u8g2gl_state_saver saver(display);
+    if (!u8g2gl_apply_clip(display, clip)) {
+        // Wholly above or left of the display: no pixel to draw into.
+        return;
+    }
+    objs[index]->render(display);
+
+    // --- Step 4: Reset the clip this function set ---
+    // The state saver cannot restore the clip: U8G2 has no clip getter. The full
+    // display is the right state to leave, because no object's clip is ever
+    // nested inside another's active clip — each is computed from its ancestors
+    // in Step 2.
+    display.setMaxClipWindow();
+}
+
+// u8g2gl_apply_clip
+// Converts a rect to setClipWindow() corners. The convention (exclusive second
+// corner) and the evidence for it are documented on the declaration, which is
+// the one place to change if PR-06's pixel test disagrees.
+//   display — receives the clip window
+//   clip    — region in device pixels; may be empty or partly negative
+bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip) {
+    // --- Step 1: Reject a rect with no area ---
+    if (clip.w <= 0 || clip.h <= 0) {
+        return false;
+    }
+
+    // --- Step 2: Compute the corners, exclusive at the far edge ---
+    // In int: x + w can leave int16_t.
     int x0 = clip.x;
     int y0 = clip.y;
-    const int x1 = static_cast<int>(clip.x) + clip.w - 1;
-    const int y1 = static_cast<int>(clip.y) + clip.h - 1;
+    const int x1 = static_cast<int>(clip.x) + clip.w;
+    const int y1 = static_cast<int>(clip.y) + clip.h;
 
-    // A region wholly above or left of the display has no drawable pixel. U8G2
-    // takes unsigned coordinates, so a negative corner would wrap to a huge
-    // value rather than clip — clamp the start and reject what is left empty.
-    if (x1 < 0 || y1 < 0) {
-        return;
+    // --- Step 3: Clamp to non-negative coordinates ---
+    // U8G2 takes unsigned coordinates, so a negative corner would wrap to a huge
+    // value rather than clip. With an exclusive far corner, x1 <= 0 means the
+    // last drawable column is left of the display.
+    if (x1 <= 0 || y1 <= 0) {
+        return false;
     }
     if (x0 < 0) {
         x0 = 0;
@@ -155,16 +188,8 @@ void u8g2gl_render_object(
         y0 = 0;
     }
 
-    // --- Step 3: Draw inside saved state and the effective clip ---
-    u8g2gl_state_saver saver(display);
     display.setClipWindow(x0, y0, x1, y1);
-    objs[index]->render(display);
-
-    // The state saver restores font and draw colour but cannot restore the clip:
-    // U8G2 has no clip getter. The full display is the right state to leave,
-    // because no object's clip is ever nested inside another's active clip —
-    // each is computed from its ancestors in Step 2.
-    display.setMaxClipWindow();
+    return true;
 }
 
 // ui_handler
