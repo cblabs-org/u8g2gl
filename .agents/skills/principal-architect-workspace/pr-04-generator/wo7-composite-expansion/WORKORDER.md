@@ -5,7 +5,7 @@ title: "Composite expansion and identifier mangling"
 branch: u8g2gl-generator/wo7-composite-expansion
 base: u8g2gl-generator/wo6-resolver
 complexity: standard
-status: draft — PA revises against WO6's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO7 — Composite expansion and mangling
@@ -93,6 +93,19 @@ container.
       hold for collections. A child tag that the parent's effective manifest declares
       as an `<element>` is known; only the not-yet-supported policy reports it. An
       undeclared child tag is still unknown.
+
+## What WO6 built, and what is not yours
+
+WO6 delivered the resolver in `cli/src/core/resolver/` (`expression.ts` evaluator,
+`resolve.ts` anchors and resolved model with provenance), used by
+`validate-geometry.ts` and by `generate()`. **Build expansion on it; do not write a second
+evaluator or a second anchor resolver.** Read WO6's Completion Report for the model shape.
+
+WO6 also surfaced geometry-contract gaps — silent deferral of unresolved coordinates,
+under-determined axes, unchecked `hcenter` values, constant shadowing, anchors on
+non-rectangular elements, bounds checked only on the first target. **Those are held for a
+proposed WO7b and are outside this work order.** If expansion makes one of them harder or
+easier to fix, say so in the Completion Report; do not fix it here.
 
 ## Strict Boundary Box
 

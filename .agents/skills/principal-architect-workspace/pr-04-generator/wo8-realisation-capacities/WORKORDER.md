@@ -84,6 +84,10 @@ rewriting this pass.
       subject, plus **one** frame-dirty observer if any draw-call element binds it.
       String subjects also carry `max_len`. This is the PR-01 constraint nearly lost
       once — test it directly.
+- [ ] **Carried from WO6 — resolve once.** `generate()` already resolves the first target
+      twice (inside validation, then for the built target). Realisation consumes
+      `GenerateResult.resolved` and the expanded tree WO7 produces; it must not resolve
+      again, and must not add a third pass.
 - [ ] **Carried from WO5a — one "drawing element" predicate.** Whether a manifest is a
       drawing element (no `view`, declared `draw=` props, no `setter=` props) is spelled
       in `validate-schema.ts`, `validate-widget-props.ts` and the manifest cross-test.

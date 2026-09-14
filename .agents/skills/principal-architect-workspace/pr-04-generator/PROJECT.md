@@ -70,7 +70,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO4b — clipping correctness and pre-1.0 version guard](wo4b-clipping-version/WORKORDER.md)** ✅ `4094489` · `u8g2gl-generator/wo4b-clipping-version` · base WO4 · standard · F1, F4, F6, version guard (checkpoint-approved)
 - [x] **[WO5a — manifest and validator carries](wo5a-validator-carries/WORKORDER.md)** · base WO4b · standard · WO1 F5, WO3 carries, `extends` remedy (checkpoint-approved split)
 - [x] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
-- [ ] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** · base WO5b · standard · [D-7], [D-20]
+- [x] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** ✅ `6b5d562` · base WO5b · standard · [D-7], [D-20]
 - [ ] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** · base WO6 · standard · §13.4, §13.6
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7 · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
@@ -555,6 +555,62 @@ a `Target:` line. The spec contradicts itself; the worker included the target, w
 | 8 | Deleting stale generated files leaves empty directories | **WO12** |
 | 9 | `generate` usage errors are prose on stderr, not JSON (matching `find`) | **WO12** — the [D-16] `--json` contract |
 
+### WO6 — complete (`6b5d562`)
+
+**Verified independently:** commits only on the WO6 branch; runtime and `docs/`
+untouched; C++ 284 unchanged, zero warnings; CLI 458 → **550**, `tsc` and lint clean.
+`validate-geometry.ts` imports the resolver and no longer parses numbers itself — one
+evaluator, as required. **End to end through the built CLI** against a 128-wide target:
+`width="#screen_width - 8"` validates; `x="#screen_width - 8" width="16"` fails with
+`U8G2GL_OUT_OF_BOUNDS` reporting the computed value ("extends to x=136, display is 128px
+wide (0..127)"); `x="10 / 0"` gives `U8G2GL_DIVISION_BY_ZERO` naming the expression,
+attribute and element; `right="0" width="40"` resolves. The worker's new validator tests
+fail 7 of 13 at the base, with the other 6 as controls.
+
+**Delivered:** `cli/src/core/resolver/` — integer-only evaluator with truncating
+division and `int32_t` range checks on every intermediate; anchor rules; a resolved model
+with per-coordinate provenance. Over-constraint is raised only in the resolver now, with
+its message unchanged. `generate()` resolves against the built target and refuses on a
+resolution error. Core exports the resolver and the generator (WO5b carry).
+`CommonAttributes` no longer types geometry or `hidden`, pinned by a type test (WO3
+carry). New codes: `UNKNOWN_CONSTANT`, `NON_INTEGER_CONSTANT`, `DIVISION_BY_ZERO`,
+`MALFORMED_EXPRESSION`, `INTEGER_OVERFLOW`.
+
+**Decisions accepted:** `hcenter` with `x` or `right` is over-constrained — consistent
+with §7.2's "supplying all three is a validation error"; centring floors a negative
+remainder, which is §7.2's "round down"; unary minus is accepted; a constant's value must
+be an integer literal. `INTEGER_OVERFLOW` beyond the four named codes is right: it keeps
+§13.2's `int32_t` claim honest.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | `validate` checks bounds only against the first target; `generate --target <other>` does not re-check bounds | **Proposed WO7b** |
+| 2 | An under-determined axis (`width` with no `x`) has no spec default; the resolved model leaves `x` absent | **Proposed WO7b** — with 4 |
+| 3 | `hcenter`/`vcenter` values are never type-checked; `hcenter="yes"` centres | **Proposed WO7b** |
+| 4 | Deferral is silent: `$prop` in a screen, or `#parent_height` under a parent with no height, resolves to nothing | **Proposed WO7b** — after expansion, an unresolved or under-determined coordinate on an element whose manifest declares geometry must be an error, never a silent absence reaching emission |
+| 5 | Anchor-derived values are not range-checked; the runtime stores coordinates as `int16_t` while §13.2 says `int32_t` | **Chief Architect** (§13.2 vs runtime); the range check itself joins **proposed WO7b** once the width is ruled |
+| 6 | A `<const>` named like a built-in (`screen_width`) is shadowed silently | **Proposed WO7b** — a reserved-name error, §13.4's rule applied to constants |
+| 7 | An `<int>` constant's value is checked only where used, not where declared | **Proposed WO7b** |
+| 8 | Anchors on centre-positioned elements (circle, ellipse, pixel) are undefined; `right` is accepted on `u8g2gl_line`, which has no `x` | **Chief Architect** (spec gap); interim rule in **proposed WO7b**: anchors only where the effective manifest declares `x`, `y`, `width`, `height` (§6.2's rectangular convention) |
+| 9 | §7.3's `<target_override>` is not resolved | **Accepted — [Q-1]**, still deferred until two real targets exist |
+| 10 | A `types.test.ts` title still says "all 23 required diagnostic codes" | **End-of-PR readability review** |
+| 11 | `generate` resolves the first target twice | **WO8** — consume `GenerateResult.resolved`; no third resolve |
+
+### Proposed WO7b — the geometry contract (awaiting the owner)
+
+**Not added on the PA's judgement.** WO7 already carries five findings on top of its own
+scope (expansion, `$prop` substitution, prefixing, mangling), and piling seven validator
+rules into the same diff would make it unreviewable — the reason the owner approved
+splitting WO5. Recommended as **WO7b, after WO7**, because findings 2 and 4 can only be
+judged once composites are expanded and every coordinate has had its chance to resolve.
+
+Scope: findings 1, 2+4, 3, 6, 7, 8 above, and 5's range check once the Chief Architect
+rules on `int16_t` versus `int32_t`. Validator and resolver only; no emission, no runtime.
+If the owner declines, the same items fold into WO8, which is the first consumer that
+cannot tolerate an absent coordinate.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -574,6 +630,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-14 — **WO6 complete** (`6b5d562`, report `e275f2f`). Verified
+  independently, including end to end through the built CLI. WO7 dispatched on
+  `u8g2gl-generator/wo7-composite-expansion`. **WO7b proposed to the owner, not
+  added.** WO4c still awaiting the owner.
 - 2026-09-14 — **WO5b complete** (`dc82dea`, report `7038a16`). Verified
   independently, including end to end through the built CLI. WO6 dispatched on
   `u8g2gl-generator/wo6-resolver`. WO4c still awaiting the owner.
