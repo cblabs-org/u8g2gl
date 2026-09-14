@@ -815,3 +815,136 @@ upgrade. Not urgent; it should be fixed at the next rebuild.
 The PA was in the main checkout again, this time on
 `u8g2gl-generator/wo4-runtime-support`. The edits went through a worktree on
 `main`.
+
+---
+
+## Session — 2026-09-14 (cont.) · PR-04 rulings: WO4c, WO7b, and real U8G2 found
+
+PR-04's PA asked for two more work orders, WO4c and WO7b. Both approved, taking
+the ledger from 14 to 16. The owner saw this before approving.
+
+### Real U8G2 source was on this machine all along
+
+The last round deferred F1 to PR-06 because "there is no U8G2 checkout". That was
+wrong. **U8G2 2.36.18 is at
+`esp32-app-foundation/sample-app/.pio/libdeps/esp32dev_all_on/U8g2/`**, a sibling
+project's PlatformIO cache. I found it by looking in the sibling projects that
+build real firmware, instead of repeating the previous round's answer. Nothing
+was downloaded.
+
+**F1 — settled from source, no longer deferred.** `clib/u8g2.h:352` documents
+`clip_x1` as the *"right corner of the clip window (excluded)"*, and `:354`
+documents `clip_y1` the same way. `u8g2_clip_intersection2` agrees: from `a`
+(included) to `b` (excluded). **The far corner is exclusive**, so the runtime
+must call `setClipWindow(x, y, x+w, y+h)`, not `x+w-1`. PR-06's container-edge
+pixel test changes from *discovering* this to *guarding* it.
+
+**WO4c — verified before approving.** Real `U8g2lib.h` has no `getFont()`, only
+`getFontAscent`/`getFontDescent`. It does have `getU8g2()` returning `u8g2_t*`,
+and `u8g2_t` has `const uint8_t *font` (`u8g2.h:359`). The PA's fix is correct.
+
+### Stub audit — names fine, types wrong
+
+Every U8G2 method the PA branch's test stub declares (38 of them) was checked
+against real 2.36.18. **Only `getFont` doesn't exist.** So the stub hasn't
+invented an API; WO4c's fix covers that.
+
+**But a check on names can't see types, and the types disagree.** The stub takes
+`int` coordinates; real U8G2 takes `u8g2_uint_t`, which is `uint16_t` because
+`U8G2_16BIT` is on by default (`u8g2.h:71`). On hardware a negative coordinate
+becomes a huge unsigned value — `-5` turns into `65531` — so an element meant to
+sit partly off the left edge lands off the right edge instead. That's exactly
+what a scrolling label or an offset container child does. **Every "degenerate
+input doesn't crash" test runs against the `int` stub**, so none of them can
+catch it. WO3's draw functions already guard negative *sizes*; nothing guards
+negative *origins* on their way into U8G2.
+
+Added to WO4c: make the stub's coordinate types match real U8G2, so the compiler
+forces each conversion to be written out, and clamp the clip window's near
+corner at 0.
+
+### Rulings
+
+**1. WO4c — approved, scope extended.** Read the font via `getU8g2()->font` and
+drop `getFont()` from the stub, as the PA proposed. Add the far-corner clamp.
+Also, as above: type the stub's coordinates as `u8g2_uint_t`/`uint16_t`, handle
+negative origins explicitly, and use the exclusive clip corner.
+
+**2. WO7b — approved.** Each of its six gaps silently turns bad geometry into
+some value when it should raise a diagnostic, and the generator can't safely
+accept a missing coordinate. The contract it enforces is now normative in §7.2:
+- anchors only on elements whose manifest declares `x`, `y`, `width`, `height`
+- every element fully positioned, never a silent zero
+- `hcenter`/`vcenter` are strict booleans
+- built-in constant names are reserved
+- constants are validated where they're declared
+- bounds are checked for the target being generated
+
+**3. §13.2 — fixed.** Coordinates are `int16_t`, matching `u8g2gl_obj`'s
+storage. Other `int` properties stay `int32_t`, because
+`set_time(uint32_t epoch_seconds)` needs the width. "Does it fit `int16_t`?" and
+"is it inside its container?" are separate checks.
+
+**4. The PA's interim anchor rule is now the permanent rule**, written into §7.2.
+It reads the manifest rather than a list of element names ([D-17]), which is why
+it could be made permanent. Anchors on non-rectangular primitives are deferred
+until a real screen needs them (§1.5).
+
+### Decided by the owner — U8G2 becomes a pinned dependency
+
+The copy that settled F1 is a build cache in another project: not reproducible,
+not in CI, and gone after `pio run --target clean`. The runtime has never been
+compiled against real U8G2 headers in this repo, only against the stub. The
+owner's decision, verbatim:
+
+> "we should simply download it into this repo and intall it as a lib in any ap
+> that uses our library and designer."
+
+— pointing at `esp32-app-foundation/modules/LVGLDisplay` as the model.
+
+**What that precedent actually does.** `LVGLDisplay` doesn't vendor LVGL. Its
+`library.json` declares `"lvgl/lvgl": "^9.5.0"`, the app's `platformio.ini`
+lists the same in `lib_deps`, and foundation's `THIRD-PARTY-NOTICES.md` has a
+row for it. PlatformIO fetches it at build time, pinned by version.
+
+**Two consumers, two mechanisms:**
+
+- **This repo** needs U8G2's source itself: for a compile check against real
+  headers, for PR-06's Wasm build, and for the catalogue builder. Mechanism: a
+  **git submodule pinned to tag 2.36.18** (e.g. `extern/u8g2`). That downloads
+  it into the repo without committing U8G2 into U8G2GL's history — 48 MB, 42 MB
+  of it in `clib`, carried by every clone for good. The repo already uses
+  submodules, and U8G2 ships its own `CMakeLists.txt`. **This is the Chief
+  Architect's recommendation and the owner hasn't confirmed it.** If a committed
+  copy was meant literally, it's a one-line change here, and nothing has been
+  executed.
+- **Apps using the library or the designer** get U8G2 the `LVGLDisplay` way: a
+  pinned dependency in the integration module's `library.json`
+  (`olikraus/U8g2`, `^2.36.18`) plus a notices row. That's PR-05.
+
+**Why 2.36.18:** `esp32-app-foundation` already builds it, and PR-05 integrates
+there. Using one U8G2 version in both repos rules out bugs that only exist
+because tests and firmware used different versions.
+
+**Licence:** U8G2's code is BSD-2-Clause; its fonts carry per-group licences
+(U8G2 wiki, `fntgrp`). U8G2GL has no `THIRD-PARTY-NOTICES.md` yet and needs one,
+with a U8G2 row covering both. That's consistent with the earlier decision to
+follow U8G2's licensing.
+
+**Routing:**
+- **PR-04 / WO4c** — add the pinned submodule, a host CMake target that compiles
+  the runtime against real U8G2 headers, and the notices file. That compile check
+  *is* WO4c's acceptance criterion — "the runtime compiles against real U8G2" —
+  and it would have caught both `getFont` and the `int`/`u8g2_uint_t` mismatch
+  automatically.
+- **PR-05** — the integration module declares `olikraus/U8g2@^2.36.18`, and
+  foundation's notices file gets a row.
+- **PR-06** — the Wasm build compiles U8G2's C source from the submodule.
+- **Q-11** — the catalogue builder uses the submodule by default and records its
+  commit, which closes Q-11.
+
+**Lesson.** Last round I said "no U8G2 checkout on this machine" after searching
+only the obvious paths, and deferred a question that was answerable. The
+sibling projects that build real firmware were the obvious place to look. When
+something turns out to be missing, check the places that actually depend on it
+before concluding it's absent.

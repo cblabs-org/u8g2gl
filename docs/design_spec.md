@@ -840,6 +840,28 @@ Per **[D-7]**, these resolve to literal integers during generation. Nothing ship
 
 Supplying two of `{x, width, right}` determines the third. Supplying all three is a validation error.
 
+**Anchors apply only to rectangular elements** — those whose manifest declares
+`x`, `y`, `width` and `height`. A line, pixel, circle or ellipse has no box for
+`right`, `bottom`, `hcenter` or `vcenter` to measure against, so using an anchor
+on one is a validation error. The rule reads the manifest rather than a list of
+element names ([D-17]), so a custom element becomes anchorable just by declaring
+those four properties. Anchor semantics for non-rectangular primitives are
+deferred until a real screen needs them (§1.5).
+
+**Every element must end up fully positioned.** If `x` or `y` can't be worked
+out from what's supplied — `width` with neither `x` nor `right`, say, or a
+constant that never resolves — that's a validation error, never a silent zero.
+
+**`hcenter` and `vcenter` are booleans** — `true` or `false`, nothing else.
+
+**Built-in constant names are reserved.** `screen_width`, `screen_height`,
+`parent_width` and `parent_height` can't be declared as user constants; doing so
+is an error, not a silent shadow. Constants are validated where they're declared,
+not only where they're used.
+
+**Bounds are checked for the target being generated**, not only the default
+target, because a screen that fits one display can overflow another (§7.3).
+
 **Centring.** `hcenter="true"` / `vcenter="true"` centre within the parent. Odd remainders round down, deterministically and identically in preview and firmware.
 
 **Container size.** `#parent_width` and `#parent_height` give the containing element's size, so a composite can lay out relative to whatever size it is given:
@@ -1327,7 +1349,7 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 | `<prop>` type | XML value | Emitted C++ | Validation |
 |---|---|---|---|
-| `int` | `12`, `#const`, expression | `int32_t` literal | Resolved to a literal at build time (§7.2); range-checked against the display |
+| `int` | `12`, `#const`, expression | `int32_t` literal — **`int16_t` for coordinates** | Resolved to a literal at build time (§7.2). Coordinates must fit `int16_t`, then are bounds-checked against their container |
 | `bool` | `true` / `false` | `true` / `false` | — |
 | `string` | text | `"..."` escaped, `PROGMEM` where the setter takes a `__FlashStringHelper` | Escaped for C++ string literals |
 | `enum` | one of `values` | enumerator via `emit` pattern | Must be a member of `values` |
@@ -1338,6 +1360,15 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 | `color` | `0`/`1`/`xor` | `U8G2GL_COLOR_*` | Monochrome set only (§10) |
 
 All numeric coordinate attributes resolve to literal integers before emission ([D-7]) — no expression survives into generated code.
+
+**Coordinates are `int16_t`.** That covers `x`, `y`, `width`, `height`, and any
+anchor or constant they resolve from, because `u8g2gl_obj` stores them as
+`int16_t`. Build-time arithmetic may use wider intermediate values, but a result
+that doesn't fit `int16_t` is a validation error, never silently truncated. Other
+`int` properties stay `int32_t`: a clock's epoch time (`set_time(uint32_t)`)
+needs that width. The two checks are separate. Fitting `int16_t` asks whether the
+value is representable at all; the bounds check (§7.2) asks whether it lies
+inside its container.
 
 ### 13.3 The object tree — flat array with parent index
 
@@ -1970,7 +2001,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-8** | **Repeaters.** A `<view>` is a static structure, so it can express "three carriages" but not "N carriages" (§6.5). A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be *designed* rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not. Schema surface, so §1.5 applies: defer until a real screen demonstrates the need | Phase 2 |
 | **Q-9** | **`setter=` has a third meaning.** On a `<bind>`, `setter=` names a *prop*, not a method: `<bind name="bind_width" setter="width">`. §13.1 says [D-18] removed `setter=`'s double meaning by introducing `draw=`, and this is a third one. Kept as-is for PR-04, because new manifest vocabulary needs a demonstrated need (§1.5). Resolve at the next schema bump — `prop=` is the obvious candidate | Next schema bump |
 | **Q-10** | **Text properties live on the base object.** `font`, `align` and text binding are on `u8g2gl_obj`, so every element inherits them — including a box or a line that can't use them. The editor's property panel will show them. That conflicts with the standards' "do not grow `u8g2gl_obj` to serve one widget". Options: an intermediate text base class, or leave the C++ as it is and hide the properties per manifest. Decide before E-2 builds the property panel on top of it | E-2 |
-| **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue | Next catalogue rebuild |
+| **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue. **Resolution path (2026-09-14):** U8G2 becomes a git submodule pinned to 2.36.18; the builder uses it by default and records its commit | PR-04 (WO4c) |
 | **Q-12** | **`bind_src` / `bind_glyph`.** §6.3 used to list them, but no manifest declared them and nothing in the runtime implemented them, so they've been removed. Binding an image or icon glyph to a subject — a Wi-Fi strength icon, say — is the likely first real need. This is additive, a minor bump. Defer until a screen needs it | Phase 2 |
 
 ---

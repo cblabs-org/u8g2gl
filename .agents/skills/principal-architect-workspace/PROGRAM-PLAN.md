@@ -69,6 +69,20 @@ graph again.** The shape below is a starting proposal for CA-1, not a decision.
 ledger's Phase 3 is consolidation. The editor track above is §20's Phase 3. The
 phase labels are left unaligned rather than renumbered across three documents.*
 
+## External dependency — U8G2 (decided 2026-09-14)
+
+Pinned to **U8G2 2.36.18**, the version `esp32-app-foundation` already builds.
+The owner decided U8G2 is fetched into this repo and installed as a library in
+every app using U8G2GL or the designer, following `modules/LVGLDisplay`.
+
+| Consumer | Mechanism | Lands in |
+|---|---|---|
+| This repo — real-header compile check, catalogue builder | Git submodule pinned to the tag *(CA recommendation, awaiting owner confirmation)* | PR-04 (WO4c) |
+| Wasm renderer and designer | Compile U8G2's C source from the submodule | PR-06 |
+| Apps using the library | `library.json` dependency `olikraus/U8g2@^2.36.18`, as `LVGLDisplay` does for LVGL | PR-05 |
+
+Licence: code BSD-2-Clause, fonts per-group. A notices row in both repos.
+
 ## Parallelism
 
 - **PR-04 ∥ PR-06** — both build against §13 and `[UD-4]`. PR-06's dynamic
