@@ -128,6 +128,31 @@ TEST(Switch, RenderDegenerateGeometry) {
     EXPECT_EQ(display.draw_rbox_count, 0);
 }
 
+// WO4c ruling (H1): a switch partly off the left and top edges is drawn with
+// explicitly wrapped origins, which U8G2 clips to the visible part — not
+// skipped, as the first pass did.
+TEST(Switch, PartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_switch sw;
+    sw.set_coords(-5, -2, 30, 14);
+    sw.set_value(false);
+
+    U8G2 display;
+    sw.render(display);
+
+    ASSERT_EQ(display.draw_rframe_count, 1);
+    EXPECT_EQ(display.last_draw_rframe_x, 65531);
+    EXPECT_EQ(display.last_draw_rframe_y, 65534);
+    EXPECT_EQ(display.last_draw_rframe_w, 30);
+    EXPECT_EQ(display.last_draw_rframe_h, 14);
+
+    // Handle off position: (-5 + 1, -2 + 1) = (-4, -1), wrapped.
+    ASSERT_EQ(display.draw_rbox_count, 1);
+    EXPECT_EQ(display.last_draw_rbox_x, 65532);
+    EXPECT_EQ(display.last_draw_rbox_y, 65535);
+    EXPECT_EQ(display.last_draw_rbox_w, 14);
+    EXPECT_EQ(display.last_draw_rbox_h, 12);
+}
+
 TEST(Switch, InheritsFromObj) {
     u8g2gl_switch sw;
     sw.set_coords(5, 5, 20, 10);

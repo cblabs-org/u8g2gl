@@ -222,7 +222,8 @@ void u8g2gl_progress_bar::render(U8G2& display) {
     // --- Step 3: Draw outer track frame ---
     // The frame, fill and stipple pixels go through the u8g2gl_draw_* functions,
     // which issue exactly the U8G2 calls this used to and own their coordinate
-    // conversion (the per-primitive rules are tabulated in u8g2gl_draw.h).
+    // conversion (rules in u8g2gl_draw.h and u8g2gl_coord.h). A bar partly off
+    // the left or top edge draws its visible part.
     u8g2gl_draw_box(display, x_, y_, w_, h_, false);
 
     // --- Step 4: Calculate fill width ---
@@ -257,13 +258,13 @@ void u8g2gl_progress_bar::render(U8G2& display) {
         char buf[8];
         snprintf(buf, sizeof(buf), "%u%%", current_percent_);
 
-        int text_w = display.getUTF8Width(buf);
-        int font_height = display.getAscent() - display.getDescent();
+        int text_w = static_cast<int>(display.getUTF8Width(buf));
+        int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
         int16_t text_x = static_cast<int16_t>(x_ + (w_ - text_w) / 2);
         int16_t text_y = static_cast<int16_t>(y_ + (h_ - font_height) / 2);
 
-        // Text origins are the unresolved WO4c case — see u8g2gl_coord_text().
-        display.drawUTF8(u8g2gl_coord_text(text_x), u8g2gl_coord_text(text_y), buf);
+        // Origins wrap explicitly and U8G2 clips them — see u8g2gl_coord_pos().
+        display.drawUTF8(u8g2gl_coord_pos(text_x), u8g2gl_coord_pos(text_y), buf);
     }
 }
 

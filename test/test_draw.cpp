@@ -320,83 +320,82 @@ TEST(DrawTriangle, UnfilledIssuesThreeDrawLineCallsBetweenVertices) {
     EXPECT_EQ(display.draw_line_y2[2], 0);
 }
 
-// --- Negative origins (WO4c) ---
-// The stub now takes u8g2_uint_t, as real U8G2 does, so an implicit conversion
-// records the wrapped value hardware would receive (-5 -> 65531). These tests
-// pin each primitive's rule from u8g2gl_draw.h: shorten, or skip. Against the
-// pre-WO4c draw functions every "shortens" case records a wrapped coordinate.
+// --- Negative origins (WO4c, PA ruling after the first pass) ---
+// Positions wrap explicitly through u8g2gl_coord_pos(), and the draw still
+// happens: U8G2 clips a wrapped negative origin to its visible part (the source
+// evidence is on u8g2gl_coord_pos()). The retyped stub records what hardware
+// receives, so -5 is observed as 65531. Sizes never wrap — the ZeroWidth and
+// NegativeWidth tests above pin that a size <= 0 draws nothing.
 
-// Any value at or above 32768 can only have come from a wrapped negative.
-static constexpr int kWrapped = 32768;
-
-TEST(DrawNegativeOrigin, FilledBoxShortensToVisiblePart) {
+TEST(DrawNegativeOrigin, FilledBoxOriginWrapsAndIsDrawn) {
     U8G2 display;
     u8g2gl_draw_box(display, -5, -3, 20, 10, true, 0);
 
     ASSERT_EQ(display.draw_box_count, 1);
-    EXPECT_EQ(display.last_draw_box_x, 0);
-    EXPECT_EQ(display.last_draw_box_y, 0);
-    EXPECT_EQ(display.last_draw_box_w, 15);
-    EXPECT_EQ(display.last_draw_box_h, 7);
-    EXPECT_LT(display.last_draw_box_x, kWrapped);
-    EXPECT_LT(display.last_draw_box_y, kWrapped);
+    EXPECT_EQ(display.last_draw_box_x, 65531);
+    EXPECT_EQ(display.last_draw_box_y, 65533);
+    EXPECT_EQ(display.last_draw_box_w, 20);   // the size is not shortened
+    EXPECT_EQ(display.last_draw_box_h, 10);
 }
 
-TEST(DrawNegativeOrigin, FilledBoxWhollyLeftOrAboveIsSkipped) {
-    U8G2 display;
-    u8g2gl_draw_box(display, -20, 0, 20, 5, true, 0);   // last column is x = -1
-    u8g2gl_draw_box(display, 0, -5, 5, 5, true, 0);     // last row is y = -1
-    EXPECT_EQ(display.draw_box_count, 0);
-}
-
-TEST(DrawNegativeOrigin, OutlineAndRoundedBoxesAreSkipped) {
+TEST(DrawNegativeOrigin, OutlineAndRoundedBoxesWrapAndAreDrawn) {
     U8G2 display;
     u8g2gl_draw_box(display, -5, 2, 20, 10, false, 0);
+    ASSERT_EQ(display.draw_frame_count, 1);
+    EXPECT_EQ(display.last_draw_frame_x, 65531);
+    EXPECT_EQ(display.last_draw_frame_y, 2);
+    EXPECT_EQ(display.last_draw_frame_w, 20);
+
     u8g2gl_draw_box(display, 2, -5, 20, 10, true, 3);
+    ASSERT_EQ(display.draw_rbox_count, 1);
+    EXPECT_EQ(display.last_draw_rbox_x, 2);
+    EXPECT_EQ(display.last_draw_rbox_y, 65531);
+    EXPECT_EQ(display.last_draw_rbox_r, 3);
+
     u8g2gl_draw_box(display, -1, -1, 20, 10, false, 3);
-    EXPECT_EQ(display.draw_frame_count, 0);
-    EXPECT_EQ(display.draw_rbox_count, 0);
-    EXPECT_EQ(display.draw_rframe_count, 0);
-    EXPECT_EQ(display.draw_box_count, 0);
+    ASSERT_EQ(display.draw_rframe_count, 1);
+    EXPECT_EQ(display.last_draw_rframe_x, 65535);
+    EXPECT_EQ(display.last_draw_rframe_y, 65535);
 }
 
-TEST(DrawNegativeOrigin, HLineShortensXAndSkipsNegativeY) {
+TEST(DrawNegativeOrigin, HVLineOriginsWrapAndLengthsDoNot) {
     U8G2 display;
-    u8g2gl_draw_hline(display, -5, 3, 20);
+    u8g2gl_draw_hline(display, -5, -1, 20);
     ASSERT_EQ(display.draw_hline_count, 1);
-    EXPECT_EQ(display.last_draw_hline_x, 0);
-    EXPECT_EQ(display.last_draw_hline_y, 3);
-    EXPECT_EQ(display.last_draw_hline_w, 15);
+    EXPECT_EQ(display.last_draw_hline_x, 65531);
+    EXPECT_EQ(display.last_draw_hline_y, 65535);
+    EXPECT_EQ(display.last_draw_hline_w, 20);
 
-    u8g2gl_draw_hline(display, 0, -1, 20);
-    EXPECT_EQ(display.draw_hline_count, 1);
-}
-
-TEST(DrawNegativeOrigin, VLineShortensYAndSkipsNegativeX) {
-    U8G2 display;
-    u8g2gl_draw_vline(display, 3, -4, 10);
+    u8g2gl_draw_vline(display, -2, -4, 10);
     ASSERT_EQ(display.draw_vline_count, 1);
-    EXPECT_EQ(display.last_draw_vline_x, 3);
-    EXPECT_EQ(display.last_draw_vline_y, 0);
-    EXPECT_EQ(display.last_draw_vline_h, 6);
-
-    u8g2gl_draw_vline(display, -1, 0, 10);
-    EXPECT_EQ(display.draw_vline_count, 1);
+    EXPECT_EQ(display.last_draw_vline_x, 65534);
+    EXPECT_EQ(display.last_draw_vline_y, 65532);
+    EXPECT_EQ(display.last_draw_vline_h, 10);
 }
 
-TEST(DrawNegativeOrigin, PointShapesAreSkipped) {
+TEST(DrawNegativeOrigin, PointPositionsWrapAndAreDrawn) {
     U8G2 display;
     u8g2gl_draw_pixel(display, -1, 5);
-    u8g2gl_draw_line(display, -2, 0, 10, 10);
-    u8g2gl_draw_line(display, 0, 0, 10, -3);
+    ASSERT_EQ(display.draw_pixel_count, 1);
+    EXPECT_EQ(display.last_draw_pixel_x, 65535);
+
+    u8g2gl_draw_line(display, -2, 0, 10, -3);
+    ASSERT_EQ(display.draw_line_count, 1);
+    EXPECT_EQ(display.last_draw_line_x1, 65534);
+    EXPECT_EQ(display.last_draw_line_y2, 65533);
+
     u8g2gl_draw_circle(display, -1, 10, 4, false);
+    ASSERT_EQ(display.draw_circle_count, 1);
+    EXPECT_EQ(display.last_draw_circle_x, 65535);
+    EXPECT_EQ(display.last_draw_circle_r, 4);
+
     u8g2gl_draw_circle(display, 10, -1, 4, true);
+    ASSERT_EQ(display.draw_disc_count, 1);
+    EXPECT_EQ(display.last_draw_disc_y, 65535);
+
     u8g2gl_draw_ellipse(display, -3, 10, 4, 2, false);
-    EXPECT_EQ(display.draw_pixel_count, 0);
-    EXPECT_EQ(display.draw_line_count, 0);
-    EXPECT_EQ(display.draw_circle_count, 0);
-    EXPECT_EQ(display.draw_disc_count, 0);
-    EXPECT_EQ(display.draw_ellipse_count, 0);
+    ASSERT_EQ(display.draw_ellipse_count, 1);
+    EXPECT_EQ(display.last_draw_ellipse_x, 65533);
 }
 
 TEST(DrawNegativeOrigin, FilledTrianglePassesSignedVerticesThrough) {
@@ -407,13 +406,14 @@ TEST(DrawNegativeOrigin, FilledTrianglePassesSignedVerticesThrough) {
     EXPECT_EQ(display.last_draw_triangle_x0, -5);
 }
 
-TEST(DrawNegativeOrigin, OutlineTriangleSkipsOnlyEdgesWithNegativeEndpoints) {
+TEST(DrawNegativeOrigin, OutlineTriangleDrawsEveryEdgeWithWrappedEndpoints) {
     U8G2 display;
     u8g2gl_draw_triangle(display, -5, 0, 10, 0, 5, 10, false);
-    // Edges v0-v1 and v2-v0 touch x = -5; only v1-v2 is drawn.
-    ASSERT_EQ(display.draw_line_count, 1);
-    EXPECT_EQ(display.draw_line_x1[0], 10);
-    EXPECT_EQ(display.draw_line_x2[0], 5);
+    // All three edges are drawn; the two touching x = -5 carry it wrapped.
+    ASSERT_EQ(display.draw_line_count, 3);
+    EXPECT_EQ(display.draw_line_x1[0], 65531);
+    EXPECT_EQ(display.draw_line_x1[1], 10);
+    EXPECT_EQ(display.draw_line_x2[2], 65531);
 }
 
 TEST(DrawTriangle, DegenerateZeroAreaDoesNotCrash) {

@@ -269,6 +269,30 @@ TEST(ProgressBar, RenderAnimationUpdate) {
     EXPECT_GT(display.update_display_area_count, 0);
 }
 
+// WO4c ruling (H1): a bar partly off the left and top edges draws its track and
+// fill from explicitly wrapped origins, which U8G2 clips to the visible part.
+TEST(ProgressBar, TrackPartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_progress_bar bar;
+    bar.set_coords(-5, -3, 42, 12);
+    bar.set_fill_style(U8G2GL_FILL_SOLID);
+    bar.set_value(50);
+
+    U8G2 display;
+    bar.render(display);
+
+    ASSERT_EQ(display.draw_frame_count, 1);
+    EXPECT_EQ(display.last_draw_frame_x, 65531);
+    EXPECT_EQ(display.last_draw_frame_y, 65533);
+    EXPECT_EQ(display.last_draw_frame_w, 42);
+    EXPECT_EQ(display.last_draw_frame_h, 12);
+
+    ASSERT_EQ(display.draw_box_count, 1);
+    EXPECT_EQ(display.last_draw_box_x, 65532);   // -4
+    EXPECT_EQ(display.last_draw_box_y, 65534);   // -2
+    EXPECT_EQ(display.last_draw_box_w, 20);
+    EXPECT_EQ(display.last_draw_box_h, 10);
+}
+
 TEST(ProgressBar, InheritsFromObj) {
     u8g2gl_progress_bar bar;
     bar.set_coords(5, 10, 50, 10);

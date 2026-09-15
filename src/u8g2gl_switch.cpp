@@ -107,17 +107,19 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 4: Draw switch track ---
     // Outer rounded rectangle frame covering the full widget bounds.
-    // Both shapes here are rounded, so both follow the rounded-shape rule in
-    // u8g2gl_draw.h: the origin must convert exactly, or the draw is skipped —
-    // moving a rounded shape would put its corners where the signed geometry
-    // has none. They are converted here rather than through u8g2gl_draw_box(),
-    // which would pick drawBox for the handle whenever its radius reaches 0.
-    u8g2_uint_t track_x = 0;
-    u8g2_uint_t track_y = 0;
-    if (u8g2gl_coord_exact(x_, track_x) && u8g2gl_coord_exact(y_, track_y)) {
-        display.drawRFrame(track_x, track_y, u8g2gl_coord_clamp(w_),
-                           u8g2gl_coord_clamp(h_), u8g2gl_coord_clamp(r));
+    // Converted here rather than through u8g2gl_draw_box(), which would pick
+    // drawFrame/drawBox whenever a radius reaches 0; the switch always draws
+    // rounded shapes. Rules from u8g2gl_coord.h: origins wrap explicitly, so a
+    // switch partly off the left or top edge draws its visible part; sizes must
+    // be positive (Step 1 guarantees it for the track); corner radii are
+    // clamped, 0 meaning square corners.
+    u8g2_uint_t track_w = 0;
+    u8g2_uint_t track_h = 0;
+    if (!u8g2gl_coord_size(w_, track_w) || !u8g2gl_coord_size(h_, track_h)) {
+        return;
     }
+    display.drawRFrame(u8g2gl_coord_pos(x_), u8g2gl_coord_pos(y_), track_w, track_h,
+                       u8g2gl_coord_clamp(r));
 
     // --- Step 5: Compute handle geometry ---
     // Handle is inset by 1 pixel from the track border.
@@ -144,10 +146,10 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 6: Draw switch handle ---
     // Filled rounded rectangle indicating current toggle state.
-    u8g2_uint_t handle_ux = 0;
-    u8g2_uint_t handle_uy = 0;
-    if (u8g2gl_coord_exact(handle_x, handle_ux) && u8g2gl_coord_exact(handle_y, handle_uy)) {
-        display.drawRBox(handle_ux, handle_uy, u8g2gl_coord_clamp(handle_w),
-                         u8g2gl_coord_clamp(handle_h), u8g2gl_coord_clamp(handle_r));
+    u8g2_uint_t handle_uw = 0;
+    u8g2_uint_t handle_uh = 0;
+    if (u8g2gl_coord_size(handle_w, handle_uw) && u8g2gl_coord_size(handle_h, handle_uh)) {
+        display.drawRBox(u8g2gl_coord_pos(handle_x), u8g2gl_coord_pos(handle_y), handle_uw,
+                         handle_uh, u8g2gl_coord_clamp(handle_r));
     }
 }

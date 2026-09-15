@@ -377,13 +377,7 @@ set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
 #     need U8G2's C sources and a hardware HAL.
 #   - It is part of the normal build, so a break fails `cmake --build` outright,
 #     and it is registered with CTest so the check is visible in every test run.
-set(U8G2GL_U8G2_DIR ${PROJECT_SOURCE_DIR}/extern/u8g2)
-if(NOT EXISTS ${U8G2GL_U8G2_DIR}/cppsrc/U8g2lib.h)
-    message(FATAL_ERROR
-        "U8G2 submodule missing at ${U8G2GL_U8G2_DIR}. The real-U8G2 acceptance "
-        "target needs it: run `git submodule update --init extern/u8g2`.")
-endif()
-
+# U8G2GL_U8G2_DIR is set, and checked to exist, by the root CMakeLists.txt.
 add_library(u8g2gl_real_u8g2 OBJECT ${U8G2GL_RUNTIME_SOURCES})
 target_include_directories(u8g2gl_real_u8g2 PRIVATE
     ${PROJECT_SOURCE_DIR}/include

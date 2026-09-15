@@ -608,12 +608,10 @@ TEST_F(Core, ApplyClipRejectsRectsRightOfOrBelowDisplay) {
 }
 
 // WO4c degenerate input: an element partly off the left (x = -5) and top edges,
-// rendered through the framework wrapper. The retyped stub records what
-// hardware would receive, so a wrapped negative shows up as a value >= 32768.
-// Before WO4c the fill box reached U8G2 at x = 65532, y = 65534.
-TEST_F(Core, RenderObjectPartlyOffLeftAndTopRecordsNoWrappedCoordinate) {
-    static constexpr int kWrapped = 32768;
-
+// rendered through the framework wrapper. Per the PA ruling, draw origins wrap
+// explicitly and are drawn (U8G2 clips them to the visible part), while the
+// clip window is clamped at both corners and never wraps.
+TEST_F(Core, RenderObjectPartlyOffLeftAndTopWrapsOriginsAndClampsClip) {
     u8g2gl_progress_bar bar;
     bar.set_coords(-5, -3, 42, 12);   // inner area 40 x 10 starting at (-4, -2)
     bar.set_fill_style(U8G2GL_FILL_SOLID);
@@ -630,22 +628,19 @@ TEST_F(Core, RenderObjectPartlyOffLeftAndTopRecordsNoWrappedCoordinate) {
     EXPECT_EQ(display.last_clip_x1, 37);
     EXPECT_EQ(display.last_clip_y1, 9);
 
-    // The outline frame cannot be drawn faithfully from a negative origin: skipped.
-    EXPECT_EQ(display.draw_frame_count, 0);
+    // The track frame is drawn from its explicitly wrapped origin (-5, -3).
+    ASSERT_EQ(display.draw_frame_count, 1);
+    EXPECT_EQ(display.last_draw_frame_x, 65531);
+    EXPECT_EQ(display.last_draw_frame_y, 65533);
+    EXPECT_EQ(display.last_draw_frame_w, 42);
+    EXPECT_EQ(display.last_draw_frame_h, 12);
 
-    // The fill is shortened to its visible part: columns -4..15, rows -2..7.
+    // The fill is drawn from (-4, -2), wrapped, at its full size.
     ASSERT_EQ(display.draw_box_count, 1);
-    EXPECT_EQ(display.last_draw_box_x, 0);
-    EXPECT_EQ(display.last_draw_box_y, 0);
-    EXPECT_EQ(display.last_draw_box_w, 16);
-    EXPECT_EQ(display.last_draw_box_h, 8);
-
-    for (int recorded : { display.last_clip_x0, display.last_clip_y0,
-                          display.last_clip_x1, display.last_clip_y1,
-                          display.last_draw_box_x, display.last_draw_box_y,
-                          display.last_draw_box_w, display.last_draw_box_h }) {
-        EXPECT_LT(recorded, kWrapped);
-    }
+    EXPECT_EQ(display.last_draw_box_x, 65532);
+    EXPECT_EQ(display.last_draw_box_y, 65534);
+    EXPECT_EQ(display.last_draw_box_w, 20);
+    EXPECT_EQ(display.last_draw_box_h, 10);
 }
 
 // --- Frame-dirty observer: u8g2gl_frame_dirty_observer() (§13.5) ---

@@ -376,31 +376,34 @@ public:
     }
     void setFontPosTop() {}
 
-    int getStrWidth(const char*) {
+    // Measurement getters return U8G2's own types (U8g2lib.h 2.36.18), so the
+    // runtime must convert them explicitly exactly as it must on hardware. The
+    // configuration fields stay int for convenience in tests.
+    u8g2_uint_t getStrWidth(const char*) {
         return 0;
     }
 
-    int getUTF8Width(const char* s) {
+    u8g2_uint_t getUTF8Width(const char* s) {
         if (custom_utf8_width != nullptr) {
-            return custom_utf8_width(s);
+            return static_cast<u8g2_uint_t>(custom_utf8_width(s));
         }
-        return utf8_width_val;
+        return static_cast<u8g2_uint_t>(utf8_width_val);
     }
 
-    int getMaxCharWidth() {
+    int8_t getMaxCharWidth() {
         return 0;
     }
 
-    int getMaxCharHeight() {
+    int8_t getMaxCharHeight() {
         return 0;
     }
 
-    int getAscent() {
-        return ascent_val;
+    int8_t getAscent() {
+        return static_cast<int8_t>(ascent_val);
     }
 
-    int getDescent() {
-        return descent_val;
+    int8_t getDescent() {
+        return static_cast<int8_t>(descent_val);
     }
 
     u8g2_uint_t getDisplayWidth() const {

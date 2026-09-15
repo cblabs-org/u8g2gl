@@ -34,21 +34,22 @@
 // draw_border_rframe
 // Draws one border layer. The button has always called drawRFrame, even at
 // radius 0, so this cannot route through u8g2gl_draw_box(), which picks
-// drawFrame at radius 0. It follows that function's rounded-shape rule
-// (u8g2gl_draw.h): the origin must convert exactly, or the layer is skipped —
-// shortening would draw an edge where the signed frame has none.
+// drawFrame at radius 0. It applies the same rules (u8g2gl_coord.h): the origin
+// wraps explicitly, so a border partly off the left or top edge draws its
+// visible part; the size must be positive; the corner radius is clamped, 0
+// meaning square corners.
 //   display  — U8G2 display driver instance
 //   x, y     — layer origin; may be negative
-//   w, h     — layer size, already checked positive by the caller
+//   w, h     — layer size
 //   r        — corner radius, >= 0
 static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
                                int16_t w, int16_t h, int16_t r) {
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
+    u8g2_uint_t uw = 0;
+    u8g2_uint_t uh = 0;
+    if (!u8g2gl_coord_size(w, uw) || !u8g2gl_coord_size(h, uh)) {
         return;
     }
-    display.drawRFrame(ux, uy, u8g2gl_coord_clamp(w), u8g2gl_coord_clamp(h),
+    display.drawRFrame(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw, uh,
                        u8g2gl_coord_clamp(r));
 }
 
@@ -159,12 +160,12 @@ void u8g2gl_button::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // Vertical centering within button bounds
-    int font_height = display.getAscent() - display.getDescent();
+    int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int y_offset = (h_ > 0) ? (h_ - font_height) / 2 : 0;
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
 
     // Horizontal centering (or alignment override if explicitly styled)
-    int text_width = display.getUTF8Width(text_);
+    int text_width = static_cast<int>(display.getUTF8Width(text_));
     int16_t draw_x = static_cast<int16_t>(x_ + (w_ - text_width) / 2);
 
     if (style_.has(U8G2GL_STYLE_ALIGN)) {
@@ -175,6 +176,6 @@ void u8g2gl_button::render(U8G2& display) {
         }
     }
 
-    // Text origins are the unresolved WO4c case — see u8g2gl_coord_text().
-    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
+    // Origins wrap explicitly and U8G2 clips them — see u8g2gl_coord_pos().
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text_);
 }

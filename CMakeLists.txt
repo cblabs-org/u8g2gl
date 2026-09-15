@@ -68,6 +68,19 @@ if(U8G2GL_BUILD_TESTS)
     )
     enable_testing()
 
+    # The real-U8G2 acceptance target (test/CMakeLists.txt) compiles against the
+    # pinned submodule. Check for it before anything else — including the
+    # googletest download — so a fresh clone gets one clear instruction rather
+    # than an opaque missing-header error part-way through the build.
+    set(U8G2GL_U8G2_DIR ${CMAKE_CURRENT_SOURCE_DIR}/extern/u8g2)
+    if(NOT EXISTS ${U8G2GL_U8G2_DIR}/cppsrc/U8g2lib.h)
+        message(FATAL_ERROR
+            "The U8G2 submodule is not initialised (${U8G2GL_U8G2_DIR} has no "
+            "cppsrc/U8g2lib.h). The host tests compile the runtime against it. "
+            "Run:\n  git submodule update --init extern/u8g2\n"
+            "or configure with -DU8G2GL_BUILD_TESTS=OFF to build the library only.")
+    endif()
+
     include(FetchContent)
     FetchContent_Declare(
         googletest

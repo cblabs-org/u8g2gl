@@ -181,11 +181,11 @@ void u8g2gl_clock::render(U8G2& display) {
     // --- Step 3: Measure widths for right-aligned digit columns ---
     // Right-aligning digit columns within a fixed "00" width prevents jitter
     // when glyphs with different advance widths change (e.g. "11" vs "00").
-    int hour_w = display.getUTF8Width(hour_str);
-    int min_w = display.getUTF8Width(min_str);
-    int colon_w = display.getUTF8Width(":");
-    int max_hour_w = display.getUTF8Width("00");
-    int max_min_w = display.getUTF8Width("00");
+    int hour_w = static_cast<int>(display.getUTF8Width(hour_str));
+    int min_w = static_cast<int>(display.getUTF8Width(min_str));
+    int colon_w = static_cast<int>(display.getUTF8Width(":"));
+    int max_hour_w = static_cast<int>(display.getUTF8Width("00"));
+    int max_min_w = static_cast<int>(display.getUTF8Width("00"));
 
     int sec_w = 0;
     int max_sec_w = 0;
@@ -195,9 +195,9 @@ void u8g2gl_clock::render(U8G2& display) {
         if (secondary_font_ != nullptr) {
             display.setFont(secondary_font_);
         }
-        sec_w = display.getUTF8Width(sec_str);
-        max_sec_w = display.getUTF8Width("00");
-        max_sec_colon_w = display.getUTF8Width(":");
+        sec_w = static_cast<int>(display.getUTF8Width(sec_str));
+        max_sec_w = static_cast<int>(display.getUTF8Width("00"));
+        max_sec_colon_w = static_cast<int>(display.getUTF8Width(":"));
         if (secondary_font_ != nullptr && style_.font != nullptr) {
             display.setFont(style_.font); // Restore primary font for hours/minutes
         }
@@ -219,13 +219,13 @@ void u8g2gl_clock::render(U8G2& display) {
 
     // --- Step 5: Compute vertical centering and baseline alignment ---
     // In U8G2GL, setFontPosTop is the standard: (ascent - descent) gives total glyph box height.
-    int font_height = display.getAscent() - display.getDescent();
+    int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int16_t draw_y = static_cast<int16_t>(y_ + ((h_ > font_height) ? (h_ - font_height) / 2 : 0));
 
     int16_t sec_draw_y = draw_y;
     if (format_ == U8G2GL_CLOCK_HH_MM_SS && secondary_font_ != nullptr) {
         display.setFont(secondary_font_);
-        int sec_font_height = display.getAscent() - display.getDescent();
+        int sec_font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
         // Bottom-align font descenders so secondary seconds digits align flush with main digits
         sec_draw_y = static_cast<int16_t>(draw_y + font_height - sec_font_height);
         if (style_.font != nullptr) {
@@ -234,23 +234,23 @@ void u8g2gl_clock::render(U8G2& display) {
     }
 
     // --- Step 6: Draw hours ---
-    // Every text origin below goes through u8g2gl_coord_text(), the unresolved
-    // WO4c case: a right- or centre-aligned clock wider than its bounds starts
-    // left of them, and nothing but the modular conversion preserves that.
+    // Every text origin below goes through u8g2gl_coord_pos(): a right- or
+    // centre-aligned clock wider than its bounds starts left of them, and U8G2
+    // draws the visible part of text whose origin arrives wrapped.
     int h_offset = max_hour_w - hour_w;
-    display.drawUTF8(u8g2gl_coord_text(start_x + h_offset), u8g2gl_coord_text(draw_y),
+    display.drawUTF8(u8g2gl_coord_pos(start_x + h_offset), u8g2gl_coord_pos(draw_y),
                      hour_str);
     int16_t current_x = static_cast<int16_t>(start_x + max_hour_w + 1);
 
     // --- Step 7: Draw colon (subject to blink visibility) ---
     if (show_colon_) {
-        display.drawUTF8(u8g2gl_coord_text(current_x), u8g2gl_coord_text(draw_y), ":");
+        display.drawUTF8(u8g2gl_coord_pos(current_x), u8g2gl_coord_pos(draw_y), ":");
     }
     current_x = static_cast<int16_t>(current_x + colon_w + 1);
 
     // --- Step 8: Draw minutes ---
     int m_offset = max_min_w - min_w;
-    display.drawUTF8(u8g2gl_coord_text(current_x + m_offset), u8g2gl_coord_text(draw_y),
+    display.drawUTF8(u8g2gl_coord_pos(current_x + m_offset), u8g2gl_coord_pos(draw_y),
                      min_str);
     current_x = static_cast<int16_t>(current_x + max_min_w + 1);
 
@@ -261,16 +261,16 @@ void u8g2gl_clock::render(U8G2& display) {
         }
 
         // Seconds colon is always visible (non-blinking), centered in slot
-        int s_colon_w = display.getUTF8Width(":");
+        int s_colon_w = static_cast<int>(display.getUTF8Width(":"));
         int s_col_offset = (max_sec_colon_w - s_colon_w) / 2;
-        display.drawUTF8(u8g2gl_coord_text(current_x + s_col_offset),
-                         u8g2gl_coord_text(sec_draw_y), ":");
+        display.drawUTF8(u8g2gl_coord_pos(current_x + s_col_offset),
+                         u8g2gl_coord_pos(sec_draw_y), ":");
         current_x = static_cast<int16_t>(current_x + max_sec_colon_w + 1);
 
         // Seconds digits right-aligned in max_sec_w slot
         int s_offset = max_sec_w - sec_w;
-        display.drawUTF8(u8g2gl_coord_text(current_x + s_offset),
-                         u8g2gl_coord_text(sec_draw_y), sec_str);
+        display.drawUTF8(u8g2gl_coord_pos(current_x + s_offset),
+                         u8g2gl_coord_pos(sec_draw_y), sec_str);
     }
 }
 

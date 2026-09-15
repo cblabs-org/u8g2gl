@@ -11,34 +11,30 @@
  *          U8G2GL stores geometry as signed int16_t (§13.2), because an element
  *          may legitimately sit partly off the display or outside its container.
  *          U8G2 takes u8g2_uint_t, which is unsigned — uint16_t on every
- *          supported target (U8G2_16BIT), uint8_t without it. An implicit
- *          conversion compiles without a warning and turns -5 into 65531, so
- *          every conversion in the runtime goes through a helper here and states
- *          which of three rules it applies (WO4c):
+ *          supported target (U8G2_16BIT). An implicit conversion compiles without
+ *          a warning, so every conversion in the runtime goes through a helper
+ *          here, named for what the value IS (WO4c):
  *
- *          - exact:   the value must already fit; otherwise the draw is SKIPPED.
- *          - span:    an origin and a length; the part left of (or above) 0 is
- *                     cut off, so the length is SHORTENED to the visible part.
- *          - clamp:   the value is CLAMPED into the representable range.
- *
- *          The rule for each primitive is chosen so that no pixel is lit that the
- *          signed geometry would not light: a span is shortened only where that is
- *          pixel-exact (a filled box, a line of pixels, a region), and every
- *          shape whose appearance depends on its origin — outlines, rounded
- *          shapes, circles, bitmaps, points, line endpoints — is skipped instead.
- *          The per-primitive table lives in u8g2gl_draw.h.
- *
- *          Text is the exception, and is UNRESOLVED — see u8g2gl_coord_text().
+ *          - a POSITION (origin, end point, centre) — u8g2gl_coord_pos(): an
+ *            explicit two's-complement wrap, because U8G2 is built to take a
+ *            negative position that way and clip it to the visible part;
+ *          - a SIZE (width, height, length, circle radius) — u8g2gl_coord_size():
+ *            <= 0 is refused (nothing to draw), and so is a size u8g2_uint_t
+ *            cannot hold; the caller then draws nothing;
+ *          - a BOUND (clip-window corner) or a CORNER RADIUS —
+ *            u8g2gl_coord_clamp(): clamped into range;
+ *          - a REFRESH REGION — u8g2gl_coord_span(): shortened to its on-screen
+ *            part, because updateDisplayArea() is not clipped by U8G2.
  *
  * Description: Four inline conversions and the representable maximum. Nothing
  *              allocates; nothing depends on int being 32-bit.
  *
  * Exported Functions:
  * - U8G2GL_U8G2_COORD_MAX:  Largest value a u8g2_uint_t holds on this build
- * - u8g2gl_coord_exact():   Convert if representable; false means skip the draw
- * - u8g2gl_coord_span():    Shorten an origin/length pair to its non-negative part
- * - u8g2gl_coord_clamp():   Clamp into [0, U8G2GL_U8G2_COORD_MAX]
- * - u8g2gl_coord_text():    Text origin — explicit modular conversion (unresolved)
+ * - u8g2gl_coord_pos():     Position — explicit wrap; U8G2 clips it
+ * - u8g2gl_coord_size():    Size — refuse <= 0 or unrepresentable
+ * - u8g2gl_coord_clamp():   Clip corner or corner radius — clamp into range
+ * - u8g2gl_coord_span():    Refresh region — shorten to the non-negative part
  */
 #ifndef U8G2GL_COORD_H
 #define U8G2GL_COORD_H
@@ -59,29 +55,64 @@
 /**
  * @brief Largest value U8G2's coordinate type holds on this build.
  *
- * 65535 with U8G2_16BIT (every 32-bit target, and unconditionally in U8G2
- * 2.36.18's u8g2.h), 255 without it. Read from the type rather than assumed, so
- * an 8-bit build clamps and skips at 255 instead of wrapping.
+ * 65535 with U8G2_16BIT (defined unconditionally in U8G2 2.36.18's u8g2.h), 255
+ * without it. Read from the type rather than assumed.
  */
 inline constexpr int32_t U8G2GL_U8G2_COORD_MAX =
     static_cast<int32_t>(std::numeric_limits<u8g2_uint_t>::max());
 
 /**
- * @brief Convert a coordinate that must be representable exactly — the SKIP rule.
+ * @brief Convert a draw POSITION — an origin, end point or centre — by an
+ *        explicit two's-complement wrap.
  *
- * For values whose meaning depends on their exact position: points, line
- * endpoints, circle centres, and the origin of an outline, a rounded shape or a
- * bitmap. Moving such a value would draw the shape somewhere it is not, and
- * shortening it would draw an edge that is not there, so the only safe response
- * to a negative (or too-large) value is to draw nothing.
+ * RULE: every draw position reaches U8G2 through this one conversion, and it
+ * wraps ON PURPOSE: -5 becomes 65531. A shape partly off the left or top edge is
+ * therefore drawn, and U8G2 draws only its visible part. Nothing is clamped,
+ * shortened or skipped here.
  *
- * @param value Signed coordinate.
- * @param out   Receives the converted value; untouched when false is returned.
- * @return false if @p value is negative or exceeds U8G2GL_U8G2_COORD_MAX. The
- *         caller must then skip the draw.
+ * Why wrapping is correct — U8G2 2.36.18 (extern/u8g2/csrc) is designed for it:
+ * - u8g2_hvline.c, u8g2_clip_intersection2(): handles the a > b case explicitly,
+ *   and its comment warns that replacing that branch with "return 0" "will not
+ *   handle the case with negative a" — a negative start arriving wrapped is a
+ *   case it exists to clip.
+ * - u8g2_intersection.c, u8g2_is_intersection_decision_tree(): treats a wrapped
+ *   span (v0 > v1) as intersecting, so u8g2_IsIntersection() does not reject it.
+ * - u8g2_box.c (u8g2_DrawBox, u8g2_DrawFrame, u8g2_DrawRBox, u8g2_DrawRFrame),
+ *   u8g2_bitmap.c (u8g2_DrawXBMP) and u8g2_font.c (glyph decoding) test
+ *   u8g2_IsIntersection() and then draw through u8g2_DrawHVLine(), which clips
+ *   with u8g2_clip_intersection2(). Their internal arithmetic (x + w, x + r) is
+ *   in u8g2_uint_t, so it wraps back consistently.
+ * - u8g2_circle.c plots outlines per pixel through u8g2_DrawPixel(), where a
+ *   wrapped negative coordinate fails x >= user_x1 and is simply not drawn;
+ *   discs and filled ellipses draw through u8g2_DrawVLine()/u8g2_DrawHVLine().
+ *
+ * The marquee depends on this: a scrolling label draws at x_ - scroll_x_, which
+ * is negative on every step once it starts.
+ *
+ * The clip window is the exception, and does NOT use this: setClipWindow() with
+ * a wrapped near corner would not clip, so u8g2gl_apply_clip() clamps both
+ * corners with u8g2gl_coord_clamp().
+ *
+ * @param value Signed position, in the range of int16_t geometry.
+ * @return @p value modulo 2^N, where N is the width of u8g2_uint_t.
  */
-inline bool u8g2gl_coord_exact(int32_t value, u8g2_uint_t& out) {
-    if (value < 0 || value > U8G2GL_U8G2_COORD_MAX) {
+inline u8g2_uint_t u8g2gl_coord_pos(int32_t value) {
+    return static_cast<u8g2_uint_t>(value);
+}
+
+/**
+ * @brief Convert a draw SIZE — width, height, length or circle radius.
+ *
+ * RULE: a size is not a position and never wraps. A size <= 0 has nothing to
+ * draw, and a size larger than U8G2GL_U8G2_COORD_MAX cannot be represented; both
+ * are refused, and the caller must draw nothing.
+ *
+ * @param value Signed size.
+ * @param out   Receives the converted size; untouched when false is returned.
+ * @return false if @p value <= 0 or > U8G2GL_U8G2_COORD_MAX — skip the draw.
+ */
+inline bool u8g2gl_coord_size(int32_t value, u8g2_uint_t& out) {
+    if (value <= 0 || value > U8G2GL_U8G2_COORD_MAX) {
         return false;
     }
     out = static_cast<u8g2_uint_t>(value);
@@ -89,20 +120,40 @@ inline bool u8g2gl_coord_exact(int32_t value, u8g2_uint_t& out) {
 }
 
 /**
- * @brief Shorten a span to the part at non-negative coordinates — the SHORTEN rule.
+ * @brief Clamp a BOUND or CORNER RADIUS into U8G2's coordinate range.
  *
- * For a run of pixels [origin, origin + length): a filled box's width or height,
- * a horizontal or vertical line, a refresh region. Cutting off the part before
- * 0 lights exactly the pixels the signed span would have lit on the display, so
- * nothing moves. A span running past U8G2GL_U8G2_COORD_MAX is shortened at that
- * end too.
+ * For clip-window corners, which must not wrap (see u8g2gl_coord_pos()), and for
+ * the corner radius of a rounded box, where 0 is a valid value meaning square
+ * corners rather than an empty shape.
+ *
+ * @param value Signed value.
+ * @return 0 for a negative value, U8G2GL_U8G2_COORD_MAX for one above it,
+ *         otherwise the value.
+ */
+inline u8g2_uint_t u8g2gl_coord_clamp(int32_t value) {
+    if (value < 0) {
+        return 0;
+    }
+    if (value > U8G2GL_U8G2_COORD_MAX) {
+        return static_cast<u8g2_uint_t>(U8G2GL_U8G2_COORD_MAX);
+    }
+    return static_cast<u8g2_uint_t>(value);
+}
+
+/**
+ * @brief Shorten a REFRESH REGION to the part at non-negative coordinates.
+ *
+ * Only for u8g2gl_partial_refresh(). updateDisplayArea() takes uint8_t tiles and
+ * U8G2 does not clip them, so a wrapped origin would name the wrong tiles.
+ * Refreshing the on-screen part of a region pushes exactly what refreshing the
+ * whole region would.
  *
  * @param origin      Signed start of the span.
  * @param length      Signed length; <= 0 is empty.
  * @param out_origin  Receives the converted start (0 if the span began before 0).
  * @param out_length  Receives the converted, shortened length.
  * @return false if nothing of the span is left at representable coordinates;
- *         the outputs are then untouched and the caller must skip the draw.
+ *         the outputs are then untouched and the caller must skip the refresh.
  */
 inline bool u8g2gl_coord_span(int32_t origin, int32_t length,
                               u8g2_uint_t& out_origin, u8g2_uint_t& out_length) {
@@ -124,62 +175,6 @@ inline bool u8g2gl_coord_span(int32_t origin, int32_t length,
     out_origin = static_cast<u8g2_uint_t>(first);
     out_length = static_cast<u8g2_uint_t>(last_excl - first);
     return true;
-}
-
-/**
- * @brief Clamp a value into U8G2's coordinate range — the CLAMP rule.
- *
- * For values that are bounds rather than positions: clip-window corners
- * (already intersected with the display by the caller), and extents or radii
- * the caller has already checked are positive, where the clamp only makes the
- * conversion explicit.
- *
- * @param value Signed value.
- * @return 0 for a negative value, U8G2GL_U8G2_COORD_MAX for one above it,
- *         otherwise the value.
- */
-inline u8g2_uint_t u8g2gl_coord_clamp(int32_t value) {
-    if (value < 0) {
-        return 0;
-    }
-    if (value > U8G2GL_U8G2_COORD_MAX) {
-        return static_cast<u8g2_uint_t>(U8G2GL_U8G2_COORD_MAX);
-    }
-    return static_cast<u8g2_uint_t>(value);
-}
-
-/**
- * @brief Convert a text origin (drawUTF8, drawGlyph) — UNRESOLVED, see below.
- *
- * WO4C STOP-AND-REPORT — THIS CONVERSION WRAPS, DELIBERATELY AND EXPLICITLY.
- * It is the unsigned modular conversion: -1 becomes U8G2GL_U8G2_COORD_MAX.
- *
- * WO4c requires that no conversion wraps, choosing per primitive between clamp,
- * shorten and skip. For text none of the three preserves existing behaviour:
- * - a marquee (long_mode scroll) draws at x - scroll_x, which is negative on
- *   every step once scrolling starts; clamping freezes the text at 0, and
- *   skipping blanks it;
- * - centred text wider than its label starts left of the label, so clamping
- *   shifts it and skipping hides it;
- * - text has no "visible part" to shorten to without copying the string.
- *
- * U8G2 2.36.18 is written to accept a wrapped text origin: its glyph renderer
- * tests intersection with wrap-aware u8g2_IsIntersection(), and draws runs
- * through u8g2_clip_intersection2() (u8g2_hvline.c), whose comment says a
- * simpler form "will not handle the case with negative a". So this is the
- * value hardware receives today, and the marquee relies on it.
- *
- * The WORKORDER and existing behaviour disagree, so the choice is recorded in
- * WO4c's Completion Report for the Principal Architect rather than made here.
- * Behaviour is unchanged and the wrap is confined to this one function:
- * LabelScroll.TextLeftOfOriginReachesU8g2Wrapped pins it, and a ruling changes
- * this body and that test, nothing else.
- *
- * @param value Signed text origin coordinate.
- * @return @p value modulo 2^N, where N is the width of u8g2_uint_t.
- */
-inline u8g2_uint_t u8g2gl_coord_text(int32_t value) {
-    return static_cast<u8g2_uint_t>(value);
 }
 
 #endif // U8G2GL_COORD_H

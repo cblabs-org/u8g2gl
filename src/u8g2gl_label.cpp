@@ -290,7 +290,7 @@ void u8g2gl_label::render(U8G2& display) {
     // setFontPosTop() is the framework standard (the Y coordinate is the top
     // of glyph bounding boxes). getAscent() is positive, getDescent() negative,
     // so (ascent - descent) gives total glyph box height.
-    int font_height = display.getAscent() - display.getDescent();
+    int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int y_offset = (h_ > 0) ? (h_ - font_height) / 2 : 0;
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
 
@@ -321,10 +321,9 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
         // the container (WO4 F6). U8G2 cannot report the clip, so a widget has
         // no way to narrow it and put it back; it must leave it alone.
         //
-        // x_ - scroll_x_ is negative on every step once the marquee starts, which
-        // is why text origins are the unresolved WO4c case: clamping would freeze
-        // the marquee and skipping would blank it. See u8g2gl_coord_text().
-        display.drawUTF8(u8g2gl_coord_text(x_ - scroll_x_), u8g2gl_coord_text(draw_y),
+        // x_ - scroll_x_ is negative on every step once the marquee starts; it
+        // wraps explicitly and U8G2 draws the visible part (u8g2gl_coord_pos()).
+        display.drawUTF8(u8g2gl_coord_pos(x_ - scroll_x_), u8g2gl_coord_pos(draw_y),
                          text_);
         return;
     }
@@ -344,7 +343,7 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
             ? x_
             : static_cast<int16_t>(x_ + (w_ - message_width_) / 2);
     }
-    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text_);
 }
 
 // u8g2gl_label::render_static
@@ -366,7 +365,7 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
 void u8g2gl_label::render_static(U8G2& display, int16_t draw_y, bool dots) {
     // clip has no measurement (Step 2 skips it), so its overflow test uses the
     // live width; dots always measures in Step 2, so message_width_ is current.
-    int text_width = dots ? message_width_ : display.getUTF8Width(text_);
+    int text_width = dots ? message_width_ : static_cast<int>(display.getUTF8Width(text_));
 
     int16_t draw_x = x_;
     if (style_.align == U8G2GL_ALIGN_CENTER) {
@@ -378,16 +377,16 @@ void u8g2gl_label::render_static(U8G2& display, int16_t draw_y, bool dots) {
 
     // drawUTF8 is used rather than drawStr for full UTF-8 Unicode character
     // support. Centred or right-aligned text wider than the label starts left
-    // of it, so this origin can be negative: see u8g2gl_coord_text().
-    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
+    // of it, so this origin can be negative: see u8g2gl_coord_pos().
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text_);
 
     if (dots && overflow_) {
-        int dots_width = display.getUTF8Width("...");
+        int dots_width = static_cast<int>(display.getUTF8Width("..."));
         int16_t dots_x = static_cast<int16_t>(x_ + w_ - dots_width);
         display.setDrawColor(0);
         u8g2gl_draw_box(display, dots_x, y_, static_cast<int16_t>(dots_width), h_);
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
-        display.drawUTF8(u8g2gl_coord_text(dots_x), u8g2gl_coord_text(draw_y), "...");
+        display.drawUTF8(u8g2gl_coord_pos(dots_x), u8g2gl_coord_pos(draw_y), "...");
     }
 }
 

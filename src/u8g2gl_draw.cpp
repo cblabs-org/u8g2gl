@@ -14,12 +14,13 @@
  *          inside the render loop, where a degenerate value (zero or negative
  *          width/height/radius) must be a silent no-op rather than undefined
  *          behaviour. U8G2's own coordinate type is unsigned, so a negative
- *          value passed through unguarded would wrap to a very large unsigned
+ *          size passed through unguarded would wrap to a very large unsigned
  *          value rather than draw nothing.
  *
- * Description: One function body per primitive. Every signed coordinate reaches
- *              U8G2 through a u8g2gl_coord.h helper; which rule each primitive
- *              applies (shorten or skip) is tabulated in u8g2gl_draw.h.
+ * Description: One function body per primitive. Positions reach U8G2 through
+ *              u8g2gl_coord_pos() (an explicit wrap U8G2 clips) and sizes
+ *              through u8g2gl_coord_size() (refused when <= 0); see
+ *              u8g2gl_coord.h for why each rule is what it is.
  */
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_coord.h"
@@ -36,147 +37,100 @@
 
 // u8g2gl_draw_box
 // Dispatches to whichever of U8G2's four box primitives matches (filled x
-// rounded), after rejecting non-positive geometry.
+// rounded), after refusing a size that is non-positive or unrepresentable.
 //   display — U8G2 display driver instance
 //   filled  — drawBox/drawRBox vs drawFrame/drawRFrame
 //   radius  — > 0 selects the rounded variant
 void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
                       int16_t height, bool filled, int16_t radius) {
-    if (width <= 0 || height <= 0) {
+    // --- Step 1: Convert the size, or draw nothing ---
+    u8g2_uint_t uw = 0;
+    u8g2_uint_t uh = 0;
+    if (!u8g2gl_coord_size(width, uw) || !u8g2gl_coord_size(height, uh)) {
         return;
     }
+    const u8g2_uint_t ux = u8g2gl_coord_pos(x);
+    const u8g2_uint_t uy = u8g2gl_coord_pos(y);
 
-    // --- Step 1: A square filled box is shortened to its visible part ---
-    // Cutting the columns left of 0 and the rows above 0 lights exactly the
-    // pixels the signed box would have lit, so this is the one box that can be
-    // shortened rather than skipped.
-    if (filled && radius <= 0) {
-        u8g2_uint_t ux = 0;
-        u8g2_uint_t uy = 0;
-        u8g2_uint_t uw = 0;
-        u8g2_uint_t uh = 0;
-        if (!u8g2gl_coord_span(x, width, ux, uw) ||
-            !u8g2gl_coord_span(y, height, uy, uh)) {
-            return;
-        }
-        display.drawBox(ux, uy, uw, uh);
-        return;
-    }
-
-    // --- Step 2: Outlines and rounded boxes need their exact origin ---
-    // Shortening a frame would draw its left or top edge at the display edge,
-    // where the signed frame has no edge; moving a rounded box would put its
-    // corners in the wrong place. Neither can be drawn faithfully from a
-    // negative origin, so the draw is skipped.
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
-        return;
-    }
-    const u8g2_uint_t uw = u8g2gl_coord_clamp(width);
-    const u8g2_uint_t uh = u8g2gl_coord_clamp(height);
-
-    // --- Step 3: Dispatch to the matching U8G2 primitive ---
-    if (radius > 0) {
-        const u8g2_uint_t ur = u8g2gl_coord_clamp(radius);
+    // --- Step 2: Dispatch to the matching U8G2 primitive ---
+    u8g2_uint_t ur = 0;
+    if (u8g2gl_coord_size(radius, ur)) {
         if (filled) {
             display.drawRBox(ux, uy, uw, uh, ur);
         } else {
             display.drawRFrame(ux, uy, uw, uh, ur);
         }
+    } else if (filled) {
+        display.drawBox(ux, uy, uw, uh);
     } else {
         display.drawFrame(ux, uy, uw, uh);
     }
 }
 
 // u8g2gl_draw_circle
-// Dispatches to drawCircle (outline) or drawDisc (filled), after rejecting a
-// non-positive radius or a centre U8G2 cannot represent. `segments` is
-// forwarded as U8G2's raw option byte.
+// Dispatches to drawCircle (outline) or drawDisc (filled), after refusing a
+// non-positive radius. `segments` is forwarded as U8G2's raw option byte.
 void u8g2gl_draw_circle(U8G2& display, int16_t x, int16_t y, int16_t radius,
                          bool filled, u8g2gl_draw_segment_t segments) {
-    if (radius <= 0) {
+    u8g2_uint_t ur = 0;
+    if (!u8g2gl_coord_size(radius, ur)) {
         return;
     }
-    // A circle is placed by its centre; moving it would draw it elsewhere.
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
-        return;
-    }
-    const u8g2_uint_t ur = u8g2gl_coord_clamp(radius);
     if (filled) {
-        display.drawDisc(ux, uy, ur, static_cast<uint8_t>(segments));
+        display.drawDisc(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), ur,
+                         static_cast<uint8_t>(segments));
     } else {
-        display.drawCircle(ux, uy, ur, static_cast<uint8_t>(segments));
+        display.drawCircle(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), ur,
+                           static_cast<uint8_t>(segments));
     }
 }
 
 // u8g2gl_draw_ellipse
 // Dispatches to drawEllipse (outline) or drawFilledEllipse (filled), after
-// rejecting a non-positive radius on either axis or an unrepresentable centre.
-// `segments` is forwarded as U8G2's raw option byte, exactly as
-// u8g2gl_draw_circle does.
+// refusing a non-positive radius on either axis. `segments` is forwarded as
+// U8G2's raw option byte, exactly as u8g2gl_draw_circle does.
 void u8g2gl_draw_ellipse(U8G2& display, int16_t x, int16_t y, int16_t rx,
                           int16_t ry, bool filled,
                           u8g2gl_draw_segment_t segments) {
-    if (rx <= 0 || ry <= 0) {
+    u8g2_uint_t urx = 0;
+    u8g2_uint_t ury = 0;
+    if (!u8g2gl_coord_size(rx, urx) || !u8g2gl_coord_size(ry, ury)) {
         return;
     }
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
-        return;
-    }
-    const u8g2_uint_t urx = u8g2gl_coord_clamp(rx);
-    const u8g2_uint_t ury = u8g2gl_coord_clamp(ry);
     if (filled) {
-        display.drawFilledEllipse(ux, uy, urx, ury, static_cast<uint8_t>(segments));
+        display.drawFilledEllipse(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), urx, ury,
+                                  static_cast<uint8_t>(segments));
     } else {
-        display.drawEllipse(ux, uy, urx, ury, static_cast<uint8_t>(segments));
+        display.drawEllipse(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), urx, ury,
+                            static_cast<uint8_t>(segments));
     }
 }
 
 // u8g2gl_draw_hline
-// Shortens the run to its visible columns; a row above the display has no
-// visible part, so it is skipped.
+// Refuses a non-positive length, then forwards directly — U8G2 has no
+// filled/outline distinction for a line of pixels.
 void u8g2gl_draw_hline(U8G2& display, int16_t x, int16_t y, int16_t width) {
-    u8g2_uint_t ux = 0;
     u8g2_uint_t uw = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_span(x, width, ux, uw) || !u8g2gl_coord_exact(y, uy)) {
+    if (!u8g2gl_coord_size(width, uw)) {
         return;
     }
-    display.drawHLine(ux, uy, uw);
+    display.drawHLine(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw);
 }
 
 // u8g2gl_draw_line
-// U8G2's drawLine accepts endpoints in either order, so there is no
-// "inverted coordinates" case to reject. It has no signed form, and the pixels
-// of a line depend on both endpoints, so an endpoint U8G2 cannot represent
-// skips the line rather than bending it.
+// Straight forward: U8G2's drawLine accepts endpoints in either order, so
+// there is no "inverted coordinates" case to reject. Both end points are
+// positions and wrap explicitly.
 void u8g2gl_draw_line(U8G2& display, int16_t x1, int16_t y1, int16_t x2,
                        int16_t y2) {
-    u8g2_uint_t ux1 = 0;
-    u8g2_uint_t uy1 = 0;
-    u8g2_uint_t ux2 = 0;
-    u8g2_uint_t uy2 = 0;
-    if (!u8g2gl_coord_exact(x1, ux1) || !u8g2gl_coord_exact(y1, uy1) ||
-        !u8g2gl_coord_exact(x2, ux2) || !u8g2gl_coord_exact(y2, uy2)) {
-        return;
-    }
-    display.drawLine(ux1, uy1, ux2, uy2);
+    display.drawLine(u8g2gl_coord_pos(x1), u8g2gl_coord_pos(y1),
+                     u8g2gl_coord_pos(x2), u8g2gl_coord_pos(y2));
 }
 
 // u8g2gl_draw_pixel
-// A pixel at a negative coordinate is off the display; skip it.
+// A single point has no degenerate case beyond what U8G2 itself clips.
 void u8g2gl_draw_pixel(U8G2& display, int16_t x, int16_t y) {
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
-        return;
-    }
-    display.drawPixel(ux, uy);
+    display.drawPixel(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y));
 }
 
 // u8g2gl_draw_triangle
@@ -190,8 +144,6 @@ void u8g2gl_draw_triangle(U8G2& display, int16_t x0, int16_t y0, int16_t x1,
         // (U8g2lib.h), the only draw call that takes signed coordinates.
         display.drawTriangle(x0, y0, x1, y1, x2, y2);
     } else {
-        // Each edge goes through u8g2gl_draw_line, so an edge with an
-        // unrepresentable endpoint is skipped on its own.
         u8g2gl_draw_line(display, x0, y0, x1, y1);
         u8g2gl_draw_line(display, x1, y1, x2, y2);
         u8g2gl_draw_line(display, x2, y2, x0, y0);
@@ -199,14 +151,11 @@ void u8g2gl_draw_triangle(U8G2& display, int16_t x0, int16_t y0, int16_t x1,
 }
 
 // u8g2gl_draw_vline
-// Shortens the run to its visible rows; a column left of the display has no
-// visible part, so it is skipped.
+// Refuses a non-positive length, then forwards directly.
 void u8g2gl_draw_vline(U8G2& display, int16_t x, int16_t y, int16_t height) {
-    u8g2_uint_t ux = 0;
-    u8g2_uint_t uy = 0;
     u8g2_uint_t uh = 0;
-    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_span(y, height, uy, uh)) {
+    if (!u8g2gl_coord_size(height, uh)) {
         return;
     }
-    display.drawVLine(ux, uy, uh);
+    display.drawVLine(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uh);
 }

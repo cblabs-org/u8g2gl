@@ -39,27 +39,24 @@
  *              is a reboot rather than an exception.
  *
  * Coordinates: parameters are signed int16_t (§13.2), but U8G2 takes unsigned
- *              u8g2_uint_t, where -5 silently becomes 65531. Every conversion
- *              goes through u8g2gl_coord.h, and each primitive applies the
- *              rule that lights no pixel the signed geometry would not
- *              (WO4c). These rules are shared by the widgets that issue the
- *              same U8G2 calls:
+ *              u8g2_uint_t, where an implicit conversion compiles silently. Every
+ *              conversion goes through u8g2gl_coord.h, by what the value is
+ *              (WO4c, PA ruling after the first pass):
  *
- *              | Primitive (U8G2 call)            | Negative origin / endpoint |
- *              |----------------------------------|----------------------------|
- *              | filled square box (drawBox)      | SHORTEN both axes          |
- *              | hline (drawHLine)                | SHORTEN x; skip if y < 0   |
- *              | vline (drawVLine)                | SHORTEN y; skip if x < 0   |
- *              | outline box (drawFrame)          | SKIP                       |
- *              | rounded box (drawRBox/RFrame)    | SKIP                       |
- *              | circle, ellipse (centre)         | SKIP                       |
- *              | line (either endpoint)           | SKIP                       |
- *              | pixel                            | SKIP                       |
- *              | filled triangle (drawTriangle)   | none — U8G2 takes int16_t  |
- *              | outline triangle                 | SKIP per edge (as line)    |
+ *              | Value                                   | Conversion              |
+ *              |-----------------------------------------|-------------------------|
+ *              | origin, end point, centre               | u8g2gl_coord_pos():     |
+ *              |                                         | explicit wrap, U8G2     |
+ *              |                                         | draws the visible part  |
+ *              | width, height, length, circle radius    | u8g2gl_coord_size():    |
+ *              |                                         | <= 0 or too large draws |
+ *              |                                         | nothing                 |
+ *              | filled triangle vertices (drawTriangle) | none — U8G2 takes       |
+ *              |                                         | int16_t                 |
  *
- *              Extents and radii are already guarded positive; they are CLAMPED,
- *              which only makes the conversion explicit.
+ *              The same rules apply to the widgets that issue these U8G2 calls
+ *              directly. The clip window is the exception: u8g2gl_apply_clip()
+ *              clamps both corners.
  *
  * Exported Types:
  * - u8g2gl_draw_segment_t: Which arc/quadrant a circle or ellipse draws

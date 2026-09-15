@@ -11,14 +11,14 @@
  *              driver symbol resolution, constructor class matching, page-mode
  *              mapping, both U8G2 source layouts, and that the committed
  *              catalogue-source.json names the commit of the pinned submodule.
- *              Runs against extern/u8g2 (or U8G2_PATH), and skips when neither is
- *              present — for example a clone made without
- *              `git submodule update --init`.
+ *              Reads U8G2 from extern/u8g2 only, so the suite behaves the same on
+ *              every machine; it skips when the submodule is not initialised.
+ *              The Arduino release layout is exercised with a synthetic tree.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import {
@@ -30,48 +30,24 @@ import {
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const cliDir = resolve(testDir, '..', '..');
-const submodulePath = resolve(cliDir, '..', 'extern', 'u8g2');
+const u8g2Path = resolve(cliDir, '..', 'extern', 'u8g2');
+const isSubmoduleAvailable = existsSync(resolve(u8g2Path, 'cppsrc', 'U8g2lib.h'));
 
-// An Arduino library release of U8G2 — the layout PlatformIO installs — where
-// one happens to exist on this machine. Only the layout test uses it.
-const releasePath = resolve(
-  homedir(),
-  'Documents/Projects/departures-board/.pio/libdeps/esp32dev/U8g2'
-);
+// U8G2 2.36.18's git tag holds 205 u8x8_display_info_t structs. (Its Arduino
+// release holds 206, because it still ships u8x8_d_st7301.c beside the renamed
+// u8x8_d_st7302.c; the catalogue built from either is identical.)
+const PINNED_STRUCT_COUNT = 205;
 
-function getU8g2Path(): string {
-  const envPath = process.env['U8G2_PATH'];
-  if (envPath && existsSync(envPath)) {
-    return envPath;
-  }
-  return submodulePath;
-}
-
-const u8g2Path = getU8g2Path();
-const isU8g2Available = existsSync(u8g2Path);
-
-/**
- * @brief The number of u8x8_display_info_t structs the tree at u8g2Path holds.
- *
- * The 2.36.18 Arduino release still ships u8x8_d_st7301.c beside its rename,
- * u8x8_d_st7302.c, so it holds one duplicate struct more than the git tag the
- * submodule pins. Both produce the identical catalogue; only this count differs.
- */
-function expectedStructCount(): number {
-  return resolveU8g2Layout(u8g2Path).clibDir.endsWith('csrc') ? 205 : 206;
-}
-const isSubmoduleAvailable = existsSync(resolve(submodulePath, 'cppsrc', 'U8g2lib.h'));
-
-describe.runIf(isU8g2Available)('U8G2 Catalogue Builder Integration (§5.2)', () => {
-  it('parses every display_info struct across driver files (205 git tag, 206 release)', () => {
+describe.runIf(isSubmoduleAvailable)('U8G2 Catalogue Builder Integration (§5.2)', () => {
+  it('parses every display_info struct across driver files', () => {
     const structs = parseDisplayInfoStructs(resolveU8g2Layout(u8g2Path).clibDir);
-    expect(structs).toHaveLength(expectedStructCount());
+    expect(structs).toHaveLength(PINNED_STRUCT_COUNT);
   });
 
   it('builds the full catalogue with expected struct and constructor counts', () => {
     const result = buildCatalogue(u8g2Path);
 
-    expect(result.structCount).toBe(expectedStructCount());
+    expect(result.structCount).toBe(PINNED_STRUCT_COUNT);
 
     // Assert the number of full-buffer constructors is reasonable (>= 700)
     expect(result.fullBufferCount).toBeGreaterThanOrEqual(700);
@@ -117,9 +93,9 @@ describe.runIf(isU8g2Available)('U8G2 Catalogue Builder Integration (§5.2)', ()
 
 describe.runIf(isSubmoduleAvailable)('U8G2 source layout and provenance (Q-11)', () => {
   it('resolves the git repository layout of the pinned submodule', () => {
-    const layout = resolveU8g2Layout(submodulePath);
-    expect(layout.clibDir).toBe(resolve(submodulePath, 'csrc'));
-    expect(layout.headerPath).toBe(resolve(submodulePath, 'cppsrc', 'U8g2lib.h'));
+    const layout = resolveU8g2Layout(u8g2Path);
+    expect(layout.clibDir).toBe(resolve(u8g2Path, 'csrc'));
+    expect(layout.headerPath).toBe(resolve(u8g2Path, 'cppsrc', 'U8g2lib.h'));
   });
 
   it('rejects a directory that is not a U8G2 source tree', () => {
@@ -127,7 +103,7 @@ describe.runIf(isSubmoduleAvailable)('U8G2 source layout and provenance (Q-11)',
   });
 
   it('reads the pinned submodule as U8G2 2.36.18 at a full commit hash', () => {
-    const source = readU8g2Source(submodulePath);
+    const source = readU8g2Source(u8g2Path);
     expect(source.tag).toBe('2.36.18');
     expect(source.commit).toMatch(/^[0-9a-f]{40}$/);
   });
@@ -141,17 +117,23 @@ describe.runIf(isSubmoduleAvailable)('U8G2 source layout and provenance (Q-11)',
   it('the committed catalogue-source.json names the commit extern/u8g2 is checked out at', () => {
     const recordPath = resolve(cliDir, 'src', 'data', 'catalogue-source.json');
     const record: unknown = JSON.parse(readFileSync(recordPath, 'utf8'));
-    expect(record).toEqual({ u8g2: readU8g2Source(submodulePath) });
+    expect(record).toEqual({ u8g2: readU8g2Source(u8g2Path) });
   });
 });
 
-describe.runIf(existsSync(resolve(releasePath, 'src', 'clib')))(
-  'U8G2 Arduino release layout',
-  () => {
-    it('resolves src/clib and src/U8g2lib.h', () => {
-      const layout = resolveU8g2Layout(releasePath);
-      expect(layout.clibDir).toBe(resolve(releasePath, 'src', 'clib'));
-      expect(layout.headerPath).toBe(resolve(releasePath, 'src', 'U8g2lib.h'));
-    });
-  }
-);
+describe('U8G2 Arduino release layout', () => {
+  it('resolves src/clib and src/U8g2lib.h in a synthetic release tree', () => {
+    // A synthetic tree, so the layout is tested identically on every machine.
+    const root = mkdtempSync(join(tmpdir(), 'u8g2gl-release-layout-'));
+    try {
+      mkdirSync(join(root, 'src', 'clib'), { recursive: true });
+      writeFileSync(join(root, 'src', 'U8g2lib.h'), '', 'utf8');
+
+      const layout = resolveU8g2Layout(root);
+      expect(layout.clibDir).toBe(join(root, 'src', 'clib'));
+      expect(layout.headerPath).toBe(join(root, 'src', 'U8g2lib.h'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -198,6 +198,32 @@ TEST(Button, RenderDegenerateGeometry) {
     EXPECT_EQ(display.draw_box_count, 0);
 }
 
+// WO4c ruling (H1): a border partly off the left and top edges is drawn with
+// explicitly wrapped origins, which U8G2 clips to the visible part.
+TEST(Button, BorderPartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_button btn;
+    btn.set_coords(-5, -2, 40, 16);   // default border width 1
+
+    U8G2 display;
+    btn.render(display);
+
+    ASSERT_EQ(display.draw_rframe_count, 1);
+    EXPECT_EQ(display.last_draw_rframe_x, 65531);
+    EXPECT_EQ(display.last_draw_rframe_y, 65534);
+    EXPECT_EQ(display.last_draw_rframe_w, 40);
+    EXPECT_EQ(display.last_draw_rframe_h, 16);
+
+    // Nested borders: every layer is drawn, the outer one wrapped.
+    u8g2gl_button nested;
+    nested.set_coords(-1, 0, 40, 16);
+    nested.set_border_width(2);
+    U8G2 display2;
+    nested.render(display2);
+    EXPECT_EQ(display2.draw_rframe_count, 2);
+    EXPECT_EQ(display2.last_draw_rframe_x, 0);   // inner layer at (-1 + 1, 0 + 1)
+    EXPECT_EQ(display2.last_draw_rframe_y, 1);
+}
+
 TEST(Button, InheritsFromObj) {
     u8g2gl_button btn;
     btn.set_coords(2, 4, 40, 15);
