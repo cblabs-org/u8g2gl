@@ -5,7 +5,7 @@ title: "The runtime compiles against real U8G2: submodule, real-header target, s
 branch: u8g2gl-generator/wo4c-real-u8g2
 base: u8g2gl-generator/wo8-realisation-capacities (PA review commit; stack tip after WO7)
 complexity: standard
-status: complete
+status: dispatched
 ---
 
 # WO4c — The runtime compiles against real U8G2
@@ -182,6 +182,39 @@ Architect's stated premise ("jumps off the right edge") is recorded in PROJECT.m
 - [x] **H8 — no machine-local catalogue source.** Remove the optional test path that reads
       departures-board's U8G2 copy when present; the catalogue tests use `extern/u8g2` only,
       so the suite behaves the same on every machine.
+
+## PA ruling after the second pass — lines clip before they convert (resolves N1)
+
+**Status was `complete`; this section re-dispatches WO4c for one narrow item.**
+
+The second pass reported N1, and the PA confirmed it in the pinned source.
+`u8g2_DrawLine` (`extern/u8g2/csrc/u8g2_line.c`) states at line 49 "no intersection check
+at the moment, should be added...", computes `dx`/`dy` from **unsigned** coordinates
+(lines 51–52), and loops pixel by pixel from `x1` to `x2` (line 78). A line from (−2, 0)
+to (10, 10) arrives with `x1 = 65534`, so `dx` becomes 65524: about 65,000 iterations and a
+visible part drawn almost flat. The explicit-wrap ruling is right for every primitive that
+reaches `u8g2_DrawHVLine` → `u8g2_clip_intersection2`; `u8g2_DrawLine` does not, so lines
+need their own rule. Outline triangles, composed from `drawLine`, inherit it. Filled
+triangles take signed `int16_t` vertices and are unaffected.
+
+- [ ] **Clip the segment to the display in signed arithmetic before converting.** In
+      `u8g2gl_draw_line` (and the outline-triangle path that composes lines), clip the
+      segment against `[0, width-1] × [0, height-1]` using the display's own dimensions,
+      computing in `int32_t` so nothing overflows. A segment wholly outside is not drawn;
+      a clipped segment's endpoints are then non-negative and inside the display, and
+      convert through the existing size-safe conversion — never `u8g2gl_coord_pos`'s wrap.
+      Clipping to the display is enough: `u8g2_DrawPixel`'s own `user_x0/x1` checks still
+      apply the clip window to each plotted pixel.
+- [ ] **One implementation, documented.** The clipping lives in one function, with a
+      comment citing `u8g2_line.c:49–52` and `:78` as the reason lines cannot take a wrapped
+      endpoint, and stating that the slope is preserved (clipping must not re-quantise the
+      line differently from U8G2 drawing the full segment where both are on-screen).
+- [ ] **Tests.** A line from (−2, 0) to (10, 10) reaches the stub with both endpoints inside
+      the display and no value ≥ 32768; a line wholly off-screen is not drawn; a line fully
+      on-screen is passed through unchanged; an outline triangle with one vertex off the
+      left edge draws three in-display lines. The first test must fail against `62dd06b`.
+- [ ] **Confirm the stub's display-dimension getters** use real U8G2's types; if they do
+      not, correct them with explicit conversions at the call site.
 
 ## Strict Boundary Box
 

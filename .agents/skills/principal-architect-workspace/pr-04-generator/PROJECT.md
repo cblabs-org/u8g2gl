@@ -786,6 +786,40 @@ include an element partly off the left edge, which checks this directly on real 
 | H9 | Stale state-saver comments outside the box (WO4b G3) | **End-of-PR readability review** |
 | §11.3 | Still says `x+w-1, y+h-1` and that the state saver saves the clip | **Chief Architect** (carried from WO4b) |
 
+### WO4c — second pass (`62dd06b`); re-dispatched for lines
+
+**Verified independently:** commits only on the WO4c branch; `docs/`, `PROGRAM*.md`,
+manifests and CLI source untouched; C++ **301**, zero warnings, including
+`RealU8g2.RuntimeCompilesAgainstRealHeaders`; CLI 602, `tsc` and lint clean. The helper set
+is `u8g2gl_coord_pos` (explicit wrap, citing the U8G2 source), `u8g2gl_coord_size`,
+`u8g2gl_coord_clamp`, `u8g2gl_coord_span`; the skip helper is gone. H3, H6, H8 closed. The
+worker also compiled every runtime source against the real headers with
+`-Wconversion -Wsign-conversion` added and got no diagnostics — beyond what was asked.
+
+**N1 — the PA's wrap ruling was too broad, confirmed in source.** `u8g2_DrawLine`
+(`extern/u8g2/csrc/u8g2_line.c`) says at line 49 "no intersection check at the moment,
+should be added...", computes `dx`/`dy` from unsigned coordinates (lines 51–52), and loops
+pixel by pixel from `x1` to `x2` (line 78). A line from (−2, 0) to (10, 10) arrives with
+`x1 = 65534`: about 65,000 iterations and a nearly flat visible part. The first pass had
+skipped such lines (wrong, but cheap); the second pass passes them wrapped (wrong and
+slow). The wrap ruling holds for every primitive reaching `u8g2_DrawHVLine` →
+`u8g2_clip_intersection2`; `u8g2_DrawLine` has no such path.
+
+**PA ruling:** lines, and the outline triangles composed from them, clip the segment to the
+display in signed `int32_t` arithmetic before converting, so the endpoints U8G2 receives
+are non-negative and in range; `u8g2_DrawPixel` still applies the clip window per pixel.
+Filled triangles take signed `int16_t` vertices and are unaffected. Re-dispatched to WO4c as
+one narrow item.
+
+**Lesson recorded.** Two successive PA rulings on this conversion were each right for most
+primitives and wrong for one. Both errors were found by reading the drawing path each
+primitive actually takes, not by reasoning about "U8G2" as one thing. PR-06's
+container-edge pixel test must include **a line partly off the left edge** as well as a
+frame, so real pixels confirm both rules.
+
+**Carried:** N2 (8-bit U8G2 builds would wrap positions above 255 into view) — **accepted**,
+the pinned 2.36.18 forces 16-bit. H5, H7, H9 and §11.3 unchanged from the first-pass triage.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -805,6 +839,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-15 — **WO4c second pass** (`62dd06b`, report `2e8c5d6`). Verified
+  independently. N1 confirmed in the pinned source: `u8g2_DrawLine` cannot take a wrapped
+  endpoint. **PA ruling:** lines clip to the display in signed arithmetic before
+  converting. WO4c re-dispatched for that one item.
 - 2026-09-15 — **WO4c first pass** (`7924d24`, report `f286f80`), status `partial`;
   interrupted once by an API usage limit and resumed with its context. Verified
   independently, including a fresh configure. **PA ruling from pinned U8G2 source:** draw
