@@ -45,7 +45,7 @@
  *
  *              | Value                                   | Conversion              |
  *              |-----------------------------------------|-------------------------|
- *              | origin, end point, centre               | u8g2gl_coord_pos():     |
+ *              | origin, centre                          | u8g2gl_coord_pos():     |
  *              |                                         | explicit wrap, U8G2     |
  *              |                                         | draws the visible part  |
  *              | width, height, length, circle radius    | u8g2gl_coord_size():    |
@@ -53,10 +53,15 @@
  *              |                                         | nothing                 |
  *              | filled triangle vertices (drawTriangle) | none — U8G2 takes       |
  *              |                                         | int16_t                 |
+ *              | line end points (drawLine, and outline  | clipped to the display  |
+ *              | triangle edges)                         | in signed arithmetic,   |
+ *              |                                         | then u8g2gl_coord_clamp;|
+ *              |                                         | never wrapped           |
  *
  *              The same rules apply to the widgets that issue these U8G2 calls
- *              directly. The clip window is the exception: u8g2gl_apply_clip()
- *              clamps both corners.
+ *              directly. Two exceptions to the wrap: u8g2gl_apply_clip() clamps
+ *              both clip-window corners, and u8g2gl_draw_line() clips lines,
+ *              because U8G2's drawLine has no intersection check (u8g2_line.c).
  *
  * Exported Types:
  * - u8g2gl_draw_segment_t: Which arc/quadrant a circle or ellipse draws
@@ -169,6 +174,11 @@ void u8g2gl_draw_hline(U8G2& display, int16_t x, int16_t y, int16_t width);
  * Matches `include/u8g2gl/manifests/u8g2gl_line.xml`. U8G2's `drawLine`
  * accepts endpoints in either order, so there is no "inverted coordinates"
  * case to guard here.
+ *
+ * The segment is clipped to the display before it reaches U8G2, keeping its
+ * slope; a line wholly off the display draws nothing. U8G2's drawLine does not
+ * clip, so a negative end point cannot be passed to it wrapped as other
+ * primitives' positions are.
  *
  * @param display U8G2 display context to draw into.
  * @param x1      Start X coordinate.

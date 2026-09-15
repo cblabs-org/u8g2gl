@@ -379,10 +379,7 @@ TEST(DrawNegativeOrigin, PointPositionsWrapAndAreDrawn) {
     ASSERT_EQ(display.draw_pixel_count, 1);
     EXPECT_EQ(display.last_draw_pixel_x, 65535);
 
-    u8g2gl_draw_line(display, -2, 0, 10, -3);
-    ASSERT_EQ(display.draw_line_count, 1);
-    EXPECT_EQ(display.last_draw_line_x1, 65534);
-    EXPECT_EQ(display.last_draw_line_y2, 65533);
+    // Lines are the exception and never wrap: see DrawLineClip below.
 
     u8g2gl_draw_circle(display, -1, 10, 4, false);
     ASSERT_EQ(display.draw_circle_count, 1);
@@ -406,14 +403,95 @@ TEST(DrawNegativeOrigin, FilledTrianglePassesSignedVerticesThrough) {
     EXPECT_EQ(display.last_draw_triangle_x0, -5);
 }
 
-TEST(DrawNegativeOrigin, OutlineTriangleDrawsEveryEdgeWithWrappedEndpoints) {
+// --- Lines clip before they convert (WO4c, PA ruling after the second pass) ---
+// U8G2's drawLine has no intersection check and measures the line from unsigned
+// end points (u8g2_line.c:49–52, :78), so a wrapped end point draws a
+// 65,000-pixel run at the wrong slope. u8g2gl_draw_line() clips the segment to
+// the display (the stub reports 128 x 64) before converting.
+
+// Both end points of a recorded line lie on the 128 x 64 display, which also
+// rules out every wrapped value (>= 32768).
+static void expect_line_on_display(int x1, int y1, int x2, int y2) {
+    for (int x : { x1, x2 }) {
+        EXPECT_GE(x, 0);
+        EXPECT_LE(x, 127);
+    }
+    for (int y : { y1, y2 }) {
+        EXPECT_GE(y, 0);
+        EXPECT_LE(y, 63);
+    }
+}
+
+TEST(DrawLineClip, PartlyOffLeftEdgeReachesU8g2InsideDisplay) {
+    U8G2 display;
+    u8g2gl_draw_line(display, -2, 0, 10, 10);
+
+    ASSERT_EQ(display.draw_line_count, 1);
+    expect_line_on_display(display.last_draw_line_x1, display.last_draw_line_y1,
+                           display.last_draw_line_x2, display.last_draw_line_y2);
+    // The start moves along the true line to x = 0: y = 10 * 2 / 12 = 1.67 -> 2.
+    EXPECT_EQ(display.last_draw_line_x1, 0);
+    EXPECT_EQ(display.last_draw_line_y1, 2);
+    EXPECT_EQ(display.last_draw_line_x2, 10);   // the on-screen end is untouched
+    EXPECT_EQ(display.last_draw_line_y2, 10);
+}
+
+TEST(DrawLineClip, WhollyOffScreenLineIsNotDrawn) {
+    U8G2 display;
+    u8g2gl_draw_line(display, -10, -5, -1, -1);    // above and left
+    u8g2gl_draw_line(display, 130, 0, 140, 10);    // right of the display
+    u8g2gl_draw_line(display, 0, 64, 127, 90);     // below the display
+    EXPECT_EQ(display.draw_line_count, 0);
+}
+
+TEST(DrawLineClip, FullyOnScreenLineIsPassedThroughUnchanged) {
+    U8G2 display;
+    u8g2gl_draw_line(display, 3, 4, 120, 60);
+    ASSERT_EQ(display.draw_line_count, 1);
+    EXPECT_EQ(display.last_draw_line_x1, 3);
+    EXPECT_EQ(display.last_draw_line_y1, 4);
+    EXPECT_EQ(display.last_draw_line_x2, 120);
+    EXPECT_EQ(display.last_draw_line_y2, 60);
+
+    // The display's corners are on the display, not beyond it.
+    u8g2gl_draw_line(display, 0, 0, 127, 63);
+    ASSERT_EQ(display.draw_line_count, 2);
+    EXPECT_EQ(display.last_draw_line_x2, 127);
+    EXPECT_EQ(display.last_draw_line_y2, 63);
+}
+
+TEST(DrawLineClip, LineCrossingBothSidesIsClippedAtEachEnd) {
+    U8G2 display;
+    u8g2gl_draw_line(display, -10, 32, 200, 32);
+    ASSERT_EQ(display.draw_line_count, 1);
+    EXPECT_EQ(display.last_draw_line_x1, 0);
+    EXPECT_EQ(display.last_draw_line_y1, 32);
+    EXPECT_EQ(display.last_draw_line_x2, 127);
+    EXPECT_EQ(display.last_draw_line_y2, 32);
+}
+
+TEST(DrawLineClip, OutlineTriangleVertexOffLeftDrawsThreeInDisplayLines) {
     U8G2 display;
     u8g2gl_draw_triangle(display, -5, 0, 10, 0, 5, 10, false);
-    // All three edges are drawn; the two touching x = -5 carry it wrapped.
+
     ASSERT_EQ(display.draw_line_count, 3);
-    EXPECT_EQ(display.draw_line_x1[0], 65531);
+    for (int i = 0; i < 3; ++i) {
+        expect_line_on_display(display.draw_line_x1[i], display.draw_line_y1[i],
+                               display.draw_line_x2[i], display.draw_line_y2[i]);
+    }
+    // Edge v0-v1 (-5, 0)-(10, 0): clipped at x = 0.
+    EXPECT_EQ(display.draw_line_x1[0], 0);
+    EXPECT_EQ(display.draw_line_y1[0], 0);
+    EXPECT_EQ(display.draw_line_x2[0], 10);
+    // Edge v1-v2 is wholly on screen and unchanged.
     EXPECT_EQ(display.draw_line_x1[1], 10);
-    EXPECT_EQ(display.draw_line_x2[2], 65531);
+    EXPECT_EQ(display.draw_line_x2[1], 5);
+    EXPECT_EQ(display.draw_line_y2[1], 10);
+    // Edge v2-v0 (5, 10)-(-5, 0): its end moves along the line to (0, 5).
+    EXPECT_EQ(display.draw_line_x1[2], 5);
+    EXPECT_EQ(display.draw_line_y1[2], 10);
+    EXPECT_EQ(display.draw_line_x2[2], 0);
+    EXPECT_EQ(display.draw_line_y2[2], 5);
 }
 
 TEST(DrawTriangle, DegenerateZeroAreaDoesNotCrash) {

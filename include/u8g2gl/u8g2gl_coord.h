@@ -15,9 +15,11 @@
  *          a warning, so every conversion in the runtime goes through a helper
  *          here, named for what the value IS (WO4c):
  *
- *          - a POSITION (origin, end point, centre) — u8g2gl_coord_pos(): an
- *            explicit two's-complement wrap, because U8G2 is built to take a
- *            negative position that way and clip it to the visible part;
+ *          - a POSITION (origin, centre) — u8g2gl_coord_pos(): an explicit
+ *            two's-complement wrap, because U8G2 is built to take a negative
+ *            position that way and clip it to the visible part. A LINE END
+ *            POINT is the exception: u8g2gl_draw_line() clips the segment to
+ *            the display first and converts with u8g2gl_coord_clamp();
  *          - a SIZE (width, height, length, circle radius) — u8g2gl_coord_size():
  *            <= 0 is refused (nothing to draw), and so is a size u8g2_uint_t
  *            cannot hold; the caller then draws nothing;
@@ -65,7 +67,8 @@ inline constexpr int32_t U8G2GL_U8G2_COORD_MAX =
  * @brief Convert a draw POSITION — an origin, end point or centre — by an
  *        explicit two's-complement wrap.
  *
- * RULE: every draw position reaches U8G2 through this one conversion, and it
+ * RULE: every draw position except a line end point (see below) reaches U8G2
+ * through this one conversion, and it
  * wraps ON PURPOSE: -5 becomes 65531. A shape partly off the left or top edge is
  * therefore drawn, and U8G2 draws only its visible part. Nothing is clamped,
  * shortened or skipped here.
@@ -89,9 +92,13 @@ inline constexpr int32_t U8G2GL_U8G2_COORD_MAX =
  * The marquee depends on this: a scrolling label draws at x_ - scroll_x_, which
  * is negative on every step once it starts.
  *
- * The clip window is the exception, and does NOT use this: setClipWindow() with
- * a wrapped near corner would not clip, so u8g2gl_apply_clip() clamps both
- * corners with u8g2gl_coord_clamp().
+ * Two exceptions do NOT use this:
+ * - The clip window: setClipWindow() with a wrapped near corner would not clip,
+ *   so u8g2gl_apply_clip() clamps both corners with u8g2gl_coord_clamp().
+ * - Line end points: u8g2_line.c's u8g2_DrawLine() has no intersection check
+ *   and measures the line from unsigned end points, so it never reaches
+ *   u8g2_clip_intersection2(). u8g2gl_draw_line() clips the segment to the
+ *   display in signed arithmetic, then converts with u8g2gl_coord_clamp().
  *
  * @param value Signed position, in the range of int16_t geometry.
  * @return @p value modulo 2^N, where N is the width of u8g2_uint_t.
@@ -122,7 +129,8 @@ inline bool u8g2gl_coord_size(int32_t value, u8g2_uint_t& out) {
 /**
  * @brief Clamp a BOUND or CORNER RADIUS into U8G2's coordinate range.
  *
- * For clip-window corners, which must not wrap (see u8g2gl_coord_pos()), and for
+ * For clip-window corners and clipped line end points, which must not wrap (see
+ * u8g2gl_coord_pos()), and for
  * the corner radius of a rounded box, where 0 is a valid value meaning square
  * corners rather than an empty shape.
  *
