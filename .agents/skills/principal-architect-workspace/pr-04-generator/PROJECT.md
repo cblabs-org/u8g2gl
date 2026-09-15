@@ -73,7 +73,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** ✅ `6b5d562` · base WO5b · standard · [D-7], [D-20]
 - [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
 - [x] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** ✅ `7924d24`, `62dd06b`, `468e386` · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
-- [ ] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
+- [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7b · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
@@ -854,6 +854,76 @@ a `ctest` acceptance check; Q-11 is closed; `THIRD-PARTY-NOTICES.md` exists.
 PR-05/PR-06), H9 (stale state-saver comments → end-of-PR readability review), N2 (8-bit
 wrap, unreachable on 2.36.18), and §11.3's clip text for the Chief Architect.
 
+### WO7b — complete (`9970859`)
+
+**Verified independently:** commits only on the WO7b branch; runtime C++, `extern/`,
+`docs/` and `PROGRAM*.md` untouched; C++ 305 unchanged, zero warnings; CLI 602 → **641**,
+`tsc` and lint clean. The worker's new and changed tests fail 31 of 71 at the base, the
+remainder being deliberate controls. **End to end through the built CLI** against a project
+with a 256-wide and a 128-wide target:
+
+- `right=` on a `u8g2gl_line` → `U8G2GL_INAPPLICABLE_ANCHOR`;
+- a label with `width` and no `x` → `U8G2GL_UNRESOLVED_GEOMETRY`;
+- a constant named `screen_width` → `U8G2GL_INVALID_NAME`;
+- `hcenter="yes"` → `U8G2GL_INVALID_ENUM_VALUE`;
+- a clean screen validates, and `validate` reports the target it checked — human output
+  "Geometry checked against target 'small' (…, 128x64)", and a `target` object in `--json`;
+- a 200-wide label: `generate --target` 256-wide exits 0; 128-wide exits 1 with
+  `U8G2GL_OUT_OF_BOUNDS`.
+
+**Delivered:** new codes `U8G2GL_INAPPLICABLE_ANCHOR`, `U8G2GL_UNRESOLVED_GEOMETRY`,
+`U8G2GL_COORDINATE_OUT_OF_RANGE` (checked before, and separately from, container bounds;
+an axis that fails it is not bounds-checked), `U8G2GL_UNSUBSTITUTED_PROP`; constants
+validated at declaration; substituted font/image/style/enum arguments checked;
+`hidden="$p"` survives parsing and gets the boolean rule after expansion; the [D-20]
+bound-geometry rule on the expanded tree; each check on the template or the expanded tree,
+never both, with "reported once" tests.
+
+**Fixture edits accepted.** Both valid fixture projects violated the new normative rules —
+they declared `screen_width`/`screen_height`, left `header_bar` unpositioned, and declared a
+prop both `required` and defaulted. The worker fixed the fixtures, not the rules, and no
+location assertion moved. Two tests that asserted anchors on any element now assert the
+rectangular-only rule. Correct: the fixtures were wrong under §7.2.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| — | §13.2 says the `int16_t` rule covers "any anchor or constant", then that only a *result* must fit; WO7b checks resolved `x`/`y`/`width`/`height` only | **Chief Architect** — which values must fit `int16_t` |
+| 1 | Composite expansion now runs **four** times per `validate` | **Proposed WO8a** — expand once; more urgent than when WO7 first reported it |
+| 2 | Line and triangle endpoints and circle/ellipse radii are never resolved: no expressions, no `int16_t` check, no bounds check | **Proposed WO8a** — a gap in §7.2's "every element fully positioned" for non-rectangular elements, and WO9/WO10 cannot emit a draw call without literal arguments |
+| 3 | `hidden` is not a strict boolean (`hidden="yes"` becomes `false`); a `hidden="$p"` written directly in a screen stays text unreported | **Proposed WO8a** — the same strictness §7.2 gives `hcenter` |
+| 4 | A `$name` in a screen (outside any composite) is silently skipped for font/image/style/enum attributes | **Proposed WO8a** |
+| 5 | Pass 4 still reports a missing required prop on an instance when the prop has a default, so the now-invalid declaration reads as two defects | **Proposed WO8a** |
+| 6 | A `<style name="$s">` child is not checked after substitution | **Proposed WO8a** |
+| 7 | `generate()` step 3 still resolves unexpanded screens (WO7 F2) | **Proposed WO8a** — with 1 |
+| 8 | WORKORDER named `schema/diagnostic.ts` for `cli/src/core/schema/diagnostic.ts` | **Accepted** — the PA's shorthand |
+| 9 | New tests avoid `wd_` composite names because full `validate` rejects them | **Chief Architect** — WO7 S1, still open |
+
+### Proposed split — WO8a / WO8b (awaiting the owner)
+
+WO8's own scope — realisation with reason codes, flattening, [D-21] capacities and
+per-subject `_n<N>` observer counts — is the most consequential analysis in PR-04
+(constraint 3: "price it honestly"). It already carries WO5a's drawing predicate and
+overload selection, WO6's resolve-once, and WO7's mangling wiring, expand-once and flag
+set. WO7b's findings add seven more. One diff containing all of it would not be reviewable,
+which is the reason the owner approved splitting WO5.
+
+**WO8a — one pipeline.** Expand once and resolve once, shared by `validate` and `generate`
+(WO7 F2/F3, WO7b 1/7, WO6 11); wire `mangleIdentifiers` in and retire the one-level check
+(WO7 F1); one drawing-element predicate and one flag set on the registry (WO5a, WO7 F8);
+resolve line/triangle endpoints and radii with the `int16_t` and bounds checks (WO7b 2);
+strict `hidden` and `$`-placeholders outside composites (WO7b 3, 4); the required-with-default
+double report and `<style name="$s">` (WO7b 5, 6). Validator, resolver and generator
+plumbing only — no realisation, no emission.
+
+**WO8b — realisation and capacities.** WO8's own line items as drafted, on top of the single
+pipeline, including overload selection by subject type (WO5a).
+
+Recommended order: WO8a → WO8b. Realisation must consume one expanded, fully resolved,
+mangled model; building it before that model exists would mean writing it twice. **If the
+owner declines**, WO8 proceeds as one work order carrying all of the above.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -873,6 +943,9 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-15 — **WO7b complete** (`9970859`, report `c4f359d`). Verified independently,
+  including end to end through the built CLI. **WO8 split proposed (WO8a / WO8b) and held
+  for the owner** — WO8 now carries eleven items beyond its own scope. Not dispatched.
 - 2026-09-15 — **WO4c complete** after a third pass (`468e386`, report `c5f5d7c`).
   Verified independently. WO7b dispatched on `u8g2gl-generator/wo7b-geometry-contract`.
 - 2026-09-15 — **WO4c second pass** (`62dd06b`, report `2e8c5d6`). Verified
