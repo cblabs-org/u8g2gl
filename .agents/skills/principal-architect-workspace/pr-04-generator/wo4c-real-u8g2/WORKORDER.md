@@ -5,7 +5,7 @@ title: "The runtime compiles against real U8G2: submodule, real-header target, s
 branch: u8g2gl-generator/wo4c-real-u8g2
 base: u8g2gl-generator/wo8-realisation-capacities (PA review commit; stack tip after WO7)
 complexity: standard
-status: partial
+status: dispatched
 ---
 
 # WO4c — The runtime compiles against real U8G2
@@ -127,6 +127,61 @@ real headers as an acceptance test, and fix what that exposes.
       metadata field the loader ignores) — say which and why. Rebuild the catalogue from the
       submodule; if the regenerated data differs from what is committed, explain the
       difference rather than committing it silently.
+
+## PA ruling after the first pass — draw positions wrap explicitly (resolves S1 and H1)
+
+**Status was `partial`; this section re-dispatches WO4c to finish.**
+
+The first pass stopped on S1 (text cannot follow "no conversion may silently wrap") and
+reported H1 (the "skip" choice now hides outlines, rounded boxes, bitmaps and circles that
+are partly off the left or top edge). The PA read the pinned U8G2 2.36.18 source in
+`extern/u8g2/csrc/`, and it settles both:
+
+- `u8g2_clip_intersection2` (`u8g2_hvline.c:87–99`) handles the `a > b` case explicitly,
+  and its comment states that replacing that branch with `return 0` "will not handle the
+  case with negative a" — U8G2 deliberately accepts a negative origin arriving as a
+  wrapped `u8g2_uint_t` and clips it to the visible part.
+- `u8g2_is_intersection_decision_tree` (`u8g2_intersection.c`) treats a wrapped span
+  (`v0 > v1`) as intersecting.
+- `u8g2_DrawFrame`/`u8g2_DrawBox`/rounded variants (`u8g2_box.c`), XBM drawing
+  (`u8g2_bitmap.c`) and glyph decoding (`u8g2_font.c`) all go through `u8g2_IsIntersection`
+  and then `u8g2_DrawHVLine` → `u8g2_clip_intersection2`. Circle outlines plot per pixel via
+  `u8g2_DrawPixel`, where a wrapped negative coordinate fails `x >= user_x1` and is
+  correctly not drawn; discs use `u8g2_DrawVLine`/`HVLine` and clip.
+
+So on real U8G2 a shape partly off the left or top edge **draws its visible part** when
+its origin arrives wrapped. The WORKORDER's "no conversion may silently wrap: clamp,
+shorten or skip" was the PA's wording, not the Chief Architect's ruling (which required
+explicit conversions and clip clamping at both corners) — and "skip" is what introduced
+H1's visible regression. The ruling below corrects that; the discrepancy with the Chief
+Architect's stated premise ("jumps off the right edge") is recorded in PROJECT.md.
+
+- [ ] **Draw positions convert through one explicit, documented wrap.** Replace the
+      per-primitive clamp/shorten/skip choices for **draw origins and end points** with a
+      single explicit conversion (generalise `u8g2gl_coord_text()` or rename it) that
+      performs the two's-complement wrap on purpose. Its comment cites the source evidence
+      above by file and function. "Explicit" is the requirement; wrapping is correct
+      because U8G2 is designed for it.
+- [ ] **Sizes are not origins.** A width, height, radius or length `<= 0` is still skipped
+      (nothing to draw), and a size that does not fit `u8g2_uint_t` is still refused — state
+      the rule at the helper.
+- [ ] **The clip window keeps its clamping** at both corners (`u8g2gl_apply_clip`) —
+      `setClipWindow` with a wrapped near corner would not clip correctly, and this was the
+      Chief Architect's explicit instruction. Unchanged.
+- [ ] **Tests follow the rule.** The degenerate-input tests now assert the **explicitly
+      wrapped** value reaches the stub for draw origins (e.g. a box at x = −5 records 65531)
+      and that the draw is **not skipped**; clip tests still assert clamping. Remove or
+      invert the assertions that required skipping. H1's affected widgets (switch, button
+      border, progress-bar track, XBM) get a partly-off-edge test each.
+- [ ] **H3 — stub measurement getters.** `getUTF8Width`, `getAscent`/`getDescent` and
+      similar return `u8g2_uint_t` or `int8_t` as real `U8g2lib.h` does, with explicit
+      conversions at each call site.
+- [ ] **H6 — fresh clones.** If `extern/u8g2` is not initialised, CMake configure fails with
+      a clear message naming `git submodule update --init extern/u8g2`, rather than an
+      opaque missing-header error.
+- [ ] **H8 — no machine-local catalogue source.** Remove the optional test path that reads
+      departures-board's U8G2 copy when present; the catalogue tests use `extern/u8g2` only,
+      so the suite behaves the same on every machine.
 
 ## Strict Boundary Box
 

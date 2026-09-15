@@ -731,6 +731,61 @@ awaiting owner confirmation)*" now reads "confirmed by the owner 2026-09-14".
 in the stack: WO4c → WO7b → WO8. The stack is serial and WO4c touches no file WO5a–WO7 did,
 so placing it at the tip avoids rebasing finished work orders a second time.
 
+### WO4c — first pass (`7924d24`), `partial`; re-dispatched
+
+**Verified independently:** commits only on the WO4c branch; `docs/`, `PROGRAM*.md` and
+manifests untouched; `extern/u8g2` pinned at `d66b49af3e48` (2.36.18); `getFont` survives
+only in comments. **Fresh configure and build:** zero warnings, **300** C++ tests including
+`RealU8g2.RuntimeCompilesAgainstRealHeaders`, which the worker showed fails on the base
+with exactly `no member named 'getFont' in 'U8G2'`. CLI 596 → **602**, `tsc` and lint
+clean. The rebuilt catalogue is byte-identical; its U8G2 tag and commit are recorded in
+`cli/src/data/catalogue-source.json`, leaving the `CATALOGUE` export's shape unchanged —
+**Q-11 closed**. `THIRD-PARTY-NOTICES.md` added. `u8g2gl_coord.h` holds only the
+conversion helpers.
+
+**S1 and H1 settled from the pinned source — and the PA's instruction was wrong.** WO4c's
+WORKORDER said "no conversion may silently wrap: clamp, shorten or skip". The worker could
+not apply that to text (a scrolling label draws at negative x every step) and reported that
+"skip" now hides outlines, rounded boxes, bitmaps and circles partly off the left or top
+edge. Reading `extern/u8g2/csrc/`:
+
+- `u8g2_clip_intersection2` (`u8g2_hvline.c:87–99`) handles `a > b` explicitly; its comment
+  says a plain `return 0` "will not handle the case with negative a";
+- `u8g2_is_intersection_decision_tree` treats a wrapped span as intersecting;
+- frames, boxes, XBM and glyphs all reach `u8g2_DrawHVLine` → `u8g2_clip_intersection2`;
+  circle outlines plot per pixel, where a wrapped negative pixel is correctly off-screen.
+
+**U8G2 is designed to take a negative origin as a wrapped `u8g2_uint_t` and draw the
+visible part.** So the PA's "skip" choice introduced a visible regression (H1), and S1's
+explicit text wrap is correct rather than an exception. **PA ruling:** draw origins and end
+points convert through one explicit, documented wrap citing that source; sizes `<= 0` are
+still skipped; the clip window keeps its clamping at both corners, exactly as the Chief
+Architect ruled. WO4c re-dispatched on the same branch to apply it.
+
+**For the Chief Architect — premise correction.** The WO4c ruling stated that on hardware
+a negative origin wraps so "an element partly off the left edge jumps off the right edge".
+For every drawing path above, U8G2's clipping handles the wrap and draws only the visible
+part. The ruling's instructions — explicit conversions, clip clamped at both corners — stand
+and are followed; only that stated consequence does not hold, and it is what led the PA to
+write "skip". Recorded, not applied silently. PR-06's container-edge pixel test should
+include an element partly off the left edge, which checks this directly on real U8G2.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| S1 | Text positions cannot follow "no silent wrap" | **Resolved by the ruling above** — explicit wrap is correct, for text and every draw origin |
+| H1 | "Skip" hides partly-off-edge outlines, rounded boxes, XBM, circles | **Resolved by the ruling above** — re-dispatched to WO4c, with a partly-off-edge test per affected widget |
+| H2 | The real-header target exposed only `getFont`; other stub mismatches were implicit conversions, now corrected in the stub | **Accepted** — the retyped stub and tests are what catch narrowing; the header check cannot |
+| H3 | Stub measurement getters still return `int` | **WO4c follow-up** |
+| H4 | U8G2 2.36.18 forces 16-bit coordinates, so WO4b's 8-bit G4 cannot occur | **Accepted** — G4 closed as not reachable on the pinned version |
+| H5 | Only the Arduino build is compiled against real headers; ESP-IDF and the Wasm editor are not | **PR-06** (Wasm build) and **PR-05** (integration), recorded |
+| H6 | A fresh clone fails to configure until the submodule is initialised | **WO4c follow-up** — a clear configure-time message; contributor docs at the end-of-PR review |
+| H7 | `u8g2gl_coord.h` needs U8G2 on the include path | **Accepted** — every runtime translation unit already requires U8G2 |
+| H8 | One catalogue test reads departures-board's U8G2 copy when present | **WO4c follow-up** — a machine-dependent test is nondeterminism |
+| H9 | Stale state-saver comments outside the box (WO4b G3) | **End-of-PR readability review** |
+| §11.3 | Still says `x+w-1, y+h-1` and that the state saver saves the clip | **Chief Architect** (carried from WO4b) |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -750,6 +805,12 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-15 — **WO4c first pass** (`7924d24`, report `f286f80`), status `partial`;
+  interrupted once by an API usage limit and resumed with its context. Verified
+  independently, including a fresh configure. **PA ruling from pinned U8G2 source:** draw
+  origins wrap explicitly (U8G2 clips negative-as-wrapped by design); the WORKORDER's
+  "skip" wording caused a visible regression and is withdrawn. WO4c re-dispatched to
+  finish, with H3, H6, H8.
 - 2026-09-14 — **Rulings on WO4c and WO7b received** (`main` @ `5f2574f`); owner's U8G2
   dependency decision recorded. **Stack rebased onto `main` @ `5f2574f`** with
   `--update-refs`: 40 commits, no conflicts (no file shared with `main`), all ten branches
