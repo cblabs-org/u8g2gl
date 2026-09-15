@@ -16,6 +16,11 @@
  *              hard error, not a tunable, since it comes from `parent_index_`
  *              being a `uint8_t`.
  *
+ *              Declarations are checked where they are declared (PR-04 WO7b): an
+ *              `<int>` constant's value must be an integer literal within int32,
+ *              the four built-in constant names are reserved (§7.2), and a prop
+ *              may not be both `required` and defaulted.
+ *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
  */
@@ -23,8 +28,9 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropType } from '../schema/widget-manifest.js';
+import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../manifest/manifest-registry.js';
+import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
@@ -162,6 +168,27 @@ function createDiagnostic(
     ...(offendingText ? { offendingText } : {}),
     ...(suggestions && suggestions.length > 0 ? { suggestions } : {}),
   };
+}
+
+// checkRequiredWithDefault
+// A prop declaring both `required="true"` and a `default` (PR-04 WO7 F10). A
+// required prop is always given, so its default can never apply, and expansion
+// and Pass 4 disagreed about whether an instance omitting it is missing it. An
+// error at the declaration; OVERCONSTRAINED, as for a prop declaring both
+// `setter` and `draw` — one declaration saying two incompatible things.
+//   prop  — the declared prop
+//   owner — prose naming its manifest: "composite 'card'"
+function checkRequiredWithDefault(prop: PropDef, owner: string): Diagnostic | undefined {
+  if (prop.required !== true || prop.default === undefined) {
+    return undefined;
+  }
+  return createDiagnostic(
+    DIAGNOSTIC_CODES.OVERCONSTRAINED,
+    `Prop '${prop.name}' in ${owner} declares both required="true" and default="${prop.default}"; ` +
+      `a required prop is always given, so its default can never apply. Remove one.`,
+    prop.loc,
+    'required, default',
+  );
 }
 
 /**
@@ -304,6 +331,45 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             `Missing required attribute 'value' on const '${c.name}'.`,
             c.loc,
             'value',
+          ),
+        );
+      } else if (c.type === 'int') {
+        // §7.2: constants are validated where they are declared, not only where
+        // used — an unused bad constant was otherwise never reported. The literal
+        // rule is the resolver's own, so declaration and use cannot disagree.
+        const literal = integerLiteralValue(c.value);
+        if (literal === undefined) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.NON_INTEGER_CONSTANT,
+              `Constant '${c.name}' is an <int> whose value '${c.value}' is not an integer literal (§7.2).`,
+              c.loc,
+              c.value,
+            ),
+          );
+        } else if (literal < INT32_MIN || literal > INT32_MAX) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.INTEGER_OVERFLOW,
+              `Constant '${c.name}' has value ${c.value}, outside the int32_t range ` +
+                `(${INT32_MIN}..${INT32_MAX}) an <int> holds (§13.2).`,
+              c.loc,
+              c.value,
+            ),
+          );
+        }
+      }
+      // §7.2: the built-in constant names are reserved. A <const> of that name
+      // could never be used — the built-in always wins — so it is an error at the
+      // declaration rather than a silent shadow.
+      if (c.name && BUILTIN_CONSTANTS.includes(c.name)) {
+        diagnostics.push(
+          createDiagnostic(
+            DIAGNOSTIC_CODES.INVALID_NAME,
+            `Constant name '${c.name}' is reserved: '#${c.name}' is a built-in the resolver supplies ` +
+              `(§7.2), so this declaration could never be used. Rename it.`,
+            c.loc,
+            c.name,
           ),
         );
       }
@@ -547,6 +613,10 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           ),
         );
       }
+      const contradiction = checkRequiredWithDefault(prop, `composite '${component.name}'`);
+      if (contradiction) {
+        diagnostics.push(contradiction);
+      }
     }
   }
 
@@ -645,6 +715,10 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             Array.from(VALID_PROP_TYPES),
           ),
         );
+      }
+      const contradiction = checkRequiredWithDefault(prop, `widget '${manifest.name}'`);
+      if (contradiction) {
+        diagnostics.push(contradiction);
       }
       // A property reaches the display through exactly one of two emission
       // targets ([D-18], §13.1): `setter` for a method on the element's own

@@ -14,14 +14,16 @@
  *              Isomorphic.
  *
  * Exports:
- * - INT32_MIN, INT32_MAX, BUILTIN_CONSTANTS, ContainerSize, EvaluationScope,
- *   ExpressionSite, Evaluation, buildConstantTable, evaluateExpression (expression.ts)
- * - Provenance, ResolvedCoordinate, ResolvedGeometry, Container, ResolvedElement,
- *   ResolvedScreen, ResolverContext, ResolveInput, ResolveResult, DiagnosticAnnotator,
- *   isCentringOn, findTargetDisplay, createResolverContext, displayContainer,
+ * - INT32_MIN, INT32_MAX, INT16_MIN, INT16_MAX, integerLiteralValue, BUILTIN_CONSTANTS,
+ *   ContainerSize, EvaluationScope, ExpressionSite, Evaluation, buildConstantTable,
+ *   evaluateExpression (expression.ts)
+ * - Provenance, ResolvedCoordinate, ResolvedGeometry, Container, DeferredCoordinate,
+ *   AxisOutcome, ResolvedElement, ResolvedScreen, ResolverContext, ResolveInput,
+ *   ResolveResult, DiagnosticAnnotator, isCentringOn, isRectangular, findTargetDisplay,
+ *   createResolverContext, displayContainer,
  *   resolveElements, resolveScreens (resolve.ts)
  * - InstantiationSite, formatLocation, formatInstantiation, withInstantiation (provenance.ts)
- * - PropArgument, ExpandedElement, ExpandedScreen, ExpansionInput, ExpansionResult,
+ * - PropArgument, Substitution, ExpandedElement, ExpandedScreen, ExpansionInput, ExpansionResult,
  *   expandScreens, walkExpanded (expand.ts)
  * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS, SCREEN_FUNCTIONS, SCREEN_TABLES,
  *   IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
@@ -32,6 +34,9 @@
 export {
   INT32_MIN,
   INT32_MAX,
+  INT16_MIN,
+  INT16_MAX,
+  integerLiteralValue,
   BUILTIN_CONSTANTS,
   buildConstantTable,
   evaluateExpression,
@@ -42,6 +47,7 @@ export {
 } from './expression.js';
 export {
   isCentringOn,
+  isRectangular,
   findTargetDisplay,
   createResolverContext,
   displayContainer,
@@ -51,6 +57,8 @@ export {
   type ResolvedCoordinate,
   type ResolvedGeometry,
   type Container,
+  type DeferredCoordinate,
+  type AxisOutcome,
   type ResolvedElement,
   type ResolvedScreen,
   type ResolverContext,
@@ -68,6 +76,7 @@ export {
   expandScreens,
   walkExpanded,
   type PropArgument,
+  type Substitution,
   type ExpandedElement,
   type ExpandedScreen,
   type ExpansionInput,

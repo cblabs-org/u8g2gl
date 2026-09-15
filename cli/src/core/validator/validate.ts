@@ -11,13 +11,17 @@
  *              the one registry ([D-17], [D-18]). Deterministically sorts all
  *              diagnostics by file, line, and column.
  *
+ *              Geometry is checked for one target — the one `generate` builds, or
+ *              the project's first — and the result says which (§7.2, PR-04 WO7b).
+ *
  * Exports:
  * - ValidateInput: Complete project input model passed to the validator
+ * - CheckedTarget: The target geometry was checked against, and its display
  * - ValidateResult: Deterministically ordered diagnostics and error counts
  * - validate(input): Run all validation passes and return aggregated results
  */
 
-import type { U8g2glProject } from '../schema/project.js';
+import type { Target, U8g2glProject } from '../schema/project.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { ManifestRegistry } from '../manifest/manifest-registry.js';
@@ -29,7 +33,8 @@ import { validateReferences } from './validate-references.js';
 import { validateDisplay } from './validate-display.js';
 import { validateWidgetProps } from './validate-widget-props.js';
 import { validateTypes } from './validate-types.js';
-import { validateGeometry } from './validate-geometry.js';
+import { checkedTarget, validateGeometry } from './validate-geometry.js';
+import { findTargetDisplay } from '../resolver/index.js';
 import { validateIdentifiers } from './validate-identifiers.js';
 import {
   validateNotYetSupported,
@@ -61,6 +66,23 @@ export interface ValidateInput {
    * `'error'`.
    */
   readonly notYetSupported?: NotYetSupportedPolicy;
+  /**
+   * The target whose display geometry is resolved and bounds-checked against.
+   * `generate` passes the target it builds, because a screen that fits one
+   * display can overflow another (§7.2, §7.3). Defaults to the project's first
+   * declared target — `validate`'s behaviour.
+   */
+  readonly target?: Target;
+}
+
+/**
+ * The target a validation run checked geometry against.
+ */
+export interface CheckedTarget {
+  readonly name: string;
+  readonly setup: string;
+  /** The display's size, when the catalogue has a record for `setup`; bounds were checked only then. */
+  readonly display?: { readonly width: number; readonly height: number };
 }
 
 /**
@@ -70,6 +92,8 @@ export interface ValidateResult {
   readonly diagnostics: readonly Diagnostic[];
   readonly errors: number;
   readonly warnings: number;
+  /** The target geometry was checked against; absent when the project declares none. */
+  readonly checkedTarget?: CheckedTarget;
 }
 
 /**
@@ -145,9 +169,21 @@ export function validate(input: ValidateInput): ValidateResult {
     }
   }
 
+  // Say which target geometry was checked against, so a caller can report it.
+  const target = checkedTarget(input);
+  const display = findTargetDisplay(target, input.catalogue ?? []);
   return {
     diagnostics: allDiagnostics,
     errors,
     warnings,
+    ...(target !== undefined
+      ? {
+          checkedTarget: {
+            name: target.name,
+            setup: target.setup,
+            ...(display ? { display: { width: display.width, height: display.height } } : {}),
+          },
+        }
+      : {}),
   };
 }

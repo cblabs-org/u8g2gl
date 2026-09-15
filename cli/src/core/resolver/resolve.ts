@@ -19,21 +19,28 @@
  *              the attribute and expression it came from, or the attributes it
  *              was derived from. `x`, `y`, `width` and `height` are read only
  *              where the element's effective manifest declares them (PR-04 WO3);
- *              the anchors are common to every element. A screen's container is
- *              the display. Composite expansion and `$prop` substitution are
- *              WO7's: a composite instance's `<view>` is not entered, and a
- *              value that names a `$prop` stays unresolved.
+ *              the anchors only on a rectangular element — one declaring all
+ *              four (§7.2, PR-04 WO7b) — since nothing else has a box for them to
+ *              measure. A screen's container is the display. Composite expansion
+ *              and `$prop` substitution are expand.ts's: pass an expanded tree
+ *              to enter instances. Each axis also reports what it could not
+ *              settle — deferred attributes, an unknown container — so the
+ *              validator can insist every element ends up fully positioned
+ *              (§7.2) without a second resolver.
  *
  * Exports:
  * - Provenance:              Where a resolved coordinate came from
  * - ResolvedCoordinate:      A literal integer and its provenance
  * - ResolvedGeometry:        An element's resolved x, y, width, height, right, bottom
  * - Container:               The element coordinates are measured against
- * - ResolvedElement:         One element, its container, geometry and children
+ * - DeferredCoordinate:      A written coordinate attribute with no value yet
+ * - AxisOutcome:             What one axis could not settle
+ * - ResolvedElement:         One element, its container, geometry, axis outcomes and children
  * - ResolvedScreen:          One screen resolved against a display
  * - ResolverContext:         Constants, registry and display shared by one resolution
  * - ResolveInput, ResolveResult
  * - isCentringOn():          Whether an `hcenter` / `vcenter` value centres
+ * - isRectangular():         Whether a manifest declares x, y, width and height
  * - findTargetDisplay():     A target's display record from the catalogue
  * - createResolverContext(): Build a context for one target
  * - displayContainer():      The screen-level container for a context
@@ -48,7 +55,7 @@ import type { Target } from '../schema/project.js';
 import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
-import type { ManifestRegistry } from '../manifest/manifest-registry.js';
+import type { EffectiveManifest, ManifestRegistry } from '../manifest/manifest-registry.js';
 import {
   buildConstantTable,
   evaluateExpression,
@@ -109,6 +116,30 @@ export interface Container extends ContainerSize {
   readonly label: string;
 }
 
+/** A coordinate attribute that was written but has no value here. */
+export interface DeferredCoordinate {
+  readonly attribute: string;
+  /** The attribute's text as written. */
+  readonly expression: string;
+  /** What it names that has no value here, spelled as written: `#parent_height`, `$gap`. */
+  readonly symbols: readonly string[];
+  readonly loc?: SourceLocation;
+}
+
+/**
+ * What one axis could not settle. Nothing here is a diagnostic: a composite's
+ * `<view>` resolved as declared defers by nature, so whether an unsettled axis
+ * is an error is the caller's judgement (§7.2 — validate-geometry.ts).
+ */
+export interface AxisOutcome {
+  /** Attributes on this axis that were written but deferred. */
+  readonly deferred: readonly DeferredCoordinate[];
+  /** Whether this axis already raised a diagnostic: an invalid expression, or over-constraint. */
+  readonly diagnosed: boolean;
+  /** Whether the container's extent along this axis was known. */
+  readonly containerKnown: boolean;
+}
+
 /** One element after resolution. */
 export interface ResolvedElement {
   /** The source node, unchanged. */
@@ -116,6 +147,8 @@ export interface ResolvedElement {
   /** What this element's coordinates were measured against. */
   readonly container: Container;
   readonly geometry: ResolvedGeometry;
+  /** What each axis could not settle. */
+  readonly axes: { readonly horizontal: AxisOutcome; readonly vertical: AxisOutcome };
   /** Nested elements, in document order (§13.9). */
   readonly children: readonly ResolvedElement[];
 }
@@ -171,6 +204,23 @@ interface AxisResult {
   readonly start?: ResolvedCoordinate;
   readonly size?: ResolvedCoordinate;
   readonly end?: ResolvedCoordinate;
+  readonly outcome: AxisOutcome;
+}
+
+/** The four properties that make an element rectangular (§7.2). */
+const RECTANGLE_PROPERTIES: readonly string[] = ['x', 'y', 'width', 'height'];
+
+/**
+ * @brief Whether an element is rectangular: its effective manifest declares
+ *        `x`, `y`, `width` and `height` (§7.2, PR-04 WO7b).
+ *
+ * Only a rectangular element has a box for `right`, `bottom`, `hcenter` and
+ * `vcenter` to measure against. Read from the manifest, never a tag list
+ * ([D-17]), so a custom element becomes anchorable by declaring the four.
+ */
+export function isRectangular(manifest: EffectiveManifest | undefined): boolean {
+  const props = manifest?.api.props ?? [];
+  return RECTANGLE_PROPERTIES.every((name) => props.some((prop) => prop.name === name));
 }
 
 /**
@@ -226,12 +276,14 @@ export function displayContainer(context: ResolverContext): Container {
 }
 
 // geometryText
-// The text of one geometry attribute, if the element has that property. The
-// anchors are common to every element; x/y/width/height are properties, and are
-// read only where the effective manifest declares them — Pass 4 reports them as
-// unknown anywhere else, and laying an element out from an attribute the
-// validator rejects would give it geometry it does not have (PR-04 WO3). An
-// unknown tag (Pass 2's error) therefore has none.
+// The text of one geometry attribute, if the element has that property.
+// x/y/width/height are properties, read only where the effective manifest
+// declares them — Pass 4 reports them as unknown anywhere else, and laying an
+// element out from an attribute the validator rejects would give it geometry it
+// does not have (PR-04 WO3). The anchors are read only on a rectangular element:
+// on anything else Pass 4 reports them (§7.2), and deriving a width for a circle
+// from `x` and `right` would invent a box it does not have. An unknown tag
+// (Pass 2's error) therefore has none.
 //   node      — the element
 //   attribute — geometry attribute name
 //   context   — for the manifest registry
@@ -240,10 +292,11 @@ function geometryText(node: WidgetNode, attribute: string, context: ResolverCont
   if (typeof value !== 'string') {
     return undefined;
   }
+  const manifest = context.manifests.get(node.tag);
   if (attribute === 'right' || attribute === 'bottom') {
-    return value;
+    return isRectangular(manifest) ? value : undefined;
   }
-  const declared = context.manifests.get(node.tag)?.api.props.some((prop) => prop.name === attribute) ?? false;
+  const declared = manifest?.api.props.some((prop) => prop.name === attribute) ?? false;
   return declared ? value : undefined;
 }
 
@@ -299,7 +352,7 @@ function resolveAxis(
   const startText = geometryText(node, axis.start, context);
   const sizeText = geometryText(node, axis.size, context);
   const endText = geometryText(node, axis.end, context);
-  const centred = isCentringOn(node.attributes[axis.centre]);
+  const centred = isRectangular(context.manifests.get(node.tag)) && isCentringOn(node.attributes[axis.centre]);
 
   // --- Step 2: Over-constraint — more positions than one edge can take ---
   let overConstrainedAxis = false;
@@ -329,6 +382,10 @@ function resolveAxis(
   }
 
   // --- Step 3: Evaluate every attribute written, so each reports its own errors ---
+  // What could not be settled is recorded, not diagnosed: whether a deferral is
+  // an error depends on whether the tree has been expanded (PR-04 WO7b).
+  const deferred: DeferredCoordinate[] = [];
+  let invalid = false;
   const evaluate = (attribute: string, text: string | undefined): ResolvedCoordinate | undefined => {
     if (text === undefined) {
       return undefined;
@@ -336,10 +393,12 @@ function resolveAxis(
     const loc = locOf(attribute);
     const result = evaluateExpression(text, scope, { ...(loc ? { loc } : {}), subject: elementLabel(node, attribute) });
     if (result.kind === 'invalid') {
+      invalid = true;
       diagnostics.push(...result.diagnostics);
       return undefined;
     }
     if (result.kind === 'deferred') {
+      deferred.push({ attribute, expression: text, symbols: result.symbols, ...(loc ? { loc } : {}) });
       return undefined;
     }
     return {
@@ -350,9 +409,14 @@ function resolveAxis(
   const start = evaluate(axis.start, startText);
   const size = evaluate(axis.size, sizeText);
   const end = evaluate(axis.end, endText);
+  const outcome: AxisOutcome = {
+    deferred,
+    diagnosed: invalid || overConstrainedAxis,
+    containerKnown: containerSize !== undefined,
+  };
 
   if (overConstrainedAxis || containerSize === undefined) {
-    return { ...(start ? { start } : {}), ...(size ? { size } : {}), ...(end ? { end } : {}) };
+    return { ...(start ? { start } : {}), ...(size ? { size } : {}), ...(end ? { end } : {}), outcome };
   }
 
   // --- Step 4: Derive the missing member from the container ---
@@ -371,18 +435,34 @@ function resolveAxis(
       start: derived(axis.start, startValue, [axis.centre, axis.size], axis.centre),
       size,
       end: derived(axis.end, C - startValue - size.value, [axis.centre, axis.size], axis.centre),
+      outcome,
     };
   }
   if (start && size) {
-    return { start, size, end: derived(axis.end, C - start.value - size.value, [axis.start, axis.size], axis.size) };
+    return {
+      start,
+      size,
+      end: derived(axis.end, C - start.value - size.value, [axis.start, axis.size], axis.size),
+      outcome,
+    };
   }
   if (size && end && startText === undefined) {
-    return { start: derived(axis.start, C - end.value - size.value, [axis.size, axis.end], axis.end), size, end };
+    return {
+      start: derived(axis.start, C - end.value - size.value, [axis.size, axis.end], axis.end),
+      size,
+      end,
+      outcome,
+    };
   }
   if (start && end && sizeText === undefined) {
-    return { start, size: derived(axis.size, C - start.value - end.value, [axis.start, axis.end], axis.end), end };
+    return {
+      start,
+      size: derived(axis.size, C - start.value - end.value, [axis.start, axis.end], axis.end),
+      end,
+      outcome,
+    };
   }
-  return { ...(start ? { start } : {}), ...(size ? { size } : {}), ...(end ? { end } : {}) };
+  return { ...(start ? { start } : {}), ...(size ? { size } : {}), ...(end ? { end } : {}), outcome };
 }
 
 // resolveNode
@@ -427,7 +507,7 @@ function resolveNode(
   };
   const children = resolveChildren(node.children, childContainer, context, diagnostics, annotate);
 
-  return { node, container, geometry, children };
+  return { node, container, geometry, axes: { horizontal: h.outcome, vertical: v.outcome }, children };
 }
 
 // resolveChildren

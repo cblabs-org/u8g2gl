@@ -23,7 +23,9 @@
  *              *deferred*, not an error. Isomorphic; never throws for user input.
  *
  * Exports:
- * - INT32_MIN, INT32_MAX:   The range §13.2 emits coordinates in
+ * - INT32_MIN, INT32_MAX:   The range build-time arithmetic and `int` properties use (§13.2)
+ * - INT16_MIN, INT16_MAX:   The range a resolved coordinate must fit (§13.2)
+ * - integerLiteralValue():  The one integer-literal rule for `<int>` constants
  * - BUILTIN_CONSTANTS:      The four constants the resolver supplies itself
  * - ContainerSize:          A width and height, either possibly unknown
  * - EvaluationScope:        Constants, display and container an expression sees
@@ -38,10 +40,31 @@ import type { ConstDecl, Globals } from '../schema/globals.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 
-/** Smallest value a resolved coordinate may take — `int32_t` per §13.2. */
+/** Smallest value build-time arithmetic may reach — `int32_t`, the width of an `int` property (§13.2). */
 export const INT32_MIN = -2147483648;
-/** Largest value a resolved coordinate may take — `int32_t` per §13.2. */
+/** Largest value build-time arithmetic may reach — `int32_t`, the width of an `int` property (§13.2). */
 export const INT32_MAX = 2147483647;
+/** Smallest value a resolved coordinate may take — `int16_t`, as `u8g2gl_obj` stores it (§13.2). */
+export const INT16_MIN = -32768;
+/** Largest value a resolved coordinate may take — `int16_t`, as `u8g2gl_obj` stores it (§13.2). */
+export const INT16_MAX = 32767;
+
+/** An integer literal: optional minus, digits. */
+const INTEGER_LITERAL = /^-?[0-9]+$/;
+
+/**
+ * @brief The value of a constant's text, if it is an integer literal.
+ *
+ * The one rule for what an `<int>` constant may hold — used where a constant is
+ * declared (validate-schema.ts) and where it is used (below), so the two cannot
+ * disagree. Leading and trailing whitespace is ignored. Range is not checked.
+ *
+ * @return The integer, or undefined when the text is not an integer literal.
+ */
+export function integerLiteralValue(text: string): number | undefined {
+  const literal = text.trim();
+  return INTEGER_LITERAL.test(literal) ? Number(literal) : undefined;
+}
 
 /**
  * Constants the resolver supplies rather than `globals.xml`. These name the
@@ -362,7 +385,7 @@ function checkRange(value: number, state: EvaluationState): number | undefined {
     createExpressionDiagnostic(
       DIAGNOSTIC_CODES.INTEGER_OVERFLOW,
       `Expression '${state.text}' in ${state.site.subject} leaves the int32_t range ` +
-        `(${INT32_MIN}..${INT32_MAX}) that coordinates are emitted in (§13.2).`,
+        `(${INT32_MIN}..${INT32_MAX}) that build-time arithmetic is checked in (§13.2).`,
       state.site,
       state.text,
     ),
@@ -412,8 +435,8 @@ function resolveConstant(name: string, state: EvaluationState): number | undefin
   // A constant's own value is a literal, not an expression: §7.2 gives
   // expressions to coordinate attributes, and a literal-only rule means
   // constants can never form a cycle.
-  const literal = decl.value.trim();
-  if (decl.type !== 'int' || !/^-?[0-9]+$/.test(literal)) {
+  const literal = integerLiteralValue(decl.value);
+  if (decl.type !== 'int' || literal === undefined) {
     const what = decl.type === 'int' ? `an <int> whose value '${decl.value}' is not an integer` : `a <${decl.type}>`;
     state.diagnostics.push(
       createExpressionDiagnostic(
@@ -425,7 +448,7 @@ function resolveConstant(name: string, state: EvaluationState): number | undefin
     );
     return undefined;
   }
-  return checkRange(Number(literal), state);
+  return checkRange(literal, state);
 }
 
 // evaluateNode

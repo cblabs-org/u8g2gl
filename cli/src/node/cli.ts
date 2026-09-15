@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
 import { checkProject, generate } from '../core/generator/index.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
+import type { CheckedTarget } from '../core/validator/index.js';
 import {
   identifyDisplay,
   sourceDisplay,
@@ -416,15 +417,26 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
 
   // --- Step 2: Load and validate through the path `generate` shares ---
   const loaded = loadOrExit(targetArg, json, failureExtra);
-  const { diagnostics, errors, warnings } = checkProject(loaded.model, 'warning');
+  const { diagnostics, errors, warnings, checkedTarget } = checkProject(loaded.model, 'warning');
 
   // --- Step 3: Emit JSON or human-readable output ---
   if (json) {
     // Machine-readable contract (§15.3, [D-16]). `fixedNames` is present only
     // when --fix-names was requested, so the existing contract is unchanged for
-    // every caller that does not ask for the fix.
+    // every caller that does not ask for the fix. `target` — the target geometry
+    // was checked against (PR-04 WO7b) — is present when the project declares one.
     console.log(
-      JSON.stringify({ diagnostics, errors, warnings, ...(fixNames ? { fixedNames } : {}) }, null, 2),
+      JSON.stringify(
+        {
+          diagnostics,
+          errors,
+          warnings,
+          ...(checkedTarget ? { target: checkedTarget } : {}),
+          ...(fixNames ? { fixedNames } : {}),
+        },
+        null,
+        2,
+      ),
     );
     process.exit(errors > 0 ? 1 : 0);
   }
@@ -443,18 +455,39 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   }
 
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
+  const targetLine = describeCheckedTarget(checkedTarget, loaded.model.hasProjectManifest);
+  const withTarget = (summary: string): string => (targetLine ? `${targetLine}\n${summary}` : summary);
   if (errors > 0) {
     console.error(formatted);
-    console.error(`\nValidation failed: ${errors} error(s), ${warnings} warning(s).`);
+    console.error(`\n${withTarget(`Validation failed: ${errors} error(s), ${warnings} warning(s).`)}`);
     process.exit(1);
   }
   if (warnings > 0) {
     console.log(formatted);
-    console.log(`\nValidation passed: 0 errors, ${warnings} warning(s).`);
+    console.log(`\n${withTarget(`Validation passed: 0 errors, ${warnings} warning(s).`)}`);
     process.exit(0);
   }
-  console.log('Validation passed: 0 errors, 0 warnings.');
+  console.log(withTarget('Validation passed: 0 errors, 0 warnings.'));
   process.exit(0);
+}
+
+// describeCheckedTarget
+// The line `validate` prints naming the target geometry was checked against
+// (PR-04 WO7b): `generate --target` checks another, so the author must be able
+// to see which one `validate` meant. Undefined for a lone file, which has no target.
+//   target              — from checkProject
+//   hasProjectManifest  — whether a u8g2gl.xml was loaded
+function describeCheckedTarget(target: CheckedTarget | undefined, hasProjectManifest: boolean): string | undefined {
+  if (target === undefined) {
+    return hasProjectManifest ? 'No <target> declared: geometry bounds were not checked.' : undefined;
+  }
+  if (target.display === undefined) {
+    return `Target '${target.name}' (${target.setup}) has no display in the catalogue: geometry bounds were not checked.`;
+  }
+  return (
+    `Geometry checked against target '${target.name}' (${target.setup}, ` +
+    `${target.display.width}x${target.display.height}); 'generate --target' checks the target it builds.`
+  );
 }
 
 /** Parsed `generate` arguments. */

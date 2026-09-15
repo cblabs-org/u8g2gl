@@ -24,6 +24,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { Target } from '../schema/project.js';
 import { validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
 
@@ -31,7 +32,7 @@ import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-suppor
  * A project as loaded, before validation: the validator's input without a
  * policy, plus what loading itself found.
  */
-export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported'> {
+export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 'target'> {
   /**
    * Diagnostics raised while loading — XML and parser diagnostics, including
    * [U-1] missing names, and any from the bundled framework manifests. Merged
@@ -57,11 +58,13 @@ export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported'> {
  * @param model  The loaded project.
  * @param policy Severity for not-yet-supported constructs — `'warning'` for
  *               `validate`, `'error'` for `generate`.
+ * @param target The target to check geometry against — `generate`'s build
+ *               target. Omitted, the project's first target is checked.
  * @return Deduplicated diagnostics sorted by file, line, column and code, with
- *         error and warning counts.
+ *         error and warning counts, and the target geometry was checked against.
  */
-export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy): ValidateResult {
-  // --- Step 1: Run the validator under the caller's policy ---
+export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy, target?: Target): ValidateResult {
+  // --- Step 1: Run the validator under the caller's policy, for the caller's target ---
   const validation = validate({
     project: model.project,
     globals: model.globals,
@@ -69,6 +72,7 @@ export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy)
     manifests: model.manifests,
     catalogue: model.catalogue,
     notYetSupported: policy,
+    ...(target !== undefined ? { target } : {}),
   });
 
   // --- Step 2: Merge, dropping the placeholder project's schema diagnostic ---
@@ -77,7 +81,8 @@ export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy)
   );
 
   // --- Step 3: Deduplicate, sort and count ---
-  return finaliseDiagnostics(merged);
+  const finalised = finaliseDiagnostics(merged);
+  return validation.checkedTarget !== undefined ? { ...finalised, checkedTarget: validation.checkedTarget } : finalised;
 }
 
 /**

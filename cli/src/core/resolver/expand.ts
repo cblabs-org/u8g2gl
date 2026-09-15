@@ -35,8 +35,19 @@
  *              CIRCULAR_REFERENCE. Deterministic: document order throughout.
  *              Isomorphic; never throws for user input.
  *
+ *              PR-04 WO7b: every whole-value substitution is recorded on its
+ *              element, so the passes that check a value written directly (fonts,
+ *              images, styles, enums, `hcenter`) can check a substituted one the
+ *              same way; each argument says whether it is fixed by the template
+ *              (a default, or a literal written inside another `<view>`), so a
+ *              defect in it is reported once rather than once per instance.
+ *              `hidden="$p"` substitutes and then takes the parser's boolean rule.
+ *              A `$name` inside longer text that cannot be substituted is an error
+ *              (interim, until the Chief Architect rules on interpolation).
+ *
  * Exports:
  * - PropArgument:      One prop bound on one composite instance
+ * - Substitution:      One attribute whose whole value was replaced by an argument
  * - ExpandedElement:   An element after expansion, with identifier and provenance
  * - ExpandedScreen:    A screen's expanded top-level elements
  * - ExpansionInput, ExpansionResult
@@ -52,6 +63,7 @@ import type { PropDef } from '../schema/widget-manifest.js';
 import type { BindingChild, EventChild, StyleChild, WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
+import { hiddenAttributeValue } from '../parser/parse-widget-tree.js';
 import { childIdentifier } from './mangle.js';
 import { withInstantiation, type InstantiationSite } from './provenance.js';
 
@@ -67,6 +79,22 @@ export interface PropArgument {
   readonly from: 'argument' | 'default';
   /** The instance attribute for an argument; the instance element for a default. */
   readonly loc?: SourceLocation;
+  /**
+   * Whether this value is the same in every instantiation of the enclosing
+   * template: the prop's declared default, or a literal (or a fixed argument
+   * passed through) written on an instance inside another composite's `<view>`.
+   * A defect in a fixed value is the template's, so it is reported once, with
+   * no instantiation chain; an unfixed one belongs to its instance.
+   */
+  readonly fixed: boolean;
+}
+
+/** One attribute whose whole value was a `$prop` reference, replaced by an argument. */
+export interface Substitution {
+  /** The attribute as the node spells it: `font`, `style_font`, `hcenter`. */
+  readonly attribute: string;
+  /** The argument that replaced it. */
+  readonly argument: PropArgument;
 }
 
 /** One element after composite expansion. */
@@ -88,6 +116,8 @@ export interface ExpandedElement {
   readonly instantiation: readonly InstantiationSite[];
   /** Present if and only if this element is an expanded composite instance: its bound props, in declaration order. */
   readonly arguments?: readonly PropArgument[];
+  /** Present when any of this element's attributes was a whole `$prop` reference that was substituted, in attribute order. */
+  readonly substitutions?: readonly Substitution[];
   /** Nested elements, in the order of `node`'s element children. */
   readonly children: readonly ExpandedElement[];
 }
@@ -289,7 +319,8 @@ function substituteText(text: string, site: ValueSite, scope: TemplateScope, sta
 
   // --- Step 2: References inside an expression — only an int argument has a meaning there ---
   // Parenthesised, so `$gap * 2` with gap="#pad + 1" keeps its precedence. A
-  // reference to a non-int prop, or to an unbound one, stays as written.
+  // reference to a non-int prop, or to an int prop with no value, cannot be
+  // substituted and would reach output literally, so it is an error (WO7b).
   if (!text.includes('$')) {
     return text;
   }
@@ -300,8 +331,59 @@ function substituteText(text: string, site: ValueSite, scope: TemplateScope, sta
       return match;
     }
     const argument = scope.args.get(name);
-    return argument !== undefined && declared.type === 'int' ? `(${argument.value})` : match;
+    if (argument !== undefined && declared.type === 'int') {
+      return `(${argument.value})`;
+    }
+    reportUnsubstitutedProp(declared, text, site, scope, state);
+    return match;
   });
+}
+
+// reportUnsubstitutedProp
+// A `$name` inside longer text that expansion cannot substitute (PR-04 WO7 F9,
+// interim until the Chief Architect rules). A non-int prop spliced into text is
+// a defect in the template's own text, reported once with no chain; an int prop
+// that this instance gave no value is the instance's, and names it.
+//   prop  — the declared prop referenced
+//   text  — the whole value as written
+//   site  — where it is written
+//   scope — the template scope
+//   state — expansion state
+function reportUnsubstitutedProp(
+  prop: PropDef,
+  text: string,
+  site: ValueSite,
+  scope: TemplateScope,
+  state: ExpansionState,
+): void {
+  const reference = `$${prop.name}`;
+  if (prop.type !== 'int') {
+    report(
+      state,
+      createExpansionDiagnostic(
+        DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP,
+        `'${reference}' in ${site.description} sits inside the longer value '${text}', and a ` +
+          `<${prop.type}> prop is substituted only as a whole value, so '${reference}' would reach ` +
+          `output literally. Interpolating a prop into text is not supported yet (§13.6).`,
+        site.loc,
+        reference,
+      ),
+    );
+    return;
+  }
+  report(
+    state,
+    withInstantiation(
+      createExpansionDiagnostic(
+        DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP,
+        `'${reference}' in ${site.description} has no value to substitute into '${text}': int prop ` +
+          `'${prop.name}' of <${scope.composite}> was not given one and declares no default.`,
+        site.loc,
+        reference,
+      ),
+      scope.chain,
+    ),
+  );
 }
 
 // substituteDirective
@@ -344,14 +426,28 @@ interface SubstitutedValues {
   readonly styleOverrides: Readonly<Record<string, string>>;
   /** Binding, event and style children, in written order. */
   readonly directives: readonly WidgetNodeChild[];
+  /** Whole-value substitutions made, in attribute order. */
+  readonly substitutions: readonly Substitution[];
+}
+
+// wholeValueArgument
+// The argument a whole-value `$prop` reference is replaced by, or undefined when
+// the value is not exactly one reference to a bound prop.
+function wholeValueArgument(text: string, scope: TemplateScope): PropArgument | undefined {
+  const whole = PROP_REFERENCE.exec(text);
+  return whole ? scope.args.get(whole[1] ?? '') : undefined;
 }
 
 // substituteNode
 // A template node's attributes, style overrides and directives with `$prop`s
 // substituted. `name` is identity and is never substituted: a name comes from
-// the author, not from an argument ([U-1]).
+// the author, not from an argument ([U-1]). `hidden` takes the parser's boolean
+// rule once its placeholder is substituted (PR-04 WO7 F6).
 function substituteNode(written: WidgetNode, scope: TemplateScope, state: ExpansionState): SubstitutedValues {
   const label = elementLabel(written);
+  const substitutions: Substitution[] = [];
+
+  // --- Step 1: Attributes ---
   const attributes: Record<string, string | boolean | undefined> = {};
   for (const [attribute, value] of Object.entries(written.attributes)) {
     if (typeof value !== 'string' || attribute === 'name') {
@@ -365,11 +461,17 @@ function substituteNode(written: WidgetNode, scope: TemplateScope, state: Expans
       scope,
       state,
     );
-    if (substituted !== undefined) {
-      attributes[attribute] = substituted;
+    if (substituted === undefined) {
+      continue;
+    }
+    attributes[attribute] = attribute === 'hidden' ? hiddenAttributeValue(substituted) : substituted;
+    const argument = wholeValueArgument(value, scope);
+    if (argument !== undefined) {
+      substitutions.push({ attribute, argument });
     }
   }
 
+  // --- Step 2: `style_*` overrides — the node also carries each as an attribute, recorded above ---
   const styleOverrides: Record<string, string> = {};
   for (const [key, value] of Object.entries(written.styleOverrides)) {
     const loc = written.attributeLocs?.[`style_${key}`] ?? written.loc;
@@ -384,29 +486,45 @@ function substituteNode(written: WidgetNode, scope: TemplateScope, state: Expans
     }
   }
 
+  // --- Step 3: Directives ---
   const directives = written.children
     .filter((child): child is BindingChild | EventChild | StyleChild => !isElement(child))
     .map((child) => substituteDirective(child, written, scope, state));
 
-  return { attributes: attributes as WidgetNode['attributes'], styleOverrides, directives };
+  return { attributes: attributes as WidgetNode['attributes'], styleOverrides, directives, substitutions };
 }
 
 // bindArguments
 // §13.6 step 1 for one instance: the supplied attribute, else the declared
 // default. A missing required prop is reported with the wording Pass 4 uses for
 // the same condition, so the two read as one fact.
-//   instance — the instance, its own attributes already substituted
-//   props    — the composite's declared props
-//   scope    — the scope the instance's template will be copied in
-//   state    — expansion state
+//   instance  — the instance, its own attributes already substituted
+//   written   — the same instance as written, before substitution
+//   enclosing — the template the instance is written in, or undefined in a screen
+//   props     — the composite's declared props
+//   scope     — the scope the instance's template will be copied in
+//   state     — expansion state
 function bindArguments(
   instance: WidgetNode,
+  written: WidgetNode,
+  enclosing: TemplateScope | undefined,
   props: readonly PropDef[],
   scope: TemplateScope,
   state: ExpansionState,
 ): PropArgument[] {
   const args: PropArgument[] = [];
   const outer = scope.chain.slice(0, -1);
+
+  // An argument written in a screen belongs to that instance. One written inside
+  // a template is fixed by the template when it is a literal, or passes through
+  // an argument that is itself fixed.
+  const isFixed = (prop: string): boolean => {
+    const raw = written.attributes[prop];
+    if (enclosing === undefined || typeof raw !== 'string') {
+      return false;
+    }
+    return raw.includes('$') ? (wholeValueArgument(raw, enclosing)?.fixed ?? false) : true;
+  };
 
   // --- Step 1: Supplied value, then default; required props must have one ---
   for (const prop of props) {
@@ -416,10 +534,24 @@ function bindArguments(
     const supplied = instance.attributes[prop.name];
     if (typeof supplied === 'string' && supplied !== '') {
       const loc = instance.attributeLocs?.[prop.name] ?? instance.loc;
-      args.push({ prop: prop.name, type: prop.type, value: supplied, from: 'argument', ...(loc ? { loc } : {}) });
+      args.push({
+        prop: prop.name,
+        type: prop.type,
+        value: supplied,
+        from: 'argument',
+        ...(loc ? { loc } : {}),
+        fixed: isFixed(prop.name),
+      });
     } else if (prop.default !== undefined) {
       const loc = instance.loc;
-      args.push({ prop: prop.name, type: prop.type, value: prop.default, from: 'default', ...(loc ? { loc } : {}) });
+      args.push({
+        prop: prop.name,
+        type: prop.type,
+        value: prop.default,
+        from: 'default',
+        ...(loc ? { loc } : {}),
+        fixed: true,
+      });
     } else if (prop.required) {
       report(
         state,
@@ -459,6 +591,7 @@ function expandNode(written: WidgetNode, scope: TemplateScope | undefined, state
         attributes: written.attributes,
         styleOverrides: written.styleOverrides,
         directives: written.children.filter((child) => !isElement(child)),
+        substitutions: [],
       };
 
   // --- Step 2: Identity — prefixed by the innermost instance, never invented ---
@@ -476,7 +609,7 @@ function expandNode(written: WidgetNode, scope: TemplateScope | undefined, state
     const site: InstantiationSite = { tag: written.tag, name, identifier, ...(written.loc ? { loc: written.loc } : {}) };
     const props = manifest.declared.api.props;
     const inner: TemplateScope = { composite: written.tag, props, args: new Map(), chain: [...chain, site] };
-    args = bindArguments(substituted, props, inner, state);
+    args = bindArguments(substituted, written, scope, props, inner, state);
     const bound: TemplateScope = { ...inner, args: new Map(args.map((argument) => [argument.prop, argument])) };
     template = manifest.view.children.map((child) => expandNode(child, bound, state));
   }
@@ -492,6 +625,7 @@ function expandNode(written: WidgetNode, scope: TemplateScope | undefined, state
     identifier,
     instantiation: chain,
     ...(args !== undefined ? { arguments: args } : {}),
+    ...(own.substitutions.length > 0 ? { substitutions: own.substitutions } : {}),
     children,
   };
 }

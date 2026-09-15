@@ -11,15 +11,157 @@
  *              Image-ness is derived from the manifest's `type="image"` prop
  *              ([D-17], PR-3R WO7) rather than a hardcoded tag list.
  *
+ *              Font, image and style values are checked as written — in screens
+ *              and in each composite's `<view>` — skipping `$`-references, which
+ *              are unknowable there. The values composite expansion substitutes
+ *              for those references are then checked on the expanded tree by the
+ *              same function (PR-04 WO7b, WO7 F4), and only those, so no value is
+ *              checked twice; substituted-values.ts decides where each is reported.
+ *
  * Exports:
  * - validateReferences(input): Runs Pass 2 cross-reference validation
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { Globals } from '../schema/globals.js';
+import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { findClosest } from '../catalogue/edit-distance.js';
+import { expandScreens, walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
+import { reportSubstituted } from './substituted-values.js';
+
+/** The declarations a value written on a screen element may name. */
+interface ReferenceScope {
+  readonly declaredFonts: readonly string[];
+  readonly fontSet: ReadonlySet<string>;
+  readonly declaredImages: readonly string[];
+  readonly imageSet: ReadonlySet<string>;
+  /** Global styles, then the screen's own. */
+  readonly availableStyles: readonly string[];
+  readonly availableStyleSet: ReadonlySet<string>;
+  readonly manifests: ValidateInput['manifests'];
+}
+
+// referenceScope
+// What an element on `screen` may refer to.
+function referenceScope(globals: Globals, screen: Screen, manifests: ValidateInput['manifests']): ReferenceScope {
+  const declaredFonts = (globals?.fonts ?? []).map((f) => f.name);
+  const declaredImages = (globals?.images ?? []).map((i) => i.name);
+  const availableStyles = [...(globals?.styles ?? []).map((s) => s.name), ...(screen.styles ?? []).map((s) => s.name)];
+  return {
+    declaredFonts,
+    fontSet: new Set(declaredFonts),
+    declaredImages,
+    imageSet: new Set(declaredImages),
+    availableStyles,
+    availableStyleSet: new Set(availableStyles),
+    manifests,
+  };
+}
+
+// checkValueReferences
+// 2b–2d for one element: its font, `style_font` override, image, style and focus
+// style must name declarations in scope. A `$`-reference is skipped — it is not
+// yet a value.
+//   node  — the element
+//   scope — what it may refer to
+//   only  — when given, only these attributes are checked (a substitution's)
+function checkValueReferences(node: WidgetNode, scope: ReferenceScope, only?: ReadonlySet<string>): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const checks = (...attributes: string[]): boolean => only === undefined || attributes.some((a) => only.has(a));
+  const { declaredFonts, fontSet, declaredImages, imageSet, availableStyles, availableStyleSet, manifests } = scope;
+
+  // --- Step 1: Font references ---
+  const fontAttr = node.attributes.font;
+  if (checks('font') && typeof fontAttr === 'string' && !fontAttr.startsWith('$') && !fontSet.has(fontAttr)) {
+    diagnostics.push(
+      createRefDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_FONT,
+        `Unknown font '${fontAttr}' referenced on <${node.tag}>.`,
+        node.attributeLocs?.font ?? node.loc,
+        fontAttr,
+        findClosest(fontAttr, declaredFonts),
+      ),
+    );
+  }
+
+  const styleFontOverride = node.styleOverrides.font;
+  if (
+    checks('style_font') &&
+    typeof styleFontOverride === 'string' &&
+    !styleFontOverride.startsWith('$') &&
+    !fontSet.has(styleFontOverride)
+  ) {
+    diagnostics.push(
+      createRefDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_FONT,
+        `Unknown font '${styleFontOverride}' in style_font on <${node.tag}>.`,
+        node.attributeLocs?.style_font ?? node.loc,
+        styleFontOverride,
+        findClosest(styleFontOverride, declaredFonts),
+      ),
+    );
+  }
+
+  // --- Step 2: Image references ---
+  // Image-ness is derived from the manifest ([D-17]) — a `type="image"` prop
+  // named `src` or `image` — rather than a hardcoded tag list. Of the three tags
+  // this list once named, only `u8g2gl_xbm` ever had a manifest; `u8g2gl_bitmap`
+  // and `u8g2gl_icon` name elements that do not exist and are already rejected
+  // as UNKNOWN_WIDGET before this code runs (PR-3R WO7).
+  const imageAttr = node.attributes.image ?? node.attributes.src;
+  if (checks('image', 'src') && typeof imageAttr === 'string' && !imageAttr.startsWith('$')) {
+    const manifest = manifests.get(node.tag);
+    const isImageTag = manifest?.api.props.some((p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'));
+    if (isImageTag && !imageSet.has(imageAttr)) {
+      diagnostics.push(
+        createRefDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_IMAGE,
+          `Unknown image '${imageAttr}' referenced on <${node.tag}>.`,
+          node.attributeLocs?.image ?? node.attributeLocs?.src ?? node.loc,
+          imageAttr,
+          findClosest(imageAttr, declaredImages),
+        ),
+      );
+    }
+  }
+
+  // --- Step 3: Style and focus-style references ---
+  const styleAttr = node.attributes.style;
+  if (checks('style') && typeof styleAttr === 'string' && !styleAttr.startsWith('$') && !availableStyleSet.has(styleAttr)) {
+    diagnostics.push(
+      createRefDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_STYLE,
+        `Unknown style '${styleAttr}' referenced on <${node.tag}>.`,
+        node.attributeLocs?.style ?? node.loc,
+        styleAttr,
+        findClosest(styleAttr, availableStyles),
+      ),
+    );
+  }
+
+  const focusStyleAttr = node.attributes.focusStyle ?? node.attributes.focus_style;
+  if (
+    checks('focus_style', 'focusStyle') &&
+    typeof focusStyleAttr === 'string' &&
+    !focusStyleAttr.startsWith('$') &&
+    !availableStyleSet.has(focusStyleAttr)
+  ) {
+    diagnostics.push(
+      createRefDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_STYLE,
+        `Unknown focus style '${focusStyleAttr}' referenced on <${node.tag}>.`,
+        node.attributeLocs?.focus_style ?? node.attributeLocs?.focusStyle ?? node.loc,
+        focusStyleAttr,
+        findClosest(focusStyleAttr, availableStyles),
+      ),
+    );
+  }
+
+  return diagnostics;
+}
 
 function createRefDiagnostic(
   code: string,
@@ -110,7 +252,6 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   const declaredSubjects = (globals?.subjects ?? []).map((s) => s.name);
   const subjectSet = new Set(declaredSubjects);
 
-  const globalStyles = (globals?.styles ?? []).map((s) => s.name);
 
   // One namespace for every element ([D-18]). The `u8g2gl_` prefix still picks
   // the diagnostic code below — a stable API — but whether a tag is known, and
@@ -150,9 +291,8 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
 
   // --- 2. Validate screen views and widget nodes ---
   for (const screen of screens ?? []) {
-    const screenStyles = (screen.styles ?? []).map((s) => s.name);
-    const availableStyles = [...globalStyles, ...screenStyles];
-    const availableStyleSet = new Set(availableStyles);
+    const scope = referenceScope(globals, screen, manifests);
+    const { availableStyles, availableStyleSet } = scope;
 
     const screenElementNames = new Set<string>();
 
@@ -191,93 +331,8 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
         }
       }
 
-      // 2b. Check font references
-      const fontAttr = node.attributes.font;
-      if (typeof fontAttr === 'string' && !fontAttr.startsWith('$')) {
-        if (!fontSet.has(fontAttr)) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_FONT,
-              `Unknown font '${fontAttr}' referenced on <${node.tag}>.`,
-              node.attributeLocs?.font ?? node.loc,
-              fontAttr,
-              findClosest(fontAttr, declaredFonts),
-            ),
-          );
-        }
-      }
-
-      const styleFontOverride = node.styleOverrides.font;
-      if (typeof styleFontOverride === 'string' && !styleFontOverride.startsWith('$')) {
-        if (!fontSet.has(styleFontOverride)) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_FONT,
-              `Unknown font '${styleFontOverride}' in style_font on <${node.tag}>.`,
-              node.attributeLocs?.style_font ?? node.loc,
-              styleFontOverride,
-              findClosest(styleFontOverride, declaredFonts),
-            ),
-          );
-        }
-      }
-
-      // 2c. Check image references. Image-ness is derived from the manifest
-      // ([D-17]) — a `type="image"` prop named `src` or `image` — rather than
-      // a hardcoded tag list. Of the three tags this list once named, only
-      // `u8g2gl_xbm` ever had a manifest; `u8g2gl_bitmap` and `u8g2gl_icon`
-      // name elements that do not exist and are already rejected as
-      // UNKNOWN_WIDGET before this code runs (PR-3R WO7).
-      const imageAttr = node.attributes.image ?? node.attributes.src;
-      if (typeof imageAttr === 'string' && !imageAttr.startsWith('$')) {
-        const manifest = manifests.get(node.tag);
-        const isImageTag = manifest?.api.props.some(
-          (p) => p.type === 'image' && (p.name === 'src' || p.name === 'image'),
-        );
-
-        if (isImageTag && !imageSet.has(imageAttr)) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_IMAGE,
-              `Unknown image '${imageAttr}' referenced on <${node.tag}>.`,
-              node.attributeLocs?.image ?? node.attributeLocs?.src ?? node.loc,
-              imageAttr,
-              findClosest(imageAttr, declaredImages),
-            ),
-          );
-        }
-      }
-
-      // 2d. Check style references
-      const styleAttr = node.attributes.style;
-      if (typeof styleAttr === 'string' && !styleAttr.startsWith('$')) {
-        if (!availableStyleSet.has(styleAttr)) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_STYLE,
-              `Unknown style '${styleAttr}' referenced on <${node.tag}>.`,
-              node.attributeLocs?.style ?? node.loc,
-              styleAttr,
-              findClosest(styleAttr, availableStyles),
-            ),
-          );
-        }
-      }
-
-      const focusStyleAttr = node.attributes.focusStyle ?? node.attributes.focus_style;
-      if (typeof focusStyleAttr === 'string' && !focusStyleAttr.startsWith('$')) {
-        if (!availableStyleSet.has(focusStyleAttr)) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_STYLE,
-              `Unknown focus style '${focusStyleAttr}' referenced on <${node.tag}>.`,
-              node.attributeLocs?.focus_style ?? node.attributeLocs?.focusStyle ?? node.loc,
-              focusStyleAttr,
-              findClosest(focusStyleAttr, availableStyles),
-            ),
-          );
-        }
-      }
+      // 2b–2d. Font, image, style and focus-style references
+      diagnostics.push(...checkValueReferences(node, scope));
 
       for (const child of node.children) {
         if ('kind' in child && child.kind === 'style') {
@@ -472,6 +527,22 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
               ),
             );
           }
+        }
+      }
+    });
+  }
+
+  // --- 3b. Values composite expansion substituted (PR-04 WO7b, WO7 F4) ---
+  // After sections 2 and 3, so a value already reported where it was written as
+  // an argument is recognised and not reported again where the template uses it.
+  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
+  const reportSubstitutedValue = reportSubstituted(diagnostics);
+  for (const expanded of expansion.screens) {
+    const scope = referenceScope(globals, expanded.screen, manifests);
+    walkExpanded(expanded.elements, (element) => {
+      for (const substitution of element.substitutions ?? []) {
+        for (const diagnostic of checkValueReferences(element.node, scope, new Set([substitution.attribute]))) {
+          reportSubstitutedValue(diagnostic, substitution, element);
         }
       }
     });

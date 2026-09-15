@@ -178,14 +178,22 @@ function layoutFiles(input: GenerateInput, target: Target): GeneratedFile[] {
  * @return Files in emission order (empty on any error), and sorted diagnostics.
  */
 export function generate(input: GenerateInput): GenerateResult {
-  // --- Step 1: Validate exactly as `validate` does, refusing unsupported constructs ---
-  const checked = checkProject(input, GENERATE_NOT_YET_SUPPORTED_POLICY);
-  if (checked.errors > 0) {
-    return { files: [], ...checked };
-  }
-
-  // --- Step 2: Choose the target ---
+  // --- Step 1: Choose the target, so validation checks the display being built ---
+  // A screen that fits the first target can overflow this one (§7.2, §7.3), so
+  // bounds, int16_t fit and positioning are judged for the target generated. An
+  // unknown target falls back to the first for validation, and is reported below.
   const target = resolveTarget(input);
+
+  // --- Step 2: Validate exactly as `validate` does, refusing unsupported constructs ---
+  const { diagnostics, errors, warnings } = checkProject(
+    input,
+    GENERATE_NOT_YET_SUPPORTED_POLICY,
+    'code' in target ? undefined : target,
+  );
+  const checked = { diagnostics, errors, warnings };
+  if (checked.errors > 0) {
+    return { files: [], ...checked, ...('code' in target ? {} : { target: target.name }) };
+  }
   if ('code' in target) {
     return {
       files: [],
@@ -196,10 +204,10 @@ export function generate(input: GenerateInput): GenerateResult {
   }
 
   // --- Step 3: Resolve geometry against the built target's display ---
-  // Validation resolved against the *first* target. `--target` may name another,
-  // whose display can make an expression invalid — `64 / (#screen_width - 128)`
-  // is 1 on a 192-wide panel and a division by zero on a 128-wide one — so the
-  // chosen target is resolved again and any error refuses the build like any other.
+  // Validation above already judged this target — `64 / (#screen_width - 128)`
+  // is 1 on a 192-wide panel and a division by zero on a 128-wide one. This
+  // resolution produces the model WO9/WO10 emit from; any error it raises still
+  // refuses the build. (Resolving once and sharing it is WO8's.)
   const resolution = resolveScreens({
     globals: input.globals,
     screens: input.screens,

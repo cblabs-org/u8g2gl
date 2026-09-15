@@ -81,6 +81,21 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     ]);
   });
 
+  it('u8g2gl validate says which target geometry was checked against, in text and in --json (PR-04 WO7b)', async () => {
+    const text = await runCliSubprocess(['validate', validProjectDir]);
+    expect(text.stdout).toContain(
+      "Geometry checked against target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C, 128x64); " +
+        "'generate --target' checks the target it builds.",
+    );
+
+    const json = JSON.parse((await runCliSubprocess(['validate', validProjectDir, '--json'])).stdout) as { target?: unknown };
+    expect(json.target).toEqual({
+      name: 'primary',
+      setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
+      display: { width: 128, height: 64 },
+    });
+  });
+
   it('u8g2gl validate broken-project/ -> exit 1, diagnostics on stderr', async () => {
     const res = await runCliSubprocess(['validate', brokenProjectDir]);
 

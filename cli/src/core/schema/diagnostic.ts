@@ -156,7 +156,9 @@ export const DIAGNOSTIC_CODES = {
   /**
    * A coordinate expression uses a constant whose value is not an integer — a
    * `<string>` constant, or an `<int>` whose `value` is not an integer literal.
-   * Coordinate arithmetic is integer-only (§7.2, §13.9). Reported at the use.
+   * Coordinate arithmetic is integer-only (§7.2, §13.9). An `<int>` whose value
+   * is not an integer literal is also reported at its declaration (§7.2,
+   * "validated where they're declared"), whether or not anything uses it.
    */
   NON_INTEGER_CONSTANT: 'U8G2GL_NON_INTEGER_CONSTANT',
   /** A coordinate expression divides by an operand that evaluates to zero (§7.2). */
@@ -180,6 +182,37 @@ export const DIAGNOSTIC_CODES = {
    * props, spelled with their `$`.
    */
   UNKNOWN_PROP: 'U8G2GL_UNKNOWN_PROP',
+  /**
+   * `right`, `bottom`, `hcenter` or `vcenter` on an element that is not
+   * rectangular — whose effective manifest does not declare all of `x`, `y`,
+   * `width` and `height` (§7.2). A line, pixel, circle or ellipse has no box for
+   * an anchor to measure. The message names the element and the anchor.
+   */
+  INAPPLICABLE_ANCHOR: 'U8G2GL_INAPPLICABLE_ANCHOR',
+  /**
+   * An element whose manifest declares geometry does not end up fully
+   * positioned after composite expansion (§7.2): its `x` or `y` is
+   * under-determined (`width` with neither `x` nor `right`), or a coordinate it
+   * writes never resolves — a `$prop` outside a composite, a `#parent_*` whose
+   * container has no size, an anchor measured against a container with no size.
+   * Never a silent zero or absence.
+   */
+  UNRESOLVED_GEOMETRY: 'U8G2GL_UNRESOLVED_GEOMETRY',
+  /**
+   * A resolved coordinate — `x`, `y`, `width` or `height` — lies outside
+   * `int16_t`, the type `u8g2gl_obj` stores coordinates in (§13.2). Separate
+   * from, and checked before, `OUT_OF_BOUNDS`: this asks whether the value is
+   * representable at all, not whether it fits its container.
+   */
+  COORDINATE_OUT_OF_RANGE: 'U8G2GL_COORDINATE_OUT_OF_RANGE',
+  /**
+   * A `$name` inside longer text in a composite's `<view>` that expansion
+   * cannot substitute — a non-`int` prop spliced into text (`text="Hi $who"`),
+   * or an `int` prop given no value — and that would otherwise reach output
+   * literally (§13.6). Interim rule (PR-04 WO7b) until the Chief Architect rules
+   * on interpolation.
+   */
+  UNSUBSTITUTED_PROP: 'U8G2GL_UNSUBSTITUTED_PROP',
 } as const;
 
 /**

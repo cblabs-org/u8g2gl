@@ -62,18 +62,22 @@ function runCli(args: readonly string[]): Promise<ExecResult> {
 
 const tempDirs: string[] = [];
 
-/** A generatable project: builtin font, no deferred constructs. */
-function createProject(options: { outputDir?: string; unnamed?: boolean } = {}): string {
+/**
+ * A generatable project: builtin font, no deferred constructs. `wideTarget` adds
+ * a second, 256-wide target named `wide`; `width` sets the label's width.
+ */
+function createProject(options: { outputDir?: string; unnamed?: boolean; wideTarget?: boolean; width?: number } = {}): string {
   mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
   const dir = mkdtempSync(resolve(__dirname, '../../tmp/generate-'));
   tempDirs.push(dir);
   mkdirSync(join(dir, 'screens'));
   const output = options.outputDir === undefined ? '' : `\n    <output dir="${options.outputDir}" />`;
+  const wide = options.wideTarget ? '\n        <target name="wide" setup="U8G2_SH1122_256X64_F_3W_HW_SPI" />' : '';
   writeFileSync(
     join(dir, 'u8g2gl.xml'),
     `<u8g2gl schema="0.4" name="gen" version="1.0.0">
     <targets>
-        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
+        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />${wide}
     </targets>${output}
 </u8g2gl>
 `,
@@ -84,7 +88,7 @@ function createProject(options: { outputDir?: string; unnamed?: boolean } = {}):
     join(dir, 'screens/screen_home.xml'),
     `<screen name="home">
     <view>
-        <u8g2gl_label${name} x="0" y="0" width="128" height="12" font="u8g2_font_6x10_mr" text="Hi" />
+        <u8g2gl_label${name} x="0" y="0" width="${options.width ?? 128}" height="12" font="u8g2_font_6x10_mr" text="Hi" />
     </view>
 </screen>
 `,
@@ -229,6 +233,25 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
 
     expect((await runCli(['generate', dir])).code).toBe(0);
     expect(readFileSync(join(dir, 'generated/app_glue.cpp'), 'utf-8')).toBe('// mine\n');
+  });
+
+  it('checks bounds for the target it builds: a 128-wide and a 256-wide target differ (PR-04 WO7b)', async () => {
+    const dir = createProject({ wideTarget: true, width: 200 });
+
+    const wide = await runCli(['generate', dir, '--target', 'wide', '--json']);
+    const wideJson = JSON.parse(wide.stdout) as GenerateJson;
+    expect(wide.code).toBe(0);
+    expect(wideJson.errors).toBe(0);
+    expect(wideJson.files.length).toBeGreaterThan(0);
+
+    const narrow = await runCli(['generate', dir, '--target', 'primary', '--json']);
+    const narrowJson = JSON.parse(narrow.stdout) as GenerateJson;
+    expect(narrow.code).toBe(1);
+    expect(narrowJson.files).toEqual([]);
+    expect(narrowJson.diagnostics.map((d) => `${d.code} ${d.file}:${d.line}`)).toEqual([
+      'U8G2GL_OUT_OF_BOUNDS screens/screen_home.xml:3',
+    ]);
+    expect(narrowJson.diagnostics[0]?.message).toContain('display is 128px wide');
   });
 
   it('refuses an unknown --target with a structured suggestion', async () => {

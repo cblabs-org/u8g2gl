@@ -14,8 +14,20 @@
  *              not declare, missing required props, and enum values outside the
  *              declared set, and `flag="disabled"` on a drawing element, which
  *              has no object to disable (§8.4). Layout and identity attributes in
- *              COMMON_ATTRIBUTES and `style_*` overrides are always accepted.
- *              Unknown tags are Pass 2's concern and are skipped here.
+ *              COMMON_ATTRIBUTES and `style_*` overrides are accepted, except that
+ *              an anchor is inapplicable to an element that is not rectangular,
+ *              and `hcenter` / `vcenter` must be `true` or `false` (§7.2, PR-04
+ *              WO7b). Unknown tags are Pass 2's concern and are skipped here.
+ *
+ *              Once, never twice (PR-04 WO7b): every check runs on the elements
+ *              as written — screens and each composite's `<view>` — so a template
+ *              defect is reported once however often it is instantiated. The one
+ *              exception is a value that was a `$prop` there: it is unknowable as
+ *              written, so the enum and centring checks run again on the expanded
+ *              tree for exactly the attributes expansion substituted, located at
+ *              the element that uses the value with its instance named — unless
+ *              the argument is fixed by the template (reported once, no chain) or
+ *              this pass already reported the same code at the argument itself.
  *
  * Exports:
  * - validateWidgetProps(input): Runs Pass 4 element property validation
@@ -26,7 +38,21 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import type { EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
+import { expandScreens, isRectangular, walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
+import { reportSubstituted } from './substituted-values.js';
+
+/**
+ * The anchor attributes (§7.2). They name the layout contract, not elements
+ * ([D-17]); which elements may carry them is read from the manifest.
+ */
+const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vcenter'];
+
+/** The centring switches, which are strict booleans (§7.2). */
+const CENTRING_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter'];
+
+/** The only values a centring switch may take (§7.2). */
+const BOOLEAN_VALUES: readonly string[] = ['true', 'false'];
 
 /**
  * Identity, anchor and style attributes valid on every element, which no
@@ -152,27 +178,37 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
   }
 
   // --- Step 4: Check enum values against the declared set ---
+  // A `$`-prefixed value is a composite template parameter, resolved at
+  // expansion time; its value is not knowable here (see checkSubstitutedValues).
   for (const prop of props) {
-    if (prop.type !== 'enum' || !prop.values) {
-      continue;
+    const diagnostic = checkEnumValue(node, prop.name, manifest);
+    if (diagnostic !== undefined) {
+      diagnostics.push(diagnostic);
     }
-    const rawVal = node.attributes[prop.name];
-    // A `$`-prefixed value is a composite template parameter, resolved at
-    // expansion time; its value is not knowable here.
-    if (typeof rawVal !== 'string' || rawVal === '' || rawVal.startsWith('$')) {
-      continue;
-    }
-    const allowedValues = prop.values.split(',').map((v) => v.trim());
-    if (!allowedValues.includes(rawVal)) {
+  }
+
+  // --- Step 4b: Anchors only on a rectangular element; centring switches are booleans (§7.2) ---
+  if (!isRectangular(manifest)) {
+    for (const anchor of ANCHOR_ATTRIBUTES) {
+      const value = node.attributes[anchor];
+      if (typeof value !== 'string' || (CENTRING_ATTRIBUTES.includes(anchor) && value === 'false')) {
+        continue;
+      }
       diagnostics.push(
         createPropDiagnostic(
-          DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-          `Invalid value '${rawVal}' for enum property '${prop.name}' on <${node.tag}>. Expected one of: ${allowedValues.join(', ')}.`,
-          node.attributeLocs?.[prop.name] ?? node.loc,
-          rawVal,
-          findClosest(rawVal, allowedValues),
+          DIAGNOSTIC_CODES.INAPPLICABLE_ANCHOR,
+          `Anchor '${anchor}' cannot apply to ${describeNode(node)}: anchors apply only to rectangular ` +
+            `elements, whose manifest declares x, y, width and height, and <${node.tag}> does not (§7.2).`,
+          node.attributeLocs?.[anchor] ?? node.loc,
+          anchor,
         ),
       );
+    }
+  }
+  for (const attribute of CENTRING_ATTRIBUTES) {
+    const diagnostic = checkCentringValue(node, attribute);
+    if (diagnostic !== undefined) {
+      diagnostics.push(diagnostic);
     }
   }
 
@@ -200,6 +236,92 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
   }
 
   return diagnostics;
+}
+
+// describeNode
+// "<u8g2gl_circle> 'dot'", or "<u8g2gl_circle>" when unnamed.
+function describeNode(node: WidgetNode): string {
+  const name = node.attributes.name;
+  return typeof name === 'string' && name !== '' ? `<${node.tag}> '${name}'` : `<${node.tag}>`;
+}
+
+// checkEnumValue
+// The INVALID_ENUM_VALUE diagnostic for one attribute, if the manifest declares
+// it as an enum and its value is known and outside the declared set.
+//   node      — the element
+//   attribute — the attribute to check
+//   manifest  — effective manifest for node.tag
+function checkEnumValue(node: WidgetNode, attribute: string, manifest: EffectiveManifest): Diagnostic | undefined {
+  const prop = manifest.api.props.find((p) => p.name === attribute);
+  if (prop === undefined || prop.type !== 'enum' || !prop.values) {
+    return undefined;
+  }
+  const rawVal = node.attributes[attribute];
+  if (typeof rawVal !== 'string' || rawVal === '' || rawVal.startsWith('$')) {
+    return undefined;
+  }
+  const allowedValues = prop.values.split(',').map((v) => v.trim());
+  if (allowedValues.includes(rawVal)) {
+    return undefined;
+  }
+  return createPropDiagnostic(
+    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
+    `Invalid value '${rawVal}' for enum property '${prop.name}' on <${node.tag}>. Expected one of: ${allowedValues.join(', ')}.`,
+    node.attributeLocs?.[prop.name] ?? node.loc,
+    rawVal,
+    findClosest(rawVal, allowedValues),
+  );
+}
+
+// checkCentringValue
+// The INVALID_ENUM_VALUE diagnostic for an `hcenter` / `vcenter` value that is
+// neither `true` nor `false` (§7.2). The same code as an enum: a boolean is a
+// two-member set, and the suggestions carry both members. A `$`-reference is not
+// yet a value.
+//   node      — the element
+//   attribute — `hcenter` or `vcenter`
+function checkCentringValue(node: WidgetNode, attribute: string): Diagnostic | undefined {
+  const value = node.attributes[attribute];
+  if (typeof value !== 'string' || value.startsWith('$') || BOOLEAN_VALUES.includes(value)) {
+    return undefined;
+  }
+  return createPropDiagnostic(
+    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
+    `Invalid value '${value}' for '${attribute}' on ${describeNode(node)}: it is a boolean, ` +
+      `'true' or 'false' (§7.2).`,
+    node.attributeLocs?.[attribute] ?? node.loc,
+    value,
+    [...BOOLEAN_VALUES],
+  );
+}
+
+// checkSubstitutedValues
+// The enum and centring checks for the values composite expansion substituted —
+// the ones Step 4 skipped as `$`-references (PR-04 WO7 F5). Nothing else is
+// checked again: every other value was checked as written.
+//   input       — validator input
+//   diagnostics — output; also read, so a fact already reported at the argument is not repeated
+function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[]): void {
+  const { globals, screens, manifests } = input;
+  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
+  const report = reportSubstituted(diagnostics);
+  for (const screen of expansion.screens) {
+    walkExpanded(screen.elements, (element) => {
+      const manifest = manifests.get(element.node.tag);
+      if (manifest === undefined) {
+        return;
+      }
+      for (const substitution of element.substitutions ?? []) {
+        const { attribute } = substitution;
+        const diagnostic = CENTRING_ATTRIBUTES.includes(attribute)
+          ? checkCentringValue(element.node, attribute)
+          : checkEnumValue(element.node, attribute, manifest);
+        if (diagnostic !== undefined) {
+          report(diagnostic, substitution, element);
+        }
+      }
+    });
+  }
 }
 
 // isDrawingElement
@@ -249,6 +371,7 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
   for (const composite of manifests.declaredComposites) {
     walkNodes(composite.view?.children ?? [], visit);
   }
+  checkSubstitutedValues(input, diagnostics);
 
   return diagnostics;
 }

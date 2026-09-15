@@ -276,10 +276,11 @@ describe('validateWidgetProps', () => {
       expect(diagnostics).toEqual([]);
     });
 
-    it('accepts identity and anchor attributes on any element', () => {
+    it('accepts identity attributes on any element, and anchors on a rectangular one', () => {
+      expect(run({ tag: 'u8g2gl_pixel', attributes: { name: 'px', x: '0', y: '0', style: 's' } })).toEqual([]);
       const diagnostics = run({
-        tag: 'u8g2gl_pixel',
-        attributes: { name: 'px', x: '0', y: '0', right: '1', bottom: '1', hcenter: 'true', vcenter: 'true', style: 's' },
+        tag: 'u8g2gl_label',
+        attributes: { name: 'lbl', right: '1', bottom: '1', hcenter: 'false', vcenter: 'true', width: '4', height: '4', font: 'f', style: 's' },
       });
       expect(diagnostics).toEqual([]);
     });

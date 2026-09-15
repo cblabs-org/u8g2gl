@@ -244,9 +244,10 @@ describe('resolver anchors (PR-04 WO6, §7.2)', () => {
       expect(numbers(element)).toEqual({ x: undefined, y: undefined, width: undefined, height: undefined, right: undefined, bottom: undefined });
     });
 
-    it('still reads the common anchors', () => {
-      const { element } = resolveOne(node('u8g2gl_line', { right: '3' }));
-      expect(element.geometry.right?.value).toBe(3);
+    it('reads the anchors only on a rectangular element (§7.2, PR-04 WO7b)', () => {
+      expect(resolveOne(node('u8g2gl_label', { right: '3' })).element.geometry.right?.value).toBe(3);
+      // u8g2gl_line declares none of x, y, width, height: no box for `right` to measure.
+      expect(resolveOne(node('u8g2gl_line', { right: '3' })).element.geometry.right).toBeUndefined();
     });
   });
 });

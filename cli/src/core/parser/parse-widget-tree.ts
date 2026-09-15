@@ -27,6 +27,7 @@
  * - createWidgetParseContext: Build a context seeded from a document's elements
  * - parseWidgetTree: Parse an array of child elements into WidgetNode AST nodes
  * - parseWidgetNode: Recursively parse a single element into a WidgetNode
+ * - hiddenAttributeValue: The boolean rule for `hidden`, keeping a `$prop` placeholder as text
  */
 
 import type {
@@ -221,6 +222,25 @@ function allocateName(allocator: NameAllocator, cleanTag: string): string {
   return generatedName;
 }
 
+/** A value that is exactly one `$prop` reference — expand.ts's whole-value placeholder. */
+const PROP_PLACEHOLDER = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * @brief The parsed value of a `hidden` attribute: `"true"` is true, anything
+ *        else false — except a whole `$prop` placeholder, which stays text.
+ *
+ * Converting `hidden="$p"` to a boolean here lost the reference before composite
+ * expansion could substitute it, so every such element became visible (PR-04
+ * WO7 F6). Expansion substitutes the placeholder and applies this same function
+ * to the argument, so the rule is spelled once.
+ *
+ * @param text The attribute value as written, or as substituted.
+ * @return A boolean, or the placeholder text unchanged.
+ */
+export function hiddenAttributeValue(text: string): string | boolean {
+  return PROP_PLACEHOLDER.test(text) ? text : text === 'true';
+}
+
 /**
  * Recursively parses a single RawXmlElement into a WidgetNode.
  * Enforces [U-1] element identity per the context's {@link MissingNamePolicy}.
@@ -256,7 +276,7 @@ export function parseWidgetNode(
       attributes['focus_style'] = attr.value;
       attributeLocs['focusStyle'] = attr.loc;
     } else if (attr.name === 'hidden') {
-      attributes['hidden'] = attr.value === 'true';
+      attributes['hidden'] = hiddenAttributeValue(attr.value);
     } else {
       attributes[attr.name] = attr.value;
     }

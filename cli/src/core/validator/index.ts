@@ -16,7 +16,7 @@
  *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers
  */
 
-export { validate, type ValidateInput, type ValidateResult } from './validate.js';
+export { validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
 export { validateSchema } from './validate-schema.js';
 export { validateReferences } from './validate-references.js';
 export { validateDisplay } from './validate-display.js';
