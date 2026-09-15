@@ -17,6 +17,7 @@
  *              for the u8g2gl_glyph widget.
  */
 #include "u8g2gl/u8g2gl_glyph.h"
+#include "u8g2gl/u8g2gl_coord.h"
 
 #if __has_include(<U8G2lib.h>)
 #include <U8G2lib.h>
@@ -69,5 +70,7 @@ void u8g2gl_glyph::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 3: Draw glyph ---
-    display.drawGlyph(x_, y_, glyph_);
+    // A glyph goes through U8G2's font renderer exactly as text does, so its
+    // origin takes the same unresolved WO4c conversion — see u8g2gl_coord_text().
+    display.drawGlyph(u8g2gl_coord_text(x_), u8g2gl_coord_text(y_), glyph_);
 }

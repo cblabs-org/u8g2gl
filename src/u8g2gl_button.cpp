@@ -18,6 +18,8 @@
  *              get_border_width, tick, and render methods for u8g2gl_button.
  */
 #include "u8g2gl/u8g2gl_button.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 
 #if __has_include(<U8G2lib.h>)
 #include <U8G2lib.h>
@@ -28,6 +30,27 @@
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
+
+// draw_border_rframe
+// Draws one border layer. The button has always called drawRFrame, even at
+// radius 0, so this cannot route through u8g2gl_draw_box(), which picks
+// drawFrame at radius 0. It follows that function's rounded-shape rule
+// (u8g2gl_draw.h): the origin must convert exactly, or the layer is skipped —
+// shortening would draw an edge where the signed frame has none.
+//   display  — U8G2 display driver instance
+//   x, y     — layer origin; may be negative
+//   w, h     — layer size, already checked positive by the caller
+//   r        — corner radius, >= 0
+static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
+                               int16_t w, int16_t h, int16_t r) {
+    u8g2_uint_t ux = 0;
+    u8g2_uint_t uy = 0;
+    if (!u8g2gl_coord_exact(x, ux) || !u8g2gl_coord_exact(y, uy)) {
+        return;
+    }
+    display.drawRFrame(ux, uy, u8g2gl_coord_clamp(w), u8g2gl_coord_clamp(h),
+                       u8g2gl_coord_clamp(r));
+}
 
 // u8g2gl_button::set_text
 // Stores pointer to the button label text and flags the object as dirty.
@@ -93,13 +116,11 @@ void u8g2gl_button::render(U8G2& display) {
     bool is_focused = !has_flag(U8G2GL_FLAG_DISABLED) && style_.invert;
 
     // --- Step 4: Draw background inversion if focused ---
+    // u8g2gl_draw_box() issues exactly the call this did — drawRBox when
+    // rounded, drawBox otherwise — and owns the coordinate conversion for both.
     if (is_focused) {
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
-        if (style_.radius > 0) {
-            display.drawRBox(x_, y_, w_, h_, style_.radius);
-        } else {
-            display.drawBox(x_, y_, w_, h_);
-        }
+        u8g2gl_draw_box(display, x_, y_, w_, h_, true, style_.radius);
     }
 
     // --- Step 5: Draw border frame(s) ---
@@ -108,7 +129,7 @@ void u8g2gl_button::render(U8G2& display) {
     if (border_width_ > 0) {
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
         if (border_width_ == 1) {
-            display.drawRFrame(x_, y_, w_, h_, style_.radius);
+            draw_border_rframe(display, x_, y_, w_, h_, style_.radius);
         } else {
             for (uint8_t i = 0; i < border_width_; ++i) {
                 int16_t bx = static_cast<int16_t>(x_ + i);
@@ -119,7 +140,7 @@ void u8g2gl_button::render(U8G2& display) {
                     break;
                 }
                 int16_t br = (style_.radius > i) ? static_cast<int16_t>(style_.radius - i) : 0;
-                display.drawRFrame(bx, by, bw, bh, br);
+                draw_border_rframe(display, bx, by, bw, bh, br);
             }
         }
     }
@@ -154,5 +175,6 @@ void u8g2gl_button::render(U8G2& display) {
         }
     }
 
-    display.drawUTF8(draw_x, draw_y, text_);
+    // Text origins are the unresolved WO4c case — see u8g2gl_coord_text().
+    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
 }

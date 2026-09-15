@@ -133,37 +133,32 @@ void u8g2gl_frame_dirty_observer(void* user_data);
  *        U8G2's clip-corner convention; no other runtime code calls
  *        setClipWindow().
  *
- * CLIP-CORNER CONVENTION — ASSUMPTION NOT VERIFIED BY A PIXEL TEST.
- * The second corner is treated as exclusive: a rect {x, y, w, h} becomes
- * setClipWindow(x, y, x + w, y + h), so the rect's last column (x + w - 1) and
- * last row (y + h - 1) remain drawable. design_spec §11.3 writes x+w-1, y+h-1;
- * that form would lose the last column and row if this assumption holds.
+ * CLIP-CORNER CONVENTION — THE FAR CORNER IS EXCLUSIVE, SETTLED FROM SOURCE.
+ * A rect {x, y, w, h} becomes setClipWindow(x, y, x + w, y + h), so the rect's
+ * last column (x + w - 1) and last row (y + h - 1) remain drawable. design_spec
+ * §11.3's x+w-1, y+h-1 form would lose the last column and row.
  *
- * Evidence: a reading of U8G2 2.36.18 source (not a render), in
- * departures-board-v3's PlatformIO cache, src/clib/:
- * - u8g2_apply_clip_window() (u8g2_setup.c) bounds user_x1 by clip_x1, and
- *   user_x1 defaults to the display width — an exclusive bound;
- * - u8g2_IsIntersection() (u8g2_intersection.c) states "upper limits are not
- *   included";
- * - u8g2_DrawHVLine() (u8g2_hvline.c) returns on x >= user_x1.
+ * Source: U8G2 2.36.18, now pinned at extern/u8g2. u8g2.h:352/354 document
+ * clip_x1 and clip_y1 as "(excluded)", and u8g2_clip_intersection2()
+ * (u8g2_hvline.c), which clips every line U8G2 draws against the window,
+ * agrees: it clips "against c (included) to d (excluded)".
  *
- * Nothing on the host renders through real U8G2, so the stub cannot confirm
- * this. PR-06's real-U8G2 build must add a pixel test at a container edge — an
- * object whose clip is exactly its bounds, drawing its last column and row —
- * which shows any one-pixel difference directly. If it disagrees, change this
- * function and nothing else; Core.ApplyClipPinsExclusiveCornerConvention pins
- * the current choice.
+ * PR-06's container-edge pixel test — an object whose clip is exactly its
+ * bounds, drawing its last column and row — now guards this convention rather
+ * than discovering it. If it ever fails, change this function and nothing
+ * else; Core.ApplyClipPinsExclusiveCornerConvention pins it on the host.
  *
- * U8G2 takes unsigned coordinates, so a negative origin would wrap to a huge
- * value rather than clip. A negative x or y is clamped to 0, and a rect with no
- * pixel at non-negative coordinates is rejected.
+ * Both corners are clamped to the display before they are converted to U8G2's
+ * unsigned coordinate type: the near corner at 0, because a negative origin
+ * would otherwise wrap to a huge value rather than clip, and the far corner at
+ * the display's width and height. A rect with no pixel on the display is
+ * rejected.
  *
  * @param display U8G2 instance whose clip window is set.
  * @param clip    Region to allow drawing into, in device pixels.
  * @return true if the clip window was set. false — and the display untouched —
- *         if the rect is empty or lies wholly above or left of the display; the
- *         caller must then draw nothing, because the previous clip is still in
- *         force.
+ *         if the rect is empty or lies wholly outside the display; the caller
+ *         must then draw nothing, because the previous clip is still in force.
  */
 bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip);
 

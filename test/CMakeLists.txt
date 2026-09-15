@@ -361,11 +361,53 @@ add_test(NAME VersionGuard.StaleSchemaMinorFailsToCompile
 set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
     PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.4"
 )
+# --- Real U8G2 acceptance target (WO4c) ---
+# Every other target compiles the runtime against test/stubs/U8G2lib.h, and a
+# stub can offer an API real U8G2 lacks: getFont() did, and nothing noticed. This
+# target compiles the runtime's own sources against U8G2's real headers from the
+# pinned submodule (extern/u8g2, tag 2.36.18) instead, so an API or type mismatch
+# is a build failure here rather than on someone's hardware.
+#
+#   - ARDUINO is defined because every firmware build defines it, and it changes
+#     the U8G2 class (it derives from Print). test/real_u8g2/ supplies the Arduino
+#     platform headers that implies — never a U8G2 declaration.
+#   - U8G2's include paths are SYSTEM so its own warnings do not count; our
+#     sources are still compiled with -Wall -Wextra -Wpedantic and must be clean.
+#   - It is an OBJECT library: compile-only, never linked, because linking would
+#     need U8G2's C sources and a hardware HAL.
+#   - It is part of the normal build, so a break fails `cmake --build` outright,
+#     and it is registered with CTest so the check is visible in every test run.
+set(U8G2GL_U8G2_DIR ${PROJECT_SOURCE_DIR}/extern/u8g2)
+if(NOT EXISTS ${U8G2GL_U8G2_DIR}/cppsrc/U8g2lib.h)
+    message(FATAL_ERROR
+        "U8G2 submodule missing at ${U8G2GL_U8G2_DIR}. The real-U8G2 acceptance "
+        "target needs it: run `git submodule update --init extern/u8g2`.")
+endif()
+
+add_library(u8g2gl_real_u8g2 OBJECT ${U8G2GL_RUNTIME_SOURCES})
+target_include_directories(u8g2gl_real_u8g2 PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(u8g2gl_real_u8g2 SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_real_u8g2 PRIVATE ARDUINO=10819)
+target_compile_options(u8g2gl_real_u8g2 PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+add_test(NAME RealU8g2.RuntimeCompilesAgainstRealHeaders
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target u8g2gl_real_u8g2
+)
+
 # All invoke the build system on the same tree; never run them concurrently.
 set_tests_properties(
     VersionGuard.MatchingSchemaMajorCompiles
     VersionGuard.SchemaZeroFourCompiles
     VersionGuard.MismatchedSchemaMajorFailsToCompile
     VersionGuard.StaleSchemaMinorFailsToCompile
+    RealU8g2.RuntimeCompilesAgainstRealHeaders
     PROPERTIES RESOURCE_LOCK u8g2gl_build_tree
 )

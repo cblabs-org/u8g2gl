@@ -10,8 +10,16 @@
  *              for display geometry), joins them with setup functions in u8g2_d_setup.c
  *              and constructor classes in U8g2lib.h. Produces deterministic DisplayRecord
  *              entries for full-buffer displays and a page-mode suggestion map.
+ *              Accepts U8G2 in either layout — the Arduino library release
+ *              (src/clib, src/U8g2lib.h) or the upstream git repository that
+ *              extern/u8g2 pins (csrc, cppsrc/U8g2lib.h) — and reads which commit
+ *              a tree is, so the catalogue can record its source (Q-11).
  *
  * Exports:
+ * - U8g2Layout: Where a U8G2 tree keeps the driver sources and U8g2lib.h
+ * - U8g2Source: The U8G2 tag and commit a tree is checked out at
+ * - resolveU8g2Layout(u8g2Path): Locate the inputs in either U8G2 layout
+ * - readU8g2Source(u8g2Path): Read the tag and commit of a U8G2 git checkout
  * - ParsedDisplayInfo: Raw geometry and offset info parsed from u8x8 struct
  * - ParsedSetupFunction: Setup function metadata from u8g2_d_setup.c
  * - ParsedConstructor: Class metadata from U8g2lib.h
@@ -24,7 +32,8 @@
  * - buildCatalogue(u8g2Path): End-to-end catalogue and page-mode builder
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   BusFamily,
@@ -81,6 +90,107 @@ export interface BuildCatalogueResult {
   readonly fullBufferCount: number;
   /** Total number of page-mode constructors mapped. */
   readonly pageModeCount: number;
+}
+
+/**
+ * Where a U8G2 source tree keeps the two inputs the builder reads.
+ */
+export interface U8g2Layout {
+  /** Directory holding u8x8_d_*.c and u8g2_d_setup.c. */
+  readonly clibDir: string;
+  /** Path to the C++ U8g2lib.h holding the constructor classes. */
+  readonly headerPath: string;
+}
+
+/**
+ * The U8G2 commit a catalogue is built from (Q-11). Both fields are null when the
+ * tree is not the top of a git checkout, because nothing then identifies it.
+ */
+export interface U8g2Source {
+  /** Tag that names HEAD exactly (e.g. "2.36.18"), or null if none does. */
+  readonly tag: string | null;
+  /** Full 40-character commit hash of HEAD, or null. */
+  readonly commit: string | null;
+}
+
+/**
+ * @brief Locates the driver sources and U8g2lib.h in either U8G2 layout.
+ *
+ * The Arduino library release (what PlatformIO installs) flattens U8G2 into
+ * src/clib and src/U8g2lib.h; the upstream git repository, which extern/u8g2
+ * pins, keeps them in csrc and cppsrc. The file contents are the same kind in
+ * both, so only the locations differ.
+ *
+ * @param u8g2Path Root of a U8G2 tree.
+ * @return The resolved locations.
+ * @throws Error if the path has neither layout. This is a build script's
+ *         precondition failure, not a user diagnostic.
+ */
+export function resolveU8g2Layout(u8g2Path: string): U8g2Layout {
+  // --- Step 1: Arduino library release layout ---
+  const releaseClib = join(u8g2Path, 'src', 'clib');
+  if (existsSync(releaseClib)) {
+    return { clibDir: releaseClib, headerPath: join(u8g2Path, 'src', 'U8g2lib.h') };
+  }
+
+  // --- Step 2: Upstream git repository layout (extern/u8g2) ---
+  const repoClib = join(u8g2Path, 'csrc');
+  const repoHeader = join(u8g2Path, 'cppsrc', 'U8g2lib.h');
+  if (existsSync(repoClib) && existsSync(repoHeader)) {
+    return { clibDir: repoClib, headerPath: repoHeader };
+  }
+
+  throw new Error(
+    `Not a U8G2 source tree: ${u8g2Path} has neither src/clib (Arduino release) ` +
+      'nor csrc and cppsrc/U8g2lib.h (git repository)'
+  );
+}
+
+/**
+ * @brief Runs one git command in a directory and returns its trimmed output.
+ *
+ * @param cwd  Directory to run git in.
+ * @param args git arguments.
+ * @return Trimmed stdout, or null if git failed, is missing, or printed nothing.
+ */
+function runGit(cwd: string, args: readonly string[]): string | null {
+  try {
+    const out = execFileSync('git', ['-C', cwd, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const trimmed = out.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @brief Reads the tag and commit a U8G2 tree is checked out at (Q-11).
+ *
+ * @param u8g2Path Root of a U8G2 tree.
+ * @return The source record. Both fields are null unless @p u8g2Path is itself
+ *         the top of a git checkout; tag is null when no tag names HEAD exactly.
+ */
+export function readU8g2Source(u8g2Path: string): U8g2Source {
+  // --- Step 1: Only the top of a checkout identifies a U8G2 commit ---
+  // `git -C` answers for the nearest enclosing repository, so a plain copy of
+  // U8G2 inside another project would otherwise report that project's commit —
+  // a confident, wrong record, which is worse than none.
+  const unknown: U8g2Source = { tag: null, commit: null };
+  if (!existsSync(u8g2Path)) {
+    return unknown;
+  }
+  const topLevel = runGit(u8g2Path, ['rev-parse', '--show-toplevel']);
+  if (topLevel === null || realpathSync(topLevel) !== realpathSync(u8g2Path)) {
+    return unknown;
+  }
+
+  // --- Step 2: Read HEAD, and the tag if one names it exactly ---
+  const commit = runGit(u8g2Path, ['rev-parse', 'HEAD']);
+  const tag = runGit(u8g2Path, ['describe', '--tags', '--exact-match', 'HEAD']);
+  return { tag, commit };
 }
 
 /**
@@ -351,11 +461,11 @@ export function parseSetupFunctions(clibDir: string): Map<string, ParsedSetupFun
  *
  * Extracts class name and the setup function invoked in the constructor initializer.
  *
- * @param u8g2Path Root path to the U8G2 library.
+ * @param u8g2Path Root path to the U8G2 library, in either layout.
  * @return Array of ParsedConstructor objects.
  */
 export function parseConstructors(u8g2Path: string): ParsedConstructor[] {
-  const headerPath = join(u8g2Path, 'src', 'U8g2lib.h');
+  const { headerPath } = resolveU8g2Layout(u8g2Path);
   const content = readFileSync(headerPath, 'utf8');
 
   const classRegex = /class\s+(U8G2_[a-zA-Z0-9_]+)\s*:\s*public\s+U8G2\s*\{[^}]*?(u8g2_Setup_[a-zA-Z0-9_]+)\s*\(&u8g2/gs;
@@ -419,11 +529,11 @@ function parseClassNameTokens(className: string): {
  * display_info structs, calculates RAM budgets, and builds the full-buffer
  * catalogue along with the page-mode replacement map.
  *
- * @param u8g2Path Root path to the U8G2 library.
+ * @param u8g2Path Root path to the U8G2 library, in either layout.
  * @return BuildCatalogueResult containing sorted catalogue and page-mode map.
  */
 export function buildCatalogue(u8g2Path: string): BuildCatalogueResult {
-  const clibDir = join(u8g2Path, 'src', 'clib');
+  const { clibDir } = resolveU8g2Layout(u8g2Path);
 
   // --- Step 1: Parse authoritative display_info structs ---
   const allStructs = parseDisplayInfoStructs(clibDir);

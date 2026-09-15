@@ -21,6 +21,8 @@
  *              tick, render, and render_animation_update.
  */
 #include "u8g2gl/u8g2gl_clock.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
 
@@ -232,19 +234,24 @@ void u8g2gl_clock::render(U8G2& display) {
     }
 
     // --- Step 6: Draw hours ---
+    // Every text origin below goes through u8g2gl_coord_text(), the unresolved
+    // WO4c case: a right- or centre-aligned clock wider than its bounds starts
+    // left of them, and nothing but the modular conversion preserves that.
     int h_offset = max_hour_w - hour_w;
-    display.drawUTF8(start_x + h_offset, draw_y, hour_str);
+    display.drawUTF8(u8g2gl_coord_text(start_x + h_offset), u8g2gl_coord_text(draw_y),
+                     hour_str);
     int16_t current_x = static_cast<int16_t>(start_x + max_hour_w + 1);
 
     // --- Step 7: Draw colon (subject to blink visibility) ---
     if (show_colon_) {
-        display.drawUTF8(current_x, draw_y, ":");
+        display.drawUTF8(u8g2gl_coord_text(current_x), u8g2gl_coord_text(draw_y), ":");
     }
     current_x = static_cast<int16_t>(current_x + colon_w + 1);
 
     // --- Step 8: Draw minutes ---
     int m_offset = max_min_w - min_w;
-    display.drawUTF8(current_x + m_offset, draw_y, min_str);
+    display.drawUTF8(u8g2gl_coord_text(current_x + m_offset), u8g2gl_coord_text(draw_y),
+                     min_str);
     current_x = static_cast<int16_t>(current_x + max_min_w + 1);
 
     // --- Step 9: Draw seconds (if HH_MM_SS format) ---
@@ -256,12 +263,14 @@ void u8g2gl_clock::render(U8G2& display) {
         // Seconds colon is always visible (non-blinking), centered in slot
         int s_colon_w = display.getUTF8Width(":");
         int s_col_offset = (max_sec_colon_w - s_colon_w) / 2;
-        display.drawUTF8(current_x + s_col_offset, sec_draw_y, ":");
+        display.drawUTF8(u8g2gl_coord_text(current_x + s_col_offset),
+                         u8g2gl_coord_text(sec_draw_y), ":");
         current_x = static_cast<int16_t>(current_x + max_sec_colon_w + 1);
 
         // Seconds digits right-aligned in max_sec_w slot
         int s_offset = max_sec_w - sec_w;
-        display.drawUTF8(current_x + s_offset, sec_draw_y, sec_str);
+        display.drawUTF8(u8g2gl_coord_text(current_x + s_offset),
+                         u8g2gl_coord_text(sec_draw_y), sec_str);
     }
 }
 
@@ -276,7 +285,7 @@ void u8g2gl_clock::render_animation_update(U8G2& display, uint32_t now_ms) {
     if (show_colon_ != old_colon) {
         // Clear own bounding box first ([D-5])
         display.setDrawColor(0);
-        display.drawBox(x_, y_, w_, h_);
+        u8g2gl_draw_box(display, x_, y_, w_, h_);
 
         // Re-render
         render(display);

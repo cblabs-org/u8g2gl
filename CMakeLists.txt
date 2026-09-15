@@ -31,22 +31,27 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(U8G2GL_BUILD_TESTS "Build U8G2GL tests" ON)
 
-add_library(u8g2gl STATIC
-    src/u8g2gl.cpp
-    src/u8g2gl_obj.cpp
-    src/u8g2gl_label.cpp
-    src/u8g2gl_xbm.cpp
-    src/u8g2gl_glyph.cpp
-    src/u8g2gl_progress_bar.cpp
-    src/u8g2gl_clock.cpp
-    src/u8g2gl_switch.cpp
-    src/u8g2gl_button.cpp
-    src/u8g2gl_tree.cpp
-    src/u8g2gl_subject.cpp
-    src/u8g2gl_style.cpp
-    src/u8g2gl_core.cpp
-    src/u8g2gl_draw.cpp
+# One list of runtime sources, absolute so test/ can reuse it: the real-U8G2
+# acceptance target (test/CMakeLists.txt) must compile exactly what the library
+# compiles, or a source added here would escape the check.
+set(U8G2GL_RUNTIME_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_obj.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_label.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_xbm.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_glyph.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_progress_bar.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_clock.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_switch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_button.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_tree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_subject.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_style.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_core.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_draw.cpp
 )
+
+add_library(u8g2gl STATIC ${U8G2GL_RUNTIME_SOURCES})
 
 target_include_directories(u8g2gl PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -38,6 +38,29 @@
  *              a crash: these run inside the render loop, where a bad value
  *              is a reboot rather than an exception.
  *
+ * Coordinates: parameters are signed int16_t (§13.2), but U8G2 takes unsigned
+ *              u8g2_uint_t, where -5 silently becomes 65531. Every conversion
+ *              goes through u8g2gl_coord.h, and each primitive applies the
+ *              rule that lights no pixel the signed geometry would not
+ *              (WO4c). These rules are shared by the widgets that issue the
+ *              same U8G2 calls:
+ *
+ *              | Primitive (U8G2 call)            | Negative origin / endpoint |
+ *              |----------------------------------|----------------------------|
+ *              | filled square box (drawBox)      | SHORTEN both axes          |
+ *              | hline (drawHLine)                | SHORTEN x; skip if y < 0   |
+ *              | vline (drawVLine)                | SHORTEN y; skip if x < 0   |
+ *              | outline box (drawFrame)          | SKIP                       |
+ *              | rounded box (drawRBox/RFrame)    | SKIP                       |
+ *              | circle, ellipse (centre)         | SKIP                       |
+ *              | line (either endpoint)           | SKIP                       |
+ *              | pixel                            | SKIP                       |
+ *              | filled triangle (drawTriangle)   | none — U8G2 takes int16_t  |
+ *              | outline triangle                 | SKIP per edge (as line)    |
+ *
+ *              Extents and radii are already guarded positive; they are CLAMPED,
+ *              which only makes the conversion explicit.
+ *
  * Exported Types:
  * - u8g2gl_draw_segment_t: Which arc/quadrant a circle or ellipse draws
  *

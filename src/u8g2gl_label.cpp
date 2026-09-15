@@ -19,7 +19,9 @@
  *              helpers, and render_animation_update for u8g2gl_label.
  */
 #include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include "u8g2gl/u8g2gl_tree.h"
 
@@ -318,7 +320,12 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
         // clip, so a scrolling label inside a narrower container painted outside
         // the container (WO4 F6). U8G2 cannot report the clip, so a widget has
         // no way to narrow it and put it back; it must leave it alone.
-        display.drawUTF8(static_cast<int16_t>(x_ - scroll_x_), draw_y, text_);
+        //
+        // x_ - scroll_x_ is negative on every step once the marquee starts, which
+        // is why text origins are the unresolved WO4c case: clamping would freeze
+        // the marquee and skipping would blank it. See u8g2gl_coord_text().
+        display.drawUTF8(u8g2gl_coord_text(x_ - scroll_x_), u8g2gl_coord_text(draw_y),
+                         text_);
         return;
     }
 
@@ -337,7 +344,7 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
             ? x_
             : static_cast<int16_t>(x_ + (w_ - message_width_) / 2);
     }
-    display.drawUTF8(draw_x, draw_y, text_);
+    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
 }
 
 // u8g2gl_label::render_static
@@ -370,16 +377,17 @@ void u8g2gl_label::render_static(U8G2& display, int16_t draw_y, bool dots) {
     // For U8G2GL_ALIGN_LEFT, draw_x remains x_.
 
     // drawUTF8 is used rather than drawStr for full UTF-8 Unicode character
-    // support.
-    display.drawUTF8(draw_x, draw_y, text_);
+    // support. Centred or right-aligned text wider than the label starts left
+    // of it, so this origin can be negative: see u8g2gl_coord_text().
+    display.drawUTF8(u8g2gl_coord_text(draw_x), u8g2gl_coord_text(draw_y), text_);
 
     if (dots && overflow_) {
         int dots_width = display.getUTF8Width("...");
         int16_t dots_x = static_cast<int16_t>(x_ + w_ - dots_width);
         display.setDrawColor(0);
-        display.drawBox(dots_x, y_, dots_width, h_);
+        u8g2gl_draw_box(display, dots_x, y_, static_cast<int16_t>(dots_width), h_);
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
-        display.drawUTF8(dots_x, draw_y, "...");
+        display.drawUTF8(u8g2gl_coord_text(dots_x), u8g2gl_coord_text(draw_y), "...");
     }
 }
 
@@ -425,7 +433,7 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
     if (scroll_x_ != old_scroll_x) {
         // Clear own bounding box first ([D-5])
         display.setDrawColor(0);
-        display.drawBox(x_, y_, w_, h_);
+        u8g2gl_draw_box(display, x_, y_, w_, h_);
 
         // Re-render text inside the label's own bounds. This path runs outside
         // u8g2gl_render_object(), while the main loop is blocked, so no

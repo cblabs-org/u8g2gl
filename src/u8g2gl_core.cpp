@@ -22,6 +22,7 @@
  *              convention
  */
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_tree.h"
 
@@ -168,27 +169,41 @@ bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip) {
     }
 
     // --- Step 2: Compute the corners, exclusive at the far edge ---
-    // In int: x + w can leave int16_t.
-    int x0 = clip.x;
-    int y0 = clip.y;
-    const int x1 = static_cast<int>(clip.x) + clip.w;
-    const int y1 = static_cast<int>(clip.y) + clip.h;
+    // In int32_t: x + w can leave int16_t, and int may be 16-bit.
+    int32_t x0 = clip.x;
+    int32_t y0 = clip.y;
+    int32_t x1 = static_cast<int32_t>(clip.x) + clip.w;
+    int32_t y1 = static_cast<int32_t>(clip.y) + clip.h;
 
-    // --- Step 3: Clamp to non-negative coordinates ---
-    // U8G2 takes unsigned coordinates, so a negative corner would wrap to a huge
-    // value rather than clip. With an exclusive far corner, x1 <= 0 means the
-    // last drawable column is left of the display.
-    if (x1 <= 0 || y1 <= 0) {
-        return false;
-    }
+    // --- Step 3: Clamp both corners to the display ---
+    // U8G2 takes unsigned coordinates, so a negative near corner would wrap to
+    // a huge value rather than clip. The far corner is clamped too, so the
+    // window never names a column or row past the display and always fits
+    // u8g2_uint_t, whatever its width on this build.
+    const int32_t display_w = static_cast<int32_t>(display.getDisplayWidth());
+    const int32_t display_h = static_cast<int32_t>(display.getDisplayHeight());
     if (x0 < 0) {
         x0 = 0;
     }
     if (y0 < 0) {
         y0 = 0;
     }
+    if (x1 > display_w) {
+        x1 = display_w;
+    }
+    if (y1 > display_h) {
+        y1 = display_h;
+    }
 
-    display.setClipWindow(x0, y0, x1, y1);
+    // --- Step 4: Reject a rect with no pixel on the display ---
+    // With an exclusive far corner, x1 <= x0 means no column survives: the rect
+    // lay wholly left of, or wholly right of, the display (likewise rows).
+    if (x1 <= x0 || y1 <= y0) {
+        return false;
+    }
+
+    display.setClipWindow(u8g2gl_coord_clamp(x0), u8g2gl_coord_clamp(y0),
+                          u8g2gl_coord_clamp(x1), u8g2gl_coord_clamp(y1));
     return true;
 }
 

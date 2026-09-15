@@ -17,6 +17,7 @@
  *              for the u8g2gl_switch widget.
  */
 #include "u8g2gl/u8g2gl_switch.h"
+#include "u8g2gl/u8g2gl_coord.h"
 
 #if __has_include(<U8G2lib.h>)
 #include <U8G2lib.h>
@@ -106,7 +107,17 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 4: Draw switch track ---
     // Outer rounded rectangle frame covering the full widget bounds.
-    display.drawRFrame(x_, y_, w_, h_, r);
+    // Both shapes here are rounded, so both follow the rounded-shape rule in
+    // u8g2gl_draw.h: the origin must convert exactly, or the draw is skipped —
+    // moving a rounded shape would put its corners where the signed geometry
+    // has none. They are converted here rather than through u8g2gl_draw_box(),
+    // which would pick drawBox for the handle whenever its radius reaches 0.
+    u8g2_uint_t track_x = 0;
+    u8g2_uint_t track_y = 0;
+    if (u8g2gl_coord_exact(x_, track_x) && u8g2gl_coord_exact(y_, track_y)) {
+        display.drawRFrame(track_x, track_y, u8g2gl_coord_clamp(w_),
+                           u8g2gl_coord_clamp(h_), u8g2gl_coord_clamp(r));
+    }
 
     // --- Step 5: Compute handle geometry ---
     // Handle is inset by 1 pixel from the track border.
@@ -133,5 +144,10 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 6: Draw switch handle ---
     // Filled rounded rectangle indicating current toggle state.
-    display.drawRBox(handle_x, handle_y, handle_w, handle_h, handle_r);
+    u8g2_uint_t handle_ux = 0;
+    u8g2_uint_t handle_uy = 0;
+    if (u8g2gl_coord_exact(handle_x, handle_ux) && u8g2gl_coord_exact(handle_y, handle_uy)) {
+        display.drawRBox(handle_ux, handle_uy, u8g2gl_coord_clamp(handle_w),
+                         u8g2gl_coord_clamp(handle_h), u8g2gl_coord_clamp(handle_r));
+    }
 }

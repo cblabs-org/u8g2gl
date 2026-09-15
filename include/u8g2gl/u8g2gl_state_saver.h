@@ -66,7 +66,11 @@ public:
     explicit u8g2gl_state_saver(U8G2& display)
         : display_(display),
           saved_draw_color_(display.getDrawColor()),
-          saved_font_(display.getFont()) {
+          // U8G2 has no getFont(): the current font is only readable from its
+          // state struct (U8g2lib.h getU8g2(), u8g2.h `const uint8_t *font`).
+          // A getFont() once existed in the test stub alone, so this compiled
+          // on the host and not against real U8G2 (WO4b G1, fixed in WO4c).
+          saved_font_(display.getU8g2()->font) {
     }
 
     /** @brief Restore the draw colour and font captured at construction. */

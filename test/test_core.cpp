@@ -21,6 +21,7 @@
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_progress_bar.h"
 #include "u8g2gl/u8g2gl_style.h"
 #include "u8g2gl/u8g2gl_subject.h"
 #include "U8G2lib.h"
@@ -573,6 +574,78 @@ TEST_F(Core, ApplyClipRejectsEmptyAndOffDisplayRects) {
     EXPECT_TRUE(u8g2gl_apply_clip(display, one_column_on));
     EXPECT_EQ(display.last_clip_x0, 0);
     EXPECT_EQ(display.last_clip_x1, 1);
+}
+
+// WO4c: the far corner is clamped to the display as well as the near corner at
+// 0, so the window never names a column or row past the display.
+TEST_F(Core, ApplyClipClampsFarCornerToDisplay) {
+    U8G2 display;   // the stub reports 128 x 64
+    const u8g2gl_rect overhanging = { 100, 50, 60, 30 };
+
+    EXPECT_TRUE(u8g2gl_apply_clip(display, overhanging));
+    EXPECT_EQ(display.last_clip_x0, 100);
+    EXPECT_EQ(display.last_clip_y0, 50);
+    EXPECT_EQ(display.last_clip_x1, 128);
+    EXPECT_EQ(display.last_clip_y1, 64);
+
+    // Both corners at once: a rect larger than the display in every direction.
+    const u8g2gl_rect covering = { -10, -10, 200, 100 };
+    EXPECT_TRUE(u8g2gl_apply_clip(display, covering));
+    EXPECT_EQ(display.last_clip_x0, 0);
+    EXPECT_EQ(display.last_clip_y0, 0);
+    EXPECT_EQ(display.last_clip_x1, 128);
+    EXPECT_EQ(display.last_clip_y1, 64);
+}
+
+TEST_F(Core, ApplyClipRejectsRectsRightOfOrBelowDisplay) {
+    U8G2 display;
+    const u8g2gl_rect right_of_display = { 128, 0, 10, 10 };   // first column is x = 128
+    const u8g2gl_rect below_display = { 0, 64, 10, 10 };
+
+    EXPECT_FALSE(u8g2gl_apply_clip(display, right_of_display));
+    EXPECT_FALSE(u8g2gl_apply_clip(display, below_display));
+    EXPECT_EQ(display.set_clip_window_count, 0);
+}
+
+// WO4c degenerate input: an element partly off the left (x = -5) and top edges,
+// rendered through the framework wrapper. The retyped stub records what
+// hardware would receive, so a wrapped negative shows up as a value >= 32768.
+// Before WO4c the fill box reached U8G2 at x = 65532, y = 65534.
+TEST_F(Core, RenderObjectPartlyOffLeftAndTopRecordsNoWrappedCoordinate) {
+    static constexpr int kWrapped = 32768;
+
+    u8g2gl_progress_bar bar;
+    bar.set_coords(-5, -3, 42, 12);   // inner area 40 x 10 starting at (-4, -2)
+    bar.set_fill_style(U8G2GL_FILL_SOLID);
+    bar.set_value(50);                // fill width 20
+
+    u8g2gl_obj* const objs[] = { &bar };
+    U8G2 display;
+    u8g2gl_render_object(display, objs, nullptr, 0);
+
+    // Clip: both near corners clamped, far corners exclusive.
+    EXPECT_EQ(display.set_clip_window_count, 1);
+    EXPECT_EQ(display.last_clip_x0, 0);
+    EXPECT_EQ(display.last_clip_y0, 0);
+    EXPECT_EQ(display.last_clip_x1, 37);
+    EXPECT_EQ(display.last_clip_y1, 9);
+
+    // The outline frame cannot be drawn faithfully from a negative origin: skipped.
+    EXPECT_EQ(display.draw_frame_count, 0);
+
+    // The fill is shortened to its visible part: columns -4..15, rows -2..7.
+    ASSERT_EQ(display.draw_box_count, 1);
+    EXPECT_EQ(display.last_draw_box_x, 0);
+    EXPECT_EQ(display.last_draw_box_y, 0);
+    EXPECT_EQ(display.last_draw_box_w, 16);
+    EXPECT_EQ(display.last_draw_box_h, 8);
+
+    for (int recorded : { display.last_clip_x0, display.last_clip_y0,
+                          display.last_clip_x1, display.last_clip_y1,
+                          display.last_draw_box_x, display.last_draw_box_y,
+                          display.last_draw_box_w, display.last_draw_box_h }) {
+        EXPECT_LT(recorded, kWrapped);
+    }
 }
 
 // --- Frame-dirty observer: u8g2gl_frame_dirty_observer() (§13.5) ---

@@ -22,6 +22,8 @@
  *              render_animation_update.
  */
 #include "u8g2gl/u8g2gl_progress_bar.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
 
@@ -218,7 +220,10 @@ void u8g2gl_progress_bar::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 3: Draw outer track frame ---
-    display.drawFrame(x_, y_, w_, h_);
+    // The frame, fill and stipple pixels go through the u8g2gl_draw_* functions,
+    // which issue exactly the U8G2 calls this used to and own their coordinate
+    // conversion (the per-primitive rules are tabulated in u8g2gl_draw.h).
+    u8g2gl_draw_box(display, x_, y_, w_, h_, false);
 
     // --- Step 4: Calculate fill width ---
     int16_t inner_w = static_cast<int16_t>(w_ - 2);
@@ -233,14 +238,16 @@ void u8g2gl_progress_bar::render(U8G2& display) {
             bool toggle = (i % 2 == 0);
             for (int16_t row = 0; row < inner_h; row++) {
                 if ((row + (toggle ? 0 : 1)) % 2 == 0) {
-                    display.drawPixel(x_ + 1 + i, y_ + 1 + row);
+                    u8g2gl_draw_pixel(display, static_cast<int16_t>(x_ + 1 + i),
+                                      static_cast<int16_t>(y_ + 1 + row));
                 }
             }
         }
     } else {
         // Solid fill
         if (fill > 0) {
-            display.drawBox(x_ + 1, y_ + 1, fill, inner_h);
+            u8g2gl_draw_box(display, static_cast<int16_t>(x_ + 1),
+                            static_cast<int16_t>(y_ + 1), fill, inner_h);
         }
     }
 
@@ -255,7 +262,8 @@ void u8g2gl_progress_bar::render(U8G2& display) {
         int16_t text_x = static_cast<int16_t>(x_ + (w_ - text_w) / 2);
         int16_t text_y = static_cast<int16_t>(y_ + (h_ - font_height) / 2);
 
-        display.drawUTF8(text_x, text_y, buf);
+        // Text origins are the unresolved WO4c case — see u8g2gl_coord_text().
+        display.drawUTF8(u8g2gl_coord_text(text_x), u8g2gl_coord_text(text_y), buf);
     }
 }
 
@@ -270,7 +278,7 @@ void u8g2gl_progress_bar::render_animation_update(U8G2& display, uint32_t now_ms
     if (current_percent_ != old_percent) {
         // Clear own bounding box first ([D-5])
         display.setDrawColor(0);
-        display.drawBox(x_, y_, w_, h_);
+        u8g2gl_draw_box(display, x_, y_, w_, h_);
 
         // Re-render
         render(display);

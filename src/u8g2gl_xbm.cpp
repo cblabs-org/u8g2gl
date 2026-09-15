@@ -18,6 +18,7 @@
  *              for the u8g2gl_xbm widget.
  */
 #include "u8g2gl/u8g2gl_xbm.h"
+#include "u8g2gl/u8g2gl_coord.h"
 
 #if __has_include(<U8G2lib.h>)
 #include <U8G2lib.h>
@@ -69,5 +70,14 @@ void u8g2gl_xbm::render(U8G2& display) {
     display.setBitmapMode(static_cast<uint8_t>(style_.bitmap_mode));
 
     // --- Step 3: Draw XBM bitmap ---
-    display.drawXBMP(x_, y_, w_, h_, bits_);
+    // SKIP rule (u8g2gl_draw.h): U8G2 draws a bitmap from its first bit at the
+    // given origin, so shortening a negative origin would shift the image rather
+    // than crop it. A bitmap left of or above the display is not drawn. The size
+    // is clamped, so a non-positive size draws nothing instead of wrapping.
+    u8g2_uint_t ux = 0;
+    u8g2_uint_t uy = 0;
+    if (!u8g2gl_coord_exact(x_, ux) || !u8g2gl_coord_exact(y_, uy)) {
+        return;
+    }
+    display.drawXBMP(ux, uy, u8g2gl_coord_clamp(w_), u8g2gl_coord_clamp(h_), bits_);
 }

@@ -22,6 +22,7 @@
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_tree.h"
@@ -374,7 +375,11 @@ TEST(LabelScroll, InitialDelayBeforeScroll) {
 
     // Verify pixel offset has incremented to 1 (drawn at x - scroll_x = 0 - 1 = -1)
     label.render(display);
-    EXPECT_EQ(display.last_draw_utf8_x, -1);
+    // x_ - scroll_x_ = -1 reaches U8G2 through u8g2gl_coord_text(), which wraps
+    // it explicitly (WO4c stop-and-report); the retyped stub records what
+    // hardware receives, so -1 is observed as 65535.
+    EXPECT_EQ(display.last_draw_utf8_x, static_cast<int>(u8g2gl_coord_text(-1)));
+    EXPECT_EQ(display.last_draw_utf8_x, 65535);
 }
 
 TEST(LabelScroll, ResetScroll) {
@@ -392,7 +397,11 @@ TEST(LabelScroll, ResetScroll) {
     label.tick(3001);
 
     label.render(display);
-    EXPECT_EQ(display.last_draw_utf8_x, -1);
+    // x_ - scroll_x_ = -1 reaches U8G2 through u8g2gl_coord_text(), which wraps
+    // it explicitly (WO4c stop-and-report); the retyped stub records what
+    // hardware receives, so -1 is observed as 65535.
+    EXPECT_EQ(display.last_draw_utf8_x, static_cast<int>(u8g2gl_coord_text(-1)));
+    EXPECT_EQ(display.last_draw_utf8_x, 65535);
 
     // Reset rewinds offset back to 0
     label.reset_scroll();
@@ -818,7 +827,29 @@ TEST(LabelScrollCircular, StillMarquees) {
     label.tick(3001);
 
     label.render(display);
-    EXPECT_EQ(display.last_draw_utf8_x, -1);
+    // x_ - scroll_x_ = -1 reaches U8G2 through u8g2gl_coord_text(), which wraps
+    // it explicitly (WO4c stop-and-report); the retyped stub records what
+    // hardware receives, so -1 is observed as 65535.
+    EXPECT_EQ(display.last_draw_utf8_x, static_cast<int>(u8g2gl_coord_text(-1)));
+    EXPECT_EQ(display.last_draw_utf8_x, 65535);
+}
+
+// PINS THE UNRESOLVED WO4c TEXT CONVERSION. A text origin left of the display
+// reaches U8G2 wrapped, explicitly, through u8g2gl_coord_text(): clamping would
+// freeze a marquee and skipping would blank it, so the choice among clamp,
+// shorten and skip is recorded for the Principal Architect instead of made.
+// When it is ruled on, change u8g2gl_coord_text() and this test, nothing else.
+TEST(LabelScroll, TextLeftOfOriginReachesU8g2Wrapped) {
+    u8g2gl_label label;
+    label.set_coords(-5, 4, 20, 10);   // clip mode, partly off the left edge
+    label.set_text("Hi");
+
+    U8G2 display;
+    label.render(display);
+
+    ASSERT_EQ(display.draw_utf8_count, 1);
+    EXPECT_EQ(display.last_draw_utf8_x, 65531);   // -5 modulo 2^16
+    EXPECT_EQ(display.last_draw_utf8_y, 9);       // 4 + (10 - 0) / 2, centred
 }
 
 // =====================================================================

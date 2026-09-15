@@ -588,11 +588,11 @@ TEST(StateSaver, SavesAndRestores) {
         display.setDrawColor(2);
         display.setFont(&font2);
         EXPECT_EQ(display.getDrawColor(), 2);
-        EXPECT_EQ(display.getFont(), &font2);
+        EXPECT_EQ(display.getU8g2()->font, &font2);
     }
 
     EXPECT_EQ(display.getDrawColor(), 1);
-    EXPECT_EQ(display.getFont(), &font1);
+    EXPECT_EQ(display.getU8g2()->font, &font1);
 }
 
 TEST(PartialRefresh, TileAligned) {
@@ -603,6 +603,25 @@ TEST(PartialRefresh, TileAligned) {
     EXPECT_EQ(display.last_ty, 0);
     EXPECT_EQ(display.last_tw, 2);
     EXPECT_EQ(display.last_th, 2);
+}
+
+TEST(PartialRefresh, NegativeOriginRefreshesOnlyVisiblePart) {
+    U8G2 display;
+    // Pixels -12..7 by -10..5: only 0..7 by 0..5 is on the display, one tile.
+    // Tile arithmetic on the raw origin would give tx = -1, which U8G2's
+    // uint8_t tile argument receives as 255 (WO4c).
+    u8g2gl_partial_refresh(display, -12, -10, 20, 16);
+    EXPECT_EQ(display.update_display_area_count, 1);
+    EXPECT_EQ(display.last_tx, 0);
+    EXPECT_EQ(display.last_ty, 0);
+    EXPECT_EQ(display.last_tw, 1);
+    EXPECT_EQ(display.last_th, 1);
+}
+
+TEST(PartialRefresh, WhollyOffDisplayRefreshesNothing) {
+    U8G2 display;
+    u8g2gl_partial_refresh(display, -16, 0, 16, 8);
+    EXPECT_EQ(display.update_display_area_count, 0);
 }
 
 TEST(PartialRefresh, NonAligned) {
