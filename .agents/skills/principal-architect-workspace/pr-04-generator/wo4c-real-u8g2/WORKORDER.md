@@ -5,7 +5,7 @@ title: "The runtime compiles against real U8G2: submodule, real-header target, s
 branch: u8g2gl-generator/wo4c-real-u8g2
 base: u8g2gl-generator/wo8-realisation-capacities (PA review commit; stack tip after WO7)
 complexity: standard
-status: dispatched
+status: partial
 ---
 
 # WO4c — The runtime compiles against real U8G2
@@ -78,10 +78,10 @@ real headers as an acceptance test, and fix what that exposes.
 
 ## Line-Item Instructions
 
-- [ ] **Submodule.** `git submodule add https://github.com/olikraus/u8g2.git extern/u8g2`,
+- [x] **Submodule.** `git submodule add https://github.com/olikraus/u8g2.git extern/u8g2`,
       check out tag **`2.36.18`**, and commit the gitlink. `.gitmodules` already exists —
       add to it, do not replace it. Record the pinned commit SHA in the Completion Report.
-- [ ] **Real-header acceptance target.** A host CMake target that compiles the runtime
+- [x] **Real-header acceptance target.** A host CMake target that compiles the runtime
       (`src/*.cpp`) against **U8G2's real headers from `extern/u8g2`**, not the stub. It is
       compile-only if linking needs hardware. Real `U8g2lib.h` includes Arduino headers:
       supply the **minimum Arduino platform shim** (e.g. `Arduino.h`, `Print.h`) under
@@ -90,10 +90,10 @@ real headers as an acceptance test, and fix what that exposes.
       `SYSTEM` so third-party warnings do not count against zero-warnings; **our** code must
       still compile with zero warnings under `-Wall -Wextra -Wpedantic`. Register it so
       `ctest` (or the normal build) fails if it fails.
-- [ ] **Prove the target catches the defects.** In a throwaway worktree under `tmp/`,
+- [x] **Prove the target catches the defects.** In a throwaway worktree under `tmp/`,
       confirm the target **fails** on this branch's base code (`getFont`) before your fix,
       and say what it reported. Remove the worktree.
-- [ ] **Font via the real API.** `u8g2gl_state_saver` reads the font through
+- [x] **Font via the real API.** `u8g2gl_state_saver` reads the font through
       `display.getU8g2()->font`. Remove `getFont()` from the stub; give the stub
       `getU8g2()` returning a struct with a `font` member, so the stub can no longer offer
       an API real U8G2 lacks.
@@ -104,23 +104,23 @@ real headers as an acceptance test, and fix what that exposes.
       No conversion may silently wrap: a negative origin is clamped, or the primitive's
       length/extent is shortened to the visible part, or the draw is skipped — choose per
       primitive, document the choice at the helper, and test it.
-- [ ] **Clip clamped at both corners.** `u8g2gl_apply_clip` clamps the near corner at 0
+- [x] **Clip clamped at both corners.** `u8g2gl_apply_clip` clamps the near corner at 0
       (as today) and the far corner to the display, with explicit conversions.
-- [ ] **F1 comment.** In `u8g2gl_apply_clip`, replace the "not verified by a pixel test"
+- [x] **F1 comment.** In `u8g2gl_apply_clip`, replace the "not verified by a pixel test"
       note with the source citation: `u8g2.h:352/354` document `clip_x1`/`clip_y1` as
       "(excluded)", and `u8g2_clip_intersection2` agrees (U8G2 2.36.18, now pinned at
       `extern/u8g2`). Note that PR-06's container-edge pixel test now **guards** the
       convention rather than discovering it.
-- [ ] **Degenerate-input tests that can fail.** Element partly off the left edge (x = −5)
+- [x] **Degenerate-input tests that can fail.** Element partly off the left edge (x = −5)
       and partly off the top: against the retyped stub, assert no recorded coordinate is a
       wrapped value (≥ 32768). At least one such test must fail against the base code, and
       the report says which.
-- [ ] **`THIRD-PARTY-NOTICES.md`** at the repository root with a U8G2 row: the code is
+- [x] **`THIRD-PARTY-NOTICES.md`** at the repository root with a U8G2 row: the code is
       **BSD-2-Clause**; the fonts are licensed **per font group** (U8G2 wiki page
       "fntgrp"). State both, the pinned version, and that the submodule is used for host
       tests and the catalogue build, while applications get U8G2 through their own
       dependency (PR-05).
-- [ ] **Catalogue builder uses the submodule and records its source (closes Q-11).**
+- [x] **Catalogue builder uses the submodule and records its source (closes Q-11).**
       `cli/src/node/build-catalogue.ts` defaults `--u8g2-path` to `extern/u8g2`, and the
       build records the U8G2 commit (and tag) it was built from. Record it **without
       changing the `CATALOGUE` export's shape** (e.g. a sibling metadata file or a
@@ -147,22 +147,23 @@ is unreleased in this PR.
 
 ## Testing Requirement
 
-- [ ] The real-header target builds on the finished branch and demonstrably failed on the
+- [x] The real-header target builds on the finished branch and demonstrably failed on the
       base.
-- [ ] No `getFont` anywhere in `include/`, `src/` or the stub.
+- [x] No `getFont` anywhere in `include/`, `src/` or the stub.
 - [ ] Negative-origin tests assert no wrapped coordinate reaches the stub; at least one
-      fails at the base.
-- [ ] Clip clamped at both corners, pinned by a test.
-- [ ] Catalogue build from `extern/u8g2` records its source commit.
+      fails at the base. *(True for every primitive except text origins, which reach the
+      stub wrapped, explicitly — stop-and-report S1. 13 tests fail at the base.)*
+- [x] Clip clamped at both corners, pinned by a test.
+- [x] Catalogue build from `extern/u8g2` records its source commit.
 
 ## Verification Requirement
 
-- [ ] `git submodule status` shows `extern/u8g2` at the 2.36.18 commit
-- [ ] `cmake -S . -B build && cmake --build build` — zero warnings in our code
-- [ ] `ctest --test-dir build` — all pass (baseline 284, one known skip), including the
+- [x] `git submodule status` shows `extern/u8g2` at the 2.36.18 commit
+- [x] `cmake -S . -B build && cmake --build build` — zero warnings in our code
+- [x] `ctest --test-dir build` — all pass (baseline 284, one known skip), including the
       real-header target
-- [ ] `cd cli && npx vitest run && npx tsc --noEmit && npm run lint` — clean (baseline 596)
-- [ ] `git diff --name-only` limited to the Boundary Box
+- [x] `cd cli && npx vitest run && npx tsc --noEmit && npm run lint` — clean (baseline 596)
+- [x] `git diff --name-only` limited to the Boundary Box
 
 ## Issue Surfacing
 
@@ -173,4 +174,385 @@ real-header target to expose more than `getFont`; anything outside the box is a 
 
 ## Completion Report
 
-*To be filled in by the worker.*
+**Status: `partial`.** Every line item is delivered except one clause, which is recorded
+rather than chosen (S1). The "no conversion may silently wrap" rule cannot be met for
+**text origins** without changing marquee behaviour. Text origins are converted
+explicitly, in one function, and pinned by a test, but they still wrap.
+
+- Implementation commit: `7924d24`. This report is committed separately.
+- The session was interrupted once by an API usage limit and resumed from the untouched
+  working tree. Nothing was reset, stashed or discarded.
+
+### Authorization verified (from committed artifacts)
+
+- Front matter: `project: pr-04-generator`, `status: dispatched` at dispatch.
+- `../PROJECT.md` "Human Approval" records the owner's words, *"Approved — proceed with
+  the twelve work orders, start WO1"*, at `2026-09-13T19:59:36Z`.
+- `../PROJECT.md` "Rulings on WO4c and WO7b" records **"WO4c — APPROVED, extended"**.
+- "U8G2 dependency — decided" quotes the owner's submodule authorisation, pinned at 2.36.18.
+- The status log records WO4c as dispatched on this branch.
+
+### Per line item
+
+1. **Submodule.**
+   - `extern/u8g2` was added from `https://github.com/olikraus/u8g2.git` and checked out
+     at tag `2.36.18`.
+   - **Pinned commit `d66b49af3e48cd0becf95f862353bf94a9c0c2be`.**
+   - `.gitmodules` was appended to; the three `.agents/skills` entries are untouched.
+   - That clone was the only network operation. googletest was reused from the existing
+     `build/_deps` checkout via `FETCHCONTENT_SOURCE_DIR_GOOGLETEST` for the extra builds.
+2. **Real-header acceptance target.**
+   - **Build.** In `test/CMakeLists.txt`, `add_library(u8g2gl_real_u8g2 OBJECT
+     ${U8G2GL_RUNTIME_SOURCES})`. It compiles the same source list as the library:
+     root `CMakeLists.txt` now defines `U8G2GL_RUNTIME_SOURCES` once and both targets
+     use it, so a new source cannot escape the check.
+   - **Include paths.** `include/` and `test/real_u8g2/` are ordinary; `extern/u8g2/cppsrc`
+     and `extern/u8g2/csrc` are `SYSTEM`. The stub directory is **not** on this
+     target's path.
+   - **Flags.** `-Wall -Wextra -Wpedantic`. `ARDUINO=10819` is defined because every
+     firmware build defines it, and it changes the class: `U8G2` then derives from `Print`.
+   - **Compile-only.** It is an OBJECT library, never linked; linking would need U8G2's C
+     sources and a HAL.
+   - **Registration, twice.** It is in the normal build, so a break fails
+     `cmake --build`. It is also CTest `RealU8g2.RuntimeCompilesAgainstRealHeaders`
+     (`cmake --build … --target u8g2gl_real_u8g2`), sharing the version guards'
+     `RESOURCE_LOCK`.
+   - **Missing submodule.** Configure stops with a `FATAL_ERROR` naming
+     `git submodule update --init extern/u8g2`.
+   - **Arduino shim (`test/real_u8g2/`).**
+     - `Arduino.h` includes `<stddef.h>` and `<stdint.h>`, nothing else.
+     - `Print.h` declares `class Print` with the pure `write(uint8_t)` and the buffer
+       `write(const uint8_t*, size_t)` that U8G2's classes override.
+     - It declares no U8G2 or U8X8 API, and nothing else was needed.
+3. **Proven on the base code**, using a throwaway worktree `tmp/wo4c-base-proof` at
+   `1316cd1`, since removed (`git worktree list` shows only the main tree).
+   - **Setup.** The base `src/` and `include/` were kept. The new `CMakeLists.txt` and
+     `test/` tree were copied in, plus `u8g2gl_coord.h`, which one test assertion includes
+     and no base source does. `extern/u8g2` was symlinked.
+   - **Stage A — base runtime.** The real-header target reported exactly one error:
+     ```
+     include/u8g2gl/u8g2gl_state_saver.h:69:31: error: no member named 'getFont' in 'U8G2'
+     ```
+     and `RealU8g2.RuntimeCompilesAgainstRealHeaders` **Failed**. No other U8G2 API or type
+     mismatch stopped the compile. Implicit `int`→`u8g2_uint_t` conversions compile
+     silently, which is exactly why the stub retype and tests are needed.
+   - **Stage B — base runtime plus only the `getU8g2()->font` fix.** Everything built, and
+     **13 of the new tests failed** (listed under item 8).
+4. **Font via the real API.**
+   - The state saver's initialiser is `saved_font_(display.getU8g2()->font)`, with a
+     why-comment.
+   - The stub has no `getFont()`. It declares `struct u8g2_t { const uint8_t* font; }`
+     (private member `u8g2`); `getU8g2()` returns it and `setFont()` writes it.
+   - `StateSaver.SavesAndRestores` reads `getU8g2()->font`.
+   - `grep getFont include src test/stubs` finds no call or declaration. Its only matches
+     are four why-comments explaining the removal (`u8g2gl_state_saver.h:69,71`,
+     `test/stubs/U8G2lib.h:16,59`).
+5. **Stub coordinates are `u8g2_uint_t`.** `typedef uint16_t u8g2_uint_t;` in the stub.
+   - **Retyped to match `U8g2lib.h` 2.36.18:** every coordinate, extent and radius
+     parameter of drawBox/Frame/RBox/RFrame, drawH/VLine, drawLine, drawPixel,
+     drawCircle/Disc, drawEllipse/FilledEllipse, drawXBMP, drawGlyph, drawStr, drawUTF8,
+     drawButtonUTF8, and setClipWindow.
+   - **Also corrected to real U8G2:**
+     - `drawTriangle` takes **`int16_t`**, as U8G2 declares it.
+     - `updateDisplayArea` takes **`uint8_t`** tiles.
+     - `drawUTF8`, `drawStr` and `drawGlyph` return `u8g2_uint_t`.
+     - `drawButtonUTF8` has U8G2's 7 parameters (the stub had 6).
+     - `getDisplayWidth/Height` return `u8g2_uint_t`.
+   - Recording fields stay `int`, so tests compare directly and a wrapped value shows as
+     ≥ 32768.
+   - **New header `include/u8g2gl/u8g2gl_coord.h`.** It holds only the conversion helpers
+     this item asks for, which is why it is inside the Boundary Box. Nothing in it
+     allocates.
+
+   | Helper | Rule | Behaviour |
+   |---|---|---|
+   | `U8G2GL_U8G2_COORD_MAX` | — | `numeric_limits<u8g2_uint_t>::max()`, so an 8-bit build clamps at 255 |
+   | `u8g2gl_coord_exact(v, out)` | **skip** | false if `v < 0` or `> MAX`; caller draws nothing |
+   | `u8g2gl_coord_span(origin, len, o, l)` | **shorten** | cuts the part before 0 (and past MAX); false if nothing is left |
+   | `u8g2gl_coord_clamp(v)` | **clamp** | into `[0, MAX]`; used for clip corners and extents/radii already checked positive |
+   | `u8g2gl_coord_text(v)` | **explicit modular (wraps)** | stop-and-report S1 |
+
+   The per-primitive choice is tabulated in `u8g2gl_draw.h`'s file header. Widgets route
+   through the `u8g2gl_draw_*` functions, or apply the same rule locally where the U8G2
+   call differs.
+
+   | Primitive / call site | Rule for a negative origin |
+   |---|---|
+   | filled square box (`drawBox`) — `u8g2gl_draw_box`, button focus fill, progress-bar fill, label dots/animation clears, clock clear | **shorten** both axes |
+   | `drawHLine` | **shorten** x; skip if y < 0 |
+   | `drawVLine` | **shorten** y; skip if x < 0 |
+   | `drawFrame` (box outline, progress-bar track) | **skip** |
+   | `drawRBox` / `drawRFrame` (rounded box, button borders, switch track and handle) | **skip** |
+   | `drawCircle` / `drawDisc` / `drawEllipse` / `drawFilledEllipse` (centre) | **skip** |
+   | `drawLine` (either endpoint), outline triangle (per edge) | **skip** |
+   | `drawPixel` (incl. progress-bar stipple) | **skip** |
+   | `drawXBMP` (`u8g2gl_xbm`) | **skip**: shortening would shift the image, not crop it |
+   | filled `drawTriangle` | none — U8G2 takes `int16_t` |
+   | `drawUTF8` / `drawGlyph` (label, button, clock, progress-bar text, glyph) | `u8g2gl_coord_text` — **S1** |
+   | `setClipWindow` | clamp both corners to the display (item 6) |
+   | `updateDisplayArea` (`u8g2gl_partial_refresh`) | **shorten** region, then clamp tiles at 255 |
+
+   **Why these rules.** Shorten only where it is pixel-exact: a filled run lights the same
+   on-screen pixels. Everything whose appearance depends on its exact origin is skipped, so
+   no pixel is lit that the signed geometry would not light.
+
+   Button and switch convert locally rather than through `u8g2gl_draw_box`, because they
+   call `drawRFrame`/`drawRBox` even at radius 0, and the draw function would switch those
+   to `drawFrame`/`drawBox`. That would be a widget behaviour change.
+6. **Clip clamped at both corners.** `u8g2gl_apply_clip` works in `int32_t`:
+   - Near corner clamped at 0.
+   - Far corner clamped to `getDisplayWidth()` / `getDisplayHeight()`.
+   - Rejects the rect when `x1 <= x0 || y1 <= y0`, so a rect wholly right of or below the
+     display is now rejected too.
+   - Passes each corner through `u8g2gl_coord_clamp`.
+   - Pinned by `Core.ApplyClipClampsFarCornerToDisplay` (`{100,50,60,30}` → `(100,50,128,64)`;
+     `{-10,-10,200,100}` → `(0,0,128,64)`) and
+     `Core.ApplyClipRejectsRectsRightOfOrBelowDisplay`.
+7. **F1 comment.** The declaration's Doxygen in `u8g2gl_core.h` now reads exactly:
+   ```
+   CLIP-CORNER CONVENTION — THE FAR CORNER IS EXCLUSIVE, SETTLED FROM SOURCE.
+   A rect {x, y, w, h} becomes setClipWindow(x, y, x + w, y + h), so the rect's
+   last column (x + w - 1) and last row (y + h - 1) remain drawable. design_spec
+   §11.3's x+w-1, y+h-1 form would lose the last column and row.
+
+   Source: U8G2 2.36.18, now pinned at extern/u8g2. u8g2.h:352/354 document
+   clip_x1 and clip_y1 as "(excluded)", and u8g2_clip_intersection2()
+   (u8g2_hvline.c), which clips every line U8G2 draws against the window,
+   agrees: it clips "against c (included) to d (excluded)".
+
+   PR-06's container-edge pixel test — an object whose clip is exactly its
+   bounds, drawing its last column and row — now guards this convention rather
+   than discovering it. If it ever fails, change this function and nothing
+   else; Core.ApplyClipPinsExclusiveCornerConvention pins it on the host.
+
+   Both corners are clamped to the display before they are converted to U8G2's
+   unsigned coordinate type: the near corner at 0, because a negative origin
+   would otherwise wrap to a huge value rather than clip, and the far corner at
+   the display's width and height. A rect with no pixel on the display is
+   rejected.
+   ```
+   I re-read both citations in `extern/u8g2/csrc` (`u8g2.h:352/354`, `u8g2_hvline.c:61–116`).
+8. **Degenerate-input tests.** 15 new gtest cases:
+   - **`test_core.cpp`**
+     - `Core.RenderObjectPartlyOffLeftAndTopRecordsNoWrappedCoordinate` — a progress bar
+       at (−5, −3) through `u8g2gl_render_object`. Clip is (0,0,37,9), the frame is
+       skipped, and the fill is shortened to (0,0,16,8). Every recorded value is < 32768.
+     - `Core.ApplyClipClampsFarCornerToDisplay`
+     - `Core.ApplyClipRejectsRectsRightOfOrBelowDisplay`
+   - **`test_draw.cpp`, `DrawNegativeOrigin.*`**
+     - `FilledBoxShortensToVisiblePart`
+     - `FilledBoxWhollyLeftOrAboveIsSkipped`
+     - `OutlineAndRoundedBoxesAreSkipped`
+     - `HLineShortensXAndSkipsNegativeY`
+     - `VLineShortensYAndSkipsNegativeX`
+     - `PointShapesAreSkipped`
+     - `FilledTrianglePassesSignedVerticesThrough`
+     - `OutlineTriangleSkipsOnlyEdgesWithNegativeEndpoints`
+   - **`test_obj.cpp`:** `PartialRefresh.NegativeOriginRefreshesOnlyVisiblePart`,
+     `PartialRefresh.WhollyOffDisplayRefreshesNothing`
+   - **`test_xbm.cpp`:** `Xbm.NegativeOriginIsSkippedNotWrapped`
+   - **`test_label.cpp`:** `LabelScroll.TextLeftOfOriginReachesU8g2Wrapped`, which pins S1.
+
+   **Failed against the base (Stage B), 13 tests:**
+   - The three `Core.*` above. Base values:
+     - fill box x = **65531**, y = **65533** (the wrap);
+     - far clip corner 160/80 and 190/90, not clamped;
+     - a rect right of the display accepted.
+   - All `DrawNegativeOrigin.*` except `FilledTrianglePassesSignedVerticesThrough`, whose
+     behaviour is unchanged by design.
+   - Both `PartialRefresh.*` tests (base tile x/y = **255**).
+   - `Xbm.NegativeOriginIsSkippedNotWrapped` (drawn at a wrapped origin).
+
+   `LabelScroll.TextLeftOfOriginReachesU8g2Wrapped` passes at the base too, because S1
+   leaves text behaviour unchanged.
+9. **`THIRD-PARTY-NOTICES.md`.** One U8G2 row:
+
+   | Field | Content |
+   |---|---|
+   | Version | 2.36.18, pinned as submodule `extern/u8g2` |
+   | Licence | **Code:** BSD-2-Clause ("new-bsd"). **Fonts:** licensed **per font group**, linked to the U8G2 wiki page **fntgrp**. |
+   | Use | The submodule is used only for **host tests** and the **catalogue build**. Nothing is copied into U8G2GL sources or packages. **Applications get U8G2 through their own dependency** (PR-05), under U8G2's own terms. |
+
+   It points to `extern/u8g2/LICENSE` as authoritative; that file's wording matches both
+   statements.
+10. **Catalogue builder records its source (Q-11).**
+    - **Default path.** `build-catalogue.ts` defaults to `<repo>/extern/u8g2`, resolved from
+      the script's location. `--u8g2-path` and `U8G2_PATH` still override it.
+    - **Two layouts.** `catalogue-builder.ts` gains `resolveU8g2Layout()` because the git
+      repository layout (`csrc`, `cppsrc/U8g2lib.h`) differs from the Arduino release
+      (`src/clib`, `src/U8g2lib.h`). Without it the builder could not read the submodule.
+    - **Reading the commit.** `readU8g2Source()` returns `{ tag, commit }` via
+      `git rev-parse HEAD` and `git describe --tags --exact-match`. It returns nulls unless
+      the path is **itself** the top of a checkout; otherwise `git -C` would report the
+      enclosing project's commit.
+    - **Where it is recorded — a sibling file**, `cli/src/data/catalogue-source.json`:
+      `{"u8g2": {"tag": "2.36.18", "commit": "d66b49af3e48cd0becf95f862353bf94a9c0c2be"}}`.
+      - **Why a sibling file:** `catalogue.json` *is* the `CATALOGUE` array (`catalogue.ts`
+        casts the parsed JSON directly), so any field inside it would change the export's
+        shape.
+      - It holds no path and no timestamp, so the same commit rebuilds byte-identically.
+      - The script warns when no commit can be recorded.
+    - **Rebuilt from the submodule:** `catalogue.json` and `page-mode-map.json` are
+      **byte-identical** to what was committed (1637 records, 3274 page-mode mappings), so
+      no data file changed.
+    - **One difference, in the struct count only:** 205 `u8x8_display_info_t` structs from
+      the git tag against 206 from the Arduino release. The 2.36.18 release still ships
+      `u8x8_d_st7301.c` beside its rename `u8x8_d_st7302.c` (U8G2 commit `9e58bc30`), and
+      the duplicate maps to no additional record.
+    - **Tests** (`cli/test/catalogue/builder.test.ts`):
+      - It now runs against `extern/u8g2` by default.
+      - The two struct-count assertions compute the expected count per layout (the previous
+        test hard-coded 206 against the release copy).
+      - Six new tests: both layouts resolve; a non-U8G2 directory is rejected; the submodule
+        reads as tag 2.36.18 with a 40-hex commit; a nested non-checkout records nulls; the
+        committed `catalogue-source.json` equals the submodule's actual commit.
+
+### Test counts
+
+| Suite | Before | After |
+|---|---|---|
+| C++ `ctest` | 284 (1 known skip) | **300** (same skip `SizeOfReport.ThirtyTwoBitTarget`): 15 gtest + `RealU8g2.RuntimeCompilesAgainstRealHeaders` |
+| CLI `vitest` | 596 | **602** |
+
+- **Build checks.** Zero warnings in the in-tree build and in a from-scratch configure and
+  build (`tmp/wo4c-clean-build`), which also passed 300/300. `npx tsc --noEmit` and
+  `npm run lint` are clean.
+- **Stricter audit.** Every `src/*.cpp` compiled against the real headers with
+  `-Wconversion -Wsign-conversion` added: no diagnostics.
+
+**Existing tests changed deliberately** (also listed in the commit message):
+- `LabelScroll.InitialDelayBeforeScroll`, `LabelScroll.ResetScroll` and
+  `LabelScrollCircular.StillMarquees` expected `last_draw_utf8_x == -1`. The stub now
+  records the `u8g2_uint_t` value hardware receives, so each expects
+  `u8g2gl_coord_text(-1)` = 65535. The behaviour is unchanged.
+- `StateSaver.SavesAndRestores` reads `getU8g2()->font`.
+- The catalogue struct-count assertions, as described in item 10.
+
+### Stop-and-report (recorded, not chosen)
+
+- **S1 — Text origins cannot satisfy "no conversion may silently wrap" without changing
+  widget behaviour.** `drawUTF8` and `drawGlyph` take `u8g2_uint_t`.
+  - **Marquee.** It draws at `x_ − scroll_x_`, which is negative on every step once
+    scrolling starts. Clamping freezes the text at x = 0, and skipping blanks it.
+  - **Aligned text.** Centred or right-aligned text wider than its label (and a clock wider
+    than its bounds) starts left of the element. Clamping shifts it and skipping hides it.
+  - **No shorten option.** Text has no "visible part" to shorten to without copying the
+    string, which is forbidden ([D-1]).
+  - **Why the wrap works on hardware.** U8G2 2.36.18 is written to accept a wrapped text
+    origin. The glyph renderer tests intersection with the wrap-aware
+    `u8g2_IsIntersection()`, and runs go through `u8g2_clip_intersection2()`, whose comment
+    says a simpler form "will not handle the case with negative a". So the wrap is what
+    makes today's marquee work.
+
+  **What I did:** kept behaviour, and made the conversion **explicit and confined to one
+  function**, `u8g2gl_coord_text()`. Its Doxygen carries this analysis, every text call
+  site routes through it, and `LabelScroll.TextLeftOfOriginReachesU8g2Wrapped` pins it.
+
+  **Ruling needed (PA/CA):** accept the explicit wrap for text as the documented
+  exception, or choose a rule. A ruling changes that one function body and that test.
+
+- **Spec disagreement, carried from WO4b and unchanged:** design_spec §11.3 still says
+  `x+w-1, y+h-1` and that the state saver saves the clip. `docs/` was not touched.
+  → **Chief Architect**.
+
+### Decisions I made
+
+- **D1 — New header `u8g2gl_coord.h`.** It holds only the conversion helpers ("as few
+  helpers as possible"), is shared by `src/` and `u8g2gl_helpers.h`, and is inside the box
+  as coordinate conversion.
+- **D2 — `ARDUINO` defined in the real-header target.** That is the firmware view of the
+  class, and the reason the Print shim exists.
+- **D3 — OBJECT library in the normal build, plus a CTest entry.** Both failure routes
+  named by the WORKORDER are covered. A missing submodule is a configure-time
+  `FATAL_ERROR` when tests are enabled, rather than a silently skipped check.
+- **D4 — Per-primitive rules as tabulated in item 5.** Shorten only where pixel-exact, skip
+  otherwise.
+- **D5 — Local conversion in button and switch** instead of `u8g2gl_draw_box`, to keep
+  their `drawRFrame`/`drawRBox` calls at radius 0.
+- **D6 — `u8g2gl_partial_refresh` also converts explicitly** (shorten, then clamp tiles to
+  `uint8_t`). Its tile arguments were `int` → `uint8_t` conversions, which wrap. Its
+  "Exported Functions" header also listed `u8g2gl_min/max`, which live elsewhere; I
+  corrected that while in the file.
+- **D7 — Sibling `catalogue-source.json`** (item 10), plus support for both U8G2 layouts in
+  the builder, which the submodule default required.
+
+### Out-of-scope findings (not fixed, not filed)
+
+- **H1 — The SKIP rule changes on-screen behaviour for shapes partly off the left or top
+  edge.** Before WO4c such shapes reached U8G2 wrapped. U8G2's HV-line clipper
+  (`u8g2_clip_intersection2`, "handle the a>b case correctly") and `u8g2_IsIntersection`
+  are wrap-aware, so on hardware a frame, rounded box, bitmap or circle partly off the
+  left/top edge **probably drew its visible part**. It is now skipped entirely, which the
+  WORKORDER mandates.
+  - Affected widgets: switch, button border, progress-bar track, `u8g2gl_xbm`.
+  - `drawLine` is the exception. `u8g2_line.c` says "no intersection check at the moment",
+    so skipping there is clearly safer.
+  - → **PA / PR-06**: the real-U8G2 pixel test should decide whether wrap-aware
+    pass-through is correct for these calls. If so, `u8g2gl_coord_exact` call sites become
+    `u8g2gl_coord_text`-style.
+- **H2 — The real headers exposed only `getFont`.** Stage A stopped on that single error.
+  The other stub/real differences (listed in item 5) compiled anyway, because they were
+  implicit conversions, and are now corrected in the stub. The real-header target cannot
+  catch *implicit* narrowing by construction; the retyped stub and tests are what do.
+- **H3 — Stub metric return types still differ from real U8G2.**
+  - `getUTF8Width`/`getStrWidth` return `int` (real: `u8g2_uint_t`).
+  - `getAscent`/`getDescent`/`getMaxChar*` return `int` (real: `int8_t`).
+  - These are values, not coordinates passed to U8G2, and the widenings are harmless.
+    Aligning them would change what tests can configure.
+  - → **PA**: decide whether the stub mirrors return types too.
+- **H4 — `u8g2.h` 2.36.18 defines `U8G2_16BIT` unconditionally (line 71)**, not only on
+  32-bit targets. The 8-bit `u8g2_uint_t` case (WO4b G4) is unreachable with the pinned
+  version unless a user edits the header. The clamps still cover it.
+- **H5 — Only the Arduino view is compiled against the real headers.** ESP-IDF
+  (non-Arduino) and the Wasm editor build (`ARDUINO` undefined, so no `Print` base) are
+  unchecked. → **PA / WO11 / PR-05**.
+- **H6 — Fresh clones now need `git submodule update --init extern/u8g2`** before a test
+  configure. CI and contributor docs should say so. → **PA / PR-05**.
+- **H7 — `u8g2gl_coord.h` has no `class U8G2;` fallback** like other headers, because it
+  needs `u8g2_uint_t`. Only runtime sources include it, but any public header that includes
+  it now requires U8G2 on the include path (`u8g2gl_helpers.h` already did in practice).
+- **H8 — The previous default catalogue path** pointed at `~/Documents/Projects/departures-board/...`,
+  and the test's release-layout case still uses that path when present (existing pattern).
+  It is optional and skipped when absent.
+- **H9 — Stale state-saver comments outside the box** (WO4b G3: `u8g2gl_obj.h:396`,
+  `u8g2gl_button.cpp`/`u8g2gl_label.cpp` step comments) are still present.
+  → **End-of-PR readability review**.
+
+### Changed files (`git diff --name-only 1316cd1..7924d24`)
+
+```
+.gitmodules
+CMakeLists.txt
+THIRD-PARTY-NOTICES.md
+cli/src/data/catalogue-source.json
+cli/src/node/build-catalogue.ts
+cli/src/node/catalogue-builder.ts
+cli/test/catalogue/builder.test.ts
+extern/u8g2
+include/u8g2gl/u8g2gl_coord.h
+include/u8g2gl/u8g2gl_core.h
+include/u8g2gl/u8g2gl_draw.h
+include/u8g2gl/u8g2gl_helpers.h
+include/u8g2gl/u8g2gl_state_saver.h
+src/u8g2gl_button.cpp
+src/u8g2gl_clock.cpp
+src/u8g2gl_core.cpp
+src/u8g2gl_draw.cpp
+src/u8g2gl_glyph.cpp
+src/u8g2gl_label.cpp
+src/u8g2gl_progress_bar.cpp
+src/u8g2gl_switch.cpp
+src/u8g2gl_xbm.cpp
+test/CMakeLists.txt
+test/real_u8g2/Arduino.h
+test/real_u8g2/Print.h
+test/stubs/U8G2lib.h
+test/test_core.cpp
+test/test_draw.cpp
+test/test_label.cpp
+test/test_obj.cpp
+test/test_xbm.cpp
+```
+
+All are inside the Boundary Box. `docs/`, `PROGRAM*.md`, manifests, validator, resolver and
+generator are untouched, and there is no version bump.
