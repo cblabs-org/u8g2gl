@@ -72,7 +72,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO5b — `generate` command and shared load path](wo5b-generate-command/WORKORDER.md)** · base WO5a · standard · constraint 4; NOT_YET_SUPPORTED severity split; WO1 F9
 - [x] **[WO6 — resolver: arithmetic and anchors](wo6-resolver/WORKORDER.md)** ✅ `6b5d562` · base WO5b · standard · [D-7], [D-20]
 - [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
-- [ ] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
+- [x] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** ✅ `7924d24`, `62dd06b`, `468e386` · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
 - [ ] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
 - [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7b · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
@@ -820,6 +820,40 @@ frame, so real pixels confirm both rules.
 **Carried:** N2 (8-bit U8G2 builds would wrap positions above 255 into view) — **accepted**,
 the pinned 2.36.18 forces 16-bit. H5, H7, H9 and §11.3 unchanged from the first-pass triage.
 
+### WO4c — complete (`468e386`)
+
+**Verified independently:** commits only on the WO4c branch; the third pass touched five
+files, all inside the box (`u8g2gl_coord.h`, `u8g2gl_draw.h`, `u8g2gl_draw.cpp`,
+`test_draw.cpp`, the WORKORDER); `docs/`, `PROGRAM*.md` and `cli/` untouched. C++ 301 →
+**305**, zero warnings, including five `DrawLineClip` tests and
+`RealU8g2.RuntimeCompilesAgainstRealHeaders`; CLI 602, `tsc` and lint clean.
+
+**Delivered:** `u8g2gl_clip_line_to_display()` in `src/u8g2gl_draw.cpp` — Cohen–Sutherland
+against the display's own dimensions, products in `int64_t` and rounded division, an
+eight-pass bound that guarantees termination, citing `u8g2_line.c:49–52, 78`. Clipped
+endpoints convert through `u8g2gl_coord_clamp` (the size rule refuses 0, which is a valid
+endpoint). Outline triangles inherit it through `u8g2gl_draw_line`; filled triangles and
+every other primitive keep the explicit wrap. `DrawLineClip.PartlyOffLeftEdgeReachesU8g2InsideDisplay`
+failed at `62dd06b` with `x1 = 65534`, as required. The worker widened the ruling's
+`int32_t` to `int64_t` for the products, correctly — they overflow `int32_t`.
+
+**Accepted:** T1 — a clipped endpoint is rounded to a whole pixel on the true line, so a
+clipped line's visible pixels can differ by about one from drawing the whole segment; this
+is inherent to integer clipping. T2 — a line grazing a display corner can reach the
+eight-pass bound and lose one or two corner pixels; the bound is what guarantees
+termination, and the loss is cosmetic. **Both go to PR-06's container-edge pixel test,
+which must include a clipped line.**
+
+**WO4c overall.** Three passes. The work order's objective was met on the first; the second
+and third corrected PA rulings on coordinate conversion — first too narrow ("skip"), then
+too broad ("wrap everything") — each caught by a worker reporting what the real drawing
+path does. The runtime now compiles against real U8G2 2.36.18, pinned at `extern/u8g2`, as
+a `ctest` acceptance check; Q-11 is closed; `THIRD-PARTY-NOTICES.md` exists.
+
+**Still open, carried:** H5 (only the Arduino build is checked against real headers →
+PR-05/PR-06), H9 (stale state-saver comments → end-of-PR readability review), N2 (8-bit
+wrap, unreachable on 2.36.18), and §11.3's clip text for the Chief Architect.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -839,6 +873,8 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-15 — **WO4c complete** after a third pass (`468e386`, report `c5f5d7c`).
+  Verified independently. WO7b dispatched on `u8g2gl-generator/wo7b-geometry-contract`.
 - 2026-09-15 — **WO4c second pass** (`62dd06b`, report `2e8c5d6`). Verified
   independently. N1 confirmed in the pinned source: `u8g2_DrawLine` cannot take a wrapped
   endpoint. **PA ruling:** lines clip to the display in signed arithmetic before

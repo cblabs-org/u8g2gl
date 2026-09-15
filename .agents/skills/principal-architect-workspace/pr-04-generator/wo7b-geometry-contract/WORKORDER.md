@@ -5,7 +5,7 @@ title: "The geometry contract: validate the expanded tree against design_spec §
 branch: u8g2gl-generator/wo7b-geometry-contract
 base: u8g2gl-generator/wo4c-real-u8g2
 complexity: standard
-status: draft — PA revises against WO4c's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO7b — The geometry contract
