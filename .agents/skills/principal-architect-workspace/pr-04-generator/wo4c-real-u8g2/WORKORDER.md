@@ -5,7 +5,7 @@ title: "The runtime compiles against real U8G2: submodule, real-header target, s
 branch: u8g2gl-generator/wo4c-real-u8g2
 base: u8g2gl-generator/wo8-realisation-capacities (PA review commit; stack tip after WO7)
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO4c — The runtime compiles against real U8G2
@@ -197,7 +197,7 @@ reaches `u8g2_DrawHVLine` → `u8g2_clip_intersection2`; `u8g2_DrawLine` does no
 need their own rule. Outline triangles, composed from `drawLine`, inherit it. Filled
 triangles take signed `int16_t` vertices and are unaffected.
 
-- [ ] **Clip the segment to the display in signed arithmetic before converting.** In
+- [x] **Clip the segment to the display in signed arithmetic before converting.** In
       `u8g2gl_draw_line` (and the outline-triangle path that composes lines), clip the
       segment against `[0, width-1] × [0, height-1]` using the display's own dimensions,
       computing in `int32_t` so nothing overflows. A segment wholly outside is not drawn;
@@ -205,15 +205,15 @@ triangles take signed `int16_t` vertices and are unaffected.
       convert through the existing size-safe conversion — never `u8g2gl_coord_pos`'s wrap.
       Clipping to the display is enough: `u8g2_DrawPixel`'s own `user_x0/x1` checks still
       apply the clip window to each plotted pixel.
-- [ ] **One implementation, documented.** The clipping lives in one function, with a
+- [x] **One implementation, documented.** The clipping lives in one function, with a
       comment citing `u8g2_line.c:49–52` and `:78` as the reason lines cannot take a wrapped
       endpoint, and stating that the slope is preserved (clipping must not re-quantise the
       line differently from U8G2 drawing the full segment where both are on-screen).
-- [ ] **Tests.** A line from (−2, 0) to (10, 10) reaches the stub with both endpoints inside
+- [x] **Tests.** A line from (−2, 0) to (10, 10) reaches the stub with both endpoints inside
       the display and no value ≥ 32768; a line wholly off-screen is not drawn; a line fully
       on-screen is passed through unchanged; an outline triangle with one vertex off the
       left edge draws three in-display lines. The first test must fail against `62dd06b`.
-- [ ] **Confirm the stub's display-dimension getters** use real U8G2's types; if they do
+- [x] **Confirm the stub's display-dimension getters** use real U8G2's types; if they do
       not, correct them with explicit conversions at the call site.
 
 ## Strict Boundary Box
@@ -851,4 +851,171 @@ test/test_xbm.cpp
 ```
 
 All are inside the Boundary Box. No network access this pass, and `docs/`, `PROGRAM*.md`
+and the manifests are untouched. There is no version bump.
+
+### Third pass — PA ruling after the second pass (resolves N1)
+
+**Status: `complete`.** Implementation commit `468e386`, on top of PA commit `72175fc`. I
+re-read the ruling from the committed WORKORDER before starting.
+
+#### Per ruling item
+
+1. **Clip in signed arithmetic before converting.**
+   - `u8g2gl_draw_line()` clips the segment to `[0, width-1] × [0, height-1]` from
+     `getDisplayWidth()` / `getDisplayHeight()` before any conversion. A segment wholly
+     outside is not drawn.
+   - The clipped end points are non-negative and in range, and convert through
+     `u8g2gl_coord_clamp()`, never `u8g2gl_coord_pos()`.
+   - **Why clamp and not `u8g2gl_coord_size()`:** the ruling says "the existing size-safe
+     conversion", but the size rule refuses 0, and 0 is a valid end point. Clamp is the
+     existing non-wrapping conversion, and for in-range values it only makes the
+     conversion explicit.
+   - Outline triangles compose their edges with `u8g2gl_draw_line()`, so they inherit the
+     clip. Filled triangles are unchanged (signed `int16_t` vertices).
+   - The explicit-wrap rule is unchanged for every other primitive.
+2. **One implementation, documented.** The clipping is one file-local function in
+   `src/u8g2gl_draw.cpp`:
+   ```cpp
+   static bool u8g2gl_clip_line_to_display(int32_t width, int32_t height,
+                                           int32_t& x1, int32_t& y1,
+                                           int32_t& x2, int32_t& y2);
+   ```
+   It is file-local because its only caller is `u8g2gl_draw_line()`. Its two helpers,
+   `line_clip_outcode()` and `line_clip_div_round()`, are file-local too. Its comment,
+   exactly:
+   ```
+   // u8g2gl_clip_line_to_display
+   // Clips the segment (x1, y1)-(x2, y2) to the display's pixel grid
+   // [0, width-1] x [0, height-1], in signed arithmetic, before anything is
+   // converted to U8G2's unsigned coordinate type. Returns false when no part of
+   // the segment is on the display; the caller then draws nothing.
+   //   width, height — the display's size (getDisplayWidth/Height())
+   //   x1, y1, x2, y2 — end points; an end point outside is moved onto the edge
+   //
+   // WHY LINES ARE CLIPPED, when every other primitive takes a wrapped position
+   // (u8g2gl_coord_pos()): U8G2 2.36.18's u8g2_DrawLine() (extern/u8g2/csrc/
+   // u8g2_line.c) says "no intersection check at the moment, should be added..."
+   // (line 49), computes dx and dy from UNSIGNED end points (lines 51–52), and
+   // then plots pixel by pixel from x1 to x2 (line 78). It never reaches
+   // u8g2_clip_intersection2(), so a wrapped end point is not clipped: -2 arrives
+   // as 65534, and (-2, 0)-(10, 10) becomes a 65,524-pixel loop whose visible part
+   // is drawn almost flat. Clipping to the display is sufficient, because
+   // u8g2_DrawPixel() still applies the clip window to every plotted pixel.
+   //
+   // SLOPE IS PRESERVED. A segment with both end points on the display is returned
+   // unchanged, so U8G2 draws exactly the pixels it always drew. An end point
+   // outside is moved along the true line (x1, y1)-(x2, y2) to where it meets the
+   // display edge, and only that intersection is rounded to the nearest pixel, so
+   // the direction of the line is kept; U8G2 then draws the on-screen segment.
+   //
+   // Algorithm: Cohen–Sutherland. Each pass moves one outside end point onto an
+   // edge it lies beyond, which clears that outcode bit; rounding can leave the
+   // moved point just beyond an adjacent edge, which the next pass clips. Four
+   // edges per end point bound it at eight passes. A segment still outside after
+   // that only grazes a corner, and is not drawn.
+   ```
+   **Algorithm.**
+   - Each end point gets a Cohen–Sutherland outcode (left, right, top, bottom).
+   - If both codes are 0, the segment is returned as it stands, unchanged when it started
+     on screen. If the codes share a bit, both ends are beyond the same edge, so it is
+     not drawn.
+   - Otherwise one outside end point moves onto an edge it lies beyond, e.g.
+     `x = x1 + round(dx·(0 − y1) / dy)` for the top edge, and its code is recomputed.
+   - The multiplication is done in `int64_t`. Two `int16_t`-sized deltas can each approach
+     65535, so their product does not fit `int32_t`. The quotient is an offset along a
+     segment proven to cross that edge, so it fits `int32_t`.
+   - Rounding is to nearest, halves away from zero. The loop is bounded at eight passes.
+   - `u8g2gl_draw.h`'s rules table gains a "line end points → clipped to the display in
+     signed arithmetic, then `u8g2gl_coord_clamp`, never wrapped" row. It and
+     `u8g2gl_coord.h` (the POSITION rule and its exceptions) now name lines as the second
+     exception beside the clip window.
+3. **Tests** (`test/test_draw.cpp`, stub display 128 × 64).
+   - **Added:**
+     - `DrawLineClip.PartlyOffLeftEdgeReachesU8g2InsideDisplay`: (−2, 0)→(10, 10) reaches
+       the stub as (0, 2)→(10, 10). Both ends are checked inside the display, which rules
+       out any value ≥ 32768; y = 10·2/12 = 1.67 → 2.
+     - `DrawLineClip.WhollyOffScreenLineIsNotDrawn`: above-left, right of and below the
+       display; `draw_line_count` stays 0.
+     - `DrawLineClip.FullyOnScreenLineIsPassedThroughUnchanged`: (3, 4)→(120, 60), plus
+       corner to corner (0, 0)→(127, 63), both exact.
+     - `DrawLineClip.LineCrossingBothSidesIsClippedAtEachEnd`: (−10, 32)→(200, 32) becomes
+       (0, 32)→(127, 32).
+     - `DrawLineClip.OutlineTriangleVertexOffLeftDrawsThreeInDisplayLines`: vertices
+       (−5, 0), (10, 0), (5, 10) give three in-display lines: (0, 0)→(10, 0),
+       (10, 0)→(5, 10) unchanged, and (5, 10)→(0, 5).
+   - **Replaced:** `DrawNegativeOrigin.OutlineTriangleDrawsEveryEdgeWithWrappedEndpoints`
+     (asserted wrapped end points) is superseded by the last test above.
+   - **Changed:** `DrawNegativeOrigin.PointPositionsWrapAndAreDrawn` no longer draws a line.
+     Its two wrapped-line assertions are removed, with a comment pointing to
+     `DrawLineClip`. Pixel, circle, disc and ellipse still wrap.
+   - **Failed at `62dd06b`.** Proven in a throwaway worktree `tmp/wo4c3-base-proof`: the
+     second-pass runtime with the new `test_draw.cpp`, `extern/u8g2` symlinked, googletest
+     from the local checkout, nothing fetched. The worktree was removed afterwards
+     (`git worktree list` shows only the main tree).
+     `DrawLineClip.PartlyOffLeftEdgeReachesU8g2InsideDisplay` **failed**: the stub
+     recorded `x1 = 65534` (`Expected: (x) <= (127), actual: 65534 vs 127`), not the
+     expected 0.
+     My summary grep for the other `DrawLineClip.*` results matched nothing, so I record
+     only the first test's outcome, which is the one the ruling requires.
+4. **Display-dimension getters confirmed.**
+   - The stub's `getDisplayWidth()` / `getDisplayHeight()` return `u8g2_uint_t`, as real
+     `U8g2lib.h:182–183` does.
+   - Both call sites convert explicitly with `static_cast<int32_t>`: `u8g2gl_apply_clip`
+     (unchanged) and the new one in `u8g2gl_draw_line`.
+   - The stub's are `const` and real U8G2's are not. That does not affect the type or any
+     call site, so I did not change it.
+
+#### Test counts
+
+| Suite | After second pass | After third pass |
+|---|---|---|
+| C++ `ctest` | 301 (1 known skip) | **305** (same skip `SizeOfReport.ThirtyTwoBitTarget`), including `RealU8g2.RuntimeCompilesAgainstRealHeaders` |
+| CLI `vitest` | 602 | **602** (no CLI change) |
+
+- **C++ net +4:** five `DrawLineClip` tests added, one superseded triangle test removed.
+- **Builds.** Zero warnings in the reconfigured in-tree build and in a from-scratch build
+  (`tmp/wo4c3-clean-build`, googletest from the local checkout); both pass 305/305.
+- **Stricter audit.** Every `src/*.cpp` compiled against the real headers with
+  `-Wconversion -Wsign-conversion` added produces no diagnostics.
+- **CLI checks.** `npx tsc --noEmit` and `npm run lint` are clean.
+
+#### Decisions
+
+- **F1 — `u8g2gl_coord_clamp` for clipped end points**, not `u8g2gl_coord_size` (item 1).
+- **F2 — The clip function is file-local in `u8g2gl_draw.cpp`**, its only caller, rather
+  than public in `u8g2gl_coord.h`. The tests exercise it through `u8g2gl_draw_line()` and
+  `u8g2gl_draw_triangle()`, which is how everything reaches it.
+- **F3 — Products in `int64_t`.** The ruling says `int32_t`; `int32_t` holds every
+  coordinate and quotient, but not the intermediate products, which would overflow.
+
+#### New findings (not fixed, not filed)
+
+- **T1 — "Slope preserved" is exact only for segments that needed no clipping.**
+  - A wholly on-screen segment passes through unchanged, so U8G2 draws exactly its usual
+    pixels.
+  - A clipped end point lies on the true line, but is rounded to the nearest pixel. U8G2
+    then runs its own pixel-stepping from that rounded point, so the on-screen pixels of a
+    clipped line can differ by about one pixel from U8G2 drawing the whole segment.
+  - Exact identity would need the runtime to plot the pixels itself rather than call
+    `drawLine`.
+  - → **PA / PR-06**: the pixel test should include a clipped line and decide whether
+    that is acceptable.
+- **T2 — A segment that only grazes a display corner** can still be outside after the
+  eight-pass bound and is then not drawn. At most one or two corner pixels; documented at
+  the function.
+- **Still open, unchanged by this ruling:** N2 (8-bit `u8g2_uint_t` wrap, unreachable with
+  2.36.18), H5 (only the Arduino view is compiled against the real headers), H7
+  (`u8g2gl_coord.h` has no `class U8G2;` fallback), H9 (stale state-saver comments outside
+  the box), and design_spec §11.3 for the Chief Architect. N1 is closed by this pass.
+
+#### Changed files (`git diff --name-only 72175fc..468e386`)
+
+```
+include/u8g2gl/u8g2gl_coord.h
+include/u8g2gl/u8g2gl_draw.h
+src/u8g2gl_draw.cpp
+test/test_draw.cpp
+```
+
+All are inside the Boundary Box. There was no network access, and `docs/`, `PROGRAM*.md`
 and the manifests are untouched. There is no version bump.
