@@ -5,7 +5,7 @@ title: "The runtime compiles against real U8G2: submodule, real-header target, s
 branch: u8g2gl-generator/wo4c-real-u8g2
 base: u8g2gl-generator/wo8-realisation-capacities (PA review commit; stack tip after WO7)
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO4c — The runtime compiles against real U8G2
@@ -156,30 +156,30 @@ explicit conversions and clip clamping at both corners) — and "skip" is what i
 H1's visible regression. The ruling below corrects that; the discrepancy with the Chief
 Architect's stated premise ("jumps off the right edge") is recorded in PROJECT.md.
 
-- [ ] **Draw positions convert through one explicit, documented wrap.** Replace the
+- [x] **Draw positions convert through one explicit, documented wrap.** Replace the
       per-primitive clamp/shorten/skip choices for **draw origins and end points** with a
       single explicit conversion (generalise `u8g2gl_coord_text()` or rename it) that
       performs the two's-complement wrap on purpose. Its comment cites the source evidence
       above by file and function. "Explicit" is the requirement; wrapping is correct
       because U8G2 is designed for it.
-- [ ] **Sizes are not origins.** A width, height, radius or length `<= 0` is still skipped
+- [x] **Sizes are not origins.** A width, height, radius or length `<= 0` is still skipped
       (nothing to draw), and a size that does not fit `u8g2_uint_t` is still refused — state
       the rule at the helper.
-- [ ] **The clip window keeps its clamping** at both corners (`u8g2gl_apply_clip`) —
+- [x] **The clip window keeps its clamping** at both corners (`u8g2gl_apply_clip`) —
       `setClipWindow` with a wrapped near corner would not clip correctly, and this was the
       Chief Architect's explicit instruction. Unchanged.
-- [ ] **Tests follow the rule.** The degenerate-input tests now assert the **explicitly
+- [x] **Tests follow the rule.** The degenerate-input tests now assert the **explicitly
       wrapped** value reaches the stub for draw origins (e.g. a box at x = −5 records 65531)
       and that the draw is **not skipped**; clip tests still assert clamping. Remove or
       invert the assertions that required skipping. H1's affected widgets (switch, button
       border, progress-bar track, XBM) get a partly-off-edge test each.
-- [ ] **H3 — stub measurement getters.** `getUTF8Width`, `getAscent`/`getDescent` and
+- [x] **H3 — stub measurement getters.** `getUTF8Width`, `getAscent`/`getDescent` and
       similar return `u8g2_uint_t` or `int8_t` as real `U8g2lib.h` does, with explicit
       conversions at each call site.
-- [ ] **H6 — fresh clones.** If `extern/u8g2` is not initialised, CMake configure fails with
+- [x] **H6 — fresh clones.** If `extern/u8g2` is not initialised, CMake configure fails with
       a clear message naming `git submodule update --init extern/u8g2`, rather than an
       opaque missing-header error.
-- [ ] **H8 — no machine-local catalogue source.** Remove the optional test path that reads
+- [x] **H8 — no machine-local catalogue source.** Remove the optional test path that reads
       departures-board's U8G2 copy when present; the catalogue tests use `extern/u8g2` only,
       so the suite behaves the same on every machine.
 
@@ -611,3 +611,211 @@ test/test_xbm.cpp
 
 All are inside the Boundary Box. `docs/`, `PROGRAM*.md`, manifests, validator, resolver and
 generator are untouched, and there is no version bump.
+
+### Second pass — PA ruling after the first pass (resolves S1 and H1)
+
+**Status: `complete`.** Implementation commit `62dd06b`, on top of PA commit `8a19acf`. I
+re-read the ruling from the committed WORKORDER before starting. S1 is resolved by the
+ruling, so the first pass's "partial" reason no longer applies.
+
+The first pass's Testing Requirement box, "negative-origin tests assert no wrapped
+coordinate reaches the stub", is **superseded** by this ruling and left unticked on
+purpose: the tests now assert the opposite, that the wrapped value arrives and the draw
+happens.
+
+#### Per ruling item
+
+1. **One explicit, documented wrap for draw positions.**
+   - `u8g2gl_coord_text()` is generalised and renamed **`u8g2gl_coord_pos(int32_t)`** in
+     `include/u8g2gl/u8g2gl_coord.h`. `u8g2gl_coord_exact()` (the skip rule) is removed,
+     so no call site can still skip.
+   - Every draw origin, end point and centre goes through it: all eight `u8g2gl_draw_*`
+     functions (triangle outline edges via `u8g2gl_draw_line`), switch track and handle,
+     button borders, the bitmap widget, and every text and glyph origin in label, button,
+     clock, progress bar and glyph.
+   - The filled box is no longer shortened.
+   - The helper's rule comment, exactly:
+     ```
+     RULE: every draw position reaches U8G2 through this one conversion, and it
+     wraps ON PURPOSE: -5 becomes 65531. A shape partly off the left or top edge is
+     therefore drawn, and U8G2 draws only its visible part. Nothing is clamped,
+     shortened or skipped here.
+
+     Why wrapping is correct — U8G2 2.36.18 (extern/u8g2/csrc) is designed for it:
+     - u8g2_hvline.c, u8g2_clip_intersection2(): handles the a > b case explicitly,
+       and its comment warns that replacing that branch with "return 0" "will not
+       handle the case with negative a" — a negative start arriving wrapped is a
+       case it exists to clip.
+     - u8g2_intersection.c, u8g2_is_intersection_decision_tree(): treats a wrapped
+       span (v0 > v1) as intersecting, so u8g2_IsIntersection() does not reject it.
+     - u8g2_box.c (u8g2_DrawBox, u8g2_DrawFrame, u8g2_DrawRBox, u8g2_DrawRFrame),
+       u8g2_bitmap.c (u8g2_DrawXBMP) and u8g2_font.c (glyph decoding) test
+       u8g2_IsIntersection() and then draw through u8g2_DrawHVLine(), which clips
+       with u8g2_clip_intersection2(). Their internal arithmetic (x + w, x + r) is
+       in u8g2_uint_t, so it wraps back consistently.
+     - u8g2_circle.c plots outlines per pixel through u8g2_DrawPixel(), where a
+       wrapped negative coordinate fails x >= user_x1 and is simply not drawn;
+       discs and filled ellipses draw through u8g2_DrawVLine()/u8g2_DrawHVLine().
+
+     The marquee depends on this: a scrolling label draws at x_ - scroll_x_, which
+     is negative on every step once it starts.
+
+     The clip window is the exception, and does NOT use this: setClipWindow() with
+     a wrapped near corner would not clip, so u8g2gl_apply_clip() clamps both
+     corners with u8g2gl_coord_clamp().
+     ```
+   - `u8g2gl_draw.h`'s rules table now has three rows: position → `u8g2gl_coord_pos()`;
+     size → `u8g2gl_coord_size()`; filled triangle → none, because U8G2 takes `int16_t`.
+2. **Sizes are not origins.**
+   - New **`u8g2gl_coord_size(int32_t, u8g2_uint_t&)`**, with this rule at the helper:
+     *"a size is not a position and never wraps. A size <= 0 has nothing to draw, and a
+     size larger than U8G2GL_U8G2_COORD_MAX cannot be represented; both are refused, and
+     the caller must draw nothing."*
+   - It covers box width/height, h/v line length, circle radius, ellipse rx/ry,
+     button-border and switch sizes, and bitmap size.
+   - Corner radii of rounded boxes are the one exception. In the button and switch, which
+     call `drawRFrame`/`drawRBox` at any radius, they go through `u8g2gl_coord_clamp()`,
+     documented as *"the corner radius of a rounded box, where 0 is a valid value meaning
+     square corners rather than an empty shape"*. In `u8g2gl_draw_box` a radius that fails
+     `u8g2gl_coord_size` selects the square variant, as before.
+3. **Clip window keeps its clamping.** `u8g2gl_apply_clip` is unchanged: both corners are
+   clamped, and `Core.ApplyClip*` still assert clamping.
+   - `u8g2gl_coord_span()` (shorten) is kept **only** for `u8g2gl_partial_refresh()`,
+     because `updateDisplayArea()` tiles are not clipped by U8G2.
+   - Both `PartialRefresh.*` tests are unchanged.
+4. **Tests follow the rule.**
+   - **Inverted from "skipped" to "drawn with the wrapped value":**
+     - `DrawNegativeOrigin.FilledBoxOriginWrapsAndIsDrawn` — was `FilledBoxShortensToVisiblePart`. Now box (−5, −3) records (65531, 65533, 20, 10).
+     - `DrawNegativeOrigin.OutlineAndRoundedBoxesWrapAndAreDrawn` — was `OutlineAndRoundedBoxesAreSkipped`.
+     - `DrawNegativeOrigin.HVLineOriginsWrapAndLengthsDoNot` — merges the former `HLineShortensXAndSkipsNegativeY` and `VLineShortensYAndSkipsNegativeX`.
+     - `DrawNegativeOrigin.PointPositionsWrapAndAreDrawn` — was `PointShapesAreSkipped`. Covers pixel, line, circle, disc and ellipse.
+     - `DrawNegativeOrigin.OutlineTriangleDrawsEveryEdgeWithWrappedEndpoints` — was `OutlineTriangleSkipsOnlyEdgesWithNegativeEndpoints`.
+     - `Xbm.PartlyOffEdgeDrawsWithWrappedOrigin` — was `NegativeOriginIsSkippedNotWrapped`. Also pins that a size of 0 draws nothing.
+     - `Core.RenderObjectPartlyOffLeftAndTopWrapsOriginsAndClampsClip` — was `…RecordsNoWrappedCoordinate`. Clip is clamped to (0, 0, 37, 9); the track frame is drawn at (65531, 65533, 42, 12) and the fill at (65532, 65534, 20, 10).
+   - **Removed:** `DrawNegativeOrigin.FilledBoxWhollyLeftOrAboveIsSkipped`, which only
+     asserted a skip.
+   - **Added, one per H1-affected widget:**
+     - `Switch.PartlyOffEdgeDrawsWithWrappedOrigin`
+     - `Button.BorderPartlyOffEdgeDrawsWithWrappedOrigin` (single and nested borders)
+     - `ProgressBar.TrackPartlyOffEdgeDrawsWithWrappedOrigin`
+     - The bitmap widget's test is the inverted one above.
+   - **Label:** `LabelScroll.TextLeftOfOriginReachesU8g2Wrapped` and the three scroll
+     assertions are kept; comments now cite the ruling and `u8g2gl_coord_pos()`.
+5. **H3 — measurement getters.** The stub now matches `U8g2lib.h`:
+   - `getUTF8Width` and `getStrWidth` return `u8g2_uint_t`.
+   - `getAscent`, `getDescent`, `getMaxCharWidth` and `getMaxCharHeight` return `int8_t`.
+   - Every call site in `src/` converts explicitly: 20 sites, `static_cast<int>(…)`, with
+     the label's two existing `static_cast<int16_t>(…)` kept.
+   - The test configuration fields (`utf8_width_val`, `ascent_val`, …) stay `int`, cast
+     inside the stub.
+   - Audit: every `src/*.cpp` compiled against the real headers with `-Wconversion
+     -Wsign-conversion` added produces **no diagnostics**.
+6. **H6 — fresh clones.**
+   - The check moved from `test/CMakeLists.txt` to the root `CMakeLists.txt`, inside
+     `if(U8G2GL_BUILD_TESTS)` and **before** the googletest `FetchContent`. A fresh clone
+     now fails first, and without downloading anything.
+   - `U8G2GL_U8G2_DIR` is set there and reused by the test target.
+   - **Proven** in a throwaway worktree at HEAD with the submodule not initialised
+     (removed afterwards). Configure reported:
+     ```
+     CMake Error at CMakeLists.txt:77 (message):
+       The U8G2 submodule is not initialised
+       (.../tmp/wo4c2-h6-proof/extern/u8g2 has no cppsrc/U8g2lib.h).  The host tests
+       compile the runtime against it.  Run:
+
+         git submodule update --init extern/u8g2
+
+       or configure with -DU8G2GL_BUILD_TESTS=OFF to build the library only.
+     ```
+   - The library-only advice was checked too: `-DU8G2GL_BUILD_TESTS=OFF` configures
+     cleanly.
+7. **H8 — no machine-local catalogue source.** `cli/test/catalogue/builder.test.ts` reads
+   `extern/u8g2` only.
+   - `U8G2_PATH` and the departures-board path are gone from the tests. The struct count
+     is the pinned constant 205.
+   - The Arduino release layout is still tested, with a **synthetic tree** built by
+     `mkdtempSync` and removed in `finally`, so it runs identically everywhere.
+   - `build-catalogue.ts` still honours `--u8g2-path`/`U8G2_PATH` as script options
+     (unchanged, not a test path).
+
+#### Test counts
+
+| Suite | After first pass | After second pass |
+|---|---|---|
+| C++ `ctest` | 300 (1 known skip) | **301** (same skip `SizeOfReport.ThirtyTwoBitTarget`), including `RealU8g2.RuntimeCompilesAgainstRealHeaders` |
+| CLI `vitest` | 602 | **602**: one machine-path test replaced by one synthetic-layout test |
+
+- **C++ net +1:** three widget tests added, one skip-only test removed, two h/v line
+  tests merged into one.
+- **Builds.** Zero warnings in the reconfigured in-tree build and in a from-scratch build
+  (`tmp/wo4c2-clean-build`, googletest from the existing local checkout, nothing
+  fetched); both pass 301/301.
+- **CLI checks.** `npx tsc --noEmit` and `npm run lint` are clean.
+
+#### Decisions
+
+- **E1 — Corner radius is clamped, not refused.** For `drawRFrame`/`drawRBox` in button
+  and switch, 0 is a meaningful corner radius (square corners), so "radius <= 0 is
+  skipped" is read as applying to a radius that *is* the shape (circle, ellipse), not a
+  corner radius.
+- **E2 — `u8g2gl_coord_span()` kept for partial refresh only.** Tile arguments are not
+  clipped by U8G2, so wrapping them would refresh the wrong region. The ruling addresses
+  draw positions; refresh is not a draw.
+- **E3 — The submodule check lives in the root file**, so it precedes the googletest
+  download.
+
+#### New findings (not fixed, not filed)
+
+- **N1 — `drawLine` is NOT wrap-safe; the ruling's evidence does not cover it.** Read in
+  `extern/u8g2/csrc/u8g2_line.c`, `u8g2_DrawLine()`:
+  - It says "no intersection check at the moment, should be added…".
+  - It computes `dx`/`dy` by comparing `u8g2_uint_t` end points
+    (`if ( x1 > x2 ) dx = x1-x2; else dx = x2-x1;`), then steps Bresenham from `x1` to `x2`.
+  - With a wrapped end point, e.g. (−2, 0)→(10, 10), arriving as (65534, 0)→(10, 10),
+    `dx` becomes 65524 instead of 12.
+  - **Result:** the loop runs about 65,000 iterations (each through `u8g2_DrawPixel`), and
+    the on-screen pixels are plotted at slope ≈ 10/65524 instead of 10/12 — a wrong,
+    nearly flat line, plus a frame-time cost.
+  - `u8g2gl_draw_line` and outline triangles now pass wrapped end points per the ruling.
+    The first pass skipped them.
+  - Filled triangles are unaffected: `u8g2_DrawTriangle` takes `int16_t`.
+  - → **PA**: lines probably need their own rule, such as clipping the segment to the
+    display in `u8g2gl_draw_line` before converting, or skipping. PR-06's pixel test
+    should include a line with a negative end point.
+- **N2 — Positions beyond 255 on an 8-bit `u8g2_uint_t` build would wrap modulo 256**
+  into the visible area. Unreachable with the pinned 2.36.18, which defines `U8G2_16BIT`
+  unconditionally (first-pass H4); recorded because the wrap is now the rule.
+- **Still open from the first pass, unchanged by the ruling:** H5 (only the Arduino view
+  is compiled against the real headers), H7 (`u8g2gl_coord.h` has no `class U8G2;`
+  fallback), H9 (stale state-saver comments outside the box), and the §11.3 spec
+  disagreement for the Chief Architect. H2's stub corrections stand; H3, H6 and H8 are
+  closed above; H1 and S1 are closed by the ruling.
+
+#### Changed files (`git diff --name-only 8a19acf..62dd06b`)
+
+```
+CMakeLists.txt
+cli/test/catalogue/builder.test.ts
+include/u8g2gl/u8g2gl_coord.h
+include/u8g2gl/u8g2gl_draw.h
+src/u8g2gl_button.cpp
+src/u8g2gl_clock.cpp
+src/u8g2gl_draw.cpp
+src/u8g2gl_glyph.cpp
+src/u8g2gl_label.cpp
+src/u8g2gl_progress_bar.cpp
+src/u8g2gl_switch.cpp
+src/u8g2gl_xbm.cpp
+test/CMakeLists.txt
+test/stubs/U8G2lib.h
+test/test_button.cpp
+test/test_core.cpp
+test/test_draw.cpp
+test/test_label.cpp
+test/test_progress_bar.cpp
+test/test_switch.cpp
+test/test_xbm.cpp
+```
+
+All are inside the Boundary Box. No network access this pass, and `docs/`, `PROGRAM*.md`
+and the manifests are untouched. There is no version bump.
