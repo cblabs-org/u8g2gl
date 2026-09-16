@@ -74,7 +74,8 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
 - [x] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** ✅ `7924d24`, `62dd06b`, `468e386` · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
 - [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
-- [ ] **[WO8 — realisation and capacities](wo8-realisation-capacities/WORKORDER.md)** · base WO7b · standard · [D-18], [D-21], `_n<N>`
+- [ ] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
+- [ ] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** · base WO8a · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
@@ -924,6 +925,21 @@ Recommended order: WO8a → WO8b. Realisation must consume one expanded, fully r
 mangled model; building it before that model exists would mean writing it twice. **If the
 owner declines**, WO8 proceeds as one work order carrying all of the above.
 
+### Owner approval — WO8 split, 2026-09-16
+
+**APPROVED by the human (Matt McNeill) on 2026-09-16.** The owner's own words, verbatim:
+
+> "And yes split WO8 is fine."
+
+Context: the owner had the WO7b review and the split proposal above in front of them —
+WO8a (one pipeline: expand once, resolve once, mangling wired in, non-rectangular geometry
+resolved, five WO7b checking gaps) then WO8b (realisation, flattening, capacities,
+`_n<N>` counts, overload selection). The ledger is now **seventeen** work orders. The
+combined `wo8-realisation-capacities/WORKORDER.md` is retired in favour of the two.
+
+The same message asked for a bridge prompt to the Chief Architect; it is
+`CA-BRIDGE-2026-09-16.md` in this directory.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -943,6 +959,12 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-16 — **Owner approved the WO8 split.** Ledger now **seventeen**. WO8a dispatched
+  on `u8g2gl-generator/wo8a-one-pipeline`; WO8b drafted on top of it; the combined
+  `wo8-realisation-capacities/` retired. Bridge prompt for the Chief Architect written to
+  `CA-BRIDGE-2026-09-16.md` (seven items: §13.2 `int16_t` scope, the `wd_` prefix, §11.3's
+  clip text, the negative-origin premise, `$prop` interpolation, two small inconsistencies,
+  and the obligations handed to PR-05/PR-06).
 - 2026-09-15 — **WO7b complete** (`9970859`, report `c4f359d`). Verified independently,
   including end to end through the built CLI. **WO8 split proposed (WO8a / WO8b) and held
   for the owner** — WO8 now carries eleven items beyond its own scope. Not dispatched.
