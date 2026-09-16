@@ -223,6 +223,24 @@ export const DIAGNOSTIC_CODES = {
    *   `UNRESOLVED_GEOMETRY`, which still reports the geometry attributes.
    */
   UNSUBSTITUTED_PROP: 'U8G2GL_UNSUBSTITUTED_PROP',
+  /**
+   * Something requires a C++ object of an element that has no class to
+   * instantiate — a `draw=`-only drawing element ([D-18], §13.5).
+   *
+   * §13.5's rule gives an element an object when something must hold a
+   * reference to it or it must remember something between frames: a
+   * `<focus_ring>` naming it, an event on it, nested children it contains, or a
+   * parent composite's typed pointer to it. A drawing element compiles to a
+   * free `u8g2gl_draw_*` call and has no class, so there is nothing to
+   * reference, nothing to focus and nothing to nest inside.
+   *
+   * Deliberately not `INAPPLICABLE_FLAG`'s shape: that names one attribute the
+   * element cannot carry, while this names a *structural* requirement the
+   * element cannot meet, and the message says which condition created it.
+   * A binding is **not** one of those conditions — a drawing element compiles
+   * its binding into the draw call (§13.5) and needs no object for it.
+   */
+  DRAWING_ELEMENT_NEEDS_OBJECT: 'U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT',
 } as const;
 
 /**

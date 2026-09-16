@@ -14,6 +14,7 @@
  * - GENERATED_MARKER, HeaderStamp, formatHeaderStamp, isGeneratedContent (header.ts)
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
  *   GENERATE_NOT_YET_SUPPORTED_POLICY (generate.ts)
+ * - Realisation and capacities — §13.5, §13.3, [D-21] (realise/)
  */
 
 export { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
@@ -30,3 +31,4 @@ export {
   type GenerateResult,
   type GeneratedFile,
 } from './generate.js';
+export * from './realise/index.js';

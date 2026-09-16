@@ -15,6 +15,12 @@
  *              document order — each opening with its header stamp. PR-04 WO5b
  *              emits the stamps only; WO9 and WO10 fill in the content.
  *
+ *              PR-04 WO8b adds the analysis those two emit from: every element's
+ *              realisation and the flat object model (§13.5, §13.3), and the
+ *              static capacities counted from them ([D-21]). Both are carried on
+ *              the result rather than written anywhere — this module still emits
+ *              no content.
+ *
  * Exports:
  * - GENERATE_NOT_YET_SUPPORTED_POLICY: Always 'error' — the build refuses what it cannot emit
  * - GenerateInput:   A loaded project, the target to build and the generator version
@@ -28,8 +34,9 @@ import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
 import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
-import { checkProject, type ProjectModel } from './check-project.js';
+import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { formatHeaderStamp } from './header.js';
+import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from './realise/index.js';
 
 /**
  * The not-yet-supported policy `generate()` applies. Fixed, not a parameter: a
@@ -82,6 +89,19 @@ export interface GenerateResult {
    * files were produced; WO9 and WO10 emit from it.
    */
   readonly resolved?: readonly ResolvedScreen[];
+  /**
+   * What every element became and where it sits in the flat object model
+   * (§13.5, §13.3), in the same order as {@link resolved} — the two are views
+   * of one expanded tree. Present only when files were produced; WO10 emits the
+   * objects, parent tables and draw calls from it.
+   */
+  readonly realised?: readonly RealisedScreen[];
+  /**
+   * The static capacities counted from what was realised ([D-21]). Present only
+   * when files were produced; WO9 emits `u8g2gl_generated_config.h` from it and
+   * §18 reports it.
+   */
+  readonly capacities?: Capacities;
 }
 
 // resolveTarget
@@ -223,7 +243,26 @@ export function generate(input: GenerateInput): GenerateResult {
     };
   }
 
-  // --- Step 4: Lay out the file set ---
+  // --- Step 4: Decide what every element becomes, and count the capacities ---
+  // Realisation runs on the very model validation judged — the pipeline built
+  // for *this* target (§13.11 step 3) — so what is counted is what will be
+  // emitted. Every diagnostic realisation raises is an error (an element with
+  // no class that something needs an object of), so any of them refuses the
+  // build, and the counts are merged through the one comparator both journeys
+  // report in.
+  const realisation =
+    pipeline === undefined
+      ? undefined
+      : realiseScreens({ globals: input.globals, manifests: input.manifests, expansion: pipeline.expansion });
+  if (realisation !== undefined && realisation.diagnostics.length > 0) {
+    return {
+      files: [],
+      ...finaliseDiagnostics([...checked.diagnostics, ...realisation.diagnostics]),
+      target: target.name,
+    };
+  }
+
+  // --- Step 5: Lay out the file set ---
   // No second resolution: Pass 6 judged this very model against this very
   // display, so a resolution error has already refused the build above.
   return {
@@ -231,5 +270,11 @@ export function generate(input: GenerateInput): GenerateResult {
     ...checked,
     target: target.name,
     ...(pipeline !== undefined ? { resolved: pipeline.resolution.screens } : {}),
+    ...(realisation !== undefined
+      ? {
+          realised: realisation.screens,
+          capacities: computeCapacities({ globals: input.globals, screens: realisation.screens }),
+        }
+      : {}),
   };
 }
