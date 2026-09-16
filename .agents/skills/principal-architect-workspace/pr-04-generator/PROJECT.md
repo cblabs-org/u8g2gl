@@ -75,7 +75,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** ✅ `7924d24`, `62dd06b`, `468e386` · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
 - [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
 - [x] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** ✅ `2954fc2` · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
-- [ ] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** · base WO8a · standard · [D-18], [D-21], `_n<N>`
+- [x] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** ✅ `6c2c909` · base WO8a · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
@@ -986,6 +986,93 @@ over the real function is the guard.
 | 6 | `ValidateInput.pipeline` carries a trust-based display obligation | **Noted** — WO8b and WO9 must pass the pipeline built for the target they are working on |
 | 7 | "Resolve once" is true of **screens**; Pass 6 still resolves composite templates separately, as WO7b requires | **WO8b** — told explicitly not to assume it away |
 
+### WO8b — complete (`6c2c909`)
+
+**Verified independently:** one commit, on the WO8b branch only; runtime C++, `extern/`,
+`docs/`, `PROGRAM*.md` and the validator passes untouched; C++ 305 unchanged, zero warnings;
+CLI 669 → **694**, `tsc` and lint clean; no existing test changed, WO8a's expansion counter
+included.
+
+**The three things that had to be right are right.** Realisation is one pass over the whole
+document, recording every reason code that held — including the three that only PR-08/PR-09
+can trigger — so a reported reason is true rather than merely sufficient. The [D-18]
+amendment is applied **at the outcome only**: `requiredByRule` keeps the unamended answer, so
+demotion can be switched on later without rewriting the pass. Per-subject observers are object
+bindings plus **exactly one** frame-dirty observer, pinned by three tests including the
+zero-object case — the PR-01 constraint that was nearly lost in a stray commit. §13.12's
+example reproduces exactly: five objects in order, parents `NO_PARENT,0,0,0,NO_PARENT`, `rule`
+as interleaved draw calls, and total bindings **4** where the product would be 5.
+
+**The worker priced its own base run honestly**, which is worth recording: 25 of 25 new tests
+fail at the base, but 23 fail only because the module does not exist there. It reported "2
+discriminate behaviour" rather than claiming 25.
+
+**Finding 1 reproduced by the PA, and it is a live defect.** A project of 128 composite
+instances reaches **256 objects**; `validate` and `generate` both exit 0 with no diagnostic.
+`countScreenObjects` omits composite containers and counts drawing elements — both inverted by
+[D-18] — so its comment claiming it "can never miss a real overflow" is false. `parent_index_`
+is a `uint8_t`, so emission would write an unrepresentable parent table. **This must be fixed
+before WO9/WO10 emit.**
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | The 254-object ceiling can be missed entirely; the conservative over-count is now an under-count | **Proposed WO8c** — replace it with realisation's exact count |
+| 2 | `U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT` is `generate`-only, so `validate` passes a document `generate` refuses | **Proposed WO8c** — decision 1's journey split: warning in `validate`, error in `generate` |
+| 3 | The pipeline's per-target display obligation is met at the only call site but unenforced by the types | **Noted** — WO9 threads the pipeline for the target it emits |
+| 4 | A focus ring cannot name a composite child | **PR-09** — recorded; it decides whether entries may name mangled identifiers |
+| 5 | Every class-backed element inherits `bind_text` and geometry bindings from `u8g2gl_obj.xml`, which capacity counts inherit | **Q-10**, already deferred to E-2 |
+
+### Chief Architect rulings on CA-BRIDGE-2026-09-16 — applied 2026-09-16
+
+All seven ruled; the spec edits and record-keeping were delegated to this PR. What changed:
+
+1. **§13.2 — as implemented.** Only a **resolved coordinate** must fit `int16_t`; constants
+   keep their `int32_t` check at declaration, and anchor arithmetic may pass through wider
+   intermediates. The first sentence now says "a resolved coordinate".
+2. **§13.4 — `wd_` is no longer reserved.** By [D-12] a tag *is* its class name, so `wd_`
+   names classes users write and the generator never produces one. **Precondition confirmed
+   before changing it:** `wd_` appears in the CLI only in two copies of the reserved-prefix
+   list (`mangle.ts:50`, `validate-identifiers.ts:27`) and one prefix-strip
+   (`parse-widget-tree.ts:380`) — no emitted symbol, so nothing needs renaming. The code
+   change and a restored `wd_` fixture are **proposed WO8c** (those files are a worker's, not
+   the PA's, and the two duplicate lists should collapse to one).
+3. **§11.3 — corrected to the pinned source.** `setClipWindow(x, y, x+w, y+h)`, citing
+   `u8g2.h:352/354`; the state saver saves draw colour and font only, because U8G2 has no
+   getter for clip window, font mode or bitmap mode; clip lifetime belongs to the render
+   wrapper.
+4. **Negative origins — accepted, no action.** The wrap-everywhere-except-lines split stands.
+5. **`$prop` interpolation — hard error ratified for 0.4**, and recorded as **Q-13** in §21 as
+   a candidate for the next schema bump.
+6. **Three inconsistencies fixed:** §6.4's example is `format="hh_mm"`; §13.9 admits the
+   Target line, with the reason (the target is an input, so determinism is unaffected);
+   `ui_flows.md` now shows `bind_text` declared once per subject type, and **d19 keeps its
+   text** with a dated amendment appended — decision records are history.
+7. **Obligations recorded:** `PROGRAM-PLAN.md`'s PR-06 row now carries the container-edge
+   pixel test (exact-bounds clip, frame partly off the left edge, clipped line with the ~1px
+   and corner-pixel tolerances) and a real-header compile check for the Wasm build; the PR-05
+   row carries the same check for ESP-IDF. **§21's Q-11 is marked closed** by WO4c, citing
+   `catalogue-source.json`.
+
+### Proposed WO8c — validator alignment (awaiting the owner)
+
+Three small validator changes that the rulings and WO8b's findings imply, kept out of WO9 so
+emission stays one reviewable diff:
+
+- **The exact object ceiling.** Replace `countScreenObjects` with realisation's exact count,
+  so the 254 structural limit ([A-3], [D-21]) is enforced rather than missed. A regression
+  test at 256 objects — the case that passes today.
+- **Realisation's refusal obeys the journey split.** `U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT`
+  becomes a warning in `validate` and an error in `generate`, like every other
+  not-yet-supported and refusal path (decision 1), so `validate` never passes a document
+  `generate` refuses.
+- **`wd_` un-reserved (ruling 2).** Remove it from both prefix lists, collapse the two lists
+  into one, and restore a `wd_`-named fixture so a test covers §6.6's convention.
+
+Small, validator-only, and a prerequisite for WO9: emission must not be written against a
+ceiling check that can under-count. **If the owner declines**, these fold into WO9.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1005,6 +1092,13 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-16 — **Chief Architect rulings on CA-BRIDGE-2026-09-16 received and applied.** All
+  seven ruled; the spec edits and record-keeping were delegated to this PR and are done on
+  `u8g2gl-generator/pa-ca-rulings`. **WO8c proposed to the owner** for the validator work the
+  rulings and WO8b imply; not dispatched.
+- 2026-09-16 — **WO8b complete** (`6c2c909`). Verified independently. Its ceiling finding
+  reproduced end to end: 128 composite instances reach **256 objects** and both `validate`
+  and `generate` exit 0 — a live hole in [D-21]'s structural guard.
 - 2026-09-16 — **WO8a complete** (`2954fc2`). Verified independently, including end to end
   through the built CLI. Boundary excursion into `parse-widget-tree.ts` accepted. WO8b
   dispatched on `u8g2gl-generator/wo8b-realisation-capacities`; four value-completeness

@@ -170,8 +170,8 @@ The exclusion is not wrong, but it was written against a different case. A *gene
 The manifests as shipped in PR-03 declare:
 
 ```xml
-<bind name="bind_text"     type="string" setter="bind_text" fmt="bind_text_fmt" />
-<bind name="bind_text_int" type="int"    setter="bind_text" fmt="bind_text_fmt" />
+<bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
+<bind name="bind_text" type="int"    setter="bind_text" fmt="bind_text_fmt" />
 ```
 
 Rendered literally, that is two rows — *Bind text* and *Bind text int* — and the user must know their subject's type before they can tell which row to use. The manifest is describing one user-facing capability through two generator-facing entries, and the panel must reflect the user's model, not the generator's.

@@ -35,8 +35,8 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 | PR-3R | U8G2GL | ★ Interim remediation to `[D-18]`–`[D-21]`, schema 0.4 | PR-03 | ✅ **MERGED #4** |
 | **PR-04** | U8G2GL | Generator XML→C++ per §13: realisation, composite expansion, build-time layout, mangling, generated capacities `[D-21]`, **editor-target registry `[UD-4]`** | PR-3R | **NEXT — awaiting PA handoff** |
 | PR-04b | U8G2GL | **Font and image pipeline:** `<bdf>` through `bdfconv` in Wasm [Q-2], PNG→XBM `<convert>`. Split out of PR-04, which refuses both with a named error | PR-04 | Pending — **on the critical path** |
-| PR-05 | foundation | Integration module, build hooks, first board migrated | PR-04 + **PR-04b** | Pending |
-| PR-06 | U8G2GL | Wasm renderer + snapshot harness | PR-3R | Pending — may run ∥ PR-04 |
+| PR-05 | foundation | Integration module, build hooks, first board migrated. **Owed by PR-04:** a compile check against real U8G2 headers for the ESP-IDF build — PR-04 WO4c covers Arduino only | PR-04 + **PR-04b** | Pending |
+| PR-06 | U8G2GL | Wasm renderer + snapshot harness. **Owed by PR-04:** a container-edge pixel test against real U8G2 — (a) an element whose clip is exactly its bounds, drawing to its last column and row; (b) a frame partly off the left edge, confirming wrapped origins draw their visible part; (c) a clipped line, allowing ~1px endpoint rounding (WO4c T1) and a corner pixel at the clipping bound (T2). Plus a compile check against real U8G2 headers for the Wasm build | PR-3R | Pending — may run ∥ PR-04 |
 | PR-07 | foundation | ★ **GO/NO-GO GATE** | PR-05 + PR-06 | Pending — see CA-2 |
 
 ## Editor track — the programme's destination (design_spec §20 Phase 3)
