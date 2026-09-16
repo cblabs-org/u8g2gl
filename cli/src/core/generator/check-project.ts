@@ -25,6 +25,7 @@
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
+import type { ScreenPipeline } from '../resolver/index.js';
 import { validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
 
@@ -32,7 +33,7 @@ import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-suppor
  * A project as loaded, before validation: the validator's input without a
  * policy, plus what loading itself found.
  */
-export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 'target'> {
+export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 'target' | 'pipeline'> {
   /**
    * Diagnostics raised while loading — XML and parser diagnostics, including
    * [U-1] missing names, and any from the bundled framework manifests. Merged
@@ -60,10 +61,20 @@ export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 't
  *               `validate`, `'error'` for `generate`.
  * @param target The target to check geometry against — `generate`'s build
  *               target. Omitted, the project's first target is checked.
+ * @param pipeline The expansion and resolution to judge, when the caller has
+ *               one to share. `generate` passes the model it will emit from, so
+ *               the document is expanded once for the whole command and what is
+ *               validated is exactly what is generated (PR-04 WO8a). It must
+ *               have been built for `target`'s display.
  * @return Deduplicated diagnostics sorted by file, line, column and code, with
  *         error and warning counts, and the target geometry was checked against.
  */
-export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy, target?: Target): ValidateResult {
+export function checkProject(
+  model: ProjectModel,
+  policy: NotYetSupportedPolicy,
+  target?: Target,
+  pipeline?: ScreenPipeline,
+): ValidateResult {
   // --- Step 1: Run the validator under the caller's policy, for the caller's target ---
   const validation = validate({
     project: model.project,
@@ -73,6 +84,7 @@ export function checkProject(model: ProjectModel, policy: NotYetSupportedPolicy,
     catalogue: model.catalogue,
     notYetSupported: policy,
     ...(target !== undefined ? { target } : {}),
+    ...(pipeline !== undefined ? { pipeline } : {}),
   });
 
   // --- Step 2: Merge, dropping the placeholder project's schema diagnostic ---

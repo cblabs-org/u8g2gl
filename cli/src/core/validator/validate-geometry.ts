@@ -51,25 +51,18 @@
  *              once; a pair that depends on an instance names it.
  *
  * Exports:
- * - checkedTarget(input):    The target Pass 6 checks — `input.target`, or the first declared
  * - validateGeometry(input): Runs Pass 6 geometry and bounding validation
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import type { Target } from '../schema/project.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode } from '../schema/widget-node.js';
 import {
   INT16_MAX,
   INT16_MIN,
-  createResolverContext,
-  displayContainer,
-  expandScreens,
-  findTargetDisplay,
   isCentringOn,
   isRectangular,
   resolveElements,
-  walkExpanded,
   withInstantiation,
   type AxisOutcome,
   type DeferredCoordinate,
@@ -79,6 +72,7 @@ import {
   type ResolverContext,
 } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
+import { pipelineOf } from './shared-model.js';
 
 function createGeomDiagnostic(
   code: string,
@@ -141,18 +135,6 @@ function describeNode(node: WidgetNode): string {
   return typeof name === 'string' && name !== '' ? `<${node.tag}> '${name}'` : `<${node.tag}>`;
 }
 
-/**
- * @brief The target Pass 6 resolves and bounds-checks against.
- *
- * `generate` passes the target it builds; `validate` passes none, and the
- * project's first declared target is checked, as it always has been (§7.2).
- *
- * @return The target, or undefined when the project declares none.
- */
-export function checkedTarget(input: ValidateInput): Target | undefined {
-  return input.target ?? input.project?.targets?.[0];
-}
-
 // ---------------------------------------------------------------------------
 // Which axes a template settles
 // ---------------------------------------------------------------------------
@@ -192,7 +174,7 @@ function settledInTemplate(node: WidgetNode, axis: GeometryAxis, outcome: AxisOu
 // Prose for why a written coordinate has no value.
 //   deferred — the deferred attribute
 //   element  — the element it is on
-function deferralReason(deferred: DeferredCoordinate, element: ResolvedElement, axis: GeometryAxis): string {
+function deferralReason(deferred: DeferredCoordinate, element: ResolvedElement, axis?: GeometryAxis): string {
   const reasons = deferred.symbols.map((symbol) => {
     if (symbol.startsWith('$')) {
       return `'${symbol}' is never substituted — a $prop has a value only inside a composite's <view>`;
@@ -202,7 +184,9 @@ function deferralReason(deferred: DeferredCoordinate, element: ResolvedElement, 
     }
     return `'${symbol}' has no value for this target`;
   });
-  return reasons.length > 0 ? reasons.join('; ') : `it depends on the container's ${axis.size}, which is unknown`;
+  return reasons.length > 0
+    ? reasons.join('; ')
+    : `it depends on the container's ${axis?.size ?? 'size'}, which is unknown`;
 }
 
 // underDetermination
@@ -412,6 +396,113 @@ function checkAxisBounds(
 }
 
 // ---------------------------------------------------------------------------
+// Endpoints and radii — the coordinates outside the rectangle (§6.2)
+// ---------------------------------------------------------------------------
+
+// checkExtras
+// Checks 1, 2 and 3 for each endpoint and radius the resolver settled. Before
+// PR-04 WO8a none of these was resolved at all (WO7b finding 2): an expression
+// in `x1` never evaluated, and a value outside the display or outside `int16_t`
+// reached emission unremarked, which WO9/WO10 cannot emit a draw call from.
+//
+// A point is held to its container exactly as `x` is. A length (a radius) is
+// checked for representability and for being non-negative, but not against the
+// container: what a radius should be measured against needs the
+// centre-positioned-element semantics §7.2 defers (WO6 finding 8).
+//   element         — the resolved element
+//   context         — resolution context, for the display
+//   templateSourced — whether the element was copied from a composite's `<view>`
+//   emit            — receives each diagnostic
+function checkExtras(
+  element: ResolvedElement,
+  context: ResolverContext,
+  templateSourced: boolean,
+  emit: ElementDiagnosticSink,
+): void {
+  const { node } = element;
+  // The catalogue record supplies both sizes or neither, so either answers
+  // "is there a display?" — the deferral a missing record causes is Pass 3's.
+  const displayKnown = context.display.width !== undefined;
+
+  for (const extra of element.extras) {
+    // --- Step 1: Written, but never resolved (§7.2) ---
+    const { deferred } = extra;
+    if (deferred !== undefined) {
+      const placeholder = deferred.symbols.some((symbol) => symbol.startsWith('$'));
+      if ((templateSourced && placeholder) || (!displayKnown && !placeholder)) {
+        continue;
+      }
+      emit(
+        node,
+        createGeomDiagnostic(
+          DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+          `'${deferred.attribute}' on ${describeNode(node)} cannot be resolved: ${deferralReason(deferred, element)}. ` +
+            `Every coordinate must resolve to a literal before emission (§7.2, §13.2).`,
+          deferred.loc ?? node.loc,
+          deferred.expression,
+        ),
+      );
+      continue;
+    }
+    const { coordinate } = extra;
+    if (coordinate === undefined) {
+      continue; // The expression was invalid; the evaluator has already said why.
+    }
+
+    // --- Step 2: Representable as a stored coordinate (§13.2) ---
+    if (coordinate.value < INT16_MIN || coordinate.value > INT16_MAX) {
+      emit(
+        node,
+        createGeomDiagnostic(
+          DIAGNOSTIC_CODES.COORDINATE_OUT_OF_RANGE,
+          `${describeNode(node)} resolves to ${extra.attribute}=${coordinate.value}, outside the int16_t range ` +
+            `(${INT16_MIN}..${INT16_MAX}) coordinates are stored in (§13.2).`,
+          coordinate.provenance.loc ?? node.loc,
+          sourceText(coordinate),
+        ),
+      );
+      continue; // A value that cannot be stored is not then measured.
+    }
+
+    // --- Step 3: A length is non-negative; a point lies inside its container ---
+    if (extra.kind === 'length') {
+      if (coordinate.value < 0) {
+        emit(
+          node,
+          createGeomDiagnostic(
+            DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+            `Element '<${node.tag}>' resolves to ${extra.attribute}=${coordinate.value}, which is negative.`,
+            coordinate.provenance.loc ?? node.loc,
+            sourceText(coordinate),
+          ),
+        );
+      }
+      continue;
+    }
+    const axis = AXES.find((candidate) => candidate.name === extra.axis);
+    if (axis === undefined) {
+      continue;
+    }
+    const limit = element.container[axis.size];
+    if (limit === undefined) {
+      continue;
+    }
+    if (coordinate.value < 0 || coordinate.value > limit - 1) {
+      emit(
+        node,
+        createGeomDiagnostic(
+          DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+          `Element '<${node.tag}>' has ${extra.attribute}=${coordinate.value}, but ${element.container.label} ` +
+            `is ${limit}px ${axis.extent} (0..${limit - 1}).`,
+          coordinate.provenance.loc ?? node.loc,
+          sourceText(coordinate),
+        ),
+      );
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The per-element walk
 // ---------------------------------------------------------------------------
 
@@ -446,6 +537,7 @@ function checkElements(
         checkAxisBounds(element, axis, limit, emit);
       }
     }
+    checkExtras(element, context, rules.templateSourced(element), emit);
     checkElements(element.children, rules, context, emit);
   }
 }
@@ -457,15 +549,6 @@ function walkResolved(elements: readonly ResolvedElement[], visit: (element: Res
     visit(element);
     walkResolved(element.children, visit);
   }
-}
-
-// indexExpanded
-// Each expanded node's element, for finding a resolved node's instantiation chain.
-// A lookup only; nothing iterates it, so its order never reaches output.
-function indexExpanded(elements: readonly ExpandedElement[]): Map<WidgetNode, ExpandedElement> {
-  const index = new Map<WidgetNode, ExpandedElement>();
-  walkExpanded(elements, (element) => index.set(element.node, element));
-  return index;
 }
 
 // ---------------------------------------------------------------------------
@@ -561,13 +644,14 @@ function checkBoundContainers(
  */
 export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { globals, screens, catalogue, manifests } = input;
+  const { manifests } = input;
 
-  // --- Step 1: Resolve against the target being checked ---
-  // Without a catalogue record the display has no size: `#screen_*` stay
+  // --- Step 1: The run's shared expansion and resolution, for the target checked ---
+  // One expansion and one resolution serve every pass and `generate` (PR-04
+  // WO8a). Without a catalogue record the display has no size: `#screen_*` stay
   // deferred and screen-level bounds go unchecked, rather than guessed.
-  const display = findTargetDisplay(checkedTarget(input), catalogue ?? []);
-  const context = createResolverContext(globals, manifests, display);
+  const pipeline = pipelineOf(input);
+  const context = pipeline.context;
 
   // --- Step 2: Composite templates, as declared ---
   // A defect in a template's own text — a malformed expression, an unknown
@@ -605,27 +689,31 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   // Expansion gives an instance its template as children, so `#parent_*` and
   // anchors inside it resolve against the instance's own resolved geometry
   // ([D-20], §13.6 step 4). Expansion's own diagnostics are Pass 5's to report.
-  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
-  for (const screen of expansion.screens) {
-    const origins = indexExpanded(screen.elements);
-    // A screen element's diagnostic is reported as it is. One inside an instance
-    // names the instance — unless the template already said exactly this, in
-    // which case it is a fact about the template, not about this instance.
-    const place = (node: WidgetNode, diagnostic: Diagnostic): Diagnostic | undefined => {
-      const chain = origins.get(node)?.instantiation ?? [];
-      if (chain.length === 0) {
-        return diagnostic;
-      }
-      return templateReported.has(diagnosticKey(diagnostic)) ? undefined : withInstantiation(diagnostic, chain);
-    };
-    const sourceOf = (element: ResolvedElement): WidgetNode | undefined => origins.get(element.node)?.source;
-    const resolved = resolveElements(
-      screen.elements.map((element) => element.node),
-      displayContainer(context),
-      context,
-      place,
-    );
-    diagnostics.push(...resolved.diagnostics);
+  // A screen element's diagnostic is reported as it is. One inside an instance
+  // names the instance — unless the template already said exactly this, in
+  // which case it is a fact about the template, not about this instance.
+  const place = (node: WidgetNode, diagnostic: Diagnostic): Diagnostic | undefined => {
+    const chain = pipeline.expandedOf(node)?.instantiation ?? [];
+    if (chain.length === 0) {
+      return diagnostic;
+    }
+    return templateReported.has(diagnosticKey(diagnostic)) ? undefined : withInstantiation(diagnostic, chain);
+  };
+  const report = (node: WidgetNode, diagnostic: Diagnostic): void => {
+    const kept = place(node, diagnostic);
+    if (kept !== undefined) {
+      diagnostics.push(kept);
+    }
+  };
+  const sourceOf = (element: ResolvedElement): WidgetNode | undefined => pipeline.expandedOf(element.node)?.source;
+
+  // The resolution is the pipeline's, so it carries each diagnostic with the
+  // node it is about and leaves the placing to this pass — the one place that
+  // knows a template has already spoken for its instances.
+  for (const { node, diagnostic } of pipeline.resolution.raised) {
+    report(node, diagnostic);
+  }
+  for (const resolved of pipeline.resolution.screens) {
     checkElements(
       resolved.elements,
       {
@@ -639,18 +727,13 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
         },
       },
       context,
-      (node, diagnostic) => {
-        const kept = place(node, diagnostic);
-        if (kept !== undefined) {
-          diagnostics.push(kept);
-        }
-      },
+      report,
     );
   }
 
   // --- Step 4: [D-20] bound-geometry containers, on the expanded tree ---
   const fixedPairs = new Map<WidgetNode, Set<WidgetNode>>();
-  for (const screen of expansion.screens) {
+  for (const screen of pipeline.expansion.screens) {
     checkBoundContainers(screen.elements, diagnostics, fixedPairs);
   }
 

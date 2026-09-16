@@ -28,9 +28,10 @@ import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import { expandScreens, walkExpanded } from '../resolver/index.js';
+import { walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
-import { reportSubstituted } from './substituted-values.js';
+import { pipelineOf } from './shared-model.js';
+import { propReferenceIn, reportSubstituted, unsubstitutedPlaceholder } from './substituted-values.js';
 
 /** The declarations a value written on a screen element may name. */
 interface ReferenceScope {
@@ -160,6 +161,44 @@ function checkValueReferences(node: WidgetNode, scope: ReferenceScope, only?: Re
     );
   }
 
+  return diagnostics;
+}
+
+/**
+ * The value attributes Pass 2 checks by name. A `$prop` in one of them, written
+ * outside any composite, is reported here (PR-04 WO8a); `style_font` is reached
+ * through `styleOverrides` and is handled beside them.
+ */
+const VALUE_ATTRIBUTES: readonly string[] = ['font', 'image', 'src', 'style', 'focus_style'];
+
+// screenLevelPlaceholders
+// A `$prop` in a font, image or style value written directly in a screen. There
+// is nothing to substitute it with, so it would reach output literally.
+//   node — the element as written in a screen
+function screenLevelPlaceholders(node: WidgetNode): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const attribute of VALUE_ATTRIBUTES) {
+    const reference = propReferenceIn(node.attributes[attribute]);
+    if (reference !== undefined) {
+      diagnostics.push(
+        unsubstitutedPlaceholder(
+          reference,
+          `'${attribute}' on <${node.tag}>`,
+          node.attributeLocs?.[attribute] ?? node.loc,
+        ),
+      );
+    }
+  }
+  const styleFont = propReferenceIn(node.styleOverrides.font);
+  if (styleFont !== undefined) {
+    diagnostics.push(
+      unsubstitutedPlaceholder(
+        styleFont,
+        `'style_font' on <${node.tag}>`,
+        node.attributeLocs?.style_font ?? node.loc,
+      ),
+    );
+  }
   return diagnostics;
 }
 
@@ -334,9 +373,20 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
       // 2b–2d. Font, image, style and focus-style references
       diagnostics.push(...checkValueReferences(node, scope));
 
+      // A `$prop` here can never be substituted: a screen has no template and so
+      // no props to bind, and every check above skips a `$` value as unknowable
+      // (PR-04 WO7b finding 4). Inside a composite's `<view>` the same values are
+      // checked once expansion has substituted them, in 3b below.
+      diagnostics.push(...screenLevelPlaceholders(node));
+
       for (const child of node.children) {
         if ('kind' in child && child.kind === 'style') {
-          if (!availableStyleSet.has(child.name)) {
+          const reference = propReferenceIn(child.name);
+          if (reference !== undefined) {
+            diagnostics.push(
+              unsubstitutedPlaceholder(reference, `<style> on <${node.tag}>`, child.loc ?? node.loc),
+            );
+          } else if (!availableStyleSet.has(child.name)) {
             diagnostics.push(
               createRefDiagnostic(
                 DIAGNOSTIC_CODES.UNKNOWN_STYLE,
@@ -535,12 +585,31 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   // --- 3b. Values composite expansion substituted (PR-04 WO7b, WO7 F4) ---
   // After sections 2 and 3, so a value already reported where it was written as
   // an argument is recognised and not reported again where the template uses it.
-  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
+  const expansion = pipelineOf(input).expansion;
   const reportSubstitutedValue = reportSubstituted(diagnostics);
   for (const expanded of expansion.screens) {
     const scope = referenceScope(globals, expanded.screen, manifests);
     walkExpanded(expanded.elements, (element) => {
       for (const substitution of element.substitutions ?? []) {
+        // A `<style name="$s">` child, whose value is not an attribute of the
+        // element and so was never checked once substituted (PR-04 WO7b 6).
+        const { styleChild } = substitution;
+        if (styleChild !== undefined) {
+          if (!scope.availableStyleSet.has(styleChild.name)) {
+            reportSubstitutedValue(
+              createRefDiagnostic(
+                DIAGNOSTIC_CODES.UNKNOWN_STYLE,
+                `Unknown style '${styleChild.name}' in <style> child on <${element.node.tag}>.`,
+                styleChild.loc ?? element.node.loc,
+                styleChild.name,
+                findClosest(styleChild.name, scope.availableStyles),
+              ),
+              substitution,
+              element,
+            );
+          }
+          continue;
+        }
         for (const diagnostic of checkValueReferences(element.node, scope, new Set([substitution.attribute]))) {
           reportSubstitutedValue(diagnostic, substitution, element);
         }

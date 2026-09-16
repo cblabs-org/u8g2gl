@@ -149,6 +149,55 @@ const bindingKey = (binding: BindDef): string => `${binding.name}\n${binding.typ
  */
 export const ROOT_CLASS_MANIFEST = 'u8g2gl_obj';
 
+/**
+ * @brief Whether a manifest describes a **drawing element**: it has no `<view>`,
+ *        its own props declare `draw=`, and none declares `setter=` ([D-18], §6.2).
+ *
+ * A drawing element compiles to a free `u8g2gl_draw_*` call and never has a
+ * class, so it has no base to `extends`, no object, and nothing to disable.
+ * Decided from the manifest, never from a list of tags ([D-17]) — a custom
+ * element becomes one simply by declaring only `draw=` props.
+ *
+ * Pass the manifest **as declared**: on an `EffectiveManifest` that is
+ * `.declared`. Inherited props would answer a different question, because a
+ * manifest that wrongly declares `extends` (which the schema pass reports)
+ * would inherit `u8g2gl_obj`'s setters and stop looking like what it is.
+ *
+ * Before PR-04 WO8a this was spelled three times — the schema pass, the prop
+ * pass and the manifest cross-test — which is exactly where WO5a finding 2 said
+ * the next defect would hide.
+ *
+ * @param manifest A declared manifest, or undefined for an unknown tag.
+ * @return True when the manifest is a drawing element.
+ */
+export function isDrawingElement(manifest: WidgetManifest | undefined): boolean {
+  const props = manifest?.api?.props ?? [];
+  return (
+    manifest !== undefined &&
+    manifest.view === undefined &&
+    props.some((prop) => prop.draw !== undefined) &&
+    !props.some((prop) => prop.setter !== undefined)
+  );
+}
+
+/**
+ * The flags a `<bind_flag_if_*>` directive may set (§8.4). Fixed by the spec for
+ * every element rather than declared per manifest (PR-04 WO3 PA decision), so it
+ * names the binding contract, not elements ([D-17]).
+ *
+ * It lives beside {@link isDrawingElement} because the two are read together:
+ * which flags exist, and which of them a given element can actually carry.
+ * Before PR-04 WO8a the set was spelled in two passes (WO7 F8).
+ */
+export const BINDING_FLAGS: readonly string[] = ['hidden', 'disabled'];
+
+/**
+ * The flags that need an object to live on. `hidden` applies to every element —
+ * an object flag, or a draw-time guard on a drawing element (§13.5) — but a
+ * drawing element has no object, so there is nothing to disable (PR-04 WO5a).
+ */
+export const OBJECT_ONLY_FLAGS: readonly string[] = ['disabled'];
+
 // parentTagOf
 // The tag a manifest inherits from, or undefined for a root. A manifest that
 // names itself is not a root — it falls through to the cycle diagnostic.

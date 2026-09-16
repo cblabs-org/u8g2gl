@@ -27,8 +27,8 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
-import { findTargetDisplay, resolveScreens, type ResolvedScreen } from '../resolver/index.js';
-import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
+import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
+import { checkProject, type ProjectModel } from './check-project.js';
 import { formatHeaderStamp } from './header.js';
 
 /**
@@ -184,11 +184,31 @@ export function generate(input: GenerateInput): GenerateResult {
   // unknown target falls back to the first for validation, and is reported below.
   const target = resolveTarget(input);
 
-  // --- Step 2: Validate exactly as `validate` does, refusing unsupported constructs ---
+  // --- Step 2: Expand once and resolve once, against the display being built ---
+  // This is the model WO9/WO10 emit from, and handing the same one to validation
+  // is what makes "validated" and "generated" the same document (§13.11 step 3,
+  // PR-04 WO8a). Before this, `generate` validated an expanded tree and then
+  // resolved an *unexpanded* one of its own, so its resolved model had no
+  // composite interiors at all (WO7 F2) and the first target was resolved twice
+  // (WO6 finding 11). An unresolved target has no display to build for; the
+  // refusal below reports it, and validation falls back to the first target.
+  const display = 'code' in target ? undefined : findTargetDisplay(target, input.catalogue);
+  const pipeline =
+    'code' in target
+      ? undefined
+      : createScreenPipeline({
+          globals: input.globals,
+          screens: input.screens,
+          manifests: input.manifests,
+          ...(display ? { display } : {}),
+        });
+
+  // --- Step 3: Validate exactly as `validate` does, refusing unsupported constructs ---
   const { diagnostics, errors, warnings } = checkProject(
     input,
     GENERATE_NOT_YET_SUPPORTED_POLICY,
     'code' in target ? undefined : target,
+    pipeline,
   );
   const checked = { diagnostics, errors, warnings };
   if (checked.errors > 0) {
@@ -203,24 +223,13 @@ export function generate(input: GenerateInput): GenerateResult {
     };
   }
 
-  // --- Step 3: Resolve geometry against the built target's display ---
-  // Validation above already judged this target — `64 / (#screen_width - 128)`
-  // is 1 on a 192-wide panel and a division by zero on a 128-wide one. This
-  // resolution produces the model WO9/WO10 emit from; any error it raises still
-  // refuses the build. (Resolving once and sharing it is WO8's.)
-  const resolution = resolveScreens({
-    globals: input.globals,
-    screens: input.screens,
-    manifests: input.manifests,
-    display: findTargetDisplay(target, input.catalogue),
-  });
-  if (resolution.diagnostics.length > 0) {
-    const merged = finaliseDiagnostics([...checked.diagnostics, ...resolution.diagnostics]);
-    if (merged.errors > 0) {
-      return { files: [], ...merged, target: target.name };
-    }
-  }
-
   // --- Step 4: Lay out the file set ---
-  return { files: layoutFiles(input, target), ...checked, target: target.name, resolved: resolution.screens };
+  // No second resolution: Pass 6 judged this very model against this very
+  // display, so a resolution error has already refused the build above.
+  return {
+    files: layoutFiles(input, target),
+    ...checked,
+    target: target.name,
+    ...(pipeline !== undefined ? { resolved: pipeline.resolution.screens } : {}),
+  };
 }

@@ -47,7 +47,8 @@
  *
  * Exports:
  * - PropArgument:      One prop bound on one composite instance
- * - Substitution:      One attribute whose whole value was replaced by an argument
+ * - Substitution:      One value whose whole text was replaced by an argument
+ * - STYLE_CHILD_VALUE: The `attribute` a `<style name="$s">` substitution records
  * - ExpandedElement:   An element after expansion, with identifier and provenance
  * - ExpandedScreen:    A screen's expanded top-level elements
  * - ExpansionInput, ExpansionResult
@@ -89,13 +90,27 @@ export interface PropArgument {
   readonly fixed: boolean;
 }
 
-/** One attribute whose whole value was a `$prop` reference, replaced by an argument. */
+/** One value whose whole text was a `$prop` reference, replaced by an argument. */
 export interface Substitution {
-  /** The attribute as the node spells it: `font`, `style_font`, `hcenter`. */
+  /**
+   * The attribute as the node spells it: `font`, `style_font`, `hcenter`. For a
+   * `<style>` child it is `'<style> name'`, and {@link styleChild} carries the
+   * child itself — the value is not an attribute of the element.
+   */
   readonly attribute: string;
   /** The argument that replaced it. */
   readonly argument: PropArgument;
+  /**
+   * The `<style name="$s">` child this substitution was made on, when it was
+   * made on one rather than on an attribute (PR-04 WO7b 6). Pass 2 checks the
+   * substituted style name through it; the passes that read attributes skip
+   * any substitution carrying it.
+   */
+  readonly styleChild?: StyleChild;
 }
+
+/** The attribute name recorded for a `<style name="$s">` child's substitution. */
+export const STYLE_CHILD_VALUE = '<style> name';
 
 /** One element after composite expansion. */
 export interface ExpandedElement {
@@ -389,11 +404,15 @@ function reportUnsubstitutedProp(
 // substituteDirective
 // A binding, event or style child with its values substituted. Values that are
 // not attributes cannot be "left unset", so an unbound reference stays as written.
+// A `<style>` child whose whole `name` was a reference records a substitution,
+// so Pass 2 can check the style it resolved to (PR-04 WO7b 6).
+//   substitutions — appended to; the caller carries them onto the element
 function substituteDirective(
   child: BindingChild | EventChild | StyleChild,
   owner: WidgetNode,
   scope: TemplateScope,
   state: ExpansionState,
+  substitutions: Substitution[],
 ): WidgetNodeChild {
   const description = `<${child.kind === 'style' ? 'style' : child.type}> on ${elementLabel(owner)}`;
   const loc = child.loc ?? owner.loc;
@@ -415,8 +434,14 @@ function substituteDirective(
         screen: child.screen === undefined ? undefined : keep(child.screen),
         callback: child.callback === undefined ? undefined : keep(child.callback),
       };
-    case 'style':
-      return { ...child, name: keep(child.name) };
+    case 'style': {
+      const substituted: StyleChild = { ...child, name: keep(child.name) };
+      const argument = wholeValueArgument(child.name, scope);
+      if (argument !== undefined) {
+        substitutions.push({ attribute: STYLE_CHILD_VALUE, argument, styleChild: substituted });
+      }
+      return substituted;
+    }
   }
 }
 
@@ -489,7 +514,7 @@ function substituteNode(written: WidgetNode, scope: TemplateScope, state: Expans
   // --- Step 3: Directives ---
   const directives = written.children
     .filter((child): child is BindingChild | EventChild | StyleChild => !isElement(child))
-    .map((child) => substituteDirective(child, written, scope, state));
+    .map((child) => substituteDirective(child, written, scope, state, substitutions));
 
   return { attributes: attributes as WidgetNode['attributes'], styleOverrides, directives, substitutions };
 }

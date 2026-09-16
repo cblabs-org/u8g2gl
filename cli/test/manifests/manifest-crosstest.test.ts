@@ -28,7 +28,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseWidgetManifestFile } from '../../src/core/parser/parse-widget-manifest.js';
-import { buildManifestRegistry, parseFrameworkManifests } from '../../src/core/manifest/index.js';
+import { buildManifestRegistry, isDrawingElement, parseFrameworkManifests } from '../../src/core/manifest/index.js';
 import { ROOT_CLASS_MANIFEST } from '../../src/core/manifest/manifest-registry.js';
 import type { EffectiveManifest } from '../../src/core/manifest/index.js';
 import type { PropDef } from '../../src/core/schema/widget-manifest.js';
@@ -72,14 +72,6 @@ function methodsAlongChain(manifest: EffectiveManifest): CppFunction[] {
 /** The `draw=` props of a prop list, in list order. */
 function drawProps(props: readonly PropDef[]): PropDef[] {
   return props.filter((p) => p.draw !== undefined);
-}
-
-/**
- * A drawing element: a manifest with `draw=` props and no `setter=` props. It
- * has no class ([D-18]), so its bindings cannot name a C++ method.
- */
-function isDrawingElement(props: readonly PropDef[]): boolean {
-  return props.some((p) => p.draw !== undefined) && !props.some((p) => p.setter !== undefined);
 }
 
 describe('Widget Manifests', () => {
@@ -228,7 +220,10 @@ describe('Widget Manifests', () => {
           expect(missing).toEqual([]);
         });
 
-        if (isDrawingElement(manifest.declared.api.props)) {
+        // A drawing element has no class ([D-18]), so its bindings cannot name
+        // a C++ method. The predicate is the registry's, so this cross-test and
+        // the validator cannot drift apart (PR-04 WO8a).
+        if (isDrawingElement(manifest.declared)) {
           // PR-04 WO3: a drawing element's <bind setter=> names the draw= prop
           // whose argument the bound subject supplies at draw time (§13.5,
           // "Bindings without an object"), since there is no method to name.

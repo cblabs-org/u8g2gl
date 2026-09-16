@@ -28,12 +28,14 @@ import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { DisplayRecord } from '../schema/display-record.js';
 import type { Diagnostic } from '../schema/diagnostic.js';
 
+import type { ScreenPipeline } from '../resolver/index.js';
+import { checkedTarget, pipelineOf } from './shared-model.js';
 import { validateSchema } from './validate-schema.js';
 import { validateReferences } from './validate-references.js';
 import { validateDisplay } from './validate-display.js';
 import { validateWidgetProps } from './validate-widget-props.js';
 import { validateTypes } from './validate-types.js';
-import { checkedTarget, validateGeometry } from './validate-geometry.js';
+import { validateGeometry } from './validate-geometry.js';
 import { findTargetDisplay } from '../resolver/index.js';
 import { validateIdentifiers } from './validate-identifiers.js';
 import {
@@ -73,6 +75,18 @@ export interface ValidateInput {
    * declared target — `validate`'s behaviour.
    */
   readonly target?: Target;
+  /**
+   * The expansion and resolution every pass in this run shares (§13.11 step 3).
+   * `validate()` builds one and threads it through, so a run expands the
+   * document exactly once however many passes need the expanded tree, and
+   * `generate` judges and emits from the very same model (PR-04 WO8a).
+   *
+   * Optional so a pass can still be called on its own in a unit test, which
+   * then gets a pipeline of its own. A supplied pipeline must have been built
+   * for {@link ValidateInput.target}'s display, or the run would bounds-check
+   * one display and emit for another.
+   */
+  readonly pipeline?: ScreenPipeline;
 }
 
 /**
@@ -116,34 +130,40 @@ export interface ValidateResult {
 export function validate(input: ValidateInput): ValidateResult {
   const allDiagnostics: Diagnostic[] = [];
 
+  // Expand once, resolve once, and let every pass below read the same model
+  // (§13.11 step 3, PR-04 WO8a). Built here rather than inside each pass so the
+  // passes cannot drift into judging different trees; `generate` supplies its
+  // own, for the target it is building.
+  const passInput: ValidateInput = { ...input, pipeline: pipelineOf(input) };
+
   // Pass 0: The registry's own diagnostics. Reported here rather than left to
   // each caller, so the CLI and the designer cannot disagree about whether a
   // shadowing manifest is an error.
   allDiagnostics.push(...input.manifests.diagnostics);
 
   // Pass 1: Schema structure & versions
-  allDiagnostics.push(...validateSchema(input));
+  allDiagnostics.push(...validateSchema(passInput));
 
   // Pass 2: Cross-file symbol references
-  allDiagnostics.push(...validateReferences(input));
+  allDiagnostics.push(...validateReferences(passInput));
 
   // Pass 3: Display catalogue & page mode checks
-  allDiagnostics.push(...validateDisplay(input));
+  allDiagnostics.push(...validateDisplay(passInput));
 
   // Pass 4: Widget properties against manifests
-  allDiagnostics.push(...validateWidgetProps(input));
+  allDiagnostics.push(...validateWidgetProps(passInput));
 
   // Pass 5: Type checking & binding compatibility
-  allDiagnostics.push(...validateTypes(input));
+  allDiagnostics.push(...validateTypes(passInput));
 
   // Pass 6: Geometry constraints & display bounds
-  allDiagnostics.push(...validateGeometry(input));
+  allDiagnostics.push(...validateGeometry(passInput));
 
   // Pass 7: Identifier rules & inlining collisions
-  allDiagnostics.push(...validateIdentifiers(input));
+  allDiagnostics.push(...validateIdentifiers(passInput));
 
   // Pass 8: Constructs the generator does not build yet, at the caller's policy
-  allDiagnostics.push(...validateNotYetSupported(input));
+  allDiagnostics.push(...validateNotYetSupported(passInput));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
   allDiagnostics.sort((a, b) => {

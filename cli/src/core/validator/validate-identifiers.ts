@@ -20,7 +20,9 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { mangleIdentifiers } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
+import { pipelineOf } from './shared-model.js';
 
 const RESERVED_PREFIXES = ['u8g2gl_', 'ui_', 'wd_'] as const;
 
@@ -344,9 +346,6 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
     }
 
     const seenElementNames = new Set<string>();
-    const directElementMap = new Map<string, SourceLocation | undefined>();
-    const componentInstances: { instanceName: string; componentName: string; loc?: SourceLocation }[] =
-      [];
 
     walkNodes(screen.view?.children ?? [], (node) => {
       const name = node.attributes.name;
@@ -379,41 +378,21 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         );
       } else {
         seenElementNames.add(name);
-        directElementMap.set(name, nameLoc);
-      }
-
-      if (manifests.get(node.tag)?.view) {
-        componentInstances.push({
-          instanceName: name,
-          componentName: node.tag,
-          loc: nameLoc,
-        });
       }
     });
-
-    // 3a. Composite inlining collision check (§13.4)
-    for (const inst of componentInstances) {
-      const comp = manifests.get(inst.componentName);
-      if (comp?.view?.children) {
-        walkNodes(comp.view.children, (child) => {
-          const childName = child.attributes.name;
-          if (typeof childName === 'string' && childName) {
-            const inlinedName = `${inst.instanceName}_${childName}`;
-            if (directElementMap.has(inlinedName)) {
-              diagnostics.push(
-                createIdDiagnostic(
-                  DIAGNOSTIC_CODES.NAME_COLLISION,
-                  `Composite-inlining name collision: inlined element '${inlinedName}' from composite '${inst.componentName}' (instance '${inst.instanceName}') collides with element '${inlinedName}' in screen '${screen.name}'.`,
-                  inst.loc,
-                  inlinedName,
-                ),
-              );
-            }
-          }
-        });
-      }
-    }
   }
+
+  // --- 3a. §13.4 mangling: every generated identifier, collision-checked ---
+  // One `mangleIdentifiers` call over the expanded tree, replacing the one-level
+  // inlining check this pass used to run (PR-04 WO7 F1). That check compared a
+  // screen-level name against the children of a directly instantiated composite
+  // and nothing else: it never saw a nested composite (`bar_clk_digits`), never
+  // saw two composite children colliding with each other or with a global
+  // identifier, and named only one of the two sources. §13.4 requires a hard
+  // error naming both, so the module that builds the identifiers is also the one
+  // that checks them, and `generate` refuses on what it raises.
+  const expansion = pipelineOf(input).expansion;
+  diagnostics.push(...mangleIdentifiers({ globals, screens: expansion.screens }).diagnostics);
 
   // --- 4. Duplicate manifest declarations of one tag (F7, PR-04 WO3) ---
   // Every declared manifest, plain widget or composite: [D-18] has one element

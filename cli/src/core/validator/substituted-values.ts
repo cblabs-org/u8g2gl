@@ -27,8 +27,57 @@
  * - reportSubstituted():  A reporter appending to a pass's diagnostics
  */
 
-import type { Diagnostic } from '../schema/diagnostic.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { SourceLocation } from '../schema/source-location.js';
 import { withInstantiation, type ExpandedElement, type Substitution } from '../resolver/index.js';
+
+/** A `$prop` reference anywhere in a value — expansion's placeholder grammar. */
+const PROP_REFERENCE = /\$[A-Za-z_][A-Za-z0-9_]*/;
+
+/**
+ * @brief The first `$prop` reference in a value, spelled with its `$`.
+ *
+ * @param value An attribute value as parsed; a boolean or absent value has none.
+ * @return The reference, e.g. `'$face'`, or undefined.
+ */
+export function propReferenceIn(value: string | boolean | undefined): string | undefined {
+  return typeof value === 'string' ? (PROP_REFERENCE.exec(value)?.[0] ?? undefined) : undefined;
+}
+
+/**
+ * @brief The diagnostic for a `$prop` written outside any composite `<view>`.
+ *
+ * A `$name` is a template parameter (§8.3), so it has a value only where a
+ * composite's `<api>` declares it and an instance binds it. Written in a screen
+ * there is nothing to substitute, and before PR-04 WO8a the passes that check a
+ * value simply skipped it — so `font="$f"` in a screen validated and would have
+ * reached output as the literal text `$f`.
+ *
+ * The one spelling of this rule, so Pass 2 and Pass 4 cannot word it differently.
+ *
+ * @param reference The reference as written, e.g. `'$face'`.
+ * @param where     Prose naming the value: `'font' on <u8g2gl_label> 'title'`.
+ * @param loc       The attribute's own location.
+ * @return The `U8G2GL_UNSUBSTITUTED_PROP` diagnostic.
+ */
+export function unsubstitutedPlaceholder(
+  reference: string,
+  where: string,
+  loc: SourceLocation | undefined,
+): Diagnostic {
+  return {
+    code: DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP,
+    severity: 'error',
+    file: loc?.file ?? '',
+    line: loc?.line ?? 1,
+    column: loc?.column ?? 1,
+    message:
+      `'${reference}' in ${where} is written outside any composite's <view>, where there are no ` +
+      `props to substitute, so it would reach output literally. A $prop has a value only inside ` +
+      `the <view> of a composite that declares it in its <api> (§8.3, §13.6).`,
+    offendingText: reference,
+  };
+}
 
 /**
  * Records one diagnostic about a value expansion substituted.

@@ -222,23 +222,32 @@ function allocateName(allocator: NameAllocator, cleanTag: string): string {
   return generatedName;
 }
 
-/** A value that is exactly one `$prop` reference — expand.ts's whole-value placeholder. */
-const PROP_PLACEHOLDER = /^\$[A-Za-z_][A-Za-z0-9_]*$/;
+/** The only values a boolean attribute may take (§7.2). */
+const BOOLEAN_TEXT: readonly string[] = ['true', 'false'];
 
 /**
- * @brief The parsed value of a `hidden` attribute: `"true"` is true, anything
- *        else false — except a whole `$prop` placeholder, which stays text.
+ * @brief The parsed value of a `hidden` attribute: `"true"` and `"false"` are
+ *        booleans; anything else — a `$prop` placeholder, or a value that is
+ *        simply not a boolean — stays text.
  *
- * Converting `hidden="$p"` to a boolean here lost the reference before composite
- * expansion could substitute it, so every such element became visible (PR-04
- * WO7 F6). Expansion substitutes the placeholder and applies this same function
- * to the argument, so the rule is spelled once.
+ * Two defects shaped this rule, and both were silent:
+ * - Converting `hidden="$p"` to a boolean lost the reference before composite
+ *   expansion could substitute it, so every such element became visible (PR-04
+ *   WO7 F6). Expansion substitutes the placeholder and applies this same
+ *   function to the argument, so the rule is spelled once.
+ * - The old rule was `text === 'true'`, which quietly turned `hidden="yes"`
+ *   into `false` — the element rendered, and nothing said why (PR-04 WO7b 3).
+ *   Keeping the text instead lets Pass 4 hold `hidden` to the strictness §7.2
+ *   gives `hcenter` / `vcenter`, rather than guessing on the author's behalf.
+ *
+ * So a non-boolean value survives parsing deliberately: this function decides
+ * what the document *says*, and the validator decides whether it is allowed.
  *
  * @param text The attribute value as written, or as substituted.
- * @return A boolean, or the placeholder text unchanged.
+ * @return A boolean for `"true"` / `"false"`, or the text unchanged.
  */
 export function hiddenAttributeValue(text: string): string | boolean {
-  return PROP_PLACEHOLDER.test(text) ? text : text === 'true';
+  return BOOLEAN_TEXT.includes(text) ? text === 'true' : text;
 }
 
 /**

@@ -36,11 +36,12 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
-import type { EffectiveManifest } from '../manifest/manifest-registry.js';
+import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import { expandScreens, isRectangular, walkExpanded } from '../resolver/index.js';
+import { isRectangular, walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
-import { reportSubstituted } from './substituted-values.js';
+import { pipelineOf } from './shared-model.js';
+import { propReferenceIn, reportSubstituted, unsubstitutedPlaceholder } from './substituted-values.js';
 
 /**
  * The anchor attributes (§7.2). They name the layout contract, not elements
@@ -51,7 +52,16 @@ const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vce
 /** The centring switches, which are strict booleans (§7.2). */
 const CENTRING_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter'];
 
-/** The only values a centring switch may take (§7.2). */
+/**
+ * Every attribute held to a strict boolean. The centring switches are §7.2's;
+ * `hidden` joins them in PR-04 WO8a, because `hidden="yes"` used to parse to
+ * `false` and the element simply rendered, with nothing said (WO7b finding 3).
+ * These are layout and visibility contract names, not element knowledge
+ * ([D-17]) — `hidden` is accepted only where the manifest declares it.
+ */
+const BOOLEAN_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter', 'hidden'];
+
+/** The only values a boolean attribute may take (§7.2). */
 const BOOLEAN_VALUES: readonly string[] = ['true', 'false'];
 
 /**
@@ -119,7 +129,9 @@ function walkNodes(
 // attributes, missing required props, out-of-range enum values — in that order.
 //   node     — the instance as parsed from a screen
 //   manifest — effective manifest for node.tag, inheritance already merged
-function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diagnostic[] {
+//   atScreenLevel — whether the element is written in a screen rather than in a
+//                   composite's `<view>`, where a `$prop` has no meaning
+function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest, atScreenLevel: boolean): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const { props, bindings } = manifest.api;
 
@@ -160,8 +172,13 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
   }
 
   // --- Step 3: Require mandatory props ---
+  // A prop declared `required` *and* defaulted is an invalid declaration, which
+  // Pass 1 reports once at the declaration (OVERCONSTRAINED, WO7b). Reporting a
+  // missing attribute here as well would make one mistake read as several
+  // defects — one per instance — so the declaration is reported and the
+  // instances are left alone (PR-04 WO7b finding 5).
   for (const prop of props) {
-    if (!prop.required) {
+    if (!prop.required || prop.default !== undefined) {
       continue;
     }
     const val = node.attributes[prop.name];
@@ -205,30 +222,35 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest): Diag
       );
     }
   }
-  for (const attribute of CENTRING_ATTRIBUTES) {
-    const diagnostic = checkCentringValue(node, attribute);
+  for (const attribute of BOOLEAN_ATTRIBUTES) {
+    const diagnostic = checkBooleanValue(node, attribute);
     if (diagnostic !== undefined) {
       diagnostics.push(diagnostic);
     }
   }
 
+  // --- Step 4c: A `$prop` written outside any composite can never be substituted ---
+  if (atScreenLevel) {
+    diagnostics.push(...screenLevelPlaceholders(node, manifest));
+  }
+
   // --- Step 5: Flag directives must name a flag the element can carry ---
-  // §8.4 fixes the flag set at `hidden` and `disabled`, so it is not declared
-  // per element. `hidden` applies to every element — an object flag, or a
-  // draw-time guard on a drawing element (§13.5). `disabled` is interaction
-  // state on an object; a drawing element has no object, so there is nothing
-  // to disable (PR-04 WO5a).
-  if (isDrawingElement(manifest)) {
+  // §8.4 fixes the flag set, so it is not declared per element; the registry
+  // spells both the set and the drawing-element test once (PR-04 WO8a).
+  // `hidden` applies to every element — an object flag, or a draw-time guard on
+  // a drawing element (§13.5). `disabled` is interaction state on an object,
+  // and a drawing element has none (PR-04 WO5a).
+  if (isDrawingElement(manifest.declared)) {
     for (const child of node.children) {
-      if ('kind' in child && child.kind === 'binding' && child.flag === 'disabled') {
+      if ('kind' in child && child.kind === 'binding' && child.flag !== undefined && OBJECT_ONLY_FLAGS.includes(child.flag)) {
         diagnostics.push(
           createPropDiagnostic(
             DIAGNOSTIC_CODES.INAPPLICABLE_FLAG,
-            `Flag 'disabled' in <${child.type}> cannot apply to <${node.tag}>: it is a drawing ` +
+            `Flag '${child.flag}' in <${child.type}> cannot apply to <${node.tag}>: it is a drawing ` +
               `element (draw= props only) with no object to disable. Only 'hidden' applies to a ` +
               `drawing element (§8.4).`,
             child.loc ?? node.loc,
-            'disabled',
+            child.flag,
           ),
         );
       }
@@ -273,14 +295,55 @@ function checkEnumValue(node: WidgetNode, attribute: string, manifest: Effective
   );
 }
 
-// checkCentringValue
-// The INVALID_ENUM_VALUE diagnostic for an `hcenter` / `vcenter` value that is
-// neither `true` nor `false` (§7.2). The same code as an enum: a boolean is a
-// two-member set, and the suggestions carry both members. A `$`-reference is not
-// yet a value.
+// screenLevelPlaceholders
+// A `$prop` in an enum or boolean attribute written outside any composite's
+// `<view>`. The enum and boolean checks skip such a value as "not yet knowable",
+// which is true inside a template and false in a screen, where nothing will ever
+// substitute it (PR-04 WO7b findings 3 and 4). Fonts, images and styles are
+// Pass 2's, through the same helper; geometry is Pass 6's UNRESOLVED_GEOMETRY.
+//   node     — the element as written in a screen
+//   manifest — effective manifest for node.tag
+function screenLevelPlaceholders(node: WidgetNode, manifest: EffectiveManifest): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const checked = new Set<string>();
+  const check = (attribute: string): void => {
+    if (checked.has(attribute)) {
+      return;
+    }
+    checked.add(attribute);
+    const reference = propReferenceIn(node.attributes[attribute]);
+    if (reference !== undefined) {
+      diagnostics.push(
+        unsubstitutedPlaceholder(
+          reference,
+          `'${attribute}' on ${describeNode(node)}`,
+          node.attributeLocs?.[attribute] ?? node.loc,
+        ),
+      );
+    }
+  };
+
+  for (const prop of manifest.api.props) {
+    if (prop.type === 'enum') {
+      check(prop.name);
+    }
+  }
+  for (const attribute of BOOLEAN_ATTRIBUTES) {
+    check(attribute);
+  }
+  return diagnostics;
+}
+
+// checkBooleanValue
+// The INVALID_ENUM_VALUE diagnostic for a boolean attribute — `hcenter`,
+// `vcenter` or `hidden` — whose value is neither `true` nor `false` (§7.2). The
+// same code as an enum: a boolean is a two-member set, and the suggestions carry
+// both members. A value the parser already turned into a real boolean is not a
+// string and needs no check; a `$`-reference is not yet a value, and outside a
+// composite it is screenLevelPlaceholders' to report.
 //   node      — the element
-//   attribute — `hcenter` or `vcenter`
-function checkCentringValue(node: WidgetNode, attribute: string): Diagnostic | undefined {
+//   attribute — `hcenter`, `vcenter` or `hidden`
+function checkBooleanValue(node: WidgetNode, attribute: string): Diagnostic | undefined {
   const value = node.attributes[attribute];
   if (typeof value !== 'string' || value.startsWith('$') || BOOLEAN_VALUES.includes(value)) {
     return undefined;
@@ -302,8 +365,8 @@ function checkCentringValue(node: WidgetNode, attribute: string): Diagnostic | u
 //   input       — validator input
 //   diagnostics — output; also read, so a fact already reported at the argument is not repeated
 function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[]): void {
-  const { globals, screens, manifests } = input;
-  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
+  const { manifests } = input;
+  const expansion = pipelineOf(input).expansion;
   const report = reportSubstituted(diagnostics);
   for (const screen of expansion.screens) {
     walkExpanded(screen.elements, (element) => {
@@ -313,8 +376,11 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
       }
       for (const substitution of element.substitutions ?? []) {
         const { attribute } = substitution;
-        const diagnostic = CENTRING_ATTRIBUTES.includes(attribute)
-          ? checkCentringValue(element.node, attribute)
+        if (substitution.styleChild !== undefined) {
+          continue; // A `<style name="$s">` value is not an attribute: Pass 2's.
+        }
+        const diagnostic = BOOLEAN_ATTRIBUTES.includes(attribute)
+          ? checkBooleanValue(element.node, attribute)
           : checkEnumValue(element.node, attribute, manifest);
         if (diagnostic !== undefined) {
           report(diagnostic, substitution, element);
@@ -322,22 +388,6 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
       }
     });
   }
-}
-
-// isDrawingElement
-// Whether an element is a drawing element: its own manifest declares draw= props
-// and no setter= props, so it has no class and never an object ([D-18], §6.2).
-// Decided from the registry's manifest, never from a list of tags ([D-17]), and
-// by the same test the schema pass uses for its `extends` rule. A composite is
-// never one: it realises as a container object.
-//   manifest — effective manifest for the instance's tag
-function isDrawingElement(manifest: EffectiveManifest): boolean {
-  const props = manifest.declared.api.props;
-  return (
-    manifest.view === undefined &&
-    props.some((p) => p.draw !== undefined) &&
-    !props.some((p) => p.setter !== undefined)
-  );
 }
 
 /**
@@ -358,18 +408,18 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
   const diagnostics: Diagnostic[] = [];
   const { screens, manifests } = input;
 
-  const visit = (node: WidgetNode): void => {
+  const visit = (atScreenLevel: boolean) => (node: WidgetNode): void => {
     const manifest = manifests.get(node.tag);
     if (manifest) {
-      diagnostics.push(...checkInstanceProps(node, manifest));
+      diagnostics.push(...checkInstanceProps(node, manifest, atScreenLevel));
     }
   };
 
   for (const screen of screens ?? []) {
-    walkNodes(screen.view?.children ?? [], visit);
+    walkNodes(screen.view?.children ?? [], visit(true));
   }
   for (const composite of manifests.declaredComposites) {
-    walkNodes(composite.view?.children ?? [], visit);
+    walkNodes(composite.view?.children ?? [], visit(false));
   }
   checkSubstitutedValues(input, diagnostics);
 

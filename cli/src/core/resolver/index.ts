@@ -18,13 +18,15 @@
  *   ContainerSize, EvaluationScope, ExpressionSite, Evaluation, buildConstantTable,
  *   evaluateExpression (expression.ts)
  * - Provenance, ResolvedCoordinate, ResolvedGeometry, Container, DeferredCoordinate,
- *   AxisOutcome, ResolvedElement, ResolvedScreen, ResolverContext, ResolveInput,
+ *   AxisOutcome, ResolvedExtra, ResolvedElement, ResolvedScreen, ResolverContext, ResolveInput,
  *   ResolveResult, DiagnosticAnnotator, isCentringOn, isRectangular, findTargetDisplay,
  *   createResolverContext, displayContainer,
  *   resolveElements, resolveScreens (resolve.ts)
  * - InstantiationSite, formatLocation, formatInstantiation, withInstantiation (provenance.ts)
  * - PropArgument, Substitution, ExpandedElement, ExpandedScreen, ExpansionInput, ExpansionResult,
- *   expandScreens, walkExpanded (expand.ts)
+ *   expandScreens, walkExpanded, STYLE_CHILD_VALUE (expand.ts)
+ * - RaisedDiagnostic, PipelineResolution, ScreenPipeline, PipelineInput,
+ *   createScreenPipeline (pipeline.ts) — one expansion and one resolution per command
  * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS, SCREEN_FUNCTIONS, SCREEN_TABLES,
  *   IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput, the per-kind spelling helpers and
@@ -59,6 +61,7 @@ export {
   type Container,
   type DeferredCoordinate,
   type AxisOutcome,
+  type ResolvedExtra,
   type ResolvedElement,
   type ResolvedScreen,
   type ResolverContext,
@@ -75,6 +78,7 @@ export {
 export {
   expandScreens,
   walkExpanded,
+  STYLE_CHILD_VALUE,
   type PropArgument,
   type Substitution,
   type ExpandedElement,
@@ -82,6 +86,13 @@ export {
   type ExpansionInput,
   type ExpansionResult,
 } from './expand.js';
+export {
+  createScreenPipeline,
+  type RaisedDiagnostic,
+  type PipelineResolution,
+  type ScreenPipeline,
+  type PipelineInput,
+} from './pipeline.js';
 export {
   RESERVED_IDENTIFIER_PREFIXES,
   CPP_KEYWORDS,

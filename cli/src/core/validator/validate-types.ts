@@ -43,16 +43,11 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode } from '../schema/widget-node.js';
 import type { SubjectDecl } from '../schema/globals.js';
 import type { BindDef } from '../schema/widget-manifest.js';
+import { BINDING_FLAGS } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import { expandScreens, walkExpanded, withInstantiation } from '../resolver/index.js';
+import { walkExpanded, withInstantiation } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
-
-/**
- * The flags a `<bind_flag_if_*>` directive may set (§8.4). Fixed by the spec for
- * every element, not declared per manifest (PR-04 WO3 PA decision), so it names
- * the binding contract, not elements ([D-17]).
- */
-const BINDING_FLAGS: readonly string[] = ['hidden', 'disabled'];
+import { pipelineOf } from './shared-model.js';
 
 function createTypeDiagnostic(
   code: string,
@@ -259,14 +254,14 @@ function checkElement(
  */
 export function validateTypes(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { globals, screens, manifests } = input;
+  const { globals, manifests } = input;
 
   const subjectMap = new Map<string, SubjectDecl>(
     (globals?.subjects ?? []).map((s) => [s.name, s]),
   );
 
-  // --- Step 1: Expand composites, so their interiors are checked with arguments substituted ---
-  const expansion = expandScreens({ globals, screens: screens ?? [], manifests });
+  // --- Step 1: The run's expanded tree, so interiors are checked with arguments substituted ---
+  const expansion = pipelineOf(input).expansion;
   for (const diagnostic of expansion.diagnostics) {
     // Pass 4 reports a missing required prop on every instance, at the same
     // place and in the same words; reporting it here too would say it twice.

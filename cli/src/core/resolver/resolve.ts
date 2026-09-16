@@ -35,6 +35,7 @@
  * - Container:               The element coordinates are measured against
  * - DeferredCoordinate:      A written coordinate attribute with no value yet
  * - AxisOutcome:             What one axis could not settle
+ * - ResolvedExtra:           A resolved endpoint or radius — a coordinate outside the rectangle
  * - ResolvedElement:         One element, its container, geometry, axis outcomes and children
  * - ResolvedScreen:          One screen resolved against a display
  * - ResolverContext:         Constants, registry and display shared by one resolution
@@ -140,6 +141,37 @@ export interface AxisOutcome {
   readonly containerKnown: boolean;
 }
 
+/**
+ * A coordinate an element carries outside the rectangle — a line or triangle
+ * endpoint, or a circle or ellipse radius (§6.2). Resolved through the same
+ * evaluator as `x` and `width`, because §7.2 gives expressions to coordinate
+ * attributes and WO9/WO10 cannot emit a draw call without literal arguments
+ * (PR-04 WO7b finding 2).
+ *
+ * Present only for an attribute the element's manifest declares and the author
+ * wrote. `coordinate` and `deferred` are both absent when the expression was
+ * invalid — the evaluator already raised that diagnostic.
+ */
+export interface ResolvedExtra {
+  /** The attribute as written: `x1`, `y0`, `radius`, `rx`. */
+  readonly attribute: string;
+  /** The axis a point lies on; absent for a length, which is not bounds-checked. */
+  readonly axis?: 'horizontal' | 'vertical';
+  /**
+   * What the value is, and so how far it can be checked. A `point` is a
+   * position, held to its container exactly as `x` is. A `length` is a distance
+   * from a centre: it is checked for representability and for being
+   * non-negative, but not against the container, because what a radius should
+   * be measured against needs the centre-positioned-element semantics §7.2
+   * defers (PR-04 WO6 finding 8, with the Chief Architect).
+   */
+  readonly kind: 'point' | 'length';
+  /** The literal value, when it resolved. */
+  readonly coordinate?: ResolvedCoordinate;
+  /** Written, but with no value here. */
+  readonly deferred?: DeferredCoordinate;
+}
+
 /** One element after resolution. */
 export interface ResolvedElement {
   /** The source node, unchanged. */
@@ -149,6 +181,8 @@ export interface ResolvedElement {
   readonly geometry: ResolvedGeometry;
   /** What each axis could not settle. */
   readonly axes: { readonly horizontal: AxisOutcome; readonly vertical: AxisOutcome };
+  /** Endpoints and radii, in a fixed order that never depends on the document (§13.9). */
+  readonly extras: readonly ResolvedExtra[];
   /** Nested elements, in document order (§13.9). */
   readonly children: readonly ResolvedElement[];
 }
@@ -209,6 +243,37 @@ interface AxisResult {
 
 /** The four properties that make an element rectangular (§7.2). */
 const RECTANGLE_PROPERTIES: readonly string[] = ['x', 'y', 'width', 'height'];
+
+/**
+ * The coordinate attributes that lie outside the rectangle (§6.2's drawing set):
+ * the two-point form's endpoints, the triangle's third vertex, and the circle
+ * and ellipse radii.
+ *
+ * Like `AXES` and the anchors, these name the **layout contract**, not elements,
+ * so they are not element knowledge in [D-17]'s sense: the list says what `x1`
+ * *means*, while which elements have an `x1` is read from the manifest, exactly
+ * as `x` and `width` are. An element that declares none of these has none.
+ *
+ * A fixed order, so a resolved element's `extras` never depend on attribute
+ * order in the document (§13.9).
+ */
+interface ExtraCoordinateDef {
+  readonly attribute: string;
+  readonly axis?: 'horizontal' | 'vertical';
+  readonly kind: 'point' | 'length';
+}
+
+const EXTRA_COORDINATES: readonly ExtraCoordinateDef[] = [
+  { attribute: 'x0', axis: 'horizontal', kind: 'point' },
+  { attribute: 'y0', axis: 'vertical', kind: 'point' },
+  { attribute: 'x1', axis: 'horizontal', kind: 'point' },
+  { attribute: 'y1', axis: 'vertical', kind: 'point' },
+  { attribute: 'x2', axis: 'horizontal', kind: 'point' },
+  { attribute: 'y2', axis: 'vertical', kind: 'point' },
+  { attribute: 'radius', kind: 'length' },
+  { attribute: 'rx', kind: 'length' },
+  { attribute: 'ry', kind: 'length' },
+];
 
 /**
  * @brief Whether an element is rectangular: its effective manifest declares
@@ -465,6 +530,64 @@ function resolveAxis(
   return { ...(start ? { start } : {}), ...(size ? { size } : {}), ...(end ? { end } : {}), outcome };
 }
 
+// resolveExtras
+// Resolves the endpoints and radii an element declares and writes (§6.2). The
+// same evaluator the rectangle goes through, so `x1="#screen_width - 8"` means
+// there exactly what it means in `width`, and an error in it is raised once.
+// Nothing here is derived: an endpoint has no anchor rule to complete it.
+//   node        — the element
+//   scope       — expression scope for this element
+//   context     — shared resolution context
+//   diagnostics — output
+function resolveExtras(
+  node: WidgetNode,
+  scope: EvaluationScope,
+  context: ResolverContext,
+  diagnostics: Diagnostic[],
+): ResolvedExtra[] {
+  const props = context.manifests.get(node.tag)?.api.props ?? [];
+  const resolved: ResolvedExtra[] = [];
+
+  for (const extra of EXTRA_COORDINATES) {
+    // --- Step 1: Only where the manifest declares it and the author wrote it ---
+    // Pass 4 reports an attribute no manifest declares, and a missing required
+    // endpoint; laying out from either would invent geometry (PR-04 WO3).
+    const text = node.attributes[extra.attribute];
+    if (typeof text !== 'string' || !props.some((prop) => prop.name === extra.attribute)) {
+      continue;
+    }
+    const base = { attribute: extra.attribute, kind: extra.kind, ...(extra.axis ? { axis: extra.axis } : {}) };
+    const loc = node.attributeLocs?.[extra.attribute] ?? node.loc;
+
+    // --- Step 2: Evaluate, recording what could not be settled ---
+    const result = evaluateExpression(text, scope, {
+      ...(loc ? { loc } : {}),
+      subject: elementLabel(node, extra.attribute),
+    });
+    if (result.kind === 'invalid') {
+      // The evaluator has said why; the value is simply absent from here on.
+      diagnostics.push(...result.diagnostics);
+      resolved.push(base);
+      continue;
+    }
+    if (result.kind === 'deferred') {
+      resolved.push({
+        ...base,
+        deferred: { attribute: extra.attribute, expression: text, symbols: result.symbols, ...(loc ? { loc } : {}) },
+      });
+      continue;
+    }
+    resolved.push({
+      ...base,
+      coordinate: {
+        value: result.value,
+        provenance: { kind: 'attribute', attribute: extra.attribute, expression: text, ...(loc ? { loc } : {}) },
+      },
+    });
+  }
+  return resolved;
+}
+
 // resolveNode
 // Resolves one element and, recursively, its nested elements; the element's own
 // resolved size becomes its children's container.
@@ -484,6 +607,7 @@ function resolveNode(
   const own: Diagnostic[] = [];
   const h = resolveAxis(node, HORIZONTAL, container.width, scope, context, own);
   const v = resolveAxis(node, VERTICAL, container.height, scope, context, own);
+  const extras = resolveExtras(node, scope, context, own);
   for (const diagnostic of own) {
     const kept = annotate ? annotate(node, diagnostic) : diagnostic;
     if (kept !== undefined) {
@@ -507,7 +631,7 @@ function resolveNode(
   };
   const children = resolveChildren(node.children, childContainer, context, diagnostics, annotate);
 
-  return { node, container, geometry, axes: { horizontal: h.outcome, vertical: v.outcome }, children };
+  return { node, container, geometry, axes: { horizontal: h.outcome, vertical: v.outcome }, extras, children };
 }
 
 // resolveChildren

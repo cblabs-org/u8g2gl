@@ -206,11 +206,21 @@ export const DIAGNOSTIC_CODES = {
    */
   COORDINATE_OUT_OF_RANGE: 'U8G2GL_COORDINATE_OUT_OF_RANGE',
   /**
-   * A `$name` inside longer text in a composite's `<view>` that expansion
-   * cannot substitute — a non-`int` prop spliced into text (`text="Hi $who"`),
-   * or an `int` prop given no value — and that would otherwise reach output
-   * literally (§13.6). Interim rule (PR-04 WO7b) until the Chief Architect rules
-   * on interpolation.
+   * A `$name` that nothing can substitute, and that would therefore reach
+   * output literally (§8.3, §13.6). Two conditions share this code, because
+   * they are one fact — the reference has no value and never will:
+   *
+   * - Inside a composite's `<view>`, a `$name` in longer text that expansion
+   *   cannot substitute: a non-`int` prop spliced into text (`text="Hi $who"`),
+   *   or an `int` prop given no value. Interim rule (PR-04 WO7b) until the
+   *   Chief Architect rules on interpolation.
+   * - **Outside any composite** — written directly in a screen — a `$name` in a
+   *   font, image, style or enum attribute, or in `hidden` / `hcenter` /
+   *   `vcenter`. A `$prop` is a template parameter, and a screen has no
+   *   template and so no props to bind, so the reference can only be a mistake.
+   *   Before PR-04 WO8a every pass skipped such a value as "not yet knowable"
+   *   and it validated silently; only geometry caught it, as
+   *   `UNRESOLVED_GEOMETRY`, which still reports the geometry attributes.
    */
   UNSUBSTITUTED_PROP: 'U8G2GL_UNSUBSTITUTED_PROP',
 } as const;

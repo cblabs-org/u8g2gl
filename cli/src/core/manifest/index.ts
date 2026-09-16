@@ -17,6 +17,10 @@
 
 export {
   buildManifestRegistry,
+  isDrawingElement,
+  BINDING_FLAGS,
+  OBJECT_ONLY_FLAGS,
+  ROOT_CLASS_MANIFEST,
   type ManifestRegistry,
   type ManifestRegistryInput,
   type EffectiveManifest,

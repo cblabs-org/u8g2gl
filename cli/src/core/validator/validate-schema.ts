@@ -29,7 +29,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
-import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../manifest/manifest-registry.js';
+import { ROOT_CLASS_MANIFEST, isDrawingElement, type ManifestRegistry } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
@@ -650,7 +650,6 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     // not a mixed manifest, so each kind is found among props declaring only it.
     const props = manifest.api?.props ?? [];
     const hasSetterProp = props.some((p) => p.setter !== undefined);
-    const hasDrawProp = props.some((p) => p.draw !== undefined);
     const setterOnlyProp = props.find((p) => p.setter !== undefined && p.draw === undefined);
     const drawOnlyProp = props.find((p) => p.draw !== undefined && p.setter === undefined);
     if (setterOnlyProp && drawOnlyProp) {
@@ -674,7 +673,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           'extends',
         ),
       );
-    } else if (hasDrawProp && !hasSetterProp && manifest.extends !== undefined) {
+    } else if (isDrawingElement(manifest) && manifest.extends !== undefined) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.DRAWING_ELEMENT_EXTENDS,
