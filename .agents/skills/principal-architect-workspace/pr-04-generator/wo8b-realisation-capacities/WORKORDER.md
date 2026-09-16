@@ -5,7 +5,7 @@ title: "Realisation, flattening and generated capacities"
 branch: u8g2gl-generator/wo8b-realisation-capacities
 base: u8g2gl-generator/wo8a-one-pipeline
 complexity: standard
-status: draft — PA revises against WO8a's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO8b — Realisation and capacities
@@ -52,6 +52,22 @@ Decide, for every element in the whole document, whether it becomes an object or
 and why; flatten to the object array; and count every capacity the runtime needs from what
 was decided. WO8a's single pipeline supplies one expanded, resolved, mangled model — consume
 it; do not expand, resolve or mangle again.
+
+## What WO8a built, and two cautions
+
+WO8a delivered `cli/src/core/resolver/pipeline.ts` and `cli/src/core/validator/shared-model.ts`:
+one expansion and one screen resolution, shared by every validator pass and by `generate()`,
+with mangling wired in and a test that counts expansions over the real `expandScreens`.
+**Consume that model. Do not expand, resolve or mangle again**, and do not weaken the count
+assertion — it has already caught a silent fallback where every pass built its own pipeline
+and the suite stayed green.
+
+- **"Resolve once" is true of screens, not templates.** Pass 6 still resolves a composite's
+  own `<view>` separately, as WO7b requires so a template defect is reported once. Do not
+  assume a composite template carries resolved geometry, and do not "fix" that here.
+- **The pipeline is built for one target.** `ValidateInput.pipeline` carries a display
+  obligation nothing enforces: pass the pipeline built for the target you are working on, and
+  say in your report where that is threaded.
 
 ## Background — this is a whole-document analysis, not a predicate
 

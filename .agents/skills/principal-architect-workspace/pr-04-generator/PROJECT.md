@@ -74,7 +74,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO7 — composite expansion and mangling](wo7-composite-expansion/WORKORDER.md)** ✅ `a19b65a` · base WO6 · standard · §13.4, §13.6
 - [x] **[WO4c — the runtime compiles against real U8G2](wo4c-real-u8g2/WORKORDER.md)** ✅ `7924d24`, `62dd06b`, `468e386` · `u8g2gl-generator/wo4c-real-u8g2` · base WO7 (stack tip) · standard · G1, stub coordinate types, U8G2 submodule, Q-11 (CA-approved) — numbered for its origin in WO4b, placed after WO7 in the stack
 - [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
-- [ ] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
+- [x] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** ✅ `2954fc2` · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
 - [ ] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** · base WO8a · standard · [D-18], [D-21], `_n<N>`
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
@@ -940,6 +940,52 @@ combined `wo8-realisation-capacities/WORKORDER.md` is retired in favour of the t
 The same message asked for a bridge prompt to the Chief Architect; it is
 `CA-BRIDGE-2026-09-16.md` in this directory.
 
+### WO8a — complete (`2954fc2`)
+
+**Verified independently:** one commit, on the WO8a branch only; runtime C++, `extern/`,
+`docs/` and `PROGRAM*.md` untouched; C++ 305 unchanged, zero warnings; CLI 641 → **669**,
+`tsc` and lint clean; 20 of 38 new tests fail at the base, the rest controls. **End to end
+through the built CLI:**
+
+- `a_b` at screen level beside child `b` of instance `a` → `U8G2GL_NAME_COLLISION`, and both
+  `validate` and `generate` exit 1 — the check WO7 built and nothing called until now;
+- `hidden="yes"` → `U8G2GL_INVALID_ENUM_VALUE`;
+- `x1="#screen_width - 8"` on a line resolves; `x1="#screen_width + 40"` →
+  `U8G2GL_OUT_OF_BOUNDS`. Non-rectangular geometry is resolved and checked at last.
+
+**Delivered:** `resolver/pipeline.ts` and `validator/shared-model.ts` — one expansion and one
+screen resolution, shared by every validator pass and by `generate()`, with a test that wraps
+the real `expandScreens` so a fifth expansion fails loudly; mangling wired in and the older
+one-level collision check retired; the drawing-element predicate and the flag set on the
+registry, every call site migrated; strict `hidden`; screen-level `$name` and substituted
+`<style name="$s">` checked; required-with-default reported once. No new diagnostic codes.
+
+**Boundary excursion — accepted.** `cli/src/core/parser/parse-widget-tree.ts` is not in the
+box and the worker changed it, flagging it rather than widening scope silently. The edit is
+confined to the one `hidden`-parsing function — the same function WO7b changed for the same
+attribute — and line item 5 is undeliverable without it: the parser collapsed `hidden="yes"`
+to `false` before any validator could see a value to report. Reviewed the diff: it replaces
+`text === 'true'` with "`true`/`false` are booleans, anything else stays text", and documents
+both defects that shaped the rule. Correct, and correctly disclosed.
+
+**The expansion-count test earned its keep before it ever shipped.** A substitution the worker
+used to point the passes at the shared model silently did not match; every pass fell back to
+building its own pipeline and all 642 tests still passed. Lint's unused-variable error is what
+exposed it. That is the vacuous-green failure mode this PR keeps meeting — a count assertion
+over the real function is the guard.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | A `radius` is never bounds-checked: `radius="500"` on a 128-wide display validates. Needs the centre-positioned-element semantics §7.2 defers | **Chief Architect** — with WO6 finding 8, already on the bridge |
+| 2 | No `bool` prop except `hidden` is value-checked: `filled="yes"` passes. Confirmed end to end | **WO9** — emission maps a prop value to C++; `yes` is not a `bool` literal |
+| 3 | A screen-level `$prop` in a `bind_*` attribute is still silent | **WO9** — same group |
+| 4 | A literal `<style>` child inside a `<view>` is unchecked | **WO9** — same group |
+| 5 | Non-coordinate `int` props are never evaluated, so `scroll_px_per_sec="#speed"` reaches emission as text | **WO9** — the §13.2 value helper cannot spell an unresolved expression |
+| 6 | `ValidateInput.pipeline` carries a trust-based display obligation | **Noted** — WO8b and WO9 must pass the pipeline built for the target they are working on |
+| 7 | "Resolve once" is true of **screens**; Pass 6 still resolves composite templates separately, as WO7b requires | **WO8b** — told explicitly not to assume it away |
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -959,6 +1005,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-16 — **WO8a complete** (`2954fc2`). Verified independently, including end to end
+  through the built CLI. Boundary excursion into `parse-widget-tree.ts` accepted. WO8b
+  dispatched on `u8g2gl-generator/wo8b-realisation-capacities`; four value-completeness
+  findings to WO9; the radius bounds check added to the Chief Architect's list.
 - 2026-09-16 — **Owner approved the WO8 split.** Ledger now **seventeen**. WO8a dispatched
   on `u8g2gl-generator/wo8a-one-pipeline`; WO8b drafted on top of it; the combined
   `wo8-realisation-capacities/` retired. Bridge prompt for the Chief Architect written to

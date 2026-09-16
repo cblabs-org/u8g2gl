@@ -53,6 +53,19 @@ WO10 and WO11 reuse.
 
 ## Line-Item Instructions
 
+- [ ] **Carried from WO8a — every emitted value must be literal and typed.** The value helper
+      below cannot spell a value the pipeline never resolved or checked, and four gaps reach it
+      today. Close each, with a test that fails at the base:
+  - **Booleans:** only `hidden` is value-checked, so `filled="yes"` validates and would reach
+    emission (confirmed end to end). Every `type="bool"` prop takes `true`/`false` only, with
+    the strictness §7.2 gives `hcenter`.
+  - **Non-coordinate `int` props are never evaluated:** `scroll_px_per_sec="#speed"` arrives as
+    text. Resolve every `type="int"` prop through the existing evaluator — one evaluator, no
+    second copy — and apply the `int32_t` range rule (§13.2 keeps coordinates at `int16_t`).
+  - **A screen-level `$prop` in a `bind_*` attribute** is silent; at screen level there is
+    nothing to substitute, so it is an error, as it already is for other attributes.
+  - **A literal `<style>` child inside a `<view>`** is unchecked; check it as the attribute
+    form is checked.
 - [ ] **Shared helper — value spelling (§13.2):** one function mapping a prop type
       and resolved value to its C++ spelling (`int`, `bool`, escaped `string`,
       `enum` via `emit`, `font`, `image`, `subject`, `style`, `color`). Setter calls
@@ -91,6 +104,9 @@ WO10 and WO11 reuse.
 ## Strict Boundary Box
 
 **In scope:** `cli/src/core/generator/emit/` (project units and shared helpers);
+`cli/src/core/validator/` and `cli/src/core/resolver/` (the four WO8a value-completeness
+carries only — booleans, `int` props, screen-level `$prop` in `bind_*`, literal `<style>`
+child);
 `cli/src/node/cli.ts` (version lookup only); `cli/src/core/parser/parse-project.ts`
 and `cli/src/core/validator/` (`<output prefix>` only);
 `cli/src/node/` only if the writer needs asset file reads passed in; golden
