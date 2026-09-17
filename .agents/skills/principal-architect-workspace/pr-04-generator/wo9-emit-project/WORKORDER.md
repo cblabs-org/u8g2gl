@@ -3,9 +3,9 @@ work_order: WO9
 project: pr-04-generator
 title: "Firmware emission: project-level files"
 branch: u8g2gl-generator/wo9-emit-project
-base: u8g2gl-generator/wo8-realisation-capacities
+base: u8g2gl-generator/wo8c-validator-alignment
 complexity: standard
-status: draft — PA revises against WO8's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO9 — Project-level emission
@@ -25,7 +25,7 @@ under "Human Approval" (owner's own words, timestamped) and that this WORKORDER'
 ## Branch
 
 **Branch**: `u8g2gl-generator/wo9-emit-project`
-**Base**: `u8g2gl-generator/wo8-realisation-capacities`
+**Base**: `u8g2gl-generator/wo8c-validator-alignment`
 
 `git branch --show-current` **as its own command immediately before every commit**.
 
@@ -50,6 +50,21 @@ Where this work order and the spec disagree, **stop and report**.
 
 Emit every file that is not per-screen, through **shared emission helpers** that
 WO10 and WO11 reuse.
+
+## What the pipeline already gives you
+
+WO8a expands and resolves once; WO8b realises, flattens and counts capacities; WO8c enforces
+the 254-object ceiling against realisation's own count. **Consume all of it.**
+
+- **Never compute a second object count, capacity or expansion.** WO8c's ceiling exists
+  because a second, drifted count let a 256-object screen through both commands. Source scans
+  now fail if a second count or a second reserved-prefix list appears — do not add one.
+- **Capacities come from WO8b**, including per-subject observer counts (`_n<N>`) and the true
+  binding sum. Emit those numbers; do not re-derive them.
+- **The pipeline is built for one target.** Thread the pipeline and realisation for the target
+  you are emitting; `ValidateInput.realisation` and `realisationOf()` are how they travel.
+- **Realisation currently lives in `generator/realise/`** and the validator imports it. That
+  layering is recorded as a wart to settle at the end-of-PR review — do not move it here.
 
 ## Line-Item Instructions
 

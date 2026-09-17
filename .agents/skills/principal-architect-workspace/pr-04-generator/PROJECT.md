@@ -76,7 +76,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
 - [x] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** ✅ `2954fc2` · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
 - [x] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** ✅ `6c2c909` · base WO8a · standard · [D-18], [D-21], `_n<N>`
-- [ ] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
+- [x] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** ✅ `ae1e7a9` · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
 - [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8c · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
@@ -95,6 +95,10 @@ the approved decomposition.
   commit.
 - Out-of-scope findings go in the Completion Report. Filing issues is the PA's
   authority, not the worker's.
+- **Never measure one suite while another runs.** WO8c launched a full CLI run alongside a
+  base-worktree suite and a `cmake`/`ctest` cycle: it reported seven files failing in 3616s,
+  and the same tree run alone gives 702/702 in 5.9s. A contended run measures nothing — every
+  figure in a Completion Report must come from an uncontended run.
 - **"Stop and report" means: do not choose — record it in the Completion Report,
   then continue with the remaining line items.** It never means halt the work order
   or ask for permission. (Clarified after WO5a noticed WORKORDERs said "stop" while
@@ -1094,6 +1098,47 @@ The owner's own words, verbatim:
 
 The ledger is now **eighteen** work orders. WO9's base moves to WO8c.
 
+### WO8c — complete (`ae1e7a9`)
+
+**Verified independently:** one commit, on the WO8c branch only; `docs/`, `PROGRAM*.md`,
+runtime C++, manifests and realisation's own analysis (`realise.ts`, `capacities.ts`)
+untouched; C++ 305 unchanged, zero warnings; CLI 694 → **702** across 46 files, `tsc` and
+lint clean. One reserved-prefix list survives — `['u8g2gl_', 'ui_']` in `mangle.ts`, imported
+by `validate-identifiers.ts` — and `fixtures/valid/widgets/wd_badge/` exists.
+
+**End to end through the built CLI:**
+
+- 128 composite instances → 256 objects → `U8G2GL_TOO_MANY_OBJECTS`, and **both** `validate`
+  and `generate` exit 1. This is the case that exited 0 twice yesterday;
+- 127 instances → 254 objects → passes;
+- **300 drawing elements → passes.** The old count rejected them, which nobody had noticed:
+  it was wrong in *both* directions, and the worker found the second half;
+- a `wd_thing` composite validates.
+
+**The dependency inversion is accepted, and correctly disclosed.** The ceiling is now Pass 9
+checking `RealisedScreen.objects.length` — the length of the array emission writes a `uint8_t`
+parent table for — so the check cannot disagree with the thing it protects. That makes the
+validator import `generator/realise/`, which is backwards. The worker took that over
+inventing a second count, and said so plainly. It is the right trade: **a drifted second count
+is the defect**, as this very ceiling demonstrated. Three source scans now fail if a second
+count or a second prefix list appears.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | `parse-widget-tree.ts:380`'s comment now misstates why it strips `wd_`, and the strip pools `<wd_badge>` with `<badge>` for name synthesis | **End-of-PR readability review.** The pool is harmless — the synthesised-name allocator is document-wide and dedupes (PR-03 WO8) — but the comment is now wrong |
+| 2 | Realisation's home (`generator/realise/`) is a layering wart now that the validator consumes it | **Recorded.** A move to a neutral `core/` location is behaviour-free; it is not worth churning mid-emission. Raise it at the end-of-PR review, where the reviewer sees the whole shape |
+| 3 | `notYetSupportedPolicy` now also carries realisation's refusal severity, so the name is narrower than its meaning | **End-of-PR readability review** |
+| 4 | `validate` now realises on every run — correct, but new work in the path the designer drives per keystroke | **Accepted, recorded for the editor track.** Correctness first; realisation is linear in elements. E-1/E-2 should measure it against ui_spec §4.1's 16 ms budget before optimising |
+| 5 | `Capacities.maxObjectsPerScreen` (max across screens) and the per-screen ceiling answer different questions with similar names | **WO12** — it reports capacities in the §18.1 budget |
+| 6 | `DRAWING_ELEMENT_NEEDS_OBJECT`'s comment in `diagnostic.ts` still reads as build-only | **End-of-PR readability review** |
+
+**Process lesson added to Standing instructions:** the worker ran a full suite concurrently
+with a base-worktree suite and a `cmake`/`ctest` cycle, got "seven files failing in 3616s",
+and re-ran it alone to get 702/702 in 5.9s. It reported the contended figure as measuring
+nothing rather than as a result. Every green figure must come from an uncontended run.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1113,6 +1158,10 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-17 — **WO8c complete** (`ae1e7a9`). Verified independently, including end to end:
+  256 objects now fails both commands, 254 passes, **300 drawing elements now pass** (a false
+  rejection nobody had noticed), and a `wd_` element validates. WO9 dispatched on
+  `u8g2gl-generator/wo9-emit-project`.
 - 2026-09-17 — **Owner approved WO8c**, leaving the placement to the PA. Ledger now
   **eighteen**. WO8c dispatched on `u8g2gl-generator/wo8c-validator-alignment`; WO9 re-based
   on it.
