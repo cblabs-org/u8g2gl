@@ -15,6 +15,9 @@
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
  *   GENERATE_NOT_YET_SUPPORTED_POLICY (generate.ts)
  * - Realisation and capacities — §13.5, §13.3, [D-21] (realise/)
+ * - Emission — §13.2's value spelling, the draw-argument order and the
+ *   project-level units (emit/). WO10 and WO11 emit through these helpers
+ *   rather than spelling a setter call or an argument list of their own.
  */
 
 export { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
@@ -32,3 +35,4 @@ export {
   type GeneratedFile,
 } from './generate.js';
 export * from './realise/index.js';
+export * from './emit/index.js';

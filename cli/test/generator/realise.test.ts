@@ -480,7 +480,27 @@ describe('capacities — per-subject observer counts drive the _n<N> types', () 
 // --- The generator wiring --------------------------------------------------
 
 describe('generate() carries the realised model and the capacities', () => {
-  function model(body: string, composites: readonly WidgetManifest[]): ProjectModel {
+  /**
+   * The bytes of the `icon_wifi` asset `GLOBALS_XML` declares.
+   *
+   * Supplied because PR-04 WO9 compiles an `<xbm>` into the generated code
+   * (§14.2): a declared image whose bytes are absent is now a diagnostic, where
+   * before nothing read the declaration at all. Emitting nothing for it instead
+   * would put an undefined `ui_image_*` symbol into generated code and turn a
+   * clear diagnostic into a link error.
+   */
+  const ASSETS: ReadonlyMap<string, string> = new Map([
+    [
+      'images/wifi.xbm',
+      ['#define wifi_width 8', '#define wifi_height 8', 'static unsigned char wifi_bits[] = {',
+       '   0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00 };', ''].join('\n'),
+    ],
+  ]);
+
+  function model(
+    body: string,
+    composites: readonly WidgetManifest[],
+  ): ProjectModel & { readonly assets: ReadonlyMap<string, string> } {
     return {
       project: parseProjectFile(PROJECT_XML, 'u8g2gl.xml').value!,
       globals: globals(),
@@ -489,6 +509,7 @@ describe('generate() carries the realised model and the capacities', () => {
       catalogue: CATALOGUE,
       loadDiagnostics: [],
       hasProjectManifest: true,
+      assets: ASSETS,
     };
   }
 

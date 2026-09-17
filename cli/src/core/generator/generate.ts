@@ -10,16 +10,21 @@
  *          any error remains. Isomorphic and free of I/O — the Node writer puts
  *          the files on disk, and the designer will hold them in memory.
  * Description: Chooses the target (the named one, or the first declared), then
- *              lays out the §13.7 file set — `u8g2gl_generated_config.h`, `ui.hpp`,
- *              the subjects, fonts and images units, and one `.cpp` per screen in
- *              document order — each opening with its header stamp. PR-04 WO5b
- *              emits the stamps only; WO9 and WO10 fill in the content.
+ *              hands the validated, realised model to `emit/`, which renders the
+ *              §13.7 file set — `u8g2gl_generated_config.h`, `ui.hpp`, the
+ *              subjects, styles, fonts and images units, and one `.cpp` per
+ *              screen in document order — each opening with its header stamp.
  *
- *              PR-04 WO8b adds the analysis those two emit from: every element's
+ *              PR-04 WO8b added the analysis emission reads: every element's
  *              realisation and the flat object model (§13.5, §13.3), and the
- *              static capacities counted from them ([D-21]). Both are carried on
- *              the result rather than written anywhere — this module still emits
- *              no content.
+ *              static capacities counted from them ([D-21]). **WO9 is where that
+ *              analysis first becomes C++**: the project-level files are emitted
+ *              in full, and the per-screen units carry their stamp until WO10
+ *              fills them in.
+ *
+ *              Emission can raise diagnostics of its own, for the two defects no
+ *              pass can see — an unreadable `<xbm>` asset and a subject's
+ *              declared value — and they refuse the build like any other error.
  *
  * Exports:
  * - GENERATE_NOT_YET_SUPPORTED_POLICY: Always 'error' — the build refuses what it cannot emit
@@ -34,8 +39,8 @@ import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
 import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
-import { checkProject, type ProjectModel } from './check-project.js';
-import { formatHeaderStamp } from './header.js';
+import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
+import { emitProjectFiles } from './emit/index.js';
 import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from './realise/index.js';
 
 /**
@@ -53,6 +58,18 @@ export interface GenerateInput extends ProjectModel {
   readonly target?: string;
   /** Version of the CLI running, stamped into every file (§13.9). */
   readonly generatorVersion: string;
+  /**
+   * Asset file text by the `src` path its declaration names (§14.2) — an
+   * `<xbm>`'s bytes are compiled into the generated code, so emission needs
+   * them.
+   *
+   * Passed in rather than read, because this module is isomorphic and
+   * `src/core/` may not touch the filesystem (typescript.md §1): the Node
+   * loader reads them from disk and the designer will supply them from editor
+   * buffers. Absent is the same as empty — the images emitter reports any asset
+   * it needed and did not get.
+   */
+  readonly assets?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -153,39 +170,6 @@ function resolveTarget(input: GenerateInput): Target | Diagnostic {
   };
 }
 
-// layoutFiles
-// The §13.7 file set, each file a header stamp. Order is fixed — project units,
-// then screens in the order loaded — so output never depends on hash or set
-// order (§13.9).
-//   input  — generate input
-//   target — the resolved target
-function layoutFiles(input: GenerateInput, target: Target): GeneratedFile[] {
-  const projectSource = input.project.loc?.file ?? 'u8g2gl.xml';
-  const globalsSource = input.globals.loc?.file ?? 'globals.xml';
-  const stamp = (source: string): string =>
-    formatHeaderStamp({
-      source,
-      schema: input.project.schema,
-      generator: input.generatorVersion,
-      target: target.name,
-    });
-
-  // File names are §13.7's. The unit names beyond `ui.hpp` and
-  // `u8g2gl_generated_config.h` are placeholders WO9/WO10 may rename; the
-  // writer's stale-file cleanup makes a rename safe.
-  return [
-    { path: 'u8g2gl_generated_config.h', content: stamp(projectSource) },
-    { path: 'ui.hpp', content: stamp(projectSource) },
-    { path: 'ui_subjects.cpp', content: stamp(globalsSource) },
-    { path: 'ui_fonts.cpp', content: stamp(globalsSource) },
-    { path: 'ui_images.cpp', content: stamp(globalsSource) },
-    ...input.screens.map((screen) => ({
-      path: `ui_screen_${screen.name}.cpp`,
-      content: stamp(screen.loc?.file ?? `screens/screen_${screen.name}.xml`),
-    })),
-  ];
-}
-
 /**
  * @brief Validates a project and lays out its generated files.
  *
@@ -256,19 +240,44 @@ export function generate(input: GenerateInput): GenerateResult {
     };
   }
 
-  // --- Step 5: Lay out the file set ---
-  // No second resolution: Pass 6 judged this very model against this very
-  // display, so a resolution error has already refused the build above.
+  // --- Step 5: Count the capacities from what was realised ([D-21]) ---
+  // No second resolution and no second count: Pass 6 judged this very model
+  // against this very display, and these are the objects and bindings Pass 9
+  // has just checked against §13.3's ceiling (PR-04 WO8c).
+  const capacities =
+    realisation === undefined
+      ? undefined
+      : computeCapacities({ globals: input.globals, screens: realisation.screens });
+
+  // --- Step 6: Emit every file that is not per-screen (§13.7) ---
+  const emitted =
+    capacities === undefined
+      ? { files: [] as readonly GeneratedFile[], diagnostics: [] }
+      : emitProjectFiles({
+          project: input.project,
+          globals: input.globals,
+          screens: input.screens,
+          capacities,
+          assets: input.assets ?? new Map<string, string>(),
+          generatorVersion: input.generatorVersion,
+          target: target.name,
+        });
+
+  // Emission sees two defects validation cannot: an `<xbm>` asset, which is not
+  // read until now, and a subject's declared `value`, which no pass type-checks.
+  // Both are the author's, so they refuse the build exactly as a validation
+  // error does — a partial set is never written ([D-11]).
+  const finalised = finaliseDiagnostics([...checked.diagnostics, ...emitted.diagnostics]);
+  if (finalised.errors > 0) {
+    return { files: [], ...finalised, target: target.name };
+  }
+
   return {
-    files: layoutFiles(input, target),
-    ...checked,
+    files: emitted.files,
+    ...finalised,
     target: target.name,
     ...(pipeline !== undefined ? { resolved: pipeline.resolution.screens } : {}),
-    ...(realisation !== undefined
-      ? {
-          realised: realisation.screens,
-          capacities: computeCapacities({ globals: input.globals, screens: realisation.screens }),
-        }
-      : {}),
+    ...(realisation !== undefined ? { realised: realisation.screens } : {}),
+    ...(capacities !== undefined ? { capacities } : {}),
   };
 }

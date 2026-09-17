@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A user-written composite, carrying §6.6's recommended `wd_` prefix. It
+     realises as a real container object ([D-18]), so it costs an object and
+     prefixes its child's identifier (§13.4). -->
+<widget name="wd_badge">
+    <api>
+        <prop name="caption" type="string" default="Badge" />
+    </api>
+    <view>
+        <u8g2gl_label name="caption" x="2" y="1" width="56" height="10"
+                      font="u8g2_font_6x10_mr" text="$caption" align="left" />
+    </view>
+</widget>

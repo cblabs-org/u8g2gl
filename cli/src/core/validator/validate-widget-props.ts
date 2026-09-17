@@ -17,7 +17,11 @@
  *              COMMON_ATTRIBUTES and `style_*` overrides are accepted, except that
  *              an anchor is inapplicable to an element that is not rectangular,
  *              and `hcenter` / `vcenter` must be `true` or `false` (§7.2, PR-04
- *              WO7b). Unknown tags are Pass 2's concern and are skipped here.
+ *              WO7b). **Every `type="bool"` prop takes that same strictness**
+ *              (PR-04 WO9): only `hidden` was ever value-checked, so
+ *              `filled="yes"` validated and reached emission, where §13.2's
+ *              value helper has no `bool` spelling for it. Unknown tags are
+ *              Pass 2's concern and are skipped here.
  *
  *              Once, never twice (PR-04 WO7b): every check runs on the elements
  *              as written — screens and each composite's `<view>` — so a template
@@ -53,16 +57,45 @@ const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vce
 const CENTRING_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter'];
 
 /**
- * Every attribute held to a strict boolean. The centring switches are §7.2's;
+ * The attributes held to a strict boolean by the **layout and visibility
+ * contract**, whatever element carries them. The centring switches are §7.2's;
  * `hidden` joins them in PR-04 WO8a, because `hidden="yes"` used to parse to
  * `false` and the element simply rendered, with nothing said (WO7b finding 3).
- * These are layout and visibility contract names, not element knowledge
- * ([D-17]) — `hidden` is accepted only where the manifest declares it.
+ * These are contract names, not element knowledge ([D-17]) — `hidden` is
+ * accepted only where the manifest declares it.
+ *
+ * It is the floor, not the whole set: {@link booleanAttributesOf} adds every
+ * `type="bool"` prop the element's own manifest declares.
  */
 const BOOLEAN_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter', 'hidden'];
 
 /** The only values a boolean attribute may take (§7.2). */
 const BOOLEAN_VALUES: readonly string[] = ['true', 'false'];
+
+// booleanAttributesOf
+// Every attribute on one element that must be `true` or `false`: the contract
+// names above, plus every `type="bool"` prop its manifest declares — read from
+// the manifest, never a tag list ([D-17]), so a custom element's own bool prop
+// is checked exactly as `filled` is.
+//
+// Before PR-04 WO9 only `hidden` was value-checked, so `filled="yes"` validated
+// and reached emission (WO8a finding 2, confirmed end to end) — where §13.2's
+// value helper has no `bool` spelling for `yes` and could only have guessed. A
+// bool is a two-member set, so it gets the strictness §7.2 gives `hcenter`.
+//
+// `hidden` is declared `type="bool"` on `u8g2gl_obj`, so it arrives from both
+// sources; the list is deduplicated, or every `hidden="yes"` would be reported
+// twice for one mistake.
+//   manifest — effective manifest for the element's tag
+function booleanAttributesOf(manifest: EffectiveManifest): readonly string[] {
+  const names = [...BOOLEAN_ATTRIBUTES];
+  for (const prop of manifest.api.props) {
+    if (prop.type === 'bool' && !names.includes(prop.name)) {
+      names.push(prop.name);
+    }
+  }
+  return names;
+}
 
 /**
  * Identity, anchor and style attributes valid on every element, which no
@@ -222,7 +255,7 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest, atScr
       );
     }
   }
-  for (const attribute of BOOLEAN_ATTRIBUTES) {
+  for (const attribute of booleanAttributesOf(manifest)) {
     const diagnostic = checkBooleanValue(node, attribute);
     if (diagnostic !== undefined) {
       diagnostics.push(diagnostic);
@@ -328,7 +361,7 @@ function screenLevelPlaceholders(node: WidgetNode, manifest: EffectiveManifest):
       check(prop.name);
     }
   }
-  for (const attribute of BOOLEAN_ATTRIBUTES) {
+  for (const attribute of booleanAttributesOf(manifest)) {
     check(attribute);
   }
   return diagnostics;
@@ -379,7 +412,7 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
         if (substitution.styleChild !== undefined) {
           continue; // A `<style name="$s">` value is not an attribute: Pass 2's.
         }
-        const diagnostic = BOOLEAN_ATTRIBUTES.includes(attribute)
+        const diagnostic = booleanAttributesOf(manifest).includes(attribute)
           ? checkBooleanValue(element.node, attribute)
           : checkEnumValue(element.node, attribute, manifest);
         if (diagnostic !== undefined) {

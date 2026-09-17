@@ -316,7 +316,14 @@ describe('hidden is a strict boolean (WO7b 3)', () => {
       DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
     );
     expect(found).toHaveLength(1);
-    expect(found[0]?.message).toContain("in instance 'h' of <hider>");
+    // Reported once, at the `hide="yes"` the author actually wrote (PR-04 WO9).
+    // Until every `type="bool"` prop became strict, `hide` itself was unchecked
+    // and the defect surfaced only on the substituted `hidden="$hide"` inside
+    // the template — which had to name the instance to be intelligible at all.
+    // Checking the argument where it is written is both earlier and more direct,
+    // and substituted-values.ts then suppresses the duplicate at the use.
+    expect(found[0]?.message).toContain("'hide' on <hider> 'h'");
+    expect(found[0]).toMatchObject({ file: SCREEN_FILE, offendingText: 'yes' });
   });
 });
 

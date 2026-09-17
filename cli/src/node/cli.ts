@@ -21,9 +21,8 @@
  * - runCli(args): Main entry point for command-line execution
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { CATALOGUE } from '../data/catalogue.js';
 import { checkProject, generate } from '../core/generator/index.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
@@ -45,6 +44,7 @@ import {
   formatCatalogueSummary,
 } from './format-display.js';
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
+import { getGeneratorVersion } from './generator-version.js';
 import { loadProject, type LoadedProject } from './load-project.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
@@ -72,21 +72,28 @@ const KNOWN_TARGET_RAM: Record<string, number> = {
 };
 
 /**
- * @brief Reads the package version from package.json.
+ * @brief The generator version, or a clear failure.
  *
- * Resolves package.json relative to import.meta.url so it functions
- * correctly in both transpiled dist and local test environments.
+ * The lookup itself lives in `generator-version.ts`, where it can be tested:
+ * this module calls `runCli()` at load, so a test importing it would run the
+ * CLI. It throws rather than defaulting, because the version is stamped into
+ * committed output (PR-04 WO5b finding 6) — so the throw is turned into one
+ * plain message and a non-zero exit here, never a stack trace.
  *
- * @return Semantic version string, or fallback '0.3.0' if unreadable.
+ * @param json Whether the caller is in `--json` mode.
+ * @return The version. Exits the process if it cannot be determined.
  */
-function getPackageVersion(): string {
+function generatorVersionOrExit(json: boolean): string {
   try {
-    const pkgUrl = new URL('../../package.json', import.meta.url);
-    const content = readFileSync(fileURLToPath(pkgUrl), 'utf8');
-    const parsed = JSON.parse(content) as { version?: string };
-    return parsed.version ?? '0.3.0';
-  } catch {
-    return '0.3.0';
+    return getGeneratorVersion();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (json) {
+      console.log(JSON.stringify({ files: [], diagnostics: [], errors: 1, warnings: 0, error: message }, null, 2));
+    } else {
+      console.error(message);
+    }
+    process.exit(1);
   }
 }
 
@@ -579,7 +586,8 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
   const result = generate({
     ...loaded.model,
     ...(options.target !== undefined ? { target: options.target } : {}),
-    generatorVersion: getPackageVersion(),
+    generatorVersion: generatorVersionOrExit(json),
+    assets: loaded.assets,
   });
   const { diagnostics, errors, warnings } = result;
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
@@ -689,7 +697,7 @@ export function runCli(rawArgs: readonly string[]): void {
   }
 
   if (showVersion) {
-    console.log(getPackageVersion());
+    console.log(generatorVersionOrExit(json));
     return;
   }
 

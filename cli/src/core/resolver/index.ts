@@ -18,7 +18,8 @@
  *   ContainerSize, EvaluationScope, ExpressionSite, Evaluation, buildConstantTable,
  *   evaluateExpression (expression.ts)
  * - Provenance, ResolvedCoordinate, ResolvedGeometry, Container, DeferredCoordinate,
- *   AxisOutcome, ResolvedExtra, ResolvedElement, ResolvedScreen, ResolverContext, ResolveInput,
+ *   AxisOutcome, ResolvedExtra, ResolvedProperty, ResolvedElement, ResolvedScreen,
+ *   ResolverContext, ResolveInput,
  *   ResolveResult, DiagnosticAnnotator, isCentringOn, isRectangular, findTargetDisplay,
  *   createResolverContext, displayContainer,
  *   resolveElements, resolveScreens (resolve.ts)
@@ -62,6 +63,7 @@ export {
   type DeferredCoordinate,
   type AxisOutcome,
   type ResolvedExtra,
+  type ResolvedProperty,
   type ResolvedElement,
   type ResolvedScreen,
   type ResolverContext,

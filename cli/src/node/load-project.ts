@@ -79,6 +79,17 @@ export interface LoadedProject {
    * framework manifest under `u8g2gl/manifests/<file>` (WO1 F9).
    */
   readonly fileContents: ReadonlyMap<string, string>;
+  /**
+   * Asset file text by the `src` path its declaration names (§14.2), for the
+   * emitters to compile into generated code.
+   *
+   * Read here because `src/core/` may not touch the filesystem
+   * (typescript.md §1): emission is isomorphic and takes the bytes as a
+   * parameter, which is also what lets the designer supply them from editor
+   * buffers instead of from disk. An asset that could not be read is simply
+   * absent, and the images emitter reports it against its own declaration.
+   */
+  readonly assets: ReadonlyMap<string, string>;
 }
 
 // bundledFrameworkFilename
@@ -240,5 +251,45 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     },
     projectRoot,
     fileContents,
+    assets: readAssets(projectRoot, globals),
   };
+}
+
+// readAssets
+// The text of every asset the document declares, keyed by the `src` path the
+// declaration names (§14.2).
+//
+// Only `<xbm>`: a `<convert>` image is refused before emission (PR-04b), and a
+// `<bdf>` font likewise (§14.1), so reading either would be work for a build
+// that cannot finish.
+//
+// A `src` that resolves outside the project directory is skipped rather than
+// read. [D-11] and §13.10 confine what the generator *writes* to the output
+// directory; confining what it reads to the project is the same principle
+// applied to the other direction, and an author who needs an asset from
+// elsewhere can copy it in. A skipped or unreadable asset is left absent, and
+// the images emitter reports it with the declaration's own location — a missing
+// file is the author's defect, not the loader's, so nothing is thrown here.
+//   projectRoot — absolute project directory, or undefined for a single file
+//   globals     — the parsed globals, for the declarations
+function readAssets(projectRoot: string | undefined, globals: Globals): ReadonlyMap<string, string> {
+  const assets = new Map<string, string>();
+  if (projectRoot === undefined) {
+    return assets;
+  }
+  for (const image of globals.images ?? []) {
+    if (image.kind !== 'xbm' || image.src === '' || assets.has(image.src)) {
+      continue;
+    }
+    const absolute = resolve(projectRoot, image.src);
+    if (absolute !== projectRoot && !absolute.startsWith(projectRoot + sep)) {
+      continue;
+    }
+    try {
+      assets.set(image.src, readFileSync(absolute, 'utf-8'));
+    } catch {
+      // Absent: reported by the images emitter, against the declaration.
+    }
+  }
+  return assets;
 }

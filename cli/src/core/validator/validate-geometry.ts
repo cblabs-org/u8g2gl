@@ -27,6 +27,12 @@
  *                 the container's origin, extend past its far edge, or resolve to
  *                 a negative size. The container is the display for a screen's
  *                 top level, otherwise the parent's resolved size.
+ *              4. Every **non-coordinate `int` property** resolved too (§13.2,
+ *                 PR-04 WO9): `scroll_px_per_sec="#speed"` used never to be
+ *                 evaluated at all and reached emission as text (WO8a finding
+ *                 5). These are held to `int32_t` rather than `int16_t` and are
+ *                 not bounds-checked — a scroll speed has no container — so they
+ *                 are checked apart from the geometry, in `checkProperties`.
  *              With no catalogue record for the target the display has no size:
  *              `#screen_*` and anchors against it stay unresolved without a
  *              diagnostic (Pass 3 reports the display), rather than guessed.
@@ -503,6 +509,66 @@ function checkExtras(
 }
 
 // ---------------------------------------------------------------------------
+// Non-coordinate `int` properties (§13.2)
+// ---------------------------------------------------------------------------
+
+// checkProperties
+// Check 1 for every `int` property that is not a coordinate: it too must reach
+// emission as a literal. The resolver now evaluates these through the same
+// evaluator as `x` (PR-04 WO9, closing WO8a finding 5) — before that,
+// `scroll_px_per_sec="#speed"` was never evaluated at all and arrived at the
+// §13.2 value helper as the text `#speed`.
+//
+// An invalid expression has already been reported by the evaluator itself, so
+// what is left here is the case it deliberately treats as "not yet knowable": a
+// value that never resolved. Two codes, because they are two different facts —
+// a `$prop` written where nothing can substitute it, and a value whose
+// container or target is simply unknown.
+//
+// Deliberately **not** held to `int16_t`, and not bounds-checked: §13.2 gives
+// that width to a *coordinate* and leaves other `int` properties at `int32_t`
+// (which `set_time(uint32_t)` needs), and a scroll speed has no container to lie
+// inside. The evaluator's own int32 range check is the whole type rule.
+//   element         — the resolved element
+//   context         — resolution context, for the display
+//   templateSourced — whether the element was copied from a composite's `<view>`
+//   emit            — receives each diagnostic
+function checkProperties(
+  element: ResolvedElement,
+  context: ResolverContext,
+  templateSourced: boolean,
+  emit: ElementDiagnosticSink,
+): void {
+  const { node } = element;
+  const displayKnown = context.display.width !== undefined;
+
+  for (const property of element.properties) {
+    const { deferred } = property;
+    if (deferred === undefined) {
+      continue;
+    }
+    // A `$` left in a copied template was expansion's error (UNKNOWN_PROP); a
+    // built-in with no display is Pass 3's. Either way something already stands
+    // against this value, so nothing more is inferred.
+    const placeholder = deferred.symbols.some((symbol) => symbol.startsWith('$'));
+    if ((templateSourced && placeholder) || (!displayKnown && !placeholder)) {
+      continue;
+    }
+    emit(
+      node,
+      createGeomDiagnostic(
+        placeholder ? DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP : DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+        `'${deferred.attribute}' on ${describeNode(node)} cannot be resolved: ` +
+          `${deferralReason(deferred, element)}. Every 'int' property must resolve to a literal ` +
+          `before emission (§13.2).`,
+        deferred.loc ?? node.loc,
+        deferred.expression,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The per-element walk
 // ---------------------------------------------------------------------------
 
@@ -538,6 +604,7 @@ function checkElements(
       }
     }
     checkExtras(element, context, rules.templateSourced(element), emit);
+    checkProperties(element, context, rules.templateSourced(element), emit);
     checkElements(element.children, rules, context, emit);
   }
 }

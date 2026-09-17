@@ -28,6 +28,17 @@
  *              validator can insist every element ends up fully positioned
  *              (§7.2) without a second resolver.
  *
+ *              **Every `int` property goes through the same evaluator, not only
+ *              the coordinates** (PR-04 WO9, closing WO8a finding 5). Nothing
+ *              used to evaluate a non-coordinate `int`, so
+ *              `scroll_px_per_sec="#speed"` arrived at emission as the literal
+ *              text `#speed` — which the §13.2 value helper cannot spell, and
+ *              which would have reached committed C++. These are recorded
+ *              separately from the geometry because §13.2 holds them to a
+ *              different width: a resolved *coordinate* must fit `int16_t`,
+ *              while any other `int` property stays `int32_t`, which a clock's
+ *              `set_time(uint32_t)` needs.
+ *
  * Exports:
  * - Provenance:              Where a resolved coordinate came from
  * - ResolvedCoordinate:      A literal integer and its provenance
@@ -36,6 +47,7 @@
  * - DeferredCoordinate:      A written coordinate attribute with no value yet
  * - AxisOutcome:             What one axis could not settle
  * - ResolvedExtra:           A resolved endpoint or radius — a coordinate outside the rectangle
+ * - ResolvedProperty:        A resolved non-coordinate `int` property (§13.2)
  * - ResolvedElement:         One element, its container, geometry, axis outcomes and children
  * - ResolvedScreen:          One screen resolved against a display
  * - ResolverContext:         Constants, registry and display shared by one resolution
@@ -172,6 +184,35 @@ export interface ResolvedExtra {
   readonly deferred?: DeferredCoordinate;
 }
 
+/**
+ * A non-coordinate `int` property resolved to a literal (§13.2).
+ *
+ * §7.2 gives expressions to coordinate attributes, and nothing stopped an
+ * author writing one in any other `int` property. Until PR-04 WO9 nothing
+ * evaluated them either, so `scroll_px_per_sec="#speed"` reached emission as
+ * text (WO8a finding 5) — and the §13.2 value helper has no way to spell an
+ * unresolved expression as C++. Every `int` property now goes through the one
+ * evaluator, so an expression means the same thing wherever it is written.
+ *
+ * Kept apart from {@link ResolvedExtra} and the geometry because the **type
+ * rule differs**: a resolved coordinate must fit `int16_t` (validate-geometry.ts
+ * checks that), while these stay `int32_t`, which is the width §13.2 gives an
+ * ordinary `int` property and which `set_time(uint32_t)` needs. The evaluator's
+ * own `int32_t` range check is therefore the whole rule here.
+ *
+ * Present only for an attribute the element's manifest declares as `type="int"`
+ * and the author wrote. `value` and `deferred` are both absent when the
+ * expression was invalid — the evaluator already raised that diagnostic.
+ */
+export interface ResolvedProperty {
+  /** The attribute as written: `scroll_px_per_sec`, `padding`, `time`. */
+  readonly attribute: string;
+  /** The literal value, when it resolved, with the expression it came from. */
+  readonly value?: ResolvedCoordinate;
+  /** Written, but with no value here. */
+  readonly deferred?: DeferredCoordinate;
+}
+
 /** One element after resolution. */
 export interface ResolvedElement {
   /** The source node, unchanged. */
@@ -183,6 +224,11 @@ export interface ResolvedElement {
   readonly axes: { readonly horizontal: AxisOutcome; readonly vertical: AxisOutcome };
   /** Endpoints and radii, in a fixed order that never depends on the document (§13.9). */
   readonly extras: readonly ResolvedExtra[];
+  /**
+   * Non-coordinate `int` properties, in the manifest's declaration order so the
+   * list never depends on attribute order in the document (§13.9).
+   */
+  readonly properties: readonly ResolvedProperty[];
   /** Nested elements, in document order (§13.9). */
   readonly children: readonly ResolvedElement[];
 }
@@ -274,6 +320,21 @@ const EXTRA_COORDINATES: readonly ExtraCoordinateDef[] = [
   { attribute: 'rx', kind: 'length' },
   { attribute: 'ry', kind: 'length' },
 ];
+
+/**
+ * Every attribute this module already settles as a **coordinate**: the rectangle
+ * (§7.2) and the endpoints and radii outside it (§6.2).
+ *
+ * It exists to say what an `int` property is *not*: anything `type="int"` that
+ * is not one of these is an ordinary `int32_t` value, resolved by
+ * `resolveProperties` and held to a different range than a coordinate (§13.2).
+ * Derived from the two lists above rather than written out again, so a new
+ * coordinate attribute cannot be added to one and forgotten in the other.
+ */
+const COORDINATE_ATTRIBUTES: ReadonlySet<string> = new Set([
+  ...RECTANGLE_PROPERTIES,
+  ...EXTRA_COORDINATES.map((extra) => extra.attribute),
+]);
 
 /**
  * @brief Whether an element is rectangular: its effective manifest declares
@@ -588,6 +649,76 @@ function resolveExtras(
   return resolved;
 }
 
+// resolveProperties
+// Resolves every `int` property that is not a coordinate (§13.2) — the same
+// evaluator `x` and `width` go through, so `#gap` means one thing everywhere and
+// an error in it is raised once, by the code that already knows how to say why.
+//
+// This closes the last of the four ways an unresolved value could reach emission
+// (PR-04 WO8a finding 5): `scroll_px_per_sec="#speed"` was never evaluated at
+// all, so it arrived at the §13.2 value helper as the text `#speed`. Nothing is
+// derived here — an `int` property has no anchor rule to complete it — and
+// nothing is read from a default: a default is manifest-authored and literal,
+// while only a written value can carry an expression.
+//   node        — the element
+//   scope       — expression scope for this element
+//   context     — shared resolution context
+//   diagnostics — output
+function resolveProperties(
+  node: WidgetNode,
+  scope: EvaluationScope,
+  context: ResolverContext,
+  diagnostics: Diagnostic[],
+): ResolvedProperty[] {
+  const resolved: ResolvedProperty[] = [];
+
+  // Manifest declaration order, never attribute order, so two runs over one
+  // document produce the same list (§13.9).
+  for (const prop of context.manifests.get(node.tag)?.api.props ?? []) {
+    // --- Step 1: Only a non-coordinate `int` the author actually wrote ---
+    // A coordinate is resolveAxis's or resolveExtras' — resolving it twice would
+    // be a second answer for one attribute.
+    if (prop.type !== 'int' || COORDINATE_ATTRIBUTES.has(prop.name)) {
+      continue;
+    }
+    const text = node.attributes[prop.name];
+    if (typeof text !== 'string') {
+      continue;
+    }
+    const loc = node.attributeLocs?.[prop.name] ?? node.loc;
+
+    // --- Step 2: Evaluate, recording what could not be settled ---
+    // A deferral is recorded rather than diagnosed, exactly as for a coordinate:
+    // a composite's `<view>` resolved as declared defers by nature, so whether
+    // an unsettled value is an error is the validator's judgement.
+    const result = evaluateExpression(text, scope, {
+      ...(loc ? { loc } : {}),
+      subject: elementLabel(node, prop.name),
+    });
+    if (result.kind === 'invalid') {
+      // The evaluator has said why; the value is simply absent from here on.
+      diagnostics.push(...result.diagnostics);
+      resolved.push({ attribute: prop.name });
+      continue;
+    }
+    if (result.kind === 'deferred') {
+      resolved.push({
+        attribute: prop.name,
+        deferred: { attribute: prop.name, expression: text, symbols: result.symbols, ...(loc ? { loc } : {}) },
+      });
+      continue;
+    }
+    resolved.push({
+      attribute: prop.name,
+      value: {
+        value: result.value,
+        provenance: { kind: 'attribute', attribute: prop.name, expression: text, ...(loc ? { loc } : {}) },
+      },
+    });
+  }
+  return resolved;
+}
+
 // resolveNode
 // Resolves one element and, recursively, its nested elements; the element's own
 // resolved size becomes its children's container.
@@ -608,6 +739,7 @@ function resolveNode(
   const h = resolveAxis(node, HORIZONTAL, container.width, scope, context, own);
   const v = resolveAxis(node, VERTICAL, container.height, scope, context, own);
   const extras = resolveExtras(node, scope, context, own);
+  const properties = resolveProperties(node, scope, context, own);
   for (const diagnostic of own) {
     const kept = annotate ? annotate(node, diagnostic) : diagnostic;
     if (kept !== undefined) {
@@ -631,7 +763,15 @@ function resolveNode(
   };
   const children = resolveChildren(node.children, childContainer, context, diagnostics, annotate);
 
-  return { node, container, geometry, axes: { horizontal: h.outcome, vertical: v.outcome }, extras, children };
+  return {
+    node,
+    container,
+    geometry,
+    axes: { horizontal: h.outcome, vertical: v.outcome },
+    extras,
+    properties,
+    children,
+  };
 }
 
 // resolveChildren

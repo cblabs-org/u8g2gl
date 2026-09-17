@@ -18,6 +18,13 @@
  *              same function (PR-04 WO7b, WO7 F4), and only those, so no value is
  *              checked twice; substituted-values.ts decides where each is reported.
  *
+ *              PR-04 WO9 closes two ways an unresolvable reference reached
+ *              emission: a `$prop` in a `bind_*` attribute written in a screen,
+ *              where there is no template to substitute it (WO8a finding 3), and
+ *              a **literal** `<style>` child inside a `<view>`, which neither
+ *              this walk nor the substituted-value walk examined (WO8a finding
+ *              4).
+ *
  * Exports:
  * - validateReferences(input): Runs Pass 2 cross-reference validation
  */
@@ -172,8 +179,9 @@ function checkValueReferences(node: WidgetNode, scope: ReferenceScope, only?: Re
 const VALUE_ATTRIBUTES: readonly string[] = ['font', 'image', 'src', 'style', 'focus_style'];
 
 // screenLevelPlaceholders
-// A `$prop` in a font, image or style value written directly in a screen. There
-// is nothing to substitute it with, so it would reach output literally.
+// A `$prop` in a font, image, style or **binding** value written directly in a
+// screen. There is nothing to substitute it with, so it would reach output
+// literally.
 //   node — the element as written in a screen
 function screenLevelPlaceholders(node: WidgetNode): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -198,6 +206,31 @@ function screenLevelPlaceholders(node: WidgetNode): Diagnostic[] {
         node.attributeLocs?.style_font ?? node.loc,
       ),
     );
+  }
+
+  // A `$prop` in a binding attribute (PR-04 WO9, closing WO8a finding 3). 2e
+  // below skips a `$` value as "not yet knowable", which is true inside a
+  // template and false here: a screen has no props to bind, so nothing will ever
+  // substitute it. Left unreported, `bind_text="$subject"` in a screen named no
+  // declared subject, realisation recorded a binding on it all the same, and
+  // emission would have registered an observer on a subject called `$subject`.
+  //
+  // The attribute names are not a list: any `bind_*` is a binding (§8.4), and
+  // the `_fmt` companion is a format string rather than a subject reference.
+  for (const [attribute, value] of Object.entries(node.attributes)) {
+    if (!attribute.startsWith('bind_') || attribute.endsWith('_fmt')) {
+      continue;
+    }
+    const reference = propReferenceIn(value);
+    if (reference !== undefined) {
+      diagnostics.push(
+        unsubstitutedPlaceholder(
+          reference,
+          `'${attribute}' on <${node.tag}>`,
+          node.attributeLocs?.[attribute] ?? node.loc,
+        ),
+      );
+    }
   }
   return diagnostics;
 }
@@ -290,6 +323,13 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
 
   const declaredSubjects = (globals?.subjects ?? []).map((s) => s.name);
   const subjectSet = new Set(declaredSubjects);
+
+  // Global styles only, for the checks inside a composite's `<view>`: a template
+  // is instantiated on whatever screen the author chooses, so a screen-local
+  // style is not in scope for it. The screen walk uses `referenceScope`, which
+  // adds that screen's own styles.
+  const declaredGlobalStyles = (globals?.styles ?? []).map((s) => s.name);
+  const globalStyleSet = new Set(declaredGlobalStyles);
 
 
   // One namespace for every element ([D-18]). The `u8g2gl_` prefix still picks
@@ -533,6 +573,34 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
               findClosest(imageAttr, declaredImages),
             ),
           );
+        }
+      }
+
+      // A literal `<style>` child inside the template (PR-04 WO9, closing WO8a
+      // finding 4). The screen walk has always checked these; this walk never
+      // did, and 3b checks only the ones expansion *substituted* — so a style
+      // name written as literal text in a `<view>` was the one spelling nothing
+      // examined, and `<style name="hedaer" />` reached emission as
+      // `ui_style_hedaer`, a symbol no unit defines.
+      //
+      // Reported against the template, once, however often the composite is
+      // instantiated: the defect is in the template's own text.
+      for (const child of node.children) {
+        if ('kind' in child && child.kind === 'style') {
+          if (propNames.has(child.name) || child.name.startsWith('$')) {
+            continue; // A `$prop`; 3b checks what it is substituted with.
+          }
+          if (!globalStyleSet.has(child.name)) {
+            diagnostics.push(
+              createRefDiagnostic(
+                DIAGNOSTIC_CODES.UNKNOWN_STYLE,
+                `Unknown style '${child.name}' in <style> child in composite '${component.name}'.`,
+                child.loc ?? node.loc,
+                child.name,
+                findClosest(child.name, declaredGlobalStyles),
+              ),
+            );
+          }
         }
       }
 

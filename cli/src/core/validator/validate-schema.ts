@@ -41,6 +41,17 @@ import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '..
 const VALID_SCHEMA_VERSION = '0.4';
 
 /**
+ * The prefix §13.4 fixes every generated identifier at, and the only value
+ * `<output prefix>` may name (see section 1b).
+ *
+ * Spelled here because `mangle.ts` builds it into each per-kind spelling helper
+ * (`ui_screen_${screen}_${fn}`) rather than exporting it as one constant; there
+ * is no single symbol to import. Recorded as a finding rather than fixed,
+ * because `mangle.ts` is outside this work order's boundary.
+ */
+const GENERATED_IDENTIFIER_PREFIX = 'ui_';
+
+/**
  * The §15.4 migration table for the one superseded schema version this CLI
  * still recognises by name. Each entry is a change landed by PR-3R (WO1–WO7)
  * that a `schema="0.3"` project must apply verbatim; the refusal path below
@@ -238,6 +249,36 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           );
         }
       }
+    }
+
+    // --- 1b. <output prefix> cannot be honoured (§13.4, PR-04 WO9) ---
+    // `<output prefix>` has been parsed since PR-02 and read by nothing, so an
+    // author could set it and quietly get `ui_` anyway (PR-04 WO5b finding 4).
+    // It cannot be made to mean anything: §13.4 fixes every generated identifier
+    // at `ui_` — `ui_screen_home_init`, `ui_subject_temperature`,
+    // `ui_style_header` — and §13.7's file names are that same stem, so a prefix
+    // could only rename the files while the identifiers inside them kept `ui_`.
+    // That is precisely the mismatch §13.4's "never silently renamed" rule
+    // exists to prevent: generated code must read against the author's XML.
+    //
+    // So it is diagnosed rather than accepted silently. `prefix="ui_"` is
+    // allowed: it asks for exactly what the generator already does, so it is a
+    // redundant restatement rather than a request that cannot be met, and
+    // erroring on it would reject a harmless document.
+    const prefix = project.output?.prefix;
+    if (prefix !== undefined && prefix !== GENERATED_IDENTIFIER_PREFIX) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+          `'prefix="${prefix}"' on <output> cannot be honoured: §13.4 fixes every generated ` +
+            `identifier at '${GENERATED_IDENTIFIER_PREFIX}', and the generated file names are that ` +
+            `same stem, so a prefix would leave the file names disagreeing with the identifiers ` +
+            `inside them. Remove it, or write prefix="${GENERATED_IDENTIFIER_PREFIX}".`,
+          project.output?.loc ?? project.loc,
+          prefix,
+          [GENERATED_IDENTIFIER_PREFIX],
+        ),
+      );
     }
   }
 
