@@ -77,7 +77,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** ✅ `2954fc2` · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
 - [x] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** ✅ `6c2c909` · base WO8a · standard · [D-18], [D-21], `_n<N>`
 - [x] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** ✅ `ae1e7a9` · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
-- [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8c · standard · §13.7
+- [x] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** ✅ `136c0c2` · base WO8c · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11 · standard · §13.9, §18, [D-16]; CLI 0.7.0
@@ -1139,6 +1139,59 @@ with a base-worktree suite and a `cmake`/`ctest` cycle, got "seven files failing
 and re-ran it alone to get 702/702 in 5.9s. It reported the contended figure as measuring
 nothing rather than as a result. Every green figure must come from an uncontended run.
 
+### WO9 — complete (`136c0c2`) — the generator emits C++
+
+**Verified independently:** one commit, on the WO9 branch only; `include/`, `src/`, `extern/`,
+`docs/`, `PROGRAM*.md`, the manifests and realisation's analysis untouched; C++ 305 unchanged,
+zero warnings; CLI 702 → **776** across 51 files, `tsc` and lint clean — every suite run alone,
+per the new standing instruction.
+
+**Generated a project end to end and read the output.** Seven units: `u8g2gl_generated_config.h`,
+`ui.hpp`, `ui_subjects.cpp`, `ui_styles.cpp`, `ui_fonts.cpp`, `ui_images.cpp` and the screen
+unit. What that showed:
+
+- **Capacities come from realisation, not a guess:** for a two-object screen,
+  `MAX_OBJECTS_PER_SCREEN 2`, `MAX_BINDINGS_PER_OBJ 1`, `MAX_TOTAL_BINDINGS 2`,
+  `MAX_STYLES 1` — the true sum, not the product ([D-21]).
+- **`_n<N>` is real:** `u8g2gl_subject_string_n<16, 2> ui_subject_station;` with the comment
+  "2 observers; 2 object bindings; no frame-dirty observer; 16 usable characters, so
+  max_len + 1 bytes (§8.2)". That is the PR-01 constraint, emitted and explained.
+- **Header stamp** carries source, schema, generator and target, with **no timestamp**.
+- **Regeneration is byte-identical** (`diff -r` clean across two `--out` runs), and `--check`
+  exits 0 on an up-to-date directory.
+- **`<bdf>` is refused** with the PR-04b message; `filled="yes"` now errors
+  (`U8G2GL_INVALID_ENUM_VALUE`) — the value carry closed.
+
+**Two decisions accepted, one of them a good withdrawal.** The worker first emitted a
+`.cmake` file of `-D` definitions for WO4's F5, then withdrew it: it spelled the four
+capacities a second time — exactly the drift WO8c spent a work order removing — and CMake's
+`#` comments could not carry the `// GENERATED` marker the writer uses to delete stale output,
+so it would have lingered forever once renamed. Integration is now `-include` of the one
+header. **WO10 proves it.** `<output prefix>` is diagnosed as meaningless against §13.4's
+fixed `ui_` identifiers, with `prefix="ui_"` accepted as a redundant restatement.
+
+**Base proof priced honestly again:** of 37 new tests, the worker reported **10** as
+behavioural failures at the base and said the other 27 fail trivially because their modules do
+not exist there.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | Every drawing manifest marks `x/y/width/height` `required="true"`, so §6.2's and §8.4's own `bind_width` examples cannot validate and no drawing element can be anchor-positioned | **WO10** — **PA decision:** the manifests drop `required` on geometry a binding or anchor can supply. This is manifest data ([D-17]), not schema vocabulary, and WO7b's "every element fully positioned" rule already catches a genuinely missing position |
+| 2 | `u8g2gl_circle.xml` / `u8g2gl_ellipse.xml` declare `segments` as an enum with **no `emit=`**, so no enumerator can be spelled — **WO10 cannot emit a circle or ellipse** | **WO10** — `emit="U8G2GL_DRAW_SEGMENT_{VALUE^^}"`; the runtime's `u8g2gl_draw_segment_t` spells `UPPER_RIGHT`, `UPPER_LEFT`, `LOWER_LEFT`, `LOWER_RIGHT`, `ALL`, and its values mirror U8G2's option bits and must not be renumbered |
+| 3 | §13.5's example reads `ui_subject_level.value`, which cannot compile — the member is private and `get()` is the accessor | **Chief Architect** — spec defect; the worker followed the runtime |
+| 4 | §13.7's emitted-file list names subjects, fonts and images but not a styles unit, which the work order required and WO9 emits | **Chief Architect** — add the styles unit to §13.7 |
+| 5 | A `<builtin>` font name is never validated: emission aliases it verbatim (`ui_font_<name> = <name>`), so a typo becomes a link error in the user's firmware build. **Checked by the PA** — nothing in the validator looks at it. Now checkable, since U8G2 is pinned at `extern/u8g2` | **WO12** — validate `<builtin>` names against U8G2's own font symbols, the same way [D-14] derives the display catalogue |
+| 6 | A subject's `value` is never type-checked by any pass (emission now reports it); a string's initial value is never checked against `max_len`; `StyleDecl` still carries `truncate`, which [D-19] deleted | **WO12** |
+| 7 | `U8G2GL_UNRESOLVED_GEOMETRY` is now reused for non-coordinate `int` props, where its name is narrower than its use | **WO12** — with the `notYetSupportedPolicy` rename |
+| 8 | A `<bind_flag_if_*>` directive's `subject="$p"` at screen level is still silent — WO8a's carry named the attribute form only | **WO10** — it emits bindings |
+
+**One deliberate behavioural change in an existing test, accepted:** with every `type="bool"`
+prop strict, `hide="yes"` is now reported at the attribute the author wrote rather than on the
+substituted `hidden="$hide"` inside the template. Still exactly one diagnostic, and closer to
+the author.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1158,6 +1211,11 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-17 — **WO9 complete** (`136c0c2`) — **the generator emits C++.** Verified
+  independently, including generating a project end to end, reading the emitted units and
+  confirming byte-identical regeneration. WO10 dispatched on
+  `u8g2gl-generator/wo10-emit-screens` with three manifest fixes it needs first. Two items
+  added for the Chief Architect (§13.5's `.value`, §13.7's file list).
 - 2026-09-17 — **WO8c complete** (`ae1e7a9`). Verified independently, including end to end:
   256 objects now fails both commands, 254 passes, **300 drawing elements now pass** (a false
   rejection nobody had noticed), and a `wd_` element validates. WO9 dispatched on

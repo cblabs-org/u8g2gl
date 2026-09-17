@@ -5,7 +5,7 @@ title: "Firmware emission: screens, and the compile layer"
 branch: u8g2gl-generator/wo10-emit-screens
 base: u8g2gl-generator/wo9-emit-project
 complexity: standard
-status: draft — PA revises against WO9's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO10 — Screen emission and compile layer
@@ -51,6 +51,33 @@ Where this work order and the spec disagree, **stop and report**.
 Emit each screen's translation unit, and prove the output compiles and behaves by
 building it in the C++ test suite.
 
+## Do these first — three manifest fixes, or you cannot emit
+
+WO9 emits the project-level units and the two shared helpers (`emit/value.ts`,
+`emit/draw-args.ts`). **Spell every setter call and draw argument through them**; that single
+spelling is what WO11's parity test holds firmware and the editor to. WO9 also surfaced three
+blockers:
+
+- [ ] **`segments` has no `emit=`, so a circle or ellipse cannot be emitted at all.** Add
+      `emit="U8G2GL_DRAW_SEGMENT_{VALUE^^}"` to the `segments` prop in
+      `include/u8g2gl/manifests/u8g2gl_circle.xml` and `u8g2gl_ellipse.xml`, and rebuild the
+      bundle (`npm run build:manifests` in `cli/`). The runtime's `u8g2gl_draw_segment_t`
+      (`include/u8g2gl/u8g2gl_draw.h`) spells `U8G2GL_DRAW_SEGMENT_UPPER_RIGHT`, `_UPPER_LEFT`,
+      `_LOWER_LEFT`, `_LOWER_RIGHT`, `_ALL`. Its values mirror U8G2's `U8G2_DRAW_*` option
+      bits — **do not renumber them**, and do not add an enumerator the header lacks. A test
+      must emit a circle with a non-default segment.
+- [ ] **Drawing manifests over-require geometry (PA decision).** Every drawing manifest marks
+      `x`, `y`, `width`, `height` `required="true"`, so §6.2's and §8.4's own examples —
+      `<u8g2gl_box … bind_width="level" />` with no `width`, and anchor-positioned drawing
+      elements — cannot validate. Drop `required` from geometry a **binding or an anchor** can
+      supply, on every drawing manifest, and rebuild the bundle. This is manifest data
+      ([D-17]), not schema vocabulary: WO7b's "every element fully positioned" rule already
+      makes a genuinely missing position an error, so nothing is weakened. Tests: §8.4's
+      bound-width box validates and emits; a box with no width and no binding still fails.
+- [ ] **`<bind_flag_if_*>` with `subject="$p"` at screen level is silent.** WO8a's carry closed
+      the attribute form only. At screen level there is nothing to substitute, so it is an
+      error, with the same code that form already uses.
+
 ## Line-Item Instructions
 
 - [ ] **Per-screen `.cpp`:** static objects in array order (composite containers as
@@ -87,8 +114,11 @@ building it in the C++ test suite.
 
 ## Strict Boundary Box
 
-**In scope:** `cli/src/core/generator/emit/` (screen units); `test/` (generated
-fixture, new C++ test, `test/CMakeLists.txt`); CLI tests; this WORKORDER.
+**In scope:** `cli/src/core/generator/emit/` (screen units); `include/u8g2gl/manifests/*.xml`
+and `cli/src/data/manifests.json` (the two manifest fixes above only);
+`cli/src/core/validator/` (the `<bind_flag_if_*>` `$p` gap only); `test/` (generated
+fixture, new C++ test, `test/CMakeLists.txt`, and the `-include` integration WO9 designed);
+CLI tests; this WORKORDER.
 
 **Do NOT touch:** runtime sources (a runtime gap is a **stop and report** — WO4
 owned that surface); editor emission (WO11); shared helpers except to fix a defect,
