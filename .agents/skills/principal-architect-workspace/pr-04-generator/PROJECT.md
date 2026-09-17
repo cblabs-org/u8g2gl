@@ -76,7 +76,8 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO7b — the geometry contract](wo7b-geometry-contract/WORKORDER.md)** ✅ `9970859` · base WO4c · standard · §7.2 / §13.2 normative contract, WO6 and WO7 carries (CA-approved)
 - [x] **[WO8a — one pipeline](wo8a-one-pipeline/WORKORDER.md)** ✅ `2954fc2` · `u8g2gl-generator/wo8a-one-pipeline` · base WO7b · standard · expand once, resolve once, mangling wired in, non-rectangular geometry, WO7b carries (owner-approved split)
 - [x] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** ✅ `6c2c909` · base WO8a · standard · [D-18], [D-21], `_n<N>`
-- [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8 · standard · §13.7
+- [ ] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
+- [ ] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** · base WO8c · standard · §13.7
 - [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11 · standard · §13.9, §18, [D-16]; CLI 0.7.0
@@ -1073,6 +1074,26 @@ emission stays one reviewable diff:
 Small, validator-only, and a prerequisite for WO9: emission must not be written against a
 ceiling check that can under-count. **If the owner declines**, these fold into WO9.
 
+### Owner approval — WO8c, 2026-09-17
+
+**APPROVED by the human (Matt McNeill) on 2026-09-17**, with the placement left to the PA.
+The owner's own words, verbatim:
+
+> "you can add wo8c or wo9 whichever you prefer"
+
+**PA choice: a separate WO8c.** Three reasons, all from this PR's own evidence:
+
+1. **It is a prerequisite, not an extra.** Emission must not be written against a ceiling
+   check that under-counts; WO9 would otherwise inherit a guard the PA has demonstrated does
+   not fire.
+2. **Different failure modes.** WO8c is validator alignment — one count, one severity rule,
+   one prefix list. WO9 is new emitted surface with golden files. Mixing them puts a
+   behaviour change and a new artefact in one diff, which is what the owner split WO5 and WO8
+   to avoid.
+3. **WO9 already carries four value-completeness gaps** from WO8a on top of its own scope.
+
+The ledger is now **eighteen** work orders. WO9's base moves to WO8c.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1092,6 +1113,9 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-17 — **Owner approved WO8c**, leaving the placement to the PA. Ledger now
+  **eighteen**. WO8c dispatched on `u8g2gl-generator/wo8c-validator-alignment`; WO9 re-based
+  on it.
 - 2026-09-16 — **Chief Architect rulings on CA-BRIDGE-2026-09-16 received and applied.** All
   seven ruled; the spec edits and record-keeping were delegated to this PR and are done on
   `u8g2gl-generator/pa-ca-rulings`. **WO8c proposed to the owner** for the validator work the
