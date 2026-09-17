@@ -21,12 +21,14 @@
  *              would be a module cycle.
  *
  * Exports:
- * - checkedTarget(input): The target this run resolves and bounds-checks against
- * - pipelineOf(input):    The run's shared expansion and resolution
+ * - checkedTarget(input):  The target this run resolves and bounds-checks against
+ * - pipelineOf(input):     The run's shared expansion and resolution
+ * - realisationOf(input):  The run's shared realisation of that expansion
  */
 
 import type { Target } from '../schema/project.js';
 import { createScreenPipeline, findTargetDisplay, type ScreenPipeline } from '../resolver/index.js';
+import { realiseScreens, type RealisationResult } from '../generator/realise/index.js';
 import type { ValidateInput } from './validate.js';
 
 /**
@@ -60,5 +62,34 @@ export function pipelineOf(input: ValidateInput): ScreenPipeline {
     screens: input.screens ?? [],
     manifests: input.manifests,
     ...(display ? { display } : {}),
+  });
+}
+
+/**
+ * @brief What every element of this run's document becomes (§13.5, §13.3).
+ *
+ * Pass 9 needs it to count objects exactly and to report realisation's refusals
+ * at the run's policy; `generate` needs the very same analysis to emit from, so
+ * it realises once and supplies it here rather than letting the document be
+ * realised twice per build.
+ *
+ * The direction of this import is worth naming: the validator reads the
+ * generator's realisation, which is the reverse of the usual layering. The
+ * alternative was a second object count living in the validator, and a second
+ * count is exactly the defect this closes — the one Pass 1 kept, which had
+ * drifted from the truth by two [D-18] inversions and stopped firing.
+ *
+ * @param input Validator input; its `realisation` is used when present.
+ * @return The supplied realisation, or one built from the run's shared
+ *         expansion — the same model every other pass judged.
+ */
+export function realisationOf(input: ValidateInput): RealisationResult {
+  if (input.realisation !== undefined) {
+    return input.realisation;
+  }
+  return realiseScreens({
+    globals: input.globals,
+    manifests: input.manifests,
+    expansion: pipelineOf(input).expansion,
   });
 }

@@ -13,7 +13,8 @@
  * - ValidateInput: Parameter contract for validation
  * - ValidateResult: Return contract containing diagnostics and counts
  * - Individual pass functions: validateSchema, validateReferences, validateDisplay,
- *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers
+ *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers,
+ *   validateNotYetSupported, validateRealisation
  */
 
 export { validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
@@ -29,3 +30,4 @@ export {
   DEFAULT_NOT_YET_SUPPORTED_POLICY,
   type NotYetSupportedPolicy,
 } from './validate-not-yet-supported.js';
+export { validateRealisation } from './validate-realisation.js';

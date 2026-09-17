@@ -29,6 +29,7 @@ import type { DisplayRecord } from '../schema/display-record.js';
 import type { Diagnostic } from '../schema/diagnostic.js';
 
 import type { ScreenPipeline } from '../resolver/index.js';
+import type { RealisationResult } from '../generator/realise/index.js';
 import { checkedTarget, pipelineOf } from './shared-model.js';
 import { validateSchema } from './validate-schema.js';
 import { validateReferences } from './validate-references.js';
@@ -42,6 +43,7 @@ import {
   validateNotYetSupported,
   type NotYetSupportedPolicy,
 } from './validate-not-yet-supported.js';
+import { validateRealisation } from './validate-realisation.js';
 
 /**
  * Full project and asset input structure supplied to the validator.
@@ -87,6 +89,17 @@ export interface ValidateInput {
    * one display and emit for another.
    */
   readonly pipeline?: ScreenPipeline;
+  /**
+   * What every element of that expansion becomes (§13.5, §13.3), for Pass 9.
+   * `generate` realises once and supplies it, so a build realises the document
+   * exactly once and the objects counted against §13.3's ceiling are the very
+   * ones it will emit a parent table for.
+   *
+   * Optional for the same reason as {@link ValidateInput.pipeline}: a pass
+   * called on its own in a unit test gets its own. A supplied realisation must
+   * be of {@link ValidateInput.pipeline}'s expansion.
+   */
+  readonly realisation?: RealisationResult;
 }
 
 /**
@@ -123,6 +136,7 @@ export interface ValidateResult {
  * 6. Layout geometry & display bounds (validateGeometry)
  * 7. Identifier naming rules & collisions (validateIdentifiers)
  * 8. Constructs not yet generated, at `input.notYetSupported` (validateNotYetSupported)
+ * 9. The exact object ceiling, and realisation's refusals (validateRealisation)
  *
  * @param input The parsed project AST models and display catalogue.
  * @return Ordered diagnostics with error and warning totals.
@@ -164,6 +178,12 @@ export function validate(input: ValidateInput): ValidateResult {
 
   // Pass 8: Constructs the generator does not build yet, at the caller's policy
   allDiagnostics.push(...validateNotYetSupported(passInput));
+
+  // Pass 9: What the document actually becomes — the exact object count against
+  // §13.3's ceiling, and realisation's refusals at the caller's policy. Last,
+  // because it is the only pass that judges the realised model rather than the
+  // authored one.
+  allDiagnostics.push(...validateRealisation(passInput));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
   allDiagnostics.sort((a, b) => {

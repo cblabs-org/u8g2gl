@@ -124,7 +124,11 @@ describe('validateIdentifiers', () => {
     expect(invalidNameDiags.some((d) => d.offendingText === 'TitleLabel')).toBe(true);
   });
 
-  it('rejects reserved prefixes (u8g2gl_, ui_, wd_) on non-widget identifiers', () => {
+  // §13.4 reserves the framework's prefix and generated code's, and no longer
+  // reserves `wd_`: by [D-12] a tag *is* its C++ class name, so `wd_` names
+  // classes users write (§6.6) and the generator never produces one (Chief
+  // Architect ruling, 2026-09-16).
+  it('rejects reserved prefixes (u8g2gl_, ui_) and accepts wd_, which §13.4 no longer reserves', () => {
     const screen: Screen = {
       name: 'home',
       view: {
@@ -159,7 +163,7 @@ describe('validateIdentifiers', () => {
     const invalidDiags = diagnostics.filter(
       (d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME,
     );
-    expect(invalidDiags).toHaveLength(3);
+    expect(invalidDiags.map((d) => d.offendingText)).toEqual(['u8g2gl_custom', 'ui_label']);
   });
 
   it('rejects C++ keywords as identifiers', () => {

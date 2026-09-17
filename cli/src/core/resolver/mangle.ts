@@ -46,8 +46,21 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { ExpandedElement, ExpandedScreen } from './expand.js';
 import { formatInstantiation, formatLocation, withInstantiation, type InstantiationSite } from './provenance.js';
 
-/** Prefixes §13.4 reserves for the framework and generated code. */
-export const RESERVED_IDENTIFIER_PREFIXES: readonly string[] = ['u8g2gl_', 'ui_', 'wd_'];
+/**
+ * Prefixes §13.4 reserves: `u8g2gl_` for the framework, `ui_` for generated
+ * code.
+ *
+ * **The one list.** Pass 7 checks author-written names against it and this
+ * module checks the identifiers that only exist after prefixing; the two are the
+ * same rule, and spelling it twice is how a rule drifts.
+ *
+ * **`wd_` is deliberately absent** (Chief Architect ruling, 2026-09-16, §13.4).
+ * By [D-12] a tag *is* its C++ class name, so `wd_` names classes users write
+ * (`wd_service_list`, §6.6) and the generator never produces one — reserving it
+ * forbade the very convention §6.6 recommends, and had already cost a fixture
+ * its name.
+ */
+export const RESERVED_IDENTIFIER_PREFIXES: readonly string[] = ['u8g2gl_', 'ui_'];
 
 /**
  * C++ keywords (§13.4). The same list Pass 7 checks author-written names

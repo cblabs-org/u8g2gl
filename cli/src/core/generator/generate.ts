@@ -34,7 +34,7 @@ import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
 import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
-import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
+import { checkProject, type ProjectModel } from './check-project.js';
 import { formatHeaderStamp } from './header.js';
 import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from './realise/index.js';
 
@@ -223,12 +223,25 @@ export function generate(input: GenerateInput): GenerateResult {
           ...(display ? { display } : {}),
         });
 
-  // --- Step 3: Validate exactly as `validate` does, refusing unsupported constructs ---
+  // --- Step 3: Decide what every element becomes ---
+  // Realisation runs on the very model validation is about to judge — the
+  // pipeline built for *this* target (§13.11 step 3) — so what is counted is
+  // what will be emitted. It runs *before* validation, not after, because
+  // Pass 9 judges it: the exact object count against §13.3's ceiling, and
+  // realisation's own refusals at this journey's severity. One realisation per
+  // build, and one object count in the codebase (PR-04 WO8c).
+  const realisation =
+    pipeline === undefined
+      ? undefined
+      : realiseScreens({ globals: input.globals, manifests: input.manifests, expansion: pipeline.expansion });
+
+  // --- Step 4: Validate exactly as `validate` does, refusing unsupported constructs ---
   const { diagnostics, errors, warnings } = checkProject(
     input,
     GENERATE_NOT_YET_SUPPORTED_POLICY,
     'code' in target ? undefined : target,
     pipeline,
+    realisation,
   );
   const checked = { diagnostics, errors, warnings };
   if (checked.errors > 0) {
@@ -240,25 +253,6 @@ export function generate(input: GenerateInput): GenerateResult {
       diagnostics: [...checked.diagnostics, target],
       errors: checked.errors + 1,
       warnings: checked.warnings,
-    };
-  }
-
-  // --- Step 4: Decide what every element becomes, and count the capacities ---
-  // Realisation runs on the very model validation judged — the pipeline built
-  // for *this* target (§13.11 step 3) — so what is counted is what will be
-  // emitted. Every diagnostic realisation raises is an error (an element with
-  // no class that something needs an object of), so any of them refuses the
-  // build, and the counts are merged through the one comparator both journeys
-  // report in.
-  const realisation =
-    pipeline === undefined
-      ? undefined
-      : realiseScreens({ globals: input.globals, manifests: input.manifests, expansion: pipeline.expansion });
-  if (realisation !== undefined && realisation.diagnostics.length > 0) {
-    return {
-      files: [],
-      ...finaliseDiagnostics([...checked.diagnostics, ...realisation.diagnostics]),
-      target: target.name,
     };
   }
 

@@ -7,7 +7,7 @@
  * Purpose: Pass 7 — Validates naming rules, reserved identifiers, C++ keywords,
  *          duplicate names, duplicate manifests, and composite-inlining collisions (§13.4, §15.1).
  * Description: Checks that identifier names conform to [a-z][a-z0-9_]*, contain no
- *              double underscores, avoid reserved prefixes (u8g2gl_, ui_, wd_),
+ *              double underscores, avoid reserved prefixes (u8g2gl_, ui_),
  *              and do not collide with C++ keywords. Enforces [U-1] element identity
  *              (every widget element must possess a valid, non-empty name).
  *              Detects duplicate identifiers within screen/composite scopes, duplicate manifest declarations, and flags
@@ -20,11 +20,9 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
-import { mangleIdentifiers } from '../resolver/index.js';
+import { mangleIdentifiers, RESERVED_IDENTIFIER_PREFIXES } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
-
-const RESERVED_PREFIXES = ['u8g2gl_', 'ui_', 'wd_'] as const;
 
 /** Complete list of standard C++ keywords. */
 const CPP_KEYWORDS: ReadonlySet<string> = new Set([
@@ -169,8 +167,9 @@ function checkNameRule(
     );
   }
 
-  // No reserved prefixes
-  for (const prefix of RESERVED_PREFIXES) {
+  // No reserved prefixes — §13.4's one list, shared with the mangler, which
+  // applies it to the identifiers that only exist after prefixing.
+  for (const prefix of RESERVED_IDENTIFIER_PREFIXES) {
     if (name.startsWith(prefix)) {
       return createIdDiagnostic(
         DIAGNOSTIC_CODES.INVALID_NAME,

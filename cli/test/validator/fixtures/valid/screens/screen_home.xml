@@ -4,5 +4,6 @@
         <status_bar name="header_bar" x="0" y="0" width="128" height="12" font="small_9" title="Home" />
         <u8g2gl_label name="lbl_info" x="0" y="20" width="128" height="12"
                       font="tall_12" bind_text="station_name" align="left" />
+        <wd_badge name="badge" x="0" y="34" width="48" height="10" caption="Live" />
     </view>
 </screen>

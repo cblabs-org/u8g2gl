@@ -60,10 +60,13 @@ export const U8G2GL_NO_PARENT = 255;
  * and {@link U8G2GL_NO_PARENT} consumes one of its values, so a screen holds at
  * most this many objects.
  *
- * Realisation reports the **exact** count against it; Pass 1 keeps its own
- * conservative structural count, which is what actually refuses a document
- * (`validate-schema.ts`). Two counts of one ceiling is deliberate for now — see
- * this work order's Completion Report.
+ * This is the **only** object count in the codebase (PR-04 WO8c). Pass 1 used to
+ * keep a second, structural one, and the two had drifted: written before [D-18],
+ * it skipped composite containers and counted `draw=`-only elements, so it could
+ * report fewer objects than a screen really has and a 256-object screen passed
+ * both `validate` and `generate` in silence. `validate-realisation.ts` now
+ * enforces the ceiling against the length of the object array below, which is
+ * exactly what emission writes a `uint8_t` parent table for.
  */
 export const MAX_OBJECTS_PER_SCREEN = 254;
 

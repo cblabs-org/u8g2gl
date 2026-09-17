@@ -28,6 +28,7 @@ import type { Target } from '../schema/project.js';
 import type { ScreenPipeline } from '../resolver/index.js';
 import { validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
 import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
+import type { RealisationResult } from './realise/index.js';
 
 /**
  * A project as loaded, before validation: the validator's input without a
@@ -66,6 +67,11 @@ export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 't
  *               the document is expanded once for the whole command and what is
  *               validated is exactly what is generated (PR-04 WO8a). It must
  *               have been built for `target`'s display.
+ * @param realisation What that model becomes (§13.5, §13.3), when the caller has
+ *               already worked it out. `generate` realises once and passes it,
+ *               so Pass 9 counts the objects the build will actually emit rather
+ *               than realising the document a second time (PR-04 WO8c). It must
+ *               be of `pipeline`'s expansion.
  * @return Deduplicated diagnostics sorted by file, line, column and code, with
  *         error and warning counts, and the target geometry was checked against.
  */
@@ -74,6 +80,7 @@ export function checkProject(
   policy: NotYetSupportedPolicy,
   target?: Target,
   pipeline?: ScreenPipeline,
+  realisation?: RealisationResult,
 ): ValidateResult {
   // --- Step 1: Run the validator under the caller's policy, for the caller's target ---
   const validation = validate({
@@ -85,6 +92,7 @@ export function checkProject(
     notYetSupported: policy,
     ...(target !== undefined ? { target } : {}),
     ...(pipeline !== undefined ? { pipeline } : {}),
+    ...(realisation !== undefined ? { realisation } : {}),
   });
 
   // --- Step 2: Merge, dropping the placeholder project's schema diagnostic ---

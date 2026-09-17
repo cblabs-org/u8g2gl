@@ -114,7 +114,11 @@ describe('[U-1] Element Identity', () => {
     expect(dupDiag?.message).toContain("Duplicate element name 'my_box' in screen 'home'");
   });
 
-  it('TEST: Reserved prefix in name produces error', () => {
+  // `u8g2gl_` and `ui_` are reserved; `wd_` is not. §13.4 reserved all three
+  // until the Chief Architect's 2026-09-16 ruling: by [D-12] a tag *is* its C++
+  // class name, so `wd_` names classes users write (§6.6) and the generator
+  // never emits one — reserving it forbade the convention §6.6 recommends.
+  it('TEST: Reserved prefix in name produces error, and wd_ is not one', () => {
     const xml = `<screen name="home">
     <view>
         <u8g2gl_box name="u8g2gl_box_item" x="0" y="0" width="10" height="10" />
@@ -134,10 +138,10 @@ describe('[U-1] Element Identity', () => {
     const invalidNameDiags = diagnostics.filter(
       (d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME,
     );
-    expect(invalidNameDiags).toHaveLength(3);
+    expect(invalidNameDiags).toHaveLength(2);
     expect(invalidNameDiags.some((d) => d.offendingText === 'u8g2gl_box_item')).toBe(true);
     expect(invalidNameDiags.some((d) => d.offendingText === 'ui_header')).toBe(true);
-    expect(invalidNameDiags.some((d) => d.offendingText === 'wd_widget_instance')).toBe(true);
+    expect(invalidNameDiags.some((d) => d.offendingText === 'wd_widget_instance')).toBe(false);
   });
 
   it('TEST: Auto-generated names are valid identifiers per §13.4', () => {

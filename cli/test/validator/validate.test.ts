@@ -38,6 +38,11 @@ describe('validate orchestrator integration', () => {
       resolve(validDir, 'widgets', 'status_bar', 'status_bar.xml'),
       'utf-8',
     );
+    // A user composite carrying §6.6's `wd_` prefix. §13.4 reserved `wd_` until
+    // the Chief Architect un-reserved it (2026-09-16), which is why WO7 had to
+    // rename this fixture's ancestor; it is back so a test covers the
+    // convention rather than its absence (PR-04 WO8c).
+    const badgeXml = readFileSync(resolve(validDir, 'widgets', 'wd_badge', 'wd_badge.xml'), 'utf-8');
 
     const project = parseProjectFile(projectXml, 'u8g2gl.xml').value!;
     const globals = parseGlobalsFile(globalsXml, 'globals.xml').value!;
@@ -48,6 +53,7 @@ describe('validate orchestrator integration', () => {
       componentXml,
       'widgets/status_bar/status_bar.xml',
     ).value!;
+    const badge = parseWidgetManifestFile(badgeXml, 'widgets/wd_badge/wd_badge.xml').value!;
 
     // The fixture ships no copy of u8g2gl_label's manifest (PR-04 WO1): the
     // label comes from the bundled framework manifests, as it does in the CLI.
@@ -55,7 +61,7 @@ describe('validate orchestrator integration', () => {
       project,
       globals,
       screens: [screen],
-      manifests: frameworkRegistry([component]),
+      manifests: frameworkRegistry([component, badge]),
       catalogue: CATALOGUE,
     };
   }
@@ -72,6 +78,17 @@ describe('validate orchestrator integration', () => {
       DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
       DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
     ]);
+  });
+
+  // §6.6 recommends `wd_` for user elements and §13.4 reserved it, so a
+  // composite named as the spec recommends was rejected — the contradiction the
+  // Chief Architect resolved in favour of §6.6 (2026-09-16, ruling 2).
+  it('accepts a wd_-named composite, its wd_-named child, and its instance', () => {
+    const result = validate(loadValidProject());
+    const names = result.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME);
+
+    expect(names).toEqual([]);
+    expect(result.errors).toBe(0);
   });
 
   it('collects multiple errors across files without early bail', () => {

@@ -11,10 +11,15 @@
  *              attribute values match expected primitive types and enum sets.
  *              Enforces schema version "0.4", refusing the superseded "0.3"
  *              with a specific migration diagnostic rather than a generic
- *              mismatch (§15.4, PR-3R WO8). Also enforces the 254-object
- *              structural ceiling per screen ([A-3], [D-21], PR-3R WO7) — a
- *              hard error, not a tunable, since it comes from `parent_index_`
- *              being a `uint8_t`.
+ *              mismatch (§15.4, PR-3R WO8).
+ *
+ *              The 254-object ceiling is **not** checked here. This pass used to
+ *              count objects structurally, and that count predated [D-18]: it
+ *              skipped composite containers and counted `draw=`-only elements,
+ *              both inverted by that decision, so it could report fewer objects
+ *              than a screen really has. Pass 9 enforces the ceiling against
+ *              realisation's exact count instead (`validate-realisation.ts`,
+ *              PR-04 WO8c).
  *
  *              Declarations are checked where they are declared (PR-04 WO7b): an
  *              `<int>` constant's value must be an integer literal within int32,
@@ -29,9 +34,8 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
-import { ROOT_CLASS_MANIFEST, isDrawingElement, type ManifestRegistry } from '../manifest/manifest-registry.js';
+import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
-import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
 const VALID_SCHEMA_VERSION = '0.4';
@@ -62,13 +66,6 @@ const SCHEMA_0_3_MIGRATIONS: readonly string[] = [
   "manifest 'setter=' naming a U8G2 call becomes 'draw=' naming a runtime " +
     'free function ([D-18])',
 ];
-
-/**
- * Structural object ceiling ([A-3], [D-21]). `parent_index_` is a `uint8_t`
- * and `U8G2GL_NO_PARENT` consumes one value, so a screen can hold at most
- * this many objects — a property of the object model, not a tunable.
- */
-const MAX_OBJECTS_PER_SCREEN = 254;
 
 const VALID_PROP_TYPES: ReadonlySet<PropType> = new Set([
   'int',
@@ -103,53 +100,6 @@ const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   '180',
   '270',
 ]);
-
-/**
- * Counts the elements a screen's tree structurally contributes toward the
- * 254-object ceiling ([A-3]).
- *
- * This is a conservative over-count, not the generator's future exact
- * accounting (PR-04's half of [D-21]): every ordinary widget node counts as
- * one, even a `draw=`-only primitive that will ultimately compile to a free
- * function and consume no object slot at all (design_spec.md line ~246). A
- * composite instantiation (found in `composites`) is not itself counted —
- * [D-18] inlines it, so its own template's children are counted in its place
- * — which is what actually lands in the generated object array. Counting
- * every ordinary node can only over-flag a screen relative to the
- * generator's later, more precise count; it can never miss a real overflow,
- * which is the property this hard error exists to guarantee before PR-04
- * exists to compute the exact figure.
- *
- * Composite cycles are guarded against here independently of Pass 2's own
- * cycle detector (`validateReferences`), since Pass 1 runs first and a cycle
- * would otherwise recurse forever; `visiting` breaks the loop and lets the
- * dedicated diagnostic in Pass 2 report it properly.
- */
-function countScreenObjects(
-  nodes: readonly WidgetNodeChild[],
-  manifests: ManifestRegistry,
-  visiting: ReadonlySet<string>,
-): number {
-  let count = 0;
-  for (const child of nodes) {
-    if (!('tag' in child) || typeof child.tag !== 'string') {
-      continue;
-    }
-    const composite = manifests.get(child.tag);
-    if (composite?.view) {
-      if (visiting.has(child.tag)) {
-        continue; // Cycle — reported by Pass 2, not double-counted here.
-      }
-      const nextVisiting = new Set(visiting);
-      nextVisiting.add(child.tag);
-      count += countScreenObjects(composite.view.children, manifests, nextVisiting);
-    } else {
-      count += 1;
-      count += countScreenObjects(child.children ?? [], manifests, visiting);
-    }
-  }
-  return count;
-}
 
 function createDiagnostic(
   code: string,
@@ -549,22 +499,6 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
       }
     }
 
-    // The structural object ceiling ([A-3], [D-21]): `parent_index_` is a
-    // `uint8_t` and `U8G2GL_NO_PARENT` consumes one value, so 254 objects is
-    // where the object model runs out, not a tunable a project can raise.
-    const objectCount = countScreenObjects(screen.view?.children ?? [], manifests, new Set());
-    if (objectCount > MAX_OBJECTS_PER_SCREEN) {
-      diagnostics.push(
-        createDiagnostic(
-          DIAGNOSTIC_CODES.TOO_MANY_OBJECTS,
-          `Screen '${screen.name}' has ${objectCount} objects, exceeding the structural ` +
-            `ceiling of ${MAX_OBJECTS_PER_SCREEN} (parent_index_ is a uint8_t and ` +
-            `U8G2GL_NO_PARENT consumes one value).`,
-          screen.loc,
-          screen.name,
-        ),
-      );
-    }
   }
 
   // --- 4. Composite schema validation ---
