@@ -84,6 +84,7 @@ describe('generate() (PR-04 WO5b)', () => {
       'ui_styles.cpp',
       'ui_fonts.cpp',
       'ui_images.cpp',
+      'ui.cpp',
       'ui_screen_home.cpp',
       'ui_screen_settings.cpp',
     ]);

@@ -1,7 +1,7 @@
 [
   {
     "filename": "u8g2gl_box.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_box\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_box\" required=\"true\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_box\" required=\"true\" help=\"Top edge\" />\n    <prop name=\"width\" type=\"int\" draw=\"u8g2gl_draw_box\" required=\"true\" help=\"Length in pixels\" />\n    <prop name=\"height\" type=\"int\" draw=\"u8g2gl_draw_box\" required=\"true\" help=\"Height in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_box\" default=\"true\" help=\"Whether box is filled or outline frame\" />\n    <prop name=\"radius\" type=\"int\" draw=\"u8g2gl_draw_box\" default=\"0\" help=\"Corner radius in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_width\" type=\"int\" setter=\"width\" />\n    <bind name=\"bind_height\" type=\"int\" setter=\"height\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_box\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_box\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_box\" help=\"Top edge\" />\n    <prop name=\"width\" type=\"int\" draw=\"u8g2gl_draw_box\" help=\"Length in pixels\" />\n    <prop name=\"height\" type=\"int\" draw=\"u8g2gl_draw_box\" help=\"Height in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_box\" default=\"true\" help=\"Whether box is filled or outline frame\" />\n    <prop name=\"radius\" type=\"int\" draw=\"u8g2gl_draw_box\" default=\"0\" help=\"Corner radius in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_width\" type=\"int\" setter=\"width\" />\n    <bind name=\"bind_height\" type=\"int\" setter=\"height\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_button.xml",
@@ -9,7 +9,7 @@
   },
   {
     "filename": "u8g2gl_circle.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_circle\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_circle\" required=\"true\" help=\"Center X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_circle\" required=\"true\" help=\"Center Y coordinate\" />\n    <prop name=\"radius\" type=\"int\" draw=\"u8g2gl_draw_circle\" required=\"true\" help=\"Circle radius in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_circle\" default=\"false\" help=\"Whether circle is filled disc\" />\n    <prop name=\"segments\" type=\"enum\" draw=\"u8g2gl_draw_circle\" values=\"all,upper_left,upper_right,lower_left,lower_right\" default=\"all\" help=\"Circle segments to draw\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_circle\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_circle\" help=\"Center X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_circle\" help=\"Center Y coordinate\" />\n    <prop name=\"radius\" type=\"int\" draw=\"u8g2gl_draw_circle\" required=\"true\" help=\"Circle radius in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_circle\" default=\"false\" help=\"Whether circle is filled disc\" />\n    <prop name=\"segments\" type=\"enum\" draw=\"u8g2gl_draw_circle\" values=\"all,upper_left,upper_right,lower_left,lower_right\" default=\"all\" emit=\"U8G2GL_DRAW_SEGMENT_{VALUE^^}\" help=\"Circle segments to draw\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_clock.xml",
@@ -17,7 +17,7 @@
   },
   {
     "filename": "u8g2gl_ellipse.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_ellipse\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Center X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Center Y coordinate\" />\n    <prop name=\"rx\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Horizontal radius in pixels\" />\n    <prop name=\"ry\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Vertical radius in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_ellipse\" default=\"false\" help=\"Whether ellipse is filled\" />\n    <prop name=\"segments\" type=\"enum\" draw=\"u8g2gl_draw_ellipse\" values=\"all,upper_left,upper_right,lower_left,lower_right\" default=\"all\" help=\"Ellipse segments to draw\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_ellipse\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" help=\"Center X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" help=\"Center Y coordinate\" />\n    <prop name=\"rx\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Horizontal radius in pixels\" />\n    <prop name=\"ry\" type=\"int\" draw=\"u8g2gl_draw_ellipse\" required=\"true\" help=\"Vertical radius in pixels\" />\n    <prop name=\"filled\" type=\"bool\" draw=\"u8g2gl_draw_ellipse\" default=\"false\" help=\"Whether ellipse is filled\" />\n    <prop name=\"segments\" type=\"enum\" draw=\"u8g2gl_draw_ellipse\" values=\"all,upper_left,upper_right,lower_left,lower_right\" default=\"all\" emit=\"U8G2GL_DRAW_SEGMENT_{VALUE^^}\" help=\"Ellipse segments to draw\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_glyph.xml",
@@ -25,7 +25,7 @@
   },
   {
     "filename": "u8g2gl_hline.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_hline\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_hline\" required=\"true\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_hline\" required=\"true\" help=\"Top edge\" />\n    <prop name=\"width\" type=\"int\" draw=\"u8g2gl_draw_hline\" required=\"true\" help=\"Length in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_width\" type=\"int\" setter=\"width\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_hline\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_hline\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_hline\" help=\"Top edge\" />\n    <prop name=\"width\" type=\"int\" draw=\"u8g2gl_draw_hline\" help=\"Length in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_width\" type=\"int\" setter=\"width\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_label.xml",
@@ -41,7 +41,7 @@
   },
   {
     "filename": "u8g2gl_pixel.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_pixel\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_pixel\" required=\"true\" help=\"Pixel X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_pixel\" required=\"true\" help=\"Pixel Y coordinate\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_pixel\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_pixel\" help=\"Pixel X coordinate\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_pixel\" help=\"Pixel Y coordinate\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_progress_bar.xml",
@@ -57,7 +57,7 @@
   },
   {
     "filename": "u8g2gl_vline.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_vline\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_vline\" required=\"true\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_vline\" required=\"true\" help=\"Top edge\" />\n    <prop name=\"height\" type=\"int\" draw=\"u8g2gl_draw_vline\" required=\"true\" help=\"Length in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_height\" type=\"int\" setter=\"height\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_vline\">\n  <api>\n    <prop name=\"x\" type=\"int\" draw=\"u8g2gl_draw_vline\" help=\"Left edge\" />\n    <prop name=\"y\" type=\"int\" draw=\"u8g2gl_draw_vline\" help=\"Top edge\" />\n    <prop name=\"height\" type=\"int\" draw=\"u8g2gl_draw_vline\" help=\"Length in pixels\" />\n    <bind name=\"bind_x\" type=\"int\" setter=\"x\" />\n    <bind name=\"bind_y\" type=\"int\" setter=\"y\" />\n    <bind name=\"bind_height\" type=\"int\" setter=\"height\" />\n  </api>\n</widget>\n"
   },
   {
     "filename": "u8g2gl_xbm.xml",

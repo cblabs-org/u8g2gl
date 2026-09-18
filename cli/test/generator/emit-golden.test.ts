@@ -65,6 +65,7 @@ describe('golden files — the emitted project (§17.1, §13.9)', () => {
       'ui_styles.cpp',
       'ui_fonts.cpp',
       'ui_images.cpp',
+      'ui.cpp',
       'ui_screen_home.cpp',
     ]);
   });
@@ -83,6 +84,7 @@ describe('golden files — the emitted project (§17.1, §13.9)', () => {
     'ui_styles.cpp',
     'ui_fonts.cpp',
     'ui_images.cpp',
+    'ui.cpp',
     'ui_screen_home.cpp',
   ]) {
     it(`matches the golden byte for byte: ${path}`, () => {

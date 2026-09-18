@@ -17,10 +17,10 @@
  *
  *              PR-04 WO8b added the analysis emission reads: every element's
  *              realisation and the flat object model (§13.5, §13.3), and the
- *              static capacities counted from them ([D-21]). **WO9 is where that
- *              analysis first becomes C++**: the project-level files are emitted
- *              in full, and the per-screen units carry their stamp until WO10
- *              fills them in.
+ *              static capacities counted from them ([D-21]). WO9 emitted the
+ *              project-level files from it; WO10 emits `ui.cpp` and every
+ *              screen's unit — objects, parent tables, draw calls — from the
+ *              same realisation and resolution.
  *
  *              Emission can raise diagnostics of its own, for the two defects no
  *              pass can see — an unreadable `<xbm>` asset and a subject's
@@ -249,14 +249,20 @@ export function generate(input: GenerateInput): GenerateResult {
       ? undefined
       : computeCapacities({ globals: input.globals, screens: realisation.screens });
 
-  // --- Step 6: Emit every file that is not per-screen (§13.7) ---
+  // --- Step 6: Emit every file (§13.7) ---
+  // The screens are emitted from the very realisation Pass 9 judged and the very
+  // resolution Pass 6 judged — the pipeline built for this target — so what is
+  // written is what was validated (PR-04 WO10).
   const emitted =
-    capacities === undefined
+    capacities === undefined || realisation === undefined || pipeline === undefined
       ? { files: [] as readonly GeneratedFile[], diagnostics: [] }
       : emitProjectFiles({
           project: input.project,
           globals: input.globals,
           screens: input.screens,
+          realised: realisation.screens,
+          resolved: pipeline.resolution.screens,
+          manifests: input.manifests,
           capacities,
           assets: input.assets ?? new Map<string, string>(),
           generatorVersion: input.generatorVersion,

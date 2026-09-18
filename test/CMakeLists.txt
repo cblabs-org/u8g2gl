@@ -396,6 +396,95 @@ add_test(NAME RealU8g2.RuntimeCompilesAgainstRealHeaders
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target u8g2gl_real_u8g2
 )
 
+# --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
+# test/generated_fixture/ is a small project whose generated/ directory is
+# committed output of `u8g2gl generate` (cli/test/generator/compile-fixture.test.ts
+# fails if regenerating it changes a byte). Building and running it here makes a
+# defect in emission a failing test rather than a surprise in the first real
+# firmware build.
+#
+# The runtime is compiled a second time for it, as u8g2gl_fixture_runtime, with
+# the generated capacities forced into every translation unit — the integration
+# the generated header documents for CMake ([D-21], PR-04 WO4 F5). The pools are
+# sized inside src/u8g2gl_obj.cpp, so including the header only from generated
+# code would leave the library on u8g2gl_config.h's defaults. PUBLIC, so the
+# generated units and the test itself see the same values the library does.
+# support/capacity_probe.cpp is compiled into the library target beside
+# u8g2gl_obj.cpp, and static_asserts the counted total from inside that build.
+#
+# The test links this library and not `u8g2gl`: the two define the same symbols,
+# and the point is to run the fixture on the pool it generated.
+set(U8G2GL_FIXTURE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/generated_fixture)
+set(U8G2GL_FIXTURE_GENERATED ${U8G2GL_FIXTURE_DIR}/generated)
+
+add_library(u8g2gl_fixture_runtime STATIC
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${U8G2GL_FIXTURE_DIR}/support/capacity_probe.cpp
+)
+target_include_directories(u8g2gl_fixture_runtime PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+    ${U8G2GL_FIXTURE_DIR}/support
+)
+target_compile_options(u8g2gl_fixture_runtime PUBLIC
+    "SHELL:-include ${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
+)
+target_compile_options(u8g2gl_fixture_runtime PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+# Every generated unit, listed rather than globbed: a unit the generator stops
+# emitting must fail this build, not silently drop out of it.
+add_executable(test_generated_fixture
+    test_generated_fixture.cpp
+    ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_images.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_gauges.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_home.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_styles.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_subjects.cpp
+)
+target_include_directories(test_generated_fixture PRIVATE
+    ${U8G2GL_FIXTURE_GENERATED}
+)
+
+# The fonts unit is the one generated unit that includes U8G2 by name, and it
+# spells it as real U8G2 does, <U8g2lib.h>. The host stub is U8G2lib.h, so the
+# unit is built on its own, with support/u8g2_case/ first on its include path
+# to forward the real spelling to the stub — warning-free on a case-insensitive
+# filesystem and found at all on a case-sensitive one. It does not link the
+# runtime target, so the stub directory never precedes the shim.
+#
+# A <builtin> font also names U8G2's own table, which real U8G2 declares and
+# the stub does not, so the fixture's two are declared by a forced include.
+add_library(u8g2gl_fixture_fonts OBJECT
+    ${U8G2GL_FIXTURE_GENERATED}/ui_fonts.cpp
+)
+target_include_directories(u8g2gl_fixture_fonts PRIVATE
+    ${U8G2GL_FIXTURE_DIR}/support/u8g2_case
+    ${U8G2GL_FIXTURE_GENERATED}
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_compile_options(u8g2gl_fixture_fonts PRIVATE
+    # SHELL: keeps each flag with its argument; CMake would otherwise
+    # de-duplicate the second -include and pass the header as an input file.
+    "SHELL:-include ${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
+    "SHELL:-include ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.h"
+    -Wall -Wextra -Wpedantic
+)
+
+target_link_libraries(test_generated_fixture PRIVATE
+    u8g2gl_fixture_fonts
+    u8g2gl_fixture_runtime
+    GTest::gtest_main
+)
+target_compile_options(test_generated_fixture PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_generated_fixture)
+
 # All invoke the build system on the same tree; never run them concurrently.
 set_tests_properties(
     VersionGuard.MatchingSchemaMajorCompiles

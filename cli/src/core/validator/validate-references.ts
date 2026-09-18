@@ -232,6 +232,28 @@ function screenLevelPlaceholders(node: WidgetNode): Diagnostic[] {
       );
     }
   }
+
+  // The same fact written as a directive child (PR-04 WO10, closing WO9
+  // finding 8). `<bind_flag_if_eq subject="$p" … />` is a binding exactly as
+  // `bind_text="$p"` is, and at screen level nothing will substitute it either:
+  // 2e skips a `$` subject as "not yet knowable", realisation skips it as naming
+  // no subject, so the element would silently lose its flag binding. Same code
+  // as the attribute form, so a consumer branching on it sees one defect.
+  for (const child of node.children) {
+    if (!('kind' in child) || child.kind !== 'binding') {
+      continue;
+    }
+    const reference = propReferenceIn(child.subject);
+    if (reference !== undefined) {
+      diagnostics.push(
+        unsubstitutedPlaceholder(
+          reference,
+          `'subject' of <${child.type}> on <${node.tag}>`,
+          child.loc ?? node.loc,
+        ),
+      );
+    }
+  }
   return diagnostics;
 }
 

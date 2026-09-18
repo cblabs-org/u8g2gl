@@ -37,6 +37,8 @@
  * - DrawCall:            A free function and its argument list
  * - DrawCallInput:       What assembling one needs
  * - drawCallFor():       Assemble a drawing element's call
+ * - resolvedLiteralFor(): The settled literal for one prop (shared with object setters)
+ * - boundValueFor():     The draw-time subject read for one prop, if a binding drives it
  */
 
 import type { EffectiveManifest } from '../../manifest/manifest-registry.js';
@@ -88,34 +90,50 @@ function argumentError(manifest: EffectiveManifest, prop: PropDef, why: string):
   );
 }
 
-// boundValueFor
-// The draw-time read for a prop a subject drives, or undefined when none does.
-//
-// On a drawing manifest a `<bind>`'s `setter=` names a **prop**, not a method —
-// `<bind name="bind_width" setter="width" />` — which is the two-meanings
-// ambiguity §13.1 criticises, kept for PR-04 by the Chief Architect's ruling and
-// recorded as Q-9 for the next schema bump. It is read that way here because
-// that is what the shipped manifests mean.
-//   prop     — the prop being emitted
-//   bindings — the element's realised bindings
-function boundValueFor(prop: PropDef, bindings: readonly RealisedBinding[]): string | undefined {
+/**
+ * @brief The draw-time read for a prop a subject drives, or undefined when none
+ *        does.
+ *
+ * On a drawing manifest a `<bind>`'s `setter=` names a **prop**, not a method —
+ * `<bind name="bind_width" setter="width" />` — which is the two-meanings
+ * ambiguity §13.1 criticises, kept for PR-04 by the Chief Architect's ruling and
+ * recorded as Q-9 for the next schema bump. It is read that way here because
+ * that is what the shipped manifests mean.
+ *
+ * Exported (PR-04 WO10) with {@link resolvedLiteralFor}, so the screen emitter
+ * can tell before assembling a call whether an argument has any source at all,
+ * by the same rule this module applies. Behaviour is unchanged.
+ *
+ * @param prop     The prop being emitted.
+ * @param bindings The element's realised bindings.
+ * @return The subject read, e.g. `ui_subject_level.get()`.
+ */
+export function boundValueFor(prop: PropDef, bindings: readonly RealisedBinding[]): string | undefined {
   const bound = bindings.find(
     (binding) => binding.kind === 'attribute' && binding.declaration?.setter === prop.name,
   );
   return bound === undefined ? undefined : `${subjectIdentifier(bound.subject)}${SUBJECT_READ_SUFFIX}`;
 }
 
-// resolvedLiteralFor
-// The literal the resolver settled for a prop, as text, or undefined when the
-// author wrote nothing.
-//
-// Read from the resolved model rather than from the attribute, always: the
-// attribute may have been an expression or an anchor, and the resolver is the
-// one thing that knows what it came to ([D-7]). A prop is in exactly one of the
-// three places, by what kind of value it is.
-//   prop     — the prop being emitted
-//   resolved — the resolved element
-function resolvedLiteralFor(prop: PropDef, resolved: ResolvedElement): string | undefined {
+/**
+ * @brief The literal the resolver settled for a prop, as text, or undefined when
+ *        the author wrote nothing.
+ *
+ * Read from the resolved model rather than from the attribute, always: the
+ * attribute may have been an expression or an anchor, and the resolver is the
+ * one thing that knows what it came to ([D-7]). A prop is in exactly one of the
+ * three places, by what kind of value it is.
+ *
+ * Exported (PR-04 WO10) because an object's setter arguments are read exactly
+ * the same way as a draw call's, and a second copy of this lookup in the screen
+ * emitter would be a second place for the two to disagree — the duplication
+ * PROJECT.md's sharing decision exists to prevent. Behaviour is unchanged.
+ *
+ * @param prop     The prop being emitted.
+ * @param resolved The resolved element.
+ * @return The value as text, ready for {@link cppValue}.
+ */
+export function resolvedLiteralFor(prop: PropDef, resolved: ResolvedElement): string | undefined {
   // --- Step 1: The rectangle (§7.2) ---
   if (prop.name === 'x' || prop.name === 'y' || prop.name === 'width' || prop.name === 'height') {
     return resolved.geometry[prop.name]?.value?.toString();

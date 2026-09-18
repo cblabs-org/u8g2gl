@@ -3,3 +3,162 @@
 // schema: 0.4
 // generator: 0.0.0-golden
 // target: primary
+
+#include "ui.hpp"
+
+#include "u8g2gl/u8g2gl_clock.h"
+#include "u8g2gl/u8g2gl_draw.h"
+#include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_xbm.h"
+
+// --- Objects, in document order: index is draw order (§13.3) ---
+static u8g2gl_obj badge;  // 0  composite container
+static u8g2gl_label badge_caption;  // 1  child of badge
+static u8g2gl_label title;  // 2
+static u8g2gl_label lvl_a;  // 3
+static u8g2gl_label lvl_b;  // 4
+static u8g2gl_label lvl_c;  // 5
+static u8g2gl_clock clock;  // 6
+static u8g2gl_xbm wifi;  // 7
+static u8g2gl_label scroller;  // 8
+// "rule" is not here: no object required (§13.5)
+// "level_bar" is not here: no object required (§13.5)
+
+// --- Object and parent tables (§13.3) ---
+// Parallel arrays: parents[i] is the index of the object containing objs[i],
+// or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk
+// up this table at render time.
+static u8g2gl_obj* const ui_screen_home_objs[] = {
+    &badge,
+    &badge_caption,
+    &title,
+    &lvl_a,
+    &lvl_b,
+    &lvl_c,
+    &clock,
+    &wifi,
+    &scroller,
+};
+static const uint8_t ui_screen_home_parents[] = {
+    U8G2GL_NO_PARENT,  // badge
+    0,  // badge_caption
+    U8G2GL_NO_PARENT,  // title
+    U8G2GL_NO_PARENT,  // lvl_a
+    U8G2GL_NO_PARENT,  // lvl_b
+    U8G2GL_NO_PARENT,  // lvl_c
+    U8G2GL_NO_PARENT,  // clock
+    U8G2GL_NO_PARENT,  // wifi
+    U8G2GL_NO_PARENT,  // scroller
+};
+
+// --- init: construct, set properties, apply styles, register bindings (§13.7) ---
+void ui_screen_home_init() {
+    // --- Step 1: Construct ---
+    // Every object above is a default-constructed static (§13.7); nothing to do.
+
+    // --- Step 2: Set properties ---
+    badge.set_coords(0, 0, 60, 12);
+
+    badge_caption.set_coords(2, 1, 56, 10);
+    badge_caption.set_font(ui_font_u8g2_font_6x10_mr);
+    badge_caption.set_align(U8G2GL_ALIGN_LEFT);
+    badge_caption.set_text("Live");
+
+    title.set_coords(0, 16, 64, 10);
+    title.set_font(ui_font_u8g2_font_6x10_mr);
+    title.set_align(U8G2GL_ALIGN_LEFT);
+
+    lvl_a.set_coords(0, 28, 40, 10);
+    lvl_a.set_font(ui_font_u8g2_font_6x10_mr);
+
+    lvl_b.set_coords(44, 28, 40, 10);
+    lvl_b.set_font(ui_font_u8g2_font_6x10_mr);
+
+    lvl_c.set_coords(88, 28, 40, 10);
+    lvl_c.set_font(ui_font_u8g2_font_6x10_mr);
+
+    clock.set_coords(88, 52, 40, 10);
+    clock.set_font(ui_font_u8g2_font_6x10_mr);
+    clock.set_format(U8G2GL_CLOCK_HH_MM);
+    clock.set_blink(true);
+
+    wifi.set_coords(0, 52, 16, 10);
+    wifi.set_src(ui_image_icon_wifi);
+
+    scroller.set_coords(20, 52, 60, 10);
+    scroller.set_font(ui_font_u8g2_font_6x10_mr);
+    scroller.set_text("Hi");
+    scroller.set_long_mode(U8G2GL_LONG_SCROLL);
+    scroller.set_scroll_px_per_sec(20);
+
+    // --- Step 3: Apply styles (§10) ---
+    title.apply_style(ui_style_header);
+    lvl_a.apply_style(ui_style_body);
+
+    // --- Step 4: Register bindings, last, so no observer fires against a
+    // partly configured object (§13.7) ---
+    // Each bind_*() returns false only when a pool is full. The pools are
+    // sized from exactly these bindings ([D-21]), so the result is not checked.
+    title.bind_text(&ui_subject_station_name);
+    lvl_a.bind_width(&ui_subject_level);
+    lvl_b.bind_width(&ui_subject_level);
+    lvl_c.bind_width(&ui_subject_level);
+    clock.bind_time(&ui_subject_system_time);
+    wifi.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+}
+
+// --- activate / deactivate (§12.4) ---
+// Nothing to do: events and focus are not generated until PR-09, and
+// u8g2gl_set_active_screen() already marks the new screen dirty.
+void ui_screen_home_activate() {}
+
+void ui_screen_home_deactivate() {}
+
+// --- tick: the soonest deadline across every object ([D-15]) ---
+uint32_t ui_screen_home_tick(uint32_t now_ms) {
+    uint32_t next = U8G2GL_IDLE;
+    next = u8g2gl_min(next, badge.tick(now_ms));
+    next = u8g2gl_min(next, badge_caption.tick(now_ms));
+    next = u8g2gl_min(next, title.tick(now_ms));
+    next = u8g2gl_min(next, lvl_a.tick(now_ms));
+    next = u8g2gl_min(next, lvl_b.tick(now_ms));
+    next = u8g2gl_min(next, lvl_c.tick(now_ms));
+    next = u8g2gl_min(next, clock.tick(now_ms));
+    next = u8g2gl_min(next, wifi.tick(now_ms));
+    next = u8g2gl_min(next, scroller.tick(now_ms));
+    return next;
+}
+
+// --- render: document order, objects and draw calls interleaved ([D-4]) ---
+void ui_screen_home_render(U8G2& display) {
+    // Every object goes through u8g2gl_render_object(), never obj.render():
+    // the wrapper checks effective visibility, sets the effective clip window
+    // and saves and restores draw state, so nothing paints outside its
+    // container and a hidden container hides its children (§11.3). A draw
+    // call has no object, so its visibility is the build-time guard (§13.5).
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // badge
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // badge_caption
+    u8g2gl_draw_hline(display, 0, 13, 128);  // rule: no object (§13.5)
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // title
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // lvl_a
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // lvl_b
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 5);  // lvl_c
+    u8g2gl_draw_box(display, 4, 40, ui_subject_level.get(), 6, true, 0);  // level_bar: no object (§13.5)
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 6);  // clock
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 7);  // wifi
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 8);  // scroller
+}
+
+// --- The screen descriptor ui_handler() drives (§12.4) ---
+u8g2gl_screen ui_screen_home = {
+    ui_screen_home_objs,
+    ui_screen_home_parents,
+    9,
+    ui_screen_home_init,
+    ui_screen_home_activate,
+    ui_screen_home_deactivate,
+    ui_screen_home_tick,
+    ui_screen_home_render,
+    false,
+};

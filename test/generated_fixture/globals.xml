@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <!-- §13.12's subjects. -->
+        <string name="station_name" value="Euston" max_len="16" />
+        <string name="service_message" value="On time" max_len="32" />
+        <bool name="wifi_connected" value="true" />
+        <time name="system_time" value="0" />
+
+        <!-- Read only by draw calls on the gauges screen, so each costs exactly
+             one frame-dirty observer and no pool slot (§13.5, [D-21]). -->
+        <int name="level" value="10" />
+
+        <!-- Drives the panel composite's hidden flag. -->
+        <bool name="show_panel" value="false" />
+    </subjects>
+
+    <styles>
+        <style name="note" align="right" />
+    </styles>
+
+    <fonts>
+        <!-- §13.12 names BDF fonts, which PR-04 refuses (PR-04b); U8G2
+             built-ins stand in for them. -->
+        <builtin name="u8g2_font_6x10_mr" />
+        <builtin name="u8g2_font_5x7_mr" />
+    </fonts>
+
+    <images>
+        <xbm name="icon_wifi" src="assets/icon_wifi.xbm" />
+    </images>
+</globals>

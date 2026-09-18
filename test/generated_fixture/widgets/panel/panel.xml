@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A composite holding one draw-call element and one object, so that hiding
+     the container proves both halves of §13.5: the object is hidden by the
+     render wrapper's ancestor walk, the draw call by its build-time guard. -->
+<widget name="panel">
+    <api>
+        <prop name="caption" type="string" default="Note" />
+    </api>
+
+    <view>
+        <u8g2gl_hline name="edge" x="0" y="0" width="#parent_width" />
+        <u8g2gl_label name="note" x="0" y="2" width="#parent_width" height="10"
+            font="u8g2_font_6x10_mr" text="$caption" style="note" />
+    </view>
+</widget>
