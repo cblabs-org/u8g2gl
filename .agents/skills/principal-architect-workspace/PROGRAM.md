@@ -948,3 +948,63 @@ only the obvious paths, and deferred a question that was answerable. The
 sibling projects that build real firmware were the obvious place to look. When
 something turns out to be missing, check the places that actually depend on it
 before concluding it's absent.
+
+---
+
+## Session — 2026-09-18 · Prior-art review: UiUiUi
+
+The owner asked how U8G2GL compares with
+[UiUiUi](https://github.com/dirkhillbrecht/UiUiUi), then asked for the designs to
+be updated with the lessons. The owner also confirmed the Chief Architect edits
+the specification directly: *"You own the specification, so you can update those
+files directly."* The previous standing rule, "always hand off to a PA", still
+applies to implementation and record-keeping inside a PR.
+
+### Finding
+
+UiUiUi is the closest prior art to U8G2GL's **runtime**: static allocation,
+U8G2 only, monochrome widgets. So the runtime isn't what makes U8G2GL different;
+the toolchain is, and above all the editor. **concept.md §2.2 had already
+reached the adoption conclusion** ("structure alone is not what people want —
+visual tooling is"). The review adds evidence — 39 stars, no commits since
+October 2023 — and four technical lessons.
+
+### Edits
+
+- **concept.md** — §2.2 dormancy evidence; §4.2 table row updated; a "What
+  UiUiUi teaches" paragraph with the four lessons.
+- **design_spec [D-4]** — a *candidate refinement* note, with the decision
+  unchanged. Redraw stays full-frame; only sending the dirty tiles is open. The
+  dirty region must include each object's **previous** bounds, because a moved
+  or hidden element changes pixels where it used to be. The ~25 ms I²C figure is
+  labelled an estimate.
+- **design_spec §7.2** — prior art for the `<row>`/`<col>` deferral: UiUiUi built
+  the runtime preferred-size layout [D-7] rejects, and its author calls it
+  "clumsy".
+- **design_spec §21** — **Q-14** (send only dirty tiles; measure on I²C and SPI)
+  and **Q-15** (a one-of-N "cards" element; deferred to E-3).
+- **ui_spec §7.3** — a pointer to Q-15, so E-3's navigation design finds it.
+
+### Correction made while editing
+
+The first draft of Q-15 called cards "relevant to … modal navigation". ui_spec
+§7.3 excludes modals specifically because they need overlay rendering and z-order
+beyond document order ([D-4]). A cards element needs neither: it shows one child,
+in document order. The wording was loose enough to read as a back door to modals,
+so Q-15 now says plainly that cards is not a modal, and ui_spec §7.3 says the
+same.
+
+### Coordination
+
+**Q-13 is reserved** for PR-04's `$prop` interpolation question (ruling 5 of
+2026-09-16), which PR-04's PA is adding on its branch. When it rebases onto this
+commit, Q-13 belongs after Q-12 and before Q-14.
+
+### Chief Architect note
+
+UiUiUi overlaps U8G2GL in exactly the runtime, and the runtime is what PR-07's
+gate measures. That strengthens **CA-2**: a GO would show U8G2GL can do what
+UiUiUi already does, and say nothing about the editor that differentiates it.
+
+These edits were made directly on `main`, through a worktree. PR-04's PA was on
+`u8g2gl-generator/wo11-editor-target`, and its tree was not touched.

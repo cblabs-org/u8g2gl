@@ -287,6 +287,13 @@ A read-write graph. Nodes are screens; edges are `<screen_load_event>` and `<scr
 | **Carousel configuration** | `CarouselEngine` and `BoardCatalog` are esp32-app-foundation concepts. Encoding one consumer's navigation policy into a general framework is the heritage anchoring [A-1] rejects — it belongs in `modules/U8G2GLDisplay` |
 | **Modals / overlays** | Not a framework capability. Needs overlay rendering, z-order beyond document order ([D-4]), a focus stack and dismissal semantics — a `[D-n]` decision and runtime work must precede any editor surface |
 
+**Related, but not excluded — a one-of-N container** ([design_spec.md](design_spec.md)
+Q-15). Showing exactly one of several children, chosen by an integer subject, is
+neither of the exclusions above. It is a *mechanism* that carousel policy in
+`modules/U8G2GLDisplay` could drive, and it is not a modal: it draws in document
+order, so it needs no overlay rendering or z-order. It is deferred until E-3's
+navigation design needs it; this pointer is here so that design finds it.
+
 ---
 
 ## 8. The Canvas

@@ -42,7 +42,7 @@ AI-assisted authoring is a welcome second-order effect — a schema good enough 
 Nobody has built a declarative-to-codegen pipeline with a visual designer for U8G2. Two readings of that:
 
 - **Lopaka** (~1700 stars) is the most successful tool in the space and is a *drawing tool* — it generates flat procedural code with no bindings, components, multi-screen support or reuse, and no project format to round-trip. Its popularity shows appetite for visual U8G2 tooling; its limits show what is missing.
-- **PixelUI** paused development and **UiUiUi** remains niche. Both offered structure without visual tooling; neither found an audience. That is at least consistent with the reading that *structure alone* is not what people want — visual tooling is.
+- **PixelUI** paused development and **UiUiUi** remains niche — 39 stars, and no commits since October 2023 (checked 2026-09-18). Both offered structure without visual tooling; neither found an audience. That is at least consistent with the reading that *structure alone* is not what people want — visual tooling is.
 
 The addressable audience is still genuinely small: people who need monochrome specifically and have UI complex enough to justify a framework. Industrial HMI, e-paper dashboards, departure boards. This should be treated as a project built primarily for its author, with wider use as upside — but the thing being built for the author is the editor, not the pipeline underneath it.
 
@@ -109,10 +109,30 @@ departures-board is the acceptance test. [design_spec.md §20](design_spec.md) m
 | Library | Approach | Strengths | Gaps |
 |---|---|---|---|
 | **[MUI](https://github.com/olikraus/u8g2/wiki/muiref)** (official) | Menu/form system in U8G2 | <0.5 KB RAM, PROGMEM menus, official | Menus only, no general layout, no tooling |
-| **[UiUiUi](https://github.com/dirkhillbrecht/UiUiUi)** | Static widget framework | Zero heap, automatic layout, partial redraws | C++ only, no declarative layer or editor |
+| **[UiUiUi](https://github.com/dirkhillbrecht/UiUiUi)** | Static widget framework | Zero heap, automatic layout, partial redraws that send only changed 8×8 tiles | C++ only, no declarative layer or editor. v0.9.2; dormant since October 2023 |
 | **[PixelUI](https://github.com/Lawrence-Link/PixelUI)** | Component framework | View stack, animation, fixed-point math | **Development paused** |
 | **[GEM](https://github.com/Spirik/GEM)** | Menu library | Multi-level graphic menus | Menu only |
 | **[AtomUI](https://github.com/liux-pro/AtomUI)** | Console UI | SDL2 desktop simulator | Hardcoded, not general-purpose |
+
+**What UiUiUi teaches (reviewed 2026-09-18).** It is the closest prior art to
+U8G2GL's *runtime*: static allocation, U8G2 only, monochrome widgets. So the
+runtime isn't what makes U8G2GL different — the toolchain is, above all the
+editor (§2.1). Without the editor, U8G2GL would be a heavier UiUiUi written in
+XML. Four specific lessons:
+
+- **Send only what changed.** UiUiUi redraws and sends only the tiles that
+  changed. [D-4]'s full-frame *redraw* stays, but sending only dirty tiles is now
+  open as design_spec Q-14, pending measurement.
+- **Runtime flow layout is where the complexity went.** Its own README calls its
+  preferred-size calculation "clumsy". That supports [D-7] and the deferral of
+  `<row>`/`<col>` (design_spec §7.2).
+- **A one-of-N container is useful.** `UICards` shows exactly one child; U8G2GL
+  would need `bind_flag_if` on every child. Recorded as design_spec Q-15, and
+  deferred until navigation design needs it.
+- **Hand-written trees are fragile.** A UiUiUi UI is a linked tree declared by
+  hand in reverse order, from the innermost widget out, so getting the order wrong
+  is a bug the author has to find. A generator emitting a flat array removes that
+  class of error, which makes code generation more than a convenience.
 
 ### 4.3 Architectural references worth borrowing from
 
