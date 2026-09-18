@@ -1278,6 +1278,64 @@ budget, `--json` and determinism, which is what it was scoped for.
 **Placement.** Both are independent of WO11 (editor target), which proceeds now. Recommended
 order: WO11 → WO10b → WO11b → WO12. Approving both takes the ledger to **twenty**.
 
+### Lessons distilled — checkpoint 2026-09-18
+
+What PR-04 taught that the reviews above record only in passing. Written for whoever resumes
+after compaction.
+
+**1. Interruptions are routine; the resume protocol works.** Five workers hit an API usage limit
+mid-flight (WO4, WO7, WO4c, WO10, WO11). Nothing was lost once, because the protocol never
+varied: snapshot the tree (`git log --oneline <dispatch>..HEAD`, `git status --short`); never
+commit, stash or discard on a worker's behalf; resume the **same** agent with `SendMessage`
+(reload its schema with `ToolSearch` after a session restart), telling it exactly what state it
+left. A fresh agent reconstructing a half-finished diff is the riskier path. After compaction the
+old agents are gone — re-dispatch fresh from the committed WORKORDER.
+
+**2. The PA's own premises were wrong four times, all the same way.** WO7's boundary built the
+mangler but left out its two call sites, so collisions went unenforced. WO4c's first ruling said
+"skip" a negative origin, which hid visible shapes; the correction said "wrap everything", which
+broke `drawLine`. WO10's work order assumed WO7b's rule caught a missing *size* when it catches a
+missing *position*. **Each was a rule stated about a category ("U8G2", "geometry", "the
+resolver") that held for most members and failed for one.** The fix every time was reading the
+specific path — `u8g2_line.c`, the call graph, the rule's actual condition. Trace an objective to
+the exact surface that delivers it, and a rule to the exact code path it governs.
+
+**3. Workers were right to stop, and the boundary is why.** Every PA error above was caught by a
+worker declining to act outside its box and reporting instead. Tight boxes plus "stop and report
+means record and continue" produced better outcomes than loose boxes would have. Keep them tight.
+
+**4. The PA's end-to-end check found what green suites did not.** The 254-object ceiling was
+missed entirely (256 objects passed both commands) though every test was green; bound text never
+draws though the fixture test was green. Both surfaced only by running the built CLI, or reading
+the runtime, against the claim. Always run the headline behaviour end to end yourself.
+
+**5. The PA's own tooling misled it twice, harmlessly — but only because it re-checked.** A grep
+for a string-valued `"target"` falsely suggested WO7b's `--json` field was missing (it is an
+object). A zsh `C="node x"; $C` and a cwd that had drifted into `cli/` made two end-to-end runs
+fail for reasons that had nothing to do with the work. Before reporting a defect, confirm the
+check itself is sound; use absolute paths.
+
+**6. Duplication is where defects hide — five times now in PR-04.** The ceiling's second count
+(wrong in both directions), two reserved-prefix lists, three spellings of "drawing element", two
+widget/composite prop blocks (seven asymmetries), and a `.cmake` define list that would have
+spelled the capacities twice. WO8c now scans the source for a second count or prefix list. When a
+work order touches a rule, ask where else it is spelled.
+
+**7. Vacuous green keeps recurring.** WO8a's passes silently fell back to their own pipelines and
+all 642 tests stayed green; lint's unused-variable error caught it. Guards that assert a *count*
+over the real function (expansions, emitted `render_object` calls, symbols in a binary) are what
+stop it. Workers now also say how many base failures are behavioural versus "the module does not
+exist yet" — keep asking for that split.
+
+**8. Never touch a tree a worker owns.** When the Chief Architect's rulings arrived mid-WO8b, the
+spec edits waited until the worker finished, then went on their own PA branch (`pa-ca-rulings`).
+Editing underneath a running worker risks its `git add` sweeping PA files into its commit.
+
+**9. How the owner works.** Approves splits when the reviewability case is made; delegates
+placement when asked ("whichever you prefer" — then the PA chooses and records why); relays Chief
+Architect rulings by pasting them into this session. Record each ruling's provenance and each
+approval verbatim. Ask before anything outward-facing: pushing, opening the PR, filing issues.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1297,6 +1355,7 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-18 — **Checkpoint for context compaction.** WO11's worker hit the usage limit before changing anything (branch clean at `ad8062f`). `main` unchanged at `5f2574f`; the stack contains it. Lessons distilled below; `BRIDGE-PR04-CHECKPOINT.md` written so a fresh session can resume. WO10b and WO11b still await the owner.
 - 2026-09-18 — **WO10 complete** (`3a58ab3`) — **generated code compiles and runs in the C++
   suite.** Interrupted once by an API usage limit before touching anything, and resumed.
   Verified independently. **Stop-and-report 1 confirmed in the runtime: a label bound to a
