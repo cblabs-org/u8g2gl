@@ -5,7 +5,7 @@ title: "Editor target: class registry, property thunks, draw-by-name, scene desc
 branch: u8g2gl-generator/wo11-editor-target
 base: u8g2gl-generator/wo10-emit-screens
 complexity: standard
-status: draft — PA revises against WO10's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO11 — Editor target
@@ -58,6 +58,21 @@ The editor is the point of this programme. ui_spec §15 names editor-target
 generation as PR-04 scope. This work order is last among the emitters so that it
 reuses finished shared helpers rather than growing a second copy of them — PR-3R's
 evidence is that the second copy is where the defect hides.
+
+## What WO9 and WO10 built, and one known runtime defect
+
+- **Reuse, never re-spell:** `emit/value.ts` (the §13.2 value spelling), `emit/draw-args.ts`
+  (draw-argument order) and `emit/placement.ts` (container-relative → device-absolute
+  coordinates). The parity test below is only meaningful if the editor path goes through the
+  same three.
+- **The firmware fixture** is committed at `test/generated_fixture/` and compiled in the C++
+  suite; its goldens pin the generator stamp to `0.0.0-golden`. Build the parity test on that
+  fixture.
+- **Known runtime defect — do not fix it here.** `u8g2gl_label::render()` draws only `text_`;
+  a label bound to a subject never draws the subject's value (confirmed by the PA; proposed as
+  WO10b). Your parity test must not assert bound text. Literal `text` set by name is fine —
+  both targets reach `set_text()`. If the defect blocks a line item, record it and continue.
+- **Run every suite alone** — never alongside another suite or build (Standing instructions).
 
 ## Line-Item Instructions
 

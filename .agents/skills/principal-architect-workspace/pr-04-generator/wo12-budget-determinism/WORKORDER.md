@@ -82,6 +82,11 @@ by test rather than asserted.
       empty directories behind; remove a directory only when the writer emptied it.
 - [ ] **Carried from WO5b — usage errors under `--json`.** `generate` usage errors are
       prose on stderr even with `--json`. Under [D-16] they are JSON with a stable code.
+- [ ] **Carried from WO10 — the version proof changes.** WO10's goldens and committed fixture
+      pin the generator stamp to `0.0.0-golden`, so bumping `package.json` does **not** change
+      them. Prove the bump instead by generating a fresh project and asserting its header stamps
+      `0.7.0`, and by asserting the goldens still regenerate byte-identically at the pinned stamp.
+      Do not unpin the goldens.
 - [ ] **CLI 0.7.0** in `package.json`; generated headers carry it; regenerate and
       commit the WO10 fixture and golden files — that version change is the only
       diff, which is the proof the bump is the only output change.

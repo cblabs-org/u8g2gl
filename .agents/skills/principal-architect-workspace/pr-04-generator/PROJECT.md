@@ -78,7 +78,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO8b — realisation and capacities](wo8b-realisation-capacities/WORKORDER.md)** ✅ `6c2c909` · base WO8a · standard · [D-18], [D-21], `_n<N>`
 - [x] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** ✅ `ae1e7a9` · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
 - [x] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** ✅ `136c0c2` · base WO8c · standard · §13.7
-- [ ] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** · base WO9 · standard · §13.7, §13.8, §17.1
+- [x] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** ✅ `3a58ab3` · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11 · standard · §13.9, §18, [D-16]; CLI 0.7.0
 
@@ -1192,6 +1192,92 @@ prop strict, `hide="yes"` is now reported at the attribute the author wrote rath
 substituted `hidden="$hide"` inside the template. Still exactly one diagnostic, and closer to
 the author.
 
+### WO10 — complete (`3a58ab3`) — generated code compiles and runs
+
+**Verified independently:** commits only on the WO10 branch; runtime sources, `docs/`,
+`extern/` and `PROGRAM*.md` untouched. Suites run one after another, never together: C++ 305 →
+**315** with zero warnings, ten of them the generated fixture's; CLI 776 → **824** across 54
+files, `tsc` and lint clean.
+
+- **No direct `render()` calls.** `.render(` appears only in comments; `u8g2gl_render_object`
+  is emitted 6 times in the home screen and 4 in the gauges screen. The worker also proved the
+  check is not vacuous by temporarily emitting `ghost.render(display);` — both hidden-object
+  tests failed.
+- **The generated capacities reach the library's own compilation.** The runtime is compiled a
+  second time as `u8g2gl_fixture_runtime` with the generated config force-included (WO9's
+  design). A probe compiled *into that library* asserts the binding total equals 5, counted by
+  hand; without the forced include the library fails to compile with `'(32 * 8) == 5'`. [D-21]
+  is proven, not assumed.
+- **Regeneration matches the committed fixture byte for byte**, apart from the one line the
+  goldens deliberately pin: `// generator: 0.0.0-golden` where a live run stamps `0.6.0`, so a
+  version bump does not churn the fixture. **WO12's plan assumed the opposite** and is adjusted.
+- `.vite/` at the repo root is vitest's cache and is already git-ignored — finding 13 closed.
+
+**Stop-and-report 1 — confirmed by the PA, and it is a runtime defect in merged code.** When a
+bound subject changes, `u8g2gl_on_text_binding_change` (`src/u8g2gl_obj.cpp:417`) fires, and
+its own comment says "the widget reads the subject directly when it renders". But
+`u8g2gl_label::render()` draws only `text_`, which only `set_text()` assigns, and nothing
+assigns it from the subject. So `bind_text` marks the frame dirty and **nothing appears** — for
+string subjects and formatted int subjects alike, since PR-01/PR-03. §13.12's `msg` and
+`bar_location` would be blank on a device whatever the generator emits. The fixture test is
+green because it does not assert bound text, and the worker said so rather than asserting
+around it. **Not the generator's defect, and outside every PR-04 box so far → proposed WO10b.**
+
+**Stop-and-report 2 — reproduced, and it was the PA's premise.** WO10's work order said WO7b's
+"fully positioned" rule would catch a box whose `required` size was dropped. It catches a
+missing *position*, not a missing *size*: a box with no `width` and no binding now passes
+`validate` (exit 0) and is refused by `generate` (exit 1, `U8G2GL_MISSING_REQUIRED`). No bad code
+ships, but the validate/generate journey split is broken → **proposed WO11b**.
+
+**Decisions accepted:** a `ui.cpp` unit for `ui_init()` and the one-per-subject frame-dirty
+observers; `emit/placement.ts` translating the resolver's container-relative coordinates into
+the runtime's absolute ones, reusable by WO11; screen descriptor `ui_screen_<name>`; every object
+ticked, since manifests no longer declare which animate; the fixture on 128×64 to match the stub,
+with §13.12 checked line for line at 256 wide in the CLI tests; two shared-helper exports with no
+behaviour change; the `generate.ts` wiring excursion (+12/−6), disclosed.
+
+**Triage:**
+
+| # | Finding | Placed |
+|---|---|---|
+| SR1 | A label never draws a bound subject | **Proposed WO10b** |
+| SR2 | `validate` accepts a missing size that `generate` refuses | **Proposed WO11b** |
+| 1 | The manifest parser invents `set_<name>` setters for a composite's template parameters; emission filters them | **Proposed WO11b** |
+| 2 | A bound position inside an offset container is treated as absolute; the spec is silent | **Chief Architect** |
+| 3 | A container moved by a binding leaves its children behind | **Chief Architect** — with 2: [D-20] says absolute children only, but not absolute to *what* once emitted coordinates are device-absolute |
+| 4 | §13.7's file list names neither `ui.cpp` nor WO9's styles unit | **Chief Architect** — with WO9's §13.7 item |
+| 5 | The screen descriptor name is not in `mangle.ts`'s collision table, so screen `a_objs`'s descriptor can collide with screen `a`'s object table | **Proposed WO11b** |
+| 6 | §13.4 checks C++ keywords but not C library names: an element named `clock` collides with `clock()`, and a WO9 golden already has one | **Chief Architect** — a §13.4 rule change (reserve the names, or prefix emitted objects); the fix follows the ruling |
+| 7 | The stub is named `U8G2lib.h`, real U8G2 ships `U8g2lib.h` | **Checked by the PA — cosmetic.** The runtime headers try both spellings, so a case-sensitive build finds the real header. Rename the stub at the end-of-PR review |
+| 8 | `style_*` overrides are never validated, except `style_font` | **Proposed WO11b** |
+| 9 | Flag directives are under-validated: missing `ref_value`, `gt`/`lt` on bool, string or time subjects, and unknown suffixes all pass, and emission refuses them | **Proposed WO11b** |
+| 10 | `bind_text_fmt` on a string subject validates, but the emitted call would not compile | **Proposed WO11b** |
+| 11 | A literal `hidden` on a drawing element is rejected; only the bound form works | **Accepted** — WO3's design: a drawing element is hidden through `<bind_flag_if_*>` (§6.2) |
+| 12 | Following §13.7's order literally, a named style's font overrides an element's own `font=` | **Chief Architect** — precedence |
+| 13 | `.vite/` at the repo root | **Closed** — vitest's cache, git-ignored |
+
+### Proposed WO10b and WO11b (awaiting the owner)
+
+**WO10b — bound text reaches the label (runtime).** `u8g2gl_label` renders a bound subject:
+a string subject's current value, and an int subject formatted through its `bind_text_fmt`,
+read **at render time** — which is what `u8g2gl_on_text_binding_change`'s own comment already
+promises, and needs no per-label buffer for the string case. A formatted int needs somewhere to
+format into: a stack buffer inside `render()` costs no RAM per object, but `dots` and `scroll`
+modes need the text width, so the worker states the choice and its cost. Tests assert the stub's
+draw history contains the bound text, and the generated fixture's `msg` shows it. Runtime-only,
+touching no file WO11 or WO12 uses.
+
+**WO11b — validator hardening.** The validate/generate asymmetries and silent acceptances WO9
+and WO10 surfaced: a missing size (SR2), invented template setters (1), the screen-descriptor
+collision (5), `style_*` overrides (8), flag directives (9), `bind_text_fmt` on a string (10),
+plus WO9's carries — `<builtin>` font names checked against U8G2's real font symbols, subject
+`value` typing and string `max_len`, `StyleDecl.truncate`, and the `UNRESOLVED_GEOMETRY` and
+`notYetSupportedPolicy` renames. **This takes the validator carries out of WO12**, leaving it
+budget, `--json` and determinism, which is what it was scoped for.
+
+**Placement.** Both are independent of WO11 (editor target), which proceeds now. Recommended
+order: WO11 → WO10b → WO11b → WO12. Approving both takes the ledger to **twenty**.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1211,6 +1297,12 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-18 — **WO10 complete** (`3a58ab3`) — **generated code compiles and runs in the C++
+  suite.** Interrupted once by an API usage limit before touching anything, and resumed.
+  Verified independently. **Stop-and-report 1 confirmed in the runtime: a label bound to a
+  subject never draws its text** — a defect in merged code since PR-01/PR-03. **WO10b
+  (runtime) and WO11b (validator hardening) proposed to the owner, not added.** WO11
+  dispatched on `u8g2gl-generator/wo11-editor-target`.
 - 2026-09-17 — **WO9 complete** (`136c0c2`) — **the generator emits C++.** Verified
   independently, including generating a project end to end, reading the emitted units and
   confirming byte-identical regeneration. WO10 dispatched on
