@@ -1,0 +1,99 @@
+---
+work_order: WO11b
+project: pr-04-generator
+title: "Validator hardening: validate never passes what generate refuses"
+branch: u8g2gl-generator/wo11b-validator-hardening
+base: u8g2gl-generator/wo10b-bound-text
+complexity: standard
+status: draft — PA revises against WO10b's Completion Report, and the owner's confirmation of WO11b, before dispatch
+---
+
+# WO11b — Validator hardening
+
+## Authorization
+
+Part of PR-04 (`pr-04-generator`). Verify, from committed files: the human's approval of PR-04 in
+`../PROJECT.md` under "Human Approval"; that `../PROJECT.md` records **WO11b as approved by the
+owner** ("Owner approval — WO10b and WO11b", including any recorded confirmation); and that this
+WORKORDER's `status` is `dispatched`. If any is missing, record it in the Completion Report and stop.
+
+## Role Definition
+
+> You are an expert senior software engineer and execution-focused worker agent.
+> You are NOT the Principal Architect. Do not make architectural decisions, do
+> not branch beyond the one named below, do not plan beyond this checklist.
+
+## Branch
+
+**Branch**: `u8g2gl-generator/wo11b-validator-hardening` · **Base**: `u8g2gl-generator/wo10b-bound-text`
+
+`git branch --show-current` **as its own command immediately before every commit**.
+
+## COMMIT ON A GREEN BUILD
+
+Authorized to commit on a green build. Do NOT stop to ask for approval. Do not push or tag.
+
+## Standards
+
+`u8g2gl-standards` skill, `references/typescript.md`. Isomorphic core. Element knowledge is data,
+never code. One pipeline: never a second count, evaluator, expansion or prefix list.
+
+## Design authority
+
+design_spec §7.2, §8.1–§8.4, §13.2, §13.4, §14.1; PROJECT.md decision 1 (validate warns, generate
+errors, for refusals). "Stop and report" means record it, do not choose, continue.
+
+---
+
+## Objective
+
+`validate` never passes a document `generate` refuses, and no mistake reaches emission silently.
+Each item below is a gap WO9 or WO10 found; each gets a test that fails at the base.
+
+## Line-Item Instructions
+
+- [ ] **A missing size (WO10 SR2).** WO10 dropped `required` on drawing geometry a binding or anchor
+      can supply; WO7b's rule catches a missing *position*, not a missing *size*, so a box with no
+      `width` and no binding passes `validate` and `generate` refuses it. A size neither written,
+      bound nor anchor-derived is an error in `validate`.
+- [ ] **Invented template setters (WO10 f1).** The manifest parser invents `set_<name>` setters for
+      a composite's template parameters; emission filters them. Stop inventing them.
+- [ ] **Screen-descriptor collision (WO10 f5).** `ui_screen_<name>` is not in `mangle.ts`'s
+      collision table, so screen `a_objs`'s descriptor can collide with screen `a`'s object table.
+- [ ] **`style_*` overrides (WO10 f8)** are never validated except `style_font`. Validate each against
+      the style property it overrides.
+- [ ] **Flag directives (WO10 f9):** a missing `ref_value`; `gt`/`lt` on a bool, string or time subject;
+      and unknown `bind_flag_if_*` suffixes all pass today while emission refuses them.
+- [ ] **`bind_text_fmt` on a string subject (WO10 f10)** validates, but the emitted call would not
+      compile. Reject it, naming the subject's type.
+- [ ] **`<builtin>` font names (WO9 f5).** A `<builtin>` name is aliased verbatim, so a typo is a link
+      error in the user's firmware build. Check it against U8G2's own font symbols from the pinned
+      `extern/u8g2` — derived as data, the way [D-14] derives the display catalogue, never a
+      hand-kept list.
+- [ ] **Subject values (WO9 f6):** a subject's initial `value` is type-checked; a string's initial value
+      is checked against its `max_len`; remove `truncate` from `StyleDecl`, which [D-19] deleted.
+- [ ] **Two renames (WO9 f7, WO8c f3):** `U8G2GL_UNRESOLVED_GEOMETRY` is now used for non-coordinate
+      `int` props too, and `notYetSupportedPolicy` also carries realisation's refusal severity. Rename
+      each to what it now means, keeping diagnostic codes stable if they are public (say which).
+
+## Strict Boundary Box
+
+**In scope:** `cli/src/core/validator/`, `cli/src/core/resolver/mangle.ts` (the descriptor only),
+`cli/src/core/parser/parse-widget-manifest.ts` (template setters only), `cli/src/core/schema/`
+(`StyleDecl`, diagnostic names), `cli/src/node/` and `cli/src/data/` (the U8G2 font-symbol data
+build only), `cli/test/`, this WORKORDER.
+
+**Do NOT touch:** runtime C++; manifests; emission, except to delete refusals the validator now
+makes unreachable (say which); `docs/`; `PROGRAM*.md`. Run every suite alone.
+
+## Verification Requirement
+
+- [ ] CLI `vitest`, `tsc`, lint clean; C++ unchanged and green
+- [ ] Each item has a test that fails at the base (say how many behaviourally)
+- [ ] Diff limited to the Boundary Box
+
+---
+
+## Completion Report
+
+*To be filled in by the worker.*

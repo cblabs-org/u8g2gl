@@ -3,9 +3,9 @@ work_order: WO12
 project: pr-04-generator
 title: "Budget report, generate --json contract, determinism, CLI 0.7.0"
 branch: u8g2gl-generator/wo12-budget-determinism
-base: u8g2gl-generator/wo11-editor-target
+base: u8g2gl-generator/wo11b-validator-hardening
 complexity: standard
-status: draft — PA revises against WO11's Completion Report before dispatch
+status: draft — PA revises against WO11b's Completion Report before dispatch
 ---
 
 # WO12 — Budget, `--json`, determinism
@@ -25,7 +25,7 @@ under "Human Approval" (owner's own words, timestamped) and that this WORKORDER'
 ## Branch
 
 **Branch**: `u8g2gl-generator/wo12-budget-determinism`
-**Base**: `u8g2gl-generator/wo11-editor-target`
+**Base**: `u8g2gl-generator/wo11b-validator-hardening`
 
 `git branch --show-current` **as its own command immediately before every commit**.
 
@@ -87,9 +87,9 @@ by test rather than asserted.
       them. Prove the bump instead by generating a fresh project and asserting its header stamps
       `0.7.0`, and by asserting the goldens still regenerate byte-identically at the pinned stamp.
       Do not unpin the goldens.
-- [ ] **CLI 0.7.0** in `package.json`; generated headers carry it; regenerate and
-      commit the WO10 fixture and golden files — that version change is the only
-      diff, which is the proof the bump is the only output change.
+- [ ] **CLI 0.7.0** in `package.json`; a freshly generated project's header carries it.
+      The goldens and committed fixture stay pinned at `0.0.0-golden` and do **not**
+      change — the proof is the carried item above, not a regenerated diff.
 
 ## Strict Boundary Box
 

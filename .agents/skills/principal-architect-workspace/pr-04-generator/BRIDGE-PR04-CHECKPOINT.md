@@ -1,4 +1,4 @@
-# Bridge prompt — PR-04 Principal Architect, checkpoint 2026-09-18
+# Bridge prompt — PR-04 Principal Architect, checkpoint 2026-09-18 (updated with owner approvals)
 
 **Paste this into a fresh session to resume PR-04 as its Principal Architect (Tier 2).**
 It is self-contained: read it, then the files it names, and you can act without the
@@ -59,25 +59,34 @@ submission with `git rebase --update-refs --onto main <old-base> <tip>` if `main
 ### What is left
 
 1. **WO11 — editor target.** Re-dispatch (below). Its WORKORDER is committed and `dispatched`.
-2. **WO10b — bound text reaches the label (runtime).** *Proposed, awaiting the owner.* A defect
+2. **WO10b — bound text reaches the label (runtime).** **Owner-approved 2026-09-18.** A defect
    in merged code, confirmed by the PA: `u8g2gl_label::render()` draws only `text_`, which nothing
-   assigns from a bound subject, so `bind_text` shows nothing on a device.
-3. **WO11b — validator hardening.** *Proposed, awaiting the owner.* Validate/generate asymmetries
-   and silent acceptances from WO9/WO10, plus the validator carries currently parked in WO12.
+   assigns from a bound subject, so `bind_text` shows nothing on a device. WORKORDER drafted at
+   `wo10b-bound-text/WORKORDER.md`.
+3. **WO11b — validator hardening.** **Owner-approved 2026-09-18 — see the reading note below.**
+   Validate/generate asymmetries and silent acceptances from WO9/WO10, plus the validator carries
+   that were parked in WO12. WORKORDER drafted at `wo11b-validator-hardening/WORKORDER.md`.
 4. **WO12 — budget, `--json`, determinism, CLI 0.7.0.** Its version proof was adjusted after WO10
    pinned the goldens at `0.0.0-golden`.
 5. **Wrap-up** — see "Wrap-up checklist".
 
-Recommended order: **WO11 → WO10b → WO11b → WO12 → wrap-up.** If the owner approves both
-proposals, the ledger is twenty. WO10b and WO11b need their WORKORDER files written first — the
-full scope of each is in PROJECT.md under "Proposed WO10b and WO11b".
+Order: **WO11 → WO10b → WO11b → WO12 → wrap-up.** The ledger is **twenty**. WO10b and WO11b are
+drafted (`status: draft`): before dispatching each, revise it against its predecessor's Completion
+Report, set `status: dispatched`, cut its branch from the predecessor's tip, and commit. WO12's base
+is now WO11b.
 
 ## Decisions waiting on others
 
-**Owner:** approve WO10b and WO11b (see above). Record his words verbatim in PROJECT.md before
-dispatching either — a worker verifies them as its authorization.
+**Owner — approvals recorded 2026-09-18** in PROJECT.md ("Owner approval — WO10b and WO11b"),
+verbatim: *"I approve 10a and 10b"*. There is no WO10a; the only two pending proposals were WO10b
+and WO11b, and the owner had just asked for a summary of "10b and 11b", so the approval is read as
+covering both. The PA asked for a one-line confirmation. **If PROJECT.md shows no confirmation,
+get it before dispatching WO11b** — WO10b is unambiguous either way.
 
-**Chief Architect** (not yet sent — put them in one bridge when the owner is ready):
+**Chief Architect** — six items sent as `CA-BRIDGE-2026-09-18.md` (in this directory) for the owner
+to relay; **rulings awaited.** When they arrive, record each in PROJECT.md with its provenance, make
+any spec edits the Chief Architect delegates on a PA branch, and turn behavioural rulings (items 1,
+2, 3, 6) into work-order line items. The six:
 - Bound positions inside an offset container: relative or absolute? Do a moved container's
   children follow? [D-20] is silent; emitted coordinates are device-absolute (WO10 findings 2, 3).
 - §13.4 reserves C++ keywords but not C library names — an element named `clock` collides with

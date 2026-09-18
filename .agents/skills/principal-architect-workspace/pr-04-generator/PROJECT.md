@@ -80,7 +80,9 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** ✅ `136c0c2` · base WO8c · standard · §13.7
 - [x] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** ✅ `3a58ab3` · base WO9 · standard · §13.7, §13.8, §17.1
 - [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
-- [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11 · standard · §13.9, §18, [D-16]; CLI 0.7.0
+- [ ] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** · `u8g2gl-generator/wo10b-bound-text` · base WO11 · standard · runtime defect found in WO10 review (owner-approved 2026-09-18)
+- [ ] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries (owner-approved 2026-09-18)
+- [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11b · standard · §13.9, §18, [D-16]; CLI 0.7.0
 
 **WO2–WO12 were drafted before WO1 ran.** Their line items are revised by the PA
 against each predecessor's Completion Report before dispatch; the boundaries are
@@ -1336,6 +1338,23 @@ placement when asked ("whichever you prefer" — then the PA chooses and records
 Architect rulings by pasting them into this session. Record each ruling's provenance and each
 approval verbatim. Ask before anything outward-facing: pushing, opening the PR, filing issues.
 
+### Owner approval — WO10b and WO11b, 2026-09-18
+
+**APPROVED by the human (Matt McNeill) on 2026-09-18.** The owner's own words, verbatim:
+
+> "ok please update the checkpoint-bridge - I approve 10a and 10b so that those approvals are
+> contained in the checkpoint."
+
+**Reading, recorded rather than silently assumed.** There is no WO10a. The only two proposals
+pending were **WO10b** (bound text reaches the label) and **WO11b** (validator hardening), and the
+owner's immediately preceding message asked the PA to "summarise 10b and 11b" — which the PA did,
+describing exactly those two. The approval is therefore read as covering **WO10b and WO11b**. The
+PA asked the owner to confirm that reading in one line; **if no confirmation is recorded below,
+the resuming PA should get it before dispatching WO11b** (WO10b is unambiguous under either
+reading).
+
+Ledger is now **twenty**: WO11 → WO10b → WO11b → WO12. WO12 is re-based on WO11b.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1355,6 +1374,7 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-18 — **Owner approved WO10b and WO11b.** Ledger now **twenty**; order WO11 → WO10b → WO11b → WO12. Both WORKORDERs drafted; WO12 re-based on WO11b. Chief Architect bridge `CA-BRIDGE-2026-09-18.md` (six items) sent to the owner to relay; rulings awaited.
 - 2026-09-18 — **Checkpoint for context compaction.** WO11's worker hit the usage limit before changing anything (branch clean at `ad8062f`). `main` unchanged at `5f2574f`; the stack contains it. Lessons distilled below; `BRIDGE-PR04-CHECKPOINT.md` written so a fresh session can resume. WO10b and WO11b still await the owner.
 - 2026-09-18 — **WO10 complete** (`3a58ab3`) — **generated code compiles and runs in the C++
   suite.** Interrupted once by an API usage limit before touching anything, and resumed.
