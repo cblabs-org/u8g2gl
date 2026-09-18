@@ -1374,6 +1374,7 @@ and the PA's `bind_time` decision in front of them.
 
 ## Status Log
 
+- 2026-09-18 — **Resumed after compaction; WO11 re-dispatched** to a fresh worker on the owner's instruction *"ok - proceed"*. Branch verified clean (nothing after `ad8062f` but PA workspace commits). `main` has moved to `c99d9f2` (docs only: the UiUiUi prior-art review, Q-14/Q-15) — not blocking; rebase at wrap-up, expect a §21 table conflict beside Q-13. WO10b/WO11b reading confirmation still not received — required before WO11b is dispatched.
 - 2026-09-18 — **Owner approved WO10b and WO11b.** Ledger now **twenty**; order WO11 → WO10b → WO11b → WO12. Both WORKORDERs drafted; WO12 re-based on WO11b. Chief Architect bridge `CA-BRIDGE-2026-09-18.md` (six items) sent to the owner to relay; rulings awaited.
 - 2026-09-18 — **Checkpoint for context compaction.** WO11's worker hit the usage limit before changing anything (branch clean at `ad8062f`). `main` unchanged at `5f2574f`; the stack contains it. Lessons distilled below; `BRIDGE-PR04-CHECKPOINT.md` written so a fresh session can resume. WO10b and WO11b still await the owner.
 - 2026-09-18 — **WO10 complete** (`3a58ab3`) — **generated code compiles and runs in the C++
