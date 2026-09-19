@@ -10,9 +10,15 @@
  *          reviews ([D-11]). Nothing here decides anything: which elements are
  *          objects, their indices, their parents, their bindings and overloads,
  *          and each draw call's build-time visibility were all settled by
- *          realisation (WO8b); every value is spelled by the shared value helper
- *          and every draw call by the shared draw-argument helper (WO9). This
- *          module lays those answers out in the order §13.7 and §13.12 fix.
+ *          realisation (WO8b); where each element sits, which properties,
+ *          styles and overrides an object sets, the init step order and what a
+ *          flag directive compares are settled by `screen-model.ts`; every value
+ *          is spelled by the shared value helper and every draw call by the
+ *          shared draw-argument helper (WO9). This module is the firmware
+ *          target's *spelling* of those answers, in the order §13.7 and §13.12
+ *          fix. The editor target (`scene.ts`, PR-04 WO11) spells the same
+ *          answers as data, so a change to a decision belongs in
+ *          `screen-model.ts`, where both targets see it — never here alone.
  *
  *          Two rules are load-bearing and easy to break by "simplifying":
  *          - **Every object renders through `u8g2gl_render_object()`**, never
@@ -34,7 +40,9 @@
  *              descriptor `ui_handler()` drives.
  *
  *              Coordinates are converted from the resolver's container-relative
- *              space into the runtime's absolute one through `placement.ts`.
+ *              space into the runtime's absolute one through `placement.ts`, by
+ *              `screen-model.ts`'s placeScreen(). init's configuring steps come
+ *              from its INIT_STEPS, so the order is stated once for both targets.
  *
  *              Binding registration ignores the `bool` each `bind_*` returns:
  *              capacities are exact ([D-21] §4), so exhaustion cannot happen in
@@ -74,6 +82,7 @@ import {
   emissionError,
   FLAG_ENUMERATOR_PATTERN,
   flagComparison,
+  INIT_STEPS,
   namedStyles,
   placeScreen,
   rectangleOf,
@@ -81,6 +90,7 @@ import {
   typed,
   writtenProperties,
   type FlagComparison,
+  type InitStep,
   type Placement,
 } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
@@ -471,28 +481,46 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     );
   }
 
+  // The configuring steps in the one order screen-model.ts states (§13.7).
+  const stepBlocks: Record<InitStep, { readonly title: string; readonly heading: string[]; readonly body: string[] }> = {
+    properties: {
+      title: 'set properties',
+      heading: ['Set properties ---'],
+      body: stepsOrNone(properties, 'No properties to set.'),
+    },
+    styles: {
+      title: 'apply styles',
+      heading: ['Apply styles (§10) ---'],
+      body: stepsOrNone(styles, 'No styles to apply.'),
+    },
+    bindings: {
+      title: 'register bindings',
+      heading: [
+        'Register bindings, last, so no observer fires against a',
+        '    // partly configured object (§13.7) ---',
+      ],
+      body:
+        bindings.length === 0
+          ? ['    // No bindings to register.']
+          : [
+              '    // Each bind_*() returns false only when a pool is full. The pools are',
+              '    // sized from exactly these bindings ([D-21]), so the result is not checked.',
+              ...bindings,
+            ],
+    },
+  };
+  const initSteps = INIT_STEPS.flatMap((step, index) => {
+    const block = stepBlocks[step];
+    const [first, ...rest] = block.heading;
+    return ['', `    // --- Step ${index + 2}: ${first ?? ''}`, ...rest, ...block.body];
+  });
   lines.push(
     '',
-    section('init: construct, set properties, apply styles, register bindings (§13.7)'),
+    section(`init: construct, ${INIT_STEPS.map((step) => stepBlocks[step].title).join(', ')} (§13.7)`),
     `void ${fn('init')}() {`,
     '    // --- Step 1: Construct ---',
     '    // Every object above is a default-constructed static (§13.7); nothing to do.',
-    '',
-    '    // --- Step 2: Set properties ---',
-    ...stepsOrNone(properties, 'No properties to set.'),
-    '',
-    '    // --- Step 3: Apply styles (§10) ---',
-    ...stepsOrNone(styles, 'No styles to apply.'),
-    '',
-    '    // --- Step 4: Register bindings, last, so no observer fires against a',
-    '    // partly configured object (§13.7) ---',
-    ...(bindings.length === 0
-      ? ['    // No bindings to register.']
-      : [
-          '    // Each bind_*() returns false only when a pool is full. The pools are',
-          '    // sized from exactly these bindings ([D-21]), so the result is not checked.',
-          ...bindings,
-        ]),
+    ...initSteps,
     '}',
     '',
     section('activate / deactivate (§12.4)'),

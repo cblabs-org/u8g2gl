@@ -34,6 +34,7 @@
  * - RECTANGLE:            The four axes §7.2's rectangle names, in set_coords order
  * - FLAG_COMPARISONS:     The runtime's `bind_flag_if_*` overload set (§8.4)
  * - FLAG_ENUMERATOR_PATTERN: How a flag name becomes its `U8G2GL_FLAG_*` enumerator
+ * - InitStep, INIT_STEPS: The order init configures objects in (§13.7)
  * - FlagComparison:       One directive, understood
  * - RectangleAxis, Rectangle, WrittenProperty, StyleOverrides
  * - typed():              A synthetic declaration for a fixed §13.2 type
@@ -105,6 +106,19 @@ export const FLAG_COMPARISONS: Readonly<
   bind_flag_if_gt: { clearWhen: '<=', subjectTypes: ['int'] },
   bind_flag_if_lt: { clearWhen: '>=', subjectTypes: ['int'] },
 };
+
+/** One configuring step of a screen's `init`, after construction (§13.7). */
+export type InitStep = 'properties' | 'styles' | 'bindings';
+
+/**
+ * The order `init` configures objects in, after construction (§13.7). Stated
+ * once: the firmware screen unit lays its steps out in this order and the
+ * scene description carries it for the editor host to follow, so a change to
+ * the order — design_spec §13.7 now puts styles before properties, which
+ * PR-04 WO10b implements — is one edit here that both targets obey. Bindings
+ * stay last so no observer fires against a partly configured object.
+ */
+export const INIT_STEPS: readonly InitStep[] = ['properties', 'styles', 'bindings'];
 
 /** How a directive's `flag` becomes its enumerator, through `cppEnumerator()`. */
 export const FLAG_ENUMERATOR_PATTERN = 'U8G2GL_FLAG_{VALUE^^}';

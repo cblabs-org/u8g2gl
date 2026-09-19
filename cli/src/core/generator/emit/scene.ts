@@ -31,6 +31,8 @@
  *              Format, version 1:
  *              - `generated`: the stamp fields every generated C++ file carries
  *              - `display`: the target's width and height
+ *              - `init`: the order objects are configured in after construction
+ *                (`properties`, `styles`, `bindings`), as the firmware init does
  *              - `subjects`: `{ name, type, max_len? }` — never a value
  *              - `styles`: `{ name, properties: [{ name, value }] }` in applied order
  *              - `fonts`, `images`: the names the host must resolve to data
@@ -59,6 +61,7 @@ import { imageDeclarations } from './images.js';
 import {
   classOf,
   flagComparison,
+  INIT_STEPS,
   namedStyles,
   placeScreen,
   rectangleOf,
@@ -321,6 +324,9 @@ export function describeScenes(input: SceneInput): { readonly [key: string]: Jso
     version: SCENE_FORMAT_VERSION,
     generated: { ...input.generated },
     display: { width: display?.width ?? null, height: display?.height ?? null },
+    // The order the host configures objects in after constructing them — the
+    // firmware init's own order, from the one constant both targets read.
+    init: [...INIT_STEPS],
     subjects,
     styles,
     fonts,

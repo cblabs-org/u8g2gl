@@ -346,7 +346,8 @@ bool editor_host::bind_object(size_t index, const scene_json& element) {
 
 // build
 // The whole screen, step by step across every object, as a firmware init runs
-// its steps: all objects constructed, then configured, then styled, then bound.
+// its steps: all objects constructed, then each configuring step the scene's
+// `init` names, in that order, across every object.
 //
 // Once per host. The runtime has no way to remove a subject observer, so
 // rebuilding against the same subjects would leave the first build's observers
@@ -376,23 +377,23 @@ bool editor_host::build(const std::string& screen) {
     if (static_cast<int32_t>(objects_.size()) != screen_->get("objects").as_int()) {
         return fail("object count disagrees with the scene");
     }
-    // --- Step 2: Set properties ---
-    for (size_t i = 0; i < objects.size(); ++i) {
-        if (!configure_object(i, *objects[i])) {
-            return false;
+    // --- Steps 2-4: Configure, in the order the scene gives ---
+    // The firmware init's order travels in the scene (screen-model.ts's
+    // INIT_STEPS), so the host never states its own.
+    for (const scene_json& step : scene_.get("init").items()) {
+        for (size_t i = 0; i < objects.size(); ++i) {
+            const std::string& name = step.as_string();
+            const bool ok = name == "properties" ? configure_object(i, *objects[i])
+                            : name == "styles"   ? apply_styles(i, *objects[i])
+                            : name == "bindings" ? bind_object(i, *objects[i])
+                                                 : fail("unknown init step '" + name + "'");
+            if (!ok) {
+                return false;
+            }
         }
     }
-    // --- Step 3: Apply styles ---
-    for (size_t i = 0; i < objects.size(); ++i) {
-        if (!apply_styles(i, *objects[i])) {
-            return false;
-        }
-    }
-    // --- Step 4: Register bindings, last ---
-    for (size_t i = 0; i < objects.size(); ++i) {
-        if (!bind_object(i, *objects[i])) {
-            return false;
-        }
+    if (scene_.get("init").items().size() != 3) {
+        return fail("the scene's init order does not name the three configuring steps");
     }
     return true;
 }

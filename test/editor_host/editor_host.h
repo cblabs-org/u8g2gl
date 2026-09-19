@@ -18,10 +18,10 @@
  *
  * Description: `load()` reads `ui_scene.json` and creates one host-owned subject
  *              per described subject (the scene carries no values). `build()`
- *              walks one screen's elements in the order the firmware `init`
- *              does — construct, rectangle and properties, styles and overrides,
- *              then bindings and flag directives — into a fixed arena, heap-free
- *              on the runtime's side. `render()` walks the draw order: objects
+ *              constructs one screen's objects into a fixed arena, heap-free on
+ *              the runtime's side, then configures them in the order the scene's
+ *              `init` gives — the firmware init's own order: rectangle and
+ *              properties, styles and overrides, bindings and flag directives. `render()` walks the draw order: objects
  *              through u8g2gl_render_object(), draw calls through draw-by-name
  *              after their guard. Every refusal is recorded in `error()` rather
  *              than skipped, so an element the registry cannot build fails the

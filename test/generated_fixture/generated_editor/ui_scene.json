@@ -11,6 +11,11 @@
     "width": 128,
     "height": 64
   },
+  "init": [
+    "properties",
+    "styles",
+    "bindings"
+  ],
   "subjects": [
     {
       "name": "station_name",
