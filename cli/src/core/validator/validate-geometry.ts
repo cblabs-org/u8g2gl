@@ -37,6 +37,9 @@
  *                 inside the container — a pixel as 1×1, a line or triangle by
  *                 its points, a circle or ellipse by the segments it draws. The
  *                 box is the resolver's `drawnExtent()`, the one derivation.
+ *              3c. A rounded box's radius fits its own size: `2*(r+1)` within its
+ *                 literal width and height, as U8G2's corner arithmetic needs
+ *                 (`u8g2_box.c`; PR-04 WO11b follow-up).
  *              4. Every **non-coordinate `int` property** resolved too (§13.2,
  *                 PR-04 WO9): `scroll_px_per_sec="#speed"` used never to be
  *                 evaluated at all and reached emission as text (WO8a finding
@@ -652,6 +655,54 @@ function checkDrawnAxis(
   }
 }
 
+// checkCornerRadius
+// A rounded rectangle's radius against its own size (PR-04 WO11b follow-up,
+// finding 5): U8G2 draws it as four quarter-discs centred `r` in from each
+// corner — `xl = x + r` and `xr = x + w - r - 1` (u8g2_box.c:98–106 at 2.36.18,
+// the same in u8g2_DrawRFrame, :156–167) — each reaching `r` further, its own
+// centre column included (u8g2_circle.c:52). Two corners' `r + 1` columns meet
+// without overlapping only when `2*(r+1) <= w`, and the same for `h`; below `2r`
+// the band between them, `w - r - r` in `u8g2_uint_t` (:121–123), wraps. So
+// where both values are literals, `2*(r+1) <= w` and `<= h` are required. Ruling
+// 6 does not catch this: the corners never leave the box.
+//
+// Only where the radius reaches a draw call with the size — a manifest whose
+// `radius`, `width` and `height` are all `draw=` props (the box, read from the
+// manifest, never by name) — because that is where the three meet in one U8G2
+// call. A bound width or height is known only at run time and is not judged:
+// the runtime passes it to `drawRBox` unchanged (a finding, not this pass's).
+// A radius of 0 selects the plain box, so it constrains nothing.
+//   element — the resolved element
+//   context — resolution context, for the manifest
+//   emit    — receives each diagnostic
+function checkCornerRadius(element: ResolvedElement, context: ResolverContext, emit: ElementDiagnosticSink): void {
+  const { node, geometry } = element;
+  const props = context.manifests.get(node.tag)?.api.props ?? [];
+  const drawn = (name: string): boolean => props.some((prop) => prop.name === name && prop.draw !== undefined);
+  const radius = element.extras.find((extra) => extra.attribute === 'radius')?.coordinate;
+  if (!drawn('radius') || !drawn('width') || !drawn('height') || radius === undefined || radius.value <= 0) {
+    return;
+  }
+  const needed = 2 * (radius.value + 1);
+  for (const size of [geometry.width, geometry.height]) {
+    if (size === undefined || size.value >= needed) {
+      continue; // Bound, unresolved, or large enough.
+    }
+    emit(
+      node,
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+        `${describeNode(node)} has radius=${radius.value}, too large for its ${size.provenance.attribute}=` +
+          `${size.value}: U8G2 draws a rounded box's corners as quarter-discs ${radius.value} pixels in from each ` +
+          `corner, which needs 2*(radius+1) = ${needed} <= ${size.provenance.attribute} (u8g2_box.c). ` +
+          `Use radius <= ${Math.max(0, Math.floor(size.value / 2) - 1)}.`,
+        radius.provenance.loc ?? node.loc,
+        sourceText(radius),
+      ),
+    );
+  }
+}
+
 // representableAlong
 // Whether every coordinate an element has along an axis fits `int16_t`; one that
 // does not is reported by check 2 and is not then measured.
@@ -773,6 +824,7 @@ function checkElements(
       }
     }
     checkExtras(element, context, rules.templateSourced(element), emit);
+    checkCornerRadius(element, context, emit);
     checkProperties(element, context, rules.templateSourced(element), emit);
     checkElements(element.children, rules, context, emit);
   }

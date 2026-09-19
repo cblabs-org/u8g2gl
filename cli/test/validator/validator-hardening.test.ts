@@ -872,3 +872,57 @@ describe('an unknown attribute on a <style> is reported like one on an element (
     expect(offenders).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 2 — a box's radius fits its own size (finding 5)
+// ---------------------------------------------------------------------------
+
+describe("a rounded box's radius is checked against its own size: 2*(r+1) <= w, h (follow-up, finding 5)", () => {
+  const box = (attributes: string): string => `        <u8g2gl_box name="b" x="0" y="0" ${attributes} />`;
+
+  it('one pixel too large for the width is refused in both journeys, at the radius', () => {
+    const result = journeys(box('width="10" height="20" radius="5"'));
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([`${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:5`]);
+    expect(found[0]?.message).toContain('2*(radius+1) = 12 <= width');
+    expect(found[0]?.message).toContain('Use radius <= 4');
+  });
+
+  it("radius=500 on a 10×10 box (the PA's case) fails against both sizes", () => {
+    const result = journeys(box('width="10" height="10" radius="500"'));
+    expectAgreement(result);
+    expect(errorCodes(result.validated.diagnostics)).toEqual([
+      DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+      DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+    ]);
+  });
+
+  it('inside a template it is the template’s defect: reported once for two instances', () => {
+    const pill = composite('pill', '', '        <u8g2gl_box name="shape" x="0" y="0" width="8" height="8" radius="4" filled="false" />');
+    const result = journeys(
+      [
+        '        <pill name="a" x="0" y="0" width="10" height="10" />',
+        '        <pill name="b" x="20" y="0" width="10" height="10" />',
+      ].join('\n'),
+      { composites: [pill] },
+    );
+    expectAgreement(result);
+    expect(result.validated.diagnostics.map((d) => `${d.code}:${d.file}`)).toEqual([
+      `${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:widgets/pill/pill.xml`,
+      `${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:widgets/pill/pill.xml`,
+    ]);
+  });
+
+  it('the exact limit, radius 0, and a bound size are not refused (controls)', () => {
+    const result = journeys(
+      [
+        box('width="10" height="10" radius="4"'),
+        '        <u8g2gl_box name="plain" x="20" y="0" width="1" height="1" radius="0" />',
+        '        <u8g2gl_box name="grown" x="30" y="0" bind_width="level" height="40" radius="15" />',
+      ].join('\n'),
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});
