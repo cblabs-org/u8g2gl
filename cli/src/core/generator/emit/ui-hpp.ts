@@ -41,7 +41,7 @@
  * - emitUiHeader():   Emit `ui.hpp`
  */
 
-import { screenDescriptorIdentifier, screenFunctionIdentifier, SCREEN_FUNCTIONS } from '../../resolver/index.js';
+import { UI_INIT_FUNCTION, screenDescriptorIdentifier, screenFunctionIdentifier, SCREEN_FUNCTIONS } from '../../resolver/index.js';
 import { GENERATED_CONFIG_HEADER } from './generated-config.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations, PROGMEM_MACRO } from './images.js';
@@ -53,7 +53,7 @@ import { includeBlock, section, type EmittedUnit, type ProjectEmitInput } from '
 export const UI_HEADER = 'ui.hpp';
 
 /** The one call an application makes at boot (§13.7). Defined in `ui.cpp`. */
-export const UI_INIT_FUNCTION = 'ui_init';
+export { UI_INIT_FUNCTION }; // Spelled once, in mangle.ts, which collision-checks it (PR-04 WO11b).
 
 /**
  * The runtime headers `ui.hpp` needs for the declarations it makes: the screen

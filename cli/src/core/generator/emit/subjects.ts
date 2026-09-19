@@ -39,7 +39,7 @@
  */
 
 import type { SubjectDecl, SubjectType } from '../../schema/globals.js';
-import { subjectIdentifier, subjectSetterIdentifier } from '../../resolver/index.js';
+import { SUBJECTS_INIT_FUNCTION, subjectIdentifier, subjectSetterIdentifier } from '../../resolver/index.js';
 import type { SubjectObservers } from '../realise/index.js';
 import { cppStringLiteral } from './value.js';
 import { declarationError, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
@@ -55,7 +55,7 @@ export const SUBJECTS_UNIT = 'ui_subjects.cpp';
  * constructor (see the file header), and because doing it in `ui_init()` would
  * put knowledge of the subjects into the unit that knows about screens.
  */
-export const SUBJECTS_INIT_FUNCTION = 'ui_subjects_init';
+export { SUBJECTS_INIT_FUNCTION }; // Spelled once, in mangle.ts, which collision-checks it (PR-04 WO11b).
 
 /**
  * The least observer capacity a subject may be generated with.

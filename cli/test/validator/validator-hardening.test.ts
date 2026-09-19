@@ -756,7 +756,23 @@ describe('the collision table is total (WO10 f5, WO11 f6)', () => {
     const kinds = table.global.map((entry) => `${entry.identifier}:${entry.source.kind}`);
     expect(kinds).toContain('ui_screen_home:screen_descriptor');
     expect(kinds).toContain('ui_screen_gauges:screen_descriptor');
-    expect(kinds).toContain('ui_editor_registry:editor_registry');
+    expect(kinds).toContain('ui_editor_registry:fixed');
+  });
+
+  it('holds every fixed name in the ui_ namespace, each spelled once (follow-up, finding 9)', () => {
+    const project = screensModel(['home']);
+    const expansion = expandScreens({ globals: project.globals, screens: project.screens, manifests: project.manifests });
+    const table = mangleIdentifiers({ globals: project.globals, screens: expansion.screens });
+    const fixed = table.global.filter((entry) => entry.source.kind === 'fixed').map((entry) => entry.identifier);
+    expect(fixed).toEqual(['ui_init', 'ui_subjects_init', 'ui_styles_init', 'ui_editor_registry', 'ui_handler']);
+    // Spelled once: no core source but mangle.ts writes any of them as a literal.
+    const mangle = join('src', 'core', 'resolver', 'mangle.ts');
+    const offenders = sourceFiles(join(CLI_ROOT, 'src', 'core')).filter(
+      (file) =>
+        file !== mangle &&
+        /'ui_(init|subjects_init|styles_init|editor_registry|handler)'/.test(readFileSync(join(CLI_ROOT, file), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it('checks the ui_obj_ family in each screen against everything ui.hpp declares (pinned; WO10b built it)', () => {

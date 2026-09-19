@@ -41,7 +41,7 @@
 import type { StyleDecl } from '../../schema/globals.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../../manifest/index.js';
-import { styleIdentifier } from '../../resolver/index.js';
+import { STYLES_INIT_FUNCTION, styleIdentifier } from '../../resolver/index.js';
 import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 import { cppValue } from './value.js';
 
@@ -57,7 +57,7 @@ import { cppValue } from './value.js';
 export const STYLES_UNIT = 'ui_styles.cpp';
 
 /** The function that applies every style's declared properties. */
-export const STYLES_INIT_FUNCTION = 'ui_styles_init';
+export { STYLES_INIT_FUNCTION }; // Spelled once, in mangle.ts, which collision-checks it (PR-04 WO11b).
 
 /**
  * Each `<style>` attribute and the `u8g2gl_style` setter that applies it.

@@ -36,8 +36,10 @@
  *              Scopes follow the emitted translation units: everything `ui.hpp`
  *              declares is visible to every screen, and each screen's objects and
  *              local styles are visible only in its own unit. The table is total
- *              (PR-04 WO11b): each screen's descriptor and the editor registry
- *              function are in it as well as its functions and tables, and the
+ *              (PR-04 WO11b): each screen's descriptor and every fixed name —
+ *              `ui_init`, `ui_subjects_init`, `ui_styles_init`, the editor
+ *              registry, the runtime's `ui_handler` — are in it as well as each
+ *              screen's functions and tables, and the
  *              `ui_obj_` family is checked in each screen's scope against all of
  *              them. An author-written name
  *              breaking §13.4's rules, and a name declared twice, are Pass 7's
@@ -49,7 +51,9 @@
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
  * - OBJECT_IDENTIFIER_PREFIX:          `ui_obj_`, the emitted objects' family
- * - EDITOR_REGISTRY_FUNCTION:          `ui_editor_registry`, the editor target's one fixed name
+ * - EDITOR_REGISTRY_FUNCTION, UI_INIT_FUNCTION, SUBJECTS_INIT_FUNCTION,
+ *   STYLES_INIT_FUNCTION, RUNTIME_HANDLER_FUNCTION: the fixed names in the `ui_`
+ *   namespace, each spelled once and each in the collision table
  * - screenFunctionIdentifier(), screenTableIdentifier(), screenDescriptorIdentifier(), subjectIdentifier(),
  *   subjectSetterIdentifier(), fontIdentifier(), imageIdentifier(),
  *   styleIdentifier(), objectIdentifier(), childIdentifier(): Spell one identifier
@@ -107,7 +111,7 @@ export type IdentifierKind =
   | 'screen_function'
   | 'screen_table'
   | 'screen_descriptor'
-  | 'editor_registry'
+  | 'fixed'
   | 'object'
   | 'subject'
   | 'subject_setter'
@@ -194,6 +198,37 @@ export function screenDescriptorIdentifier(screen: string): string {
  * mapping is total (PR-04 WO11b, WO11 finding 6).
  */
 export const EDITOR_REGISTRY_FUNCTION = 'ui_editor_registry';
+
+/** `ui_init()`, the application's one entry point (§13.7). */
+export const UI_INIT_FUNCTION = 'ui_init';
+
+/** `ui_subjects_init()`, which applies string subjects' initial values (§8.2). */
+export const SUBJECTS_INIT_FUNCTION = 'ui_subjects_init';
+
+/** `ui_styles_init()`, which applies each style's declared properties (§10). */
+export const STYLES_INIT_FUNCTION = 'ui_styles_init';
+
+/**
+ * `ui_handler()` — not generated: the runtime declares it (`u8g2gl_core.h`), and
+ * it is the one call an application makes each loop. It sits in the `ui_`
+ * namespace §13.4 reserves for generated code, so it is in the table too.
+ */
+export const RUNTIME_HANDLER_FUNCTION = 'ui_handler';
+
+/**
+ * Every fixed, project-level name in the `ui_` namespace, with what it is: the
+ * generated functions a project always has (§13.7), the editor target's
+ * registry ([UD-4]) and the runtime's handler. Registered in the collision table
+ * beside the families, so the table is total (PR-04 WO11b follow-up, finding 9).
+ * Each name is spelled once, in the constants above; the emitters import them.
+ */
+const FIXED_IDENTIFIERS: readonly { readonly identifier: string; readonly description: string }[] = [
+  { identifier: UI_INIT_FUNCTION, description: 'the generated ui_init()' },
+  { identifier: SUBJECTS_INIT_FUNCTION, description: 'the generated ui_subjects_init()' },
+  { identifier: STYLES_INIT_FUNCTION, description: 'the generated ui_styles_init()' },
+  { identifier: EDITOR_REGISTRY_FUNCTION, description: 'the editor registry' },
+  { identifier: RUNTIME_HANDLER_FUNCTION, description: "the runtime's ui_handler()" },
+];
 
 /** `ui_screen_home_objs`. */
 export function screenTableIdentifier(screen: string, table: string): string {
@@ -436,7 +471,9 @@ export function mangleIdentifiers(input: MangleInput): IdentifierTable {
       makeEntry(screenDescriptorIdentifier(screen.name), 'screen_descriptor', description, screen.loc, `screen:${screen.name}`),
     );
   }
-  global.push(makeEntry(EDITOR_REGISTRY_FUNCTION, 'editor_registry', 'the editor registry', undefined, 'editor:registry'));
+  for (const fixed of FIXED_IDENTIFIERS) {
+    global.push(makeEntry(fixed.identifier, 'fixed', fixed.description, undefined, `fixed:${fixed.identifier}`));
+  }
   for (const subject of globals?.subjects ?? []) {
     if (subject.name) {
       const description = `subject '${subject.name}'`;

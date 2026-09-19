@@ -92,7 +92,12 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       ['ui_screen_home_parents', 'screen_table'],
       // PR-04 WO11b: the descriptor and the editor registry make the table total.
       ['ui_screen_home', 'screen_descriptor'],
-      ['ui_editor_registry', 'editor_registry'],
+      // ...and every fixed name in the ui_ namespace (WO11b follow-up).
+      ['ui_init', 'fixed'],
+      ['ui_subjects_init', 'fixed'],
+      ['ui_styles_init', 'fixed'],
+      ['ui_editor_registry', 'fixed'],
+      ['ui_handler', 'fixed'],
       ['ui_subject_temperature', 'subject'],
       ['ui_set_temperature', 'subject_setter'],
       ['ui_font_small_9', 'font'],
