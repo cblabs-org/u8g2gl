@@ -27,7 +27,7 @@ export { validateGeometry } from './validate-geometry.js';
 export { validateIdentifiers } from './validate-identifiers.js';
 export {
   validateNotYetSupported,
-  DEFAULT_NOT_YET_SUPPORTED_POLICY,
-  type NotYetSupportedPolicy,
+  DEFAULT_REFUSAL_POLICY,
+  type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 export { validateRealisation } from './validate-realisation.js';

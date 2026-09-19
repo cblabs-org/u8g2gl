@@ -112,10 +112,7 @@ describe('fix 2 — drawing geometry is not required where a binding or anchor s
   });
 
   it('still refuses a box whose width nothing supplies (the control) — at generate', () => {
-    // No validator pass catches this once `required` is gone: WO7b's rule
-    // covers an under-determined start, not an absent size. `generate` refuses
-    // it with a located diagnostic rather than throwing, and `validate` passing
-    // it is recorded as a stop-and-report in the WO10 Completion Report.
+    // `generate` refuses it with a located diagnostic rather than throwing.
     const result = generateScreen('<u8g2gl_box name="bar" x="4" y="20" height="6" />');
     expect(result.files).toEqual([]);
     expect(result.diagnostics.map((diagnostic) => [diagnostic.code, diagnostic.offendingText])).toEqual([
@@ -123,8 +120,15 @@ describe('fix 2 — drawing geometry is not required where a binding or anchor s
     ]);
   });
 
-  it('records that validate does not catch it — the journey-split gap, pinned so its fix is visible', () => {
-    expect(errors(validateScreen('<u8g2gl_box name="bar" x="4" y="20" height="6" />'))).toEqual([]);
+  it('and validate refuses it too — the journey-split gap WO10 recorded, closed by PR-04 WO11b', () => {
+    // WO7b's rule covered an under-determined start, not an absent size; Pass 6
+    // now checks the size as well, with the code generate used.
+    expect(
+      errors(validateScreen('<u8g2gl_box name="bar" x="4" y="20" height="6" />')).map((diagnostic) => [
+        diagnostic.code,
+        diagnostic.offendingText,
+      ]),
+    ).toEqual([[DIAGNOSTIC_CODES.MISSING_REQUIRED, 'width']]);
   });
 
   it('keeps a line endpoint required, since nothing else can supply it', () => {

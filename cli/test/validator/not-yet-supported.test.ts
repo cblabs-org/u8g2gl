@@ -155,8 +155,8 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
 
   it('warns by default and under "warning", errors under "error" — same code, location and message', () => {
     const byDefault = deferred(validate(inputWith()).diagnostics);
-    const warned = deferred(validate({ ...inputWith(), notYetSupported: 'warning' }).diagnostics);
-    const refused = deferred(validate({ ...inputWith(), notYetSupported: 'error' }).diagnostics);
+    const warned = deferred(validate({ ...inputWith(), refusalPolicy: 'warning' }).diagnostics);
+    const refused = deferred(validate({ ...inputWith(), refusalPolicy: 'error' }).diagnostics);
 
     expect(byDefault).toHaveLength(7);
     expect(byDefault).toEqual(warned);

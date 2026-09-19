@@ -41,7 +41,7 @@ import { findTargetDisplay } from '../resolver/index.js';
 import { validateIdentifiers } from './validate-identifiers.js';
 import {
   validateNotYetSupported,
-  type NotYetSupportedPolicy,
+  type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 import { validateRealisation } from './validate-realisation.js';
 
@@ -63,13 +63,15 @@ export interface ValidateInput {
   readonly manifests: ManifestRegistry;
   readonly catalogue: readonly DisplayRecord[];
   /**
-   * Severity of `U8G2GL_NOT_YET_SUPPORTED` (Pass 8): `'warning'` for authoring,
-   * `'error'` for the build. A parameter rather than a branch, like the [U-1]
+   * Severity of a build refusal — `U8G2GL_NOT_YET_SUPPORTED` (Pass 8) and
+   * realisation's `U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT` (Pass 9): `'warning'`
+   * for authoring, `'error'` for the build. Named `notYetSupported` before
+   * PR-04 WO11b. A parameter rather than a branch, like the [U-1]
    * missing-name policy, so both journeys run this one validator. Defaults to
-   * `DEFAULT_NOT_YET_SUPPORTED_POLICY` (`'warning'`); `generate()` always passes
+   * `DEFAULT_REFUSAL_POLICY` (`'warning'`); `generate()` always passes
    * `'error'`.
    */
-  readonly notYetSupported?: NotYetSupportedPolicy;
+  readonly refusalPolicy?: RefusalPolicy;
   /**
    * The target whose display geometry is resolved and bounds-checked against.
    * `generate` passes the target it builds, because a screen that fits one
@@ -135,7 +137,7 @@ export interface ValidateResult {
  * 5. Data binding type compatibility (validateTypes)
  * 6. Layout geometry & display bounds (validateGeometry)
  * 7. Identifier naming rules & collisions (validateIdentifiers)
- * 8. Constructs not yet generated, at `input.notYetSupported` (validateNotYetSupported)
+ * 8. Constructs not yet generated, at `input.refusalPolicy` (validateNotYetSupported)
  * 9. The exact object ceiling, and realisation's refusals (validateRealisation)
  *
  * @param input The parsed project AST models and display catalogue.

@@ -51,7 +51,7 @@ void ui_screen_bounds_init() {
     // --- Step 3: Set properties ---
     ui_obj_track.set_coords(40, 10, 60, 20);
 
-    ui_obj_track_readout.set_coords(40, 16, 20, 10);
+    ui_obj_track_readout.set_coords(0, 16, 20, 10);  // x: set by its binding below
     ui_obj_track_readout.set_font(ui_font_u8g2_font_5x7_mr);
     ui_obj_track_readout.set_text("K");
 

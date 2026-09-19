@@ -43,14 +43,14 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import { MAX_OBJECTS_PER_SCREEN } from '../generator/realise/index.js';
 import type { ValidateInput } from './validate.js';
 import { realisationOf } from './shared-model.js';
-import { DEFAULT_NOT_YET_SUPPORTED_POLICY } from './validate-not-yet-supported.js';
+import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';
 
 /**
  * Reports the object ceiling and realisation's refusals (Pass 9).
  *
- * @param input Validator input. `input.notYetSupported` sets the severity of
+ * @param input Validator input. `input.refusalPolicy` sets the severity of
  *              realisation's refusals, defaulting to
- *              {@link DEFAULT_NOT_YET_SUPPORTED_POLICY}; the ceiling is always an
+ *              {@link DEFAULT_REFUSAL_POLICY}; the ceiling is always an
  *              error, because it is a property of the object model rather than
  *              something a later PR delivers.
  * @return One `U8G2GL_TOO_MANY_OBJECTS` per overflowing screen, in document
@@ -89,7 +89,7 @@ export function validateRealisation(input: ValidateInput): readonly Diagnostic[]
   // cannot be built, and the journey decides what that costs — a warning while
   // authoring, an error in the build that would otherwise emit code for an
   // element it has no class to instantiate.
-  const severity = input.notYetSupported ?? DEFAULT_NOT_YET_SUPPORTED_POLICY;
+  const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
   for (const diagnostic of realisation.diagnostics) {
     diagnostics.push({ ...diagnostic, severity });
   }

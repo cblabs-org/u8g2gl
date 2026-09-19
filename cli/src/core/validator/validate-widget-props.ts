@@ -42,7 +42,11 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import { isRectangular, walkExpanded } from '../resolver/index.js';
+import { GEOMETRY_BINDINGS, isRectangular, walkExpanded } from '../resolver/index.js';
+import { namedStyles } from '../generator/emit/screen-model.js';
+import { styleProperties } from '../generator/emit/styles.js';
+import type { Globals, StyleDecl } from '../schema/globals.js';
+import type { Screen } from '../schema/screen.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
 import { propReferenceIn, reportSubstituted, unsubstitutedPlaceholder } from './substituted-values.js';
@@ -164,7 +168,13 @@ function walkNodes(
 //   manifest — effective manifest for node.tag, inheritance already merged
 //   atScreenLevel — whether the element is written in a screen rather than in a
 //                   composite's `<view>`, where a `$prop` has no meaning
-function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest, atScreenLevel: boolean): Diagnostic[] {
+//   styles   — the named styles in scope, for a style that supplies a required prop
+function checkInstanceProps(
+  node: WidgetNode,
+  manifest: EffectiveManifest,
+  atScreenLevel: boolean,
+  styles: StyleScope,
+): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const { props, bindings } = manifest.api;
 
@@ -205,26 +215,11 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest, atScr
   }
 
   // --- Step 3: Require mandatory props ---
-  // A prop declared `required` *and* defaulted is an invalid declaration, which
-  // Pass 1 reports once at the declaration (OVERCONSTRAINED, WO7b). Reporting a
-  // missing attribute here as well would make one mistake read as several
-  // defects — one per instance — so the declaration is reported and the
-  // instances are left alone (PR-04 WO7b finding 5).
-  for (const prop of props) {
-    if (!prop.required || prop.default !== undefined) {
-      continue;
-    }
-    const val = node.attributes[prop.name];
-    if (val === undefined || val === '') {
-      diagnostics.push(
-        createPropDiagnostic(
-          DIAGNOSTIC_CODES.MISSING_REQUIRED,
-          `Missing required attribute '${prop.name}' on <${node.tag}>.`,
-          node.loc,
-          prop.name,
-        ),
-      );
-    }
+  // Written, bound or styled all count (PR-04 WO11b); see missingRequired. A
+  // named style that is still a `$`-reference is unknowable here, so the check
+  // waits for the expanded tree (checkSubstitutedValues) rather than guessing.
+  if (!namedStyles(node).some((name) => name.startsWith('$'))) {
+    diagnostics.push(...missingRequired(node, manifest, styles));
   }
 
   // --- Step 4: Check enum values against the declared set ---
@@ -293,6 +288,84 @@ function checkInstanceProps(node: WidgetNode, manifest: EffectiveManifest, atScr
   return diagnostics;
 }
 
+/** The named styles in scope for an element, by name (§10). */
+type StyleScope = ReadonlyMap<string, StyleDecl>;
+
+// styleScope
+// What a named style on an element can resolve to: the global styles, and on a
+// screen that screen's own, which override a global style of the same name —
+// the one `ui_style_<name>` mangle.ts keys them as. A composite's `<view>` sees
+// only the globals: its template is shared by every screen.
+//   globals — the project's globals
+//   screen  — the screen the element is written in, if it is written in one
+function styleScope(globals: Globals | undefined, screen: Screen | undefined): StyleScope {
+  const scope = new Map<string, StyleDecl>();
+  for (const style of [...(globals?.styles ?? []), ...(screen?.styles ?? [])]) {
+    scope.set(style.name, style);
+  }
+  return scope;
+}
+
+// suppliedByStyle
+// Whether a named style the element applies declares a property of this name.
+// Which `<style>` attribute is which property is `styleProperties()`'s one
+// table, the one the styles unit is emitted from, so a style counts here
+// exactly when it would set the property at init (§10, §13.7).
+//   node   — the element
+//   name   — the property
+//   styles — the named styles in scope
+function suppliedByStyle(node: WidgetNode, name: string, styles: StyleScope): boolean {
+  return namedStyles(node).some((style) => {
+    const declaration = styles.get(style);
+    return declaration !== undefined && styleProperties(declaration).some((property) => property.attribute === name);
+  });
+}
+
+// missingRequired
+// The MISSING_REQUIRED diagnostic for each required prop nothing supplies.
+//
+// A value can come from four places, and any one satisfies `required` (PR-04
+// WO11b, WO10b finding 1): the attribute written; a geometry binding for it
+// ([D-20] — `bind_x` supplies `x`, from the resolver's one table); a `style_*`
+// override of it; or a named style the element applies that declares it (§10).
+// Before, only the first counted, so a label had to write `font=` beside the
+// style that already set it, and the fixture wrote `x="0"` beside `bind_x`.
+//
+// A prop declared `required` *and* defaulted is an invalid declaration, which
+// Pass 1 reports once at the declaration (OVERCONSTRAINED, WO7b). Reporting a
+// missing attribute here as well would make one mistake read as several
+// defects — one per instance — so the declaration is reported and the instances
+// are left alone (PR-04 WO7b finding 5).
+//   node     — the element, as written or as expanded
+//   manifest — its effective manifest
+//   styles   — the named styles in scope
+function missingRequired(node: WidgetNode, manifest: EffectiveManifest, styles: StyleScope): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const prop of manifest.api.props) {
+    if (!prop.required || prop.default !== undefined) {
+      continue;
+    }
+    const written = node.attributes[prop.name];
+    const binding = GEOMETRY_BINDINGS.find((entry) => entry.attribute === prop.name);
+    const supplied =
+      (written !== undefined && written !== '') ||
+      (binding !== undefined && node.attributes[binding.binding] !== undefined) ||
+      node.styleOverrides[prop.name] !== undefined ||
+      suppliedByStyle(node, prop.name, styles);
+    if (!supplied) {
+      diagnostics.push(
+        createPropDiagnostic(
+          DIAGNOSTIC_CODES.MISSING_REQUIRED,
+          `Missing required attribute '${prop.name}' on <${node.tag}>.`,
+          node.loc,
+          prop.name,
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
 // describeNode
 // "<u8g2gl_circle> 'dot'", or "<u8g2gl_circle>" when unnamed.
 function describeNode(node: WidgetNode): string {
@@ -333,7 +406,7 @@ function checkEnumValue(node: WidgetNode, attribute: string, manifest: Effective
 // `<view>`. The enum and boolean checks skip such a value as "not yet knowable",
 // which is true inside a template and false in a screen, where nothing will ever
 // substitute it (PR-04 WO7b findings 3 and 4). Fonts, images and styles are
-// Pass 2's, through the same helper; geometry is Pass 6's UNRESOLVED_GEOMETRY.
+// Pass 2's, through the same helper; geometry is Pass 6's UNRESOLVED_VALUE.
 //   node     — the element as written in a screen
 //   manifest — effective manifest for node.tag
 function screenLevelPlaceholders(node: WidgetNode, manifest: EffectiveManifest): Diagnostic[] {
@@ -402,10 +475,21 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
   const expansion = pipelineOf(input).expansion;
   const report = reportSubstituted(diagnostics);
   for (const screen of expansion.screens) {
+    const styles = styleScope(input.globals, screen.screen);
     walkExpanded(screen.elements, (element) => {
       const manifest = manifests.get(element.node.tag);
       if (manifest === undefined) {
         return;
+      }
+      // A required prop a `$`-named style may supply was left for here (Step 3
+      // of checkInstanceProps): the style's name is known now.
+      const styleSubstitution = (element.substitutions ?? []).find(
+        (substitution) => substitution.attribute === 'style' || substitution.styleChild !== undefined,
+      );
+      if (styleSubstitution !== undefined) {
+        for (const diagnostic of missingRequired(element.node, manifest, styles)) {
+          report(diagnostic, styleSubstitution, element);
+        }
       }
       for (const substitution of element.substitutions ?? []) {
         const { attribute } = substitution;
@@ -441,18 +525,19 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
   const diagnostics: Diagnostic[] = [];
   const { screens, manifests } = input;
 
-  const visit = (atScreenLevel: boolean) => (node: WidgetNode): void => {
+  const visit = (atScreenLevel: boolean, styles: StyleScope) => (node: WidgetNode): void => {
     const manifest = manifests.get(node.tag);
     if (manifest) {
-      diagnostics.push(...checkInstanceProps(node, manifest, atScreenLevel));
+      diagnostics.push(...checkInstanceProps(node, manifest, atScreenLevel, styles));
     }
   };
 
   for (const screen of screens ?? []) {
-    walkNodes(screen.view?.children ?? [], visit(true));
+    walkNodes(screen.view?.children ?? [], visit(true, styleScope(input.globals, screen)));
   }
+  const globalStyles = styleScope(input.globals, undefined);
   for (const composite of manifests.declaredComposites) {
-    walkNodes(composite.view?.children ?? [], visit(false));
+    walkNodes(composite.view?.children ?? [], visit(false, globalStyles));
   }
   checkSubstitutedValues(input, diagnostics);
 

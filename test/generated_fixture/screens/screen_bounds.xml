@@ -6,8 +6,8 @@
         <!-- Ruling 1: bound positions are container-relative. -->
         <slider name="track" x="40" y="10" width="60" height="20" />
 
-        <!-- ...and on the screen, a bound position is its value. -->
-        <u8g2gl_box name="dot" x="0" bind_x="knob_x" y="40" width="2" height="2" />
+        <!-- ...and on the screen, a bound position is its value (no literal x). -->
+        <u8g2gl_box name="dot" bind_x="knob_x" y="40" width="2" height="2" />
 
         <!-- An int subject drawn through its format. -->
         <u8g2gl_label name="temp" x="0" y="50" width="60" height="10"

@@ -64,6 +64,8 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode } from '../schema/widget-node.js';
 import {
+  boundGeometryOf,
+  geometryBindingFor,
   INT16_MAX,
   INT16_MIN,
   isCentringOn,
@@ -254,7 +256,7 @@ function checkPositioned(
     emit(
       node,
       createGeomDiagnostic(
-        DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+        DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
         `'${deferred.attribute}' on ${describeNode(node)} cannot be resolved: ${deferralReason(deferred, element, axis)}. ` +
           `Every element must end up fully positioned (§7.2).`,
         deferred.loc ?? node.loc,
@@ -263,6 +265,15 @@ function checkPositioned(
     );
   }
   if (accounted || geometry[axis.start] !== undefined) {
+    return;
+  }
+
+  // --- Step 2b: A binding supplies the start ([D-20]) ---
+  // `bind_x` positions the element at run time, relative to its container
+  // (§7.2), so a literal `x` beside it would only be overwritten (PR-04 WO11b,
+  // WO10b finding 1). The screen model passes a bound axis as 0 and lets the
+  // binding apply it; placement adds the container's origin.
+  if (node.attributes[geometryBindingFor(axis.start).binding] !== undefined) {
     return;
   }
 
@@ -279,7 +290,7 @@ function checkPositioned(
     emit(
       node,
       createGeomDiagnostic(
-        DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+        DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
         `'${axis.start}' on ${describeNode(node)} cannot be derived from '${anchor}': ${element.container.label} ` +
           `has no resolved ${axis.size} to measure against. Every element must end up fully positioned (§7.2).`,
         node.attributeLocs?.[anchor] ?? node.loc,
@@ -291,11 +302,86 @@ function checkPositioned(
   emit(
     node,
     createGeomDiagnostic(
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
       `${describeNode(node)} is not fully positioned: '${axis.start}' cannot be worked out — ` +
         `${underDetermination(node, axis, reads)}. Give '${axis.start}', or '${axis.end}' with '${axis.size}' (§7.2).`,
       node.attributeLocs?.[axis.size] ?? node.attributeLocs?.[axis.end] ?? node.loc,
       axis.start,
+    ),
+  );
+}
+
+// checkSized
+// Check 1b for one axis of one element: where the manifest declares the axis's
+// size, something must supply it — written, anchor-derived, bound, or (for a
+// draw-call argument) the manifest's own default. PR-04 WO10 dropped `required`
+// on drawing geometry a binding or anchor can supply, and nothing then caught a
+// size that none of them supplies (WO10 stop-and-report 2): `validate` passed a
+// box with no `width` that `generate` refused with MISSING_REQUIRED, and an
+// object with no `width` reached the screen model, which throws. Same code as
+// that refusal, so both journeys name it alike.
+//
+// A default counts only on a `draw=` prop: a draw call passes it, while an
+// object's rectangle is one `set_coords` call whose four arguments the screen
+// model takes from a literal or a binding and nowhere else.
+//   element — the resolved element
+//   axis    — the axis
+//   context — resolution context: manifests, display
+//   emit    — receives each diagnostic
+function checkSized(
+  element: ResolvedElement,
+  axis: GeometryAxis,
+  context: ResolverContext,
+  emit: ElementDiagnosticSink,
+): void {
+  const { node, geometry } = element;
+  const manifest = context.manifests.get(node.tag);
+  const prop = manifest?.api.props.find((candidate) => candidate.name === axis.size);
+  const outcome = element.axes[axis.name];
+
+  // --- Step 1: Only a declared size nothing has already spoken for ---
+  // A deferred or invalid coordinate on this axis is checkPositioned's or the
+  // evaluator's to report; a bound size is supplied at run time ([D-20]).
+  if (
+    prop === undefined ||
+    outcome.diagnosed ||
+    outcome.deferred.length > 0 ||
+    geometry[axis.size] !== undefined ||
+    node.attributes[geometryBindingFor(axis.size).binding] !== undefined ||
+    (prop.draw !== undefined && prop.default !== undefined)
+  ) {
+    return;
+  }
+
+  // --- Step 2: An anchor that could derive it, measured against nothing ---
+  // `x` with `right` derives `width` from the container; with no container size
+  // that is a container fact, said as such — or Pass 3's, with no display.
+  if (isRectangular(manifest) && isWritten(node, axis.end) && !outcome.containerKnown) {
+    if (context.display[axis.size] === undefined) {
+      return;
+    }
+    emit(
+      node,
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
+        `'${axis.size}' on ${describeNode(node)} cannot be derived from '${axis.end}': ${element.container.label} ` +
+          `has no resolved ${axis.size} to measure against. Every element must end up fully positioned (§7.2).`,
+        node.attributeLocs?.[axis.end] ?? node.loc,
+        axis.end,
+      ),
+    );
+    return;
+  }
+
+  // --- Step 3: Nothing supplies it ---
+  emit(
+    node,
+    createGeomDiagnostic(
+      DIAGNOSTIC_CODES.MISSING_REQUIRED,
+      `${describeNode(node)} has no '${axis.size}': it is not written, no anchor settles it, and no binding ` +
+        `supplies it (${geometryBindingFor(axis.size).binding}). Every element must end up fully sized (§7.2, §8.4).`,
+      node.loc,
+      axis.size,
     ),
   );
 }
@@ -441,7 +527,7 @@ function checkExtras(
       emit(
         node,
         createGeomDiagnostic(
-          DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+          DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
           `'${deferred.attribute}' on ${describeNode(node)} cannot be resolved: ${deferralReason(deferred, element)}. ` +
             `Every coordinate must resolve to a literal before emission (§7.2, §13.2).`,
           deferred.loc ?? node.loc,
@@ -557,7 +643,7 @@ function checkProperties(
     emit(
       node,
       createGeomDiagnostic(
-        placeholder ? DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP : DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+        placeholder ? DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP : DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
         `'${deferred.attribute}' on ${describeNode(node)} cannot be resolved: ` +
           `${deferralReason(deferred, element)}. Every 'int' property must resolve to a literal ` +
           `before emission (§13.2).`,
@@ -594,6 +680,7 @@ function checkElements(
       let representable: boolean;
       if (rules.judges(element, axis)) {
         checkPositioned(element, axis, context, rules.templateSourced(element), emit);
+        checkSized(element, axis, context, emit);
         representable = checkRepresentable(element, axis, emit);
       } else {
         representable = outOfInt16(element, axis).length === 0;
@@ -623,11 +710,11 @@ function walkResolved(elements: readonly ResolvedElement[], visit: (element: Res
 // ---------------------------------------------------------------------------
 
 /**
- * Geometry binding attributes ([D-20]) and the anchor attributes (§7.2) that
- * resolve against a container at build time. These name the layout contract,
- * not elements, so they are not element knowledge in [D-17]'s sense.
+ * The anchor attributes (§7.2) that resolve against a container at build time.
+ * These name the layout contract, not elements, so they are not element
+ * knowledge in [D-17]'s sense. The geometry bindings are the resolver's one
+ * table, `GEOMETRY_BINDINGS` (PR-04 WO11b).
  */
-const GEOMETRY_BINDINGS: readonly string[] = ['bind_x', 'bind_y', 'bind_width', 'bind_height'];
 const ANCHOR_ATTRIBUTES: readonly string[] = ['right', 'bottom', 'hcenter', 'vcenter'];
 
 // anchorOf
@@ -664,7 +751,7 @@ function checkBoundContainers(
   fixedPairs: Map<WidgetNode, Set<WidgetNode>>,
 ): void {
   for (const container of elements) {
-    const boundAttr = GEOMETRY_BINDINGS.find((attr) => container.node.attributes[attr] !== undefined);
+    const boundAttr = boundGeometryOf(container.node)?.binding;
 
     if (boundAttr !== undefined) {
       for (const child of container.children) {

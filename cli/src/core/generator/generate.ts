@@ -27,7 +27,7 @@
  *              declared value — and they refuse the build like any other error.
  *
  * Exports:
- * - GENERATE_NOT_YET_SUPPORTED_POLICY: Always 'error' — the build refuses what it cannot emit
+ * - GENERATE_REFUSAL_POLICY: Always 'error' — the build refuses what it cannot emit
  * - GenerateInput:   A loaded project, the target to build and the generator version
  * - GeneratedFile:   One output file: output-relative path and full text
  * - GenerateResult:  Files, diagnostics and counts
@@ -37,7 +37,7 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
+import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
 import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
 import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { emitProjectFiles } from './emit/index.js';
@@ -48,7 +48,7 @@ import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen
  * build that emitted code without a construct it cannot build would silently
  * drop part of the UI (PR-04 decision 1).
  */
-export const GENERATE_NOT_YET_SUPPORTED_POLICY: NotYetSupportedPolicy = 'error';
+export const GENERATE_REFUSAL_POLICY: RefusalPolicy = 'error';
 
 /**
  * Everything `generate()` needs.
@@ -173,7 +173,7 @@ function resolveTarget(input: GenerateInput): Target | Diagnostic {
 /**
  * @brief Validates a project and lays out its generated files.
  *
- * Runs {@link checkProject} under {@link GENERATE_NOT_YET_SUPPORTED_POLICY} —
+ * Runs {@link checkProject} under {@link GENERATE_REFUSAL_POLICY} —
  * the same validation `validate` runs, with not-yet-supported constructs as
  * errors. If any error remains, no files are produced. Never throws for a user
  * error.
@@ -222,7 +222,7 @@ export function generate(input: GenerateInput): GenerateResult {
   // --- Step 4: Validate exactly as `validate` does, refusing unsupported constructs ---
   const { diagnostics, errors, warnings } = checkProject(
     input,
-    GENERATE_NOT_YET_SUPPORTED_POLICY,
+    GENERATE_REFUSAL_POLICY,
     'code' in target ? undefined : target,
     pipeline,
     realisation,

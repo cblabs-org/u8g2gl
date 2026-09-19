@@ -133,7 +133,7 @@ export const DIAGNOSTIC_CODES = {
    * and composites with their own C++ class (PR-08), `<bdf>` fonts and `<convert>`
    * images (PR-04b). The message names the PR that delivers it.
    *
-   * **Emitted at two severities, chosen by the caller's `NotYetSupportedPolicy`,
+   * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
    * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).
    * `validate` (and the designer) report a `warning`, so the document is not shown
    * as broken while it is being authored; `generate` reports an `error` and writes
@@ -190,14 +190,28 @@ export const DIAGNOSTIC_CODES = {
    */
   INAPPLICABLE_ANCHOR: 'U8G2GL_INAPPLICABLE_ANCHOR',
   /**
-   * An element whose manifest declares geometry does not end up fully
-   * positioned after composite expansion (§7.2): its `x` or `y` is
-   * under-determined (`width` with neither `x` nor `right`), or a coordinate it
-   * writes never resolves — a `$prop` outside a composite, a `#parent_*` whose
-   * container has no size, an anchor measured against a container with no size.
+   * A value that must be a literal integer by emission never resolves to one
+   * (§7.2, §13.2). Two families share it, because they are one fact — the value
+   * has no literal and the build would have to guess one:
+   *
+   * - **Geometry**: an element whose manifest declares geometry does not end up
+   *   fully positioned after composite expansion — its `x` or `y` is
+   *   under-determined (`width` with neither `x` nor `right`), or a coordinate it
+   *   writes never resolves: a `$prop` outside a composite, a `#parent_*` whose
+   *   container has no size, an anchor measured against a container with no size.
+   * - **Any other `int` property** (PR-04 WO9): `scroll_px_per_sec="#speed"` with
+   *   no such value for the target.
+   *
    * Never a silent zero or absence.
+   *
+   * **Renamed in PR-04 WO11b (WO9 finding 7), key only.** The constant was
+   * `UNRESOLVED_GEOMETRY`, narrower than its use since WO9. The **code string is
+   * unchanged** — `U8G2GL_UNRESOLVED_GEOMETRY` — because codes are the public,
+   * stable API §15.3 and [D-16] promise consumers (`--json`, the designer, agent
+   * skills); renaming it would break every consumer branching on it for no
+   * change in meaning to them.
    */
-  UNRESOLVED_GEOMETRY: 'U8G2GL_UNRESOLVED_GEOMETRY',
+  UNRESOLVED_VALUE: 'U8G2GL_UNRESOLVED_GEOMETRY',
   /**
    * A resolved coordinate — `x`, `y`, `width` or `height` — lies outside
    * `int16_t`, the type `u8g2gl_obj` stores coordinates in (§13.2). Separate
@@ -220,7 +234,7 @@ export const DIAGNOSTIC_CODES = {
    *   template and so no props to bind, so the reference can only be a mistake.
    *   Before PR-04 WO8a every pass skipped such a value as "not yet knowable"
    *   and it validated silently; only geometry caught it, as
-   *   `UNRESOLVED_GEOMETRY`, which still reports the geometry attributes.
+   *   `UNRESOLVED_VALUE`, which still reports the geometry attributes.
    */
   UNSUBSTITUTED_PROP: 'U8G2GL_UNSUBSTITUTED_PROP',
   /**

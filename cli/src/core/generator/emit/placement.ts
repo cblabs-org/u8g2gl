@@ -48,7 +48,13 @@
  * - boundPositionOrigin(): The origin a position binding adds to its subject
  */
 
-import type { ResolvedCoordinate, ResolvedElement, ResolvedExtra } from '../../resolver/index.js';
+import {
+  GEOMETRY_BINDINGS,
+  isPositionBinding,
+  type ResolvedCoordinate,
+  type ResolvedElement,
+  type ResolvedExtra,
+} from '../../resolver/index.js';
 
 /** An absolute offset in device pixels. */
 export interface Origin {
@@ -83,8 +89,15 @@ function shiftedExtra(extra: ResolvedExtra, origin: Origin): ResolvedExtra {
  * nothing. Keyed by binding name, which is the same on an object's manifest
  * (`setter="bind_x"`) and a drawing element's (`setter="x"`), so the draw-call
  * argument, the object call and the editor's thunk all ask this one table.
+ *
+ * Derived from the resolver's `GEOMETRY_BINDINGS` rather than spelled here
+ * (PR-04 WO11b, closing WO10b finding 2): the validator and the screen model
+ * read the same table, so the three cannot disagree about which binding moves
+ * an element.
  */
-export const POSITION_BINDINGS: Readonly<Record<string, 'x' | 'y'>> = { bind_x: 'x', bind_y: 'y' };
+export const POSITION_BINDINGS: Readonly<Record<string, 'x' | 'y'>> = Object.fromEntries(
+  GEOMETRY_BINDINGS.filter(isPositionBinding).map((entry) => [entry.binding, entry.attribute]),
+);
 
 /**
  * @brief The origin a binding adds to its subject's value, or undefined when it

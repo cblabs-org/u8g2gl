@@ -28,6 +28,8 @@
  *   expandScreens, walkExpanded, STYLE_CHILD_VALUE (expand.ts)
  * - RaisedDiagnostic, PipelineResolution, ScreenPipeline, PipelineInput,
  *   createScreenPipeline (pipeline.ts) — one expansion and one resolution per command
+ * - GeometryAttribute, GeometryBinding, GEOMETRY_BINDINGS, geometryBindingNamed,
+ *   geometryBindingFor, isPositionBinding, PositionBinding, boundGeometryOf (geometry-bindings.ts) — [D-20]'s one table
  * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS, SCREEN_FUNCTIONS, SCREEN_TABLES,
  *   IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput, the per-kind spelling helpers and
@@ -95,6 +97,16 @@ export {
   type ScreenPipeline,
   type PipelineInput,
 } from './pipeline.js';
+export {
+  GEOMETRY_BINDINGS,
+  geometryBindingNamed,
+  geometryBindingFor,
+  boundGeometryOf,
+  isPositionBinding,
+  type GeometryAttribute,
+  type GeometryBinding,
+  type PositionBinding,
+} from './geometry-bindings.js';
 export {
   RESERVED_IDENTIFIER_PREFIXES,
   CPP_KEYWORDS,

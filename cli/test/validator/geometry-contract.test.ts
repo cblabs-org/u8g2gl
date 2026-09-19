@@ -141,7 +141,7 @@ describe('every element fully positioned (§7.2)', () => {
   it('reports width with neither x nor right, naming the element', () => {
     const found = withCode(
       run('        <u8g2gl_label name="t" width="40" y="0" height="10" />'),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ severity: 'error', file: SCREEN_FILE, line: 3, offendingText: 'x' });
@@ -152,7 +152,7 @@ describe('every element fully positioned (§7.2)', () => {
   it('reports a $prop that never substitutes', () => {
     const found = withCode(
       run('        <u8g2gl_label name="p" x="$px" y="0" width="10" height="5" />'),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found.map((d) => d.offendingText)).toEqual(['$px']);
     expect(found[0]?.message).toContain("'x' on <u8g2gl_label> 'p' cannot be resolved: '$px' is never substituted");
@@ -167,7 +167,7 @@ describe('every element fully positioned (§7.2)', () => {
           '        </u8g2gl_label>',
         ].join('\n'),
       ),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found.map((d) => [d.line, d.offendingText])).toEqual([[4, '#parent_height']]);
     expect(found[0]?.message).toContain("'height' on <u8g2gl_label> 'inner' cannot be resolved");
@@ -183,7 +183,7 @@ describe('every element fully positioned (§7.2)', () => {
           '        </u8g2gl_label>',
         ].join('\n'),
       ),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found.map((d) => [d.line, d.offendingText])).toEqual([[4, 'right']]);
     expect(found[0]?.message).toContain("'x' on <u8g2gl_label> 'inner' cannot be derived from 'right'");
@@ -192,7 +192,7 @@ describe('every element fully positioned (§7.2)', () => {
   it('a constant that never resolves is an error, reported once', () => {
     const diagnostics = run('        <u8g2gl_label name="t" x="0" y="#nope" width="10" height="5" />');
     expect(withCode(diagnostics, DIAGNOSTIC_CODES.UNKNOWN_CONSTANT)).toHaveLength(1);
-    expect(withCode(diagnostics, DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY)).toEqual([]);
+    expect(withCode(diagnostics, DIAGNOSTIC_CODES.UNRESOLVED_VALUE)).toEqual([]);
   });
 
   it('reports a template defect once however many instances use it', () => {
@@ -205,7 +205,7 @@ describe('every element fully positioned (§7.2)', () => {
         ].join('\n'),
         { composites: [loose] },
       ),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found.map((d) => [d.file, d.line])).toEqual([['widgets/loose/loose.xml', 4]]);
     expect(found[0]?.message).not.toContain('in instance');
@@ -225,7 +225,7 @@ describe('every element fully positioned (§7.2)', () => {
         ].join('\n'),
         { composites: [slot] },
       ),
-      DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+      DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
     );
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ file: 'widgets/slot/slot.xml', line: 4 });
@@ -589,7 +589,7 @@ describe('an interpolated $prop is an error (WO7 F9, interim)', () => {
     const found = withCode(diagnostics, DIAGNOSTIC_CODES.UNSUBSTITUTED_PROP);
     expect(found).toHaveLength(1);
     expect(found[0]?.message).toContain("in instance 'b' of <gapped>");
-    expect(withCode(diagnostics, DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY)).toEqual([]);
+    expect(withCode(diagnostics, DIAGNOSTIC_CODES.UNRESOLVED_VALUE)).toEqual([]);
   });
 });
 

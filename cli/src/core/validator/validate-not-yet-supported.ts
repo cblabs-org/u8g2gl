@@ -25,8 +25,8 @@
  *              - `<bdf>` fonts and `<convert>` images → PR-04b (decision 3)
  *
  * Exports:
- * - NotYetSupportedPolicy:              'warning' (authoring) or 'error' (build)
- * - DEFAULT_NOT_YET_SUPPORTED_POLICY:   'warning' — see its doc comment for why
+ * - RefusalPolicy:                'warning' (authoring) or 'error' (build)
+ * - DEFAULT_REFUSAL_POLICY:       'warning' — see its doc comment for why
  * - validateNotYetSupported(input):     Runs Pass 8
  */
 
@@ -37,14 +37,23 @@ import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import type { ValidateInput } from './validate.js';
 
 /**
- * What a not-yet-supported construct costs the caller.
+ * What a **build refusal** costs the caller: a document that is valid as
+ * authored but that `generate` will not build yet (PR-04 decision 1). Two kinds
+ * of refusal share it — this pass's not-yet-supported constructs, and
+ * realisation's (`U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT`, Pass 9) — which is why
+ * it is no longer named for the first alone (PR-04 WO11b, WO8c finding 3; it was
+ * `NotYetSupportedPolicy`, and `ValidateInput.refusalPolicy` was
+ * `notYetSupported`).
  *
  * - `'warning'` — the authoring journey (`validate`, the designer). The document
  *   is valid as authored; the author learns which construct the build refuses.
  * - `'error'` — the build journey (`generate`). Emitting code without the
  *   construct would silently drop part of the UI, so the build refuses instead.
+ *
+ * A genuine error is never a refusal: it is an error under either policy, so
+ * both journeys agree on it.
  */
-export type NotYetSupportedPolicy = 'warning' | 'error';
+export type RefusalPolicy = 'warning' | 'error';
 
 /**
  * The policy `validate()` applies when the caller chooses none.
@@ -55,7 +64,7 @@ export type NotYetSupportedPolicy = 'warning' | 'error';
  * other caller is authoring, where decision 1 requires a warning so the editor
  * never shows as broken a document that is merely ahead of the generator.
  */
-export const DEFAULT_NOT_YET_SUPPORTED_POLICY: NotYetSupportedPolicy = 'warning';
+export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 
 // The PR that delivers each deferred construct. Named once so the messages
 // cannot disagree with each other, and so each PR finds its own entries here.
@@ -70,7 +79,7 @@ const FONT_AND_IMAGE_PIPELINE_PR = 'PR-04b';
 //   loc           — where the construct is declared
 //   offendingText — the construct's tag or name, for the caret
 function deferredDiagnostic(
-  severity: NotYetSupportedPolicy,
+  severity: RefusalPolicy,
   message: string,
   loc: SourceLocation | undefined,
   offendingText: string,
@@ -101,7 +110,7 @@ function refusalClause(pr: string): string {
 function checkView(
   view: View | undefined,
   input: ValidateInput,
-  severity: NotYetSupportedPolicy,
+  severity: RefusalPolicy,
   out: Diagnostic[],
 ): void {
   if (!view) {
@@ -163,15 +172,15 @@ function checkView(
 /**
  * Reports every construct `generate` does not yet build (Pass 8).
  *
- * @param input Validator input. `input.notYetSupported` sets the severity of
+ * @param input Validator input. `input.refusalPolicy` sets the severity of
  *              every diagnostic, defaulting to
- *              {@link DEFAULT_NOT_YET_SUPPORTED_POLICY}.
+ *              {@link DEFAULT_REFUSAL_POLICY}.
  * @return One `U8G2GL_NOT_YET_SUPPORTED` diagnostic per construct: screens, then
  *         declared composites, then globals' fonts and images, each in document
  *         order. `validate()` sorts the combined result.
  */
 export function validateNotYetSupported(input: ValidateInput): readonly Diagnostic[] {
-  const severity = input.notYetSupported ?? DEFAULT_NOT_YET_SUPPORTED_POLICY;
+  const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
   const diagnostics: Diagnostic[] = [];
 
   // --- Step 1: Screens ---

@@ -27,14 +27,14 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
 import type { ScreenPipeline } from '../resolver/index.js';
 import { validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
-import type { NotYetSupportedPolicy } from '../validator/validate-not-yet-supported.js';
+import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
 import type { RealisationResult } from './realise/index.js';
 
 /**
  * A project as loaded, before validation: the validator's input without a
  * policy, plus what loading itself found.
  */
-export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 'target' | 'pipeline'> {
+export interface ProjectModel extends Omit<ValidateInput, 'refusalPolicy' | 'target' | 'pipeline'> {
   /**
    * Diagnostics raised while loading — XML and parser diagnostics, including
    * [U-1] missing names, and any from the bundled framework manifests. Merged
@@ -77,7 +77,7 @@ export interface ProjectModel extends Omit<ValidateInput, 'notYetSupported' | 't
  */
 export function checkProject(
   model: ProjectModel,
-  policy: NotYetSupportedPolicy,
+  policy: RefusalPolicy,
   target?: Target,
   pipeline?: ScreenPipeline,
   realisation?: RealisationResult,
@@ -89,7 +89,7 @@ export function checkProject(
     screens: model.screens,
     manifests: model.manifests,
     catalogue: model.catalogue,
-    notYetSupported: policy,
+    refusalPolicy: policy,
     ...(target !== undefined ? { target } : {}),
     ...(pipeline !== undefined ? { pipeline } : {}),
     ...(realisation !== undefined ? { realisation } : {}),

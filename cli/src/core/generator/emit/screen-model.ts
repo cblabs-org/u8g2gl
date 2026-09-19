@@ -55,7 +55,7 @@ import type { SourceLocation } from '../../schema/source-location.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import type { WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
-import type { ResolvedElement, ResolvedScreen } from '../../resolver/index.js';
+import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
 import type { RealisedBinding, RealisedElement, RealisedScreen } from '../realise/index.js';
 import { resolvedLiteralFor } from './draw-args.js';
 import { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
@@ -265,7 +265,7 @@ function placeAll(
       // Reported once, at the first child; the parent's own binding is the cause.
       diagnostics.push(
         emissionError(
-          DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
+          DIAGNOSTIC_CODES.UNRESOLVED_VALUE,
           `'${element.identifier}' sits inside a container whose position is bound to a subject ([D-20]), ` +
             `so it has no absolute position at build time. Give the container a literal x and y, or move ` +
             `this element out of it.`,
@@ -368,8 +368,10 @@ export function rectangleOf(object: RealisedElement, placement: Placement): Rect
     if (value !== undefined) {
       return { axis, prop: props[index], value };
     }
-    // [D-20] names exactly these four bindings, one per axis.
-    if (object.bindings.some((binding) => binding.kind === 'attribute' && binding.attribute === `bind_${axis}`)) {
+    // [D-20] names exactly these four bindings, one per axis: the resolver's
+    // one table says which (PR-04 WO11b).
+    const supplier = geometryBindingFor(axis).binding;
+    if (object.bindings.some((binding) => binding.kind === 'attribute' && binding.attribute === supplier)) {
       return { axis, prop: props[index], value: undefined };
     }
     throw new Error(

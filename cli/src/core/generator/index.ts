@@ -13,7 +13,7 @@
  * - checkProject, finaliseDiagnostics, ProjectModel (check-project.ts)
  * - GENERATED_MARKER, HeaderStamp, formatHeaderStamp, isGeneratedContent (header.ts)
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
- *   GENERATE_NOT_YET_SUPPORTED_POLICY (generate.ts)
+ *   GENERATE_REFUSAL_POLICY (generate.ts)
  * - Realisation and capacities — §13.5, §13.3, [D-21] (realise/)
  * - Emission — §13.2's value spelling, the draw-argument order and the
  *   project-level units (emit/). WO10 and WO11 emit through these helpers
@@ -29,7 +29,7 @@ export {
 } from './header.js';
 export {
   generate,
-  GENERATE_NOT_YET_SUPPORTED_POLICY,
+  GENERATE_REFUSAL_POLICY,
   type GenerateInput,
   type GenerateResult,
   type GeneratedFile,
