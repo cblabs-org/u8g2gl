@@ -38,7 +38,17 @@ import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
-import type { SubjectDecl, SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
+import {
+  STYLE_PROPERTIES,
+  type BitmapMode,
+  type DrawColor,
+  type FontMode,
+  type StyleDecl,
+  type SubjectDecl,
+  type SubjectType,
+  type TextAlign,
+} from '../schema/globals.js';
+import { findClosest } from '../catalogue/edit-distance.js';
 
 const VALID_SCHEMA_VERSION = '0.4';
 
@@ -52,6 +62,14 @@ const VALID_SCHEMA_VERSION = '0.4';
  * because `mangle.ts` is outside this work order's boundary.
  */
 const GENERATED_IDENTIFIER_PREFIX = 'ui_';
+
+/**
+ * [D-19]'s remedy for `truncate`, spelled once: the §15.4 migration table below
+ * names it for a 0.3 project, and Pass 1 names it for a `<style>` in any
+ * project that still writes it (PR-04 WO11b follow-up), so an author who
+ * writes it is told why rather than only that it is unknown.
+ */
+const TRUNCATE_REMOVED = "'truncate' is removed: use long_mode=\"clip\" ([D-19])";
 
 /**
  * The §15.4 migration table for the one superseded schema version this CLI
@@ -69,7 +87,7 @@ const SCHEMA_0_3_MIGRATIONS: readonly string[] = [
     "'components/x/' to 'widgets/x/' ([D-18])",
   "the 'components/' directory is removed: use one 'widgets/' directory " +
     'for all user elements ([D-18])',
-  "'truncate' is removed: use long_mode=\"clip\" ([D-19])",
+  TRUNCATE_REMOVED,
   "'<u8g2gl_scrolling_label>' is removed: use " +
     '\'<u8g2gl_label long_mode="scroll_circular">\' — the old widget wrapped ' +
     "continuously, which is 'scroll_circular'; 'scroll' reverses at each end " +
@@ -151,6 +169,29 @@ function checkRequiredWithDefault(prop: PropDef, owner: string): Diagnostic | un
       `a required prop is always given, so its default can never apply. Remove one.`,
     prop.loc,
     'required, default',
+  );
+}
+
+// unknownStyleAttributes
+// UNKNOWN_ATTRIBUTE for each attribute a `<style>` writes that is neither `name`
+// nor a §10 style property — the same code, severity and wording an unknown
+// attribute on an element gets (Pass 4), with the closest property suggested.
+// Until PR-04 WO11b the style parser simply dropped them, so
+// `<style truncate="true" bogus="1">` passed both journeys in silence. The
+// properties are STYLE_PROPERTIES, the one list; `truncate` keeps [D-19]'s remedy.
+//   style — the declaration, with the attributes the parser did not recognise
+function unknownStyleAttributes(style: StyleDecl): Diagnostic[] {
+  const spellings = STYLE_PROPERTIES.flatMap((property) => [property.attribute, ...(property.aliases ?? [])]);
+  return (style.unknownAttributes ?? []).map((attribute) =>
+    createDiagnostic(
+      DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+      attribute.name === 'truncate'
+        ? `Unknown attribute 'truncate' on <style>: ${TRUNCATE_REMOVED}.`
+        : `Unknown attribute '${attribute.name}' on <style>.`,
+      attribute.loc ?? style.loc,
+      attribute.name,
+      attribute.name === 'truncate' ? undefined : findClosest(attribute.name, spellings),
+    ),
   );
 }
 
@@ -476,6 +517,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     }
 
     for (const style of globals.styles ?? []) {
+      diagnostics.push(...unknownStyleAttributes(style));
       if (!style.name) {
         diagnostics.push(
           createDiagnostic(
@@ -581,6 +623,9 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
 
   // --- 3. Screen schema validation ---
   for (const screen of screens ?? []) {
+    for (const style of screen.styles ?? []) {
+      diagnostics.push(...unknownStyleAttributes(style));
+    }
     if (!screen.name) {
       diagnostics.push(
         createDiagnostic(

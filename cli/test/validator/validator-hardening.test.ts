@@ -820,3 +820,55 @@ describe("a composite's template parameters get no invented setter (WO10 f1)", (
     expect(screenUnit(result)).toContain('ui_obj_c_t.set_text("yo");');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 1 — unknown <style> attributes are reported (finding 3)
+// ---------------------------------------------------------------------------
+
+describe('an unknown attribute on a <style> is reported like one on an element (follow-up, finding 3)', () => {
+  const body = '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />';
+
+  it("the PA's reproduction: truncate and bogus are each UNKNOWN_ATTRIBUTE, in both journeys", () => {
+    const result = journeys(body, { styles: '<style name="note" align="right" truncate="true" bogus="1" />' });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.file}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}:globals.xml:truncate`,
+      `${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}:globals.xml:bogus`,
+    ]);
+    expect(found[0]?.message).toBe(
+      `Unknown attribute 'truncate' on <style>: 'truncate' is removed: use long_mode="clip" ([D-19]).`,
+    );
+    expect(found[1]?.message).toBe("Unknown attribute 'bogus' on <style>.");
+  });
+
+  it('suggests the closest style property, as for an element', () => {
+    const result = journeys(body, { styles: '<style name="note" algin="right" />' });
+    expect(result.validated.diagnostics[0]?.suggestions).toContain('align');
+  });
+
+  it("a screen's own <style> is checked the same way", () => {
+    const result = journeys(body, { screenStyles: '    <styles><style name="local" boarder="true" /></styles>\n' });
+    expectAgreement(result);
+    expect(errorsOf(result.validated.diagnostics)).toEqual([`${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}@2`]);
+  });
+
+  it('every §10 property, and the camelCase spellings always accepted, pass (the control)', () => {
+    const result = journeys(body, {
+      styles:
+        '<style name="all" font="u8g2_font_6x10_mr" draw_color="xor" invert="true" padding="1" border="true" ' +
+        'radius="2" align="center" font_mode="transparent" bitmap_mode="solid" />' +
+        '<style name="camel" drawColor="1" fontMode="solid" bitmapMode="transparent" />',
+    });
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+
+  it('the style properties are one list: no other core source spells them', () => {
+    const table = join('src', 'core', 'schema', 'globals.ts');
+    const offenders = sourceFiles(join(CLI_ROOT, 'src', 'core')).filter(
+      (file) => file !== table && /'(draw_color|font_mode|bitmap_mode)'/.test(readFileSync(join(CLI_ROOT, file), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
+  });
+});

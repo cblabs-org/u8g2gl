@@ -15,21 +15,18 @@
  * - parseStyleDeclarations: Shared style parser reused across globals and screen files
  */
 
+import { STYLE_PROPERTIES, type StylePropertyKey } from '../schema/globals.js';
 import type {
   BdfFontDecl,
-  BitmapMode,
   BuiltinFontDecl,
   ConstDecl,
   ConvertImageDecl,
-  DrawColor,
   FontDecl,
-  FontMode,
   Globals,
   ImageDecl,
   StyleDecl,
   SubjectDecl,
   SubjectType,
-  TextAlign,
   XbmImageDecl,
 } from '../schema/globals.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
@@ -60,30 +57,36 @@ export function parseStyleDeclarations(
     const nameAttr = requireAttribute(el, 'name', filename, diagnostics);
     const name = nameAttr?.value ?? '';
 
-    const font = getAttributeValue(el, 'font');
-    const drawColor = (getAttributeValue(el, 'draw_color') ??
-      getAttributeValue(el, 'drawColor')) as DrawColor | undefined;
-    const invert = getBooleanAttribute(el, 'invert');
-    const padding = getNumberAttribute(el, 'padding', filename, diagnostics);
-    const border = getBooleanAttribute(el, 'border');
-    const radius = getNumberAttribute(el, 'radius', filename, diagnostics);
-    const align = getAttributeValue(el, 'align') as TextAlign | undefined;
-    const fontMode = (getAttributeValue(el, 'font_mode') ??
-      getAttributeValue(el, 'fontMode')) as FontMode | undefined;
-    const bitmapMode = (getAttributeValue(el, 'bitmap_mode') ??
-      getAttributeValue(el, 'bitmapMode')) as BitmapMode | undefined;
+    // Each §10 property through the one list (STYLE_PROPERTIES); anything else
+    // written is recorded for Pass 1 to report rather than silently dropped
+    // (PR-04 WO11b) — `truncate`, which [D-19] deleted, among them.
+    const values: Partial<Record<StylePropertyKey, string | boolean | number>> = {};
+    const known = new Set<string>(['name']);
+    for (const property of STYLE_PROPERTIES) {
+      const spellings = [property.attribute, ...(property.aliases ?? [])];
+      spellings.forEach((spelling) => known.add(spelling));
+      const spelled = spellings.find((spelling) => getAttributeValue(el, spelling) !== undefined);
+      if (spelled === undefined) {
+        continue;
+      }
+      const value =
+        property.kind === 'bool'
+          ? getBooleanAttribute(el, spelled)
+          : property.kind === 'int'
+            ? getNumberAttribute(el, spelled, filename, diagnostics)
+            : getAttributeValue(el, spelled);
+      if (value !== undefined) {
+        values[property.key] = value;
+      }
+    }
+    const unknownAttributes = el.attributes
+      .filter((attribute) => !known.has(attribute.name))
+      .map((attribute) => ({ name: attribute.name, loc: attribute.loc }));
 
     result.push({
       name,
-      font,
-      drawColor,
-      invert,
-      padding,
-      border,
-      radius,
-      align,
-      fontMode,
-      bitmapMode,
+      ...(values as Partial<Pick<StyleDecl, StylePropertyKey>>),
+      ...(unknownAttributes.length > 0 ? { unknownAttributes } : {}),
       loc: el.loc,
     });
   }

@@ -38,7 +38,7 @@
  * - emitStylesUnit():     Emit `ui_styles.cpp`
  */
 
-import type { StyleDecl } from '../../schema/globals.js';
+import { STYLE_PROPERTIES, type StyleDecl } from '../../schema/globals.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../../manifest/index.js';
 import { STYLES_INIT_FUNCTION, styleIdentifier } from '../../resolver/index.js';
@@ -59,40 +59,10 @@ export const STYLES_UNIT = 'ui_styles.cpp';
 /** The function that applies every style's declared properties. */
 export { STYLES_INIT_FUNCTION }; // Spelled once, in mangle.ts, which collision-checks it (PR-04 WO11b).
 
-/**
- * Each `<style>` attribute and the `u8g2gl_style` setter that applies it.
- *
- * A table rather than a chain of `if`s because the mapping is the whole content
- * of this module. `truncate` is not here: [D-19] deleted it, and `StyleDecl` no
- * longer carries it (PR-04 WO11b).
- *
- * How a value is spelled is not here: it is the `u8g2gl_obj` prop named by
- * `attribute`, through `cppValue()`.
- */
-interface StyleProperty {
-  /** The `StyleDecl` member. */
-  readonly key: keyof StyleDecl;
-  /**
-   * The attribute as `<style>` spells it, which is also the element `<prop>` of
-   * the same name (§10). The editor applies a style through those props, and
-   * the value is spelled through that prop's declaration.
-   */
-  readonly attribute: string;
-  /** The `u8g2gl_style` setter. */
-  readonly setter: string;
-}
-
-const STYLE_PROPERTIES: readonly StyleProperty[] = [
-  { key: 'font', attribute: 'font', setter: 'set_font' },
-  { key: 'drawColor', attribute: 'draw_color', setter: 'set_draw_color' },
-  { key: 'invert', attribute: 'invert', setter: 'set_invert' },
-  { key: 'padding', attribute: 'padding', setter: 'set_padding' },
-  { key: 'border', attribute: 'border', setter: 'set_border' },
-  { key: 'radius', attribute: 'radius', setter: 'set_radius' },
-  { key: 'align', attribute: 'align', setter: 'set_align' },
-  { key: 'fontMode', attribute: 'font_mode', setter: 'set_font_mode' },
-  { key: 'bitmapMode', attribute: 'bitmap_mode', setter: 'set_bitmap_mode' },
-];
+// The style properties and their setters are `STYLE_PROPERTIES`, the one list
+// in the schema that the parser and Pass 1 read too (PR-04 WO11b). How a value
+// is spelled is not there: it is the `u8g2gl_obj` prop named by `attribute`,
+// through `cppValue()`.
 
 // styleValueProp
 // The `u8g2gl_obj` prop a style attribute's value is spelled through. Every
