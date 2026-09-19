@@ -5,7 +5,7 @@ title: "Editor target: class registry, property thunks, draw-by-name, scene desc
 branch: u8g2gl-generator/wo11-editor-target
 base: u8g2gl-generator/wo10-emit-screens
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO11 — Editor target

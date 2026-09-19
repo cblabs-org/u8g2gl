@@ -79,8 +79,8 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO8c — validator alignment](wo8c-validator-alignment/WORKORDER.md)** ✅ `ae1e7a9` · `u8g2gl-generator/wo8c-validator-alignment` · base `pa-ca-rulings` (PA spec-rulings commit on WO8b) · standard · exact object ceiling, refusal severity, `wd_` un-reserved (owner-approved)
 - [x] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** ✅ `136c0c2` · base WO8c · standard · §13.7
 - [x] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** ✅ `3a58ab3` · base WO9 · standard · §13.7, §13.8, §17.1
-- [ ] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** · base WO10 · standard · [UD-4], ui_spec §15
-- [ ] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** · `u8g2gl-generator/wo10b-bound-text` · base WO11 · standard · runtime defect found in WO10 review (owner-approved 2026-09-18)
+- [x] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** ✅ `61d6972`, `7958d75`, `e527504` · base WO10 · standard · [UD-4], ui_spec §15
+- [ ] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** · `u8g2gl-generator/wo10b-bound-text` · base WO11 · **high** · runtime defect found in WO10 review (owner-approved 2026-09-18; must-fix, 2026-09-19) + CA rulings 1a/1b/2/3
 - [ ] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries (owner-approved 2026-09-18)
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11b · standard · §13.9, §18, [D-16]; CLI 0.7.0
 
@@ -1355,6 +1355,50 @@ reading).
 
 Ledger is now **twenty**: WO11 → WO10b → WO11b → WO12. WO12 is re-based on WO11b.
 
+### WO11 — complete (`61d6972`, `7958d75`, `e527504`) — the editor target
+
+The worker was interrupted once by an API usage limit, resumed, paused at a green partial commit for
+the rebase onto `ff20f0c`, then resumed to finish. **Verified independently by the PA on
+2026-09-19:**
+
+- **Placement and scope.** All three commits are on `wo11-editor-target` only, and the tree is
+  clean. Nothing under `docs/`, `PROGRAM*`, `.agents/rules` or `extern` changed. The edits to
+  shared helpers are disclosed and behaviour-preserving: extractions in `draw-args.ts`, an export
+  from `value.ts`, a helper in `styles.ts`, the root CMake source list, and an ordered call log
+  in the stub (record-only).
+- **Suites, run sequentially.** A `--clean-first` C++ build with **0 warnings**. `ctest`
+  **336/336**, with the one known skip. CLI **851 tests / 56 files**. `tsc` and lint are clean.
+  One build covers both configurations: the editor runtime is a third compilation of the runtime
+  with `U8G2GL_EDITOR` defined.
+- **End to end through the built CLI.** On a copy of the committed fixture under `tmp/`,
+  `generate --target-kind editor --json` exits 0 and writes `ui_editor_registry.cpp` and
+  `ui_scene.json`. Plain `generate` writes the firmware units. **Both match the committed fixture
+  byte for byte except the version stamp**: 0.6.0 against the pinned `0.0.0-golden`, as expected.
+- **Non-vacuity, reproduced by the PA.** In the committed registry, `set_align(U8G2GL_ALIGN_RIGHT)`
+  was mis-spelled as `…LEFT`. That failed `EditorParity.GaugesScreenWithThePanelShownAndTheBlipGuardedOff`
+  ("call 11 differs") and `EditorRegistry.EveryAlignValueMatchesItsFirmwareEnumerator`. After
+  restoring the file from its copy, the tree is clean and all 336 pass.
+- **Firmware pays nothing.** `EditorSymbols.FirmwareLibraryHasNoEditorSymbols` and
+  `…FirmwareFixtureBinaryHasNoEditorSymbols` pass, and the positive control
+  `…EditorBinaryHasEditorSymbols` passes (485 symbols), so the pattern is not vacuous.
+- **Deferred rulings.** The init order is now one constant (`INIT_STEPS` in `screen-model.ts`),
+  shared by the firmware layout and the scene, so WO10b changes one array. Object names come from
+  realisation, so `ui_obj_` needs no editor work. The bound origin needs the `bind_x`/`bind_y`
+  thunk signature, which WO10b decides.
+
+**Findings triage**
+
+| # | Finding | PA check | Placed |
+|---|---|---|---|
+| 1 | The runtime cannot remove a subject observer, so an editor that rebuilds a scene against long-lived subjects leaks observer slots, and a reused binding slot can be driven by a stale observer | plausible; follows from the observer design | **PR-06 obligation** (recorded; carry to PROGRAM-PLAN at wrap-up) |
+| 2 | `ui_scene.json` cannot carry the GENERATED marker, so the writer never deletes a stale one | accepted | **WO12** (writer carries) |
+| 3 | `u8g2gl_obj.xml` does not declare `font_mode` or `bitmap_mode`, although `u8g2gl_obj` has `set_font_mode` (`u8g2gl_obj.h:369`); the editor refuses a style setting them on a label, button or clock, while firmware applies them | **confirmed**: only `u8g2gl_xbm.xml` declares them | **WO10b** (styles and manifests are already in its box) |
+| 4 | `emit/styles.ts` spells enumerators without `cppValue()`, a second spelling left from WO9 | accepted | **WO10b** (ruling 3 touches style emission) |
+| 5 | §13.1/§13.7 do not describe the editor target's files, the scene format or `--target-kind` | spec | **Chief Architect**, next bridge |
+| 6 | `ui_editor_registry` is not in `mangle.ts`'s collision table | accepted | **WO11b** (with the screen-descriptor collision) |
+| 7 | The editor runtime uses default capacities (a 256-slot pool) | accepted | **PR-06 obligation** |
+| 8 | An out-of-range `int` wraps silently when it reaches a narrower setter parameter in the editor path | accepted | **PR-06 obligation** (host validates first) |
+
 ### Chief Architect rulings on CA-BRIDGE-2026-09-18 — received 2026-09-19
 
 **Provenance.** Delivered by the Chief Architect and pasted into the PA session by the owner on
@@ -1466,6 +1510,7 @@ bind_text is active". WO10b's line items say so.
 
 ## Status Log
 
+- 2026-09-19 — **WO11 complete** (`61d6972`, `7958d75`, `e527504`). Verified independently: 0 warnings, ctest 336 (one known skip), CLI 851/56, tsc and lint clean; end to end byte-identical to the fixture bar the stamp; non-vacuity reproduced; no editor symbols in firmware. Findings triaged (3, 4 → WO10b; 6 → WO11b; 2 → WO12; 1, 7, 8 → PR-06; 5 → Chief Architect). **WO10b revised and dispatched** on `u8g2gl-generator/wo10b-bound-text`.
 - 2026-09-19 — **Chief Architect rulings on CA-BRIDGE-2026-09-18 received; stack rebased onto `main` @ `ff20f0c`.** WO11 paused at green partial `6efa6fa` (now `61d6972` after the rebase) for the rebase; 79 commits, no conflicts, tree identical to the old tip plus `main`'s docs. PA swapped §21's Q-12/Q-13 rows as the Chief Architect directed. **Owner approved WO10b as must-fix** ("agree with your recommendation on WO10b"); recorded under Human Approval, with root cause (runtime). Rulings 1a/1b/2/3 → WO10b, 1c/6/`truncate` → WO11b; no new work order. WO11 resumed.
 - 2026-09-18 — **Resumed after compaction; WO11 re-dispatched** to a fresh worker on the owner's instruction *"ok - proceed"*. Branch verified clean (nothing after `ad8062f` but PA workspace commits). `main` has moved to `c99d9f2` (docs only: the UiUiUi prior-art review, Q-14/Q-15) — not blocking; rebase at wrap-up, expect a §21 table conflict beside Q-13. WO10b/WO11b reading confirmation still not received — required before WO11b is dispatched.
 - 2026-09-18 — **Owner approved WO10b and WO11b.** Ledger now **twenty**; order WO11 → WO10b → WO11b → WO12. Both WORKORDERs drafted; WO12 re-based on WO11b. Chief Architect bridge `CA-BRIDGE-2026-09-18.md` (six items) sent to the owner to relay; rulings awaited.

@@ -60,7 +60,8 @@ Each item below is a gap WO9 or WO10 found; each gets a test that fails at the b
 - [ ] **Invented template setters (WO10 f1).** The manifest parser invents `set_<name>` setters for
       a composite's template parameters; emission filters them. Stop inventing them.
 - [ ] **Screen-descriptor collision (WO10 f5).** `ui_screen_<name>` is not in `mangle.ts`'s
-      collision table, so screen `a_objs`'s descriptor can collide with screen `a`'s object table.
+      collision table, so screen `a_objs`'s descriptor can collide with screen `a`'s object table. The
+      same for `ui_editor_registry` (WO11 f6), and for the new `ui_obj_` family (WO10b).
 - [ ] **`style_*` overrides (WO10 f8)** are never validated except `style_font`. Validate each against
       the style property it overrides.
 - [ ] **Flag directives (WO10 f9):** a missing `ref_value`; `gt`/`lt` on a bool, string or time subject;

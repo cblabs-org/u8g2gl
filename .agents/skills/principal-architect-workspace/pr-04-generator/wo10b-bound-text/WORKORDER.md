@@ -5,7 +5,7 @@ title: "Bound text reaches the label; Chief Architect emission rulings (ui_obj_,
 branch: u8g2gl-generator/wo10b-bound-text
 base: u8g2gl-generator/wo11-editor-target
 complexity: high
-status: draft — PA revises against WO11's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO10b — Bound text reaches the label
@@ -125,6 +125,16 @@ take precedence over a literal `text`, whatever order the two were set in.
 - [ ] The editor registry's set-by-name for `bind_x`/`bind_y` carries the origin too, so the parity
       test covers the new argument.
 
+### C. Carried from WO11's review
+
+- [ ] **`u8g2gl_obj.xml` declares `font_mode` and `bitmap_mode`** (WO11 f3). `u8g2gl_obj` has the
+      setters, but only `u8g2gl_xbm.xml` declares them, so the editor refuses a named style that
+      sets them on a label, button or clock while firmware applies them. Declare them, regenerate
+      the bundled manifests, and add a parity case that exercises one.
+- [ ] **`emit/styles.ts` spells enumerators through `cppValue()`** (WO11 f4). This removes the second
+      spelling left over from WO9. Output must stay byte-identical apart from this work order's
+      intended changes.
+
 ## Strict Boundary Box
 
 **In scope:** `include/u8g2gl/u8g2gl_label.h`, `src/u8g2gl_label.cpp`, `include/u8g2gl/u8g2gl_button.h`,
@@ -132,7 +142,7 @@ take precedence over a literal `text`, whatever order the two were set in.
 `src/u8g2gl_obj.cpp` (text-binding plumbing; `bind_x`/`bind_y` origin; the descriptor union),
 `include/u8g2gl/u8g2gl_editor.h`/`src/u8g2gl_editor.cpp` (the origin only),
 `include/u8g2gl/manifests/u8g2gl_obj.xml` and the bundled `cli/src/data/manifests.json` (the
-`bind_x`/`bind_y` signature only), `cli/src/core/resolver/mangle.ts`, `cli/src/core/generator/emit/`
+`bind_x`/`bind_y` signature; `font_mode`/`bitmap_mode` declarations), `cli/src/core/resolver/mangle.ts`, `cli/src/core/generator/emit/`
 (naming, init order, bound origin), goldens and committed fixtures, `test/`, `cli/test/`, this
 WORKORDER.
 
@@ -144,6 +154,7 @@ text binding off `u8g2gl_obj` (Q-10). Run every suite alone.
 - [ ] `cmake --build build` zero warnings; `ctest --test-dir build` all pass, including the
       real-U8G2 header target
 - [ ] CLI `vitest`, `tsc`, lint clean
+- [ ] Build both configurations (the editor runtime too) with zero warnings; editor parity passes
 - [ ] Goldens and fixtures regenerate byte-identically from the committed generator after your change
 - [ ] Diff limited to the Boundary Box
 

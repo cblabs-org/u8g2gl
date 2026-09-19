@@ -80,6 +80,9 @@ by test rather than asserted.
       sources).
 - [ ] **Carried from WO5b — empty directories.** Deleting stale generated files leaves
       empty directories behind; remove a directory only when the writer emptied it.
+- [ ] **Carried from WO11 — the scene file's marker.** `ui_scene.json` cannot carry the GENERATED
+      marker, so the writer never deletes a stale one. Give the writer a way to recognise it
+      (for example a top-level marker key) without special-casing the name.
 - [ ] **Carried from WO5b — usage errors under `--json`.** `generate` usage errors are
       prose on stderr even with `--json`. Under [D-16] they are JSON with a stable code.
 - [ ] **Carried from WO10 — the version proof changes.** WO10's goldens and committed fixture
