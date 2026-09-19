@@ -336,3 +336,79 @@ none of them weakened:
 - the table order in `mangle`.
 
 Scratch files are under `tmp/wo11b-*`, which is git-ignored. The base worktree was removed after use.
+
+### Follow-up (PA request, 2026-09-19) — findings 3, 5 and 9
+
+Commits `19c034b` (finding 9), `08e64c5` (finding 3), `47d6954` (finding 5), and this section. Every suite was run
+alone:
+- CLI **937 / 57 files**; `tsc` and lint clean.
+- `ctest` **361**, with the one known skip.
+- The C++ build has **0 warnings**. The C++ inputs are unchanged, and goldens and fixture regenerate byte-identically.
+
+**Base run at `a1bed44`.** The follow-up adds 10 tests and changes 2.
+- Of the new tests, all **8 non-control tests fail behaviourally**. None depends on an export missing at the base.
+- The **2 controls pass**: every §10 property, and the exact radius limit / radius 0 / a bound size.
+- Both changed tests fail at the base, behaviourally: the table-order test in `mangle.test.ts`, and "holds every
+  screen descriptor…", whose kind for the registry is now `fixed`.
+
+1. **Unknown `<style>` attributes are reported (finding 3).**
+   - `STYLE_PROPERTIES` is the one list of what a `<style>` may set. It moved from `emit/styles.ts` into
+     `schema/globals.ts`, and it keeps the camelCase spellings the parser always accepted.
+   - The parser reads a style through that list. It records every other attribute in `StyleDecl.unknownAttributes`
+     rather than reporting it, because a parse error would discard the whole of `globals.xml`.
+   - Pass 1 reports each one, for global and screen-local styles alike: `U8G2GL_UNKNOWN_ATTRIBUTE`, severity error,
+     *"Unknown attribute 'bogus' on <style>."* This is the element wording, with the closest property suggested.
+   - `truncate` says *"… 'truncate' is removed: use long_mode="clip" ([D-19])."*, which is the 0.3 migration text,
+     now spelled once as `TRUNCATE_REMOVED`.
+   - The PA's reproduction now gives the same two errors in both journeys.
+   - A source scan pins the single list.
+2. **A box's radius is checked against its own size (finding 5).**
+   - **What the pinned U8G2 2.36.18 source says** (`d66b49a`): it never states `2*(r+1) <= w` as a rule, but its
+     arithmetic implies it.
+     - `u8g2_DrawRBox` centres its corner quarter-discs at `xl = x + r` and `xr = x + w - r - 1`
+       (`extern/u8g2/csrc/u8g2_box.c:98–106`; `u8g2_DrawRFrame` does the same at `:156–167`).
+     - Each quarter-disc reaches `r` further, its own centre column included (`u8g2_circle.c:52`), so it spans
+       `r + 1` columns.
+     - The two corners meet without overlapping only when `w >= 2*(r+1)`, and the same holds for `h`.
+     - Below `2r`, the band between them, `w - r - r` held in `u8g2_uint_t` (`u8g2_box.c:121–123`), wraps.
+   - **What the check does:** Pass 6 check 3c applies where the manifest declares `radius`, `width` and `height` all
+     as `draw=` props (the box, identified from the manifest, not by name) and the radius is a positive literal. It
+     reports `OUT_OF_BOUNDS` at the radius when `2*(r+1)` exceeds a literal width or height, and suggests the largest
+     radius that fits.
+   - **A bound width or height is not judged**, because its value is only known at run time. The runtime passes it
+     to `drawRBox` unchanged. That is recorded as finding 10 below rather than guarded here, because it would need a
+     runtime change.
+3. **The collision table is total (finding 9).**
+   - `ui_init`, `ui_subjects_init` and `ui_styles_init` now have their one definition in `mangle.ts`, beside
+     `ui_editor_registry`. The emitters re-export them.
+   - The runtime's `ui_handler` is added too. It is declared in `u8g2gl_core.h`, in the `ui_` namespace that §13.4
+     reserves for generated code.
+   - All five are registered as kind `fixed`, which replaces the `editor_registry` kind added in `2d5d89a`.
+   - A source scan pins the single spelling.
+   - The other fixed names I found — the editor unit's `static` tables (`ui_editor_classes`, `_drawings`,
+     `_directives`, `_flags`, and the per-tag `ui_editor_<tag>_{properties,bindings,params}`) — are internal to
+     `ui_editor_registry.cpp`, which does not include `ui.hpp`. They are finding 11.
+
+**Diagnostic codes:** none added or renamed in the follow-up.
+
+**Outside the original box, disclosed:**
+- `emit/subjects.ts` and `emit/ui-hpp.ts` re-export the moved constants.
+- `emit/styles.ts` now imports `STYLE_PROPERTIES`.
+- Output is byte-identical.
+
+**Findings still standing, recorded as they are for the PA to place:** 1 (522 capitalised U8G2 fonts), 2 (the
+`u8g_font_*` aliases), 4 (`style_*` accepted for any setter prop), 6 (a string with no `max_len`), 7 (a format
+declared on the string overload of `bind_text`), 8 (the validator imports from `generator/emit/`).
+
+**New findings:**
+
+10. **The runtime has no guard for an oversized radius.** A radius that is too large for a *bound* size (or one set
+    through a style on an object, such as a button's `drawRFrame`) reaches U8G2 unguarded at run time.
+    `u8g2gl_draw_box` passes `r` to `drawRBox`/`drawRFrame` as it is. A runtime clamp is a runtime decision (PR-06
+    or the PA).
+11. **The editor registry unit's `static` tables are outside the collision table.**
+    - The per-tag tables are keyed by manifest tag, which is unique, so they are collision-free as long as tags are.
+    - A third scope in `mangle.ts` for that unit would make this checked rather than argued.
+12. **A style's boolean properties are not value-checked.** `invert="yes"` on a `<style>` still parses to `false`
+    silently, because `getBooleanAttribute` returns `value === 'true'`. Style enum values are checked, but only for
+    global styles.
