@@ -178,6 +178,12 @@ export interface ResolvedExtra {
    * defers (PR-04 WO6 finding 8, with the Chief Architect).
    */
   readonly kind: 'point' | 'length';
+  /**
+   * For a length, the axes it extends along from its centre: a circle's
+   * `radius` both, an ellipse's `rx` horizontal and `ry` vertical. What is drawn
+   * is measured from it (§7.2, `drawn-extent.ts`); absent for a point.
+   */
+  readonly spans?: readonly ('horizontal' | 'vertical')[];
   /** The literal value, when it resolved. */
   readonly coordinate?: ResolvedCoordinate;
   /** Written, but with no value here. */
@@ -307,6 +313,8 @@ interface ExtraCoordinateDef {
   readonly attribute: string;
   readonly axis?: 'horizontal' | 'vertical';
   readonly kind: 'point' | 'length';
+  /** For a length, the axes it extends along from its centre (see ResolvedExtra.spans). */
+  readonly spans?: readonly ('horizontal' | 'vertical')[];
 }
 
 const EXTRA_COORDINATES: readonly ExtraCoordinateDef[] = [
@@ -316,9 +324,9 @@ const EXTRA_COORDINATES: readonly ExtraCoordinateDef[] = [
   { attribute: 'y1', axis: 'vertical', kind: 'point' },
   { attribute: 'x2', axis: 'horizontal', kind: 'point' },
   { attribute: 'y2', axis: 'vertical', kind: 'point' },
-  { attribute: 'radius', kind: 'length' },
-  { attribute: 'rx', kind: 'length' },
-  { attribute: 'ry', kind: 'length' },
+  { attribute: 'radius', kind: 'length', spans: ['horizontal', 'vertical'] },
+  { attribute: 'rx', kind: 'length', spans: ['horizontal'] },
+  { attribute: 'ry', kind: 'length', spans: ['vertical'] },
 ];
 
 /**
@@ -617,7 +625,12 @@ function resolveExtras(
     if (typeof text !== 'string' || !props.some((prop) => prop.name === extra.attribute)) {
       continue;
     }
-    const base = { attribute: extra.attribute, kind: extra.kind, ...(extra.axis ? { axis: extra.axis } : {}) };
+    const base = {
+      attribute: extra.attribute,
+      kind: extra.kind,
+      ...(extra.axis ? { axis: extra.axis } : {}),
+      ...(extra.spans ? { spans: extra.spans } : {}),
+    };
     const loc = node.attributeLocs?.[extra.attribute] ?? node.loc;
 
     // --- Step 2: Evaluate, recording what could not be settled ---

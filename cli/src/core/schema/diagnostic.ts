@@ -128,6 +128,22 @@ export const DIAGNOSTIC_CODES = {
    */
   BOUND_GEOMETRY_ANCHORED_CHILD: 'U8G2GL_BOUND_GEOMETRY_ANCHORED_CHILD',
   /**
+   * A container whose own **position** is bound (`bind_x` / `bind_y`) has
+   * children — the Chief Architect's ruling 1c of 2026-09-19, §7.2 (PR-04
+   * WO11b). Children's positions are fixed at build time and there is no reflow
+   * yet, so they could not follow the container when its binding moves it; and
+   * because every element must be fully positioned, "no positioned children"
+   * means no children at all. A composite instance counts as a container: its
+   * template's elements are its children. The message points to §21 Q-16, which
+   * records how the rule can be lifted without a layout pass.
+   *
+   * An error in both journeys: it is not a construct awaiting a later PR, it is
+   * a document schema 0.4 cannot mean. Distinct from
+   * `BOUND_GEOMETRY_ANCHORED_CHILD`, which still covers a bound *size* with an
+   * anchored child; a bound position is reported here alone.
+   */
+  BOUND_POSITION_HAS_CHILDREN: 'U8G2GL_BOUND_POSITION_HAS_CHILDREN',
+  /**
    * The document uses a construct the schema accepts but the generator does not
    * build yet — focus rings, events and screen navigation (PR-09), collections
    * and composites with their own C++ class (PR-08), `<bdf>` fonts and `<convert>`

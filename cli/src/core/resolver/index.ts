@@ -28,6 +28,8 @@
  *   expandScreens, walkExpanded, STYLE_CHILD_VALUE (expand.ts)
  * - RaisedDiagnostic, PipelineResolution, ScreenPipeline, PipelineInput,
  *   createScreenPipeline (pipeline.ts) — one expansion and one resolution per command
+ * - ExtentEdge, AxisExtent, DrawnExtent, SEGMENT_EXTENTS, drawnExtent (drawn-extent.ts) —
+ *   what an element draws, for §7.2's bounds (ruling 6)
  * - GeometryAttribute, GeometryBinding, GEOMETRY_BINDINGS, geometryBindingNamed,
  *   geometryBindingFor, isPositionBinding, PositionBinding, boundGeometryOf (geometry-bindings.ts) — [D-20]'s one table
  * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS, SCREEN_FUNCTIONS, SCREEN_TABLES,
@@ -97,6 +99,13 @@ export {
   type ScreenPipeline,
   type PipelineInput,
 } from './pipeline.js';
+export {
+  SEGMENT_EXTENTS,
+  drawnExtent,
+  type ExtentEdge,
+  type AxisExtent,
+  type DrawnExtent,
+} from './drawn-extent.js';
 export {
   GEOMETRY_BINDINGS,
   geometryBindingNamed,

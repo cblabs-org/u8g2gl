@@ -248,7 +248,7 @@ describe('line and triangle endpoints and circle radii resolve (WO7b 2)', () => 
     expect(found[0]?.message).toContain('display is 64px high (0..63)');
   });
 
-  it('reports a negative radius, and leaves a radius unbounded against its container', () => {
+  it('reports a negative radius, and bounds a radius by what the circle draws (ruling 6)', () => {
     const found = withCode(
       run('        <u8g2gl_circle name="dot" x="10" y="10" radius="-3" />'),
       DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
@@ -256,9 +256,12 @@ describe('line and triangle endpoints and circle radii resolve (WO7b 2)', () => 
     expect(found).toHaveLength(1);
     expect(found[0]?.message).toContain('resolves to radius=-3, which is negative');
 
-    // A radius larger than the display is not a bounds error: what a radius is
-    // measured against needs the centre-positioned semantics §7.2 defers.
-    expect(errors(run('        <u8g2gl_circle name="dot" x="10" y="10" radius="500" />'))).toEqual([]);
+    // A radius larger than the display was not a bounds error until the Chief
+    // Architect's ruling 6 (2026-09-19, §7.2): a circle is now bounded by the
+    // box around what it draws, which closes WO8a finding 1 (PR-04 WO11b).
+    expect(
+      withCode(run('        <u8g2gl_circle name="dot" x="10" y="10" radius="500" />'), DIAGNOSTIC_CODES.OUT_OF_BOUNDS),
+    ).toHaveLength(4);
   });
 
   it('resolves an ellipse rx and ry through the evaluator', () => {

@@ -310,3 +310,156 @@ describe('a binding or a named style satisfies required (WO10b f1)', () => {
     expect(errorCodes(bad.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.MISSING_REQUIRED]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Ruling 6 — bounds-check what is drawn (Chief Architect, 2026-09-19; §7.2)
+// ---------------------------------------------------------------------------
+
+/** OUT_OF_BOUNDS diagnostics, as `offendingText@line`. */
+function outOfBounds(diagnostics: readonly Diagnostic[]): string[] {
+  return diagnostics
+    .filter((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS)
+    .map((d) => `${d.offendingText ?? ''}@${d.line}`);
+}
+
+describe('ruling 6: what is drawn is bounds-checked (§7.2)', () => {
+  it('a quarter-circle at a display corner passes, in both journeys, at every corner', () => {
+    const result = journeys(
+      [
+        '        <u8g2gl_circle name="tl" x="0" y="0" radius="10" segments="lower_right" />',
+        '        <u8g2gl_circle name="br" x="127" y="63" radius="10" segments="upper_left" />',
+        '        <u8g2gl_ellipse name="tr" x="127" y="0" rx="12" ry="6" segments="lower_left" />',
+        '        <u8g2gl_ellipse name="bl" x="0" y="63" rx="12" ry="6" segments="upper_right" />',
+      ].join('\n'),
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+
+  it('the whole circle at the same corner does not: it draws off the left and top edges', () => {
+    const result = journeys('        <u8g2gl_circle name="tl" x="0" y="0" radius="10" />');
+    expectAgreement(result);
+    expect(outOfBounds(result.validated.diagnostics)).toEqual(['10@3', '10@3']);
+    expect(result.validated.diagnostics[0]?.message).toContain("draws to x=-10 (x - radius");
+  });
+
+  it('a radius larger than the display is refused (closes WO8a finding 1)', () => {
+    const result = journeys('        <u8g2gl_circle name="c" x="64" y="32" radius="500" />');
+    expectAgreement(result);
+    expect(outOfBounds(result.validated.diagnostics)).toHaveLength(4);
+  });
+
+  it('an ellipse is bounded per axis by rx and ry', () => {
+    const result = journeys('        <u8g2gl_ellipse name="e" x="64" y="32" rx="10" ry="40" />');
+    expectAgreement(result);
+    expect(outOfBounds(result.validated.diagnostics)).toEqual(['40@3', '40@3']);
+  });
+
+  it('a pixel is a 1×1 box: one past the edge is refused, the last pixel is not', () => {
+    const inside = journeys('        <u8g2gl_pixel name="p" x="127" y="63" />');
+    expectAgreement(inside);
+    expect(inside.validated.errors).toBe(0);
+    const outside = journeys('        <u8g2gl_pixel name="p" x="128" y="20" />');
+    expectAgreement(outside);
+    expect(outOfBounds(outside.validated.diagnostics)).toEqual(['128@3']);
+  });
+
+  it('an hline is one pixel high, so its y is bounded too', () => {
+    const result = journeys('        <u8g2gl_hline name="h" x="0" y="64" width="10" />');
+    expectAgreement(result);
+    expect(outOfBounds(result.validated.diagnostics)).toEqual(['64@3']);
+  });
+
+  it('a line and a triangle are bounded by the box around their points', () => {
+    const result = journeys(
+      [
+        '        <u8g2gl_line name="l" x1="0" y1="0" x2="127" y2="63" />',
+        '        <u8g2gl_triangle name="t" x0="0" y0="0" x1="130" y1="0" x2="2" y2="4" />',
+      ].join('\n'),
+    );
+    expectAgreement(result);
+    expect(outOfBounds(result.validated.diagnostics)).toEqual(['130@4']);
+  });
+
+  it('is measured against the containing element, for the target generated', () => {
+    const badge = composite('badge', '', '        <u8g2gl_circle name="dot" x="10" y="10" radius="12" />');
+    const result = journeys('        <badge name="b" x="0" y="0" width="20" height="20" />', { composites: [badge] });
+    expectAgreement(result);
+    expect(result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.OUT_OF_BOUNDS)).toHaveLength(4);
+    expect(result.validated.diagnostics[0]?.message).toContain("containing element '<badge>' is 20px");
+  });
+
+  it('a bound centre is not measured at build time (the control)', () => {
+    const result = journeys('        <u8g2gl_circle name="c" bind_x="level" y="32" radius="10" />');
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+
+  it('the segment table exists once: no other core source spells a segment name', () => {
+    const table = join('src', 'core', 'resolver', 'drawn-extent.ts');
+    const offenders = sourceFiles(join(CLI_ROOT, 'src', 'core')).filter(
+      (file) => file !== table && /'(upper|lower)_(left|right)'/.test(readFileSync(join(CLI_ROOT, file), 'utf8')),
+    );
+    expect(offenders).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ruling 1c — a container whose position is bound has no children
+// ---------------------------------------------------------------------------
+
+describe('ruling 1c: a container whose position is bound may have no children (§7.2, Q-16)', () => {
+  const panel = composite('panel', '', '        <u8g2gl_box name="fill" x="0" y="0" width="4" height="4" />');
+
+  it('a composite instance with bind_x is a container with children: both journeys refuse it', () => {
+    const result = journeys('        <panel name="p" x="0" bind_x="offset" y="0" width="20" height="20" />', {
+      composites: [panel],
+    });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN);
+    expect(found.map((d) => `${d.offendingText ?? ''}@${d.line}`)).toEqual(['bind_x@3']);
+    expect(found[0]?.message).toContain('no reflow yet');
+    expect(found[0]?.message).toContain('Q-16');
+    expect(errorCodes(result.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN]);
+  });
+
+  it('so does an object with bind_y and an element written inside it', () => {
+    const result = journeys(
+      '        <u8g2gl_label name="l" x="0" bind_y="offset" width="40" height="20" font="u8g2_font_6x10_mr">\n' +
+        '            <u8g2gl_box name="b" x="0" y="0" width="2" height="2" />\n' +
+        '        </u8g2gl_label>',
+    );
+    expectAgreement(result);
+    expect(errorCodes(result.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN]);
+  });
+
+  it('inside a template, it is the template’s defect: reported once for two instances', () => {
+    const frame = composite(
+      'frame',
+      '',
+      '        <panel name="inner" x="0" bind_x="offset" y="0" width="10" height="10" />',
+    );
+    const result = journeys(
+      [
+        '        <frame name="a" x="0" y="0" width="20" height="20" />',
+        '        <frame name="b" x="30" y="0" width="20" height="20" />',
+      ].join('\n'),
+      { composites: [panel, frame] },
+    );
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN);
+    expect(found.map((d) => d.file)).toEqual(['widgets/frame/frame.xml']);
+  });
+
+  it('a bound size keeps the anchored-child rule, and a childless bound position is fine (controls)', () => {
+    const result = journeys(
+      [
+        '        <panel name="sized" x="0" y="0" bind_width="level" height="20" />',
+        '        <u8g2gl_box name="alone" bind_x="offset" y="30" width="2" height="2" />',
+      ].join('\n'),
+      { composites: [panel] },
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});

@@ -16,10 +16,15 @@
  *              expressions, unknown or non-integer constants, division by zero,
  *              int32 overflow), then, for every element:
  *              1. Fully positioned (§7.2): where the manifest declares `x` / `y`,
- *                 it must resolve — an under-determined axis (`width` with neither
- *                 `x` nor `right`), a `$prop` that never substitutes, a
- *                 `#parent_*` or anchor whose container has no size, is
+ *                 it must resolve or be bound (`bind_x` supplies `x`, PR-04
+ *                 WO11b) — an under-determined axis (`width` with neither `x` nor
+ *                 `right`), a `$prop` that never substitutes, a `#parent_*` or
+ *                 anchor whose container has no size, is
  *                 `U8G2GL_UNRESOLVED_GEOMETRY`. A written size must resolve too.
+ *              1b. Fully sized (PR-04 WO11b, WO10 SR2): where the manifest
+ *                 declares `width` / `height`, something must supply it —
+ *                 written, anchor-derived, bound, or a `draw=` prop's default —
+ *                 or it is `U8G2GL_MISSING_REQUIRED`, the code `generate` used.
  *              2. Fits `int16_t` (§13.2): a resolved x, y, width or height outside
  *                 it is `U8G2GL_COORDINATE_OUT_OF_RANGE` — checked first, and an
  *                 axis that fails it is not bounds-checked.
@@ -27,6 +32,11 @@
  *                 the container's origin, extend past its far edge, or resolve to
  *                 a negative size. The container is the display for a screen's
  *                 top level, otherwise the parent's resolved size.
+ *              3b. What is drawn (§7.2, the Chief Architect's ruling 6): along an
+ *                 axis the element has no size on, the pixels it draws must lie
+ *                 inside the container — a pixel as 1×1, a line or triangle by
+ *                 its points, a circle or ellipse by the segments it draws. The
+ *                 box is the resolver's `drawnExtent()`, the one derivation.
  *              4. Every **non-coordinate `int` property** resolved too (§13.2,
  *                 PR-04 WO9): `scroll_px_per_sec="#speed"` used never to be
  *                 evaluated at all and reached emission as text (WO8a finding
@@ -50,11 +60,14 @@
  *              one inside an instance names the instance unless the template
  *              already raised it word for word.
  *
- *              The [D-20] bound-geometry rule — a container whose own geometry is
- *              bound may not have anchor-positioned children, which would require
- *              reflow — runs on the expanded tree, so it sees through nested
- *              composites (PR-04 WO7 F7). A pair fixed by a template is reported
- *              once; a pair that depends on an instance names it.
+ *              The [D-20] bound-geometry rules run on the expanded tree, so they
+ *              see through nested composites (PR-04 WO7 F7): a container whose
+ *              own **position** is bound may have no children at all (ruling 1c,
+ *              `U8G2GL_BOUND_POSITION_HAS_CHILDREN`, pointing to §21 Q-16); one
+ *              whose **size** is bound may not have anchor-positioned children,
+ *              which would require reflow. A container or pair fixed by a
+ *              template is reported once; one that depends on an instance names
+ *              it.
  *
  * Exports:
  * - validateGeometry(input): Runs Pass 6 geometry and bounding validation
@@ -65,6 +78,7 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode } from '../schema/widget-node.js';
 import {
   boundGeometryOf,
+  drawnExtent,
   geometryBindingFor,
   INT16_MAX,
   INT16_MIN,
@@ -72,7 +86,9 @@ import {
   isRectangular,
   resolveElements,
   withInstantiation,
+  type AxisExtent,
   type AxisOutcome,
+  type ExtentEdge,
   type DeferredCoordinate,
   type ExpandedElement,
   type ResolvedCoordinate,
@@ -556,42 +572,97 @@ function checkExtras(
       continue; // A value that cannot be stored is not then measured.
     }
 
-    // --- Step 3: A length is non-negative; a point lies inside its container ---
-    if (extra.kind === 'length') {
-      if (coordinate.value < 0) {
-        emit(
-          node,
-          createGeomDiagnostic(
-            DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-            `Element '<${node.tag}>' resolves to ${extra.attribute}=${coordinate.value}, which is negative.`,
-            coordinate.provenance.loc ?? node.loc,
-            sourceText(coordinate),
-          ),
-        );
-      }
-      continue;
-    }
-    const axis = AXES.find((candidate) => candidate.name === extra.axis);
-    if (axis === undefined) {
-      continue;
-    }
-    const limit = element.container[axis.size];
-    if (limit === undefined) {
-      continue;
-    }
-    if (coordinate.value < 0 || coordinate.value > limit - 1) {
+    // --- Step 3: A length is non-negative ---
+    // Whether a point, or the reach of a length from its centre, lies inside the
+    // container is what the element draws, and checkDrawnAxis judges that from
+    // the one drawn-extent function (ruling 6).
+    if (extra.kind === 'length' && coordinate.value < 0) {
       emit(
         node,
         createGeomDiagnostic(
           DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-          `Element '<${node.tag}>' has ${extra.attribute}=${coordinate.value}, but ${element.container.label} ` +
-            `is ${limit}px ${axis.extent} (0..${limit - 1}).`,
+          `Element '<${node.tag}>' resolves to ${extra.attribute}=${coordinate.value}, which is negative.`,
           coordinate.provenance.loc ?? node.loc,
           sourceText(coordinate),
         ),
       );
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Check 3b — what is drawn, inside the container (§7.2, ruling 6)
+// ---------------------------------------------------------------------------
+
+// describeEdge
+// How an edge was reached, for a message: `has x2=140`, or
+// `draws to x=-3 (x - radius, segments 'all')`.
+function describeEdge(edge: ExtentEdge, element: ResolvedElement, axis: GeometryAxis, before: boolean): string {
+  const [first, second] = edge.from.map((coordinate) => coordinate.provenance.attribute);
+  if (second === undefined) {
+    return `has ${first ?? axis.start}=${edge.value}`;
+  }
+  const segments = element.node.attributes.segments;
+  const which = typeof segments === 'string' ? `, segments '${segments}'` : '';
+  return `draws to ${axis.start}=${edge.value} (${first} ${before ? '-' : '+'} ${second}${which})`;
+}
+
+// checkDrawnAxis
+// Check 3 for an axis the element has no size on: the pixels it actually draws
+// must lie inside the container (§7.2, the Chief Architect's ruling 6 of
+// 2026-09-19). A pixel is one pixel; a line or triangle spans its points; a
+// circle or ellipse spans the segments it draws, so a quarter-circle at a
+// display corner passes while the whole circle would not. The derivation is
+// the resolver's `drawnExtent()`, the one copy; this only compares. Radii are
+// judged here too — `radius="500"` on a circle used to validate (WO8a f1).
+//   element — the resolved element
+//   axis    — the axis
+//   extent  — what it draws along the axis, when known at build time
+//   limit   — the container's size along the axis
+//   emit    — receives each diagnostic
+function checkDrawnAxis(
+  element: ResolvedElement,
+  axis: GeometryAxis,
+  extent: AxisExtent,
+  limit: number,
+  emit: ElementDiagnosticSink,
+): void {
+  const { node, container } = element;
+  const range = `${container.label} is ${limit}px ${axis.extent} (0..${limit - 1})`;
+  const report = (edge: ExtentEdge, before: boolean): void => {
+    // Located at the coordinate that carries the edge past the container: the
+    // length for a centre's reach, otherwise the one coordinate.
+    const culprit = edge.from[edge.from.length - 1];
+    emit(
+      node,
+      createGeomDiagnostic(
+        DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
+        `Element '<${node.tag}>' ${describeEdge(edge, element, axis, before)}, but ${range}.` +
+          (edge.from.length > 1 ? ' What is drawn must lie inside its container (§7.2).' : ''),
+        culprit?.provenance.loc ?? node.loc,
+        culprit === undefined ? undefined : sourceText(culprit),
+      ),
+    );
+  };
+  if (extent.min.value < 0) {
+    report(extent.min, true);
+  }
+  if (extent.max.value > limit - 1) {
+    report(extent.max, false);
+  }
+}
+
+// representableAlong
+// Whether every coordinate an element has along an axis fits `int16_t`; one that
+// does not is reported by check 2 and is not then measured.
+function representableAlong(element: ResolvedElement, axis: GeometryAxis): boolean {
+  const values = [
+    element.geometry[axis.start]?.value,
+    ...element.extras
+      .filter((extra) => extra.axis === axis.name || (extra.spans?.includes(axis.name) ?? false))
+      .map((extra) => extra.coordinate?.value),
+  ];
+  return values.every((value) => value === undefined || (value >= INT16_MIN && value <= INT16_MAX));
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +747,8 @@ function checkElements(
   emit: ElementDiagnosticSink,
 ): void {
   for (const element of elements) {
+    const manifest = context.manifests.get(element.node.tag);
+    const drawn = drawnExtent(element, manifest);
     for (const axis of AXES) {
       let representable: boolean;
       if (rules.judges(element, axis)) {
@@ -686,8 +759,17 @@ function checkElements(
         representable = outOfInt16(element, axis).length === 0;
       }
       const limit = element.container[axis.size];
-      if (representable && limit !== undefined) {
+      if (!representable || limit === undefined) {
+        continue;
+      }
+      // An axis the element has a size on is a rectangle's (check 3); any other
+      // is judged by what the element draws along it (check 3b, ruling 6).
+      const sized = manifest?.api.props.some((prop) => prop.name === axis.size) ?? false;
+      const extent = drawn[axis.name];
+      if (sized) {
         checkAxisBounds(element, axis, limit, emit);
+      } else if (extent !== undefined && representableAlong(element, axis)) {
+        checkDrawnAxis(element, axis, extent, limit, emit);
       }
     }
     checkExtras(element, context, rules.templateSourced(element), emit);
@@ -749,11 +831,16 @@ function checkBoundContainers(
   elements: readonly ExpandedElement[],
   diagnostics: Diagnostic[],
   fixedPairs: Map<WidgetNode, Set<WidgetNode>>,
+  fixedContainers: Set<WidgetNode>,
 ): void {
   for (const container of elements) {
+    const boundPosition = boundGeometryOf(container.node, ['position'])?.binding;
     const boundAttr = boundGeometryOf(container.node)?.binding;
 
-    if (boundAttr !== undefined) {
+    if (boundPosition !== undefined && container.children.length > 0) {
+      // Ruling 1c: no children at all, which subsumes the anchored-child rule.
+      checkBoundPosition(container, boundPosition, diagnostics, fixedContainers);
+    } else if (boundAttr !== undefined) {
       for (const child of container.children) {
         const anchor = anchorOf(child.node);
         if (anchor === undefined) {
@@ -788,8 +875,56 @@ function checkBoundContainers(
       }
     }
 
-    checkBoundContainers(container.children, diagnostics, fixedPairs);
+    checkBoundContainers(container.children, diagnostics, fixedPairs, fixedContainers);
   }
+}
+
+// checkBoundPosition
+// Ruling 1c (Chief Architect, 2026-09-19; §7.2, §21 Q-16): a container whose own
+// position is bound may have no children in schema 0.4. Reported once per
+// container, at its binding. A container fixed by a template — written inside a
+// composite's `<view>` and bound from a literal — is the template's defect,
+// reported once however often the composite is used; one whose binding comes
+// through a `$prop` names its instance.
+//
+// Before this, the validator demanded a literal `x` beside `bind_x`, so a bound
+// container's children were placed against that literal and left behind when
+// the binding moved it (WO10 finding 3); generate refused only when no literal
+// was written. Both journeys now refuse it, with this one diagnostic.
+//   container       — the expanded container, with at least one child
+//   binding         — the position binding it writes
+//   diagnostics     — output
+//   fixedContainers — template containers already reported
+function checkBoundPosition(
+  container: ExpandedElement,
+  binding: string,
+  diagnostics: Diagnostic[],
+  fixedContainers: Set<WidgetNode>,
+): void {
+  const fixed = container.instantiation.length > 0 && !hasPlaceholder(container.source, binding);
+  if (fixed) {
+    if (fixedContainers.has(container.source)) {
+      return;
+    }
+    fixedContainers.add(container.source);
+  }
+  const { node } = container;
+  const name = typeof node.attributes.name === 'string' && node.attributes.name !== '' ? node.attributes.name : node.tag;
+  const first = container.children[0]?.node;
+  const childName =
+    first === undefined ? '' : typeof first.attributes.name === 'string' && first.attributes.name !== '' ? first.attributes.name : first.tag;
+  const count = container.children.length;
+  const diagnostic = createGeomDiagnostic(
+    DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN,
+    `Container '${name}' <${node.tag}> binds its position with '${binding}', so in schema 0.4 it may have no ` +
+      `children, and it has ${count} (the first is '${childName}'${first === undefined ? '' : ` <${first.tag}>`}). ` +
+      `Children are positioned at build time and there is no reflow yet, so they could not follow the container ` +
+      `when the binding moves it (§7.2). Bind the children's own positions instead, or see §21 Q-16 for how ` +
+      `children that follow their container may be allowed later.`,
+    node.attributeLocs?.[binding] ?? node.loc,
+    binding,
+  );
+  diagnostics.push(fixed ? diagnostic : withInstantiation(diagnostic, container.instantiation));
 }
 
 /**
@@ -887,8 +1022,9 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
 
   // --- Step 4: [D-20] bound-geometry containers, on the expanded tree ---
   const fixedPairs = new Map<WidgetNode, Set<WidgetNode>>();
+  const fixedContainers = new Set<WidgetNode>();
   for (const screen of pipeline.expansion.screens) {
-    checkBoundContainers(screen.elements, diagnostics, fixedPairs);
+    checkBoundContainers(screen.elements, diagnostics, fixedPairs, fixedContainers);
   }
 
   return diagnostics;
