@@ -134,8 +134,6 @@ export interface StyleDecl {
   readonly radius?: number;
   /** Text alignment within element width. */
   readonly align?: TextAlign;
-  /** If true, appends ellipsis when text overflows bounding width. */
-  readonly truncate?: boolean;
   /** Font drawing mode. */
   readonly fontMode?: FontMode;
   /** Bitmap drawing mode. */

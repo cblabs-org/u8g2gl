@@ -77,6 +77,13 @@ export const DIAGNOSTIC_CODES = {
    */
   DEPRECATED_SCHEMA_VERSION: 'U8G2GL_DEPRECATED_SCHEMA_VERSION',
   DUPLICATE_NAME: 'U8G2GL_DUPLICATE_NAME',
+  /**
+   * A string subject's initial `value` is longer than its declared `max_len`
+   * (§8.2, PR-04 WO11b): the buffer holds `max_len` bytes before its
+   * terminator, and the runtime would silently cut the value short. Counted in
+   * UTF-8 bytes, which is what the buffer stores.
+   */
+  STRING_TOO_LONG: 'U8G2GL_STRING_TOO_LONG',
   INVALID_ENUM_VALUE: 'U8G2GL_INVALID_ENUM_VALUE',
   FORMAT_MISMATCH: 'U8G2GL_FORMAT_MISMATCH',
   MALFORMED_XML: 'U8G2GL_MALFORMED_XML',

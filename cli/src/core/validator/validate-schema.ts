@@ -24,7 +24,9 @@
  *              Declarations are checked where they are declared (PR-04 WO7b): an
  *              `<int>` constant's value must be an integer literal within int32,
  *              the four built-in constant names are reserved (§7.2), and a prop
- *              may not be both `required` and defaulted.
+ *              may not be both `required` and defaulted. A subject's initial
+ *              value must fit its type, and a string's its `max_len` (PR-04
+ *              WO11b).
  *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
@@ -36,7 +38,7 @@ import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
-import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
+import type { SubjectDecl, SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
 
 const VALID_SCHEMA_VERSION = '0.4';
 
@@ -150,6 +152,76 @@ function checkRequiredWithDefault(prop: PropDef, owner: string): Diagnostic | un
     prop.loc,
     'required, default',
   );
+}
+
+/** The range of a `<time>` subject: Unix seconds, held as `uint32_t` (`set_time`). */
+const TIME_MAX = 4294967295;
+
+// checkSubjectValue
+// A subject's initial `value` against its declared type (§8.1), and a string's
+// against its `max_len` (§8.2). Until PR-04 WO11b no pass checked either (WO9
+// finding 6): emission caught a non-integer int or a bool that was neither
+// `true` nor `false`, as TYPE_MISMATCH — the code used here, so both journeys
+// name it alike — and nothing at all caught an int outside int32_t, a time
+// outside uint32_t, or a string longer than its buffer, which the runtime would
+// silently truncate. The same trimming emission applies to a non-string value.
+//   subject — the declaration
+function checkSubjectValue(subject: SubjectDecl): Diagnostic | undefined {
+  const declared = subject.default;
+  if (declared === undefined || declared === '') {
+    return undefined;
+  }
+  const mismatch = (why: string): Diagnostic =>
+    createDiagnostic(
+      DIAGNOSTIC_CODES.TYPE_MISMATCH,
+      `Subject '${subject.name}' is ${subject.type === 'int' ? 'an' : 'a'} <${subject.type}> whose value ` +
+        `'${declared}' ${why} (§8.1).`,
+      subject.loc,
+      declared,
+    );
+  const value = declared.trim();
+
+  switch (subject.type) {
+    case 'bool':
+      return value === 'true' || value === 'false' ? undefined : mismatch("is neither 'true' nor 'false'");
+    case 'int':
+    case 'time': {
+      if (!/^-?\d+$/.test(value)) {
+        return mismatch('is not an integer');
+      }
+      const number = Number(value);
+      if (subject.type === 'int' && (number < INT32_MIN || number > INT32_MAX)) {
+        return mismatch(`is outside int32_t (${INT32_MIN}..${INT32_MAX})`);
+      }
+      if (subject.type === 'time' && (number < 0 || number > TIME_MAX)) {
+        return mismatch(`is outside 0..${TIME_MAX}: a time is Unix seconds, held unsigned`);
+      }
+      return undefined;
+    }
+    case 'string': {
+      // `max_len` counts the bytes the buffer holds before its terminator (§8.2),
+      // and the runtime copies bytes, so a non-ASCII character counts as its
+      // UTF-8 length.
+      if (subject.maxLen === undefined) {
+        return undefined;
+      }
+      const bytes = new TextEncoder().encode(declared).length;
+      if (bytes <= subject.maxLen) {
+        return undefined;
+      }
+      const characters = [...declared].length;
+      return createDiagnostic(
+        DIAGNOSTIC_CODES.STRING_TOO_LONG,
+        `Subject '${subject.name}' has max_len="${subject.maxLen}", but its value '${declared}' is ${bytes} ` +
+          `bytes${characters !== bytes ? ` (${characters} characters, UTF-8)` : ''}, so it would not fit its buffer ` +
+          `and the runtime would silently cut it short (§8.2).`,
+        subject.loc,
+        declared,
+      );
+    }
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -396,6 +468,10 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             Array.from(VALID_SUBJECT_TYPES),
           ),
         );
+      }
+      const valueDiagnostic = checkSubjectValue(s);
+      if (valueDiagnostic) {
+        diagnostics.push(valueDiagnostic);
       }
     }
 

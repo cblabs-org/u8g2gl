@@ -68,7 +68,6 @@ export function parseStyleDeclarations(
     const border = getBooleanAttribute(el, 'border');
     const radius = getNumberAttribute(el, 'radius', filename, diagnostics);
     const align = getAttributeValue(el, 'align') as TextAlign | undefined;
-    const truncate = getBooleanAttribute(el, 'truncate');
     const fontMode = (getAttributeValue(el, 'font_mode') ??
       getAttributeValue(el, 'fontMode')) as FontMode | undefined;
     const bitmapMode = (getAttributeValue(el, 'bitmap_mode') ??
@@ -83,7 +82,6 @@ export function parseStyleDeclarations(
       border,
       radius,
       align,
-      truncate,
       fontMode,
       bitmapMode,
       loc: el.loc,

@@ -6,7 +6,8 @@
  * File: src/core/validator/validate-references.ts
  * Purpose: Pass 2 — Validates cross-file and intra-screen symbol references (§15.1).
  * Description: Checks fonts, images, subjects, styles, composite instances, and focus
- *              ring targets against declared definitions. Employs Levenshtein edit
+ *              ring targets against declared definitions, and every `<builtin>`
+ *              font against the fonts U8G2 bundles (PR-04 WO11b). Employs Levenshtein edit
  *              distance (findClosest) to provide structured replacement suggestions.
  *              Image-ness is derived from the manifest's `type="image"` prop
  *              ([D-17], PR-3R WO7) rather than a hardcoded tag list.
@@ -29,6 +30,8 @@
  * - validateReferences(input): Runs Pass 2 cross-reference validation
  */
 
+import u8g2FontData from '../../data/u8g2-fonts.json' with { type: 'json' };
+import u8g2SourceData from '../../data/catalogue-source.json' with { type: 'json' };
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
@@ -39,6 +42,17 @@ import { walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
 import { propReferenceIn, reportSubstituted, unsubstitutedPlaceholder } from './substituted-values.js';
+
+/**
+ * Every font U8G2 bundles, as the catalogue build derives them from the pinned
+ * U8G2 source — declared in `u8g2.h` and defined in `u8g2_fonts.c`
+ * (`src/node/font-symbol-builder.ts`). Data, never a hand-kept list ([D-14]).
+ */
+const U8G2_FONT_SYMBOLS: readonly string[] = u8g2FontData;
+const U8G2_FONT_SET: ReadonlySet<string> = new Set(U8G2_FONT_SYMBOLS);
+
+/** The U8G2 release that list was built from, for the message. */
+const U8G2_RELEASE: string = u8g2SourceData.u8g2.tag ?? u8g2SourceData.u8g2.commit ?? 'as pinned';
 
 /** The declarations a value written on a screen element may name. */
 interface ReferenceScope {
@@ -358,6 +372,27 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
   // the diagnostic code below — a stable API — but whether a tag is known, and
   // what to suggest for one that is not, comes from the one registry.
   const knownTags = manifests.tags;
+
+  // --- 0. A <builtin> font must be one U8G2 bundles (§14.1, PR-04 WO11b) ---
+  // Its name is aliased verbatim (`ui_font_<name> = <name>`), so a name U8G2
+  // does not provide used to surface only as an error in the user's firmware
+  // build (WO9 finding 5). The set is data derived from the pinned U8G2 source
+  // by the catalogue build ([D-14]'s method), never a list kept here.
+  for (const font of globals?.fonts ?? []) {
+    if (font.kind === 'builtin' && font.name !== '' && !U8G2_FONT_SET.has(font.name)) {
+      diagnostics.push(
+        createRefDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_FONT,
+          `<builtin> font '${font.name}' is not a font U8G2 ${U8G2_RELEASE} bundles, so the generated alias ` +
+            `would not compile (§14.1). Use the name of a U8G2 font, e.g. 'u8g2_font_6x10_mr', or declare ` +
+            `your own with <bdf>.`,
+          font.loc,
+          font.name,
+          findClosest(font.name, U8G2_FONT_SYMBOLS),
+        ),
+      );
+    }
+  }
 
   // --- 1. Validate font references in styles (globals and screen-local) ---
   for (const style of globals?.styles ?? []) {

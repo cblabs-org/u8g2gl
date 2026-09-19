@@ -63,10 +63,8 @@ export const STYLES_INIT_FUNCTION = 'ui_styles_init';
  * Each `<style>` attribute and the `u8g2gl_style` setter that applies it.
  *
  * A table rather than a chain of `if`s because the mapping is the whole content
- * of this module, and because `truncate` — which `StyleDecl` still carries — is
- * deliberately **absent**: [D-19] deleted it from `u8g2gl_style`, so there is no
- * setter to call. A style declaring it is emitted without it, and that gap is
- * reported as a finding rather than silently tolerated here.
+ * of this module. `truncate` is not here: [D-19] deleted it, and `StyleDecl` no
+ * longer carries it (PR-04 WO11b).
  *
  * How a value is spelled is not here: it is the `u8g2gl_obj` prop named by
  * `attribute`, through `cppValue()`.

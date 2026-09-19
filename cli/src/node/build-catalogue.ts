@@ -7,13 +7,17 @@
  * File: src/node/build-catalogue.ts
  * Purpose: CLI script entry point to parse U8G2 source code and build the
  *          display catalogue and page-mode replacement map data files (§5.2),
- *          and to record which U8G2 commit they were built from, so the
- *          catalogue can be reproduced and diffed across a U8G2 upgrade (Q-11).
+ *          the list of fonts U8G2 bundles (§14.1, PR-04 WO11b), and to record
+ *          which U8G2 commit they were built from, so each can be reproduced and
+ *          diffed across a U8G2 upgrade (Q-11).
  * Description: Reads U8G2 from the pinned submodule (extern/u8g2) unless
  *              `--u8g2-path` or U8G2_PATH names another tree, invokes the
- *              catalogue builder, writes catalogue.json, page-mode-map.json and
+ *              catalogue builder and the font-symbol builder, writes
+ *              catalogue.json, page-mode-map.json, u8g2-fonts.json and
  *              catalogue-source.json to src/data/, and logs the extraction
- *              metrics and the source commit.
+ *              metrics and the source commit. One run, one U8G2 tree, one
+ *              source record: the fonts and the displays cannot come from two
+ *              different U8G2 commits.
  *
  * Usage:
  *   npm run build:catalogue                                  # extern/u8g2
@@ -24,7 +28,8 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCatalogue, readU8g2Source } from './catalogue-builder.js';
+import { buildCatalogue, readU8g2Source, resolveU8g2Layout } from './catalogue-builder.js';
+import { parseFontSymbols } from './font-symbol-builder.js';
 
 /**
  * @brief Resolves a path string, expanding `~` to the user's home directory.
@@ -82,8 +87,9 @@ function main(): void {
     );
   }
 
-  // --- Step 4: Invoke builder ---
+  // --- Step 4: Invoke the builders ---
   const result = buildCatalogue(resolvedPath);
+  const fonts = parseFontSymbols(resolveU8g2Layout(resolvedPath).clibDir);
 
   // --- Step 5: Determine output target directory ---
   const dataDir = resolve(scriptDir, '..', 'data');
@@ -92,6 +98,7 @@ function main(): void {
   const cataloguePath = resolve(dataDir, 'catalogue.json');
   const pageModeMapPath = resolve(dataDir, 'page-mode-map.json');
   const sourcePath = resolve(dataDir, 'catalogue-source.json');
+  const fontsPath = resolve(dataDir, 'u8g2-fonts.json');
 
   // --- Step 6: Write JSON data files ---
   // The source is recorded in a sibling file rather than inside catalogue.json:
@@ -101,6 +108,7 @@ function main(): void {
   // rebuilds to byte-identical files.
   writeFileSync(cataloguePath, JSON.stringify(result.catalogue, null, 2) + '\n', 'utf8');
   writeFileSync(pageModeMapPath, JSON.stringify(result.pageModeMap, null, 2) + '\n', 'utf8');
+  writeFileSync(fontsPath, JSON.stringify(fonts, null, 2) + '\n', 'utf8');
   const sourceRecord = { u8g2: { tag: source.tag, commit: source.commit } };
   writeFileSync(sourcePath, JSON.stringify(sourceRecord, null, 2) + '\n', 'utf8');
 
@@ -110,9 +118,11 @@ function main(): void {
   console.log(`[u8g2gl] Resolved ${result.driverCount} driver functions`);
   console.log(`[u8g2gl] Compiled ${result.fullBufferCount} full-buffer display records`);
   console.log(`[u8g2gl] Mapped ${result.pageModeCount} page-mode constructors to full-buffer equivalents`);
+  console.log(`[u8g2gl] Listed ${fonts.length} bundled fonts, declared in u8g2.h and defined in u8g2_fonts.c`);
   console.log(`[u8g2gl] Output written to:`);
   console.log(`  - ${cataloguePath}`);
   console.log(`  - ${pageModeMapPath}`);
+  console.log(`  - ${fontsPath}`);
   console.log(`  - ${sourcePath}`);
 }
 

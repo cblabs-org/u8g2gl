@@ -16,7 +16,7 @@
  *              every diagnostic carries a real location.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -33,6 +33,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnos
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
+import { parseFontSymbols } from '../../src/node/font-symbol-builder.js';
 
 const NARROW = 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C';
 const SCREEN_FILE = 'screens/screen_home.xml';
@@ -621,5 +622,96 @@ describe('each style_* override is validated against the property it overrides (
     );
     expectAgreement(result);
     expect(result.validated.errors).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// <builtin> font names (WO9 f5)
+// ---------------------------------------------------------------------------
+
+const U8G2_CSRC = resolve(CLI_ROOT, '..', 'extern', 'u8g2', 'csrc');
+
+describe('a <builtin> font must be one U8G2 bundles (WO9 f5)', () => {
+  const label = '        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_6x10_mrr" />';
+
+  it('a misspelt name is UNKNOWN_FONT in both journeys, with the real name suggested', () => {
+    const result = journeys(label, { fonts: '<builtin name="u8g2_font_6x10_mrr" />' });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.file}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.UNKNOWN_FONT}:globals.xml:u8g2_font_6x10_mrr`,
+    ]);
+    expect(found[0]?.suggestions).toContain('u8g2_font_6x10_mr');
+    expect(found[0]?.message).toContain('U8G2 2.36.18');
+  });
+
+  it('a name U8G2 declares with either section macro is accepted (controls)', () => {
+    const result = journeys(
+      '        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_amstrad_cpc_extended_8f" />',
+      { fonts: '<builtin name="u8g2_font_amstrad_cpc_extended_8f" /><builtin name="u8g2_font_6x10_mr" />' },
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+
+  it.runIf(existsSync(U8G2_CSRC))('the committed list is exactly what the pinned U8G2 source declares and defines', () => {
+    const committed = JSON.parse(readFileSync(join(CLI_ROOT, 'src', 'data', 'u8g2-fonts.json'), 'utf8')) as string[];
+    expect(committed).toEqual(parseFontSymbols(U8G2_CSRC));
+    expect(committed.length).toBe(2039);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Subject values (WO9 f6) and truncate
+// ---------------------------------------------------------------------------
+
+describe("a subject's initial value is checked against its type and max_len (WO9 f6)", () => {
+  const body = '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />';
+
+  it.each([
+    ['<int name="n" value="lots" />', DIAGNOSTIC_CODES.TYPE_MISMATCH],
+    ['<int name="n" value="3000000000" />', DIAGNOSTIC_CODES.TYPE_MISMATCH],
+    ['<bool name="n" value="yes" />', DIAGNOSTIC_CODES.TYPE_MISMATCH],
+    ['<time name="n" value="-1" />', DIAGNOSTIC_CODES.TYPE_MISMATCH],
+    ['<time name="n" value="5000000000" />', DIAGNOSTIC_CODES.TYPE_MISMATCH],
+    ['<string name="n" value="Euston Square" max_len="6" />', DIAGNOSTIC_CODES.STRING_TOO_LONG],
+  ])('%s is refused in both journeys', (subject, code) => {
+    const result = journeys(body, { subjects: subject });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.file}`)).toEqual([`${code}:globals.xml`]);
+  });
+
+  it('a string is measured in the UTF-8 bytes its buffer holds', () => {
+    const result = journeys(body, { subjects: '<string name="unit" value="°C" max_len="2" />' });
+    expectAgreement(result);
+    expect(result.validated.diagnostics[0]?.message).toContain('3 bytes (2 characters, UTF-8)');
+  });
+
+  it('values of their types, and a string that exactly fits, build (controls)', () => {
+    const result = journeys(body, {
+      subjects:
+        '<int name="a" value="-2147483648" /><bool name="b" value="false" /><time name="c" value="4294967295" />' +
+        '<string name="d" value="Euston" max_len="6" /><string name="e" value="no limit declared" />',
+    });
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});
+
+describe('truncate is gone from the style model ([D-19], §10)', () => {
+  it('a parsed <style> carries no truncate member', () => {
+    const parsed = parseGlobalsFile(
+      '<globals><styles><style name="s" align="left" truncate="true" /></styles></globals>',
+      'globals.xml',
+    );
+    const style = parsed.value?.styles[0];
+    expect(style?.name).toBe('s');
+    expect(style !== undefined && 'truncate' in style).toBe(false);
+  });
+
+  it("the [D-19] migration message that tells an author why is kept", () => {
+    const text = readFileSync(join(CLI_ROOT, 'src', 'core', 'validator', 'validate-schema.ts'), 'utf8');
+    expect(text).toContain(`'truncate' is removed: use long_mode=\\"clip\\" ([D-19])`);
   });
 });
