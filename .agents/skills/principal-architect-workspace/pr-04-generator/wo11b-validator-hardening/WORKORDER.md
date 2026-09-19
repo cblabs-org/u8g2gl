@@ -40,7 +40,8 @@ never code. One pipeline: never a second count, evaluator, expansion or prefix l
 
 ## Design authority
 
-design_spec §7.2, §8.1–§8.4, §13.2, §13.4, §14.1; PROJECT.md decision 1 (validate warns, generate
+design_spec §7.2, §8.1–§8.4, §10, §13.2, §13.4, §14.1 (as amended on `main` @ `ff20f0c`), §21 Q-16;
+the Chief Architect's rulings recorded in PROJECT.md ("Chief Architect rulings on CA-BRIDGE-2026-09-18"); PROJECT.md decision 1 (validate warns, generate
 errors, for refusals). "Stop and report" means record it, do not choose, continue.
 
 ---
@@ -71,7 +72,22 @@ Each item below is a gap WO9 or WO10 found; each gets a test that fails at the b
       `extern/u8g2` — derived as data, the way [D-14] derives the display catalogue, never a
       hand-kept list.
 - [ ] **Subject values (WO9 f6):** a subject's initial `value` is type-checked; a string's initial value
-      is checked against its `max_len`; remove `truncate` from `StyleDecl`, which [D-19] deleted.
+      is checked against its `max_len`; remove `truncate` from `StyleDecl` (`schema/globals.ts:138`) and from the style
+      parser (`parser/parse-globals.ts:71,86`), and the stale mention in `emit/styles.ts:57`.
+      [D-19] deleted it and §10 no longer lists it. Keep the validator's [D-19] rejection message
+      (`validate-schema.ts:70`) so an author who writes it is told why.
+- [ ] **Ruling 1c (Chief Architect, 2026-09-19; §7.2, Q-16):** a container whose **own position is
+      bound** (`bind_x`/`bind_y`) may have **no children** in schema 0.4. It is an **error** in
+      `validate` and `generate` alike. The message says why (children are positioned at build
+      time and there is no reflow yet) and points to Q-16. Composite instances count as
+      containers.
+- [ ] **Ruling 6 (Chief Architect, 2026-09-19; §7.2): bounds-check what is drawn.** A pixel as a
+      1×1 box; a line by the box around its endpoints; a triangle by the box around its vertices;
+      a circle or ellipse by the box around the segments its segment bits select (a quarter-circle
+      at a display corner must pass when every drawn pixel is on the display). Checked against the
+      container, for the target being generated. Radii get checked by this rule too, which closes
+      WO8a f1. The segment → box derivation is data or one function shared with whatever else
+      needs it. Never a second copy.
 - [ ] **Two renames (WO9 f7, WO8c f3):** `U8G2GL_UNRESOLVED_GEOMETRY` is now used for non-coordinate
       `int` props too, and `notYetSupportedPolicy` also carries realisation's refusal severity. Rename
       each to what it now means, keeping diagnostic codes stable if they are public (say which).
@@ -81,7 +97,9 @@ Each item below is a gap WO9 or WO10 found; each gets a test that fails at the b
 **In scope:** `cli/src/core/validator/`, `cli/src/core/resolver/mangle.ts` (the descriptor only),
 `cli/src/core/parser/parse-widget-manifest.ts` (template setters only), `cli/src/core/schema/`
 (`StyleDecl`, diagnostic names), `cli/src/node/` and `cli/src/data/` (the U8G2 font-symbol data
-build only), `cli/test/`, this WORKORDER.
+build only), `cli/src/core/parser/parse-globals.ts` and `emit/styles.ts` (the `truncate` removal only),
+`cli/src/core/resolver/` (a shared drawn-extent function for ruling 6, if one belongs there), `cli/test/`,
+this WORKORDER.
 
 **Do NOT touch:** runtime C++; manifests; emission, except to delete refusals the validator now
 makes unreachable (say which); `docs/`; `PROGRAM*.md`. Run every suite alone.

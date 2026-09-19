@@ -1355,6 +1355,63 @@ reading).
 
 Ledger is now **twenty**: WO11 → WO10b → WO11b → WO12. WO12 is re-based on WO11b.
 
+### Chief Architect rulings on CA-BRIDGE-2026-09-18 — received 2026-09-19
+
+**Provenance.** Delivered by the Chief Architect and pasted into the PA session by the owner on
+2026-09-19. The Chief Architect made **every spec edit himself**, on `main` @ `ff20f0c`
+("docs(spec): rulings on PR-04's first emitted code — naming, binding, styles, bounds"): §7.2, §10,
+§13.1, §13.4, §13.5, §13.7, §13.8, §13.12, §21 Q-16, and a dated amendment to the [D-20] record.
+None of them are the PA's. The instruction was to rebase onto `ff20f0c` before WO11 goes further,
+to implement the rulings, and to log each one as a work-order line item here.
+
+**Rebase done 2026-09-19.** WO11's worker committed its green partial state (`6efa6fa`) and paused.
+Then `git rebase --update-refs --onto ff20f0c 5f2574f`, 79 commits, with no conflicts. The new tip's
+tree differs from the old tip's only by `5f2574f..ff20f0c` (checked with `git diff --stat`). One
+transient "local changes would be overwritten" stop on `test/CMakeLists.txt` happened with an
+empty `git status`; `--continue` resumed cleanly. §21 then listed Q-13 above Q-12. The Chief
+Architect said Q-13 goes after Q-12, so the PA swapped the two rows, and nothing else. This is the
+only PA spec edit.
+
+| # | Ruling (spec location) | Line item goes to |
+|---|---|---|
+| 1a | **Bound positions are container-relative** (§7.2, [D-20] amendment). Draw-call primitives: the container's build-time origin is added into the emitted draw arguments | **WO10b** |
+| 1b | Object-backed elements: the **PA's chosen mechanism** is below | **WO10b** |
+| 1c | A container whose **own position is bound may have no children** in 0.4. This is a validator **error**, and its message says why (no reflow yet) and points to Q-16 | **WO11b** |
+| 2 | **Every emitted object is `ui_obj_<name>`**; composite children are `ui_obj_<instance>_<child>` (§13.4, §13.12). Not `ui_<screen>_<name>`, which was withdrawn. The goldens change once, and the commit message says so | **WO10b** |
+| 3 | **An element's own attributes win over named styles** (§10). init order is construct → apply styles → set properties → bind → events → focus ring (§13.7) | **WO10b** |
+| 4, 5 | §13.7 file list; §13.5 `.get()`. Spec only, already on `main` | none |
+| 6 | **Bounds-check what is drawn, not the full box** (§7.2): a pixel as 1×1; a line by the box around its endpoints; a triangle by the box around its vertices; a circle or ellipse by the box around the segments its bits select. This departs from the PA's recommendation | **WO11b** |
+| — | `truncate` removed from §10. **Surfaced:** `cli/src/core/parser/parse-globals.ts:71,86` still parses it, `StyleDecl` (`cli/src/core/schema/globals.ts:138`) still carries it, and `emit/styles.ts:57` mentions it. The validator already rejects it with a [D-19] message (`validate-schema.ts:70`). No manifest declares it; the runtime keeps only a "deleted" comment. Already a WO11b item | **WO11b** |
+
+**Mechanism for 1b (the PA's choice, as the ruling requires).** `bind_x` and `bind_y` gain an
+`int16_t origin` parameter: the container's build-time device-absolute origin, which the generator
+emits as a literal. The observer applies `origin + subject value`. It adds in 32 bits and clamps the
+sum to int16_t, not each term, so a large offset can't wrap. `bind_width` and `bind_height` take no
+origin. In `u8g2gl_binding_desc`, `ref_value` becomes **one named member of an anonymous union**
+alongside `int16_t coord_origin`, with a comment saying which binding kind uses which. Flag bindings
+use `ref_value`, geometry bindings use `coord_origin`, and text bindings use neither. That gives the
+field one stated meaning per kind and costs no RAM per pool slot. A second `int16_t` field was
+rejected because it costs RAM in every slot; the union costs nothing. The Chief Architect ruled
+that reusing `ref_value` under its current name is a readability defect, and the union removes that.
+
+**Placement rationale.** The emission and runtime rulings (1a, 1b, 2, 3) go in **WO10b**. The
+Chief Architect tied the init-order change to WO10b's root-cause analysis. WO10b's end-to-end test
+already needs a regenerated fixture, and doing all of the golden churn in one work order means the
+goldens change exactly once. The validator rulings (1c, 6, `truncate`) go in **WO11b**, the
+validator work order. **No new work order**, so the ledger stays at twenty. WO10b's Boundary Box
+therefore grows to include the generator's emitter and mangler. Its complexity becomes `high`.
+
+**Effect on WO11.** WO11 finishes against the current emission (bare names, properties before
+styles). Its worker put the firmware screen emitter's shared decisions in
+`emit/screen-model.ts`, which **both** targets consume. So when WO10b changes naming and init order,
+both targets change together, and WO11's parity test is what proves it. WO11 has to read the
+rebased §13.1 when it resumes.
+
+**Obligation for PR-09 (recorded, not delegated).** `focus_style` re-applies a style at run time,
+and `apply_style`'s `merge_from` would then overwrite properties the element set itself. So PR-09
+must track which properties the element set itself (§10). Carry this to PROGRAM-PLAN's PR-09 entry
+at wrap-up, with the owner's agreement, since this ruling did not delegate that edit.
+
 ## Human Approval
 
 <!-- The owner's own words and the timestamp. A worker verifies this as its
@@ -1372,8 +1429,44 @@ Context: the owner had the twelve-work-order decomposition, the six findings
 above, the sharing decision, the Chief Architect's answers to the five decisions
 and the PA's `bind_time` decision in front of them.
 
+### WO10b — owner decision, 2026-09-19 (must-fix before PR-04 is submitted)
+
+**APPROVED by the human (Matt McNeill) on 2026-09-19.** The owner's own words, verbatim, as
+relayed in the Chief Architect's addendum that the owner pasted into this session:
+
+> "agree with your recommendation on WO10b"
+
+Context: the Chief Architect recommended treating WO10b as **must-fix before PR-04 is submitted**.
+A label bound to a subject that never draws its text breaks the Phase 1 exit criterion itself,
+because the departures-board status bar's station name is a bound label. This confirms WO10b
+independently of the 2026-09-18 "10a and 10b" reading. **WO11b's reading is still unconfirmed.**
+
+Acceptance, per the Chief Architect: two tests, and **both must fail on today's code**:
+(1) a runtime test that binds a label to a string subject, sets a value, renders, and asserts the
+text is drawn with that value, extending the U8G2 test double in its existing idiom if needed,
+never weakening the test; and (2) an end-to-end test in which a generated fixture with `bind_text`
+compiles and its label draws the subject's text. The point is that PR-07's pixel-diff gate must
+never be what finds this.
+
+**Root cause, stated by the PA (2026-09-19): the runtime, not the generator.**
+`u8g2gl_on_text_binding_change` (`src/u8g2gl_obj.cpp`) only calls `mark_dirty()`, and its comment
+says "the widget reads the subject directly when it renders". But `u8g2gl_label::render()`,
+`render_static()`, `render_scroll()` and `render_animation_update()` read only `text_`, which
+only `set_text()` assigns. Nothing reads the subject. The generator emits `bind_text(&subject)`
+correctly, and emits it last.
+
+**Interaction with the new init order, checked rather than assumed.** Moving styles before
+properties does not cause the defect and does not mask it: no style property sets text, and
+`bind_text` is registered last under both orders. It does bear on the fix in one way. The emitter
+writes no `set_text` for a defaulted `text` (checked in `test/generated_fixture/generated/`), but an
+author may write both `text="…"` and `bind_text`, and under the new order a style is applied before
+either. So the fix must give an active binding precedence over a literal `text`, whatever order the
+two were set in. The manifest already says `text` is "Overridden when
+bind_text is active". WO10b's line items say so.
+
 ## Status Log
 
+- 2026-09-19 — **Chief Architect rulings on CA-BRIDGE-2026-09-18 received; stack rebased onto `main` @ `ff20f0c`.** WO11 paused at green partial `6efa6fa` (now `61d6972` after the rebase) for the rebase; 79 commits, no conflicts, tree identical to the old tip plus `main`'s docs. PA swapped §21's Q-12/Q-13 rows as the Chief Architect directed. **Owner approved WO10b as must-fix** ("agree with your recommendation on WO10b"); recorded under Human Approval, with root cause (runtime). Rulings 1a/1b/2/3 → WO10b, 1c/6/`truncate` → WO11b; no new work order. WO11 resumed.
 - 2026-09-18 — **Resumed after compaction; WO11 re-dispatched** to a fresh worker on the owner's instruction *"ok - proceed"*. Branch verified clean (nothing after `ad8062f` but PA workspace commits). `main` has moved to `c99d9f2` (docs only: the UiUiUi prior-art review, Q-14/Q-15) — not blocking; rebase at wrap-up, expect a §21 table conflict beside Q-13. WO10b/WO11b reading confirmation still not received — required before WO11b is dispatched.
 - 2026-09-18 — **Owner approved WO10b and WO11b.** Ledger now **twenty**; order WO11 → WO10b → WO11b → WO12. Both WORKORDERs drafted; WO12 re-based on WO11b. Chief Architect bridge `CA-BRIDGE-2026-09-18.md` (six items) sent to the owner to relay; rulings awaited.
 - 2026-09-18 — **Checkpoint for context compaction.** WO11's worker hit the usage limit before changing anything (branch clean at `ad8062f`). `main` unchanged at `5f2574f`; the stack contains it. Lessons distilled below; `BRIDGE-PR04-CHECKPOINT.md` written so a fresh session can resume. WO10b and WO11b still await the owner.

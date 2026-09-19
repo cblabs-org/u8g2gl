@@ -6,6 +6,20 @@ conversation that produced it.
 
 ---
 
+## ⚠ Update 2026-09-19 — read this first; it supersedes parts of the text below
+
+- **Stack rebased onto `main` @ `ff20f0c`** (the Chief Architect's spec rulings). The branch SHAs
+  below are pre-rebase. WO11 resumed from its green partial commit on the rebased branch.
+- **The Chief Architect ruled on all six CA-BRIDGE-2026-09-18 items** and made every spec edit
+  himself. See PROJECT.md "Chief Architect rulings on CA-BRIDGE-2026-09-18". Rulings 1a/1b/2/3 are
+  in WO10b, and 1c/6/`truncate` are in WO11b. No new work order.
+- **The owner approved WO10b as must-fix before submission** (recorded under Human Approval, with
+  the root cause). WO10b is now `complexity: high`: bound text plus `ui_obj_` naming, the init
+  order, and container-relative bound positions.
+- **Still open:** the owner's confirmation of the WO11b reading, and an obligation for PR-09
+  (focus_style must not overwrite an element's own properties) to carry into PROGRAM-PLAN at
+  wrap-up, with the owner's agreement.
+
 ## Who you are and what you may do
 
 You are the **Principal Architect for PR-04** (the U8G2GL generator, XML → C++ per
