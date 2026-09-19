@@ -37,6 +37,7 @@
  * - cppStringLiteral():  A C++ string literal, escaped (§13.2)
  * - cppEnumerator():     An enumerator from a manifest's `emit` pattern
  * - cppValue():          Spell one prop's resolved value as C++ (§13.2)
+ * - COLOR_VALUES:        The values a `color` prop accepts
  */
 
 import type { PropDef } from '../../schema/widget-manifest.js';
@@ -59,6 +60,14 @@ const COLOR_ENUMERATORS: Readonly<Record<string, string>> = {
   '1': 'U8G2GL_COLOR_1',
   xor: 'U8G2GL_COLOR_XOR',
 };
+
+/**
+ * The values a `type="color"` prop accepts, in {@link COLOR_ENUMERATORS} order.
+ *
+ * Exported (PR-04 WO11) so the editor registry can generate one branch per
+ * colour, each spelled by {@link cppValue}, without a second list of colours.
+ */
+export const COLOR_VALUES: readonly string[] = Object.keys(COLOR_ENUMERATORS);
 
 /** Characters with a short C++ escape, rather than a numeric one. */
 const SHORT_ESCAPES: Readonly<Record<string, string>> = {

@@ -31,6 +31,9 @@
  *   (screen.ts), `ui.cpp` (ui-init.ts) and the coordinate translation they share
  *   with WO11 (placement.ts)
  * - ProjectEmissionInput, ProjectEmission, emitProjectFiles()
+ * - TargetKind, TARGET_KINDS, emitEditorFiles() — the editor target (WO11):
+ *   the registry (editor-registry.ts) and the scene description (scene.ts),
+ *   emitted from the same model through the screen model (screen-model.ts)
  */
 
 import type { Diagnostic } from '../../schema/diagnostic.js';
@@ -50,6 +53,8 @@ import { emitScreenUnit, screenUnitPath } from './screen.js';
 import { emitUiHeader, UI_HEADER } from './ui-hpp.js';
 import { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
 import type { EmittedUnit, ProjectEmitInput } from './unit.js';
+import { EDITOR_REGISTRY_UNIT, emitEditorRegistryUnit } from './editor-registry.js';
+import { emitSceneFile, SCENE_FILE } from './scene.js';
 
 export { cppEnumerator, cppStringLiteral, cppValue } from './value.js';
 export {
@@ -87,6 +92,8 @@ export { emitUiHeader, screenDescriptorIdentifier, UI_HEADER, UI_INIT_FUNCTION }
 export { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
 export { emitScreenUnit, screenUnitPath, type ScreenEmitInput } from './screen.js';
 export { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
+export { EDITOR_REGISTRY_UNIT, editorTypeEnumerator, emitEditorRegistryUnit } from './editor-registry.js';
+export { describeScenes, emitSceneFile, SCENE_FILE, SCENE_FORMAT_VERSION, type SceneInput } from './scene.js';
 
 /** Everything emission needs about one build. */
 export interface ProjectEmissionInput {
@@ -218,4 +225,65 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
   }
 
   return { files, diagnostics };
+}
+
+/**
+ * The generation targets ([UD-4], design_spec §13.1). `firmware` is the §13.7
+ * file set; `editor` is the registry and the scene description the designer's
+ * Wasm runtime builds from.
+ */
+export type TargetKind = 'firmware' | 'editor';
+
+/** Every target kind, in the order `--target-kind` documents them. */
+export const TARGET_KINDS: readonly TargetKind[] = ['firmware', 'editor'];
+
+/**
+ * @brief Emits the editor target: `ui_editor_registry.cpp` and `ui_scene.json`
+ *        ([UD-4], ui_spec §4.1 step 6, PR-04 WO11).
+ *
+ * Takes exactly the model {@link emitProjectFiles} takes — the realisation,
+ * resolution and capacities of one validated build — so the editor is emitted
+ * from the same pipeline as firmware, never a second one. Call it only for a
+ * build whose firmware emission produced no errors: the scene describes what
+ * firmware would draw, and a model firmware refuses has nothing to describe.
+ *
+ * @param input As for {@link emitProjectFiles}; `assets` is not read.
+ * @return The two files, registry first. No diagnostics: every refusal is
+ *         firmware emission's, which has already run.
+ */
+export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
+  const projectSource = input.project.loc?.file ?? 'u8g2gl.xml';
+  const generated = {
+    source: projectSource,
+    schema: input.project.schema,
+    generator: input.generatorVersion,
+    target: input.target,
+  };
+
+  // --- Step 1: The registry, from every loaded manifest ---
+  const registry = emitEditorRegistryUnit({ manifests: input.manifests, stamp: formatHeaderStamp(generated) });
+
+  // --- Step 2: The scene description, from the build's own model ---
+  const scene = emitSceneFile({
+    project: {
+      project: input.project,
+      globals: input.globals,
+      screens: input.screens,
+      capacities: input.capacities,
+      assets: input.assets,
+      stamp: '',
+    },
+    realised: input.realised,
+    resolved: input.resolved,
+    manifests: input.manifests,
+    generated,
+  });
+
+  return {
+    files: [
+      { path: EDITOR_REGISTRY_UNIT, content: registry.content },
+      { path: SCENE_FILE, content: scene },
+    ],
+    diagnostics: registry.diagnostics,
+  };
 }

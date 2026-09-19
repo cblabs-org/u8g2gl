@@ -49,6 +49,10 @@ set(U8G2GL_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_style.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_core.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_draw.cpp
+    # The editor target's checks ([UD-4], PR-04 WO11). Entirely under
+    # U8G2GL_EDITOR, so a firmware build compiles it to an empty translation
+    # unit; test/CMakeLists.txt checks the firmware binaries carry none of it.
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_editor.cpp
 )
 
 add_library(u8g2gl STATIC ${U8G2GL_RUNTIME_SOURCES})

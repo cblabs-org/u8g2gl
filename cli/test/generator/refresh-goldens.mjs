@@ -25,6 +25,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadProject } from '../../dist/node/load-project.js';
 import { generate } from '../../dist/core/generator/index.js';
+import { emitEditorFiles } from '../../dist/core/generator/emit/index.js';
 import { writeGenerated } from '../../dist/node/write-generated.js';
 
 /** Must match GOLDEN_GENERATOR_VERSION in emit-golden.test.ts and compile-fixture.test.ts. */
@@ -37,10 +38,15 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 /** Each fixture, and the directory its expectations live in. */
 const FIXTURES = [
   { project: resolve(here, 'fixtures/emit-project'), expected: resolve(here, 'fixtures/emit-project/expected') },
-  { project: resolve(here, '../../../test/generated_fixture'), expected: resolve(here, '../../../test/generated_fixture/generated') },
+  {
+    project: resolve(here, '../../../test/generated_fixture'),
+    expected: resolve(here, '../../../test/generated_fixture/generated'),
+    // The editor target (PR-04 WO11), built into the C++ parity test.
+    editor: resolve(here, '../../../test/generated_fixture/generated_editor'),
+  },
 ];
 
-for (const { project, expected } of FIXTURES) {
+for (const { project, expected, editor } of FIXTURES) {
   const loaded = loadProject(project);
   const result = generate({
     ...loaded.model,
@@ -59,4 +65,24 @@ for (const { project, expected } of FIXTURES) {
     console.log(`  ${change.action}: ${change.path}`);
   }
   console.log(`${changes.length} file(s) in ${expected}. Review the diff before committing.\n`);
+
+  if (editor !== undefined) {
+    const files = emitEditorFiles({
+      project: loaded.model.project,
+      globals: loaded.model.globals,
+      screens: loaded.model.screens,
+      realised: result.realised,
+      resolved: result.resolved,
+      manifests: loaded.model.manifests,
+      capacities: result.capacities,
+      assets: loaded.assets,
+      generatorVersion: GOLDEN_GENERATOR_VERSION,
+      target: result.target,
+    }).files;
+    const editorChanges = writeGenerated(editor, { ...result, files });
+    for (const change of editorChanges) {
+      console.log(`  ${change.action}: ${change.path}`);
+    }
+    console.log(`${editorChanges.length} file(s) in ${editor}. Review the diff before committing.\n`);
+  }
 }

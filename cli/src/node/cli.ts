@@ -19,12 +19,17 @@
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
+ *
+ * `generate --target-kind editor` (PR-04 WO11, [UD-4]) writes the editor target —
+ * the registry unit and the scene description — from the same validated build
+ * the firmware units come from, into `<output dir>_editor` by default.
  */
 
 import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
-import { checkProject, generate } from '../core/generator/index.js';
+import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
+import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
 import type { CheckedTarget } from '../core/validator/index.js';
 import {
@@ -53,6 +58,16 @@ const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate'] as const;
 
 /** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
 const DEFAULT_OUTPUT_DIR = 'generated';
+
+/**
+ * Appended to the firmware output directory to name the editor target's default
+ * one (PR-04 WO11). A sibling, never a subdirectory: the writer deletes stale
+ * GENERATED files anywhere beneath the directory it writes, so an editor
+ * directory inside `generated/` would be deleted by the next firmware run, and
+ * editor output written into `generated/` itself would delete the firmware
+ * units.
+ */
+const EDITOR_OUTPUT_SUFFIX = '_editor';
 
 /**
  * Standard microcontroller internal SRAM budgets in bytes (§5.2, §18).
@@ -130,6 +145,11 @@ Generate Options:
     --out <dir>      Output directory (default: the project's <output dir>,
                      else generated/ in the project)
     --check          Write nothing; exit 1 if any file would change (CI check)
+    --target-kind <firmware|editor>
+                     What to generate (default: firmware). 'editor' writes the
+                     designer's class registry (ui_editor_registry.cpp) and scene
+                     description (ui_scene.json) instead of the firmware units,
+                     by default into <output dir>${EDITOR_OUTPUT_SUFFIX}
   Runs the same validation as 'validate', but constructs not built yet are
   errors, and any error means nothing is written. Only files inside the output
   directory are written, and only files carrying the GENERATED header are
@@ -503,10 +523,18 @@ interface GenerateArgs {
   readonly target?: string;
   readonly out?: string;
   readonly check: boolean;
+  readonly targetKind: TargetKind;
+}
+
+// isTargetKind
+// Whether a --target-kind value names a generation target.
+function isTargetKind(value: string): value is TargetKind {
+  return (TARGET_KINDS as readonly string[]).includes(value);
 }
 
 // parseGenerateArgs
-// Parses `generate [path] --target <name> --out <dir> --check`, or reports a
+// Parses `generate [path] --target <name> --out <dir> --check
+// --target-kind <kind>`, or reports a
 // usage error and exits 2. Strict, unlike `validate`: a mistyped flag on a
 // command that writes files must not be silently ignored.
 //   args — subcommand arguments, global flags already removed
@@ -515,6 +543,7 @@ function parseGenerateArgs(args: readonly string[]): GenerateArgs {
   let target: string | undefined;
   let out: string | undefined;
   let check = false;
+  let targetKind: TargetKind = 'firmware';
 
   const usageError = (message: string): never => {
     console.error(`Error: ${message}`);
@@ -526,6 +555,17 @@ function parseGenerateArgs(args: readonly string[]): GenerateArgs {
     const arg = args[i] ?? '';
     if (arg === '--check') {
       check = true;
+    } else if (arg === '--target-kind') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        usageError(`${arg} requires a value: ${TARGET_KINDS.join(' or ')}.`);
+      }
+      i++;
+      if (value === undefined || !isTargetKind(value)) {
+        usageError(`Unknown target kind '${value ?? ''}'; expected ${TARGET_KINDS.join(' or ')}.`);
+      } else {
+        targetKind = value;
+      }
     } else if (arg === '--target' || arg === '--out') {
       const value = args[i + 1];
       if (value === undefined || value.startsWith('-')) {
@@ -546,7 +586,13 @@ function parseGenerateArgs(args: readonly string[]): GenerateArgs {
     }
   }
 
-  return { path: path ?? '.', ...(target !== undefined ? { target } : {}), ...(out !== undefined ? { out } : {}), check };
+  return {
+    path: path ?? '.',
+    ...(target !== undefined ? { target } : {}),
+    ...(out !== undefined ? { out } : {}),
+    check,
+    targetKind,
+  };
 }
 
 /** Output-relative change list as the user reads it, one line per file. */
@@ -555,6 +601,31 @@ function formatChanges(changes: readonly FileChange[], check: boolean): string {
     ? { created: 'would create', updated: 'would update', unchanged: 'unchanged', deleted: 'would delete' }
     : { created: 'created', updated: 'updated', unchanged: 'unchanged', deleted: 'deleted' };
   return changes.map((c) => `  ${verb[c.action]}: ${c.path}`).join('\n');
+}
+
+// editorFilesOf
+// The editor target's files for a build that generated: the same project model,
+// realisation, resolution and capacities firmware emission used.
+//   loaded           — the loaded project
+//   result           — its successful firmware generation
+//   generatorVersion — the version the firmware files were stamped with
+function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateResult['files'] {
+  const { realised, resolved, capacities, target } = result;
+  if (realised === undefined || resolved === undefined || capacities === undefined || target === undefined) {
+    throw new Error('A build that generated carries its realisation, resolution, capacities and target.');
+  }
+  return emitEditorFiles({
+    project: loaded.model.project,
+    globals: loaded.model.globals,
+    screens: loaded.model.screens,
+    realised,
+    resolved,
+    manifests: loaded.model.manifests,
+    capacities,
+    assets: loaded.assets,
+    generatorVersion,
+    target,
+  }).files;
 }
 
 /**
@@ -583,13 +654,19 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
 
   // --- Step 1: Load, validate and lay out — all or nothing ---
   const loaded = loadOrExit(options.path, json, { files: [] });
+  const generatorVersion = generatorVersionOrExit(json);
   const result = generate({
     ...loaded.model,
     ...(options.target !== undefined ? { target: options.target } : {}),
-    generatorVersion: generatorVersionOrExit(json),
+    generatorVersion,
     assets: loaded.assets,
   });
   const { diagnostics, errors, warnings } = result;
+  // The editor target is emitted from this very build — its realisation,
+  // resolution and capacities — and only when the firmware emission it shares a
+  // model with succeeded, so it can never describe a document `generate` refuses.
+  const written: GenerateResult =
+    options.targetKind === 'editor' && errors === 0 ? { ...result, files: editorFilesOf(loaded, result, generatorVersion) } : result;
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
 
   if (errors > 0 || loaded.projectRoot === undefined) {
@@ -605,15 +682,19 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
   // --- Step 2: Decide the output directory ---
   // --out is relative to where the command runs; <output dir> is relative to
   // the project, because the project file is what declares it.
+  const firmwareDir = loaded.model.project.output?.dir ?? DEFAULT_OUTPUT_DIR;
   const outDir = options.out !== undefined
     ? resolve(process.cwd(), options.out)
-    : resolve(loaded.projectRoot, loaded.model.project.output?.dir ?? DEFAULT_OUTPUT_DIR);
+    : resolve(
+        loaded.projectRoot,
+        options.targetKind === 'editor' ? `${firmwareDir.replace(/[/\\]+$/, '')}${EDITOR_OUTPUT_SUFFIX}` : firmwareDir,
+      );
   const outLabel = relative(process.cwd(), outDir).split(sep).join('/') || '.';
 
   // --- Step 3: Check or write ---
   let changes: readonly FileChange[];
   try {
-    changes = options.check ? planGeneratedWrite(outDir, result.files) : writeGenerated(outDir, result);
+    changes = options.check ? planGeneratedWrite(outDir, written.files) : writeGenerated(outDir, written);
   } catch (err) {
     exitWithFatal(json, outLabel, err instanceof Error ? err.message : String(err), { files: [] });
   }
@@ -634,7 +715,7 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
       );
     } else {
       console.log(
-        `Generated ${result.files.length} file(s) in ${outLabel} for target '${result.target}':\n` +
+        `Generated ${written.files.length} ${options.targetKind} file(s) in ${outLabel} for target '${result.target}':\n` +
           formatChanges(changes, false),
       );
     }

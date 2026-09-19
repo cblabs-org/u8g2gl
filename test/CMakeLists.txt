@@ -485,6 +485,85 @@ target_compile_options(test_generated_fixture PRIVATE
 
 gtest_discover_tests(test_generated_fixture)
 
+# --- The editor target ([UD-4], PR-04 WO11) ---
+# The runtime compiled a third time, with U8G2GL_EDITOR defined: the build the
+# designer's Wasm canvas uses. Default capacities, not the fixture's counted
+# ones, because an editor constructs scenes the document's pool was never sized
+# for. The registry comes from test/generated_fixture/generated_editor/, the
+# committed output of `u8g2gl generate --target-kind editor`; the CLI suite
+# (compile-fixture.test.ts) fails if regenerating it changes a byte.
+set(U8G2GL_FIXTURE_EDITOR ${U8G2GL_FIXTURE_DIR}/generated_editor)
+
+add_library(u8g2gl_editor_runtime STATIC ${U8G2GL_RUNTIME_SOURCES})
+target_include_directories(u8g2gl_editor_runtime PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+target_compile_definitions(u8g2gl_editor_runtime PUBLIC U8G2GL_EDITOR)
+target_compile_options(u8g2gl_editor_runtime PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+# One program renders the fixture both ways: the generated firmware screen
+# functions and the editor host building the same screens from the scene
+# description through the registry (test_editor_parity.cpp), plus the registry's
+# entry-by-entry tests (test_editor.cpp). The firmware units compile against
+# their own generated capacities; the library does not. Those macros are read in
+# one runtime file only — the binding pool in src/u8g2gl_obj.cpp — which no
+# generated unit compiles, so the two views never meet in one definition.
+add_executable(test_editor
+    test_editor.cpp
+    test_editor_parity.cpp
+    editor_host/editor_host.cpp
+    editor_host/scene_json.cpp
+    ${U8G2GL_FIXTURE_EDITOR}/ui_editor_registry.cpp
+    ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_images.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_gauges.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_home.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_styles.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_subjects.cpp
+)
+target_include_directories(test_editor PRIVATE
+    ${U8G2GL_FIXTURE_GENERATED}
+    ${U8G2GL_FIXTURE_DIR}/support
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host
+)
+target_compile_definitions(test_editor PRIVATE
+    U8G2GL_EDITOR_SCENE_PATH="${U8G2GL_FIXTURE_EDITOR}/ui_scene.json"
+)
+target_link_libraries(test_editor PRIVATE
+    u8g2gl_fixture_fonts
+    u8g2gl_editor_runtime
+    GTest::gtest_main
+)
+target_compile_options(test_editor PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_editor)
+
+# --- Firmware pays nothing for the editor ([UD-4]) ---
+# The registry and src/u8g2gl_editor.cpp compile to nothing without
+# U8G2GL_EDITOR. Proven on the linked artefacts rather than assumed: nm must find
+# no editor symbol — u8g2gl_editor_* or the generated ui_editor_* — in the
+# firmware library or the firmware fixture binary, and the same check must find
+# them in the editor binary, so a pattern that matched nothing could not pass.
+set(U8G2GL_EDITOR_SYMBOL_PATTERN "u8g2gl_editor|ui_editor")
+function(u8g2gl_check_editor_symbols name file expect)
+    add_test(NAME EditorSymbols.${name}
+        COMMAND ${CMAKE_COMMAND}
+            -DNM=${CMAKE_NM}
+            -DFILE=${file}
+            -DPATTERN=${U8G2GL_EDITOR_SYMBOL_PATTERN}
+            -DEXPECT=${expect}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_editor_symbols.cmake
+    )
+endfunction()
+u8g2gl_check_editor_symbols(FirmwareLibraryHasNoEditorSymbols $<TARGET_FILE:u8g2gl> absent)
+u8g2gl_check_editor_symbols(FirmwareFixtureBinaryHasNoEditorSymbols $<TARGET_FILE:test_generated_fixture> absent)
+u8g2gl_check_editor_symbols(EditorBinaryHasEditorSymbols $<TARGET_FILE:test_editor> present)
+
 # All invoke the build system on the same tree; never run them concurrently.
 set_tests_properties(
     VersionGuard.MatchingSchemaMajorCompiles

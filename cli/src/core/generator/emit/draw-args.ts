@@ -36,7 +36,12 @@
  * - SUBJECT_READ_SUFFIX: How a bound value is read at draw time
  * - DrawCall:            A free function and its argument list
  * - DrawCallInput:       What assembling one needs
+ * - DrawFunction:        A drawing element's function and argument props
+ * - DrawArgumentSource:  Where one argument comes from — bound, written, default
+ * - drawFunctionOf():    The function and argument order (shared with the editor registry)
+ * - drawArgumentSources(): Each argument's source, by the one precedence rule
  * - drawCallFor():       Assemble a drawing element's call
+ * - bindingFor():        The binding driving a prop, if any
  * - resolvedLiteralFor(): The settled literal for one prop (shared with object setters)
  * - boundValueFor():     The draw-time subject read for one prop, if a binding drives it
  */
@@ -68,6 +73,24 @@ export interface DrawCall {
    */
   readonly args: readonly string[];
 }
+
+/** A drawing element's free function and its argument props, in order. */
+export interface DrawFunction {
+  /** The free function, e.g. `u8g2gl_draw_box` (§6.2). */
+  readonly fn: string;
+  /** The `draw=` props, in declaration order — which is parameter order (WO2). */
+  readonly props: readonly PropDef[];
+}
+
+/**
+ * Where one argument of a draw call comes from. `none` is a prop with no binding,
+ * no written value and no default — a gap in validation, which the firmware
+ * emitter refuses before spelling the call.
+ */
+export type DrawArgumentSource =
+  | { readonly prop: PropDef; readonly kind: 'bound'; readonly binding: RealisedBinding }
+  | { readonly prop: PropDef; readonly kind: 'written' | 'default'; readonly literal: string }
+  | { readonly prop: PropDef; readonly kind: 'none' };
 
 /** Everything {@link drawCallFor} needs about one drawing element. */
 export interface DrawCallInput {
@@ -109,10 +132,24 @@ function argumentError(manifest: EffectiveManifest, prop: PropDef, why: string):
  * @return The subject read, e.g. `ui_subject_level.get()`.
  */
 export function boundValueFor(prop: PropDef, bindings: readonly RealisedBinding[]): string | undefined {
-  const bound = bindings.find(
-    (binding) => binding.kind === 'attribute' && binding.declaration?.setter === prop.name,
-  );
+  const bound = bindingFor(prop, bindings);
   return bound === undefined ? undefined : `${subjectIdentifier(bound.subject)}${SUBJECT_READ_SUFFIX}`;
+}
+
+/**
+ * @brief The binding that drives a drawing element's prop, or undefined when
+ *        none does.
+ *
+ * The lookup {@link boundValueFor} spells as a subject read, kept separate
+ * (PR-04 WO11) so the editor's scene description names the same binding without
+ * a second copy of the rule that a drawing manifest's `setter=` names a prop.
+ *
+ * @param prop     The prop being emitted.
+ * @param bindings The element's realised bindings.
+ * @return The attribute binding whose declaration drives `prop`.
+ */
+export function bindingFor(prop: PropDef, bindings: readonly RealisedBinding[]): RealisedBinding | undefined {
+  return bindings.find((binding) => binding.kind === 'attribute' && binding.declaration?.setter === prop.name);
 }
 
 /**
@@ -163,22 +200,24 @@ export function resolvedLiteralFor(prop: PropDef, resolved: ResolvedElement): st
 }
 
 /**
- * @brief Assembles a drawing element's `u8g2gl_draw_*` call (§6.2, §13.1).
+ * @brief A drawing element's free function and the props that are its
+ *        arguments, in parameter order (§6.2, §13.1).
  *
- * @param input The element's manifest, resolved model and realised bindings.
- * @return The free function and its arguments, in manifest declaration order.
+ * Declaration order, which is parameter order (WO2). A drawing element declares
+ * no `extends`, so its effective props are its own and nothing is inherited into
+ * the middle of the argument list.
+ *
+ * Separated from {@link drawCallFor} in PR-04 WO11, behaviour unchanged, so the
+ * editor's draw-by-name table takes its function and argument order from the
+ * same place the firmware call does.
+ *
+ * @param manifest The element's effective manifest.
+ * @return The function and its argument props, in order.
  * @throws Error if the manifest declares no `draw=` prop (the element is not a
- *         drawing element), if its `draw=` props name more than one function, or
- *         if a prop yields no value at all. All three are programmer errors —
- *         see {@link argumentError}.
+ *         drawing element), or if its `draw=` props name more than one function.
  */
-export function drawCallFor(input: DrawCallInput): DrawCall {
-  const { manifest, resolved, bindings } = input;
-
+export function drawFunctionOf(manifest: EffectiveManifest): DrawFunction {
   // --- Step 1: The props that reach the display as call arguments ---
-  // Declaration order, which is parameter order (WO2). A drawing element
-  // declares no `extends`, so its effective props are its own and nothing is
-  // inherited into the middle of the argument list.
   const drawProps = manifest.api.props.filter((prop) => prop.draw !== undefined);
   const first = drawProps[0];
   if (first?.draw === undefined) {
@@ -199,26 +238,66 @@ export function drawCallFor(input: DrawCallInput): DrawCall {
         `'${disagreeing.draw}' on '${disagreeing.name}'. A drawing element compiles to one call (§6.2).`,
     );
   }
+  return { fn, props: drawProps };
+}
 
-  // --- Step 3: Each argument: bound, then written, then the declared default ---
-  const args = drawProps.map((prop) => {
-    const bound = boundValueFor(prop, bindings);
+/**
+ * @brief Where each argument of a drawing element's call comes from: bound,
+ *        then written, then the declared default (§13.5, [D-20]).
+ *
+ * The precedence rule, stated once. {@link drawCallFor} spells each source as
+ * C++; the editor's scene description names each as data (PR-04 WO11), so the
+ * two targets cannot choose different sources for one argument.
+ *
+ * @param input The element's manifest, resolved model and realised bindings.
+ * @return One source per argument prop, in parameter order.
+ * @throws Error as {@link drawFunctionOf} does.
+ */
+export function drawArgumentSources(input: DrawCallInput): readonly DrawArgumentSource[] {
+  const { manifest, resolved, bindings } = input;
+  return drawFunctionOf(manifest).props.map((prop): DrawArgumentSource => {
+    const bound = bindingFor(prop, bindings);
     if (bound !== undefined) {
-      return bound;
+      return { prop, kind: 'bound', binding: bound };
     }
     const literal = resolvedLiteralFor(prop, resolved);
     if (literal !== undefined) {
-      return cppValue(prop, literal);
+      return { prop, kind: 'written', literal };
     }
-    if (prop.default !== undefined) {
-      return cppValue(prop, prop.default);
+    return prop.default !== undefined ? { prop, kind: 'default', literal: prop.default } : { prop, kind: 'none' };
+  });
+}
+
+/**
+ * @brief Assembles a drawing element's `u8g2gl_draw_*` call (§6.2, §13.1).
+ *
+ * @param input The element's manifest, resolved model and realised bindings.
+ * @return The free function and its arguments, in manifest declaration order.
+ * @throws Error if the manifest declares no `draw=` prop (the element is not a
+ *         drawing element), if its `draw=` props name more than one function, or
+ *         if a prop yields no value at all. All three are programmer errors —
+ *         see {@link argumentError}.
+ */
+export function drawCallFor(input: DrawCallInput): DrawCall {
+  const { manifest } = input;
+  const { fn } = drawFunctionOf(manifest);
+
+  // Each argument from its source: bound, then written, then the declared default.
+  const args = drawArgumentSources(input).map((source) => {
+    switch (source.kind) {
+      case 'bound':
+        return `${subjectIdentifier(source.binding.subject)}${SUBJECT_READ_SUFFIX}`;
+      case 'written':
+      case 'default':
+        return cppValue(source.prop, source.literal);
+      case 'none':
+        throw argumentError(
+          manifest,
+          source.prop,
+          'nothing is bound to it, the author wrote no value the resolver settled, and its manifest ' +
+            'declares no default',
+        );
     }
-    throw argumentError(
-      manifest,
-      prop,
-      'nothing is bound to it, the author wrote no value the resolver settled, and its manifest ' +
-        'declares no default',
-    );
   });
 
   return { fn, args };

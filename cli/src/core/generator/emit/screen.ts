@@ -55,27 +55,34 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
-import type { SubjectType } from '../../schema/globals.js';
-import type { SourceLocation } from '../../schema/source-location.js';
-import type { PropDef } from '../../schema/widget-manifest.js';
-import type { WidgetNode } from '../../schema/widget-node.js';
-import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
+import type { ManifestRegistry } from '../../manifest/index.js';
 import {
   screenFunctionIdentifier,
   screenTableIdentifier,
   subjectIdentifier,
-  type ResolvedElement,
   type ResolvedScreen,
 } from '../../resolver/index.js';
 import {
   U8G2GL_NO_PARENT,
-  type RealisedBinding,
   type RealisedElement,
   type RealisedScreen,
   type VisibilityTerm,
 } from '../realise/index.js';
-import { boundValueFor, drawCallFor, resolvedLiteralFor, SUBJECT_READ_SUFFIX } from './draw-args.js';
-import { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
+import { drawArgumentSources, drawCallFor, SUBJECT_READ_SUFFIX } from './draw-args.js';
+import {
+  classOf,
+  emissionError,
+  FLAG_ENUMERATOR_PATTERN,
+  flagComparison,
+  namedStyles,
+  placeScreen,
+  rectangleOf,
+  styleOverridesOf,
+  typed,
+  writtenProperties,
+  type FlagComparison,
+  type Placement,
+} from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
 import { cppEnumerator, cppValue } from './value.js';
 import { screenDescriptorIdentifier, UI_HEADER } from './ui-hpp.js';
@@ -95,163 +102,24 @@ export interface ScreenEmitInput {
 /** The runtime header declaring `u8g2gl_draw_*` (§6.2). */
 const DRAW_HEADER = '#include "u8g2gl/u8g2gl_draw.h"';
 
-/**
- * The rectangle §7.2's contract names. On a class-backed manifest all four share
- * one setter, `set_coords`, so they are emitted as one call in this order rather
- * than four — the runtime has no single-axis spelling of an initial position
- * that marks dirty once.
- */
-const RECTANGLE: readonly ('x' | 'y' | 'width' | 'height')[] = ['x', 'y', 'width', 'height'];
-
-/**
- * What the runtime's `bind_flag_if_*` overloads accept (`u8g2gl_obj.h`), and the
- * comparison that means "this flag is clear" when a draw call reads the subject
- * itself.
- *
- * This mirrors the runtime's overload set rather than any element: an int
- * subject compares four ways, a bool subject only for equality, and a string or
- * time subject not at all. A comparison outside this table has no C++ to call,
- * so it is a diagnostic rather than a compile error in the user's build.
- */
-const FLAG_COMPARISONS: Readonly<
-  Record<string, { readonly clearWhen: string; readonly subjectTypes: readonly SubjectType[] }>
-> = {
-  bind_flag_if_eq: { clearWhen: '!=', subjectTypes: ['int', 'bool'] },
-  bind_flag_if_not_eq: { clearWhen: '==', subjectTypes: ['int', 'bool'] },
-  bind_flag_if_gt: { clearWhen: '<=', subjectTypes: ['int'] },
-  bind_flag_if_lt: { clearWhen: '>=', subjectTypes: ['int'] },
-};
-
-/** A synthetic declaration for spelling a value of a fixed §13.2 type. */
-function typed(name: string, type: PropDef['type']): PropDef {
-  return { name, type };
-}
-
 /** `ui_screen_home.cpp` (§13.7). */
 export function screenUnitPath(screen: string): string {
   return `ui_screen_${screen}.cpp`;
 }
 
-/** One element, placed: its manifest and its resolved model in device coordinates. */
-interface Placement {
-  readonly manifest: EffectiveManifest;
-  readonly absolute: ResolvedElement;
-}
-
 /** What emitting one screen accumulates. */
 interface ScreenContext {
-  readonly placements: Map<RealisedElement, Placement>;
+  readonly placements: ReadonlyMap<RealisedElement, Placement>;
   readonly diagnostics: Diagnostic[];
-}
-
-// emissionError
-// A diagnostic for a defect only emission sees, located at the element. Emitted
-// as an error: it refuses the build exactly as a validation error does.
-function emissionError(code: string, message: string, loc: SourceLocation | undefined, offendingText: string): Diagnostic {
-  return {
-    code,
-    severity: 'error',
-    file: loc?.file ?? '',
-    line: loc?.line ?? 1,
-    column: loc?.column ?? 1,
-    message,
-    offendingText,
-  };
-}
-
-// resolvedByNode
-// Every resolved element keyed by the expanded node it was resolved from.
-// Realisation and resolution are two views of one expanded tree — the resolver
-// is handed exactly `element.node` (pipeline.ts) — so the node is the join key,
-// and a lookup that misses is a broken pipeline rather than a user error.
-function resolvedByNode(elements: readonly ResolvedElement[]): Map<WidgetNode, ResolvedElement> {
-  const byNode = new Map<WidgetNode, ResolvedElement>();
-  const visit = (nodes: readonly ResolvedElement[]): void => {
-    for (const node of nodes) {
-      byNode.set(node.node, node);
-      visit(node.children);
-    }
-  };
-  visit(elements);
-  return byNode;
-}
-
-// placeAll
-// Pairs every realised element with its manifest and its resolved model moved
-// into device coordinates, walking down so each child is placed against its
-// container's absolute corner.
-//   elements — realised elements at one level
-//   origin   — their container's absolute corner, or undefined when it is bound
-//   byNode   — resolved elements by node
-//   manifests, context — lookup and accumulation
-function placeAll(
-  elements: readonly RealisedElement[],
-  origin: Origin | undefined,
-  byNode: ReadonlyMap<WidgetNode, ResolvedElement>,
-  manifests: ManifestRegistry,
-  context: ScreenContext,
-): void {
-  for (const element of elements) {
-    const manifest = manifests.get(element.element.node.tag);
-    const resolved = byNode.get(element.element.node);
-    if (manifest === undefined || resolved === undefined) {
-      throw new Error(
-        `Screen emission found <${element.element.node.tag}> '${element.identifier}' without a ` +
-          `${manifest === undefined ? 'manifest' : 'resolved model'}. Emission runs only on a validated, ` +
-          `resolved document, so the pipeline has lost an element.`,
-      );
-    }
-    if (origin === undefined) {
-      // Reported once, at the first child; the parent's own binding is the cause.
-      context.diagnostics.push(
-        emissionError(
-          DIAGNOSTIC_CODES.UNRESOLVED_GEOMETRY,
-          `'${element.identifier}' sits inside a container whose position is bound to a subject ([D-20]), ` +
-            `so it has no absolute position at build time. Give the container a literal x and y, or move ` +
-            `this element out of it.`,
-          element.element.node.loc,
-          element.identifier,
-        ),
-      );
-      return;
-    }
-    const absolute = absoluteElement(resolved, origin);
-    context.placements.set(element, { manifest, absolute });
-    placeAll(element.children, childOrigin(absolute), byNode, manifests, context);
-  }
-}
-
-// placementOf
-// The placement recorded for an element. Every element was placed before any
-// line is emitted, so a miss here means placeAll stopped early on a diagnostic —
-// the caller is already refusing the build.
-function placementOf(element: RealisedElement, context: ScreenContext): Placement | undefined {
-  return context.placements.get(element);
-}
-
-// classOf
-// The C++ class of an object, and the header that declares it.
-//
-// By [D-12] an element's tag *is* its class — except a composite, whose
-// container is a plain `u8g2gl_obj` (§13.12, corrected): a composite has no C++
-// of its own (§6.4). A framework class's header is `u8g2gl/<tag>.h`; a project
-// class's is `<tag>.hpp`, beside its manifest, as §6.5 lays a custom element out.
-function classOf(manifest: EffectiveManifest): { readonly name: string; readonly include: string } {
-  if (manifest.declared.view !== undefined) {
-    return { name: ROOT_CLASS_MANIFEST, include: `#include "u8g2gl/${ROOT_CLASS_MANIFEST}.h"` };
-  }
-  return manifest.origin === 'framework'
-    ? { name: manifest.name, include: `#include "u8g2gl/${manifest.name}.h"` }
-    : { name: manifest.name, include: `#include "${manifest.name}.hpp"` };
 }
 
 // describeObject
 // The trailing comment on an object's declaration: its index, and what it is,
 // so a reviewer can read the parent table against the declarations (§13.12).
-function describeObject(object: RealisedElement, objects: readonly RealisedElement[], manifest: EffectiveManifest): string {
+function describeObject(object: RealisedElement, objects: readonly RealisedElement[], placement: Placement): string {
   const index = object.objectIndex ?? 0;
   const parts: string[] = [String(index)];
-  if (manifest.declared.view !== undefined) {
+  if (placement.manifest.declared.view !== undefined) {
     parts.push('composite container');
   }
   if (object.parentIndex !== U8G2GL_NO_PARENT) {
@@ -261,113 +129,48 @@ function describeObject(object: RealisedElement, objects: readonly RealisedEleme
 }
 
 // geometryLine
-// The one `set_coords` call for an object's rectangle, or undefined when its
-// manifest has no rectangle setter.
-//
-// An axis a binding supplies ([D-20]) may be written without a literal; it is
-// emitted as 0 and named in a comment, because the binding applies the subject's
-// current value the moment it is registered (u8g2gl_obj::add_value_binding step
-// 4) and bindings are registered before the first frame. Any other missing axis
-// is a gap in §7.2's "every element fully positioned" rule, so it throws.
+// The one `set_coords` call for an object's rectangle (screen-model.ts decides
+// it), or undefined when its manifest has no rectangle setter. A bound axis is
+// passed as 0 and named in a comment: its binding applies the subject's value
+// when it is registered, below.
 function geometryLine(object: RealisedElement, placement: Placement): string | undefined {
-  const props = RECTANGLE.map((axis) => placement.manifest.api.props.find((prop) => prop.name === axis));
-  const setter = props[0]?.setter;
-  if (setter === undefined || props.some((prop) => prop?.setter !== setter)) {
+  const rectangle = rectangleOf(object, placement);
+  if (rectangle === undefined) {
     return undefined;
   }
-  const bound: string[] = [];
-  const args = RECTANGLE.map((axis, index) => {
-    const value = placement.absolute.geometry[axis]?.value;
-    if (value !== undefined) {
-      return cppValue(props[index] ?? typed(axis, 'int'), String(value));
-    }
-    // [D-20] names exactly these four bindings, one per axis.
-    if (object.bindings.some((binding) => binding.kind === 'attribute' && binding.attribute === `bind_${axis}`)) {
-      bound.push(axis);
-      return '0';
-    }
-    throw new Error(
-      `'${object.identifier}' has no resolved '${axis}' and no binding supplies it. §7.2 requires every ` +
-        `element fully positioned, so validation should have refused this document.`,
-    );
-  });
+  const bound = rectangle.axes.filter((axis) => axis.value === undefined).map((axis) => axis.axis);
+  const args = rectangle.axes.map((axis) =>
+    axis.value === undefined ? '0' : cppValue(axis.prop ?? typed(axis.axis, 'int'), String(axis.value)),
+  );
   const note = bound.length === 0 ? '' : `  // ${bound.join(', ')}: set by its binding below`;
-  return `    ${object.identifier}.${setter}(${args.join(', ')});${note}`;
+  return `    ${object.identifier}.${rectangle.setter}(${args.join(', ')});${note}`;
 }
 
 // propertyLines
 // Every other written property, as setter calls in manifest declaration order
-// (§13.7 "set properties"). Only what the author wrote is emitted: a prop left at
-// its default is already that value in a default-constructed object (§13.7), and
-// emitting it anyway would make every file restate the manifest.
-//
-// A composite's own `<api>` props are **template parameters** (§6.4, §13.6):
-// expansion has already substituted them into the `<view>`, and the container is
-// a plain `u8g2gl_obj` with no such setter. The manifest parser nonetheless
-// gives every prop without `setter=` or `draw=` a default `set_<name>`, so
-// without this filter `title_subject="…"` would emit `bar.set_title_subject(…)`,
-// which does not compile. Only the props the container inherits are its own.
+// (§13.7 "set properties"); which props those are is screen-model.ts's answer.
 function propertyLines(object: RealisedElement, placement: Placement): string[] {
-  const lines: string[] = [];
-  const declared = placement.manifest.declared;
-  const templateParameters = new Set(
-    declared.view === undefined ? [] : declared.api.props.map((prop) => prop.name),
+  return writtenProperties(placement).map(
+    ({ prop, literal }) => `    ${object.identifier}.${prop.setter ?? ''}(${cppValue(prop, literal)});`,
   );
-  for (const prop of placement.manifest.api.props) {
-    if (
-      prop.setter === undefined ||
-      (RECTANGLE as readonly string[]).includes(prop.name) ||
-      templateParameters.has(prop.name)
-    ) {
-      continue;
-    }
-    const literal = resolvedLiteralFor(prop, placement.absolute);
-    if (literal === undefined) {
-      continue;
-    }
-    lines.push(`    ${object.identifier}.${prop.setter}(${cppValue(prop, literal)});`);
-  }
-  return lines;
-}
-
-// namedStyles
-// The styles an element names, in the order they layer: the `style` attribute,
-// then each `<style>` child as written (§10).
-function namedStyles(node: WidgetNode): string[] {
-  const names: string[] = [];
-  if (typeof node.attributes.style === 'string' && node.attributes.style !== '') {
-    names.push(node.attributes.style);
-  }
-  for (const child of node.children) {
-    if ('kind' in child && child.kind === 'style' && child.name !== '') {
-      names.push(child.name);
-    }
-  }
-  return names;
 }
 
 // styleLines
 // §13.7's "apply styles" step: each named style merged in order, then the
 // element's own `style_*` inline overrides, which §10 defines as overriding.
 //
-// An override is spelled through the element's own `<prop>` of the same name —
-// the setter and type come from the manifest ([D-17]). No validator pass checks
-// `style_*` keys or values today, so a key the element does not declare, or a
-// value its type cannot spell, is reported here rather than thrown.
+// No validator pass checks `style_*` values today, so a value the prop's type
+// cannot spell, or a key the element does not declare, is reported here rather
+// than thrown.
 function styleLines(object: RealisedElement, placement: Placement, context: ScreenContext): string[] {
   const node = placement.absolute.node;
   const lines = namedStyles(node).map(
     (name) => `    ${object.identifier}.apply_style(${cppValue(typed('style', 'style'), name)});`,
   );
-  const overrides = new Map(Object.entries(node.styleOverrides));
-  for (const prop of placement.manifest.api.props) {
-    const value = overrides.get(prop.name);
-    if (value === undefined || prop.setter === undefined) {
-      continue;
-    }
-    overrides.delete(prop.name);
+  const overrides = styleOverridesOf(placement);
+  for (const { prop, value } of overrides.applied) {
     try {
-      lines.push(`    ${object.identifier}.${prop.setter}(${cppValue(prop, value)});`);
+      lines.push(`    ${object.identifier}.${prop.setter ?? ''}(${cppValue(prop, value)});`);
     } catch (error) {
       context.diagnostics.push(
         emissionError(
@@ -381,7 +184,7 @@ function styleLines(object: RealisedElement, placement: Placement, context: Scre
     }
   }
   // What is left names a property this element does not declare.
-  for (const key of [...overrides.keys()].sort()) {
+  for (const key of overrides.unknown) {
     context.diagnostics.push(
       emissionError(
         DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
@@ -395,55 +198,14 @@ function styleLines(object: RealisedElement, placement: Placement, context: Scre
   return lines;
 }
 
-// flagComparison
-// The runtime comparison a flag directive names, and its `ref_value` spelled for
-// the subject's type — or a diagnostic saying why neither exists.
-function flagComparison(
-  binding: RealisedBinding,
-  owner: string,
-  tag: string,
-): { readonly method: string; readonly clearWhen: string; readonly ref: string; readonly flag: string } | Diagnostic {
-  const directive = binding.directive;
-  const loc = binding.loc;
-  const comparison = FLAG_COMPARISONS[binding.attribute];
-  if (comparison === undefined) {
-    return emissionError(
-      DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
-      `<${binding.attribute}> on <${tag}> '${owner}' is not a binding the runtime provides; §8.4's variants ` +
-        `are ${Object.keys(FLAG_COMPARISONS).join(', ')}.`,
-      loc,
-      binding.attribute,
-    );
-  }
-  if (binding.subjectType === undefined || !comparison.subjectTypes.includes(binding.subjectType)) {
-    return emissionError(
-      DIAGNOSTIC_CODES.TYPE_MISMATCH,
-      `<${binding.attribute}> on <${tag}> '${owner}' compares subject '${binding.subject}' ` +
-        `(${binding.subjectType ?? 'undeclared'}), but the runtime compares ${binding.attribute} only for ` +
-        `${comparison.subjectTypes.join(' and ')} subjects (§8.4).`,
-      loc,
-      binding.subject,
-    );
-  }
-  const ref = directive?.refValue ?? directive?.value;
-  if (ref === undefined || ref === '') {
-    return emissionError(
-      DIAGNOSTIC_CODES.MISSING_REQUIRED,
-      `<${binding.attribute}> on <${tag}> '${owner}' has no 'ref_value', so there is nothing to compare ` +
-        `subject '${binding.subject}' against (§8.4).`,
-      loc,
-      'ref_value',
-    );
-  }
-  // A bool subject accepts `true`/`false` as well as `0`/`1` (Pass 5); the
-  // runtime has an overload for each, so each is spelled as its own type.
-  const refType = binding.subjectType === 'bool' && (ref === 'true' || ref === 'false') ? 'bool' : 'int';
-  return {
-    method: binding.attribute,
-    clearWhen: comparison.clearWhen,
-    ref: cppValue(typed('ref_value', refType), ref),
-    flag: cppEnumerator('U8G2GL_FLAG_{VALUE^^}', binding.flag ?? ''),
-  };
+// spelledRef, spelledFlag
+// A directive's `ref_value` and flag as C++: the ref as the §13.2 type
+// screen-model.ts chose for the subject, the flag through its enumerator pattern.
+function spelledRef(comparison: FlagComparison): string {
+  return cppValue(typed('ref_value', comparison.refType), comparison.ref);
+}
+function spelledFlag(comparison: FlagComparison): string {
+  return cppEnumerator(FLAG_ENUMERATOR_PATTERN, comparison.flag);
 }
 
 // bindingLines
@@ -473,7 +235,9 @@ function bindingLines(object: RealisedElement, placement: Placement, context: Sc
       context.diagnostics.push(comparison);
       continue;
     }
-    lines.push(`    ${object.identifier}.${comparison.method}(${subject}, ${comparison.ref}, ${comparison.flag});`);
+    lines.push(
+      `    ${object.identifier}.${comparison.method}(${subject}, ${spelledRef(comparison)}, ${spelledFlag(comparison)});`,
+    );
   }
   return lines;
 }
@@ -498,7 +262,7 @@ function guardOf(element: RealisedElement, tag: string, context: ScreenContext):
       context.diagnostics.push(comparison);
       continue;
     }
-    terms.push(`${subjectIdentifier(term.subject)}${SUBJECT_READ_SUFFIX} ${comparison.clearWhen} ${comparison.ref}`);
+    terms.push(`${subjectIdentifier(term.subject)}${SUBJECT_READ_SUFFIX} ${comparison.clearWhen} ${spelledRef(comparison)}`);
   }
   return terms.join(' && ');
 }
@@ -536,13 +300,13 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
   // *something* then does — WO7b's positioning rule covers an under-determined
   // start, not a size that is simply absent. So a box with no width and no
   // bind_width reaches here, and is refused rather than thrown on.
-  const missing = placement.manifest.api.props.filter(
-    (prop) =>
-      prop.draw !== undefined &&
-      prop.default === undefined &&
-      boundValueFor(prop, element.bindings) === undefined &&
-      resolvedLiteralFor(prop, placement.absolute) === undefined,
-  );
+  const missing = drawArgumentSources({
+    manifest: placement.manifest,
+    resolved: placement.absolute,
+    bindings: element.bindings,
+  })
+    .filter((source) => source.kind === 'none')
+    .map((source) => source.prop);
   if (missing.length > 0) {
     for (const prop of missing) {
       context.diagnostics.push(
@@ -615,15 +379,15 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   const objs = screenTableIdentifier(name, 'objs');
   const parents = screenTableIdentifier(name, 'parents');
   const fn = (which: string): string => screenFunctionIdentifier(name, which);
-  const context: ScreenContext = { placements: new Map(), diagnostics: [] };
 
   // --- Step 1: Place every element in device coordinates ---
-  placeAll(realised.elements, DISPLAY_ORIGIN, resolvedByNode(resolved.elements), manifests, context);
-  if (context.diagnostics.length > 0) {
-    return { content: '', diagnostics: context.diagnostics };
+  const screenPlacements = placeScreen(realised, resolved, manifests);
+  if (screenPlacements.diagnostics.length > 0) {
+    return { content: '', diagnostics: [...screenPlacements.diagnostics] };
   }
+  const context: ScreenContext = { placements: screenPlacements.placements, diagnostics: [] };
   const placed = (element: RealisedElement): Placement => {
-    const placement = placementOf(element, context);
+    const placement = context.placements.get(element);
     if (placement === undefined) {
       throw new Error(`'${element.identifier}' was not placed.`);
     }
@@ -641,8 +405,8 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
 
   // --- Step 3: Each part of the unit, in §13.12's order ---
   const declarations = objects.map((object) => {
-    const manifest = placed(object).manifest;
-    return `static ${classOf(manifest).name} ${object.identifier};  // ${describeObject(object, objects, manifest)}`;
+    const placement = placed(object);
+    return `static ${classOf(placement.manifest).name} ${object.identifier};  // ${describeObject(object, objects, placement)}`;
   });
   const drawnOnly = realised.drawOrder
     .filter((step) => step.kind === 'draw_calls')

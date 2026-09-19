@@ -27,6 +27,7 @@
  * - STYLES_UNIT:          The unit's file name
  * - STYLES_INIT_FUNCTION: The function that applies each style's properties
  * - styleIdentifiers():   The distinct styles emitted, in order
+ * - styleProperties():    A style's declared properties by attribute, in applied order
  * - emitStylesUnit():     Emit `ui_styles.cpp`
  */
 
@@ -61,6 +62,11 @@ export const STYLES_INIT_FUNCTION = 'ui_styles_init';
 interface StyleProperty {
   /** The `StyleDecl` member. */
   readonly key: keyof StyleDecl;
+  /**
+   * The attribute as `<style>` spells it, which is also the element `<prop>` of
+   * the same name (§10). The editor applies a style through those props.
+   */
+  readonly attribute: string;
   /** The `u8g2gl_style` setter. */
   readonly setter: string;
   /** How the declared value becomes a C++ argument. */
@@ -75,28 +81,56 @@ const DRAW_COLORS: Readonly<Record<string, string>> = {
 };
 
 const STYLE_PROPERTIES: readonly StyleProperty[] = [
-  { key: 'font', setter: 'set_font', argument: (value) => fontIdentifier(String(value)) },
-  { key: 'drawColor', setter: 'set_draw_color', argument: (value) => DRAW_COLORS[String(value)] ?? 'U8G2GL_COLOR_1' },
-  { key: 'invert', setter: 'set_invert', argument: (value) => (value ? 'true' : 'false') },
-  { key: 'padding', setter: 'set_padding', argument: (value) => String(value) },
-  { key: 'border', setter: 'set_border', argument: (value) => (value ? 'true' : 'false') },
-  { key: 'radius', setter: 'set_radius', argument: (value) => String(value) },
+  { key: 'font', attribute: 'font', setter: 'set_font', argument: (value) => fontIdentifier(String(value)) },
+  { key: 'drawColor', attribute: 'draw_color', setter: 'set_draw_color', argument: (value) => DRAW_COLORS[String(value)] ?? 'U8G2GL_COLOR_1' },
+  { key: 'invert', attribute: 'invert', setter: 'set_invert', argument: (value) => (value ? 'true' : 'false') },
+  { key: 'padding', attribute: 'padding', setter: 'set_padding', argument: (value) => String(value) },
+  { key: 'border', attribute: 'border', setter: 'set_border', argument: (value) => (value ? 'true' : 'false') },
+  { key: 'radius', attribute: 'radius', setter: 'set_radius', argument: (value) => String(value) },
   {
     key: 'align',
+    attribute: 'align',
     setter: 'set_align',
     argument: (value) => `U8G2GL_ALIGN_${String(value).toUpperCase()}`,
   },
   {
     key: 'fontMode',
+    attribute: 'font_mode',
     setter: 'set_font_mode',
     argument: (value) => `U8G2GL_FONT_MODE_${String(value).toUpperCase()}`,
   },
   {
     key: 'bitmapMode',
+    attribute: 'bitmap_mode',
     setter: 'set_bitmap_mode',
     argument: (value) => `U8G2GL_BITMAP_MODE_${String(value).toUpperCase()}`,
   },
 ];
+
+/**
+ * @brief A style's declared properties, by attribute, in the order
+ *        {@link emitStylesUnit} applies them.
+ *
+ * The editor's scene description lists a style this way (PR-04 WO11), from the
+ * same table the firmware unit is written from, so the two cannot apply a
+ * different set or a different order.
+ *
+ * @param declaration The style as declared.
+ * @return Each declared property's attribute and value.
+ */
+export function styleProperties(
+  declaration: StyleDecl,
+): readonly { readonly attribute: string; readonly value: string | number | boolean }[] {
+  const properties: { attribute: string; value: string | number | boolean }[] = [];
+  for (const property of STYLE_PROPERTIES) {
+    const value = declaration[property.key];
+    if (value === undefined || typeof value === 'object') {
+      continue;
+    }
+    properties.push({ attribute: property.attribute, value });
+  }
+  return properties;
+}
 
 /**
  * @brief The distinct styles the project emits, in the order

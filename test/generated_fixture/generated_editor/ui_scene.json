@@ -1,0 +1,513 @@
+{
+  "format": "u8g2gl-scene",
+  "version": 1,
+  "generated": {
+    "source": "u8g2gl.xml",
+    "schema": "0.4",
+    "generator": "0.0.0-golden",
+    "target": "host"
+  },
+  "display": {
+    "width": 128,
+    "height": 64
+  },
+  "subjects": [
+    {
+      "name": "station_name",
+      "type": "string",
+      "max_len": 16
+    },
+    {
+      "name": "service_message",
+      "type": "string",
+      "max_len": 32
+    },
+    {
+      "name": "wifi_connected",
+      "type": "bool"
+    },
+    {
+      "name": "system_time",
+      "type": "time"
+    },
+    {
+      "name": "level",
+      "type": "int"
+    },
+    {
+      "name": "show_panel",
+      "type": "bool"
+    }
+  ],
+  "styles": [
+    {
+      "name": "note",
+      "properties": [
+        {
+          "name": "align",
+          "value": "right"
+        }
+      ]
+    }
+  ],
+  "fonts": [
+    "u8g2_font_6x10_mr",
+    "u8g2_font_5x7_mr"
+  ],
+  "images": [
+    "icon_wifi"
+  ],
+  "screens": [
+    {
+      "name": "gauges",
+      "objects": 3,
+      "parents": [
+        null,
+        0,
+        null
+      ],
+      "elements": [
+        {
+          "name": "level_bar",
+          "tag": "u8g2gl_box",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "screens/screen_gauges.xml",
+            "line": 8,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "value": 4
+            },
+            {
+              "name": "y",
+              "value": 20
+            },
+            {
+              "name": "width",
+              "subject": "level",
+              "subject_type": "int"
+            },
+            {
+              "name": "height",
+              "value": 6
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "dial",
+          "tag": "u8g2gl_circle",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "screens/screen_gauges.xml",
+            "line": 11,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "value": 100
+            },
+            {
+              "name": "y",
+              "value": 40
+            },
+            {
+              "name": "radius",
+              "value": 10
+            },
+            {
+              "name": "segments",
+              "value": "upper_left"
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "panel",
+          "tag": "panel",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_gauges.xml",
+            "line": 15,
+            "column": 9
+          },
+          "class": "u8g2gl_obj",
+          "object": 0,
+          "parent": null,
+          "rect": [
+            0,
+            30,
+            60,
+            20
+          ],
+          "properties": [],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": [
+            {
+              "directive": "bind_flag_if_eq",
+              "subject": "show_panel",
+              "subject_type": "bool",
+              "ref": false,
+              "flag": "hidden"
+            }
+          ]
+        },
+        {
+          "name": "panel_edge",
+          "tag": "u8g2gl_hline",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "widgets/panel/panel.xml",
+            "line": 11,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "value": 0
+            },
+            {
+              "name": "y",
+              "value": 30
+            },
+            {
+              "name": "width",
+              "value": 60
+            }
+          ],
+          "visibility": [
+            {
+              "ancestor": 0
+            }
+          ]
+        },
+        {
+          "name": "panel_note",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "widgets/panel/panel.xml",
+            "line": 12,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 1,
+          "parent": 0,
+          "rect": [
+            0,
+            32,
+            60,
+            10
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "text",
+              "value": "Note"
+            }
+          ],
+          "styles": [
+            "note"
+          ],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "ghost",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_gauges.xml",
+            "line": 20,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 2,
+          "parent": null,
+          "rect": [
+            64,
+            54,
+            40,
+            10
+          ],
+          "properties": [
+            {
+              "name": "hidden",
+              "value": true
+            },
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "text",
+              "value": "Ghost"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "blip",
+          "tag": "u8g2gl_pixel",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "screens/screen_gauges.xml",
+            "line": 24,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "value": 120
+            },
+            {
+              "name": "y",
+              "value": 2
+            }
+          ],
+          "visibility": [
+            {
+              "directive": "bind_flag_if_eq",
+              "subject": "wifi_connected",
+              "subject_type": "bool",
+              "ref": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "objects": 5,
+      "parents": [
+        null,
+        0,
+        0,
+        0,
+        null
+      ],
+      "elements": [
+        {
+          "name": "bar",
+          "tag": "status_bar",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_home.xml",
+            "line": 6,
+            "column": 9
+          },
+          "class": "u8g2gl_obj",
+          "object": 0,
+          "parent": null,
+          "rect": [
+            0,
+            0,
+            128,
+            11
+          ],
+          "properties": [],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "bar_location",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "widgets/status_bar/status_bar.xml",
+            "line": 12,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 1,
+          "parent": 0,
+          "rect": [
+            0,
+            0,
+            76,
+            11
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "long_mode",
+              "value": "scroll"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "station_name",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "bar_wifi_icon",
+          "tag": "u8g2gl_xbm",
+          "realisation": "object",
+          "source": {
+            "file": "widgets/status_bar/status_bar.xml",
+            "line": 16,
+            "column": 9
+          },
+          "class": "u8g2gl_xbm",
+          "object": 2,
+          "parent": 0,
+          "rect": [
+            76,
+            0,
+            12,
+            11
+          ],
+          "properties": [
+            {
+              "name": "src",
+              "value": "icon_wifi"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": [
+            {
+              "directive": "bind_flag_if_eq",
+              "subject": "wifi_connected",
+              "subject_type": "bool",
+              "ref": 0,
+              "flag": "hidden"
+            }
+          ]
+        },
+        {
+          "name": "bar_clock",
+          "tag": "u8g2gl_clock",
+          "realisation": "object",
+          "source": {
+            "file": "widgets/status_bar/status_bar.xml",
+            "line": 22,
+            "column": 9
+          },
+          "class": "u8g2gl_clock",
+          "object": 3,
+          "parent": 0,
+          "rect": [
+            88,
+            0,
+            40,
+            11
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_5x7_mr"
+            },
+            {
+              "name": "format",
+              "value": "hh_mm"
+            },
+            {
+              "name": "blink",
+              "value": true
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [
+            {
+              "name": "bind_time",
+              "subject": "system_time",
+              "subject_type": "time"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "rule",
+          "tag": "u8g2gl_hline",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "screens/screen_home.xml",
+            "line": 8,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "value": 0
+            },
+            {
+              "name": "y",
+              "value": 11
+            },
+            {
+              "name": "width",
+              "value": 128
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "msg",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_home.xml",
+            "line": 9,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 4,
+          "parent": null,
+          "rect": [
+            0,
+            16,
+            128,
+            12
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "align",
+              "value": "center"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "service_message",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        }
+      ]
+    }
+  ]
+}
