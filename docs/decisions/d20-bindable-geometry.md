@@ -110,3 +110,30 @@ the others.
 - A container whose geometry is bound cannot have anchor-positioned children —
   that would be reflow. Absolute coordinates only, enforced as a diagnostic.
 - Schema 0.4, shared with [D-18] and [D-19].
+
+## Amendment — 2026-09-19, from PR-04's first emitted code
+
+PR-04's WO10 was the first work order to emit real code, and it exposed two cases
+this record didn't decide.
+
+**Bound coordinates are container-relative, like literal ones.** A child at
+`bind_x="offset"` inside a container at x=40 is placed at 40 + offset. The
+container's origin is a build-time constant, so §3 above still holds: there is no
+runtime layout pass.
+
+Relative was chosen over absolute because **the meaning of an attribute is
+permanent; how it's implemented is not.** If bound coordinates were absolute,
+letting children follow a moving container later would change what existing XML
+means — a breaking change. Relative keeps that option open.
+
+**In schema 0.4, a container whose own position is bound may have no children.**
+This record already forbade *anchored* children of a container with bound
+geometry. The rule now covers every child, because children's positions are fixed
+at build time and can't follow a container that moves at run time. Since every
+element must be fully positioned (design_spec §7.2), this means no children at
+all. It's a validation error.
+
+It can be lifted without a breaking change: the runtime already walks each
+object's ancestors every frame ([A-3]), and adding up their origins in that walk
+would move children with their parent. That's translation, not layout. Tracked as
+design_spec Q-16.

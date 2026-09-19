@@ -864,6 +864,23 @@ not only where they're used.
 **Bounds are checked for the target being generated**, not only the default
 target, because a screen that fits one display can overflow another (§7.3).
 
+**Elements that aren't rectangles are bounds-checked by what they actually
+draw**: a pixel by its 1×1 box, a line by the box around its endpoints, a
+triangle by the box around its vertices, and a circle or ellipse by the box
+around the segments it draws. Checking a partial arc against its whole circle
+would reject valid designs, such as a quarter-circle corner at the edge of the
+display, where every pixel drawn is inside it.
+
+**Bound coordinates are container-relative, like literal ones.** `bind_x="offset"`
+on a child of a container at x=40 puts the child at 40 + offset. The container's
+origin is fixed at build time, so this needs no runtime layout ([D-7], [D-20]).
+
+**In schema 0.4, a container whose own position is bound may have no children.**
+Children's positions are fixed at build time, so they can't follow a container
+that moves at run time. And because every element must be fully positioned, "no
+positioned children" means no children at all. This is a validation error, not a
+silent misplacement. It can be lifted later without breaking anything; see Q-16.
+
 **Centring.** `hcenter="true"` / `vcenter="true"` centre within the parent. Odd remainders round down, deterministically and identically in preview and firmware.
 
 **Container size.** `#parent_width` and `#parent_height` give the containing element's size, so a composite can lay out relative to whatever size it is given:
@@ -1069,7 +1086,6 @@ Monochrome collapses the styling domain to a small set:
 | `border` | `true` / `false` | 1px outline |
 | `radius` | int px | Rounded corners |
 | `align` | `left` / `center` / `right` | Text alignment |
-| `truncate` | `true` / `false` | Ellipsis on overflow |
 | `font_mode` | `solid` / `transparent` | Text background |
 | `bitmap_mode` | `solid` / `transparent` | XBM background |
 
@@ -1083,6 +1099,8 @@ Monochrome collapses the styling domain to a small set:
 ```
 
 Inline overrides use the `style_` prefix: `style_invert="true"`.
+
+**An element's own attributes win over a named style**, and so do its inline `style_` overrides: an attribute on the element is the more specific statement of intent, the same rule CSS and LVGL use. That applies to styles applied later too — a `focus_style` (§12) must not overwrite a property the element set itself. The generator handles init by applying named styles before properties (§13.7). The runtime must keep the rule when it applies styles at run time, which means tracking which properties the element set itself.
 
 **Omitted from LVGL Pro** (no monochrome meaning): `bg_color`, `bg_opa`, `bg_grad_*`, `shadow_*`, `transform_scale`, `text_color`, `<bind_style>`.
 
@@ -1340,7 +1358,7 @@ Per [D-18] an element may be realised as an object or as draw calls, so a manife
 
 | Attribute | Meaning | Emitted as |
 |---|---|---|
-| `setter="set_font"` | A method on the element's class | `lbl.set_font(ui_font_small_9);` |
+| `setter="set_font"` | A method on the element's class | `ui_obj_lbl.set_font(ui_font_small_9);` |
 | `draw="u8g2gl_draw_box"` | A free function taking the element's geometry and properties | `u8g2gl_draw_box(d, 4, 20, 96, 8, true, 0);` |
 
 A manifest declaring `draw=` and no class is a drawing element (§6.2); it can still be bound, in which case the generated call carries an expression or a guard rather than a literal. A manifest declaring `setter=` has a class and produces an object when §6.1's rule calls for one.
@@ -1404,15 +1422,17 @@ XML names are author-facing; C++ identifiers are generated. The mapping is total
 | Kind | XML | Emitted |
 |---|---|---|
 | Screen function | `<screen name="home">` | `ui_screen_home_init()` etc. |
-| Screen-level object | `name="title"` | `title` (static, screen's TU) |
-| Composite child | `title` inside instance `statusbar` | `statusbar_title` |
-| Nested composite | instance `bar` → instance `clk` → `digits` | `bar_clk_digits` |
+| Screen-level object | `name="title"` | `ui_obj_title` (static, screen's TU) |
+| Composite child | `title` inside instance `statusbar` | `ui_obj_statusbar_title` |
+| Nested composite | instance `bar` → instance `clk` → `digits` | `ui_obj_bar_clk_digits` |
 | Subject | `<int name="temperature">` | `ui_subject_temperature`, `ui_set_temperature()` |
 | Font | `<bdf name="small_9">` | `ui_font_small_9` |
 | Image | `<xbm name="icon_wifi">` | `ui_image_icon_wifi` |
 | Style | `<style name="header">` | `ui_style_header` |
 
 **Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_`, `ui_`, `wd_`, or matching a C++ keyword. Composite instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
+
+**Every emitted object is named `ui_obj_<name>`** (2026-09-19). A bare name collides with the C standard library: an element called `clock` became `static u8g2gl_clock clock;`, which conflicts with `clock()` from `<time.h>` whenever that header is visible — and Arduino makes a lot of headers visible. A list of reserved C names can never be complete, because what's reserved depends on the platform's headers. A prefix removes the whole class of collision. The prefix is a fixed family, not the screen's name, because a screen's name could itself collide: a screen called `subject`, `font`, `image`, `style` or `screen` would put its objects in the same namespace as `ui_subject_*` and the other generated families. The screen's name wouldn't add uniqueness anyway, because each screen's objects are `static` in that screen's own translation unit. Application code never refers to these objects ([D-20] §4), so the prefix breaks nothing that code depends on.
 
 ### 13.5 Realisation — when an object is emitted
 
@@ -1444,9 +1464,9 @@ need to *store* a bound value — the generated `render()` reads it at draw time
 
 ```cpp
 u8g2gl_draw_hline(d, 0, 11, 256);                              // static
-if (ui_subject_wifi.value)                                      // bound hidden
+if (ui_subject_wifi.get())                                      // bound hidden
     u8g2gl_draw_disc(d, 250, 4, 2);
-u8g2gl_draw_box(d, 4, 20, ui_subject_level.value, 6, true, 0);  // bound width
+u8g2gl_draw_box(d, 4, 20, ui_subject_level.get(), 6, true, 0);  // bound width
 ```
 
 Two consequences:
@@ -1459,7 +1479,7 @@ Two consequences:
 2. **Ancestor visibility folds into the expression.** §13.3 computes effective
    visibility by walking up the parent chain at render time. For an element with
    no object the generator walks it at *build* time and emits a single
-   conjunction — `if (!bar.is_hidden() && ui_subject_wifi.value)` — which is
+   conjunction — `if (!ui_obj_bar.is_hidden() && ui_subject_wifi.get())` — which is
    strictly cheaper than the runtime walk it replaces.
 
 The generator may hoist adjacent siblings sharing an identical condition into
@@ -1529,7 +1549,7 @@ concrete elements.
 **`u8g2gl_generated_config.h` is emitted alongside the screens** ([D-21]). It carries the static capacities computed from this document — objects per screen, bindings per object, total bindings, styles — and is included ahead of `u8g2gl_config.h`, whose `#ifndef` defaults then apply only to anything the generator did not set. `U8G2GL_MAX_TOTAL_BINDINGS` is the true sum across objects, not `objects × bindings`, which over-allocates whenever the worst-case object is not the typical one.
 
 
-Per screen, one `.cpp`. Plus one `ui.hpp` umbrella, and one unit each for subjects, fonts, and images.
+Per screen, one `.cpp`. Plus one `ui.hpp` umbrella; one unit each for subjects, fonts, images and styles (`ui_styles.cpp`); and `ui.cpp`, which holds `ui_init()` and the frame-dirty observers. There is one observer per subject rather than per screen (§13.5), so they can't live in a screen's unit.
 
 ```cpp
 void ui_screen_home_init();        // once at boot: construct, configure, bind
@@ -1539,7 +1559,7 @@ uint32_t ui_screen_home_tick(uint32_t ms);   // returns next deadline ([D-15])
 void ui_screen_home_render(U8G2& d);         // draw, document order
 ```
 
-`init` is ordered: construct → set properties → apply styles → register bindings → wire events → build the focus ring. Bindings are registered last so no observer fires against a partly configured object.
+`init` is ordered: construct → apply styles → set properties → register bindings → wire events → build the focus ring. Styles come before properties so that **an element's own attributes win over a named style** (§10). Bindings are registered last so no observer fires against a partly configured object.
 
 **Every widget class is default-constructible, and is configured exclusively through setters.** The generator emits a default construction followed by setter calls; it never emits constructor arguments. This is a binding requirement on the runtime, and it exists to sever a dependency: without it the generator would need to know each class's constructor signature, which would couple the generator's development to the runtime's and defeat the purpose of this contract.
 
@@ -1552,13 +1572,13 @@ void ui_screen_home_render(U8G2& d);         // draw, document order
 ```
 
 ```cpp
-temp.bind_text(&ui_subject_temperature, "%d°C");
+ui_obj_temp.bind_text(&ui_subject_temperature, "%d°C");
 ```
 
 The generator type-checks the format string against the subject's declared type and rejects a mismatch at build time (§8.4). Conditional flags emit similarly:
 
 ```cpp
-wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+ui_obj_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
 ```
 
 Event callbacks emit an `extern` declaration only; the definition is the user's, and its absence is a link error whose expected signature is stated in the generated header (§8.4).
@@ -1621,50 +1641,50 @@ XML → parse → validate → resolve → flatten → compile assets → emit �
 
 #include "ui.hpp"
 
-static u8g2gl_obj      bar;              // 0  composite container
-static u8g2gl_label    bar_location;     // 1  child of bar
-static u8g2gl_xbm      bar_wifi_icon;    // 2  child of bar
-static u8g2gl_clock    bar_clock;        // 3  child of bar
-static u8g2gl_label    msg;              // 4
+static u8g2gl_obj      ui_obj_bar;              // 0  composite container
+static u8g2gl_label    ui_obj_bar_location;     // 1  child of ui_obj_bar
+static u8g2gl_xbm      ui_obj_bar_wifi_icon;    // 2  child of ui_obj_bar
+static u8g2gl_clock    ui_obj_bar_clock;        // 3  child of ui_obj_bar
+static u8g2gl_label    ui_obj_msg;              // 4
 // "rule" is not here — no object required (§13.5)
 
 static u8g2gl_obj* const ui_screen_home_objs[] = {
-    &bar, &bar_location, &bar_wifi_icon, &bar_clock, &msg,
+    &ui_obj_bar, &ui_obj_bar_location, &ui_obj_bar_wifi_icon, &ui_obj_bar_clock, &ui_obj_msg,
 };
 static const uint8_t ui_screen_home_parents[] = {
     U8G2GL_NO_PARENT, 0, 0, 0, U8G2GL_NO_PARENT,
 };
 
 void ui_screen_home_init() {
-    bar.set_coords(0, 0, 256, 11);
+    ui_obj_bar.set_coords(0, 0, 256, 11);
 
-    bar_location.set_coords(0, 0, 204, 11);       // right="52" → 256-52
-    bar_location.set_font(ui_font_small_9);
-    bar_location.set_long_mode(U8G2GL_LONG_SCROLL);
+    ui_obj_bar_location.set_coords(0, 0, 204, 11);       // right="52" → 256-52
+    ui_obj_bar_location.set_font(ui_font_small_9);
+    ui_obj_bar_location.set_long_mode(U8G2GL_LONG_SCROLL);
 
-    bar_wifi_icon.set_coords(204, 0, 12, 11);     // right="40", width=12
-    bar_wifi_icon.set_src(ui_image_icon_wifi);
+    ui_obj_bar_wifi_icon.set_coords(204, 0, 12, 11);     // right="40", width=12
+    ui_obj_bar_wifi_icon.set_src(ui_image_icon_wifi);
 
-    bar_clock.set_coords(216, 0, 40, 11);         // right="0" → 256-40
-    bar_clock.set_font(ui_font_clock_small_7);
-    bar_clock.set_blink(true);
+    ui_obj_bar_clock.set_coords(216, 0, 40, 11);         // right="0" → 256-40
+    ui_obj_bar_clock.set_font(ui_font_clock_small_7);
+    ui_obj_bar_clock.set_blink(true);
 
-    msg.set_coords(0, 16, 256, 12);               // right="0" → width 256
-    msg.set_font(ui_font_small_9);
-    msg.set_align(U8G2GL_ALIGN_CENTER);
+    ui_obj_msg.set_coords(0, 16, 256, 12);               // right="0" → width 256
+    ui_obj_msg.set_font(ui_font_small_9);
+    ui_obj_msg.set_align(U8G2GL_ALIGN_CENTER);
 
     // bindings registered last — §13.7
-    bar_location.bind_text(&ui_subject_station_name);
-    bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
-    bar_clock.bind_time(&ui_subject_system_time);
-    msg.bind_text(&ui_subject_service_message);
+    ui_obj_bar_location.bind_text(&ui_subject_station_name);
+    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_bar_clock.bind_time(&ui_subject_system_time);
+    ui_obj_msg.bind_text(&ui_subject_service_message);
 }
 
 uint32_t ui_screen_home_tick(uint32_t ms) {
     uint32_t next = U8G2GL_IDLE;
-    next = u8g2gl_min(next, bar_location.tick(ms));
-    next = u8g2gl_min(next, bar_clock.tick(ms));
-    next = u8g2gl_min(next, msg.tick(ms));
+    next = u8g2gl_min(next, ui_obj_bar_location.tick(ms));
+    next = u8g2gl_min(next, ui_obj_bar_clock.tick(ms));
+    next = u8g2gl_min(next, ui_obj_msg.tick(ms));
     return next;
 }
 
@@ -1673,12 +1693,12 @@ void ui_screen_home_render(U8G2& d) {
     // the wrapper checks effective visibility, sets the effective clip window,
     // and saves and restores draw state, so nothing paints outside its
     // container. Calls stay in document order, draw calls included.
-    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 0);  // bar — container
-    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 1);  // bar_location
-    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 2);  // bar_wifi_icon — hidden checked by the wrapper
-    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 3);  // bar_clock
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_bar — container
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_bar_location
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 2);  // ui_obj_bar_wifi_icon — hidden checked by the wrapper
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 3);  // ui_obj_bar_clock
     u8g2gl_draw_hline(d, 0, 11, 256);                                         // "rule" — no object (§13.5)
-    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 4);  // msg
+    u8g2gl_render_object(d, ui_screen_home_objs, ui_screen_home_parents, 4);  // ui_obj_msg
 }
 ```
 
@@ -2007,6 +2027,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-12** | **`bind_src` / `bind_glyph`.** §6.3 used to list them, but no manifest declared them and nothing in the runtime implemented them, so they've been removed. Binding an image or icon glyph to a subject — a Wi-Fi strength icon, say — is the likely first real need. This is additive, a minor bump. Defer until a screen needs it | Phase 2 |
 | **Q-14** | **Send only dirty tiles.** [D-4]'s redraw stays full-frame. The question is whether to *send* only the tiles covered by the union of dirty object bounds, including each moved or hidden object's previous bounds, using U8G2's `updateDisplayArea()`. Measure bus time per frame, whole buffer against dirty tiles only, on I²C and on SPI, for one real departures-board screen. Adopt it only if the saving matters. U8G2 can also cap how many tiles go out per call, which fits `ui_handler()`'s cooperative scheduling ([D-15]). Prior art: UiUiUi ([concept.md §4.2](concept.md)) | Q-4 / Phase 1 exit |
 | **Q-15** | **A "cards" element** — one container showing exactly one of its children, chosen by an integer subject, equivalent to UiUiUi's `UICards`. Today this takes `bind_flag_if` on every child, which is clumsy. It would switch between modes or pages within one region of a screen — the mechanism a carousel would drive. It is *not* a modal: modals need overlays and z-order beyond document order, which ui_spec §7.3 excludes, and a cards element needs neither. It would be a *mechanism*. Carousel *policy* stays in `modules/U8G2GLDisplay`, as ui_spec §7.3 already rules. It adds schema surface, so §1.5 applies: defer until E-3's navigation design or a departures-board carousel actually needs it | E-3 |
+| **Q-16** | **Children that follow their container.** Schema 0.4 forbids children inside a container whose position is bound (§7.2), because children's positions are fixed at build time. That rules out sliding panels and carousels — the very cases where you'd bind a container's position. Lifting it needs no layout pass: the runtime already walks each object's ancestors every frame for clipping and visibility ([A-3]), and adding up the ancestors' origins in that same walk would move children with their parent. That's translation, not layout, so [D-7] and [D-20] still hold. It touches every render path, so it waits until a real screen needs it — probably alongside Q-15 in E-3 | E-3 |
 
 ---
 

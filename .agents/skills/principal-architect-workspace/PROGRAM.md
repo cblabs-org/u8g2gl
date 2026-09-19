@@ -1008,3 +1008,75 @@ UiUiUi already does, and say nothing about the editor that differentiates it.
 
 These edits were made directly on `main`, through a worktree. PR-04's PA was on
 `u8g2gl-generator/wo11-editor-target`, and its tree was not touched.
+
+---
+
+## Session — 2026-09-19 · Rulings on CA-BRIDGE-2026-09-18 (PR-04, first emitted code)
+
+PR-04's PA reached WO11 with 12 of 18 work orders complete, and the generator
+emitting C++ that compiles and runs. WO8a, WO9 and WO10 were the first work
+orders to emit real code. They raised six questions, each with concrete evidence.
+The owner asked for the spec to be updated and landed on `main`; the Chief
+Architect made every spec edit directly.
+
+### Rulings
+
+1. **Bound positions are container-relative**, like literal ones. The reason
+   goes beyond consistency: **an attribute's meaning is permanent; its
+   implementation isn't.** Absolute would have made children-follow-parent a
+   breaking change later. **A container whose own position is bound may have no
+   children in 0.4**. The PA's wording was "no positioned children", but §7.2
+   requires every element to be positioned, so that means none at all. This rules
+   out sliding panels and carousels, which is the honest cost of having no
+   reflow. The way to lift it later is Q-16: accumulate ancestor origins in the
+   ancestor walk the runtime already does every frame. That's translation, not
+   layout. Amendment added to the [D-20] record.
+   *Checked in code:* the binding descriptor has no offset field. That makes this
+   free for draw-call primitives (the offset is a build-time literal in the draw
+   arguments) and costs a little for object-backed elements. Mechanism is the
+   PA's call.
+2. **Every emitted object is `ui_obj_<name>`.** The PA was right that a prefix
+   beats a reserved list: C library names depend on the platform's headers, and
+   `clock` has already collided with `<time.h>`. **The CA corrected its own first
+   ruling** (`ui_<screen>_<name>`) before handing it over. A screen called
+   `subject`, `font`, `image`, `style` or `screen` would have collided with the
+   other generated families. And the screen adds no uniqueness, because objects
+   are `static` in their own screen's translation unit. A fixed family can't
+   collide.
+3. **An element's own attributes win over named styles, including styles applied
+   later.** For PR-04, applying styles before properties is enough.
+   *Checked in code:* nothing re-applies a style after init yet, and
+   `apply_style()` merges with `merge_from`, so whichever is applied last wins.
+   **Obligation on PR-09:** `focus_style` re-applies styles at run time, and as
+   things stand it would overwrite an element's own `font` every time the element
+   takes focus. PR-09 needs to track which properties each element set itself.
+4. §13.7 now lists `ui_styles.cpp` and `ui.cpp`. `ui.cpp` holds the frame-dirty
+   observers, which are one per subject, not per screen.
+5. §13.5 uses `.get()`; the example as written wouldn't compile.
+6. **Non-rectangular elements are bounds-checked by what they actually draw** —
+   *not* the full bounding box the PA recommended. A quarter-circle corner at the
+   display edge has a full box that hangs off-screen, even though every pixel it
+   draws is on it. A false error that blocks a valid design costs more than the
+   conservatism saves.
+
+### Spec defect found while editing
+
+§10's styling table still listed `truncate`, which [D-19] deleted in favour of
+`long_mode`. PR-3R removed it from the code; the spec hadn't followed. Removed now.
+
+### Beyond the Chief Architect's remit — flagged to the owner
+
+**WO10b — "a label bound to a subject never draws its text" — breaks the Phase 1
+exit criterion itself.** The departures-board status bar shows a *bound* station
+name. The owner decides, but the CA recommends fixing it before PR-04 is
+submitted, not treating it as an optional work order.
+
+### Coordination
+
+The `wd_` sentence in §13.4's rules was left untouched on `main`. The PA is
+removing `wd_` on its own branch under the 2026-09-16 ruling, and editing the
+same sentence here would have caused a merge conflict. The `ui_obj_` rule went in
+as a separate paragraph.
+
+The edits were made through a worktree on `main`. PR-04's PA was on
+`u8g2gl-generator/wo11-editor-target`, and its tree was not touched.
