@@ -277,7 +277,13 @@ describe('validateWidgetProps', () => {
     });
 
     it('accepts identity attributes on any element, and anchors on a rectangular one', () => {
-      expect(run({ tag: 'u8g2gl_pixel', attributes: { name: 'px', x: '0', y: '0', style: 's' } })).toEqual([]);
+      expect(run({ tag: 'u8g2gl_pixel', attributes: { name: 'px', x: '0', y: '0' } })).toEqual([]);
+      // `style` is common to every element, but a drawing element compiles to a
+      // draw call with no object to apply it to (§13.5): refused since PR-04
+      // WO11b, as generate always refused it.
+      expect(
+        run({ tag: 'u8g2gl_pixel', attributes: { name: 'px', x: '0', y: '0', style: 's' } }).map((d) => d.code),
+      ).toEqual([DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE]);
       const diagnostics = run({
         tag: 'u8g2gl_label',
         attributes: { name: 'lbl', right: '1', bottom: '1', hcenter: 'false', vcenter: 'true', width: '4', height: '4', font: 'f', style: 's' },

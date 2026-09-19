@@ -463,3 +463,163 @@ describe('ruling 1c: a container whose position is bound may have no children (�
     expect(result.validated.errors).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Flag directives (WO10 f9)
+// ---------------------------------------------------------------------------
+
+/** A label carrying one directive. */
+function flagged(directive: string): string {
+  return `        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_6x10_mr">${directive}</u8g2gl_label>`;
+}
+
+describe('flag directives are validated as emission refuses them (WO10 f9)', () => {
+  it('a directive with no ref_value: MISSING_REQUIRED in both journeys', () => {
+    const result = journeys(flagged('<bind_flag_if_eq subject="level" flag="hidden" />'));
+    expectAgreement(result);
+    expect(result.validated.diagnostics.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.MISSING_REQUIRED}:ref_value`,
+    ]);
+  });
+
+  it.each([
+    ['gt', 'wifi', 'bool'],
+    ['lt', 'station', 'string'],
+    ['gt', 'clock', 'time'],
+    ['eq', 'station', 'string'],
+  ])('bind_flag_if_%s on a %s subject (%s) has no runtime overload: TYPE_MISMATCH', (op, subject, type) => {
+    const result = journeys(flagged(`<bind_flag_if_${op} subject="${subject}" ref_value="1" flag="hidden" />`));
+    expectAgreement(result);
+    expect(errorCodes(result.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.TYPE_MISMATCH]);
+    expect(result.validated.diagnostics[0]?.message).toContain(`(${type})`);
+  });
+
+  it('an unknown bind_flag_if_* suffix: UNKNOWN_ATTRIBUTE, with the closest variant suggested', () => {
+    const result = journeys(flagged('<bind_flag_if_ge subject="level" ref_value="1" flag="hidden" />'));
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE]);
+    expect(found[0]?.suggestions).toContain('bind_flag_if_gt');
+  });
+
+  it('the same rules hold on a drawing element, whose directive is a draw-time guard', () => {
+    const result = journeys(
+      '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4"><bind_flag_if_lt subject="wifi" ref_value="1" flag="hidden" /></u8g2gl_box>',
+    );
+    expectAgreement(result);
+    expect(errorCodes(result.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.TYPE_MISMATCH]);
+  });
+
+  it('every comparison the runtime has, on the subject types it has it for, builds (controls)', () => {
+    const result = journeys(
+      flagged(
+        [
+          '<bind_flag_if_eq subject="wifi" ref_value="true" flag="hidden" />',
+          '<bind_flag_if_not_eq subject="level" ref_value="2" flag="hidden" />',
+          '<bind_flag_if_gt subject="level" ref_value="3" flag="disabled" />',
+          '<bind_flag_if_lt subject="level" ref_value="-1" flag="hidden" />',
+        ].join(''),
+      ),
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bind_text_fmt on a string subject (WO10 f10)
+// ---------------------------------------------------------------------------
+
+describe('bind_text_fmt on a string subject is refused, naming its type (WO10 f10)', () => {
+  it('even %s, which the conversion check alone accepts — the emitted call would not compile', () => {
+    const result = journeys(
+      '        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_6x10_mr" bind_text="station" bind_text_fmt="%s" />',
+    );
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.FORMAT_MISMATCH]);
+    expect(found[0]?.message).toContain("which has type 'string'");
+  });
+
+  it('a format on an int subject still builds (the control)', () => {
+    const result = journeys(
+      '        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_6x10_mr" bind_text="level" bind_text_fmt="%d C" />',
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// style_* overrides (WO10 f8)
+// ---------------------------------------------------------------------------
+
+describe('each style_* override is validated against the property it overrides (WO10 f8)', () => {
+  const label = (attributes: string): string =>
+    `        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="u8g2_font_6x10_mr" ${attributes} />`;
+
+  it.each([
+    ['style_invert="maybe"', 'maybe'],
+    ['style_align="middle"', 'middle'],
+    ['style_font_mode="opaque"', 'opaque'],
+    ['style_draw_color="2"', '2'],
+    ['style_padding="#pad"', '#pad'],
+  ])('%s is refused in both journeys, with the code emission used', (attribute, value) => {
+    const result = journeys(label(attribute));
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([`${DIAGNOSTIC_CODES.TYPE_MISMATCH}:${value}`]);
+  });
+
+  it('suggests the members of an enum it overrides', () => {
+    const result = journeys(label('style_align="rigth"'));
+    expect(result.validated.diagnostics[0]?.suggestions).toContain('right');
+  });
+
+  it('an override of a property the element does not set: UNKNOWN_ATTRIBUTE', () => {
+    const result = journeys(label('style_sparkle="true"'));
+    expectAgreement(result);
+    expect(errorCodes(result.validated.diagnostics)).toEqual([DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE]);
+  });
+
+  it('a drawing element has no object to style: an override or a named style is refused', () => {
+    const result = journeys(
+      [
+        '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" style_radius="2" />',
+        '        <u8g2gl_hline name="r" x="0" y="10" width="10" style="note" />',
+      ].join('\n'),
+      { styles: '<style name="note" align="right" />' },
+    );
+    expectAgreement(result);
+    expect(errorsOf(result.validated.diagnostics)).toEqual([
+      `${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}@3`,
+      `${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}@4`,
+    ]);
+  });
+
+  it('a value passed into a composite is checked where the template uses it, naming the instance', () => {
+    const chip = composite(
+      'chip',
+      '<prop name="side" type="string" default="left" />',
+      '        <u8g2gl_label name="text" x="0" y="0" width="20" height="10" font="u8g2_font_6x10_mr" style_align="$side" />',
+    );
+    const result = journeys('        <chip name="c" x="0" y="0" width="20" height="10" side="middle" />', {
+      composites: [chip],
+    });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.TYPE_MISMATCH]);
+    expect(found[0]?.message).toContain("instance 'c'");
+  });
+
+  it('every §10 property overridden with a value of its type builds (the control)', () => {
+    const result = journeys(
+      label(
+        'style_align="right" style_invert="true" style_padding="2" style_draw_color="xor" style_border="false" ' +
+          'style_radius="1" style_font_mode="transparent" style_font="u8g2_font_6x10_mr"',
+      ),
+    );
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});

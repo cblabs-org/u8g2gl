@@ -23,6 +23,14 @@
  *              value helper has no `bool` spelling for it. Unknown tags are
  *              Pass 2's concern and are skipped here.
  *
+ *              PR-04 WO11b closed three places where `validate` disagreed with
+ *              `generate`: a required prop is satisfied by a geometry binding, a
+ *              `style_*` override or a named style that declares it, not only by
+ *              the attribute (WO10b finding 1); every `style_*` override must
+ *              name a property the element sets and fit its type (WO10 finding
+ *              8); and a drawing element, which has no object, may carry no
+ *              style at all (§13.5) — each refused with the code emission used.
+ *
  *              Once, never twice (PR-04 WO7b): every check runs on the elements
  *              as written — screens and each composite's `<view>` — so a template
  *              defect is reported once however often it is instantiated. The one
@@ -42,7 +50,9 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
-import { GEOMETRY_BINDINGS, isRectangular, walkExpanded } from '../resolver/index.js';
+import { GEOMETRY_BINDINGS, INT32_MAX, INT32_MIN, isRectangular, walkExpanded } from '../resolver/index.js';
+import { COLOR_VALUES } from '../generator/emit/value.js';
+import type { PropDef } from '../schema/widget-manifest.js';
 import { namedStyles } from '../generator/emit/screen-model.js';
 import { styleProperties } from '../generator/emit/styles.js';
 import type { Globals, StyleDecl } from '../schema/globals.js';
@@ -262,6 +272,9 @@ function checkInstanceProps(
     diagnostics.push(...screenLevelPlaceholders(node, manifest));
   }
 
+  // --- Step 4d: Styles, and each `style_*` override, against what they override (§10) ---
+  diagnostics.push(...checkStyles(node, manifest, atScreenLevel));
+
   // --- Step 5: Flag directives must name a flag the element can carry ---
   // §8.4 fixes the flag set, so it is not declared per element; the registry
   // spells both the set and the drawing-element test once (PR-04 WO8a).
@@ -361,6 +374,127 @@ function missingRequired(node: WidgetNode, manifest: EffectiveManifest, styles: 
           prop.name,
         ),
       );
+    }
+  }
+  return diagnostics;
+}
+
+// checkStyleOverride
+// One `style_<name>` override's value against the property it overrides (§10).
+// The element's own `<prop>` of that name is what the override is applied
+// through — the screen model's `styleOverridesOf`, and so the same setter and
+// §13.2 spelling as the attribute — so it is the prop's type the value must
+// fit. The rule is the value helper's, stated as a diagnostic: an override is
+// never resolved, so an `int` must be a literal, not an expression. A font is
+// Pass 2's (UNKNOWN_FONT), a `$`-reference is not yet a value.
+//   node  — the element
+//   name  — the property overridden, e.g. `align`
+//   value — the override's value as written
+//   prop  — the element's declaration of that property
+function checkStyleOverride(node: WidgetNode, name: string, value: string, prop: PropDef): Diagnostic | undefined {
+  if (value.startsWith('$')) {
+    return undefined;
+  }
+  const attribute = `style_${name}`;
+  const loc = node.attributeLocs?.[attribute] ?? node.loc;
+  // TYPE_MISMATCH throughout, the code emission refused these with, so a
+  // document `generate` used to refuse is refused with the same code.
+  const invalid = (allowed: readonly string[], kind: string): Diagnostic =>
+    createPropDiagnostic(
+      DIAGNOSTIC_CODES.TYPE_MISMATCH,
+      `Invalid value '${value}' for '${attribute}' on ${describeNode(node)}: it overrides '${name}', ` +
+        `which is ${kind}: one of ${allowed.join(', ')} (§10).`,
+      loc,
+      value,
+      findClosest(value, allowed),
+    );
+  switch (prop.type) {
+    case 'bool':
+      return BOOLEAN_VALUES.includes(value) ? undefined : invalid(BOOLEAN_VALUES, 'a boolean');
+    case 'color':
+      return COLOR_VALUES.includes(value) ? undefined : invalid(COLOR_VALUES, 'a draw colour');
+    case 'enum': {
+      const allowed = (prop.values ?? '').split(',').map((member) => member.trim());
+      return allowed.includes(value) ? undefined : invalid(allowed, 'an enum');
+    }
+    case 'int': {
+      const literal = /^-?\d+$/.test(value.trim()) ? Number(value.trim()) : undefined;
+      if (literal !== undefined && literal >= INT32_MIN && literal <= INT32_MAX) {
+        return undefined;
+      }
+      return createPropDiagnostic(
+        DIAGNOSTIC_CODES.TYPE_MISMATCH,
+        `'${attribute}="${value}"' on ${describeNode(node)} overrides '${name}', an int, but is not an integer ` +
+          `literal within int32_t: an override is applied as written, not evaluated (§10, §13.2).`,
+        loc,
+        value,
+      );
+    }
+    default:
+      return undefined;
+  }
+}
+
+// checkStyles
+// Named styles and `style_*` overrides against what they can apply to (§10) —
+// until PR-04 WO11b only `style_font` was ever checked (WO10 finding 8), and
+// emission refused the rest:
+// - a drawing element compiles to a draw call with no object, so it has
+//   nothing to apply a style to (§13.5); a named style on one is refused here,
+//   with the code emission used;
+// - an override must name a property the element sets through a setter — the
+//   one it is applied through — or there is no setter to call ([D-17]);
+// - its value must fit that property's type (checkStyleOverride).
+//   node          — the element as written
+//   manifest      — its effective manifest
+//   atScreenLevel — whether it is written in a screen, where a `$prop` means nothing
+function checkStyles(node: WidgetNode, manifest: EffectiveManifest, atScreenLevel: boolean): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+
+  // --- Step 1: A drawing element has no object to style ---
+  if (isDrawingElement(manifest.declared) && namedStyles(node).length > 0) {
+    diagnostics.push(
+      createPropDiagnostic(
+        DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+        `${describeNode(node)} has a style, but it compiles to a draw call with no object to apply one to ` +
+          `(§13.5, §10). Remove the style.`,
+        node.attributeLocs?.style ?? node.loc,
+        'style',
+      ),
+    );
+  }
+
+  // --- Step 2: Each override names a setter property, and fits its type ---
+  for (const [name, value] of Object.entries(node.styleOverrides)) {
+    const attribute = `style_${name}`;
+    const prop = manifest.api.props.find((candidate) => candidate.name === name && candidate.setter !== undefined);
+    if (prop === undefined) {
+      const settable = manifest.api.props.filter((candidate) => candidate.setter !== undefined).map((p) => p.name);
+      diagnostics.push(
+        createPropDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+          `'${attribute}' on ${describeNode(node)} overrides '${name}', which <${node.tag}> does not declare as a ` +
+            `property it sets, so there is no setter to apply it with (§10, [D-17]).`,
+          node.attributeLocs?.[attribute] ?? node.loc,
+          attribute,
+          findClosest(name, settable).map((candidate) => `style_${candidate}`),
+        ),
+      );
+      continue;
+    }
+    if (atScreenLevel) {
+      const reference = propReferenceIn(value);
+      if (reference !== undefined && prop.type !== 'font') {
+        // A font's `$` is Pass 2's, through the same helper.
+        diagnostics.push(
+          unsubstitutedPlaceholder(reference, `'${attribute}' on ${describeNode(node)}`, node.attributeLocs?.[attribute] ?? node.loc),
+        );
+        continue;
+      }
+    }
+    const diagnostic = checkStyleOverride(node, name, value, prop);
+    if (diagnostic !== undefined) {
+      diagnostics.push(diagnostic);
     }
   }
   return diagnostics;
@@ -496,9 +630,20 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
         if (substitution.styleChild !== undefined) {
           continue; // A `<style name="$s">` value is not an attribute: Pass 2's.
         }
-        const diagnostic = booleanAttributesOf(manifest).includes(attribute)
-          ? checkBooleanValue(element.node, attribute)
-          : checkEnumValue(element.node, attribute, manifest);
+        const overridden = attribute.startsWith('style_') ? attribute.slice('style_'.length) : undefined;
+        const overriddenProp =
+          overridden === undefined
+            ? undefined
+            : manifest.api.props.find((prop) => prop.name === overridden && prop.setter !== undefined);
+        const overrideValue = overridden === undefined ? undefined : element.node.styleOverrides[overridden];
+        const diagnostic =
+          overridden !== undefined
+            ? overriddenProp === undefined || overrideValue === undefined
+              ? undefined
+              : checkStyleOverride(element.node, overridden, overrideValue, overriddenProp)
+            : booleanAttributesOf(manifest).includes(attribute)
+              ? checkBooleanValue(element.node, attribute)
+              : checkEnumValue(element.node, attribute, manifest);
         if (diagnostic !== undefined) {
           report(diagnostic, substitution, element);
         }

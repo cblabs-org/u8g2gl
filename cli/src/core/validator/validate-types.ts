@@ -30,9 +30,12 @@
  *              the registry keeps both by merging bindings on (name, type).
  *              Nothing is inferred from a shared `setter` (PR-04 WO5a), so a
  *              binding declared only for `int` rejects a string subject. Format
- *              checks are keyed off the bindings' declared `fmt` attribute. Every
+ *              checks are keyed off the bindings' declared `fmt` attribute, and a
+ *              format on a string subject is refused outright (PR-04 WO11b). Every
  *              `<bind_flag_if_*>` must name one of §8.4's two flags (PR-04 WO5a
- *              finding 1), and its comparison value must fit its subject's type.
+ *              finding 1), be a comparison the runtime provides for its subject's
+ *              type — emission's `FLAG_COMPARISONS`, the one table — and carry a
+ *              `ref_value` that fits the subject's type (PR-04 WO11b).
  *
  * Exports:
  * - validateTypes(input): Runs Pass 5 type compatibility validation
@@ -46,6 +49,7 @@ import type { BindDef } from '../schema/widget-manifest.js';
 import { BINDING_FLAGS } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { walkExpanded, withInstantiation } from '../resolver/index.js';
+import { FLAG_COMPARISONS } from '../generator/emit/screen-model.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
 
@@ -178,9 +182,27 @@ function checkElement(
     // checked once so a shared `bind_text_fmt` is not reported twice.
     for (const fmtAttr of distinct(overloads.map((b) => b.fmt))) {
       const fmt = node.attributes[fmtAttr];
-      if (typeof fmt === 'string') {
-        checkFormat(node, fmtAttr, fmt, subject).forEach(report);
+      if (typeof fmt !== 'string') {
+        continue;
       }
+      // A format turns a value into text. A string subject already is text, and
+      // the runtime binds one as it is — `bind_text(u8g2gl_subject_string_base*)`
+      // takes no format — so the call generate would emit does not compile
+      // (PR-04 WO11b, WO10 finding 10). Refused whatever the conversions say:
+      // even `%s`, which checkFormat alone would accept.
+      if (subject.type === 'string') {
+        report(
+          createTypeDiagnostic(
+            DIAGNOSTIC_CODES.FORMAT_MISMATCH,
+            `'${fmtAttr}' on <${node.tag}> formats subject '${subject.name}', which has type 'string': a string ` +
+              `subject is drawn as the text it holds, and binding one takes no format (§8.4). Remove '${fmtAttr}'.`,
+            node.attributeLocs?.[fmtAttr] ?? node.loc,
+            fmt,
+          ),
+        );
+        continue;
+      }
+      checkFormat(node, fmtAttr, fmt, subject).forEach(report);
     }
   }
 
@@ -215,10 +237,56 @@ function checkElement(
       );
     }
 
-    // --- Step 4: The comparison value must fit the subject's type ---
+    // --- Step 3b: A comparison the runtime provides, for this subject's type ---
+    // The runtime's `bind_flag_if_*` overload set is emission's one table,
+    // FLAG_COMPARISONS: a directive outside it, or a subject type it has no
+    // overload for, has no C++ to call, and `ref_value` is the thing compared.
+    // Emission refused all three while `validate` passed them (PR-04 WO11b,
+    // WO10 finding 9); the codes are the ones emission used.
+    const comparison = FLAG_COMPARISONS[child.type];
     const subject = subjectMap.get(child.subject);
+    if (comparison === undefined) {
+      const variants = Object.keys(FLAG_COMPARISONS);
+      report(
+        createTypeDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+          `<${child.type}> on <${node.tag}> is not a binding the runtime provides; §8.4's variants are ` +
+            `${variants.join(', ')}.`,
+          child.loc ?? node.loc,
+          child.type,
+          findClosest(child.type, variants),
+        ),
+      );
+      continue;
+    }
+    if (subject !== undefined && !comparison.subjectTypes.includes(subject.type)) {
+      report(
+        createTypeDiagnostic(
+          DIAGNOSTIC_CODES.TYPE_MISMATCH,
+          `<${child.type}> on <${node.tag}> compares subject '${subject.name}' (${subject.type}), but the runtime ` +
+            `compares ${child.type} only for ${comparison.subjectTypes.join(' and ')} subjects (§8.4).`,
+          child.loc ?? node.loc,
+          child.subject,
+        ),
+      );
+      continue;
+    }
     const cmpVal = child.value ?? child.refValue;
-    if (!subject || cmpVal === undefined) {
+    if (cmpVal === undefined || cmpVal === '') {
+      report(
+        createTypeDiagnostic(
+          DIAGNOSTIC_CODES.MISSING_REQUIRED,
+          `<${child.type}> on <${node.tag}> has no 'ref_value', so there is nothing to compare subject ` +
+            `'${child.subject}' against (§8.4).`,
+          child.loc ?? node.loc,
+          'ref_value',
+        ),
+      );
+      continue;
+    }
+
+    // --- Step 4: The comparison value must fit the subject's type ---
+    if (!subject) {
       continue;
     }
     if (subject.type === 'bool' && !['true', 'false', '0', '1'].includes(cmpVal)) {

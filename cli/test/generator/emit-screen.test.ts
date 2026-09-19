@@ -575,7 +575,9 @@ describe('defects only emission sees are refused, never guessed', () => {
   it('refuses a style on an element with no object to apply it to', () => {
     const result = generateProject({ screens: { home: '<u8g2gl_hline name="r" x="0" y="0" width="10" style="note" />' } });
     expect(result.files).toEqual([]);
-    expect(withCode(result, DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE).map((d) => d.offendingText)).toEqual(['r']);
+    // Refused by Pass 4 since PR-04 WO11b, before emission: same code, with the
+    // caret on the style rather than on the element's name.
+    expect(withCode(result, DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE).map((d) => d.offendingText)).toEqual(['style']);
   });
 
 });

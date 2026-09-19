@@ -135,7 +135,9 @@ describe('validateTypes', () => {
     );
     expect(fmtDiag).toBeDefined();
     expect(fmtDiag?.severity).toBe('error');
-    expect(fmtDiag?.message).toContain("expects integer, but subject 'station_name' has type 'string'");
+    // PR-04 WO11b: any format on a string subject is refused, naming its type —
+    // the string overload of bind_text takes no format at all.
+    expect(fmtDiag?.message).toContain("subject 'station_name', which has type 'string'");
   });
 
   it('rejects string format specifier (%s) on integer subject with U8G2GL_FORMAT_MISMATCH', () => {
