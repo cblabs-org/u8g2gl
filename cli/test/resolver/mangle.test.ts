@@ -71,7 +71,7 @@ describe('§13.4 identifier helpers', () => {
 });
 
 describe('mangleIdentifiers (PR-04 WO7)', () => {
-  it('builds the full table in declaration order: screen functions and tables, subjects and setters, fonts, images, styles', () => {
+  it('builds the full table in declaration order: screen functions, tables and descriptor, the editor registry, subjects and setters, fonts, images, styles', () => {
     const globals: Globals = {
       consts: [],
       subjects: [{ name: 'temperature', type: 'int' }],
@@ -90,6 +90,9 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       ['ui_screen_home_render', 'screen_function'],
       ['ui_screen_home_objs', 'screen_table'],
       ['ui_screen_home_parents', 'screen_table'],
+      // PR-04 WO11b: the descriptor and the editor registry make the table total.
+      ['ui_screen_home', 'screen_descriptor'],
+      ['ui_editor_registry', 'editor_registry'],
       ['ui_subject_temperature', 'subject'],
       ['ui_set_temperature', 'subject_setter'],
       ['ui_font_small_9', 'font'],

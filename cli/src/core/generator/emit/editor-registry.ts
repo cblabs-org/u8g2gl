@@ -50,6 +50,7 @@
 
 import { BINDING_FLAGS, isDrawingElement, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import type { BindDef, PropDef, PropType } from '../../schema/widget-manifest.js';
+import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
 import { POSITION_BINDINGS } from './placement.js';
 import { classOf, FLAG_COMPARISONS, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
@@ -516,7 +517,7 @@ export function emitEditorRegistryUnit(input: EditorRegistryInput): EmittedUnit 
   lines.push(section('Registry'));
   lines.push(...classTable.lines, ...drawingTable.lines, ...directiveTable.lines, ...flagTable.lines);
   lines.push(
-    'const u8g2gl_editor_registry& ui_editor_registry() {',
+    `const u8g2gl_editor_registry& ${EDITOR_REGISTRY_FUNCTION}() {`,
     '    static const u8g2gl_editor_registry registry = {',
     `        ${classTable.ref},`,
     `        ${drawingTable.ref},`,

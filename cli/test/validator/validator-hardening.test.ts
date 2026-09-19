@@ -27,7 +27,7 @@ import {
 } from '../../src/core/parser/index.js';
 import { validate, type ValidateResult } from '../../src/core/validator/index.js';
 import { checkProject, generate, type GenerateResult, type ProjectModel } from '../../src/core/generator/index.js';
-import { GEOMETRY_BINDINGS } from '../../src/core/resolver/index.js';
+import { expandScreens, GEOMETRY_BINDINGS, mangleIdentifiers } from '../../src/core/resolver/index.js';
 import { POSITION_BINDINGS } from '../../src/core/generator/emit/placement.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnostic.js';
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
@@ -713,5 +713,94 @@ describe('truncate is gone from the style model ([D-19], §10)', () => {
   it("the [D-19] migration message that tells an author why is kept", () => {
     const text = readFileSync(join(CLI_ROOT, 'src', 'core', 'validator', 'validate-schema.ts'), 'utf8');
     expect(text).toContain(`'truncate' is removed: use long_mode=\\"clip\\" ([D-19])`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Screen-descriptor collision, ui_editor_registry, the ui_obj_ family (WO10 f5, WO11 f6)
+// ---------------------------------------------------------------------------
+
+/** A project with several screens, each holding one box. */
+function screensModel(names: readonly string[]): ProjectModel {
+  const base = model('        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />');
+  const screens = names.map(
+    (name) =>
+      parseScreenFile(
+        `<screen name="${name}">\n    <view>\n        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />\n    </view>\n</screen>\n`,
+        `screens/screen_${name}.xml`,
+      ).value!,
+  );
+  return { ...base, screens };
+}
+
+describe('the collision table is total (WO10 f5, WO11 f6)', () => {
+  it.each([
+    [['a', 'a_objs'], 'ui_screen_a_objs'],
+    [['a', 'a_init'], 'ui_screen_a_init'],
+  ])('screens %j: a descriptor colliding with a screen table or function is NAME_COLLISION in both journeys', (names, identifier) => {
+    const project = screensModel(names);
+    const result = {
+      validated: checkProject(project, 'warning'),
+      generated: generate({ ...project, generatorVersion: '9.9.9' }),
+    };
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NAME_COLLISION);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.message).toContain(`'${identifier}'`);
+  });
+
+  it('holds every screen descriptor and the editor registry function', () => {
+    const project = screensModel(['home', 'gauges']);
+    const expansion = expandScreens({ globals: project.globals, screens: project.screens, manifests: project.manifests });
+    const table = mangleIdentifiers({ globals: project.globals, screens: expansion.screens });
+    const kinds = table.global.map((entry) => `${entry.identifier}:${entry.source.kind}`);
+    expect(kinds).toContain('ui_screen_home:screen_descriptor');
+    expect(kinds).toContain('ui_screen_gauges:screen_descriptor');
+    expect(kinds).toContain('ui_editor_registry:editor_registry');
+  });
+
+  it('checks the ui_obj_ family in each screen against everything ui.hpp declares (pinned; WO10b built it)', () => {
+    const pair = composite('pair', '', '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />');
+    const result = journeys(
+      [
+        '        <pair name="a" x="0" y="0" width="10" height="10" />',
+        '        <u8g2gl_box name="a_b" x="20" y="0" width="4" height="4" />',
+      ].join('\n'),
+      { composites: [pair] },
+    );
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NAME_COLLISION);
+    expect(found.map((d) => d.message.includes("'ui_obj_a_b'"))).toEqual([true]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Invented template setters (WO10 f1)
+// ---------------------------------------------------------------------------
+
+describe("a composite's template parameters get no invented setter (WO10 f1)", () => {
+  it('a composite prop declaring neither setter nor draw has no setter', () => {
+    const card = composite('card', '<prop name="title" type="string" default="x" />', '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />');
+    expect(card.api.props.find((prop) => prop.name === 'title')?.setter).toBeUndefined();
+  });
+
+  it("a plain widget's prop keeps the pre-[D-18] set_<name> default (the control)", () => {
+    const parsed = parseWidgetManifestFile(
+      '<widget name="gizmo" extends="u8g2gl_obj"><api><prop name="level" type="int" /></api></widget>',
+      'widgets/gizmo/gizmo.xml',
+    );
+    expect(parsed.value?.api.props[0]?.setter).toBe('set_level');
+  });
+
+  it('and nothing emits a call for one', () => {
+    const card = composite(
+      'card',
+      '<prop name="caption" type="string" default="hi" />',
+      '        <u8g2gl_label name="t" x="0" y="0" width="20" height="10" font="u8g2_font_6x10_mr" text="$caption" />',
+    );
+    const result = journeys('        <card name="c" x="0" y="0" width="20" height="10" caption="yo" />', { composites: [card] });
+    expectAgreement(result);
+    expect(screenUnit(result)).not.toContain('set_caption');
+    expect(screenUnit(result)).toContain('ui_obj_c_t.set_text("yo");');
   });
 });

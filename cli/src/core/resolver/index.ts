@@ -123,6 +123,8 @@ export {
   SCREEN_TABLES,
   screenFunctionIdentifier,
   screenTableIdentifier,
+  screenDescriptorIdentifier,
+  EDITOR_REGISTRY_FUNCTION,
   subjectIdentifier,
   subjectSetterIdentifier,
   fontIdentifier,

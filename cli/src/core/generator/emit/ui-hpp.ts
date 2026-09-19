@@ -41,7 +41,7 @@
  * - emitUiHeader():   Emit `ui.hpp`
  */
 
-import { screenFunctionIdentifier, SCREEN_FUNCTIONS } from '../../resolver/index.js';
+import { screenDescriptorIdentifier, screenFunctionIdentifier, SCREEN_FUNCTIONS } from '../../resolver/index.js';
 import { GENERATED_CONFIG_HEADER } from './generated-config.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations, PROGMEM_MACRO } from './images.js';
@@ -72,15 +72,11 @@ const RUNTIME_HEADERS: readonly string[] = [
 /**
  * `ui_screen_home` — a screen's `u8g2gl_screen` descriptor, which an application
  * hands to `u8g2gl_set_active_screen()` (§12.4). Declared here and defined by
- * the screen's own unit (`screen.ts`).
- *
- * Spelled beside §13.4's other screen identifiers but not registered in
- * `mangle.ts`'s collision table, which predates the descriptor and is outside
- * PR-04 WO10's boundary — see that work order's Completion Report.
+ * the screen's own unit (`screen.ts`). Spelled by `mangle.ts`, which also
+ * collision-checks it (PR-04 WO11b); re-exported so this module's callers are
+ * unchanged.
  */
-export function screenDescriptorIdentifier(screen: string): string {
-  return `ui_screen_${screen}`;
-}
+export { screenDescriptorIdentifier };
 
 /** The five functions §13.7 emits per screen, and what each returns and takes. */
 const SCREEN_SIGNATURES: Readonly<Record<string, { readonly returns: string; readonly params: string }>> = {

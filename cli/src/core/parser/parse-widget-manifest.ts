@@ -121,6 +121,11 @@ export function parseWidgetManifest(
   const bindings: BindDef[] = [];
   const elements: ElementDef[] = [];
 
+  // A composite's own `<api>` props are template parameters (§6.4, §13.6):
+  // expansion substitutes them into the `<view>`, and the container is a plain
+  // `u8g2gl_obj` with no such method, so nothing may call a setter for one.
+  const isComposite = getChild(root, 'view') !== undefined;
+
   const apiEl = getChild(root, 'api');
   if (apiEl) {
     for (const child of apiEl.children) {
@@ -132,11 +137,14 @@ export function parseWidgetManifest(
         // [D-18]: a property reaches the display through exactly one emission
         // target — `setter=` (a method on the element's class) or `draw=` (a
         // free `u8g2gl_draw_*` function for a classless drawing element,
-        // §6.2). A manifest naming neither keeps the pre-[D-18] `set_<name>`
-        // default rather than silently becoming a draw call.
+        // §6.2). A plain widget's prop naming neither keeps the pre-[D-18]
+        // `set_<name>` default rather than silently becoming a draw call. A
+        // composite's template parameter gets no invented setter at all (PR-04
+        // WO11b, WO10 finding 1): emission used to have to filter
+        // `set_title_subject(…)` back out, because it would not compile.
         const setterAttr = getAttributeValue(child, 'setter');
         const drawAttr = getAttributeValue(child, 'draw');
-        const setter = setterAttr ?? (drawAttr ? undefined : `set_${propName}`);
+        const setter = setterAttr ?? (drawAttr || isComposite ? undefined : `set_${propName}`);
         const defaultVal = getAttributeValue(child, 'default');
         const required = getBooleanAttribute(child, 'required');
         const isAnimated = getBooleanAttribute(child, 'animated');

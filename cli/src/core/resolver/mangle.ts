@@ -35,7 +35,11 @@
  *                both.
  *              Scopes follow the emitted translation units: everything `ui.hpp`
  *              declares is visible to every screen, and each screen's objects and
- *              local styles are visible only in its own unit. An author-written name
+ *              local styles are visible only in its own unit. The table is total
+ *              (PR-04 WO11b): each screen's descriptor and the editor registry
+ *              function are in it as well as its functions and tables, and the
+ *              `ui_obj_` family is checked in each screen's scope against all of
+ *              them. An author-written name
  *              breaking §13.4's rules, and a name declared twice, are Pass 7's
  *              (validate-identifiers.ts), not collisions. Isomorphic.
  *
@@ -45,7 +49,8 @@
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
  * - OBJECT_IDENTIFIER_PREFIX:          `ui_obj_`, the emitted objects' family
- * - screenFunctionIdentifier(), screenTableIdentifier(), subjectIdentifier(),
+ * - EDITOR_REGISTRY_FUNCTION:          `ui_editor_registry`, the editor target's one fixed name
+ * - screenFunctionIdentifier(), screenTableIdentifier(), screenDescriptorIdentifier(), subjectIdentifier(),
  *   subjectSetterIdentifier(), fontIdentifier(), imageIdentifier(),
  *   styleIdentifier(), objectIdentifier(), childIdentifier(): Spell one identifier
  * - mangleIdentifiers():              Build and collision-check a project's table
@@ -101,6 +106,8 @@ export const SCREEN_TABLES: readonly string[] = ['objs', 'parents'];
 export type IdentifierKind =
   | 'screen_function'
   | 'screen_table'
+  | 'screen_descriptor'
+  | 'editor_registry'
   | 'object'
   | 'subject'
   | 'subject_setter'
@@ -167,6 +174,26 @@ export const OBJECT_IDENTIFIER_PREFIX = 'ui_obj_';
 export function screenFunctionIdentifier(screen: string, fn: string): string {
   return `ui_screen_${screen}_${fn}`;
 }
+
+/**
+ * @brief A screen's `u8g2gl_screen` descriptor: `ui_screen_home` — what an
+ *        application hands to `u8g2gl_set_active_screen()` (§12.4).
+ *
+ * Spelled here, beside §13.4's other screen identifiers, and registered in the
+ * collision table (PR-04 WO11b, WO10 finding 5): screen `a_objs`'s descriptor
+ * is `ui_screen_a_objs`, which is screen `a`'s object table. `ui.hpp` declares
+ * it and the screen's unit defines it through this one function.
+ */
+export function screenDescriptorIdentifier(screen: string): string {
+  return `ui_screen_${screen}`;
+}
+
+/**
+ * The editor target's registry function, `ui_editor_registry()` ([UD-4]). A
+ * fixed name rather than a family, registered in the collision table so the
+ * mapping is total (PR-04 WO11b, WO11 finding 6).
+ */
+export const EDITOR_REGISTRY_FUNCTION = 'ui_editor_registry';
 
 /** `ui_screen_home_objs`. */
 export function screenTableIdentifier(screen: string, table: string): string {
@@ -405,7 +432,11 @@ export function mangleIdentifiers(input: MangleInput): IdentifierTable {
     for (const table of SCREEN_TABLES) {
       global.push(makeEntry(screenTableIdentifier(screen.name, table), 'screen_table', description, screen.loc, `screen:${screen.name}`));
     }
+    global.push(
+      makeEntry(screenDescriptorIdentifier(screen.name), 'screen_descriptor', description, screen.loc, `screen:${screen.name}`),
+    );
   }
+  global.push(makeEntry(EDITOR_REGISTRY_FUNCTION, 'editor_registry', 'the editor registry', undefined, 'editor:registry'));
   for (const subject of globals?.subjects ?? []) {
     if (subject.name) {
       const description = `subject '${subject.name}'`;
