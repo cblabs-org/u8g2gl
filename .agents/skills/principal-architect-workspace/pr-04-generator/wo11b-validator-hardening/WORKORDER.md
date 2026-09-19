@@ -5,7 +5,7 @@ title: "Validator hardening: validate never passes what generate refuses"
 branch: u8g2gl-generator/wo11b-validator-hardening
 base: u8g2gl-generator/wo10b-bound-text
 complexity: standard
-status: draft — PA revises against WO10b's Completion Report, and the owner's confirmation of WO11b, before dispatch
+status: dispatched
 ---
 
 # WO11b — Validator hardening
@@ -14,7 +14,7 @@ status: draft — PA revises against WO10b's Completion Report, and the owner's 
 
 Part of PR-04 (`pr-04-generator`). Verify, from committed files: the human's approval of PR-04 in
 `../PROJECT.md` under "Human Approval"; that `../PROJECT.md` records **WO11b as approved by the
-owner** ("Owner approval — WO10b and WO11b", including any recorded confirmation); and that this
+owner** ("Owner approval — WO10b and WO11b", **including the owner's confirmation of 2026-09-19**); and that this
 WORKORDER's `status` is `dispatched`. If any is missing, record it in the Completion Report and stop.
 
 ## Role Definition
@@ -25,7 +25,7 @@ WORKORDER's `status` is `dispatched`. If any is missing, record it in the Comple
 
 ## Branch
 
-**Branch**: `u8g2gl-generator/wo11b-validator-hardening` · **Base**: `u8g2gl-generator/wo10b-bound-text`
+**Branch**: `u8g2gl-generator/wo11b-validator-hardening` · **Base**: `u8g2gl-generator/wo10b-bound-text` (dispatch commit on it)
 
 `git branch --show-current` **as its own command immediately before every commit**.
 
@@ -57,6 +57,14 @@ Each item below is a gap WO9 or WO10 found; each gets a test that fails at the b
       can supply; WO7b's rule catches a missing *position*, not a missing *size*, so a box with no
       `width` and no binding passes `validate` and `generate` refuses it. A size neither written,
       bound nor anchor-derived is an error in `validate`.
+- [ ] **Bound or styled values satisfy `required` (WO10b f1).** `validate` requires a literal `x`
+      even when `bind_x` supplies it, and a literal `font` even when a named style supplies it, so
+      the fixture has to write `x="0"` beside `bind_x`. A geometry attribute supplied by a binding,
+      and a property supplied by a style the element names, both satisfy `required`. Then remove
+      the fixture's redundant `x="0"` and regenerate; that output change is expected and disclosed.
+- [ ] **One table of geometry bindings (WO10b f2).** The set of geometry bindings is spelled in the
+      validator, in `emit/screen-model.ts` and in `emit/placement.ts`'s position table. Make it one
+      data table in the model, consumed by all three. Emission must stay byte-identical.
 - [ ] **Invented template setters (WO10 f1).** The manifest parser invents `set_<name>` setters for
       a composite's template parameters; emission filters them. Stop inventing them.
 - [ ] **Screen-descriptor collision (WO10 f5).** `ui_screen_<name>` is not in `mangle.ts`'s
@@ -99,7 +107,9 @@ Each item below is a gap WO9 or WO10 found; each gets a test that fails at the b
 `cli/src/core/parser/parse-widget-manifest.ts` (template setters only), `cli/src/core/schema/`
 (`StyleDecl`, diagnostic names), `cli/src/node/` and `cli/src/data/` (the U8G2 font-symbol data
 build only), `cli/src/core/parser/parse-globals.ts` and `emit/styles.ts` (the `truncate` removal only),
-`cli/src/core/resolver/` (a shared drawn-extent function for ruling 6, if one belongs there), `cli/test/`,
+`cli/src/core/resolver/` (a shared drawn-extent function for ruling 6, if one belongs there),
+`emit/screen-model.ts` and `emit/placement.ts` (consuming the one geometry-binding table only), the
+committed fixture's `screens/screen_bounds.xml` and its regenerated output, `cli/test/`,
 this WORKORDER.
 
 **Do NOT touch:** runtime C++; manifests; emission, except to delete refusals the validator now
@@ -107,7 +117,7 @@ makes unreachable (say which); `docs/`; `PROGRAM*.md`. Run every suite alone.
 
 ## Verification Requirement
 
-- [ ] CLI `vitest`, `tsc`, lint clean; C++ unchanged and green
+- [ ] CLI `vitest`, `tsc`, lint clean; runtime C++ unchanged; `cmake --build build` zero warnings and `ctest` green (the fixture compiles in both configurations)
 - [ ] Each item has a test that fails at the base (say how many behaviourally)
 - [ ] Diff limited to the Boundary Box
 

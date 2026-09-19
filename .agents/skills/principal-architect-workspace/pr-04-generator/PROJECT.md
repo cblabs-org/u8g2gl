@@ -80,8 +80,8 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO9 — project-level emission](wo9-emit-project/WORKORDER.md)** ✅ `136c0c2` · base WO8c · standard · §13.7
 - [x] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** ✅ `3a58ab3` · base WO9 · standard · §13.7, §13.8, §17.1
 - [x] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** ✅ `61d6972`, `7958d75`, `e527504` · base WO10 · standard · [UD-4], ui_spec §15
-- [ ] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** · `u8g2gl-generator/wo10b-bound-text` · base WO11 · **high** · runtime defect found in WO10 review (owner-approved 2026-09-18; must-fix, 2026-09-19) + CA rulings 1a/1b/2/3
-- [ ] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries (owner-approved 2026-09-18)
+- [x] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** ✅ `f1cffa9`, `c9b8f96`, `7d6fed9` · `u8g2gl-generator/wo10b-bound-text` · base WO11 · **high** · runtime defect found in WO10 review (owner-approved 2026-09-18; must-fix, 2026-09-19) + CA rulings 1a/1b/2/3
+- [ ] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries, CA rulings 1c/6 (owner-approved 2026-09-18, reading confirmed 2026-09-19)
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11b · standard · §13.9, §18, [D-16]; CLI 0.7.0
 
 **WO2–WO12 were drafted before WO1 ran.** Their line items are revised by the PA
@@ -1355,6 +1355,63 @@ reading).
 
 Ledger is now **twenty**: WO11 → WO10b → WO11b → WO12. WO12 is re-based on WO11b.
 
+**Confirmed by the owner on 2026-09-19**, verbatim:
+
+> "confrmed that "10a and 10b" approval meant WO10b and WO11b"
+
+**WO11b is approved.** The PR-09 obligation recorded under the Chief Architect's rulings was
+agreed in the same message, verbatim: *"PR-09 - yes"*. The PA carries it into PROGRAM-PLAN's PR-09
+entry at wrap-up.
+
+
+### WO10b — complete (`f1cffa9`, `c9b8f96`, `7d6fed9`) — bound text draws; rulings 1a/1b/2/3
+
+**Verified independently by the PA on 2026-09-19:**
+
+- **Placement and scope.** All three commits are on `wo10b-bound-text` only, and the tree is clean.
+  Nothing under `docs/`, `PROGRAM*`, `.agents/rules`, `extern` or the validator changed.
+- **Suites, run sequentially.** A `--clean-first` C++ build with **0 warnings**. `ctest` **361/361**,
+  with the one known skip. CLI **859 / 56 files**. `tsc` and lint are clean.
+- **End to end through the built CLI.** Regenerating a copy of the fixture gives output
+  byte-identical to the committed fixture in both targets, apart from the stamp. The output shows:
+  - `ui_obj_` on every static object;
+  - init in the order construct → apply styles → set properties → bindings;
+  - `ui_obj_track_readout.bind_x(&ui_subject_knob_x, 40)` for an object;
+  - `40 + ui_subject_knob_x.get()` for a draw call inside the container;
+  - a bare `ui_subject_knob_x.get()` at screen level.
+- **Acceptance, reproduced by the PA.** The PA reintroduced the defect by making
+  `u8g2gl_label::current_text()` return the literal only. That failed **15 tests**, among them
+  both of the Chief Architect's acceptance tests:
+  - `LabelBoundText.StringSubjectValueIsTheTextDrawn`, the runtime test;
+  - `GeneratedFixture.BoundLabelsDrawTheirSubjectsText`, the end-to-end test.
+
+  The other thirteen were the rest of the `LabelBoundText` suite, the int-format fixture test,
+  and four editor-parity cases, which now assert bound text on both targets. After restoring the
+  file, the tree is clean and all 361 pass.
+- **Root cause confirmed as the runtime.** `u8g2gl_button` had the same defect and got the same
+  fix. The text is read at render time through `current_text()` into a stack buffer of
+  `U8G2GL_BOUND_TEXT_BUFFER_SIZE` bytes (32, overridable with `#ifndef`), so no object gains RAM. A
+  change hook invalidates the measured width.
+- **Mechanism 1b as specified.** `ref_value` and `coord_origin` are named members of an anonymous
+  union, with a comment giving one meaning per binding kind. `bind_x` and `bind_y` take a
+  required origin; there is no default, so every caller states it. The subject value is bounded to
+  ±65536 before the 32-bit sum and the sum is then clamped, which gives the same result as clamping
+  the exact sum, because |origin| ≤ 32768. The scene format is version 2 and now carries `origin`.
+
+**Findings triage**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | `validate` requires a literal `x` even when `bind_x` supplies it, and a literal `font` even when a style supplies it, so the fixture writes `x="0"` beside `bind_x` | **WO11b** (validate refuses what generate can build) |
+| 2 | The set of geometry bindings is spelled in three places: the validator, `screen-model.ts`, and `placement.ts`'s position table | **WO11b** (one table, consumed by all three) |
+| 3 | `mangle.ts`'s keyword and reserved-prefix checks on composite child names no longer protect any C++ identifier now that `ui_obj_` prefixes everything | **Chief Architect**, next bridge (does §13.4 still want the rule?) |
+| 4 | Stale prose: `realise/model.ts` calls `identifier` "its C++ identifier"; the `u8g2gl-standards` skill gives the old init order; the generated config's "busiest object" comment uses the author's name | **wrap-up** (readability; the standards-skill edit needs the owner's say) |
+| 5 | `u8g2gl_xbm.xml` still declares `bitmap_mode`, which it now inherits; the registry merges the two, so output is unaffected | **wrap-up** |
+| 6 | Bound draw-call arguments wrap into their 16-bit parameters, while object bindings clamp (predates WO10b) | **Chief Architect**, next bridge (one semantic for both realisations) |
+| 7 | Rebinding text on the same object adds a second observer without removing the first | **PR-06 obligation**, with WO11 f1 |
+| 8 | `u8g2gl_button::set_text()` marks the frame dirty even when the text has not changed | **wrap-up** (one-line guard) |
+| 9 | The PR-09 `focus_style` obligation | **owner agreed 2026-09-19**, carried to PROGRAM-PLAN at wrap-up |
+
 ### WO11 — complete (`61d6972`, `7958d75`, `e527504`) — the editor target
 
 The worker was interrupted once by an API usage limit, resumed, paused at a green partial commit for
@@ -1510,6 +1567,7 @@ bind_text is active". WO10b's line items say so.
 
 ## Status Log
 
+- 2026-09-19 — **WO10b complete** (`f1cffa9`, `c9b8f96`, `7d6fed9`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 859/56, tsc and lint clean; end to end byte-identical bar the stamp; the defect reintroduced by the PA fails both acceptance tests (15 in all). **Owner confirmed the WO11b reading** and agreed the PR-09 obligation (both verbatim above). WO11b revised (findings 1, 2) and dispatched on `u8g2gl-generator/wo11b-validator-hardening`.
 - 2026-09-19 — **WO11 complete** (`61d6972`, `7958d75`, `e527504`). Verified independently: 0 warnings, ctest 336 (one known skip), CLI 851/56, tsc and lint clean; end to end byte-identical to the fixture bar the stamp; non-vacuity reproduced; no editor symbols in firmware. Findings triaged (3, 4 → WO10b; 6 → WO11b; 2 → WO12; 1, 7, 8 → PR-06; 5 → Chief Architect). **WO10b revised and dispatched** on `u8g2gl-generator/wo10b-bound-text`.
 - 2026-09-19 — **Chief Architect rulings on CA-BRIDGE-2026-09-18 received; stack rebased onto `main` @ `ff20f0c`.** WO11 paused at green partial `6efa6fa` (now `61d6972` after the rebase) for the rebase; 79 commits, no conflicts, tree identical to the old tip plus `main`'s docs. PA swapped §21's Q-12/Q-13 rows as the Chief Architect directed. **Owner approved WO10b as must-fix** ("agree with your recommendation on WO10b"); recorded under Human Approval, with root cause (runtime). Rulings 1a/1b/2/3 → WO10b, 1c/6/`truncate` → WO11b; no new work order. WO11 resumed.
 - 2026-09-18 — **Resumed after compaction; WO11 re-dispatched** to a fresh worker on the owner's instruction *"ok - proceed"*. Branch verified clean (nothing after `ad8062f` but PA workspace commits). `main` has moved to `c99d9f2` (docs only: the UiUiUi prior-art review, Q-14/Q-15) — not blocking; rebase at wrap-up, expect a §21 table conflict beside Q-13. WO10b/WO11b reading confirmation still not received — required before WO11b is dispatched.
