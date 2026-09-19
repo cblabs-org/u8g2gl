@@ -25,6 +25,8 @@
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_core.h"
 
+#include <cstdio>
+
 // Geometry setters — set_coords() and the four per-axis setters below all
 // guard mark_dirty() on the value actually changing. Without the guard, a
 // caller that re-sets an unchanged coordinate every tick (an animation, or a
@@ -409,16 +411,31 @@ static void u8g2gl_on_binding_flag_change(void* user_data) {
     u8g2gl_evaluate_binding(b);
 }
 
-// u8g2gl_on_text_binding_change
+// u8g2gl_obj::on_text_bound
 // Observer callback for text bindings. Unlike a flag binding there is nothing to
-// evaluate: the widget reads the subject directly when it renders, so the only
-// thing needed on change is to schedule a frame.
-//   user_data — the u8g2gl_binding_desc registered with the subject
-static void u8g2gl_on_text_binding_change(void* user_data) {
-    auto* b = static_cast<u8g2gl_binding_desc*>(user_data);
+// evaluate: the widget reads the subject through bound_text() when it renders.
+// What a change does need is the object's hook, not a bare mark_dirty(): a
+// label caches its text's measured width, and a hook that only scheduled a
+// frame would draw the new text against the old width (PR-04 WO10b).
+//   binding — the u8g2gl_binding_desc registered with the subject
+void u8g2gl_obj::on_text_bound(void* binding) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(binding);
     if (b && b->active && b->obj) {
-        b->obj->mark_dirty();
+        b->obj->on_text_binding_changed();
     }
+}
+
+// u8g2gl_find_text_binding
+// The object's active text binding, or nullptr. An object has at most one: both
+// bind_text() overloads reuse an existing text slot rather than claim a second.
+//   obj — the object whose text binding is wanted
+static u8g2gl_binding_desc* u8g2gl_find_text_binding(const u8g2gl_obj* obj) {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        if (s_binding_pool[i].active && s_binding_pool[i].obj == obj && s_binding_pool[i].is_text) {
+            return &s_binding_pool[i];
+        }
+    }
+    return nullptr;
 }
 
 // u8g2gl_allocate_binding
@@ -575,22 +592,17 @@ bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref
 
 // u8g2gl_obj::bind_text (int subject)
 // Binds display text to an integer subject, optionally formatted. Stores the
-// subject on the object rather than evaluating anything: the widget reads and
-// formats the value at render time, so this only has to arrange for a frame to
-// be scheduled when the value changes.
+// subject in the pool rather than evaluating anything: the widget reads and
+// formats the value at render time (bound_text()), so this only has to arrange
+// for on_text_binding_changed() to run when the value changes — and once now,
+// so a widget that measured a literal text re-measures the bound one.
 //   subject — subject to observe; must outlive this object
-//   fmt     — printf format applied at render time, or nullptr for the raw value
+//   fmt     — printf format applied at render time, or nullptr for "%d"
 bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject) {
         return false;
     }
-    u8g2gl_binding_desc* slot = nullptr;
-    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
-        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
-            slot = &s_binding_pool[i];
-            break;
-        }
-    }
+    u8g2gl_binding_desc* slot = u8g2gl_find_text_binding(this);
     if (!slot) {
         slot = u8g2gl_allocate_binding(this);
     }
@@ -605,12 +617,12 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     slot->is_text = true;
     slot->active = true;
 
-    if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
+    if (!subject->add_observer(slot, &u8g2gl_obj::on_text_bound)) {
         slot->active = false;
         slot->obj = nullptr;
         return false;
     }
-    mark_dirty();
+    on_text_binding_changed();
     return true;
 }
 
@@ -623,13 +635,7 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject) {
         return false;
     }
-    u8g2gl_binding_desc* slot = nullptr;
-    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
-        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
-            slot = &s_binding_pool[i];
-            break;
-        }
-    }
+    u8g2gl_binding_desc* slot = u8g2gl_find_text_binding(this);
     if (!slot) {
         slot = u8g2gl_allocate_binding(this);
     }
@@ -644,13 +650,46 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     slot->is_text = true;
     slot->active = true;
 
-    if (!subject->add_observer(slot, u8g2gl_on_text_binding_change)) {
+    if (!subject->add_observer(slot, &u8g2gl_obj::on_text_bound)) {
         slot->active = false;
         slot->obj = nullptr;
         return false;
     }
-    mark_dirty();
+    on_text_binding_changed();
     return true;
+}
+
+// u8g2gl_obj::bound_text
+// The text an active text binding shows now: a string subject's own buffer, or
+// an int subject formatted into the caller's buffer. nullptr when unbound, which
+// is how a widget knows to fall back to its literal text.
+//   buffer, capacity — scratch for an int subject's formatted value
+const char* u8g2gl_obj::bound_text(char* buffer, size_t capacity) const {
+    const u8g2gl_binding_desc* b = u8g2gl_find_text_binding(this);
+    if (b == nullptr || b->subject == nullptr) {
+        return nullptr;
+    }
+    if (b->subject_type == U8G2GL_SUBJECT_STRING) {
+        return static_cast<const u8g2gl_subject_string_base*>(b->subject)->get();
+    }
+    if (buffer == nullptr || capacity == 0) {
+        return "";
+    }
+    // The value is passed as int because a format is written for one — "%d°C"
+    // (§8.4) — and passing an int32_t where "%d" expects int is undefined on a
+    // toolchain whose int32_t is long. Every target this runtime supports has a
+    // 32-bit int (cpp.md §7), so nothing is lost. snprintf() truncates to
+    // `capacity` and always terminates.
+    const int value = static_cast<int>(static_cast<const u8g2gl_subject_int_base*>(b->subject)->get());
+    std::snprintf(buffer, capacity, b->fmt != nullptr ? b->fmt : "%d", value);
+    return buffer;
+}
+
+// u8g2gl_obj::on_text_binding_changed
+// Default hook: the object draws its text afresh every frame, so scheduling one
+// is all a change needs. See the header for when to override.
+void u8g2gl_obj::on_text_binding_changed() {
+    mark_dirty();
 }
 
 // u8g2gl_obj::add_value_binding
@@ -793,28 +832,16 @@ void* u8g2gl_obj::binding_subject(void* binding) {
 }
 
 void* u8g2gl_obj::get_bound_text_subject() const {
-    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
-        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
-            return s_binding_pool[i].subject;
-        }
-    }
-    return nullptr;
+    const u8g2gl_binding_desc* b = u8g2gl_find_text_binding(this);
+    return b != nullptr ? b->subject : nullptr;
 }
 
 const char* u8g2gl_obj::get_bound_text_fmt() const {
-    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
-        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
-            return s_binding_pool[i].fmt;
-        }
-    }
-    return nullptr;
+    const u8g2gl_binding_desc* b = u8g2gl_find_text_binding(this);
+    return b != nullptr ? b->fmt : nullptr;
 }
 
 u8g2gl_subject_type_t u8g2gl_obj::get_bound_text_type() const {
-    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
-        if (s_binding_pool[i].active && s_binding_pool[i].obj == this && s_binding_pool[i].is_text) {
-            return s_binding_pool[i].subject_type;
-        }
-    }
-    return U8G2GL_SUBJECT_INT;
+    const u8g2gl_binding_desc* b = u8g2gl_find_text_binding(this);
+    return b != nullptr ? b->subject_type : U8G2GL_SUBJECT_INT;
 }

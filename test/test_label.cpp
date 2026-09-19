@@ -18,7 +18,11 @@
  *          rewritten instead of moved.
  *
  * Description: GoogleTest suite exercising the complete contract of
- *              u8g2gl_label across all four long_mode values.
+ *              u8g2gl_label across all four long_mode values, and bound text
+ *              (PR-04 WO10b): a label bound to a subject draws that subject's
+ *              value, asserted on the text the U8G2 stub's ordered call log
+ *              recorded (it copies the text, so a value formatted on render()'s
+ *              stack can still be read after render() returns).
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_label.h"
@@ -27,9 +31,12 @@
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
+#include "u8g2gl/u8g2gl_subject.h"
 #include "U8G2lib.h"
+#include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 
 // Test dummy font array
 static const uint8_t s_mock_font[4] = { 0x01, 0x02, 0x03, 0x04 };
@@ -848,6 +855,199 @@ TEST(LabelScroll, TextLeftOfOriginReachesU8g2Wrapped) {
     ASSERT_EQ(display.draw_utf8_count, 1);
     EXPECT_EQ(display.last_draw_utf8_x, 65531);   // -5 modulo 2^16
     EXPECT_EQ(display.last_draw_utf8_y, 9);       // 4 + (10 - 0) / 2, centred
+}
+
+// =====================================================================
+// Bound text (PR-04 WO10b). Before WO10b every render path read only the
+// literal set_text() text, so a bound label drew nothing: these tests assert
+// the text actually drawn, never merely that a frame was scheduled.
+// =====================================================================
+
+namespace {
+
+// drawn_texts
+// Every drawUTF8 text the stub logged, in call order.
+std::vector<std::string> drawn_texts(const U8G2& display) {
+    std::vector<std::string> texts;
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        if (std::strcmp(display.call_log[i].op, "drawUTF8") == 0) {
+            texts.emplace_back(display.call_log[i].text);
+        }
+    }
+    return texts;
+}
+
+// width_by_length
+// A stub font whose every byte is 5 px wide, so a longer text measures wider.
+int width_by_length(const char* s) {
+    return static_cast<int>(std::strlen(s)) * 5;
+}
+
+}  // namespace
+
+// The Chief Architect's acceptance test (1): bind, set a value, render, and the
+// text drawn IS that value.
+TEST(LabelBoundText, StringSubjectValueIsTheTextDrawn) {
+    u8g2gl_subject_string_n<16> station;
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    ASSERT_TRUE(label.bind_text(&station));
+    station.set("Euston");
+
+    U8G2 display;
+    label.render(display);
+
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"Euston"});
+}
+
+TEST(LabelBoundText, ChangingTheSubjectChangesTheTextDrawn) {
+    u8g2gl_subject_string_n<16> station;
+    station.set("Euston");
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    ASSERT_TRUE(label.bind_text(&station));
+
+    U8G2 first;
+    label.render(first);
+    EXPECT_EQ(drawn_texts(first), std::vector<std::string>{"Euston"});
+
+    label.clear_dirty();
+    station.set("Crewe");
+    EXPECT_TRUE(label.is_dirty());
+    U8G2 second;
+    label.render(second);
+    EXPECT_EQ(drawn_texts(second), std::vector<std::string>{"Crewe"});
+}
+
+TEST(LabelBoundText, IntSubjectIsFormattedThroughItsFormat) {
+    u8g2gl_subject_int temperature(21);
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    ASSERT_TRUE(label.bind_text(&temperature, "%d°C"));
+
+    U8G2 display;
+    label.render(display);
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"21°C"});
+
+    temperature.set(-4);
+    U8G2 colder;
+    label.render(colder);
+    EXPECT_EQ(drawn_texts(colder), std::vector<std::string>{"-4°C"});
+}
+
+TEST(LabelBoundText, IntSubjectWithNoFormatDrawsItsDecimalValue) {
+    u8g2gl_subject_int count(-2147483647 - 1);
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    ASSERT_TRUE(label.bind_text(&count));
+
+    U8G2 display;
+    label.render(display);
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"-2147483648"});
+}
+
+TEST(LabelBoundText, FormattedTextLongerThanTheBufferIsTruncatedNotOverflowed) {
+    u8g2gl_subject_int count(7);
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    // 1 + 40 characters: longer than U8G2GL_BOUND_TEXT_BUFFER_SIZE.
+    ASSERT_TRUE(label.bind_text(&count, "%d and a unit suffix far too long to fit"));
+
+    U8G2 display;
+    // The stub copies only 31 bytes into the call log, so measure the pointer
+    // U8G2 was handed, while render() is still on the stack: the width callback
+    // runs inside render() (clip measures the live text).
+    static size_t s_seen_length = 0;
+    display.custom_utf8_width = [](const char* s) -> int {
+        s_seen_length = std::strlen(s);
+        return 0;
+    };
+    label.render(display);
+    EXPECT_EQ(s_seen_length, static_cast<size_t>(U8G2GL_BOUND_TEXT_BUFFER_SIZE - 1));
+    EXPECT_EQ(drawn_texts(display).size(), 1u);
+}
+
+TEST(LabelBoundText, BindingWinsOverALiteralSetBeforeIt) {
+    u8g2gl_subject_string_n<16> station;
+    station.set("Euston");
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    label.set_text("Literal");
+    ASSERT_TRUE(label.bind_text(&station));
+
+    U8G2 display;
+    label.render(display);
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"Euston"});
+}
+
+TEST(LabelBoundText, BindingWinsOverALiteralSetAfterIt) {
+    u8g2gl_subject_string_n<16> station;
+    station.set("Euston");
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    ASSERT_TRUE(label.bind_text(&station));
+    label.set_text("Literal");
+
+    U8G2 display;
+    label.render(display);
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"Euston"});
+    // get_text() still reports the literal it was given.
+    EXPECT_STREQ(label.get_text(), "Literal");
+}
+
+TEST(LabelBoundText, DotsOnALongBoundStringTruncatesAndReMeasuresOnChange) {
+    u8g2gl_subject_string_n<32> message;
+    message.set("A message far wider than this label");   // 35 chars -> 175 px
+    u8g2gl_label label;
+    label.set_coords(0, 0, 60, 10);
+    label.set_long_mode(U8G2GL_LONG_DOTS);
+    ASSERT_TRUE(label.bind_text(&message));
+
+    U8G2 display;
+    display.custom_utf8_width = width_by_length;
+    label.render(display);
+    // The whole bound text, then the ellipsis at x + w - width("...") = 60 - 15.
+    EXPECT_EQ(drawn_texts(display),
+              (std::vector<std::string>{"A message far wider than this l", "..."}));   // log copies 31 bytes
+    EXPECT_EQ(display.last_draw_utf8_x, 45);
+
+    // The subject now fits. The cached width must be re-measured, or the stale
+    // overflow would still draw an ellipsis over text that fits.
+    message.set("Fits");
+    U8G2 after;
+    after.custom_utf8_width = width_by_length;
+    label.render(after);
+    EXPECT_EQ(drawn_texts(after), std::vector<std::string>{"Fits"});
+}
+
+TEST(LabelBoundText, ScrollModeMarqueesABoundTextWithNoLiteral) {
+    u8g2gl_subject_string_n<32> message;
+    message.set("A message far wider than this label");
+    u8g2gl_label label;
+    label.set_coords(0, 0, 60, 10);
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    ASSERT_TRUE(label.bind_text(&message));
+
+    // tick() reads the same text render() does, so a bound label with no
+    // literal still asks for frames rather than idling.
+    EXPECT_NE(label.tick(0), U8G2GL_IDLE);
+
+    U8G2 display;
+    display.custom_utf8_width = width_by_length;
+    label.render(display);
+    ASSERT_EQ(drawn_texts(display).size(), 1u);
+    EXPECT_EQ(drawn_texts(display)[0], "A message far wider than this l");
+    EXPECT_NE(label.tick(1), U8G2GL_IDLE);
+}
+
+TEST(LabelBoundText, LiteralStillDrawsWhenNothingIsBound) {
+    u8g2gl_label label;
+    label.set_coords(0, 0, 100, 10);
+    label.set_text("Literal");
+
+    U8G2 display;
+    label.render(display);
+    EXPECT_EQ(drawn_texts(display), std::vector<std::string>{"Literal"});
 }
 
 // =====================================================================

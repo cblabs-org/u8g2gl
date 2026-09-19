@@ -14,6 +14,11 @@
  *          UTF-8 label text rendering. Operates statically with U8G2GL_IDLE
  *          lifecycle to maximize microcontroller sleep opportunities ([D-15]).
  *
+ *          Its label is the bound subject's text when bind_text() (inherited)
+ *          is active, otherwise the literal — the same rule u8g2gl_label
+ *          follows; before PR-04 WO10b render() read only the literal, so a
+ *          bound button drew no label.
+ *
  * Description: Implementation of set_text, get_text, set_border_width,
  *              get_border_width, tick, and render methods for u8g2gl_button.
  */
@@ -147,7 +152,14 @@ void u8g2gl_button::render(U8G2& display) {
     }
 
     // --- Step 6: Render label text ---
-    if (text_ == nullptr || text_[0] == '\0') {
+    // A binding wins over the literal whichever was set first, and is read now,
+    // at render time, into a stack buffer (none per button). Nothing is cached
+    // from the text, so the inherited on_text_binding_changed() — mark dirty —
+    // is all a change needs.
+    char buffer[U8G2GL_BOUND_TEXT_BUFFER_SIZE];
+    const char* bound = bound_text(buffer, sizeof(buffer));
+    const char* text = bound != nullptr ? bound : text_;
+    if (text == nullptr || text[0] == '\0') {
         return;
     }
 
@@ -165,7 +177,7 @@ void u8g2gl_button::render(U8G2& display) {
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
 
     // Horizontal centering (or alignment override if explicitly styled)
-    int text_width = static_cast<int>(display.getUTF8Width(text_));
+    int text_width = static_cast<int>(display.getUTF8Width(text));
     int16_t draw_x = static_cast<int16_t>(x_ + (w_ - text_width) / 2);
 
     if (style_.has(U8G2GL_STYLE_ALIGN)) {
@@ -177,5 +189,5 @@ void u8g2gl_button::render(U8G2& display) {
     }
 
     // Origins wrap explicitly and U8G2 clips them — see u8g2gl_coord_pos().
-    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text_);
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text);
 }

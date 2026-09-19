@@ -20,6 +20,7 @@
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_button.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_subject.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "U8G2lib.h"
 #include <iostream>
@@ -222,6 +223,40 @@ TEST(Button, BorderPartlyOffEdgeDrawsWithWrappedOrigin) {
     EXPECT_EQ(display2.draw_rframe_count, 2);
     EXPECT_EQ(display2.last_draw_rframe_x, 0);   // inner layer at (-1 + 1, 0 + 1)
     EXPECT_EQ(display2.last_draw_rframe_y, 1);
+}
+
+// PR-04 WO10b: the button's manifest declares bind_text, and its render()
+// read only the literal, the same defect as the label's. A bound button draws
+// the subject's text, in preference to a literal set in either order.
+TEST(Button, BoundStringSubjectIsTheTextDrawn) {
+    u8g2gl_subject_string_n<8> caption;
+    caption.set("Go");
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 60, 20);
+    btn.set_text("Literal");
+    ASSERT_TRUE(btn.bind_text(&caption));
+
+    U8G2 display;
+    btn.render(display);
+    EXPECT_EQ(display.draw_utf8_count, 1);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "Go");
+
+    caption.set("Stop");
+    btn.set_text("Later literal");
+    U8G2 after;
+    btn.render(after);
+    EXPECT_STREQ(after.last_draw_utf8_buf, "Stop");
+}
+
+TEST(Button, BoundIntSubjectIsFormatted) {
+    u8g2gl_subject_int count(3);
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 60, 20);
+    ASSERT_TRUE(btn.bind_text(&count, "%d left"));
+
+    U8G2 display;
+    btn.render(display);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "3 left");
 }
 
 TEST(Button, InheritsFromObj) {

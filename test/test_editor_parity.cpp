@@ -19,10 +19,9 @@
  *          differently — makes the logs differ, and the failure names the first
  *          call that does.
  *
- *          Bound **text** is deliberately not asserted anywhere: a label never
- *          draws a bound subject's value in either target (PR-04 WO10
- *          stop-and-report 1, scheduled as WO10b). The logs are still compared
- *          whole, so when WO10b lands both targets must draw it identically.
+ *          Bound **text** is asserted on both targets: since PR-04 WO10b a
+ *          label draws its bound subject's value, and each log must contain it
+ *          as well as the two logs agreeing.
  *
  * Description: Firmware state comes from the generated `ui_init()` and setters;
  *              the editor host owns its own subjects and is given the same
@@ -113,7 +112,7 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
 //   screen          — its name in the scene
 //   v               — the values both targets get
 ::testing::AssertionResult same_screen(void (*render_firmware)(U8G2&), const char* screen, const fixture_values& v,
-                                       U8G2* firmware_out = nullptr) {
+                                       U8G2* firmware_out = nullptr, U8G2* editor_out = nullptr) {
     set_firmware(v);
     U8G2 firmware;
     render_firmware(firmware);
@@ -129,7 +128,21 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
     if (firmware_out != nullptr) {
         *firmware_out = firmware;
     }
+    if (editor_out != nullptr) {
+        *editor_out = editor;
+    }
     return same_call_log(firmware, editor);
+}
+
+// drew_text
+// Whether a stub logged drawUTF8 with exactly `text`.
+bool drew_text(const U8G2& display, const char* text) {
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        if (std::strcmp(display.call_log[i].op, "drawUTF8") == 0 && std::strcmp(display.call_log[i].text, text) == 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // count_op
@@ -149,12 +162,31 @@ int count_op(const U8G2& display, const char* op) {
 TEST(EditorParity, HomeScreenDrawsIdenticallyThroughTheRegistry) {
     fixture_values v;
     U8G2 firmware;
-    EXPECT_TRUE(same_screen(ui_screen_home_render, "home", v, &firmware));
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_home_render, "home", v, &firmware, &editor));
     // Not vacuous: the composite's three objects, the icon, the rule and msg all
     // reached the stub — five clipped objects and the full-width rule.
     EXPECT_EQ(count_op(firmware, "setClipWindow"), 5);
     EXPECT_EQ(count_op(firmware, "drawXBMP"), 1);
     EXPECT_EQ(count_op(firmware, "drawHLine"), 1);
+    // Both bound labels draw their subjects' text, on both targets.
+    EXPECT_TRUE(drew_text(firmware, "Euston"));
+    EXPECT_TRUE(drew_text(firmware, "On time"));
+    EXPECT_TRUE(drew_text(editor, "Euston"));
+    EXPECT_TRUE(drew_text(editor, "On time"));
+}
+
+TEST(EditorParity, HomeScreenWithNewBoundTextOnBothTargets) {
+    fixture_values v;
+    v.station = "Crewe";
+    v.message = "Delayed";
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_home_render, "home", v, &firmware, &editor));
+    EXPECT_TRUE(drew_text(firmware, "Crewe"));
+    EXPECT_TRUE(drew_text(firmware, "Delayed"));
+    EXPECT_TRUE(drew_text(editor, "Crewe"));
+    EXPECT_TRUE(drew_text(editor, "Delayed"));
 }
 
 TEST(EditorParity, HomeScreenWithTheIconHiddenByItsFlagBinding) {

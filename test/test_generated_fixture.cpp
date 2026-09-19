@@ -23,7 +23,10 @@
  *            draw call under a hidden container obeys its build-time guard
  *            (§13.5);
  *          - the dirty gate works on generated screens: a subject change redraws
- *            once, and a static screen then idles ([D-15], §11.2).
+ *            once, and a static screen then idles ([D-15], §11.2);
+ *          - a label the generator bound with bind_text draws its subject's
+ *            text, and a new value (PR-04 WO10b; before it, a bound label drew
+ *            nothing at all).
  *
  * Description: GoogleTest cases driving the generated ui_init(), subject setters
  *              and screen descriptors through ui_handler(), asserting on the
@@ -43,7 +46,9 @@
 #include "u8g2gl/u8g2gl_subject.h"
 
 #include <cstdint>
+#include <cstring>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -77,6 +82,19 @@ void ensure_ui_initialised() {
         ui_init();
         initialised = true;
     }
+}
+
+// drawn_texts
+// Every drawUTF8 text the stub's ordered call log recorded, in call order. The
+// log copies the text, so a value formatted on a widget's stack is still there.
+std::vector<std::string> drawn_texts(const U8G2& display) {
+    std::vector<std::string> texts;
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        if (std::strcmp(display.call_log[i].op, "drawUTF8") == 0) {
+            texts.emplace_back(display.call_log[i].text);
+        }
+    }
+    return texts;
 }
 
 // show
@@ -146,10 +164,6 @@ TEST(GeneratedFixture, WorkedExampleRendersEveryObjectThroughTheWrapper) {
     EXPECT_EQ(display.last_draw_hline_w, 128);
     // The wifi icon is shown while connected.
     EXPECT_EQ(display.draw_xbmp_count, 1);
-    // msg's text is not asserted: u8g2gl_label::render() draws only set_text()
-    // text and never reads a bound string subject, so a bind_text label draws
-    // nothing whatever the generator emits. That is a runtime gap, recorded in
-    // the PR-04 WO10 Completion Report rather than worked round here.
     //
     // msg is the last object drawn, in document order: the last clip set is its
     // own bounds (0, 16, 128 x 12), far corner exclusive.
@@ -175,6 +189,37 @@ TEST(GeneratedFixture, FlagBindingHidesAnObjectThroughTheWrapper) {
     EXPECT_EQ(second.draw_xbmp_count, 0);
     EXPECT_EQ(second.set_clip_window_count, 4);  // bar_wifi_icon skipped
     ui_set_wifi_connected(true);
+}
+
+// --- Bound text (PR-04 WO10b): the Chief Architect's acceptance test (2) ---
+
+TEST(GeneratedFixture, BoundLabelsDrawTheirSubjectsText) {
+    // The generated fixture binds two labels with bind_text: msg to
+    // service_message directly, and the status bar's location to station_name
+    // through the composite's $title_subject. Both must draw the subject's
+    // value; the clock draws its time between them, so the texts are matched
+    // by value, in document order.
+    ensure_ui_initialised();
+    ui_set_station_name("Euston");
+    ui_set_service_message("On time");
+    U8G2 display;
+    show(ui_screen_home, display);
+
+    const std::vector<std::string> drawn = drawn_texts(display);
+    ASSERT_GE(drawn.size(), 2u);
+    EXPECT_EQ(drawn.front(), "Euston");   // bar_location, first object with text
+    EXPECT_EQ(drawn.back(), "On time");   // msg, the last object drawn
+
+    // A new value is drawn on the next frame, and only then: the binding marks
+    // the frame dirty.
+    ui_set_service_message("Delayed");
+    U8G2 next;
+    ui_handler(next);
+    EXPECT_EQ(next.send_count, 1);
+    const std::vector<std::string> redrawn = drawn_texts(next);
+    ASSERT_FALSE(redrawn.empty());
+    EXPECT_EQ(redrawn.back(), "Delayed");
+    ui_set_service_message("On time");
 }
 
 // --- A static screen: a subject change redraws once, then idles ---

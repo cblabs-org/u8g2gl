@@ -20,7 +20,10 @@
  *
  *          Designed without internal string buffers to eliminate RAM
  *          duplication on constrained microcontrollers; text is referenced by
- *          pointer from code flash or subject storage. The scroll-state
+ *          pointer from code flash or subject storage. A bound subject
+ *          (bind_text(), inherited) is read when the label renders and wins
+ *          over the literal text; an int subject is formatted into a buffer on
+ *          render()'s stack, never into the object (PR-04 WO10b). The scroll-state
  *          members below are the accepted cost of the merge — every label now
  *          carries them, whether it scrolls or not — see [D-19]'s cost
  *          analysis for why that is cheap in practice.
@@ -34,7 +37,8 @@
  *
  *     Content:
  *     - set_text():              Set pointer to text string (zero-copy)
- *     - get_text():              Retrieve current text pointer
+ *     - get_text():              Retrieve the literal text pointer
+ *     - on_text_binding_changed(): (override) re-measure when a bound subject changes
  *
  *     Overflow:
  *     - set_long_mode():         Select clip / dots / scroll / scroll_circular
@@ -100,7 +104,10 @@ public:
     void set_text(const char* text);
 
     /**
-     * @brief Retrieve the current text pointer.
+     * @brief Retrieve the literal text pointer.
+     *
+     * The literal only: while bind_text() is active the label draws the bound
+     * subject instead, and this still returns whatever set_text() stored.
      *
      * @return Pointer to null-terminated UTF-8 string, or nullptr if none set.
      */
@@ -268,14 +275,36 @@ public:
      */
     void render_animation_update(U8G2& display, uint32_t now_ms) override;
 
+protected:
+    /**
+     * @brief A bound subject changed (or was just bound): invalidate the
+     *        measured width, as set_text() does, and mark the frame dirty.
+     *
+     * Without this a `dots` or scrolling label would draw a new bound value
+     * against the previous value's width — an ellipsis on text that now fits,
+     * or a marquee that stops short.
+     */
+    void on_text_binding_changed() override;
+
 private:
+    // u8g2gl_label::current_text
+    // The text drawn now: the bound subject's when bind_text() is active,
+    // otherwise the literal. The one place that decision is made.
+    //   buffer — stack scratch for a formatted int subject
+    const char* current_text(char (&buffer)[U8G2GL_BOUND_TEXT_BUFFER_SIZE]) const;
+
+    // u8g2gl_label::invalidate_text
+    // Mark the measured width stale, restart a finished dwell, mark dirty.
+    void invalidate_text();
+
     // u8g2gl_label::render_scroll
     // Marquee render path for U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR,
     // extracted so render()'s per-mode dispatch stays a single switch rather
     // than one long function mixing three unrelated drawing strategies.
     //   display — U8G2 display driver instance
+    //   text    — the text to draw, resolved by render()
     //   draw_y  — vertically-centered baseline-independent top y, already computed
-    void render_scroll(U8G2& display, int16_t draw_y);
+    void render_scroll(U8G2& display, const char* text, int16_t draw_y);
 
     // u8g2gl_label::render_static
     // Non-marquee render path shared by clip and dots: draws once, aligned
@@ -284,9 +313,10 @@ private:
     // the measured text is wider than the widget — see the .cpp for why this
     // needs no truncated copy of the string.
     //   display — U8G2 display driver instance
+    //   text    — the text to draw, resolved by render()
     //   draw_y  — vertically-centered top y, already computed
     //   dots    — true to overdraw the ellipsis when text overflows
-    void render_static(U8G2& display, int16_t draw_y, bool dots);
+    void render_static(U8G2& display, const char* text, int16_t draw_y, bool dots);
 
     // Members ordered largest-alignment-first to prevent struct padding holes:
     // pointer (8B) -> uint32_t (4B) -> int16_t/uint16_t (2B) -> uint8_t/bool (1B).
@@ -297,7 +327,7 @@ private:
     // arithmetic-only +16-byte estimate had missed 8 of the actual +24).
     // last_scroll_ms_ through scroll_finished_ are the former
     // u8g2gl_scrolling_label's members, moved unchanged (PR-3R WO2, [D-19]).
-    const char* text_ = nullptr;          ///< Zero-copy string pointer
+    const char* text_ = nullptr;          ///< Zero-copy literal string pointer; a binding overrides it
     uint32_t last_scroll_ms_ = 0;         ///< Timestamp of last or next scheduled tick step
     int16_t scroll_x_ = 0;                ///< Current marquee horizontal pixel offset
     int16_t message_width_ = 0;           ///< Measured text pixel width under active font

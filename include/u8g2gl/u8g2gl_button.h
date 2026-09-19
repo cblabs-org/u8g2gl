@@ -73,7 +73,10 @@ public:
     void set_text(const char* text);
 
     /**
-     * @brief Retrieve current button label text pointer.
+     * @brief Retrieve the literal button label text pointer.
+     *
+     * The literal only: while bind_text() is active the button draws the bound
+     * subject instead.
      *
      * @return Pointer to null-terminated UTF-8 string, or nullptr if none set.
      */
