@@ -72,6 +72,8 @@ struct fixture_values {
     uint32_t time = 0;
     int32_t level = 10;
     bool show_panel = false;
+    int32_t knob_x = 5;
+    int32_t temperature = 21;
 };
 
 // set_firmware
@@ -84,6 +86,8 @@ void set_firmware(const fixture_values& v) {
     ui_set_system_time(v.time);
     ui_set_level(v.level);
     ui_set_show_panel(v.show_panel);
+    ui_set_knob_x(v.knob_x);
+    ui_set_temperature(v.temperature);
 }
 
 // editor_for
@@ -103,6 +107,8 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
     EXPECT_TRUE(host->set_time("system_time", v.time));
     EXPECT_TRUE(host->set_int("level", v.level));
     EXPECT_TRUE(host->set_bool("show_panel", v.show_panel));
+    EXPECT_TRUE(host->set_int("knob_x", v.knob_x));
+    EXPECT_TRUE(host->set_int("temperature", v.temperature));
     return host;
 }
 
@@ -226,6 +232,36 @@ TEST(EditorParity, GaugesScreenWithThePanelShownAndTheBlipGuardedOff) {
     EXPECT_EQ(count_op(firmware, "drawUTF8"), 1);
     EXPECT_EQ(count_op(firmware, "drawPixel"), 0);
     EXPECT_EQ(firmware.last_draw_box_w, 30);
+}
+
+// --- The Chief Architect's emission rulings (PR-04 WO10b) ---
+
+TEST(EditorParity, BoundsScreenDrawsIdenticallyThroughTheRegistry) {
+    // Container-relative bound positions on a draw call and an object (the
+    // origin crosses as the scene's `origin`, into the draw argument and into
+    // bind_x), an int drawn through its format, and a named style that sets
+    // font_mode — a property only u8g2gl_obj declares, which the editor could
+    // not apply before WO10b declared it there.
+    fixture_values v;
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware, &editor));
+    EXPECT_EQ(count_op(firmware, "drawBox"), 2);
+    EXPECT_EQ(firmware.last_draw_box_x, 5);   // dot, last drawn, at its value
+    EXPECT_TRUE(drew_text(firmware, "21°C"));
+    EXPECT_TRUE(drew_text(editor, "21°C"));
+    EXPECT_GE(count_op(firmware, "setFontMode"), 1);
+}
+
+TEST(EditorParity, BoundsScreenWithAMovedKnobAndANewTemperature) {
+    fixture_values v;
+    v.knob_x = -7;
+    v.temperature = 30;
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware, &editor));
+    EXPECT_TRUE(drew_text(firmware, "30°C"));
+    EXPECT_TRUE(drew_text(editor, "30°C"));
 }
 
 TEST(EditorParity, TheSceneSuppliesNoSubjectValues) {

@@ -17,6 +17,7 @@ void ui_init() {
     ui_styles_init();
 
     // --- Step 3: Every screen, in document order (§13.7) ---
+    ui_screen_bounds_init();
     ui_screen_gauges_init();
     ui_screen_home_init();
 
@@ -28,4 +29,5 @@ void ui_init() {
     // this one ([D-21]), so the result is not checked.
     ui_subject_wifi_connected.add_observer(nullptr, u8g2gl_frame_dirty_observer);
     ui_subject_level.add_observer(nullptr, u8g2gl_frame_dirty_observer);
+    ui_subject_knob_x.add_observer(nullptr, u8g2gl_frame_dirty_observer);
 }

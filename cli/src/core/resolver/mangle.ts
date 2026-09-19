@@ -14,12 +14,22 @@
  * Description: Spelling helpers for every row of §13.4's table: screen functions
  *              (§13.7) and the screen's object and parent tables (§13.3), objects,
  *              composite children, subjects and their setters, fonts, images and
- *              styles. `mangleIdentifiers()` builds the table for a project from its
+ *              styles.
+ *
+ *              **Every emitted object is `ui_obj_<name>`** (Chief Architect,
+ *              2026-09-19, §13.4): a bare `clock` collided with `<time.h>`'s
+ *              `clock()`, and no list of reserved C names can be complete. An
+ *              element's *name* — `name`, joined to its enclosing instances' names
+ *              by `_` (`bar_location`) — is what the author reads and what
+ *              realisation and diagnostics carry; `objectIdentifier()` is the one
+ *              place that name becomes the C++ object, and the collision table
+ *              checks the prefixed spelling, because that is what is declared.
+ *
+ *              `mangleIdentifiers()` builds the table for a project from its
  *              expanded screens and checks it:
- *              - a composite child whose prefixed identifier is a C++ keyword,
- *                contains `__`, or begins with a reserved prefix is
- *                `U8G2GL_INVALID_NAME` — joining two valid names can make an invalid
- *                one (`co` + `await`);
+ *              - a composite child whose joined name is a C++ keyword, contains
+ *                `__`, or begins with a reserved prefix is `U8G2GL_INVALID_NAME` —
+ *                joining two valid names can make an invalid one (`co` + `await`);
  *              - two different sources producing one identifier in one scope is
  *                `U8G2GL_NAME_COLLISION`, located at the later source and naming
  *                both.
@@ -34,9 +44,10 @@
  * - SCREEN_FUNCTIONS, SCREEN_TABLES:  Suffixes of each screen's generated symbols
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
+ * - OBJECT_IDENTIFIER_PREFIX:          `ui_obj_`, the emitted objects' family
  * - screenFunctionIdentifier(), screenTableIdentifier(), subjectIdentifier(),
  *   subjectSetterIdentifier(), fontIdentifier(), imageIdentifier(),
- *   styleIdentifier(), childIdentifier(): Spell one identifier
+ *   styleIdentifier(), objectIdentifier(), childIdentifier(): Spell one identifier
  * - mangleIdentifiers():              Build and collision-check a project's table
  */
 
@@ -143,6 +154,15 @@ export interface MangleInput {
   readonly screens: readonly ExpandedScreen[];
 }
 
+/**
+ * The family every emitted object belongs to (§13.4, 2026-09-19). A fixed
+ * family rather than the screen's name: a screen called `subject` or `style`
+ * would otherwise put its objects among `ui_subject_*` and `ui_style_*`, and
+ * each screen's objects are `static` in its own unit, so the screen's name would
+ * add no uniqueness.
+ */
+export const OBJECT_IDENTIFIER_PREFIX = 'ui_obj_';
+
 /** `ui_screen_home_init`. */
 export function screenFunctionIdentifier(screen: string, fn: string): string {
   return `ui_screen_${screen}_${fn}`;
@@ -179,11 +199,26 @@ export function styleIdentifier(style: string): string {
 }
 
 /**
- * @brief A composite child's identifier: the instance's identifier, `_`, the
- *        child's name (§13.4). Applied once per level, so instance `bar` →
- *        instance `clk` → `digits` is `bar_clk_digits`.
+ * @brief The C++ object an element is emitted as: `ui_obj_` + its name (§13.4).
  *
- * @param instanceIdentifier The enclosing instance's own identifier.
+ * `title` → `ui_obj_title`; composite child `bar_location` →
+ * `ui_obj_bar_location`. The one spelling of an object's C++ name: every
+ * emitter that declares or calls an object spells it through here.
+ *
+ * @param name The element's name, joined to its enclosing instances' names by
+ *             {@link childIdentifier}.
+ */
+export function objectIdentifier(name: string): string {
+  return `${OBJECT_IDENTIFIER_PREFIX}${name}`;
+}
+
+/**
+ * @brief A composite child's name: the instance's name, `_`, the child's name
+ *        (§13.4). Applied once per level, so instance `bar` → instance `clk` →
+ *        `digits` is `bar_clk_digits`, emitted as `ui_obj_bar_clk_digits`
+ *        through {@link objectIdentifier}.
+ *
+ * @param instanceIdentifier The enclosing instance's own joined name.
  * @param name               The child's `name` as written.
  */
 export function childIdentifier(instanceIdentifier: string, name: string): string {
@@ -198,6 +233,11 @@ export function childIdentifier(instanceIdentifier: string, name: string): strin
 interface Entry {
   readonly mangled: MangledIdentifier;
   readonly key: string;
+  /**
+   * The text a diagnostic underlines: the identifier, except for an object,
+   * whose `ui_obj_` prefix the author never wrote — there it is the name.
+   */
+  readonly written: string;
 }
 
 // makeEntry
@@ -208,6 +248,7 @@ interface Entry {
 //   loc           — where the source is declared
 //   key           — declaration identity, see Entry
 //   instantiation — enclosing instances, for an object inside a composite
+//   written       — the text to underline, when it is not the identifier
 function makeEntry(
   identifier: string,
   kind: IdentifierKind,
@@ -215,10 +256,12 @@ function makeEntry(
   loc: SourceLocation | undefined,
   key: string,
   instantiation: readonly InstantiationSite[] = [],
+  written: string = identifier,
 ): Entry {
   return {
     mangled: { identifier, source: { kind, description, ...(loc ? { loc } : {}), instantiation } },
     key,
+    written,
   };
 }
 
@@ -260,7 +303,7 @@ function checkCollisions(entries: readonly Entry[], seen: Map<string, Entry>, di
         `C++ identifier '${identifier}' is generated twice: by ${describeSource(first.mangled.source)}; ` +
         `and by ${describeSource(later)}. The generator never renames an identifier to avoid a ` +
         `collision (§13.4); rename one of the two.`,
-      offendingText: identifier,
+      offendingText: entry.written,
     });
   }
 }
@@ -295,8 +338,8 @@ function checkChildIdentifier(element: ExpandedElement, diagnostics: Diagnostic[
         line: loc?.line ?? 1,
         column: loc?.column ?? 1,
         message:
-          `Element '${element.name}' <${node.tag}> becomes C++ identifier '${identifier}', which ${problem} ` +
-          `(§13.4). Rename the element or the instance.`,
+          `Element '${element.name}' <${node.tag}> is named '${identifier}' once joined to its instance, ` +
+          `which ${problem} (§13.4). Rename the element or the instance.`,
         offendingText: identifier,
       },
       element.instantiation,
@@ -305,8 +348,9 @@ function checkChildIdentifier(element: ExpandedElement, diagnostics: Diagnostic[
 }
 
 // collectObjects
-// Adds every named element to `out`, depth-first in document order (§13.3), and
-// checks each prefixed identifier. An unnamed element has no identifier — its
+// Adds every named element to `out` as the object it is emitted as
+// (`ui_obj_<name>`), depth-first in document order (§13.3), and checks each
+// joined name. An unnamed element has no identifier — its
 // missing name is the parser's or Pass 7's error, and a name is never invented
 // ([U-1]).
 //   elements    — expanded elements
@@ -322,12 +366,13 @@ function collectObjects(elements: readonly ExpandedElement[], out: Entry[], diag
       const path = [...element.instantiation.map((site) => site.name), element.name].join('/');
       out.push(
         makeEntry(
-          element.identifier,
+          objectIdentifier(element.identifier),
           'object',
           `<${node.tag}> '${element.name}'`,
           node.attributeLocs?.name ?? node.loc,
           `object:${path}`,
           element.instantiation,
+          element.identifier,
         ),
       );
     }

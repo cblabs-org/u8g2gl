@@ -11,9 +11,9 @@
 #include "u8g2gl/u8g2gl_obj.h"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
-static u8g2gl_obj panel;  // 0  composite container
-static u8g2gl_label panel_note;  // 1  child of panel
-static u8g2gl_label ghost;  // 2
+static u8g2gl_obj ui_obj_panel;  // 0  composite container
+static u8g2gl_label ui_obj_panel_note;  // 1  child of ui_obj_panel
+static u8g2gl_label ui_obj_ghost;  // 2
 // "level_bar" is not here: no object required (§13.5)
 // "dial" is not here: no object required (§13.5)
 // "panel_edge" is not here: no object required (§13.5)
@@ -24,41 +24,41 @@ static u8g2gl_label ghost;  // 2
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk
 // up this table at render time.
 static u8g2gl_obj* const ui_screen_gauges_objs[] = {
-    &panel,
-    &panel_note,
-    &ghost,
+    &ui_obj_panel,
+    &ui_obj_panel_note,
+    &ui_obj_ghost,
 };
 static const uint8_t ui_screen_gauges_parents[] = {
-    U8G2GL_NO_PARENT,  // panel
-    0,  // panel_note
-    U8G2GL_NO_PARENT,  // ghost
+    U8G2GL_NO_PARENT,  // ui_obj_panel
+    0,  // ui_obj_panel_note
+    U8G2GL_NO_PARENT,  // ui_obj_ghost
 };
 
-// --- init: construct, set properties, apply styles, register bindings (§13.7) ---
+// --- init: construct, apply styles, set properties, register bindings (§13.7) ---
 void ui_screen_gauges_init() {
     // --- Step 1: Construct ---
     // Every object above is a default-constructed static (§13.7); nothing to do.
 
-    // --- Step 2: Set properties ---
-    panel.set_coords(0, 30, 60, 20);
+    // --- Step 2: Apply styles (§10) ---
+    ui_obj_panel_note.apply_style(ui_style_note);
 
-    panel_note.set_coords(0, 32, 60, 10);
-    panel_note.set_font(ui_font_u8g2_font_6x10_mr);
-    panel_note.set_text("Note");
+    // --- Step 3: Set properties ---
+    ui_obj_panel.set_coords(0, 30, 60, 20);
 
-    ghost.set_coords(64, 54, 40, 10);
-    ghost.set_hidden(true);
-    ghost.set_font(ui_font_u8g2_font_6x10_mr);
-    ghost.set_text("Ghost");
+    ui_obj_panel_note.set_coords(0, 32, 60, 10);
+    ui_obj_panel_note.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_panel_note.set_text("Note");
 
-    // --- Step 3: Apply styles (§10) ---
-    panel_note.apply_style(ui_style_note);
+    ui_obj_ghost.set_coords(64, 54, 40, 10);
+    ui_obj_ghost.set_hidden(true);
+    ui_obj_ghost.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_ghost.set_text("Ghost");
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
     // Each bind_*() returns false only when a pool is full. The pools are
     // sized from exactly these bindings ([D-21]), so the result is not checked.
-    panel.bind_flag_if_eq(&ui_subject_show_panel, false, U8G2GL_FLAG_HIDDEN);
+    ui_obj_panel.bind_flag_if_eq(&ui_subject_show_panel, false, U8G2GL_FLAG_HIDDEN);
 }
 
 // --- activate / deactivate (§12.4) ---
@@ -71,9 +71,9 @@ void ui_screen_gauges_deactivate() {}
 // --- tick: the soonest deadline across every object ([D-15]) ---
 uint32_t ui_screen_gauges_tick(uint32_t now_ms) {
     uint32_t next = U8G2GL_IDLE;
-    next = u8g2gl_min(next, panel.tick(now_ms));
-    next = u8g2gl_min(next, panel_note.tick(now_ms));
-    next = u8g2gl_min(next, ghost.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_panel.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_panel_note.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_ghost.tick(now_ms));
     return next;
 }
 
@@ -86,12 +86,12 @@ void ui_screen_gauges_render(U8G2& display) {
     // call has no object, so its visibility is the build-time guard (§13.5).
     u8g2gl_draw_box(display, 4, 20, ui_subject_level.get(), 6, true, 0);  // level_bar: no object (§13.5)
     u8g2gl_draw_circle(display, 100, 40, 10, false, U8G2GL_DRAW_SEGMENT_UPPER_LEFT);  // dial: no object (§13.5)
-    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 0);  // panel
-    if (!panel.is_hidden()) {
+    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 0);  // ui_obj_panel
+    if (!ui_obj_panel.is_hidden()) {
         u8g2gl_draw_hline(display, 0, 30, 60);  // panel_edge: no object (§13.5)
     }
-    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 1);  // panel_note
-    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 2);  // ghost
+    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 1);  // ui_obj_panel_note
+    u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 2);  // ui_obj_ghost
     if (ui_subject_wifi_connected.get() != false) {
         u8g2gl_draw_pixel(display, 120, 2);  // blip: no object (§13.5)
     }

@@ -14,6 +14,8 @@
     <prop name="border" type="bool" setter="set_border" default="false" help="Render outer border." />
     <prop name="radius" type="int" setter="set_radius" default="0" help="Corner rounding radius in pixels." />
     <prop name="align" type="enum" setter="set_align" values="left,center,right" default="left" emit="U8G2GL_ALIGN_{VALUE^^}" help="Horizontal text alignment." />
+    <prop name="font_mode" type="enum" setter="set_font_mode" values="solid,transparent" default="solid" emit="U8G2GL_FONT_MODE_{VALUE^^}" help="Text background: solid paints the glyph box, transparent only the glyphs." />
+    <prop name="bitmap_mode" type="enum" setter="set_bitmap_mode" values="solid,transparent" default="solid" emit="U8G2GL_BITMAP_MODE_{VALUE^^}" help="Bitmap background: solid paints the whole image, transparent only its set pixels." />
     <bind name="bind_text" type="string" setter="bind_text" fmt="bind_text_fmt" />
     <bind name="bind_text" type="int" setter="bind_text" fmt="bind_text_fmt" />
     <bind name="bind_x" type="int" setter="bind_x" />

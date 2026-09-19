@@ -16,6 +16,13 @@
  *              would leave every property looking unset, so merging a style over
  *              an element would apply nothing at all.
  *
+ *              Every value is spelled by `cppValue()` against the `u8g2gl_obj`
+ *              prop of the same name — the prop an element's own attribute and
+ *              its `style_*` override are spelled through (§10) — so a style's
+ *              `align="right"` and an element's cannot become two enumerators.
+ *              Until PR-04 WO10b this module carried its own enumerator table,
+ *              a second spelling (WO11 finding 4).
+ *
  *              A screen-local style of the same name as a global one is the
  *              override `screen.ts` describes — one `ui_style_<name>`, one pool
  *              slot — which is how `mangle.ts` keys it and how WO8b counted it.
@@ -32,8 +39,11 @@
  */
 
 import type { StyleDecl } from '../../schema/globals.js';
-import { fontIdentifier, styleIdentifier } from '../../resolver/index.js';
+import type { PropDef } from '../../schema/widget-manifest.js';
+import { ROOT_CLASS_MANIFEST, type ManifestRegistry } from '../../manifest/index.js';
+import { styleIdentifier } from '../../resolver/index.js';
 import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
+import { cppValue } from './value.js';
 
 /**
  * The styles unit.
@@ -50,62 +60,59 @@ export const STYLES_UNIT = 'ui_styles.cpp';
 export const STYLES_INIT_FUNCTION = 'ui_styles_init';
 
 /**
- * Each `<style>` attribute, the `u8g2gl_style` setter that applies it, and how
- * its value is spelled.
+ * Each `<style>` attribute and the `u8g2gl_style` setter that applies it.
  *
  * A table rather than a chain of `if`s because the mapping is the whole content
  * of this module, and because `truncate` — which `StyleDecl` still carries — is
  * deliberately **absent**: [D-19] deleted it from `u8g2gl_style`, so there is no
  * setter to call. A style declaring it is emitted without it, and that gap is
  * reported as a finding rather than silently tolerated here.
+ *
+ * How a value is spelled is not here: it is the `u8g2gl_obj` prop named by
+ * `attribute`, through `cppValue()`.
  */
 interface StyleProperty {
   /** The `StyleDecl` member. */
   readonly key: keyof StyleDecl;
   /**
    * The attribute as `<style>` spells it, which is also the element `<prop>` of
-   * the same name (§10). The editor applies a style through those props.
+   * the same name (§10). The editor applies a style through those props, and
+   * the value is spelled through that prop's declaration.
    */
   readonly attribute: string;
   /** The `u8g2gl_style` setter. */
   readonly setter: string;
-  /** How the declared value becomes a C++ argument. */
-  readonly argument: (value: string | number | boolean) => string;
 }
 
-/** `xor` uppercases to `XOR`, so the colour row is a table lookup (§10). */
-const DRAW_COLORS: Readonly<Record<string, string>> = {
-  '0': 'U8G2GL_COLOR_0',
-  '1': 'U8G2GL_COLOR_1',
-  xor: 'U8G2GL_COLOR_XOR',
-};
-
 const STYLE_PROPERTIES: readonly StyleProperty[] = [
-  { key: 'font', attribute: 'font', setter: 'set_font', argument: (value) => fontIdentifier(String(value)) },
-  { key: 'drawColor', attribute: 'draw_color', setter: 'set_draw_color', argument: (value) => DRAW_COLORS[String(value)] ?? 'U8G2GL_COLOR_1' },
-  { key: 'invert', attribute: 'invert', setter: 'set_invert', argument: (value) => (value ? 'true' : 'false') },
-  { key: 'padding', attribute: 'padding', setter: 'set_padding', argument: (value) => String(value) },
-  { key: 'border', attribute: 'border', setter: 'set_border', argument: (value) => (value ? 'true' : 'false') },
-  { key: 'radius', attribute: 'radius', setter: 'set_radius', argument: (value) => String(value) },
-  {
-    key: 'align',
-    attribute: 'align',
-    setter: 'set_align',
-    argument: (value) => `U8G2GL_ALIGN_${String(value).toUpperCase()}`,
-  },
-  {
-    key: 'fontMode',
-    attribute: 'font_mode',
-    setter: 'set_font_mode',
-    argument: (value) => `U8G2GL_FONT_MODE_${String(value).toUpperCase()}`,
-  },
-  {
-    key: 'bitmapMode',
-    attribute: 'bitmap_mode',
-    setter: 'set_bitmap_mode',
-    argument: (value) => `U8G2GL_BITMAP_MODE_${String(value).toUpperCase()}`,
-  },
+  { key: 'font', attribute: 'font', setter: 'set_font' },
+  { key: 'drawColor', attribute: 'draw_color', setter: 'set_draw_color' },
+  { key: 'invert', attribute: 'invert', setter: 'set_invert' },
+  { key: 'padding', attribute: 'padding', setter: 'set_padding' },
+  { key: 'border', attribute: 'border', setter: 'set_border' },
+  { key: 'radius', attribute: 'radius', setter: 'set_radius' },
+  { key: 'align', attribute: 'align', setter: 'set_align' },
+  { key: 'fontMode', attribute: 'font_mode', setter: 'set_font_mode' },
+  { key: 'bitmapMode', attribute: 'bitmap_mode', setter: 'set_bitmap_mode' },
 ];
+
+// styleValueProp
+// The `u8g2gl_obj` prop a style attribute's value is spelled through. Every
+// object inherits it, so it is the declaration an element's own attribute of
+// the same name uses; a style property with no such prop has no spelling that
+// agrees with the element's, which is a framework defect, not an author's.
+//   manifests — the effective manifests
+//   attribute — the style attribute, e.g. `align`
+function styleValueProp(manifests: ManifestRegistry, attribute: string): PropDef {
+  const prop = manifests.get(ROOT_CLASS_MANIFEST)?.api.props.find((candidate) => candidate.name === attribute);
+  if (prop === undefined) {
+    throw new Error(
+      `<${ROOT_CLASS_MANIFEST}> declares no '${attribute}' prop, so a style's '${attribute}' has no spelling ` +
+        `shared with an element's own attribute (§10). Declare it in ${ROOT_CLASS_MANIFEST}.xml.`,
+    );
+  }
+  return prop;
+}
 
 /**
  * @brief A style's declared properties, by attribute, in the order
@@ -210,7 +217,8 @@ export function emitStylesUnit(input: ProjectEmitInput): EmittedUnit {
       if (value === undefined || typeof value === 'object') {
         continue;
       }
-      lines.push(`    ${identifier}.${property.setter}(${property.argument(value)});`);
+      const spelled = cppValue(styleValueProp(input.manifests, property.attribute), String(value));
+      lines.push(`    ${identifier}.${property.setter}(${spelled});`);
     }
   }
   lines.push('}', '');

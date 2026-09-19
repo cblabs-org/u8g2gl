@@ -178,7 +178,7 @@ describe('mangling is wired in (WO7 F1)', () => {
     expect(found).toHaveLength(1);
     expect(found[0]?.severity).toBe('error');
     expect(found[0]?.offendingText).toBe('a_b');
-    expect(found[0]?.message).toContain("C++ identifier 'a_b' is generated twice");
+    expect(found[0]?.message).toContain("C++ identifier 'ui_obj_a_b' is generated twice");
     // Both sources, with their locations — the retired one-level check named one.
     expect(found[0]?.message).toContain('widgets/wrap/wrap.xml');
     expect(found[0]?.message).toContain(SCREEN_FILE);

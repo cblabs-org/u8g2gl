@@ -28,11 +28,11 @@
  *              everything else the text the author wrote, which the host maps
  *              through the registry entry's declared type.
  *
- *              Format, version 1:
+ *              Format, version 2 (PR-04 WO10b added `origin`; version 1 had none):
  *              - `generated`: the stamp fields every generated C++ file carries
  *              - `display`: the target's width and height
  *              - `init`: the order objects are configured in after construction
- *                (`properties`, `styles`, `bindings`), as the firmware init does
+ *                (`styles`, `properties`, `bindings`), as the firmware init does
  *              - `subjects`: `{ name, type, max_len? }` — never a value
  *              - `styles`: `{ name, properties: [{ name, value }] }` in applied order
  *              - `fonts`, `images`: the names the host must resolve to data
@@ -42,6 +42,10 @@
  *                `properties`, `styles`, `style_overrides`, `bindings`, `flags` —
  *                or a **draw call** — `arguments` (bound ones name a subject;
  *                absent ones take the manifest default) and `visibility`.
+ *              - A binding or bound argument that sets a position (`bind_x`,
+ *                `bind_y`) carries `origin`: its container's absolute corner on
+ *                that axis, which the host adds to the subject's value as
+ *                firmware does (§7.2).
  *
  * Exports:
  * - SCENE_FILE:            `ui_scene.json`
@@ -56,6 +60,7 @@ import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../realise/index.js';
 import { drawArgumentSources } from './draw-args.js';
+import { boundPositionOrigin } from './placement.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations } from './images.js';
 import {
@@ -80,7 +85,7 @@ export const SCENE_FILE = 'ui_scene.json';
  * The format version. A host checks it before reading anything else; bump it
  * for any change a host would read differently.
  */
-export const SCENE_FORMAT_VERSION = 1;
+export const SCENE_FORMAT_VERSION = 2;
 
 /** Everything describing the scenes needs. */
 export interface SceneInput {
@@ -175,11 +180,15 @@ function objectJson(element: RealisedElement, placement: Placement): { [key: str
     // The format is passed exactly when firmware passes it: the overload names
     // one and the author wrote it.
     const fmt = declaration.fmt === undefined ? undefined : placement.absolute.node.attributes[declaration.fmt];
+    // A position binding carries its container's origin, exactly as firmware
+    // passes it to bind_x/bind_y (§7.2).
+    const origin = boundPositionOrigin(binding.attribute, placement.origin);
     bindings.push({
       name: declaration.name,
       subject: binding.subject,
       subject_type: binding.subjectType ?? null,
       ...(typeof fmt === 'string' ? { fmt } : {}),
+      ...(origin === undefined ? {} : { origin }),
     });
   }
   return {
@@ -220,12 +229,14 @@ function drawCallJson(element: RealisedElement, placement: Placement): { [key: s
     manifest: placement.manifest,
     resolved: placement.absolute,
     bindings: element.bindings,
+    origin: placement.origin,
   })) {
     if (argument.kind === 'bound') {
       args.push({
         name: argument.prop.name,
         subject: argument.binding.subject,
         subject_type: argument.binding.subjectType ?? null,
+        ...(argument.origin === undefined ? {} : { origin: argument.origin }),
       });
     } else if (argument.kind === 'written') {
       args.push({ name: argument.prop.name, value: jsonValue(argument.prop.type, argument.literal) });

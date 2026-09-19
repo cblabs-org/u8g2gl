@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A composite whose children's x is bound (PR-04 WO10b). A bound position is
+     container-relative, like a literal one (§7.2, the [D-20] amendment): at
+     x="40", a knob bound to 5 is drawn at 45. One child of each realisation:
+     the box is a draw call, whose argument gains the origin; the label is an
+     object, whose bind_x() is given it. x="0" is written beside bind_x only
+     because the validator's "fully positioned" rule does not yet count a
+     binding as supplying x; the binding wins over it in both realisations. -->
+<widget name="slider">
+    <api>
+        <prop name="position" type="subject" default="knob_x" />
+    </api>
+
+    <view>
+        <u8g2gl_box name="knob" x="0" bind_x="$position" y="0" width="4" height="4" />
+        <u8g2gl_label name="readout" x="0" bind_x="$position" y="6" width="20" height="10"
+            font="u8g2_font_5x7_mr" text="K" />
+    </view>
+</widget>

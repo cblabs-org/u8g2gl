@@ -226,7 +226,7 @@ TEST(EditorRegistry, BindByNameDispatchesOnTheSubjectType) {
     host_storage int_storage;
     u8g2gl_obj* counted = u8g2gl_editor_construct(cls, int_storage.bytes, sizeof(int_storage.bytes));
     ASSERT_NE(counted, nullptr);
-    ASSERT_TRUE(u8g2gl_editor_bind(cls, counted, "bind_text", &count, U8G2GL_SUBJECT_INT, "%d trains"));
+    ASSERT_TRUE(u8g2gl_editor_bind(cls, counted, "bind_text", &count, U8G2GL_SUBJECT_INT, "%d trains", 0));
     EXPECT_EQ(counted->get_bound_text_type(), U8G2GL_SUBJECT_INT);
     EXPECT_EQ(counted->get_bound_text_subject(), static_cast<void*>(&count));
     EXPECT_STREQ(counted->get_bound_text_fmt(), "%d trains");
@@ -234,7 +234,7 @@ TEST(EditorRegistry, BindByNameDispatchesOnTheSubjectType) {
     host_storage string_storage;
     u8g2gl_obj* named = u8g2gl_editor_construct(cls, string_storage.bytes, sizeof(string_storage.bytes));
     ASSERT_NE(named, nullptr);
-    ASSERT_TRUE(u8g2gl_editor_bind(cls, named, "bind_text", &station, U8G2GL_SUBJECT_STRING, nullptr));
+    ASSERT_TRUE(u8g2gl_editor_bind(cls, named, "bind_text", &station, U8G2GL_SUBJECT_STRING, nullptr, 0));
     EXPECT_EQ(named->get_bound_text_type(), U8G2GL_SUBJECT_STRING);
     EXPECT_EQ(named->get_bound_text_subject(), static_cast<void*>(&station));
 
@@ -251,8 +251,44 @@ TEST(EditorRegistry, AFormatOnAnOverloadThatTakesNoneIsRefusedNotDropped) {
     host_storage storage;
     u8g2gl_obj* obj = u8g2gl_editor_construct(cls, storage.bytes, sizeof(storage.bytes));
     ASSERT_NE(obj, nullptr);
-    EXPECT_FALSE(u8g2gl_editor_bind(cls, obj, "bind_text", &station, U8G2GL_SUBJECT_STRING, "%s"));
+    EXPECT_FALSE(u8g2gl_editor_bind(cls, obj, "bind_text", &station, U8G2GL_SUBJECT_STRING, "%s", 0));
     EXPECT_EQ(obj->get_bound_text_subject(), nullptr);
+    u8g2gl_editor_destroy(obj);
+}
+
+// --- Position bindings carry the container origin (§7.2, PR-04 WO10b) ---
+
+TEST(EditorRegistry, BindXByNamePassesTheContainerOriginToTheRuntime) {
+    // The scene gives a position binding its container's absolute origin, and
+    // the thunk passes it on exactly as firmware's bind_x(&subject, 40) does: a
+    // child of a container at x=40 bound to 5 is at 45.
+    const u8g2gl_editor_class& cls = label_class();
+    u8g2gl_subject_int_n<2> offset(5);
+    host_storage storage;
+    u8g2gl_obj* obj = u8g2gl_editor_construct(cls, storage.bytes, sizeof(storage.bytes));
+    ASSERT_NE(obj, nullptr);
+    ASSERT_TRUE(u8g2gl_editor_bind(cls, obj, "bind_x", &offset, U8G2GL_SUBJECT_INT, nullptr, 40));
+    EXPECT_EQ(obj->get_x(), 45);
+    offset.set(-3);
+    EXPECT_EQ(obj->get_x(), 37);
+    u8g2gl_editor_destroy(obj);
+}
+
+TEST(EditorRegistry, AnOriginOnABindingThatTakesNoneIsRefusedNotDropped) {
+    // bind_width is a length and bind_text is not a position: an origin handed to
+    // either would be silently lost, so the thunk refuses it, as it refuses a
+    // format an overload cannot take.
+    const u8g2gl_editor_class& cls = label_class();
+    u8g2gl_subject_int_n<2> width(10);
+    u8g2gl_subject_string_n<16, 2> station;
+    host_storage storage;
+    u8g2gl_obj* obj = u8g2gl_editor_construct(cls, storage.bytes, sizeof(storage.bytes));
+    ASSERT_NE(obj, nullptr);
+    EXPECT_FALSE(u8g2gl_editor_bind(cls, obj, "bind_width", &width, U8G2GL_SUBJECT_INT, nullptr, 40));
+    EXPECT_FALSE(u8g2gl_editor_bind(cls, obj, "bind_text", &station, U8G2GL_SUBJECT_STRING, nullptr, 40));
+    EXPECT_EQ(obj->get_bound_text_subject(), nullptr);
+    EXPECT_TRUE(u8g2gl_editor_bind(cls, obj, "bind_width", &width, U8G2GL_SUBJECT_INT, nullptr, 0));
+    EXPECT_EQ(obj->get_w(), 10);
     u8g2gl_editor_destroy(obj);
 }
 

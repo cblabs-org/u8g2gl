@@ -23,7 +23,9 @@
  *                into host storage, the rectangle thunk, one set-by-name thunk
  *                per setter prop and one bind-by-name thunk per `<bind>` **per
  *                subject type** (`bind_text` for string and for int are two
- *                entries, never one);
+ *                entries, never one); a position binding's thunk passes the
+ *                container origin the host gives it, as firmware passes the
+ *                literal (§7.2, `placement.ts`'s POSITION_BINDINGS);
  *              - a **drawing** element ([D-18]) gets a draw-by-name entry calling
  *                the same `u8g2gl_draw_*` function the firmware call does, its
  *                defaults spelled by `cppValue()`;
@@ -49,6 +51,7 @@
 import { BINDING_FLAGS, isDrawingElement, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import type { BindDef, PropDef, PropType } from '../../schema/widget-manifest.js';
 import { drawFunctionOf } from './draw-args.js';
+import { POSITION_BINDINGS } from './placement.js';
 import { classOf, FLAG_COMPARISONS, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
 import { COLOR_VALUES, cppEnumerator, cppStringLiteral, cppValue } from './value.js';
@@ -169,17 +172,31 @@ function setterThunk(cls: string, prop: PropDef): string[] {
 // bindingThunk
 // One binding's bind-by-name lambda, for one subject type. Where the manifest
 // declares a format, u8g2gl_editor_bind_call() passes it only to an overload that
-// takes one; where it declares none, a format is refused.
+// takes one; where it declares none, a format is refused. A position binding
+// (bind_x, bind_y) passes the container origin to the runtime, as firmware
+// passes its literal; any other binding refuses a non-zero origin rather than
+// drop it, the same rule as a format.
 //   cls     — the C++ class
 //   binding — the `<bind>` declaration for this subject type
 function bindingThunk(cls: string, binding: BindDef): string[] {
-  const head = '[](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {';
+  const head = '[](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {';
   const self = `static_cast<${cls}*>(obj)`;
   const typedSubject = `static_cast<${subjectBase(binding.type)}*>(subject)`;
+  if (POSITION_BINDINGS[binding.name] !== undefined) {
+    return [
+      head,
+      ...indent(['if (fmt != nullptr) { return false; }', `return ${self}->${binding.setter}(${typedSubject}, origin);`], 1),
+      '}',
+    ];
+  }
+  const refuseOrigin = 'if (origin != 0) { return false; }';
   if (binding.fmt === undefined) {
     return [
       head,
-      ...indent(['if (fmt != nullptr) { return false; }', `return ${self}->${binding.setter}(${typedSubject});`], 1),
+      ...indent(
+        [refuseOrigin, 'if (fmt != nullptr) { return false; }', `return ${self}->${binding.setter}(${typedSubject});`],
+        1,
+      ),
       '}',
     ];
   }
@@ -187,6 +204,7 @@ function bindingThunk(cls: string, binding: BindDef): string[] {
     head,
     ...indent(
       [
+        refuseOrigin,
         `return u8g2gl_editor_bind_call(${self}, ${typedSubject}, fmt,`,
         `    [](auto* s, auto* sub, const char* f) -> decltype(s->${binding.setter}(sub, f)) { return s->${binding.setter}(sub, f); },`,
         `    [](auto* s, auto* sub) { return s->${binding.setter}(sub); });`,

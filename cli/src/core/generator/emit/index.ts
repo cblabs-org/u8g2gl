@@ -188,6 +188,7 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
       globals: input.globals,
       screens: input.screens,
       capacities: input.capacities,
+      manifests: input.manifests,
       assets: input.assets,
       stamp: stampFor(plan.source === 'project' ? projectSource : globalsSource),
     });
@@ -270,6 +271,7 @@ export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
       globals: input.globals,
       screens: input.screens,
       capacities: input.capacities,
+      manifests: input.manifests,
       assets: input.assets,
       stamp: '',
     },

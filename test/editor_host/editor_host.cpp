@@ -48,8 +48,8 @@ bool editor_host::load(const std::string& scene_path) {
     if (!parse_error.empty()) {
         return fail(parse_error);
     }
-    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 1) {
-        return fail("not a version 1 u8g2gl scene description");
+    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 2) {
+        return fail("not a version 2 u8g2gl scene description");
     }
     for (const scene_json& described : scene_.get("subjects").items()) {
         if (described.has("value")) {
@@ -322,8 +322,11 @@ bool editor_host::bind_object(size_t index, const scene_json& element) {
             return fail(name + ": binding names an unknown subject");
         }
         const char* fmt = binding.has("fmt") ? binding.get("fmt").as_string().c_str() : nullptr;
+        // A position binding's container origin (§7.2); firmware passes the same
+        // number as a literal to bind_x/bind_y.
+        const int16_t origin = binding.has("origin") ? static_cast<int16_t>(binding.get("origin").as_int()) : 0;
         if (!u8g2gl_editor_bind(*classes_[index], objects_[index], binding.get("name").as_string().c_str(), slot->base,
-                                type, fmt)) {
+                                type, fmt, origin)) {
             return fail(name + ": " + binding.get("name").as_string() + " refused");
         }
     }
@@ -462,6 +465,11 @@ bool editor_host::draw_call(U8G2& display, const scene_json& element) {
                 return fail(name + "." + param + ": unknown subject");
             }
             arg = u8g2gl_editor_read_subject(slot->base, slot->type);
+            // A bound position is container-relative (§7.2): firmware draws
+            // `origin + subject.get()`, so the host adds the same origin.
+            if (argument.has("origin")) {
+                arg.integer += argument.get("origin").as_int();
+            }
         } else if (!value_for(drawing->params[index].type, argument.get("value"), name + "." + param, &arg)) {
             return false;
         }

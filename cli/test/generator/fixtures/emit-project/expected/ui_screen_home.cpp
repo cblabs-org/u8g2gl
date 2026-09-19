@@ -13,15 +13,15 @@
 #include "u8g2gl/u8g2gl_xbm.h"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
-static u8g2gl_obj badge;  // 0  composite container
-static u8g2gl_label badge_caption;  // 1  child of badge
-static u8g2gl_label title;  // 2
-static u8g2gl_label lvl_a;  // 3
-static u8g2gl_label lvl_b;  // 4
-static u8g2gl_label lvl_c;  // 5
-static u8g2gl_clock clock;  // 6
-static u8g2gl_xbm wifi;  // 7
-static u8g2gl_label scroller;  // 8
+static u8g2gl_obj ui_obj_badge;  // 0  composite container
+static u8g2gl_label ui_obj_badge_caption;  // 1  child of ui_obj_badge
+static u8g2gl_label ui_obj_title;  // 2
+static u8g2gl_label ui_obj_lvl_a;  // 3
+static u8g2gl_label ui_obj_lvl_b;  // 4
+static u8g2gl_label ui_obj_lvl_c;  // 5
+static u8g2gl_clock ui_obj_clock;  // 6
+static u8g2gl_xbm ui_obj_wifi;  // 7
+static u8g2gl_label ui_obj_scroller;  // 8
 // "rule" is not here: no object required (§13.5)
 // "level_bar" is not here: no object required (§13.5)
 
@@ -30,82 +30,82 @@ static u8g2gl_label scroller;  // 8
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk
 // up this table at render time.
 static u8g2gl_obj* const ui_screen_home_objs[] = {
-    &badge,
-    &badge_caption,
-    &title,
-    &lvl_a,
-    &lvl_b,
-    &lvl_c,
-    &clock,
-    &wifi,
-    &scroller,
+    &ui_obj_badge,
+    &ui_obj_badge_caption,
+    &ui_obj_title,
+    &ui_obj_lvl_a,
+    &ui_obj_lvl_b,
+    &ui_obj_lvl_c,
+    &ui_obj_clock,
+    &ui_obj_wifi,
+    &ui_obj_scroller,
 };
 static const uint8_t ui_screen_home_parents[] = {
-    U8G2GL_NO_PARENT,  // badge
-    0,  // badge_caption
-    U8G2GL_NO_PARENT,  // title
-    U8G2GL_NO_PARENT,  // lvl_a
-    U8G2GL_NO_PARENT,  // lvl_b
-    U8G2GL_NO_PARENT,  // lvl_c
-    U8G2GL_NO_PARENT,  // clock
-    U8G2GL_NO_PARENT,  // wifi
-    U8G2GL_NO_PARENT,  // scroller
+    U8G2GL_NO_PARENT,  // ui_obj_badge
+    0,  // ui_obj_badge_caption
+    U8G2GL_NO_PARENT,  // ui_obj_title
+    U8G2GL_NO_PARENT,  // ui_obj_lvl_a
+    U8G2GL_NO_PARENT,  // ui_obj_lvl_b
+    U8G2GL_NO_PARENT,  // ui_obj_lvl_c
+    U8G2GL_NO_PARENT,  // ui_obj_clock
+    U8G2GL_NO_PARENT,  // ui_obj_wifi
+    U8G2GL_NO_PARENT,  // ui_obj_scroller
 };
 
-// --- init: construct, set properties, apply styles, register bindings (§13.7) ---
+// --- init: construct, apply styles, set properties, register bindings (§13.7) ---
 void ui_screen_home_init() {
     // --- Step 1: Construct ---
     // Every object above is a default-constructed static (§13.7); nothing to do.
 
-    // --- Step 2: Set properties ---
-    badge.set_coords(0, 0, 60, 12);
+    // --- Step 2: Apply styles (§10) ---
+    ui_obj_title.apply_style(ui_style_header);
+    ui_obj_lvl_a.apply_style(ui_style_body);
 
-    badge_caption.set_coords(2, 1, 56, 10);
-    badge_caption.set_font(ui_font_u8g2_font_6x10_mr);
-    badge_caption.set_align(U8G2GL_ALIGN_LEFT);
-    badge_caption.set_text("Live");
+    // --- Step 3: Set properties ---
+    ui_obj_badge.set_coords(0, 0, 60, 12);
 
-    title.set_coords(0, 16, 64, 10);
-    title.set_font(ui_font_u8g2_font_6x10_mr);
-    title.set_align(U8G2GL_ALIGN_LEFT);
+    ui_obj_badge_caption.set_coords(2, 1, 56, 10);
+    ui_obj_badge_caption.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_badge_caption.set_align(U8G2GL_ALIGN_LEFT);
+    ui_obj_badge_caption.set_text("Live");
 
-    lvl_a.set_coords(0, 28, 40, 10);
-    lvl_a.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_title.set_coords(0, 16, 64, 10);
+    ui_obj_title.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_title.set_align(U8G2GL_ALIGN_LEFT);
 
-    lvl_b.set_coords(44, 28, 40, 10);
-    lvl_b.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_lvl_a.set_coords(0, 28, 40, 10);
+    ui_obj_lvl_a.set_font(ui_font_u8g2_font_6x10_mr);
 
-    lvl_c.set_coords(88, 28, 40, 10);
-    lvl_c.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_lvl_b.set_coords(44, 28, 40, 10);
+    ui_obj_lvl_b.set_font(ui_font_u8g2_font_6x10_mr);
 
-    clock.set_coords(88, 52, 40, 10);
-    clock.set_font(ui_font_u8g2_font_6x10_mr);
-    clock.set_format(U8G2GL_CLOCK_HH_MM);
-    clock.set_blink(true);
+    ui_obj_lvl_c.set_coords(88, 28, 40, 10);
+    ui_obj_lvl_c.set_font(ui_font_u8g2_font_6x10_mr);
 
-    wifi.set_coords(0, 52, 16, 10);
-    wifi.set_src(ui_image_icon_wifi);
+    ui_obj_clock.set_coords(88, 52, 40, 10);
+    ui_obj_clock.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_clock.set_format(U8G2GL_CLOCK_HH_MM);
+    ui_obj_clock.set_blink(true);
 
-    scroller.set_coords(20, 52, 60, 10);
-    scroller.set_font(ui_font_u8g2_font_6x10_mr);
-    scroller.set_text("Hi");
-    scroller.set_long_mode(U8G2GL_LONG_SCROLL);
-    scroller.set_scroll_px_per_sec(20);
+    ui_obj_wifi.set_coords(0, 52, 16, 10);
+    ui_obj_wifi.set_src(ui_image_icon_wifi);
 
-    // --- Step 3: Apply styles (§10) ---
-    title.apply_style(ui_style_header);
-    lvl_a.apply_style(ui_style_body);
+    ui_obj_scroller.set_coords(20, 52, 60, 10);
+    ui_obj_scroller.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_scroller.set_text("Hi");
+    ui_obj_scroller.set_long_mode(U8G2GL_LONG_SCROLL);
+    ui_obj_scroller.set_scroll_px_per_sec(20);
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
     // Each bind_*() returns false only when a pool is full. The pools are
     // sized from exactly these bindings ([D-21]), so the result is not checked.
-    title.bind_text(&ui_subject_station_name);
-    lvl_a.bind_width(&ui_subject_level);
-    lvl_b.bind_width(&ui_subject_level);
-    lvl_c.bind_width(&ui_subject_level);
-    clock.bind_time(&ui_subject_system_time);
-    wifi.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_title.bind_text(&ui_subject_station_name);
+    ui_obj_lvl_a.bind_width(&ui_subject_level);
+    ui_obj_lvl_b.bind_width(&ui_subject_level);
+    ui_obj_lvl_c.bind_width(&ui_subject_level);
+    ui_obj_clock.bind_time(&ui_subject_system_time);
+    ui_obj_wifi.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
 }
 
 // --- activate / deactivate (§12.4) ---
@@ -118,15 +118,15 @@ void ui_screen_home_deactivate() {}
 // --- tick: the soonest deadline across every object ([D-15]) ---
 uint32_t ui_screen_home_tick(uint32_t now_ms) {
     uint32_t next = U8G2GL_IDLE;
-    next = u8g2gl_min(next, badge.tick(now_ms));
-    next = u8g2gl_min(next, badge_caption.tick(now_ms));
-    next = u8g2gl_min(next, title.tick(now_ms));
-    next = u8g2gl_min(next, lvl_a.tick(now_ms));
-    next = u8g2gl_min(next, lvl_b.tick(now_ms));
-    next = u8g2gl_min(next, lvl_c.tick(now_ms));
-    next = u8g2gl_min(next, clock.tick(now_ms));
-    next = u8g2gl_min(next, wifi.tick(now_ms));
-    next = u8g2gl_min(next, scroller.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_badge.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_badge_caption.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_title.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_lvl_a.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_lvl_b.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_lvl_c.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_clock.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_wifi.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_scroller.tick(now_ms));
     return next;
 }
 
@@ -137,17 +137,17 @@ void ui_screen_home_render(U8G2& display) {
     // and saves and restores draw state, so nothing paints outside its
     // container and a hidden container hides its children (§11.3). A draw
     // call has no object, so its visibility is the build-time guard (§13.5).
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // badge
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // badge_caption
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_badge
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_badge_caption
     u8g2gl_draw_hline(display, 0, 13, 128);  // rule: no object (§13.5)
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // title
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // lvl_a
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // lvl_b
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 5);  // lvl_c
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // ui_obj_title
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // ui_obj_lvl_a
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // ui_obj_lvl_b
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 5);  // ui_obj_lvl_c
     u8g2gl_draw_box(display, 4, 40, ui_subject_level.get(), 6, true, 0);  // level_bar: no object (§13.5)
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 6);  // clock
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 7);  // wifi
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 8);  // scroller
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 6);  // ui_obj_clock
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 7);  // ui_obj_wifi
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 8);  // ui_obj_scroller
 }
 
 // --- The screen descriptor ui_handler() drives (§12.4) ---

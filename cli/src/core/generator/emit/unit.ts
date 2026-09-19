@@ -32,6 +32,7 @@
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
 import type { Globals } from '../../schema/globals.js';
+import type { ManifestRegistry } from '../../manifest/index.js';
 import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
@@ -60,6 +61,12 @@ export interface ProjectEmitInput {
    * types.
    */
   readonly capacities: Capacities;
+  /**
+   * The effective manifests. The styles unit spells a style's values through
+   * the declaring `u8g2gl_obj` props (§10, `cppValue()`), so a style and an
+   * element's own setter cannot spell one value two ways (PR-04 WO10b).
+   */
+  readonly manifests: ManifestRegistry;
   /**
    * Asset file text by the `src` path each declaration names, supplied by
    * `src/node/` because `src/core/` may not read files (typescript.md §1). An

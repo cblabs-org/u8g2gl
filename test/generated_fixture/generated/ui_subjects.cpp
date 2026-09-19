@@ -26,6 +26,12 @@ u8g2gl_subject_int_n<1> ui_subject_level(10);
 // show_panel: 1 observer; 1 object binding; no frame-dirty observer.
 u8g2gl_subject_bool_n<1> ui_subject_show_panel(false);
 
+// knob_x: 2 observers; 1 object binding; one frame-dirty observer.
+u8g2gl_subject_int_n<2> ui_subject_knob_x(5);
+
+// temperature: 1 observer; 1 object binding; no frame-dirty observer.
+u8g2gl_subject_int_n<1> ui_subject_temperature(21);
+
 // --- Setters (§8.1) ---
 
 void ui_set_station_name(const char* value) {
@@ -50,6 +56,14 @@ void ui_set_level(int32_t value) {
 
 void ui_set_show_panel(bool value) {
     ui_subject_show_panel.set(value);
+}
+
+void ui_set_knob_x(int32_t value) {
+    ui_subject_knob_x.set(value);
+}
+
+void ui_set_temperature(int32_t value) {
+    ui_subject_temperature.set(value);
 }
 
 // --- Initial values (§8.2) ---

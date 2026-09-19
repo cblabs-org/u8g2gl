@@ -22,18 +22,30 @@
  *          WO11's editor target, which needs the same absolute positions, calls
  *          the same function rather than growing a second copy.
  *
+ *          **Bound positions are container-relative too** (§7.2, the [D-20]
+ *          amendment of 2026-09-19): `bind_x="offset"` inside a container at
+ *          x=40 puts the element at 40 + offset. A bound value is only known at
+ *          run time, so the origin cannot be added here; instead this module
+ *          says *which* origin a position binding carries, and the emitters
+ *          spell it — added into a draw call's argument, or passed to the
+ *          object's `bind_x(subject, origin)` / `bind_y(subject, origin)`.
+ *
  * Description: `absoluteElement()` returns a copy of a resolved element with its
  *              position coordinates moved by an origin; `childOrigin()` gives the
- *              origin an element's own children are measured from. A container
- *              whose position is not a build-time literal — bound through
- *              `bind_x`/`bind_y` ([D-20]) — has no absolute origin to add, and
- *              that is reported rather than guessed as zero.
+ *              origin an element's own children are measured from;
+ *              `boundPositionOrigin()` gives the origin a position binding adds
+ *              at run time. A container whose position is not a build-time
+ *              literal — bound through `bind_x`/`bind_y` ([D-20]) — has no
+ *              absolute origin to add, and that is reported rather than guessed
+ *              as zero.
  *
  * Exports:
  * - Origin:            An absolute device-pixel offset
  * - DISPLAY_ORIGIN:    The origin of a screen's top-level elements
  * - absoluteElement(): Move a resolved element's positions into device space
  * - childOrigin():     The origin an element's children are measured from
+ * - POSITION_BINDINGS: The bindings that set a position, and their axes
+ * - boundPositionOrigin(): The origin a position binding adds to its subject
  */
 
 import type { ResolvedCoordinate, ResolvedElement, ResolvedExtra } from '../../resolver/index.js';
@@ -63,6 +75,33 @@ function shiftedExtra(extra: ResolvedExtra, origin: Origin): ResolvedExtra {
   }
   const by = extra.axis === 'vertical' ? origin.y : origin.x;
   return { ...extra, coordinate: shifted(extra.coordinate, by) };
+}
+
+/**
+ * The [D-20] bindings that set a **position**, and the axis each moves along.
+ * `bind_width` and `bind_height` are absent: a size is a length, and moves with
+ * nothing. Keyed by binding name, which is the same on an object's manifest
+ * (`setter="bind_x"`) and a drawing element's (`setter="x"`), so the draw-call
+ * argument, the object call and the editor's thunk all ask this one table.
+ */
+export const POSITION_BINDINGS: Readonly<Record<string, 'x' | 'y'>> = { bind_x: 'x', bind_y: 'y' };
+
+/**
+ * @brief The origin a binding adds to its subject's value, or undefined when it
+ *        does not set a position.
+ *
+ * A bound position means what a literal one means: a place inside the
+ * element's container (§7.2). The container's absolute corner is a build-time
+ * constant, so the generator emits it as a literal and the runtime adds it —
+ * 0 for an element directly on the screen.
+ *
+ * @param binding The binding's name, e.g. `bind_x`.
+ * @param origin  The absolute corner of the element's container.
+ * @return The origin along the binding's axis; undefined for any other binding.
+ */
+export function boundPositionOrigin(binding: string, origin: Origin): number | undefined {
+  const axis = POSITION_BINDINGS[binding];
+  return axis === undefined ? undefined : origin[axis];
 }
 
 /**

@@ -94,10 +94,26 @@ const FRAME = `<widget name="frame">
 </widget>
 `;
 
+/**
+ * A composite whose children are positioned by bindings (ruling 1): one draw
+ * call and one object. `x="0"` is written beside `bind_x` because validation's
+ * "fully positioned" rule does not yet count a binding as supplying x.
+ */
+const SLIDER = `<widget name="slider">
+    <view>
+        <u8g2gl_box name="knob" x="0" bind_x="level" y="0" width="4" height="4" />
+        <u8g2gl_label name="knob_label" x="0" bind_x="level" y="0" bind_y="count" width="10" height="10"
+                      font="${FONT}" text="K" />
+    </view>
+</widget>
+`;
+
 interface Options {
   readonly screens: Readonly<Record<string, string>>;
   readonly display?: string;
   readonly widgets?: readonly string[];
+  /** The globals document; {@link GLOBALS} when absent. */
+  readonly globals?: string;
 }
 
 /** Generates a project in memory against the real framework manifests. */
@@ -121,7 +137,7 @@ function generateProject(options: Options): GenerateResult {
   });
   return generate({
     project,
-    globals: parseGlobalsFile(GLOBALS, 'globals.xml').value!,
+    globals: parseGlobalsFile(options.globals ?? GLOBALS, 'globals.xml').value!,
     screens,
     manifests: frameworkRegistry(widgets),
     catalogue: CATALOGUE,
@@ -179,18 +195,18 @@ describe('§13.12 — the worked example generates as the spec prints it', () =>
   it('declares the five objects in §13.12 order, the container as a plain u8g2gl_obj', () => {
     const declarations = unit.split('\n').filter((line) => line.startsWith('static u8g2gl_') && line.includes(';'));
     expect(declarations.map((line) => line.replace(/;.*$/, ';'))).toEqual([
-      'static u8g2gl_obj bar;',
-      'static u8g2gl_label bar_location;',
-      'static u8g2gl_xbm bar_wifi_icon;',
-      'static u8g2gl_clock bar_clock;',
-      'static u8g2gl_label msg;',
+      'static u8g2gl_obj ui_obj_bar;',
+      'static u8g2gl_label ui_obj_bar_location;',
+      'static u8g2gl_xbm ui_obj_bar_wifi_icon;',
+      'static u8g2gl_clock ui_obj_bar_clock;',
+      'static u8g2gl_label ui_obj_msg;',
     ]);
     expect(unit).toContain('// "rule" is not here: no object required (§13.5)');
   });
 
   it('emits §13.12 parent table', () => {
     expect(unit).toMatch(
-      /static const uint8_t ui_screen_home_parents\[\] = \{\n {4}U8G2GL_NO_PARENT, {2}\/\/ bar\n {4}0, {2}\/\/ bar_location\n {4}0, {2}\/\/ bar_wifi_icon\n {4}0, {2}\/\/ bar_clock\n {4}U8G2GL_NO_PARENT, {2}\/\/ msg\n\};/,
+      /static const uint8_t ui_screen_home_parents\[\] = \{\n {4}U8G2GL_NO_PARENT, {2}\/\/ ui_obj_bar\n {4}0, {2}\/\/ ui_obj_bar_location\n {4}0, {2}\/\/ ui_obj_bar_wifi_icon\n {4}0, {2}\/\/ ui_obj_bar_clock\n {4}U8G2GL_NO_PARENT, {2}\/\/ ui_obj_msg\n\};/,
     );
   });
 
@@ -198,14 +214,14 @@ describe('§13.12 — the worked example generates as the spec prints it', () =>
     const init = body(unit, 'void ui_screen_home_init()');
     expect(init).toEqual(
       expect.arrayContaining([
-        '    bar.set_coords(0, 0, 256, 11);',
-        '    bar_location.set_coords(0, 0, 204, 11);',
-        '    bar_wifi_icon.set_coords(204, 0, 12, 11);',
-        '    bar_clock.set_coords(216, 0, 40, 11);',
-        '    msg.set_coords(0, 16, 256, 12);',
-        '    msg.set_align(U8G2GL_ALIGN_CENTER);',
-        '    bar_location.set_long_mode(U8G2GL_LONG_SCROLL);',
-        '    bar_clock.set_blink(true);',
+        '    ui_obj_bar.set_coords(0, 0, 256, 11);',
+        '    ui_obj_bar_location.set_coords(0, 0, 204, 11);',
+        '    ui_obj_bar_wifi_icon.set_coords(204, 0, 12, 11);',
+        '    ui_obj_bar_clock.set_coords(216, 0, 40, 11);',
+        '    ui_obj_msg.set_coords(0, 16, 256, 12);',
+        '    ui_obj_msg.set_align(U8G2GL_ALIGN_CENTER);',
+        '    ui_obj_bar_location.set_long_mode(U8G2GL_LONG_SCROLL);',
+        '    ui_obj_bar_clock.set_blink(true);',
       ]),
     );
   });
@@ -213,10 +229,10 @@ describe('§13.12 — the worked example generates as the spec prints it', () =>
   it('registers §13.12 bindings last, in document order', () => {
     const init = body(unit, 'void ui_screen_home_init()');
     const bindings = [
-      '    bar_location.bind_text(&ui_subject_station_name);',
-      '    bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);',
-      '    bar_clock.bind_time(&ui_subject_system_time);',
-      '    msg.bind_text(&ui_subject_service_message);',
+      '    ui_obj_bar_location.bind_text(&ui_subject_station_name);',
+      '    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);',
+      '    ui_obj_bar_clock.bind_time(&ui_subject_system_time);',
+      '    ui_obj_msg.bind_text(&ui_subject_service_message);',
     ];
     expect(init.slice(-bindings.length)).toEqual(bindings);
   });
@@ -242,24 +258,24 @@ describe('§13.12 — the worked example generates as the spec prints it', () =>
       expect(code).not.toMatch(/\b[a-z_][a-z0-9_]*\.render\(/);
     }
     // The control: the pattern does find a direct call where one is written.
-    expect('    msg.render(display);').toMatch(/\b[a-z_][a-z0-9_]*\.render\(/);
+    expect('    ui_obj_msg.render(display);').toMatch(/\b[a-z_][a-z0-9_]*\.render\(/);
   });
 
   it('does not emit a composite template parameter as a container setter', () => {
     // title_subject is status_bar's own <api> prop, substituted by expansion.
     // The container is a plain u8g2gl_obj and has no set_title_subject().
     expect(unit).not.toContain('set_title_subject');
-    expect(unit).not.toContain('bar.set_font');
+    expect(unit).not.toContain('ui_obj_bar.set_font');
   });
 
   it('aggregates tick over every object with u8g2gl_min ([D-15])', () => {
     expect(body(unit, 'uint32_t ui_screen_home_tick(uint32_t now_ms)')).toEqual([
       '    uint32_t next = U8G2GL_IDLE;',
-      '    next = u8g2gl_min(next, bar.tick(now_ms));',
-      '    next = u8g2gl_min(next, bar_location.tick(now_ms));',
-      '    next = u8g2gl_min(next, bar_wifi_icon.tick(now_ms));',
-      '    next = u8g2gl_min(next, bar_clock.tick(now_ms));',
-      '    next = u8g2gl_min(next, msg.tick(now_ms));',
+      '    next = u8g2gl_min(next, ui_obj_bar.tick(now_ms));',
+      '    next = u8g2gl_min(next, ui_obj_bar_location.tick(now_ms));',
+      '    next = u8g2gl_min(next, ui_obj_bar_wifi_icon.tick(now_ms));',
+      '    next = u8g2gl_min(next, ui_obj_bar_clock.tick(now_ms));',
+      '    next = u8g2gl_min(next, ui_obj_msg.tick(now_ms));',
       '    return next;',
     ]);
   });
@@ -308,7 +324,7 @@ describe('draw calls — guards, hoisting and absolute coordinates (§13.5)', ()
     // 4) and are emitted in absolute coordinates, which is what the runtime draws in.
     expect(render.slice(0, 5)).toEqual([
       '    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);',
-      '    if (!box.is_hidden()) {',
+      '    if (!ui_obj_box.is_hidden()) {',
       '        u8g2gl_draw_hline(display, 10, 20, 40);',
       '        u8g2gl_draw_hline(display, 10, 21, 40);',
       '    }',
@@ -320,15 +336,15 @@ describe('draw calls — guards, hoisting and absolute coordinates (§13.5)', ()
     // document order, so it gets its own block after the object.
     expect(render.slice(5, 9)).toEqual([
       '    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);',
-      '    if (!box.is_hidden()) {',
+      '    if (!ui_obj_box.is_hidden()) {',
       '        u8g2gl_draw_hline(display, 10, 35, 40);',
       '    }',
     ]);
   });
 
   it('places an object child at its container\'s absolute corner too', () => {
-    expect(unit).toContain('    box_text.set_coords(12, 23, 20, 10);');
-    expect(unit).toContain('    box.set_hidden(true);');
+    expect(unit).toContain('    ui_obj_box_text.set_coords(12, 23, 20, 10);');
+    expect(unit).toContain('    ui_obj_box.set_hidden(true);');
   });
 
   it('reads a bound value from the subject at draw time', () => {
@@ -363,8 +379,8 @@ describe('bindings are emitted from the overload realisation chose (WO5a finding
       },
     });
     const init = body(file(result, 'ui_screen_home.cpp'), 'void ui_screen_home_init()');
-    expect(init).toContain('    n.bind_text(&ui_subject_count, "%d trains");');
-    expect(init).toContain('    s.bind_text(&ui_subject_station_name);');
+    expect(init).toContain('    ui_obj_n.bind_text(&ui_subject_count, "%d trains");');
+    expect(init).toContain('    ui_obj_s.bind_text(&ui_subject_station_name);');
   });
 
   it('spells a bool comparison value as a bool, and an int one as an int', () => {
@@ -380,12 +396,12 @@ describe('bindings are emitted from the overload realisation chose (WO5a finding
       },
     });
     const init = body(file(result, 'ui_screen_home.cpp'), 'void ui_screen_home_init()');
-    expect(init).toContain('    a.bind_flag_if_eq(&ui_subject_flag, true, U8G2GL_FLAG_HIDDEN);');
-    expect(init).toContain('    b.bind_flag_if_not_eq(&ui_subject_count, -2, U8G2GL_FLAG_DISABLED);');
+    expect(init).toContain('    ui_obj_a.bind_flag_if_eq(&ui_subject_flag, true, U8G2GL_FLAG_HIDDEN);');
+    expect(init).toContain('    ui_obj_b.bind_flag_if_not_eq(&ui_subject_count, -2, U8G2GL_FLAG_DISABLED);');
   });
 });
 
-describe('styles are applied after properties and before bindings (§13.7)', () => {
+describe('styles are applied before properties, and bindings last (§13.7, ruling 3)', () => {
   const result = generateProject({
     screens: {
       home: `<u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="${FONT}"
@@ -394,12 +410,70 @@ describe('styles are applied after properties and before bindings (§13.7)', () 
   });
   const init = body(file(result, 'ui_screen_home.cpp'), 'void ui_screen_home_init()');
 
-  it('orders set properties, then named styles, then inline overrides, then bindings', () => {
+  it('orders named styles, then inline overrides, then set properties, then bindings', () => {
     const index = (line: string): number => init.indexOf(line);
-    expect(index('    l.set_text("L");')).toBeGreaterThanOrEqual(0);
-    expect(index('    l.apply_style(ui_style_note);')).toBeGreaterThan(index('    l.set_text("L");'));
-    expect(index('    l.set_invert(true);')).toBeGreaterThan(index('    l.apply_style(ui_style_note);'));
-    expect(index('    l.bind_x(&ui_subject_level);')).toBeGreaterThan(index('    l.set_invert(true);'));
+    expect(index('    ui_obj_l.apply_style(ui_style_note);')).toBeGreaterThanOrEqual(0);
+    expect(index('    ui_obj_l.set_invert(true);')).toBeGreaterThan(index('    ui_obj_l.apply_style(ui_style_note);'));
+    expect(index('    ui_obj_l.set_text("L");')).toBeGreaterThan(index('    ui_obj_l.set_invert(true);'));
+    expect(index('    ui_obj_l.bind_x(&ui_subject_level, 0);')).toBeGreaterThan(index('    ui_obj_l.set_text("L");'));
+  });
+
+  it("sets an element's own font after its named style's, so its own wins (§10)", () => {
+    // The Chief Architect's precedence rule: the setter that runs last wins, so
+    // the style must be merged before the element's own font= is set.
+    const own = generateProject({
+      globals: GLOBALS.replace('<style name="note" align="right" />', '<style name="note" font="u8g2_font_5x7_mr" />'),
+      screens: {
+        home: `<u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="${FONT}" text="L" style="note" />`,
+      },
+    });
+    const lines = body(file(own, 'ui_screen_home.cpp'), 'void ui_screen_home_init()');
+    const style = lines.indexOf('    ui_obj_l.apply_style(ui_style_note);');
+    const font = lines.indexOf(`    ui_obj_l.set_font(ui_font_${FONT});`);
+    expect(style).toBeGreaterThanOrEqual(0);
+    expect(font).toBeGreaterThan(style);
+  });
+
+  it('names the steps in that order in the unit, so a reader sees the rule', () => {
+    const unit = file(result, 'ui_screen_home.cpp');
+    expect(unit).toContain('// --- init: construct, apply styles, set properties, register bindings (§13.7) ---');
+    expect(unit.indexOf('// --- Step 2: Apply styles (§10) ---')).toBeLessThan(unit.indexOf('// --- Step 3: Set properties ---'));
+  });
+});
+
+describe('bound positions are container-relative (§7.2, [D-20] amendment, ruling 1)', () => {
+  const result = generateProject({
+    screens: {
+      home: `
+        <slider name="box" x="40" y="20" width="40" height="16" />
+        <u8g2gl_box name="dot" x="0" bind_x="level" y="50" width="2" height="2" />
+        <u8g2gl_label name="free" x="0" bind_x="level" y="0" bind_y="count" width="20" height="10"
+                      font="${FONT}" text="F" />`,
+    },
+    widgets: [SLIDER],
+  });
+  const unit = file(result, 'ui_screen_home.cpp');
+  const render = renderCode(unit, 'home');
+  const init = body(unit, 'void ui_screen_home_init()');
+
+  it('generates without a diagnostic', () => {
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("adds a draw call's container origin into its bound argument", () => {
+    // The composite's knob is bound inside a container at (40, 20).
+    expect(render).toContain('        u8g2gl_draw_box(display, 40 + ui_subject_level.get(), 20, 4, 4, true, 0);');
+  });
+
+  it("passes an object's container origin to bind_x and bind_y as a literal", () => {
+    expect(init).toContain('    ui_obj_box_knob_label.bind_x(&ui_subject_level, 40);');
+    expect(init).toContain('    ui_obj_box_knob_label.bind_y(&ui_subject_count, 20);');
+  });
+
+  it('leaves a screen-level bound position as its value — the control', () => {
+    expect(render).toContain('    u8g2gl_draw_box(display, ui_subject_level.get(), 50, 2, 2, true, 0);');
+    expect(init).toContain('    ui_obj_free.bind_x(&ui_subject_level, 0);');
+    expect(init).toContain('    ui_obj_free.bind_y(&ui_subject_count, 0);');
   });
 });
 

@@ -298,7 +298,7 @@ describe('validateIdentifiers', () => {
     expect(collisions[0]?.offendingText).toBe('bar_title');
     // Both sources, which the retired check could not do: the composite's child
     // and the screen element that mangles to the same C++ identifier.
-    expect(collisions[0]?.message).toContain("C++ identifier 'bar_title' is generated twice");
+    expect(collisions[0]?.message).toContain("C++ identifier 'ui_obj_bar_title' is generated twice");
     expect(collisions[0]?.message).toContain("<u8g2gl_label> 'title'");
     expect(collisions[0]?.message).toContain("<u8g2gl_label> 'bar_title'");
     expect(collisions[0]?.message).toContain('never renames');

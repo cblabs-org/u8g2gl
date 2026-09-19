@@ -13,11 +13,11 @@
 #include "u8g2gl/u8g2gl_xbm.h"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
-static u8g2gl_obj bar;  // 0  composite container
-static u8g2gl_label bar_location;  // 1  child of bar
-static u8g2gl_xbm bar_wifi_icon;  // 2  child of bar
-static u8g2gl_clock bar_clock;  // 3  child of bar
-static u8g2gl_label msg;  // 4
+static u8g2gl_obj ui_obj_bar;  // 0  composite container
+static u8g2gl_label ui_obj_bar_location;  // 1  child of ui_obj_bar
+static u8g2gl_xbm ui_obj_bar_wifi_icon;  // 2  child of ui_obj_bar
+static u8g2gl_clock ui_obj_bar_clock;  // 3  child of ui_obj_bar
+static u8g2gl_label ui_obj_msg;  // 4
 // "rule" is not here: no object required (§13.5)
 
 // --- Object and parent tables (§13.3) ---
@@ -25,55 +25,55 @@ static u8g2gl_label msg;  // 4
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk
 // up this table at render time.
 static u8g2gl_obj* const ui_screen_home_objs[] = {
-    &bar,
-    &bar_location,
-    &bar_wifi_icon,
-    &bar_clock,
-    &msg,
+    &ui_obj_bar,
+    &ui_obj_bar_location,
+    &ui_obj_bar_wifi_icon,
+    &ui_obj_bar_clock,
+    &ui_obj_msg,
 };
 static const uint8_t ui_screen_home_parents[] = {
-    U8G2GL_NO_PARENT,  // bar
-    0,  // bar_location
-    0,  // bar_wifi_icon
-    0,  // bar_clock
-    U8G2GL_NO_PARENT,  // msg
+    U8G2GL_NO_PARENT,  // ui_obj_bar
+    0,  // ui_obj_bar_location
+    0,  // ui_obj_bar_wifi_icon
+    0,  // ui_obj_bar_clock
+    U8G2GL_NO_PARENT,  // ui_obj_msg
 };
 
-// --- init: construct, set properties, apply styles, register bindings (§13.7) ---
+// --- init: construct, apply styles, set properties, register bindings (§13.7) ---
 void ui_screen_home_init() {
     // --- Step 1: Construct ---
     // Every object above is a default-constructed static (§13.7); nothing to do.
 
-    // --- Step 2: Set properties ---
-    bar.set_coords(0, 0, 128, 11);
-
-    bar_location.set_coords(0, 0, 76, 11);
-    bar_location.set_font(ui_font_u8g2_font_6x10_mr);
-    bar_location.set_long_mode(U8G2GL_LONG_SCROLL);
-
-    bar_wifi_icon.set_coords(76, 0, 12, 11);
-    bar_wifi_icon.set_src(ui_image_icon_wifi);
-
-    bar_clock.set_coords(88, 0, 40, 11);
-    bar_clock.set_font(ui_font_u8g2_font_5x7_mr);
-    bar_clock.set_format(U8G2GL_CLOCK_HH_MM);
-    bar_clock.set_blink(true);
-
-    msg.set_coords(0, 16, 128, 12);
-    msg.set_font(ui_font_u8g2_font_6x10_mr);
-    msg.set_align(U8G2GL_ALIGN_CENTER);
-
-    // --- Step 3: Apply styles (§10) ---
+    // --- Step 2: Apply styles (§10) ---
     // No styles to apply.
+
+    // --- Step 3: Set properties ---
+    ui_obj_bar.set_coords(0, 0, 128, 11);
+
+    ui_obj_bar_location.set_coords(0, 0, 76, 11);
+    ui_obj_bar_location.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_bar_location.set_long_mode(U8G2GL_LONG_SCROLL);
+
+    ui_obj_bar_wifi_icon.set_coords(76, 0, 12, 11);
+    ui_obj_bar_wifi_icon.set_src(ui_image_icon_wifi);
+
+    ui_obj_bar_clock.set_coords(88, 0, 40, 11);
+    ui_obj_bar_clock.set_font(ui_font_u8g2_font_5x7_mr);
+    ui_obj_bar_clock.set_format(U8G2GL_CLOCK_HH_MM);
+    ui_obj_bar_clock.set_blink(true);
+
+    ui_obj_msg.set_coords(0, 16, 128, 12);
+    ui_obj_msg.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_msg.set_align(U8G2GL_ALIGN_CENTER);
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
     // Each bind_*() returns false only when a pool is full. The pools are
     // sized from exactly these bindings ([D-21]), so the result is not checked.
-    bar_location.bind_text(&ui_subject_station_name);
-    bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
-    bar_clock.bind_time(&ui_subject_system_time);
-    msg.bind_text(&ui_subject_service_message);
+    ui_obj_bar_location.bind_text(&ui_subject_station_name);
+    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_bar_clock.bind_time(&ui_subject_system_time);
+    ui_obj_msg.bind_text(&ui_subject_service_message);
 }
 
 // --- activate / deactivate (§12.4) ---
@@ -86,11 +86,11 @@ void ui_screen_home_deactivate() {}
 // --- tick: the soonest deadline across every object ([D-15]) ---
 uint32_t ui_screen_home_tick(uint32_t now_ms) {
     uint32_t next = U8G2GL_IDLE;
-    next = u8g2gl_min(next, bar.tick(now_ms));
-    next = u8g2gl_min(next, bar_location.tick(now_ms));
-    next = u8g2gl_min(next, bar_wifi_icon.tick(now_ms));
-    next = u8g2gl_min(next, bar_clock.tick(now_ms));
-    next = u8g2gl_min(next, msg.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_bar.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_bar_location.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_bar_wifi_icon.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_bar_clock.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_msg.tick(now_ms));
     return next;
 }
 
@@ -101,12 +101,12 @@ void ui_screen_home_render(U8G2& display) {
     // and saves and restores draw state, so nothing paints outside its
     // container and a hidden container hides its children (§11.3). A draw
     // call has no object, so its visibility is the build-time guard (§13.5).
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // bar
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // bar_location
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // bar_wifi_icon
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // bar_clock
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_bar
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_bar_location
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // ui_obj_bar_wifi_icon
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // ui_obj_bar_clock
     u8g2gl_draw_hline(display, 0, 11, 128);  // rule: no object (§13.5)
-    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // msg
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // ui_obj_msg
 }
 
 // --- The screen descriptor ui_handler() drives (§12.4) ---

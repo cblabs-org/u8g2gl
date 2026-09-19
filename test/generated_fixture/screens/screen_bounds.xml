@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PR-04 WO10b: the Chief Architect's emission rulings of 2026-09-19, compiled
+     and run. -->
+<screen name="bounds">
+    <view>
+        <!-- Ruling 1: bound positions are container-relative. -->
+        <slider name="track" x="40" y="10" width="60" height="20" />
+
+        <!-- ...and on the screen, a bound position is its value. -->
+        <u8g2gl_box name="dot" x="0" bind_x="knob_x" y="40" width="2" height="2" />
+
+        <!-- An int subject drawn through its format. -->
+        <u8g2gl_label name="temp" x="0" y="50" width="60" height="10"
+                      font="u8g2_font_6x10_mr" bind_text="temperature" bind_text_fmt="%d°C" />
+
+        <!-- Ruling 3: the element's own font= wins over the named style's font;
+             the style's align and font_mode, which it does not set, still apply. -->
+        <u8g2gl_label name="own_font" x="64" y="50" width="60" height="10"
+                      font="u8g2_font_6x10_mr" style="loud" text="Own" />
+
+        <!-- ...and so does an inline style_* override: right, not the style's
+             center. -->
+        <u8g2gl_label name="override" x="64" y="38" width="60" height="10"
+                      font="u8g2_font_6x10_mr" style="loud" style_align="right" text="Ovr" />
+    </view>
+</screen>

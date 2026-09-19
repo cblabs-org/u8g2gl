@@ -168,8 +168,11 @@ using u8g2gl_editor_rect_fn = void (*)(u8g2gl_obj* obj, int16_t x, int16_t y, in
  * @param subject A `u8g2gl_subject_<type>_base` of the entry's type.
  * @param fmt     The author's format, or nullptr. False if the runtime's overload
  *                takes no format and one was given — never silently dropped.
+ * @param origin  For a position binding (`bind_x`, `bind_y`), the container's
+ *                absolute origin, passed on exactly as firmware passes its
+ *                literal (§7.2). Any other binding refuses a non-zero origin.
  */
-using u8g2gl_editor_bind_fn = bool (*)(u8g2gl_obj* obj, void* subject, const char* fmt);
+using u8g2gl_editor_bind_fn = bool (*)(u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin);
 /** @brief Placement-construct the class into `storage`. */
 using u8g2gl_editor_construct_fn = u8g2gl_obj* (*)(void* storage);
 /**
@@ -329,12 +332,14 @@ bool u8g2gl_editor_set_property(const u8g2gl_editor_class& cls, u8g2gl_obj* obj,
  * @param subject      A `u8g2gl_subject_<type>_base`; must outlive the object.
  * @param subject_type Its type — selects the overload.
  * @param fmt          The author's format (`bind_text_fmt`), or nullptr.
- * @return false if no binding of that name accepts that type, a format was given
- *         to an overload that takes none, or the runtime refused the binding
- *         (a pool is full).
+ * @param origin       The container origin a position binding adds (the scene's
+ *                     `origin`); 0 for every other binding.
+ * @return false if no binding of that name accepts that type, a format or a
+ *         non-zero origin was given to an overload that takes none, or the
+ *         runtime refused the binding (a pool is full).
  */
 bool u8g2gl_editor_bind(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name, void* subject,
-                        u8g2gl_subject_type_t subject_type, const char* fmt);
+                        u8g2gl_subject_type_t subject_type, const char* fmt, int16_t origin);
 
 /**
  * @brief A `<bind_flag_if_*>` directive by name, on any object.

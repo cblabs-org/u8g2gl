@@ -13,10 +13,19 @@
 
         <!-- Drives the panel composite's hidden flag. -->
         <bool name="show_panel" value="false" />
+
+        <!-- The bounds screen (PR-04 WO10b): a position bound inside a
+             container and on the screen, and an int drawn through a format. -->
+        <int name="knob_x" value="5" />
+        <int name="temperature" value="21" />
     </subjects>
 
     <styles>
         <style name="note" align="right" />
+        <!-- The bounds screen: a style whose font an element's own font= and
+             style_font override must both beat (§10), and which sets font_mode,
+             so the editor applies a style property only u8g2gl_obj declares. -->
+        <style name="loud" font="u8g2_font_5x7_mr" align="center" font_mode="transparent" />
     </styles>
 
     <fonts>

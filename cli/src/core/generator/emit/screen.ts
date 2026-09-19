@@ -34,8 +34,8 @@
  * Description: The unit holds, in order: the widget headers it uses; the static
  *              objects in array order (a composite's container is a plain
  *              `u8g2gl_obj`, §13.12); the object and parent tables; `init`
- *              (construct → set properties → apply styles → register bindings,
- *              §13.7); `activate`/`deactivate`; `tick`, the minimum deadline
+ *              (construct → apply styles → set properties → register bindings,
+ *              §13.7 — styles first so an element's own attributes win, §10); `activate`/`deactivate`; `tick`, the minimum deadline
  *              across every object ([D-15]); `render`; and the `u8g2gl_screen`
  *              descriptor `ui_handler()` drives.
  *
@@ -70,6 +70,7 @@ import {
   subjectIdentifier,
   type ResolvedScreen,
 } from '../../resolver/index.js';
+import { objectIdentifier } from '../../resolver/mangle.js';
 import {
   U8G2GL_NO_PARENT,
   type RealisedElement,
@@ -77,6 +78,7 @@ import {
   type VisibilityTerm,
 } from '../realise/index.js';
 import { drawArgumentSources, drawCallFor, SUBJECT_READ_SUFFIX } from './draw-args.js';
+import { boundPositionOrigin } from './placement.js';
 import {
   classOf,
   emissionError,
@@ -123,6 +125,13 @@ interface ScreenContext {
   readonly diagnostics: Diagnostic[];
 }
 
+// cpp
+// An element's C++ object, `ui_obj_<name>` (§13.4). Diagnostics keep the name
+// the author wrote; everything that is C++ goes through here.
+function cpp(element: { readonly identifier: string }): string {
+  return objectIdentifier(element.identifier);
+}
+
 // describeObject
 // The trailing comment on an object's declaration: its index, and what it is,
 // so a reviewer can read the parent table against the declarations (§13.12).
@@ -133,7 +142,8 @@ function describeObject(object: RealisedElement, objects: readonly RealisedEleme
     parts.push('composite container');
   }
   if (object.parentIndex !== U8G2GL_NO_PARENT) {
-    parts.push(`child of ${objects[object.parentIndex]?.identifier ?? '?'}`);
+    const parent = objects[object.parentIndex];
+    parts.push(`child of ${parent === undefined ? '?' : cpp(parent)}`);
   }
   return parts.join('  ');
 }
@@ -153,7 +163,7 @@ function geometryLine(object: RealisedElement, placement: Placement): string | u
     axis.value === undefined ? '0' : cppValue(axis.prop ?? typed(axis.axis, 'int'), String(axis.value)),
   );
   const note = bound.length === 0 ? '' : `  // ${bound.join(', ')}: set by its binding below`;
-  return `    ${object.identifier}.${rectangle.setter}(${args.join(', ')});${note}`;
+  return `    ${cpp(object)}.${rectangle.setter}(${args.join(', ')});${note}`;
 }
 
 // propertyLines
@@ -161,13 +171,15 @@ function geometryLine(object: RealisedElement, placement: Placement): string | u
 // (§13.7 "set properties"); which props those are is screen-model.ts's answer.
 function propertyLines(object: RealisedElement, placement: Placement): string[] {
   return writtenProperties(placement).map(
-    ({ prop, literal }) => `    ${object.identifier}.${prop.setter ?? ''}(${cppValue(prop, literal)});`,
+    ({ prop, literal }) => `    ${cpp(object)}.${prop.setter ?? ''}(${cppValue(prop, literal)});`,
   );
 }
 
 // styleLines
 // §13.7's "apply styles" step: each named style merged in order, then the
 // element's own `style_*` inline overrides, which §10 defines as overriding.
+// It runs before "set properties" (INIT_STEPS), so an attribute the element
+// sets itself wins over both.
 //
 // No validator pass checks `style_*` values today, so a value the prop's type
 // cannot spell, or a key the element does not declare, is reported here rather
@@ -175,12 +187,12 @@ function propertyLines(object: RealisedElement, placement: Placement): string[] 
 function styleLines(object: RealisedElement, placement: Placement, context: ScreenContext): string[] {
   const node = placement.absolute.node;
   const lines = namedStyles(node).map(
-    (name) => `    ${object.identifier}.apply_style(${cppValue(typed('style', 'style'), name)});`,
+    (name) => `    ${cpp(object)}.apply_style(${cppValue(typed('style', 'style'), name)});`,
   );
   const overrides = styleOverridesOf(placement);
   for (const { prop, value } of overrides.applied) {
     try {
-      lines.push(`    ${object.identifier}.${prop.setter ?? ''}(${cppValue(prop, value)});`);
+      lines.push(`    ${cpp(object)}.${prop.setter ?? ''}(${cppValue(prop, value)});`);
     } catch (error) {
       context.diagnostics.push(
         emissionError(
@@ -221,7 +233,9 @@ function spelledFlag(comparison: FlagComparison): string {
 // bindingLines
 // §13.7's last init step, and §13.8's spelling. An attribute binding calls the
 // method of the overload realisation chose for the subject's type (WO8b) —
-// never re-selected by name, because `bind_text` is declared once per type.
+// never re-selected by name, because `bind_text` is declared once per type. A
+// position binding also passes its container's absolute origin as a literal,
+// because a bound position is container-relative (§7.2): `bind_x(&s, 40)`.
 function bindingLines(object: RealisedElement, placement: Placement, context: ScreenContext): string[] {
   const node = placement.absolute.node;
   const lines: string[] = [];
@@ -237,7 +251,9 @@ function bindingLines(object: RealisedElement, placement: Placement, context: Sc
       }
       const fmt = declaration.fmt === undefined ? undefined : node.attributes[declaration.fmt];
       const fmtArg = typeof fmt === 'string' ? `, ${cppValue(typed(declaration.fmt ?? 'fmt', 'string'), fmt)}` : '';
-      lines.push(`    ${object.identifier}.${declaration.setter}(${subject}${fmtArg});`);
+      const origin = boundPositionOrigin(binding.attribute, placement.origin);
+      const originArg = origin === undefined ? '' : `, ${cppValue(typed('origin', 'int'), String(origin))}`;
+      lines.push(`    ${cpp(object)}.${declaration.setter}(${subject}${fmtArg}${originArg});`);
       continue;
     }
     const comparison = flagComparison(binding, object.identifier, node.tag);
@@ -246,7 +262,7 @@ function bindingLines(object: RealisedElement, placement: Placement, context: Sc
       continue;
     }
     lines.push(
-      `    ${object.identifier}.${comparison.method}(${subject}, ${spelledRef(comparison)}, ${spelledFlag(comparison)});`,
+      `    ${cpp(object)}.${comparison.method}(${subject}, ${spelledRef(comparison)}, ${spelledFlag(comparison)});`,
     );
   }
   return lines;
@@ -260,7 +276,7 @@ function guardOf(element: RealisedElement, tag: string, context: ScreenContext):
   const terms: string[] = [];
   for (const term of element.visibility ?? ([] as readonly VisibilityTerm[])) {
     if (term.kind === 'ancestor_visible') {
-      terms.push(`!${term.identifier}.is_hidden()`);
+      terms.push(`!${objectIdentifier(term.identifier)}.is_hidden()`);
       continue;
     }
     const binding = element.bindings.find((candidate) => candidate.directive === term.directive);
@@ -314,6 +330,7 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
     manifest: placement.manifest,
     resolved: placement.absolute,
     bindings: element.bindings,
+    origin: placement.origin,
   })
     .filter((source) => source.kind === 'none')
     .map((source) => source.prop);
@@ -332,7 +349,12 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
     }
     return { guard: '', line: '' };
   }
-  const call = drawCallFor({ manifest: placement.manifest, resolved: placement.absolute, bindings: element.bindings });
+  const call = drawCallFor({
+    manifest: placement.manifest,
+    resolved: placement.absolute,
+    bindings: element.bindings,
+    origin: placement.origin,
+  });
   return {
     guard: guardOf(element, node.tag, context),
     line: `    ${call.fn}(display, ${call.args.join(', ')});  // ${element.identifier}: no object (§13.5)`,
@@ -416,7 +438,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   // --- Step 3: Each part of the unit, in §13.12's order ---
   const declarations = objects.map((object) => {
     const placement = placed(object);
-    return `static ${classOf(placement.manifest).name} ${object.identifier};  // ${describeObject(object, objects, placement)}`;
+    return `static ${classOf(placement.manifest).name} ${cpp(object)};  // ${describeObject(object, objects, placement)}`;
   });
   const drawnOnly = realised.drawOrder
     .filter((step) => step.kind === 'draw_calls')
@@ -441,7 +463,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     step.kind === 'object'
       ? {
           guard: '',
-          line: `    u8g2gl_render_object(display, ${objs}, ${parents}, ${step.objectIndex});  // ${step.element.identifier}`,
+          line: `    u8g2gl_render_object(display, ${objs}, ${parents}, ${step.objectIndex});  // ${cpp(step.element)}`,
         }
       : drawCallStep(step.element, placed(step.element), context),
   );
@@ -470,12 +492,12 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
       '// or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk',
       '// up this table at render time.',
       `static u8g2gl_obj* const ${objs}[] = {`,
-      ...objects.map((object) => `    &${object.identifier},`),
+      ...objects.map((object) => `    &${cpp(object)},`),
       '};',
       `static const uint8_t ${parents}[] = {`,
       ...objects.map(
         (object) =>
-          `    ${object.parentIndex === U8G2GL_NO_PARENT ? 'U8G2GL_NO_PARENT' : String(object.parentIndex)},  // ${object.identifier}`,
+          `    ${object.parentIndex === U8G2GL_NO_PARENT ? 'U8G2GL_NO_PARENT' : String(object.parentIndex)},  // ${cpp(object)}`,
       ),
       '};',
     );
@@ -535,7 +557,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     ...(hasObjects
       ? [
           '    uint32_t next = U8G2GL_IDLE;',
-          ...objects.map((object) => `    next = u8g2gl_min(next, ${object.identifier}.tick(now_ms));`),
+          ...objects.map((object) => `    next = u8g2gl_min(next, ${cpp(object)}.tick(now_ms));`),
           '    return next;',
         ]
       : ['    (void)now_ms;', '    return U8G2GL_IDLE;']),

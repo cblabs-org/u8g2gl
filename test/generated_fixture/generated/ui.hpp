@@ -58,8 +58,17 @@ void ui_set_level(int32_t value);
 extern u8g2gl_subject_bool_n<1> ui_subject_show_panel;
 void ui_set_show_panel(bool value);
 
+// knob_x (int)
+extern u8g2gl_subject_int_n<2> ui_subject_knob_x;
+void ui_set_knob_x(int32_t value);
+
+// temperature (int)
+extern u8g2gl_subject_int_n<1> ui_subject_temperature;
+void ui_set_temperature(int32_t value);
+
 // --- Styles (§10) ---
 extern u8g2gl_style ui_style_note;
+extern u8g2gl_style ui_style_loud;
 
 // --- Fonts (§14.1) ---
 extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
@@ -69,6 +78,14 @@ extern const uint8_t* const ui_font_u8g2_font_5x7_mr;
 extern const uint8_t ui_image_icon_wifi[];
 
 // --- Screens (§13.7) ---
+
+// screen 'bounds'
+void ui_screen_bounds_init();
+void ui_screen_bounds_activate();
+void ui_screen_bounds_deactivate();
+uint32_t ui_screen_bounds_tick(uint32_t now_ms);
+void ui_screen_bounds_render(U8G2& display);
+extern u8g2gl_screen ui_screen_bounds;
 
 // screen 'gauges'
 void ui_screen_gauges_init();

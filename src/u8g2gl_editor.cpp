@@ -208,12 +208,12 @@ bool u8g2gl_editor_set_property(const u8g2gl_editor_class& cls, u8g2gl_obj* obj,
 }
 
 bool u8g2gl_editor_bind(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name, void* subject,
-                        u8g2gl_subject_type_t subject_type, const char* fmt) {
+                        u8g2gl_subject_type_t subject_type, const char* fmt, int16_t origin) {
     const u8g2gl_editor_binding* binding = u8g2gl_editor_find_binding(cls, name, subject_type);
     if (obj == nullptr || subject == nullptr || binding == nullptr) {
         return false;
     }
-    return binding->bind(obj, subject, fmt);
+    return binding->bind(obj, subject, fmt, origin);
 }
 
 // u8g2gl_editor_bind_flag

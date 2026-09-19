@@ -199,12 +199,12 @@ TEST(BindingInvariant, BindFlagIfNotEqBoolBoolRef) {
 // [D-20] geometry bindings (PR-04 WO3).
 TEST(BindingInvariant, BindX) {
     expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
-        [](u8g2gl_obj& o, int_subject& s) { return o.bind_x(&s); });
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_x(&s, 0); });
 }
 
 TEST(BindingInvariant, BindY) {
     expect_one_slot_one_observer<u8g2gl_obj, int_subject>(
-        [](u8g2gl_obj& o, int_subject& s) { return o.bind_y(&s); });
+        [](u8g2gl_obj& o, int_subject& s) { return o.bind_y(&s, 0); });
 }
 
 TEST(BindingInvariant, BindWidth) {

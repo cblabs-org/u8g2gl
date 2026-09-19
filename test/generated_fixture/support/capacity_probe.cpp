@@ -34,10 +34,12 @@
 //   gauges: panel bind_flag_if_eq                                      -> 1
 //           (level_bar, dial and blip are draw calls: they read their
 //            subjects at draw time and take no pool slot, §13.5)
-// Total 5. Regenerate and recount together if the fixture changes.
-static_assert(U8G2GL_MAX_TOTAL_BINDINGS == 5,
+//   bounds: track_readout bind_x, temp bind_text                       -> 2
+//           (track_knob and dot are draw calls, as above)
+// Total 7. Regenerate and recount together if the fixture changes.
+static_assert(U8G2GL_MAX_TOTAL_BINDINGS == 7,
               "The runtime library was not compiled with the generated capacities: "
-              "U8G2GL_MAX_TOTAL_BINDINGS is not the fixture's counted total of 5. "
+              "U8G2GL_MAX_TOTAL_BINDINGS is not the fixture's counted total of 7. "
               "Check the forced include of u8g2gl_generated_config.h on "
               "u8g2gl_fixture_runtime in test/CMakeLists.txt.");
 

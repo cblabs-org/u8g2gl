@@ -430,8 +430,8 @@ TEST(Binding, FourGeometryBindingsPlusTextFitTheDefaultBudget) {
     u8g2gl_subject_int geom_x(5), geom_y(6), geom_w(7), geom_h(8);
     u8g2gl_subject_int text_subject(42);
 
-    EXPECT_TRUE(obj.bind_x(&geom_x));
-    EXPECT_TRUE(obj.bind_y(&geom_y));
+    EXPECT_TRUE(obj.bind_x(&geom_x, 0));
+    EXPECT_TRUE(obj.bind_y(&geom_y, 0));
     EXPECT_TRUE(obj.bind_width(&geom_w));
     EXPECT_TRUE(obj.bind_height(&geom_h));
     EXPECT_TRUE(obj.bind_text(&text_subject, "%d"));

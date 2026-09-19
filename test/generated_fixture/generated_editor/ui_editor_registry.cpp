@@ -24,7 +24,7 @@
 #include "u8g2gl/u8g2gl_xbm.h"
 
 // --- Composites ---
-// panel, status_bar: expanded before the editor sees them; each
+// panel, slider, status_bar: expanded before the editor sees them; each
 // container is a plain u8g2gl_obj (§13.12), constructed through that entry.
 
 // --- u8g2gl_button: class (framework, extends u8g2gl_obj) ---
@@ -98,6 +98,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_button_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_button* self = static_cast<u8g2gl_button*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_button* self = static_cast<u8g2gl_button*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // text (string)
     {"text",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -116,7 +134,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_button_properties[] = {
 static const u8g2gl_editor_binding ui_editor_u8g2gl_button_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_button*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -124,7 +143,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_button_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_button*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -132,28 +152,30 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_button_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_button*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_button*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_button*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_button*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_button*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_button*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -231,6 +253,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_clock_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_clock* self = static_cast<u8g2gl_clock*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_clock* self = static_cast<u8g2gl_clock*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // time (int)
     {"time",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -265,7 +305,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_clock_properties[] = {
 static const u8g2gl_editor_binding ui_editor_u8g2gl_clock_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_clock*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -273,7 +314,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_clock_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_clock*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -281,35 +323,38 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_clock_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_clock*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_clock*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_clock*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_clock*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_clock*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_clock*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_time (time subject)
     {"bind_time",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_clock*>(obj)->bind_time(static_cast<u8g2gl_subject_time_base*>(subject));
         },
@@ -387,6 +432,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_glyph_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_glyph* self = static_cast<u8g2gl_glyph*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_glyph* self = static_cast<u8g2gl_glyph*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // glyph (int)
     {"glyph",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -398,7 +461,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_glyph_properties[] = {
 static const u8g2gl_editor_binding ui_editor_u8g2gl_glyph_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_glyph*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -406,7 +470,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_glyph_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_glyph*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -414,28 +479,30 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_glyph_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_glyph*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_glyph*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_glyph*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_glyph*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_glyph*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_glyph*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -513,6 +580,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_label_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_label* self = static_cast<u8g2gl_label*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_label* self = static_cast<u8g2gl_label*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // text (string)
     {"text",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -556,7 +641,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_label_properties[] = {
 static const u8g2gl_editor_binding ui_editor_u8g2gl_label_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_label*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -564,7 +650,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_label_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_label*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -572,28 +659,30 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_label_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_label*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_label*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_label*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_label*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_label*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_label*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -671,11 +760,30 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_obj_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_obj* self = static_cast<u8g2gl_obj*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_obj* self = static_cast<u8g2gl_obj*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
 };
 static const u8g2gl_editor_binding ui_editor_u8g2gl_obj_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_obj*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -683,7 +791,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_obj_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_obj*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -691,28 +800,30 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_obj_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_obj*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_obj*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_obj*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_obj*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_obj*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_obj*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -790,6 +901,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_progress_bar_properties[] =
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_progress_bar* self = static_cast<u8g2gl_progress_bar*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_progress_bar* self = static_cast<u8g2gl_progress_bar*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // value (int)
     {"value",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -824,7 +953,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_progress_bar_properties[] =
 static const u8g2gl_editor_binding ui_editor_u8g2gl_progress_bar_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_progress_bar*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -832,7 +962,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_progress_bar_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_progress_bar*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -840,35 +971,38 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_progress_bar_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_progress_bar*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_progress_bar*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_progress_bar*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_progress_bar*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_progress_bar*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_progress_bar*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_value (int subject)
     {"bind_value",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_progress_bar*>(obj)->bind_value(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -946,6 +1080,24 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_switch_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // font_mode (enum)
+    {"font_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_switch* self = static_cast<u8g2gl_switch*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
+    // bitmap_mode (enum)
+    {"bitmap_mode",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            u8g2gl_switch* self = static_cast<u8g2gl_switch*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_bitmap_mode(U8G2GL_BITMAP_MODE_TRANSPARENT); return true; }
+            return false;
+        },
+        U8G2GL_EDITOR_ENUM},
     // value (bool)
     {"value",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -957,7 +1109,8 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_switch_properties[] = {
 static const u8g2gl_editor_binding ui_editor_u8g2gl_switch_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_switch*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -965,7 +1118,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_switch_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_switch*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -973,35 +1127,38 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_switch_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_switch*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_switch*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_switch*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_switch*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_switch*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_switch*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_value (bool subject)
     {"bind_value",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_switch*>(obj)->bind_value(static_cast<u8g2gl_subject_bool_base*>(subject));
         },
@@ -1079,13 +1236,15 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_xbm_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
-    // src (image)
-    {"src",
+    // font_mode (enum)
+    {"font_mode",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
-            static_cast<u8g2gl_xbm*>(obj)->set_src(static_cast<const uint8_t*>(value.pointer));
-            return true;
+            u8g2gl_xbm* self = static_cast<u8g2gl_xbm*>(obj);
+            if (u8g2gl_editor_is(value, "solid")) { self->set_font_mode(U8G2GL_FONT_MODE_SOLID); return true; }
+            if (u8g2gl_editor_is(value, "transparent")) { self->set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT); return true; }
+            return false;
         },
-        U8G2GL_EDITOR_IMAGE},
+        U8G2GL_EDITOR_ENUM},
     // bitmap_mode (enum)
     {"bitmap_mode",
         [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
@@ -1095,11 +1254,19 @@ static const u8g2gl_editor_property ui_editor_u8g2gl_xbm_properties[] = {
             return false;
         },
         U8G2GL_EDITOR_ENUM},
+    // src (image)
+    {"src",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_value& value) -> bool {
+            static_cast<u8g2gl_xbm*>(obj)->set_src(static_cast<const uint8_t*>(value.pointer));
+            return true;
+        },
+        U8G2GL_EDITOR_IMAGE},
 };
 static const u8g2gl_editor_binding ui_editor_u8g2gl_xbm_bindings[] = {
     // bind_text (string subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_xbm*>(obj), static_cast<u8g2gl_subject_string_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -1107,7 +1274,8 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_xbm_bindings[] = {
         U8G2GL_SUBJECT_STRING},
     // bind_text (int subject)
     {"bind_text",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             return u8g2gl_editor_bind_call(static_cast<u8g2gl_xbm*>(obj), static_cast<u8g2gl_subject_int_base*>(subject), fmt,
                 [](auto* s, auto* sub, const char* f) -> decltype(s->bind_text(sub, f)) { return s->bind_text(sub, f); },
                 [](auto* s, auto* sub) { return s->bind_text(sub); });
@@ -1115,28 +1283,30 @@ static const u8g2gl_editor_binding ui_editor_u8g2gl_xbm_bindings[] = {
         U8G2GL_SUBJECT_INT},
     // bind_x (int subject)
     {"bind_x",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_xbm*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_xbm*>(obj)->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_y (int subject)
     {"bind_y",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
             if (fmt != nullptr) { return false; }
-            return static_cast<u8g2gl_xbm*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject));
+            return static_cast<u8g2gl_xbm*>(obj)->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);
         },
         U8G2GL_SUBJECT_INT},
     // bind_width (int subject)
     {"bind_width",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_xbm*>(obj)->bind_width(static_cast<u8g2gl_subject_int_base*>(subject));
         },
         U8G2GL_SUBJECT_INT},
     // bind_height (int subject)
     {"bind_height",
-        [](u8g2gl_obj* obj, void* subject, const char* fmt) -> bool {
+        [](u8g2gl_obj* obj, void* subject, const char* fmt, int16_t origin) -> bool {
+            if (origin != 0) { return false; }
             if (fmt != nullptr) { return false; }
             return static_cast<u8g2gl_xbm*>(obj)->bind_height(static_cast<u8g2gl_subject_int_base*>(subject));
         },
@@ -1219,56 +1389,56 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_button*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_button_properties,
         ui_editor_u8g2gl_button_bindings,
-        sizeof(u8g2gl_button), alignof(u8g2gl_button), 11, 6},
+        sizeof(u8g2gl_button), alignof(u8g2gl_button), 13, 6},
     // u8g2gl_clock
     {"u8g2gl_clock",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_clock(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_clock*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_clock_properties,
         ui_editor_u8g2gl_clock_bindings,
-        sizeof(u8g2gl_clock), alignof(u8g2gl_clock), 13, 7},
+        sizeof(u8g2gl_clock), alignof(u8g2gl_clock), 15, 7},
     // u8g2gl_glyph
     {"u8g2gl_glyph",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_glyph(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_glyph*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_glyph_properties,
         ui_editor_u8g2gl_glyph_bindings,
-        sizeof(u8g2gl_glyph), alignof(u8g2gl_glyph), 10, 6},
+        sizeof(u8g2gl_glyph), alignof(u8g2gl_glyph), 12, 6},
     // u8g2gl_label
     {"u8g2gl_label",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_label(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_label*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_label_properties,
         ui_editor_u8g2gl_label_bindings,
-        sizeof(u8g2gl_label), alignof(u8g2gl_label), 14, 6},
+        sizeof(u8g2gl_label), alignof(u8g2gl_label), 16, 6},
     // u8g2gl_obj
     {"u8g2gl_obj",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_obj(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_obj*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_obj_properties,
         ui_editor_u8g2gl_obj_bindings,
-        sizeof(u8g2gl_obj), alignof(u8g2gl_obj), 9, 6},
+        sizeof(u8g2gl_obj), alignof(u8g2gl_obj), 11, 6},
     // u8g2gl_progress_bar
     {"u8g2gl_progress_bar",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_progress_bar(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_progress_bar*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_progress_bar_properties,
         ui_editor_u8g2gl_progress_bar_bindings,
-        sizeof(u8g2gl_progress_bar), alignof(u8g2gl_progress_bar), 13, 7},
+        sizeof(u8g2gl_progress_bar), alignof(u8g2gl_progress_bar), 15, 7},
     // u8g2gl_switch
     {"u8g2gl_switch",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_switch(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_switch*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_switch_properties,
         ui_editor_u8g2gl_switch_bindings,
-        sizeof(u8g2gl_switch), alignof(u8g2gl_switch), 10, 7},
+        sizeof(u8g2gl_switch), alignof(u8g2gl_switch), 12, 7},
     // u8g2gl_xbm
     {"u8g2gl_xbm",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_xbm(); },
         [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<u8g2gl_xbm*>(obj)->set_coords(x, y, w, h); },
         ui_editor_u8g2gl_xbm_properties,
         ui_editor_u8g2gl_xbm_bindings,
-        sizeof(u8g2gl_xbm), alignof(u8g2gl_xbm), 11, 6},
+        sizeof(u8g2gl_xbm), alignof(u8g2gl_xbm), 12, 6},
 };
 
 static const u8g2gl_editor_drawing ui_editor_drawings[] = {

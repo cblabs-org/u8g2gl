@@ -41,16 +41,16 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // u8g2gl_config.h's #ifndef defaults then apply only to what is not set here,
 // which is why this header must be included first (§13.7).
 
-// The busiest screen is 'home'.
+// The busiest screen is 'bounds'.
 #define U8G2GL_MAX_OBJECTS_PER_SCREEN 5
 
-// The busiest object is 'panel'.
+// The busiest object is 'track_readout'.
 #define U8G2GL_MAX_BINDINGS_PER_OBJ 1
 
 // The true sum across every object, never objects x bindings ([D-21]).
-#define U8G2GL_MAX_TOTAL_BINDINGS 5
+#define U8G2GL_MAX_TOTAL_BINDINGS 7
 
-// Distinct styles: note.
-#define U8G2GL_MAX_STYLES 1
+// Distinct styles: note, loud.
+#define U8G2GL_MAX_STYLES 2
 
 #endif // U8G2GL_GENERATED_CONFIG_H

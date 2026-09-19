@@ -22,7 +22,10 @@
  *              Three sources, in this order of precedence per prop:
  *              1. **bound** ([D-20]) — the value is read from the subject at
  *                 draw time, because a full-frame redraw ([D-4]) means a
- *                 stateless element need not store it (§13.5);
+ *                 stateless element need not store it (§13.5). A bound
+ *                 *position* is container-relative (§7.2), so its container's
+ *                 absolute origin is added: `40 + ui_subject_x.get()`. Which
+ *                 origin is `placement.ts`'s answer; this module only spells it;
  *              2. **written** — the literal the resolver settled, taken from
  *                 whichever of the resolved geometry, endpoints/radii or `int`
  *                 properties holds it, never re-parsed from the attribute text;
@@ -43,13 +46,13 @@
  * - drawCallFor():       Assemble a drawing element's call
  * - bindingFor():        The binding driving a prop, if any
  * - resolvedLiteralFor(): The settled literal for one prop (shared with object setters)
- * - boundValueFor():     The draw-time subject read for one prop, if a binding drives it
  */
 
 import type { EffectiveManifest } from '../../manifest/manifest-registry.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import { subjectIdentifier, type ResolvedElement } from '../../resolver/index.js';
 import type { RealisedBinding } from '../realise/index.js';
+import { boundPositionOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
 import { cppValue } from './value.js';
 
 /**
@@ -86,9 +89,18 @@ export interface DrawFunction {
  * Where one argument of a draw call comes from. `none` is a prop with no binding,
  * no written value and no default — a gap in validation, which the firmware
  * emitter refuses before spelling the call.
+ *
+ * A `bound` source's `origin` is what is added to the subject's value: the
+ * container's absolute origin for a bound position (§7.2), undefined for any
+ * other bound prop.
  */
 export type DrawArgumentSource =
-  | { readonly prop: PropDef; readonly kind: 'bound'; readonly binding: RealisedBinding }
+  | {
+      readonly prop: PropDef;
+      readonly kind: 'bound';
+      readonly binding: RealisedBinding;
+      readonly origin: number | undefined;
+    }
   | { readonly prop: PropDef; readonly kind: 'written' | 'default'; readonly literal: string }
   | { readonly prop: PropDef; readonly kind: 'none' };
 
@@ -100,6 +112,11 @@ export interface DrawCallInput {
   readonly resolved: ResolvedElement;
   /** Its bindings, with the overload realisation already chose (WO8b). */
   readonly bindings: readonly RealisedBinding[];
+  /**
+   * Its container's absolute corner, which a bound position is relative to
+   * (§7.2). Absent means the display's corner — an element on the screen.
+   */
+  readonly origin?: Origin;
 }
 
 // argumentError
@@ -114,35 +131,15 @@ function argumentError(manifest: EffectiveManifest, prop: PropDef, why: string):
 }
 
 /**
- * @brief The draw-time read for a prop a subject drives, or undefined when none
- *        does.
+ * @brief The binding that drives a drawing element's prop, or undefined when
+ *        none does.
  *
  * On a drawing manifest a `<bind>`'s `setter=` names a **prop**, not a method —
  * `<bind name="bind_width" setter="width" />` — which is the two-meanings
  * ambiguity §13.1 criticises, kept for PR-04 by the Chief Architect's ruling and
  * recorded as Q-9 for the next schema bump. It is read that way here because
- * that is what the shipped manifests mean.
- *
- * Exported (PR-04 WO10) with {@link resolvedLiteralFor}, so the screen emitter
- * can tell before assembling a call whether an argument has any source at all,
- * by the same rule this module applies. Behaviour is unchanged.
- *
- * @param prop     The prop being emitted.
- * @param bindings The element's realised bindings.
- * @return The subject read, e.g. `ui_subject_level.get()`.
- */
-export function boundValueFor(prop: PropDef, bindings: readonly RealisedBinding[]): string | undefined {
-  const bound = bindingFor(prop, bindings);
-  return bound === undefined ? undefined : `${subjectIdentifier(bound.subject)}${SUBJECT_READ_SUFFIX}`;
-}
-
-/**
- * @brief The binding that drives a drawing element's prop, or undefined when
- *        none does.
- *
- * The lookup {@link boundValueFor} spells as a subject read, kept separate
- * (PR-04 WO11) so the editor's scene description names the same binding without
- * a second copy of the rule that a drawing manifest's `setter=` names a prop.
+ * that is what the shipped manifests mean. Shared (PR-04 WO11) so the editor's
+ * scene description names the same binding the firmware call reads.
  *
  * @param prop     The prop being emitted.
  * @param bindings The element's realised bindings.
@@ -258,7 +255,12 @@ export function drawArgumentSources(input: DrawCallInput): readonly DrawArgument
   return drawFunctionOf(manifest).props.map((prop): DrawArgumentSource => {
     const bound = bindingFor(prop, bindings);
     if (bound !== undefined) {
-      return { prop, kind: 'bound', binding: bound };
+      return {
+        prop,
+        kind: 'bound',
+        binding: bound,
+        origin: boundPositionOrigin(bound.attribute, input.origin ?? DISPLAY_ORIGIN),
+      };
     }
     const literal = resolvedLiteralFor(prop, resolved);
     if (literal !== undefined) {
@@ -285,8 +287,14 @@ export function drawCallFor(input: DrawCallInput): DrawCall {
   // Each argument from its source: bound, then written, then the declared default.
   const args = drawArgumentSources(input).map((source) => {
     switch (source.kind) {
-      case 'bound':
-        return `${subjectIdentifier(source.binding.subject)}${SUBJECT_READ_SUFFIX}`;
+      case 'bound': {
+        // A zero origin is not spelled: a screen-level element's bound
+        // position reads exactly as its value, as §13.5's example writes it.
+        const read = `${subjectIdentifier(source.binding.subject)}${SUBJECT_READ_SUFFIX}`;
+        return source.origin === undefined || source.origin === 0
+          ? read
+          : `${cppValue({ name: 'origin', type: 'int' }, String(source.origin))} + ${read}`;
+      }
       case 'written':
       case 'default':
         return cppValue(source.prop, source.literal);

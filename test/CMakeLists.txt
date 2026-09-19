@@ -440,6 +440,7 @@ add_executable(test_generated_fixture
     ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_images.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_bounds.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_screen_gauges.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_screen_home.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_styles.cpp
@@ -520,6 +521,7 @@ add_executable(test_editor
     ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_images.cpp
+    ${U8G2GL_FIXTURE_GENERATED}/ui_screen_bounds.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_screen_gauges.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_screen_home.cpp
     ${U8G2GL_FIXTURE_GENERATED}/ui_styles.cpp

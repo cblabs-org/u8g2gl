@@ -23,6 +23,7 @@ import {
   subjectIdentifier,
   subjectSetterIdentifier,
 } from '../../src/core/resolver/index.js';
+import { objectIdentifier } from '../../src/core/resolver/mangle.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import type { Globals } from '../../src/core/schema/globals.js';
 import type { Screen } from '../../src/core/schema/screen.js';
@@ -62,6 +63,10 @@ describe('§13.4 identifier helpers', () => {
     expect(styleIdentifier('header')).toBe('ui_style_header');
     expect(childIdentifier('statusbar', 'title')).toBe('statusbar_title');
     expect(childIdentifier(childIdentifier('bar', 'clk'), 'digits')).toBe('bar_clk_digits');
+    // Every emitted object is ui_obj_<name> (§13.4, 2026-09-19): a bare
+    // `clock` collided with <time.h>'s clock().
+    expect(objectIdentifier('clock')).toBe('ui_obj_clock');
+    expect(objectIdentifier(childIdentifier(childIdentifier('bar', 'clk'), 'digits'))).toBe('ui_obj_bar_clk_digits');
   });
 });
 
@@ -92,7 +97,7 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       ['ui_style_header', 'style'],
     ]);
     expect(table.screens).toEqual([
-      { screen: 'home', identifiers: [expect.objectContaining({ identifier: 'title', source: expect.objectContaining({ kind: 'object' }) })] },
+      { screen: 'home', identifiers: [expect.objectContaining({ identifier: 'ui_obj_title', source: expect.objectContaining({ kind: 'object' }) })] },
     ]);
   });
 
@@ -108,7 +113,13 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
     ], [WD_X]);
 
     expect(table.diagnostics).toEqual([]);
-    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['first', 'first_b', 'middle', 'second', 'second_b']);
+    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual([
+      'ui_obj_first',
+      'ui_obj_first_b',
+      'ui_obj_middle',
+      'ui_obj_second',
+      'ui_obj_second_b',
+    ]);
   });
 
   it('two instances of one composite produce distinct, non-colliding identifiers', () => {
@@ -119,7 +130,7 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
     ], [WD_X]);
 
     expect(table.diagnostics).toEqual([]);
-    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['a', 'a_b', 'c', 'c_b']);
+    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['ui_obj_a', 'ui_obj_a_b', 'ui_obj_c', 'ui_obj_c_b']);
   });
 
   it('`a_b` at screen level colliding with child `b` of instance `a` is a hard error naming both', () => {
@@ -140,15 +151,16 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       severity: 'error',
       file: 'widgets/wd_x/wd_x.xml',
       line: 4,
+      // The caret underlines the name the author wrote, not the ui_obj_ prefix.
       offendingText: 'a_b',
     });
-    expect(collision?.message).toContain("C++ identifier 'a_b' is generated twice");
+    expect(collision?.message).toContain("C++ identifier 'ui_obj_a_b' is generated twice");
     expect(collision?.message).toContain("<u8g2gl_box> 'a_b' at screens/screen_home.xml:3:");
     expect(collision?.message).toContain("<u8g2gl_box> 'b' at widgets/wd_x/wd_x.xml:4:");
     expect(collision?.message).toContain("in instance 'a' of <wd_x> at screens/screen_home.xml:4:9");
     expect(collision?.message).toContain('never renames');
     // Both identifiers stay in the table as written — nothing is renamed.
-    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['a_b', 'a', 'a_b']);
+    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['ui_obj_a_b', 'ui_obj_a', 'ui_obj_a_b']);
   });
 
   it('collides nested prefixes the same way: bar_clk_digits against a screen-level bar_clk_digits', () => {
@@ -194,7 +206,7 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
     const globals: Globals = { ...EMPTY_GLOBALS, styles: [{ name: 'header' }] };
     const table = mangle([screen('        <u8g2gl_box name="title" x="0" y="0" width="4" height="4" />', 'home', '    <styles><style name="header" /></styles>\n')], [], globals);
     expect(table.diagnostics).toEqual([]);
-    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['ui_style_header', 'title']);
+    expect(table.screens[0]?.identifiers.map((m) => m.identifier)).toEqual(['ui_style_header', 'ui_obj_title']);
   });
 
   describe('reserved spellings made by prefixing', () => {

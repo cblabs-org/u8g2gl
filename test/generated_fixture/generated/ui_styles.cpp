@@ -11,6 +11,9 @@
 // note
 u8g2gl_style ui_style_note;
 
+// loud
+u8g2gl_style ui_style_loud;
+
 // --- Style properties (§10) ---
 // Set through the setters, never a brace initialiser: the setters are what
 // record the property in set_mask, and without that a style merged over an
@@ -19,4 +22,8 @@ u8g2gl_style ui_style_note;
 void ui_styles_init() {
     // note
     ui_style_note.set_align(U8G2GL_ALIGN_RIGHT);
+    // loud
+    ui_style_loud.set_font(ui_font_u8g2_font_5x7_mr);
+    ui_style_loud.set_align(U8G2GL_ALIGN_CENTER);
+    ui_style_loud.set_font_mode(U8G2GL_FONT_MODE_TRANSPARENT);
 }

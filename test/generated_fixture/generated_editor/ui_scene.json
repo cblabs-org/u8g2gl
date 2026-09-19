@@ -1,6 +1,6 @@
 {
   "format": "u8g2gl-scene",
-  "version": 1,
+  "version": 2,
   "generated": {
     "source": "u8g2gl.xml",
     "schema": "0.4",
@@ -12,8 +12,8 @@
     "height": 64
   },
   "init": [
-    "properties",
     "styles",
+    "properties",
     "bindings"
   ],
   "subjects": [
@@ -42,6 +42,14 @@
     {
       "name": "show_panel",
       "type": "bool"
+    },
+    {
+      "name": "knob_x",
+      "type": "int"
+    },
+    {
+      "name": "temperature",
+      "type": "int"
     }
   ],
   "styles": [
@@ -51,6 +59,23 @@
         {
           "name": "align",
           "value": "right"
+        }
+      ]
+    },
+    {
+      "name": "loud",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_5x7_mr"
+        },
+        {
+          "name": "align",
+          "value": "center"
+        },
+        {
+          "name": "font_mode",
+          "value": "transparent"
         }
       ]
     }
@@ -63,6 +88,260 @@
     "icon_wifi"
   ],
   "screens": [
+    {
+      "name": "bounds",
+      "objects": 5,
+      "parents": [
+        null,
+        0,
+        null,
+        null,
+        null
+      ],
+      "elements": [
+        {
+          "name": "track",
+          "tag": "slider",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 7,
+            "column": 9
+          },
+          "class": "u8g2gl_obj",
+          "object": 0,
+          "parent": null,
+          "rect": [
+            40,
+            10,
+            60,
+            20
+          ],
+          "properties": [],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "track_knob",
+          "tag": "u8g2gl_box",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "widgets/slider/slider.xml",
+            "line": 15,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "subject": "knob_x",
+              "subject_type": "int",
+              "origin": 40
+            },
+            {
+              "name": "y",
+              "value": 10
+            },
+            {
+              "name": "width",
+              "value": 4
+            },
+            {
+              "name": "height",
+              "value": 4
+            }
+          ],
+          "visibility": [
+            {
+              "ancestor": 0
+            }
+          ]
+        },
+        {
+          "name": "track_readout",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "widgets/slider/slider.xml",
+            "line": 16,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 1,
+          "parent": 0,
+          "rect": [
+            40,
+            16,
+            20,
+            10
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_5x7_mr"
+            },
+            {
+              "name": "text",
+              "value": "K"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [
+            {
+              "name": "bind_x",
+              "subject": "knob_x",
+              "subject_type": "int",
+              "origin": 40
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "dot",
+          "tag": "u8g2gl_box",
+          "realisation": "draw_calls",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 10,
+            "column": 9
+          },
+          "arguments": [
+            {
+              "name": "x",
+              "subject": "knob_x",
+              "subject_type": "int",
+              "origin": 0
+            },
+            {
+              "name": "y",
+              "value": 40
+            },
+            {
+              "name": "width",
+              "value": 2
+            },
+            {
+              "name": "height",
+              "value": 2
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "temp",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 13,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 2,
+          "parent": null,
+          "rect": [
+            0,
+            50,
+            60,
+            10
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "temperature",
+              "subject_type": "int",
+              "fmt": "%d°C"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "own_font",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 18,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 3,
+          "parent": null,
+          "rect": [
+            64,
+            50,
+            60,
+            10
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "text",
+              "value": "Own"
+            }
+          ],
+          "styles": [
+            "loud"
+          ],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "override",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 23,
+            "column": 9
+          },
+          "class": "u8g2gl_label",
+          "object": 4,
+          "parent": null,
+          "rect": [
+            64,
+            38,
+            60,
+            10
+          ],
+          "properties": [
+            {
+              "name": "font",
+              "value": "u8g2_font_6x10_mr"
+            },
+            {
+              "name": "text",
+              "value": "Ovr"
+            }
+          ],
+          "styles": [
+            "loud"
+          ],
+          "style_overrides": [
+            {
+              "name": "align",
+              "value": "right"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        }
+      ]
+    },
     {
       "name": "gauges",
       "objects": 3,

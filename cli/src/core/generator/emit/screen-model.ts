@@ -64,6 +64,12 @@ import { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './pla
 export interface Placement {
   readonly manifest: EffectiveManifest;
   readonly absolute: ResolvedElement;
+  /**
+   * The absolute corner of the element's container — the display's for a
+   * screen-level element. A bound position is relative to it (§7.2), so it is
+   * what a `bind_x`/`bind_y` adds at run time (`placement.ts`).
+   */
+  readonly origin: Origin;
 }
 
 /** Every element of one screen, placed, and what placing it found. */
@@ -113,12 +119,19 @@ export type InitStep = 'properties' | 'styles' | 'bindings';
 /**
  * The order `init` configures objects in, after construction (§13.7). Stated
  * once: the firmware screen unit lays its steps out in this order and the
- * scene description carries it for the editor host to follow, so a change to
- * the order — design_spec §13.7 now puts styles before properties, which
- * PR-04 WO10b implements — is one edit here that both targets obey. Bindings
- * stay last so no observer fires against a partly configured object.
+ * scene description carries it for the editor host to follow, so both targets
+ * obey one list.
+ *
+ * **Styles before properties** (Chief Architect, 2026-09-19, §10): an
+ * element's own attribute is the more specific statement of intent, so it must
+ * win over a named style — `font=` over the style's font — and the setter that
+ * runs last is the one that wins. The `styles` step also applies the element's
+ * inline `style_*` overrides, after its named styles, so an override beats the
+ * style it overrides too. **Bindings stay last** so no observer fires against a
+ * partly configured object, and a bound text wins over a literal one because
+ * the runtime reads the binding first (PR-04 WO10b).
  */
-export const INIT_STEPS: readonly InitStep[] = ['properties', 'styles', 'bindings'];
+export const INIT_STEPS: readonly InitStep[] = ['styles', 'properties', 'bindings'];
 
 /** How a directive's `flag` becomes its enumerator, through `cppEnumerator()`. */
 export const FLAG_ENUMERATOR_PATTERN = 'U8G2GL_FLAG_{VALUE^^}';
@@ -263,7 +276,7 @@ function placeAll(
       return;
     }
     const absolute = absoluteElement(resolved, origin);
-    placements.set(element, { manifest, absolute });
+    placements.set(element, { manifest, absolute, origin });
     placeAll(element.children, childOrigin(absolute), byNode, manifests, placements, diagnostics);
   }
 }

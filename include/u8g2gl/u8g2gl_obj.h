@@ -45,7 +45,8 @@
  *
  *     Data binding:
  *     - bind_text():         Bind display text to a subject
- *     - bind_x/y/width/height(): Bind one geometry axis to an int subject ([D-20])
+ *     - bind_x/y():          Bind a position, container-relative, to an int subject ([D-20])
+ *     - bind_width/height(): Bind a size to an int subject ([D-20])
  *     - bind_flag_if_*():    Conditional flag from a subject's value
  *     - add_value_binding(): (protected) pool slot + observer for a widget's
  *                            own bind_* method
@@ -309,28 +310,44 @@ public:
     bool bind_text(u8g2gl_subject_string_base* subject);
 
     /**
-     * @brief Bind the left edge to an int subject ([D-20]).
+     * @brief Bind the left edge to an int subject, relative to a container
+     *        ([D-20] and its 2026-09-19 amendment, §7.2).
      *
-     * Each change calls set_x(), so the frame is marked dirty only when the
-     * position actually changes — a moved element on an otherwise static
-     * screen is redrawn (§11.2). The current value is applied immediately.
-     * This is the whole of runtime layout: nothing re-resolves anchors, so the
-     * generator rejects anchor-positioned children of a geometry-bound container.
-     * Values outside the int16_t range are clamped to it.
+     * A bound coordinate means what a literal one means: a position inside the
+     * element's container. The runtime stores absolute coordinates, so the
+     * container's absolute origin — fixed at build time, and emitted by the
+     * generator as a literal — is passed here and added to every value: a child
+     * of a container at x=40 bound to 5 is at x=45. A screen-level element
+     * passes 0.
+     *
+     * Each change calls set_x(origin + value), so the frame is marked dirty only
+     * when the position actually changes — a moved element on an otherwise
+     * static screen is redrawn (§11.2). The current value is applied
+     * immediately. This is the whole of runtime layout: nothing re-resolves
+     * anchors, and a container whose own position is bound may have no children
+     * in schema 0.4 (§7.2). **The sum is clamped to int16_t, not each term**, so
+     * a large origin plus a large value pins the element at the edge of the
+     * coordinate space instead of wrapping.
      *
      * @param subject Subject to observe. Must outlive this object.
+     * @param origin  The container's absolute left edge; 0 at screen level.
      * @return false if @p subject is null, or the binding pool or the subject's
      *         observer capacity is exhausted; no binding is registered.
      */
-    bool bind_x(u8g2gl_subject_int_base* subject);
+    bool bind_x(u8g2gl_subject_int_base* subject, int16_t origin);
 
-    /** @brief Bind the top edge to an int subject; see bind_x(). */
-    bool bind_y(u8g2gl_subject_int_base* subject);
+    /** @brief Bind the top edge, relative to a container's top @p origin; see bind_x(). */
+    bool bind_y(u8g2gl_subject_int_base* subject, int16_t origin);
 
-    /** @brief Bind the width to an int subject; see bind_x(). */
+    /**
+     * @brief Bind the width to an int subject ([D-20]).
+     *
+     * A size is a length, not a position, so it takes no origin. Each change
+     * calls set_w(); values outside the int16_t range are clamped to it.
+     */
     bool bind_width(u8g2gl_subject_int_base* subject);
 
-    /** @brief Bind the height to an int subject; see bind_x(). */
+    /** @brief Bind the height to an int subject; see bind_width(). */
     bool bind_height(u8g2gl_subject_int_base* subject);
 
     /**
@@ -560,7 +577,8 @@ private:
     static void on_text_bound(void* binding);
 
     // Observer callbacks behind bind_x/y/width/height(); each forwards the
-    // subject's value to the matching per-axis setter.
+    // subject's value to the matching per-axis setter, x and y after adding the
+    // binding's container origin.
     static void on_x_bound(void* binding);
     static void on_y_bound(void* binding);
     static void on_width_bound(void* binding);

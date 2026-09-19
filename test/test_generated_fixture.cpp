@@ -55,9 +55,9 @@ namespace {
 // The fixture's own counts, from test/generated_fixture/ (capacity_probe.cpp
 // counts the bindings line by line). Held here as the test's expectation of the
 // generator, so a change to what is counted fails a test that names it.
-constexpr uint32_t kFixtureTotalBindings = 5;
+constexpr uint32_t kFixtureTotalBindings = 7;
 constexpr uint32_t kFixtureBindingsPerObject = 1;
-constexpr uint32_t kFixtureObjectsOnBusiestScreen = 5;  // home: bar and its three children, msg
+constexpr uint32_t kFixtureObjectsOnBusiestScreen = 5;  // home: bar, its three children and msg; bounds: 5 too
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not
@@ -136,7 +136,7 @@ TEST(GeneratedFixture, UiInitFillsTheBindingPoolExactly) {
     ensure_ui_initialised();
     u8g2gl_subject_int_n<1> spare(0);
     u8g2gl_obj probe;
-    EXPECT_FALSE(probe.bind_x(&spare));
+    EXPECT_FALSE(probe.bind_x(&spare, 0));
 }
 
 // --- §13.12: the worked example generates, compiles and renders ---
@@ -325,4 +325,113 @@ TEST(GeneratedFixture, CircleDrawsTheSegmentTheDocumentNamed) {
     EXPECT_EQ(display.last_draw_circle_y, 40);
     EXPECT_EQ(display.last_draw_circle_r, 10);
     EXPECT_EQ(display.last_draw_circle_option, U8G2GL_DRAW_SEGMENT_UPPER_LEFT);
+}
+
+// --- The Chief Architect's emission rulings of 2026-09-19 (PR-04 WO10b) ---
+
+namespace {
+
+// logged
+// Every call to `op` the stub logged, in order.
+std::vector<u8g2_stub_call> logged(const U8G2& display, const char* op) {
+    std::vector<u8g2_stub_call> calls;
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        if (std::strcmp(display.call_log[i].op, op) == 0) {
+            calls.push_back(display.call_log[i]);
+        }
+    }
+    return calls;
+}
+
+// drawn_with
+// The drawUTF8 call that drew `text`, and the font and font mode last set
+// before it — what that label rendered with. Fails the test if it never drew.
+struct drawn_label {
+    int32_t x = -1;
+    const void* font = nullptr;
+    int32_t font_mode = -1;
+};
+drawn_label drawn_with(const U8G2& display, const char* text) {
+    drawn_label found;
+    const void* font = nullptr;
+    int32_t font_mode = -1;
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        const u8g2_stub_call& call = display.call_log[i];
+        if (std::strcmp(call.op, "setFont") == 0) {
+            font = call.pointer;
+        } else if (std::strcmp(call.op, "setFontMode") == 0) {
+            font_mode = call.args[0];
+        } else if (std::strcmp(call.op, "drawUTF8") == 0 && std::strcmp(call.text, text) == 0) {
+            found.x = call.args[0];
+            found.font = font;
+            found.font_mode = font_mode;
+            return found;
+        }
+    }
+    ADD_FAILURE() << "nothing drew \"" << text << "\"";
+    return found;
+}
+
+}  // namespace
+
+TEST(GeneratedFixture, BoundPositionsAreContainerRelative) {
+    // Ruling 1 (§7.2, [D-20] amendment): track sits at x=40. Its knob (a draw
+    // call) and readout (an object) are bound to knob_x = 5, so both are at 45;
+    // dot, directly on the screen and bound to the same subject, is at 5.
+    ui_set_knob_x(5);
+    U8G2 display;
+    show(ui_screen_bounds, display);
+
+    const std::vector<u8g2_stub_call> boxes = logged(display, "drawBox");
+    ASSERT_EQ(boxes.size(), 2u);
+    EXPECT_EQ(boxes[0].args[0], 45);   // track_knob: 40 + 5
+    EXPECT_EQ(boxes[0].args[1], 10);
+    EXPECT_EQ(boxes[1].args[0], 5);    // dot: 0 + 5
+    EXPECT_EQ(boxes[1].args[1], 40);
+    EXPECT_EQ(drawn_with(display, "K").x, 45);   // track_readout: bind_x(&knob_x, 40)
+
+    // The origin stays with the binding: a new value moves all three.
+    ui_set_knob_x(12);
+    U8G2 moved;
+    ui_handler(moved);
+    EXPECT_EQ(moved.send_count, 1);
+    const std::vector<u8g2_stub_call> moved_boxes = logged(moved, "drawBox");
+    ASSERT_EQ(moved_boxes.size(), 2u);
+    EXPECT_EQ(moved_boxes[0].args[0], 52);
+    EXPECT_EQ(moved_boxes[1].args[0], 12);
+    EXPECT_EQ(drawn_with(moved, "K").x, 52);
+    ui_set_knob_x(5);
+}
+
+TEST(GeneratedFixture, IntBoundLabelDrawsItsFormattedValue) {
+    // temp: bind_text="temperature" bind_text_fmt="%d°C".
+    ui_set_temperature(21);
+    U8G2 display;
+    show(ui_screen_bounds, display);
+    EXPECT_EQ(drawn_with(display, "21°C").font, static_cast<const void*>(ui_font_u8g2_font_6x10_mr));
+
+    ui_set_temperature(-3);
+    U8G2 colder;
+    ui_handler(colder);
+    EXPECT_EQ(colder.send_count, 1);
+    drawn_with(colder, "-3°C");
+    ui_set_temperature(21);
+}
+
+TEST(GeneratedFixture, ElementsOwnAttributesWinOverANamedStyle) {
+    // Ruling 3 (§10): style "loud" sets font 5x7, align center and font_mode
+    // transparent. own_font writes font 6x10 itself, and ends with 6x10; the
+    // style's align and font_mode, which own_font does not set, still apply.
+    U8G2 display;
+    show(ui_screen_bounds, display);
+    const drawn_label own = drawn_with(display, "Own");
+    EXPECT_EQ(own.font, static_cast<const void*>(ui_font_u8g2_font_6x10_mr));
+    EXPECT_NE(own.font, static_cast<const void*>(ui_font_u8g2_font_5x7_mr));
+    EXPECT_EQ(own.x, 64 + 60 / 2);   // centred by the style; the stub measures text as 0 wide
+    EXPECT_EQ(own.font_mode, U8G2GL_FONT_MODE_TRANSPARENT);
+
+    // override's inline style_align="right" wins over the style's center.
+    const drawn_label overridden = drawn_with(display, "Ovr");
+    EXPECT_EQ(overridden.x, 64 + 60);
+    EXPECT_EQ(overridden.font, static_cast<const void*>(ui_font_u8g2_font_6x10_mr));
 }

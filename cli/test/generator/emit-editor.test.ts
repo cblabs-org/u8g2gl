@@ -124,10 +124,24 @@ describe('the editor registry unit (WO11, [UD-4])', () => {
     expect(bindings.match(/u8g2gl_editor_bind_call\(/g)).toHaveLength(2);
     expect(bindings).toContain('decltype(s->bind_text(sub, f))');
     // bind_x declares no format: a format is refused outright.
-    expect(bindings).toMatch(/\{"bind_x",\n\s*\[\]\(u8g2gl_obj\* obj, void\* subject, const char\* fmt\) -> bool \{\n\s*if \(fmt != nullptr\) \{ return false; \}/);
+    expect(bindings).toMatch(
+      /\{"bind_x",\n\s*\[\]\(u8g2gl_obj\* obj, void\* subject, const char\* fmt, int16_t origin\) -> bool \{\n\s*if \(fmt != nullptr\) \{ return false; \}/,
+    );
     expect(table(unit, 'ui_editor_gauge_dial_bindings')).toContain(
       'static_cast<gauge_dial*>(obj)->bind_needle(static_cast<u8g2gl_subject_int_base*>(subject));',
     );
+  });
+
+  it('passes the container origin to a position binding and refuses one anywhere else (§7.2)', () => {
+    const bindings = table(unit, 'ui_editor_u8g2gl_label_bindings');
+    // bind_x and bind_y take the origin, exactly as firmware's literal.
+    expect(bindings).toContain('->bind_x(static_cast<u8g2gl_subject_int_base*>(subject), origin);');
+    expect(bindings).toContain('->bind_y(static_cast<u8g2gl_subject_int_base*>(subject), origin);');
+    // A size, a text and a widget's own binding take none: an origin there is
+    // refused, never dropped — once per such entry.
+    const refusals = bindings.match(/if \(origin != 0\) \{ return false; \}/g) ?? [];
+    expect(refusals).toHaveLength(4); // bind_text x2, bind_width, bind_height
+    expect(table(unit, 'ui_editor_gauge_dial_bindings')).toContain('if (origin != 0) { return false; }');
   });
 
   it('draws each drawing element with the firmware draw function and argument order', () => {
@@ -199,6 +213,7 @@ function fixtureScene(): { readonly scene: Record<string, unknown>; readonly res
       globals: loaded.model.globals,
       screens: loaded.model.screens,
       capacities: result.capacities!,
+      manifests: loaded.model.manifests,
       assets: loaded.assets,
       stamp: '',
     },
@@ -232,6 +247,8 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
       'system_time',
       'level',
       'show_panel',
+      'knob_x',
+      'temperature',
     ]);
     for (const subject of subjects) {
       expect(subject).not.toHaveProperty('value');
@@ -259,11 +276,13 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     for (const screen of screens) {
       const unit = readFileSync(join(fixtureDir, 'generated', `ui_screen_${screen.name}.cpp`), 'utf-8');
       for (const e of screen.elements.filter((candidate) => candidate.realisation === 'object')) {
-        const rect = new RegExp(`^    ${e.name}\\.set_coords\\((.*)\\);`, 'm').exec(unit);
+        const rect = new RegExp(`^    ui_obj_${e.name}\\.set_coords\\((.*)\\);`, 'm').exec(unit);
         expect(rect, e.name).not.toBeNull();
         expect((e.rect as number[]).join(', '), e.name).toBe(rect![1]);
-        const setters = [...unit.matchAll(new RegExp(`^    ${e.name}\\.set_(?!coords)`, 'gm'))];
-        expect((e.properties as unknown[]).length, e.name).toBe(setters.length);
+        const setters = [...unit.matchAll(new RegExp(`^    ui_obj_${e.name}\\.set_(?!coords)`, 'gm'))];
+        // An inline style_* override is a setter call too, made in the styles step.
+        const calls = (e.properties as unknown[]).length + (e.style_overrides as unknown[]).length;
+        expect(calls, e.name).toBe(setters.length);
       }
     }
     expect(element(byName('gauges'), 'ghost').properties).toEqual([
@@ -308,8 +327,43 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
   });
 
   it('describes each style by the element props it sets, in the firmware’s applied order', () => {
-    expect(scene.styles).toEqual([{ name: 'note', properties: [{ name: 'align', value: 'right' }] }]);
+    expect(scene.styles).toEqual([
+      { name: 'note', properties: [{ name: 'align', value: 'right' }] },
+      {
+        name: 'loud',
+        properties: [
+          { name: 'font', value: 'u8g2_font_5x7_mr' },
+          { name: 'align', value: 'center' },
+          { name: 'font_mode', value: 'transparent' },
+        ],
+      },
+    ]);
     expect(element(byName('gauges'), 'panel_note').styles).toEqual(['note']);
+  });
+
+  it('gives a position binding its container origin, as firmware passes it (§7.2)', () => {
+    // track sits at (40, 10): its object child's bind_x and its draw-call child's
+    // bound x both carry 40; dot, on the screen, carries 0.
+    expect(element(byName('bounds'), 'track_readout').bindings).toEqual([
+      { name: 'bind_x', subject: 'knob_x', subject_type: 'int', origin: 40 },
+    ]);
+    expect(element(byName('bounds'), 'track_knob').arguments).toContainEqual({
+      name: 'x',
+      subject: 'knob_x',
+      subject_type: 'int',
+      origin: 40,
+    });
+    expect(element(byName('bounds'), 'dot').arguments).toContainEqual({
+      name: 'x',
+      subject: 'knob_x',
+      subject_type: 'int',
+      origin: 0,
+    });
+    // A binding that sets no position carries none.
+    expect(element(byName('bounds'), 'temp').bindings).toEqual([
+      { name: 'bind_text', subject: 'temperature', subject_type: 'int', fmt: '%d°C' },
+    ]);
+    expect(scene.version).toBe(2);
   });
 
   it('is emitted as ui_scene.json beside the registry, deterministically', () => {

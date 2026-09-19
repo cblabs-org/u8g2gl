@@ -344,7 +344,18 @@ struct u8g2gl_binding_desc {
     u8g2gl_obj* obj = nullptr;
     void* subject = nullptr;
     const char* fmt = nullptr;
-    int32_t ref_value = 0;
+    // One slot field, one stated meaning per binding kind (Chief Architect,
+    // 2026-09-19): a flag binding (bind_flag_if_*) compares the subject against
+    // `ref_value`; a position binding (bind_x/bind_y) adds `coord_origin`, its
+    // container's build-time absolute origin, to the subject's value ([D-20]
+    // amendment). Text bindings and every other value binding use neither. A
+    // union rather than a second field, because this struct is one pool slot and
+    // a second field would cost RAM in every slot for a value only position
+    // bindings carry; the union costs nothing.
+    union {
+        int32_t ref_value = 0;   ///< Flag bindings only
+        int16_t coord_origin;    ///< bind_x / bind_y only; set before the first read
+    };
     u8g2gl_subject_type_t subject_type = U8G2GL_SUBJECT_INT;
     u8g2gl_binding_op_t op = U8G2GL_BIND_OP_EQ;
     uint8_t flag = 0;
@@ -692,22 +703,21 @@ void u8g2gl_obj::on_text_binding_changed() {
     mark_dirty();
 }
 
-// u8g2gl_obj::add_value_binding
-// Claims one pool slot and one observer slot for a widget's own value binding,
-// rolling the pool slot back if the subject has no observer capacity, then runs
-// the widget's callback once so the current value is shown from the first frame.
-//   subject — the subject, type-erased; `type` says what it really is
-//   type    — which subject type `subject` points to, for the add_observer cast
-//   cb      — the widget's observer callback, called with the slot as its handle
-bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_observer_cb cb) {
+// u8g2gl_register_value_binding
+// Steps 1-3 of add_value_binding(), apart so a position binding can store its
+// origin in the slot before the first callback reads it. Returns the slot, or
+// nullptr having consumed nothing.
+//   obj, subject, type, cb — as add_value_binding()
+static u8g2gl_binding_desc* u8g2gl_register_value_binding(u8g2gl_obj* obj, void* subject,
+                                                          u8g2gl_subject_type_t type, u8g2gl_observer_cb cb) {
     if (!subject || !cb) {
-        return false;
+        return nullptr;
     }
 
     // --- Step 1: Claim a slot in the shared pool ---
-    u8g2gl_binding_desc* slot = u8g2gl_allocate_binding(this);
+    u8g2gl_binding_desc* slot = u8g2gl_allocate_binding(obj);
     if (!slot) {
-        return false;
+        return nullptr;
     }
     slot->subject = subject;
     slot->subject_type = type;
@@ -736,6 +746,21 @@ bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8
     if (!added) {
         slot->active = false;
         slot->obj = nullptr;
+        return nullptr;
+    }
+    return slot;
+}
+
+// u8g2gl_obj::add_value_binding
+// Claims one pool slot and one observer slot for a widget's own value binding,
+// rolling the pool slot back if the subject has no observer capacity, then runs
+// the widget's callback once so the current value is shown from the first frame.
+//   subject — the subject, type-erased; `type` says what it really is
+//   type    — which subject type `subject` points to, for the add_observer cast
+//   cb      — the widget's observer callback, called with the slot as its handle
+bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8g2gl_observer_cb cb) {
+    u8g2gl_binding_desc* slot = u8g2gl_register_value_binding(this, subject, type, cb);
+    if (!slot) {
         return false;
     }
 
@@ -744,17 +769,36 @@ bool u8g2gl_obj::add_value_binding(void* subject, u8g2gl_subject_type_t type, u8
     return true;
 }
 
-// Geometry bindings ([D-20]). Each is one add_value_binding() call, so each
-// consumes exactly one pool slot and one observer — the invariant the
-// generator counts capacities against ([D-21]). The callbacks route through
-// the per-axis setters rather than writing x_/y_/w_/h_ directly, so the change
-// guard and mark_dirty() stay in one place.
-bool u8g2gl_obj::bind_x(u8g2gl_subject_int_base* subject) {
-    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_x_bound);
+// u8g2gl_bind_position
+// A position binding: one value binding whose slot also carries the container
+// origin, stored before the first callback applies the current value.
+//   obj     — the object being bound
+//   subject — an int subject
+//   origin  — the container's absolute origin along this axis
+//   cb      — on_x_bound or on_y_bound
+static bool u8g2gl_bind_position(u8g2gl_obj* obj, u8g2gl_subject_int_base* subject, int16_t origin,
+                                 u8g2gl_observer_cb cb) {
+    u8g2gl_binding_desc* slot = u8g2gl_register_value_binding(obj, subject, U8G2GL_SUBJECT_INT, cb);
+    if (!slot) {
+        return false;
+    }
+    slot->coord_origin = origin;
+    cb(slot);
+    return true;
 }
 
-bool u8g2gl_obj::bind_y(u8g2gl_subject_int_base* subject) {
-    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_obj::on_y_bound);
+// Geometry bindings ([D-20]). Each consumes exactly one pool slot and one
+// observer — the invariant the generator counts capacities against ([D-21]).
+// The callbacks route through the per-axis setters rather than writing
+// x_/y_/w_/h_ directly, so the change guard and mark_dirty() stay in one place.
+// Only the two positions carry an origin: a bound coordinate is
+// container-relative like a literal one (§7.2), and a size is a length.
+bool u8g2gl_obj::bind_x(u8g2gl_subject_int_base* subject, int16_t origin) {
+    return u8g2gl_bind_position(this, subject, origin, &u8g2gl_obj::on_x_bound);
+}
+
+bool u8g2gl_obj::bind_y(u8g2gl_subject_int_base* subject, int16_t origin) {
+    return u8g2gl_bind_position(this, subject, origin, &u8g2gl_obj::on_y_bound);
 }
 
 bool u8g2gl_obj::bind_width(u8g2gl_subject_int_base* subject) {
@@ -766,52 +810,77 @@ bool u8g2gl_obj::bind_height(u8g2gl_subject_int_base* subject) {
 }
 
 // u8g2gl_bound_coord
-// Reads an int subject for a geometry axis. Subjects are int32_t and geometry
-// is int16_t; clamping rather than truncating means an out-of-range value pins
-// the element at the edge of the coordinate space instead of wrapping it to
-// the opposite side of the display.
+// Reads an int subject for a geometry axis and adds an origin. Subjects are
+// int32_t and geometry is int16_t; clamping rather than truncating means an
+// out-of-range result pins the element at the edge of the coordinate space
+// instead of wrapping it to the opposite side of the display.
+//
+// The **sum** is clamped, never each term (Chief Architect, 2026-09-19): 40 +
+// 40000 must pin at INT16_MAX, and -10000 + 40000 is a perfectly good 30000.
+// The sum is taken in 32 bits, so the value is first bounded to ±65536 to make
+// overflow impossible. That changes no result: any value beyond it puts the sum
+// outside int16_t whatever the int16_t origin, so it clamps to the same edge.
 //   obj     — binding_object() of the handle; nullptr once the slot is inactive
 //   subject — binding_subject() of the handle, an int subject by construction
-//   out     — receives the clamped value
+//   origin  — added to the value; 0 for a size
+//   out     — receives the clamped sum
 // Returns obj, or nullptr if the binding is no longer active.
-static u8g2gl_obj* u8g2gl_bound_coord(u8g2gl_obj* obj, void* subject, int16_t& out) {
+static u8g2gl_obj* u8g2gl_bound_coord(u8g2gl_obj* obj, void* subject, int16_t origin, int16_t& out) {
     if (!obj || !subject) {
         return nullptr;
     }
+    constexpr int32_t kBeyondAnyOrigin = 65536;
     int32_t v = static_cast<u8g2gl_subject_int_base*>(subject)->get();
-    if (v > INT16_MAX) {
-        v = INT16_MAX;
-    } else if (v < INT16_MIN) {
-        v = INT16_MIN;
+    if (v > kBeyondAnyOrigin) {
+        v = kBeyondAnyOrigin;
+    } else if (v < -kBeyondAnyOrigin) {
+        v = -kBeyondAnyOrigin;
     }
-    out = static_cast<int16_t>(v);
+    int32_t sum = static_cast<int32_t>(origin) + v;
+    if (sum > INT16_MAX) {
+        sum = INT16_MAX;
+    } else if (sum < INT16_MIN) {
+        sum = INT16_MIN;
+    }
+    out = static_cast<int16_t>(sum);
     return obj;
+}
+
+// u8g2gl_position_origin
+// A position binding's container origin, read only from an active slot:
+// u8g2gl_bind_position() stored it before the first callback.
+//   binding — the u8g2gl_binding_desc registered with the subject
+static int16_t u8g2gl_position_origin(void* binding) {
+    auto* b = static_cast<u8g2gl_binding_desc*>(binding);
+    return (b && b->active) ? b->coord_origin : 0;
 }
 
 void u8g2gl_obj::on_x_bound(void* binding) {
     int16_t v = 0;
-    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding),
+                                             u8g2gl_position_origin(binding), v)) {
         obj->set_x(v);
     }
 }
 
 void u8g2gl_obj::on_y_bound(void* binding) {
     int16_t v = 0;
-    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding),
+                                             u8g2gl_position_origin(binding), v)) {
         obj->set_y(v);
     }
 }
 
 void u8g2gl_obj::on_width_bound(void* binding) {
     int16_t v = 0;
-    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), 0, v)) {
         obj->set_w(v);
     }
 }
 
 void u8g2gl_obj::on_height_bound(void* binding) {
     int16_t v = 0;
-    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), v)) {
+    if (u8g2gl_obj* obj = u8g2gl_bound_coord(binding_object(binding), binding_subject(binding), 0, v)) {
         obj->set_h(v);
     }
 }

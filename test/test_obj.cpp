@@ -215,8 +215,8 @@ TEST(Obj, BindWidthUpdatesGeometryAndGatesStaticFrame) {
 TEST(Obj, BindEachAxisDrivesItsSetter) {
     u8g2gl_subject_int sx, sy, sh;
     u8g2gl_obj obj;
-    ASSERT_TRUE(obj.bind_x(&sx));
-    ASSERT_TRUE(obj.bind_y(&sy));
+    ASSERT_TRUE(obj.bind_x(&sx, 0));
+    ASSERT_TRUE(obj.bind_y(&sy, 0));
     ASSERT_TRUE(obj.bind_height(&sh));
     sx.set(3);
     sy.set(-4);
@@ -224,7 +224,80 @@ TEST(Obj, BindEachAxisDrivesItsSetter) {
     EXPECT_EQ(obj.get_x(), 3);
     EXPECT_EQ(obj.get_y(), -4);
     EXPECT_EQ(obj.get_h(), INT16_MAX);
-    EXPECT_FALSE(obj.bind_x(nullptr));
+    EXPECT_FALSE(obj.bind_x(nullptr, 0));
+}
+
+// --- Bound positions are container-relative (§7.2, [D-20] amendment, WO10b) ---
+
+TEST(Obj, BoundPositionAddsTheContainerOrigin) {
+    // A child of a container at (40, 30) bound to 5 is at 45; the generator
+    // emits the container's absolute origin as bind_x's literal.
+    u8g2gl_subject_int offset(5);
+    u8g2gl_subject_int drop(2);
+    u8g2gl_obj child;
+    ASSERT_TRUE(child.bind_x(&offset, 40));
+    ASSERT_TRUE(child.bind_y(&drop, 30));
+    EXPECT_EQ(child.get_x(), 45);
+    EXPECT_EQ(child.get_y(), 32);
+
+    // The origin stays with the binding: every later value is relative too.
+    offset.set(-7);
+    EXPECT_EQ(child.get_x(), 33);
+    drop.set(0);
+    EXPECT_EQ(child.get_y(), 30);
+}
+
+TEST(Obj, ScreenLevelBoundPositionIsItsValue) {
+    u8g2gl_subject_int x(5);
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_x(&x, 0));
+    EXPECT_EQ(obj.get_x(), 5);
+}
+
+TEST(Obj, BoundPositionClampsTheSumNotEachTerm) {
+    u8g2gl_subject_int v(0);
+    u8g2gl_obj obj;
+
+    // A value outside int16_t that the origin brings back inside: clamping the
+    // value first would give 32767 - 10000 = 22767; the sum is 30000.
+    v.set(40000);
+    ASSERT_TRUE(obj.bind_x(&v, -10000));
+    EXPECT_EQ(obj.get_x(), 30000);
+    v.set(-40000);
+    u8g2gl_obj low;
+    ASSERT_TRUE(low.bind_x(&v, 10000));
+    EXPECT_EQ(low.get_x(), -30000);
+
+    // Sums past each edge pin at it, never wrap.
+    u8g2gl_subject_int w(1);
+    u8g2gl_obj high;
+    ASSERT_TRUE(high.bind_x(&w, INT16_MAX));
+    EXPECT_EQ(high.get_x(), INT16_MAX);
+    w.set(-1);
+    u8g2gl_obj under;
+    ASSERT_TRUE(under.bind_y(&w, INT16_MIN));
+    EXPECT_EQ(under.get_y(), INT16_MIN);
+
+    // And at the int32_t extremes, where a naive 32-bit sum would overflow.
+    u8g2gl_subject_int extreme(INT32_MAX);
+    u8g2gl_obj top;
+    ASSERT_TRUE(top.bind_x(&extreme, INT16_MIN));
+    EXPECT_EQ(top.get_x(), INT16_MAX);
+    extreme.set(INT32_MIN);
+    EXPECT_EQ(top.get_x(), INT16_MIN);
+    u8g2gl_subject_int bottom_value(INT32_MIN);
+    u8g2gl_obj bottom;
+    ASSERT_TRUE(bottom.bind_y(&bottom_value, INT16_MAX));
+    EXPECT_EQ(bottom.get_y(), INT16_MIN);
+}
+
+TEST(Obj, BoundSizeTakesNoOrigin) {
+    // A width is a length: it is not moved by any container.
+    u8g2gl_subject_int width(12);
+    u8g2gl_obj obj;
+    obj.set_coords(40, 0, 1, 1);
+    ASSERT_TRUE(obj.bind_width(&width));
+    EXPECT_EQ(obj.get_w(), 12);
 }
 
 TEST(Obj, PerAxisSettersUnchangedDoNotMarkDirty) {
