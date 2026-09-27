@@ -143,6 +143,41 @@ function createDiagnostic(
   };
 }
 
+// outputDirEscapes
+// Whether an `<output dir>` could name anything outside the project (§13.10).
+// Lexical, because `src/core/` may not use `node:path` (typescript.md §1) — and
+// lexical is the stricter reading anyway: an absolute path is refused outright
+// rather than accepted because it happens to point inside the project today, and
+// a Windows-style `\` or drive letter is refused for the same reason.
+//
+// The rule: no absolute path, no backslash, and the running depth must never go
+// negative as the segments are walked. A trailing `..` that only returns to the
+// project root — `a/..` — is a strange way to write `.`, and `.` itself is the
+// project root, which is not a directory generation may own either, so a net
+// depth of zero is refused as well.
+//   dir — the declared directory, exactly as written
+function outputDirEscapes(dir: string): boolean {
+  const trimmed = dir.trim();
+  if (trimmed === '' || trimmed.startsWith('/') || trimmed.includes('\\') || /^[A-Za-z]:/.test(trimmed)) {
+    return true;
+  }
+  let depth = 0;
+  for (const segment of trimmed.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue;
+    }
+    if (segment === '..') {
+      depth--;
+      if (depth < 0) {
+        return true;
+      }
+      continue;
+    }
+    depth++;
+  }
+  return depth === 0;
+}
+
 // checkRequiredWithDefault
 // A prop declaring both `required="true"` and a `default` (PR-04 WO7 F10). A
 // required prop is always given, so its default can never apply, and expansion
@@ -412,6 +447,31 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     // allowed: it asks for exactly what the generator already does, so it is a
     // redundant restatement rather than a request that cannot be met, and
     // erroring on it would reject a harmless document.
+    // --- 1c. <output dir> must stay inside the project (§13.10, PR-04 WO12) ---
+    // §13.10 draws the boundary and the writer enforces it *relative to the
+    // directory it is handed* — so `dir="../src"` validated cleanly and the
+    // writer, pointed at the application's own sources, would happily delete any
+    // file there carrying the GENERATED marker. Checked lexically rather than by
+    // resolving a real path, because this module is isomorphic and `src/core/`
+    // may not touch the filesystem or `node:path` (typescript.md §1); a lexical
+    // check is also the stricter one, since it refuses an absolute path outright
+    // instead of asking whether it happens to land inside the project today.
+    const dir = project.output?.dir;
+    if (dir !== undefined && outputDirEscapes(dir)) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.OUTPUT_DIR_OUTSIDE_PROJECT,
+          `'dir="${dir}"' on <output> resolves outside the project. §13.10 generates only into the ` +
+            `configured output directory and never into the application's own sources, and the writer ` +
+            `deletes stale generated files anywhere beneath the directory it is given. Name a ` +
+            `directory inside the project, such as dir="generated".`,
+          project.output?.loc ?? project.loc,
+          dir,
+          ['generated'],
+        ),
+      );
+    }
+
     const prefix = project.output?.prefix;
     if (prefix !== undefined && prefix !== GENERATED_IDENTIFIER_PREFIX) {
       diagnostics.push(

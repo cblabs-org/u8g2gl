@@ -29,6 +29,10 @@
  *              through the registry entry's declared type.
  *
  *              Format, version 2 (PR-04 WO10b added `origin`; version 1 had none):
+ *              - `u8g2gl_generated`: the marker the **writer** recognises the file
+ *                by. A host reads nothing from it, and it is not part of the
+ *                format a host checks, so adding it did not bump the version —
+ *                every host already ignores keys it does not read (WO12).
  *              - `generated`: the stamp fields every generated C++ file carries
  *              - `display`: the target's width and height
  *              - `init`: the order objects are configured in after construction
@@ -76,6 +80,7 @@ import {
   type Placement,
 } from './screen-model.js';
 import { styleIdentifiers, styleProperties } from './styles.js';
+import { GENERATED_JSON_MARKER_KEY, GENERATED_JSON_MARKER_VALUE } from '../header.js';
 import type { ProjectEmitInput } from './unit.js';
 
 /** The scene description's file name. */
@@ -331,6 +336,11 @@ export function describeScenes(input: SceneInput): { readonly [key: string]: Jso
   });
 
   return {
+    // First key, so the marker is in the first bytes of the file, as the C++
+    // marker is the first line of a unit. It is the writer's, not a host's:
+    // JSON carries no comment, so without it the writer cannot tell this file
+    // from one a person wrote and would never delete a stale one (WO11 f2).
+    [GENERATED_JSON_MARKER_KEY]: GENERATED_JSON_MARKER_VALUE,
     format: 'u8g2gl-scene',
     version: SCENE_FORMAT_VERSION,
     generated: { ...input.generated },

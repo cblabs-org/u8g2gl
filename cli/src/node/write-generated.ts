@@ -20,6 +20,10 @@
  *              so a rejected path leaves the directory untouched. Files whose
  *              bytes are already right are not rewritten.
  *
+ *              A directory the writer empties is removed with its last generated
+ *              file; one that was already empty is not the writer's to remove
+ *              (PR-04 WO5b carry, WO12).
+ *
  * Exports:
  * - FileAction:             'created' | 'updated' | 'unchanged' | 'deleted'
  * - FileChange:             One output path and what happens to it
@@ -34,6 +38,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -170,9 +175,15 @@ export function planGeneratedWrite(outDir: string, files: readonly GeneratedFile
  * rewritten; stale files carrying the GENERATED marker are deleted; everything
  * else in the directory is left alone.
  *
+ * A subdirectory the run empties — its last generated file deleted, as happens
+ * when a screen is renamed out of it — is removed with it. A directory that was
+ * already empty is left alone: it is not this run's to remove.
+ *
  * @param outDir Output directory, created if absent.
  * @param result A generation result. It must have no errors.
- * @return The changes made, in {@link planGeneratedWrite}'s order.
+ * @return The changes made, in {@link planGeneratedWrite}'s order. Directories
+ *         are not listed: a `FileChange` is about a file, and `--check` asks
+ *         whether any *file* would change (§16).
  * @throws Error, writing nothing, if `result.errors` is non-zero or any path
  *         could land outside `outDir`. Both are programmer errors: the CLI
  *         never calls this for a refused build, and core never emits such a path.
@@ -189,14 +200,48 @@ export function writeGenerated(outDir: string, result: GenerateResult): readonly
   const contentByPath = new Map(result.files.map((f) => [f.path, f.content]));
 
   // --- Step 3: Apply ---
+  const emptied = new Set<string>();
   for (const change of changes) {
     const destination = join(root, ...change.path.split('/'));
     if (change.action === 'deleted') {
       unlinkSync(destination);
+      emptied.add(dirname(destination));
     } else if (change.action !== 'unchanged') {
       mkdirSync(dirname(destination), { recursive: true });
       writeFileSync(destination, contentByPath.get(change.path) ?? '', 'utf-8');
     }
   }
+
+  // --- Step 4: Remove the directories this run emptied, and only those ---
+  removeEmptiedDirectories(root, emptied);
   return changes;
+}
+
+// removeEmptiedDirectories
+// Removes a directory only when **this run** emptied it, by deleting the last
+// generated file in it (PR-04 WO5b carry, closed in WO12). Without this, renaming
+// a screen out of a subdirectory left the directory behind for ever: its file was
+// deleted, so nothing regenerated into it and nothing ever looked at it again.
+//
+// "Only those" is the whole rule, and it is why this takes a set rather than
+// walking the tree for empty directories. A directory that was already empty
+// before the run is somebody else's — quite possibly a deliberate placeholder —
+// and §13.10's boundary is about what generation may touch, not merely about
+// where it may write. The cascade upward is still the writer's own doing: a parent
+// left empty by removing a child this run emptied was emptied by this run too.
+//   root    — the absolute output directory, which is never removed
+//   emptied — absolute directories a generated file was deleted from
+function removeEmptiedDirectories(root: string, emptied: ReadonlySet<string>): void {
+  // Deepest first, so a nested directory is gone before its parent is judged.
+  const deepestFirst = [...emptied].sort((a, b) => b.split(sep).length - a.split(sep).length);
+  for (const start of deepestFirst) {
+    let directory = start;
+    while (directory !== root && isWithin(root, directory) && existsSync(directory)) {
+      if (readdirSync(directory).length > 0) {
+        break;
+      }
+      rmdirSync(directory);
+      directory = dirname(directory);
+    }
+  }
 }

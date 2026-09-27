@@ -88,6 +88,20 @@ export const DIAGNOSTIC_CODES = {
   FORMAT_MISMATCH: 'U8G2GL_FORMAT_MISMATCH',
   MALFORMED_XML: 'U8G2GL_MALFORMED_XML',
   MISSING_FILE: 'U8G2GL_MISSING_FILE',
+  /**
+   * `<output dir>` names a directory that is not inside the project (PR-04
+   * WO5b carry, closed in WO12). §13.10 is absolute about the boundary:
+   * generation writes only to the configured output directory and never to
+   * "anything under `modules/` or the app's own sources" ([D-11]).
+   *
+   * `dir="../src"` used to validate, and the writer's own guard is relative to
+   * whatever directory it is handed — so the escape was caught by nothing until
+   * a `generate` run had already been pointed at the application's sources,
+   * where the writer deletes any file carrying the GENERATED marker. A
+   * deliberately distinct code, because the remedy is specific and mechanical:
+   * name a directory inside the project.
+   */
+  OUTPUT_DIR_OUTSIDE_PROJECT: 'U8G2GL_OUTPUT_DIR_OUTSIDE_PROJECT',
   CIRCULAR_REFERENCE: 'U8G2GL_CIRCULAR_REFERENCE',
   /**
    * A screen's element tree exceeds the structural object ceiling ([A-3],
