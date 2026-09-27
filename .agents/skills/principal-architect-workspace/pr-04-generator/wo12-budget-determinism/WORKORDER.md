@@ -436,8 +436,8 @@ Scratch files are under `tmp/wo12/`, which is git-ignored; the base worktree was
 
 ### Out-of-scope findings — not fixed, not filed
 
-1. **Stop-and-report: this work order and §18 disagree about the framebuffer, and the spec may be
-   right.** The WORKORDER and the dispatch both list the framebuffer among the figures "the generator
+1. **[CLOSED in the follow-up — upheld, and the framebuffer is now reported.] Stop-and-report: this
+   work order and §18 disagree about the framebuffer, and the spec may be right.** The WORKORDER and the dispatch both list the framebuffer among the figures "the generator
    cannot know". But §18's own example prints `framebuffer (256x64) 2.0 KB <- derived from
    u8g2_m_32_8_f`, and `DisplayRecord.framebufferBytes` already carries exactly that number —
    `tiles.width * tiles.height * 8`, derived from U8G2's allocator tables ([D-14]) and already used by
@@ -446,8 +446,12 @@ Scratch files are under `tmp/wo12/`, which is git-ignored; the base worktree was
    a different constructor from the one the `<target>` names, so the buffer genuinely is not the
    generator's. The PA may prefer an *attributed* line — "the catalogue's full-buffer figure for this
    setup: 1024 bytes" — which would be a derived, sourced fact rather than an estimate, and would
-   restore §18's most useful RAM line. One line in `report/budget.ts`. **Not changed.**
-2. **`read-project.ts` sorts discovered filenames with `localeCompare` — twice.** This is
+   restore §18's most useful RAM line. One line in `report/budget.ts`. **Not changed** — until the
+   coordinator upheld this and asked for exactly that line; see the Follow-up.
+2. **[CLOSED in the follow-up.] `read-project.ts` sorts discovered filenames with `localeCompare` —
+   twice.** *The "unlikely to bite" reasoning below was wrong and is left standing only so the
+   correction is visible: `screen_a_1.xml` and `screen_a1.xml` are both ordinary lowercase filenames
+   whose collated and code-unit orders differ, and the follow-up's tests are built on that pair.* This is
    file-discovery order reaching *emission* order, so a host collation that ordered two project
    filenames differently would change the committed bytes: the §13.9 defect, in the one place the
    comparator line item did not name (it named `validate.ts` and `check-project.ts`). Unlikely to bite
@@ -455,7 +459,8 @@ Scratch files are under `tmp/wo12/`, which is git-ignored; the base worktree was
    three-line change already made in the three diagnostic paths. Outside the box; my
    `read-project-order.test.ts` pins the *canonical order*, which both comparators give for these
    names, so it does **not** cover this.
-3. **Three more `localeCompare` sorts, one of them on a committed artefact.**
+3. **[CLOSED in the follow-up.] Three more `localeCompare` sorts, one of them on a committed
+   artefact.**
    `node/catalogue-builder.ts` sorts the display records and page-mode constructors it writes into
    `src/data/catalogue.json`, which is committed — so that file's order is host-dependent, which is
    §13.9's hazard applied to a generated artefact the tool ships. `catalogue/edit-distance.ts`'s
@@ -493,3 +498,182 @@ Scratch files are under `tmp/wo12/`, which is git-ignored; the base worktree was
     It is UTF-8 throughout and matches the diagnostics formatter's existing practice, so nothing here
     is new — but a Windows console in a legacy code page would mangle it, and nobody has tested one.
 
+---
+
+## Follow-up (coordinator request, 2026-09-28) — three items, all closed
+
+Commit `a93f5f9`, on top of `58c8fc7`. Baseline for this section: CLI 1030 / 61 files, ctest 361 with
+the one known skip, zero warnings.
+
+| Suite | Baseline `58c8fc7` | Tip |
+|---|---|---|
+| `npx vitest run` | 1030 / 61 files | **1044 / 62 files**, all pass |
+| `npx tsc --noEmit` | clean | clean |
+| `npm run lint` | clean | clean |
+| `cmake --build build` | 0 warnings | **0 warnings** |
+| `ctest --test-dir build` | 361, 1 known skip | **361**, same skip |
+
+`git diff --name-only 58c8fc7..HEAD` — 15 files:
+
+```
+cli/src/core/catalogue/edit-distance.ts
+cli/src/core/catalogue/query.ts
+cli/src/core/generator/report/budget.ts
+cli/src/core/generator/report/model.ts
+cli/src/core/order.ts                      (new)
+cli/src/core/validator/validate.ts
+cli/src/data/catalogue.json
+cli/src/data/page-mode-map.json
+cli/src/node/catalogue-builder.ts
+cli/src/node/format-budget.ts
+cli/src/node/read-project.ts
+cli/test/catalogue/order.test.ts           (new)
+cli/test/generator/budget-report.test.ts
+cli/test/generator/determinism.test.ts
+cli/test/integration/generate.test.ts
+```
+
+### Item 1 — the framebuffer is reported
+
+The stop-and-report is upheld and acted on. §18's example prints
+`framebuffer (256x64) 2.0 KB <- derived from u8g2_m_32_8_f`; §5.2 states that `framebuffer_bytes`
+"is exact, taken from the buffer allocator (`u8g2_m_16_8_f` → 16×8 tiles × 8 = 1024), not estimated".
+Withholding it was the **reverse** of the mistake §1.3 guards against: §1.3 bars a figure the tooling
+*cannot* substantiate, and this one it can.
+
+- **Sourced and attributed**, in §18's own style: the item carries the pixel size, the derivation names
+  the tile dimensions and the allocator symbol — `u8g2_m_16_8_f`, which really is defined in
+  `extern/u8g2/csrc/u8g2_d_memory.c:61` and is §5.2's own worked example for a 128×64 panel.
+- **The bytes come from the catalogue's tile dimensions, never from parsing the symbol name**, so the
+  report cannot disagree with the catalogue about the number while agreeing with it about the symbol.
+  A test asserts both — the symbol appears, and the figure equals `16 * 8 * 8`.
+- **`measured` in the JSON contract**, with its derivation, so it joins `ramDerivedBytes`. For the
+  committed fixture that total is now **1074 bytes** (1024 framebuffer + 50 string-subject storage),
+  against 50 before.
+- **The caveat survives as a note on the reported figure**, in a new optional `BudgetLine.note`.
+  `derivation` says where a figure came from; `note` says what it is not. They are separate fields
+  because a reader who found "framebuffer" listed under a heading reading **NOT MEASURED** would have
+  been told the opposite of the truth. The note renders directly beneath its own table, never with the
+  unmeasured reasons.
+- **Unmeasured only when the catalogue has no record** for the target's `setup` — the one case where
+  there is genuinely nothing to report. Pinned by a test that builds the report with no `display`.
+
+The FLASH and RAM block as `generate` now prints it, verbatim, on the committed fixture:
+
+```
+  FLASH
+    runtime core                          unmeasured
+    framework element classes (3)         unmeasured
+    custom element classes (1)            unmeasured
+    fonts (2)                             unmeasured
+    image data (xbm arrays) (1)             32 bytes
+    generated code                        unmeasured
+    ------------------------------------------------
+    derivable                               32 bytes
+
+  RAM (static)
+    framebuffer (128x64)                  1024 bytes
+    element objects (13)                  unmeasured
+    string subject storage (2)              50 bytes
+    subject observer slots (10)           unmeasured
+    binding pool slots (7)                unmeasured
+    styles (2)                            unmeasured
+    ------------------------------------------------
+    derivable                             1074 bytes
+    note — framebuffer (128x64): the application constructs the U8G2 instance and owns
+    its buffer (§12.1, §13.10), so this is the full-buffer cost of the setup target
+    'host' names, not a measurement of the application's own buffer: a page-mode or
+    differently sized constructor costs something else
+```
+
+### Items 2 and 3 — one comparator, and the four sorts that were still locale-dependent
+
+`cli/src/core/order.ts` (new, isomorphic, 60 lines of which most is the reason) exports
+**`compareCodeUnits`** — the one string order in the codebase. `compareDiagnostics` now goes through
+it, and so do all four sorts the findings named:
+
+| Sort | Why it mattered |
+|---|---|
+| `read-project.ts`, screen filenames | **This order reaches the emitted bytes.** Screens are emitted in load order, one `.cpp` each, and `ui.hpp` declares them in that order |
+| `read-project.ts`, widget manifests | Manifest order is registration order, and a diagnostic about two manifests names whichever was seen first |
+| `catalogue-builder.ts`, records | Orders what is written into the **committed** `src/data/catalogue.json` |
+| `catalogue-builder.ts`, page-mode constructors | Same file family, same reason |
+| `edit-distance.ts`, the suggestion tie-break | Decides which fix a caller applying `suggestions[0]` gets — the thing [D-16] exists for |
+| `query.ts`, tied `find` results | `find --json` is a contract a caller compares between runs |
+
+**My "unlikely to bite" caveat in the first report was wrong, and the tests are built on the fact that
+it was.** `'screen_a_1.xml'` collates **before** `'screen_a1.xml'` under ICU, which weakens the
+underscore, and sorts **after** it by code unit, because `'1'` is 0x31 and `'_'` is 0x5F. Both are
+ordinary, valid, lowercase U8G2GL screen filenames. A project containing both generated different bytes
+on two machines, and neither diff would have been wrong.
+
+**How each new test is made non-vacuous.** Every one names the pair whose two orders genuinely
+disagree, and asserts the **collated order is not what is produced** — so it fails under
+`localeCompare` on the same machine it passes on now, with no locale to change. Each group also carries
+a guard test asserting the pair still tells the two orders apart, so a future ICU cannot make the group
+vacuous without failing. And a source scan over the four modules (comments stripped, because two of
+them now *explain* the rule) fails if a fifth copy returns.
+
+### Did the committed catalogue's bytes change? Yes — and this is the whole of it
+
+`npm run build:catalogue` rewrote two of its four outputs:
+
+- **`catalogue.json`: 86 of 1637 record positions moved.** The record *set* is identical and the
+  records themselves are byte-identical when both files are sorted the same way — verified set-wise and
+  content-wise, not eyeballed. Nothing was added, removed or edited; 1637 records before and after.
+- **`page-mode-map.json`: 172 of 3274 key positions moved.** Every mapping is identical; only key
+  order changed.
+- **`u8g2-fonts.json` and `catalogue-source.json` are untouched.** WO11b already sorted the font list
+  by code unit, so there was nothing to fix there — which is worth noting as the one place this rule
+  was already right.
+
+**One cause, four families.** A variant or controller token that is a *prefix* of a longer one, where
+the shorter is followed by `_`. Collation weakens the underscore and puts the shorter token first; by
+code unit the letter (0x41–0x5A) precedes `_` (0x5F), so the longer token now comes first:
+
+| Was first | Now first |
+|---|---|
+| `U8G2_S1D15300_100X32_F_*` | `U8G2_S1D15300_100X32I_F_*` |
+| `U8G2_SSD1362_206X36_*`, `U8G2_SSD1362_256X64_*` | reordered against `U8G2_SSD1362Z_256X64_*` |
+| `U8G2_ST75256_JLX256160_*` | `U8G2_ST75256_JLX256160M_*` |
+| `U8G2_ST7567_*` | reordered against `U8G2_ST7567_ENH_*` |
+
+**Nothing generated moved.** `refresh-goldens.mjs` reports `unchanged` for all 20 golden and fixture
+files after the rebuild, so the reorder did not reach a single emitted byte.
+
+### Base-failure status of every new test (baseline `58c8fc7`)
+
+Measured in a throwaway worktree under `tmp/wo12-base2`, since removed. **Run twice, deliberately:**
+
+- **As committed at the base**, `order.ts` is absent, so `catalogue/order.test.ts` and
+  `determinism.test.ts` cannot be collected at all — 22 tests that do not run. That figure prices the
+  *scaffolding*, not the fix.
+- **With `order.ts` copied in** and nothing else, so only behaviour is measured — this is the honest
+  figure: **14 behavioural failures, 0 trivial.**
+
+| File | New | Base result |
+|---|---|---|
+| `test/catalogue/order.test.ts` | 7 | **5 fail behaviourally** — the base catalogue is in collated order, the suggestion tie-break and `find`'s order are collated. 2 pass by design: they assert *ICU's* behaviour, which is what makes the pair valid |
+| `test/generator/determinism.test.ts` | +5 | **4 fail behaviourally** — the base loads `screen_a_1.xml` first, emits it first, and its four modules still contain `localeCompare`. 1 passes by design: the same kind of ICU guard |
+| `test/generator/budget-report.test.ts` | +2 net (3 added, 1 replaced) | **4 fail behaviourally** — the base reports the framebuffer as unmeasured, names no allocator, gives a different reason with no display, and totals 17 rather than 1041 |
+| `test/integration/generate.test.ts` | 0 new, 1 modified | **1 fails behaviourally** — the base's `--json` has the framebuffer unmeasured and `ramDerivedBytes` 0 |
+
+So of 14 net-new tests, **14 fail behaviourally at the base** and 3 further guard tests pass there on
+purpose, because their job is to check that ICU still disagrees with a code-unit comparison.
+
+### Disclosed, beyond the extended box
+
+`cli/src/core/order.ts` is a new module. The coordinator's item 2 said "on the one shared comparator
+where that fits", so a shared comparator was anticipated; putting it in a module of its own rather than
+inside the first file that needed it is the same judgement `compareDiagnostics` got, for the same
+reason — five of PR-04's defects have been one rule spelled in more than one place.
+
+Two inline code-unit comparators remain and were **not** touched, because they are already correct and
+are outside these three items: `emit/unit.ts`'s `includeBlock()` and `write-generated.ts`'s
+`listFiles()`. Folding them onto `compareCodeUnits` would be tidying emission, which the Boundary Box
+excludes. Recorded here rather than changed.
+
+Findings 1, 2 and 3 of the original report are closed here; the first three entries in that list are
+marked accordingly, and finding 2 keeps its wrong "unlikely to bite" reasoning with the correction
+beside it, because a quietly repaired mistake is one nobody can learn from. Findings 4 to 10 stand as
+recorded, and the PA is placing them.
