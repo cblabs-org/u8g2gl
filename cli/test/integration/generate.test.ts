@@ -41,11 +41,54 @@ interface JsonDiagnostic {
   readonly suggestions?: string[];
 }
 
+interface JsonFigure {
+  readonly kind: 'measured' | 'unmeasured';
+  readonly bytes?: number;
+  readonly derivation?: string;
+  readonly reason?: string;
+}
+
+interface JsonBudgetLine {
+  readonly item: string;
+  readonly count?: number;
+  readonly names?: string[];
+  readonly figure: JsonFigure;
+}
+
 interface GenerateJson {
   readonly files: Array<{ path: string; action: string }>;
   readonly diagnostics: JsonDiagnostic[];
   readonly errors: number;
   readonly warnings: number;
+  readonly budget?: {
+    readonly generator: string;
+    readonly target: string;
+    readonly setup: string;
+    readonly display?: { width: number; height: number };
+    readonly flash: JsonBudgetLine[];
+    readonly ram: JsonBudgetLine[];
+    readonly ramDerivedBytes: number;
+  };
+  readonly capacity?: {
+    readonly header: string;
+    readonly entries: Array<{ macro: string; label: string; value: number; ceiling?: number; names: string[] }>;
+  };
+  readonly realisation?: {
+    readonly demotion: {
+      classedElementDemotionDelivered: boolean;
+      objectsNotRequiredByRule: number;
+      names: string[];
+      statement: string;
+    };
+    readonly screens: Array<{
+      screen: string;
+      objects: number;
+      drawCallElements: number;
+      elements: Array<{ name: string; tag: string; realisation: string; reasons: string[] }>;
+    }>;
+    readonly totalObjects: number;
+    readonly totalDrawCallElements: number;
+  };
 }
 
 function runCli(args: readonly string[]): Promise<ExecResult> {
@@ -164,7 +207,16 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     const parsed = JSON.parse(res.stdout) as GenerateJson;
 
     expect(res.code).toBe(0);
-    expect(Object.keys(parsed)).toEqual(['files', 'diagnostics', 'errors', 'warnings']);
+    // The whole [D-16] contract, in order: PR-04 WO12 added the last three.
+    expect(Object.keys(parsed)).toEqual([
+      'files',
+      'diagnostics',
+      'errors',
+      'warnings',
+      'budget',
+      'capacity',
+      'realisation',
+    ]);
     expect(parsed.files).toEqual(
       [
         'u8g2gl_generated_config.h',
@@ -283,10 +335,190 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(res.stderr).toContain('Unknown option for generate: --fix-names');
   });
 
+  it('prints the §18 budget, §18.1 capacities and §13.5 realisation on every run', async () => {
+    const dir = createProject();
+    const res = await runCli(['generate', dir]);
+
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain("u8g2gl 0.7.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
+    expect(res.stdout).toContain('  FLASH');
+    expect(res.stdout).toContain('  RAM (static)');
+    expect(res.stdout).toContain('  CAPACITY (generated — see u8g2gl_generated_config.h)');
+    expect(res.stdout).toContain('objects, busiest screen');
+    expect(res.stdout).toContain('  REALISATION (§13.5');
+    // The fixture's one label is a classed element with no binding, so it is an
+    // object only because of [D-18]'s amendment — and the report says so.
+    expect(res.stdout).toContain('title');
+    expect(res.stdout).toContain('[amendment]');
+    expect(res.stdout).toContain('classed-element demotion is not yet delivered');
+  });
+
+  it('reports every unmeasurable cost as unmeasured, with its reason, and estimates nothing', async () => {
+    const dir = createProject();
+    const res = await runCli(['generate', dir, '--json']);
+    const parsed = JSON.parse(res.stdout) as GenerateJson;
+    const budget = parsed.budget;
+    expect(budget).toBeDefined();
+
+    // Not one flash cost is claimed for this project except the image arrays,
+    // which are the only flash bytes the generator writes itself — and it
+    // declares no <xbm>, so that line is an exact 0 rather than a guess.
+    for (const line of budget!.flash) {
+      if (line.item === 'image data (xbm arrays)') {
+        expect(line.figure).toMatchObject({ kind: 'measured', bytes: 0 });
+        continue;
+      }
+      expect(line.figure.kind, line.item).toBe('unmeasured');
+      expect(line.figure.reason).toBeTruthy();
+      expect(line.figure.bytes).toBeUndefined();
+    }
+    const framebuffer = budget!.ram.find((l) => l.item === 'framebuffer');
+    expect(framebuffer?.figure.kind).toBe('unmeasured');
+    expect(framebuffer?.figure.reason).toContain('§13.10');
+    // And the one honest total is named for what it is.
+    expect(budget!.ramDerivedBytes).toBe(0);
+    expect(res.stdout).not.toMatch(/\d+ ?% of/);
+  });
+
+  it('reports capacities that match the header it just wrote, byte for byte', async () => {
+    const dir = createProject();
+    const res = await runCli(['generate', dir, '--json']);
+    const parsed = JSON.parse(res.stdout) as GenerateJson;
+    const header = readFileSync(join(dir, 'generated/u8g2gl_generated_config.h'), 'utf-8');
+
+    expect(parsed.capacity?.header).toBe('u8g2gl_generated_config.h');
+    expect(parsed.capacity?.entries.length).toBe(4);
+    for (const entry of parsed.capacity!.entries) {
+      const match = new RegExp(`^#define ${entry.macro} (\\d+)$`, 'm').exec(header);
+      expect(match, `${entry.macro} missing from the emitted header`).not.toBeNull();
+      // One deliberate divergence, and the emitted header states it in full:
+      // U8G2GL_MAX_TOTAL_BINDINGS sizes an array, and a zero-length array is
+      // ill-formed in standard C++, so the *define* is floored at 1 while the
+      // budget reports the true figure. §1.3 is why it is this way round: the
+      // report must not inherit a C++ constraint as if it were a cost.
+      const floored = entry.macro === 'U8G2GL_MAX_TOTAL_BINDINGS' ? Math.max(entry.value, 1) : entry.value;
+      expect(Number(match?.[1])).toBe(floored);
+    }
+    // This project binds nothing, so it is the floored case, and the header says so.
+    expect(parsed.capacity?.entries.find((e) => e.macro === 'U8G2GL_MAX_TOTAL_BINDINGS')?.value).toBe(0);
+    expect(header).toContain('the budget still reports the true figure, 0');
+    // Names are the author's — 'home', never 'ui_screen_home' or 'ui_obj_title'.
+    expect(parsed.capacity?.entries[0]?.names).toEqual(['home']);
+    expect(parsed.capacity?.entries[0]?.ceiling).toBe(254);
+  });
+
+  it('states the [D-18] amendment in JSON as well as in the human report', async () => {
+    const dir = createProject();
+    const parsed = JSON.parse((await runCli(['generate', dir, '--json'])).stdout) as GenerateJson;
+    const demotion = parsed.realisation?.demotion;
+
+    expect(demotion?.classedElementDemotionDelivered).toBe(false);
+    expect(demotion?.statement).toContain('not yet delivered');
+    expect(demotion?.names).toEqual(['title']);
+    expect(parsed.realisation?.screens[0]?.screen).toBe('home');
+    expect(parsed.realisation?.screens[0]?.elements[0]).toMatchObject({
+      name: 'title',
+      tag: 'u8g2gl_label',
+      realisation: 'object',
+      reasons: ['class_backed'],
+    });
+  });
+
+  it('carries the budget under --check too, where nothing was written', async () => {
+    const dir = createProject();
+    await runCli(['generate', dir]);
+    const res = await runCli(['generate', dir, '--check', '--json']);
+    const parsed = JSON.parse(res.stdout) as GenerateJson;
+
+    expect(res.code).toBe(0);
+    expect(parsed.files.every((f) => f.action === 'unchanged')).toBe(true);
+    // The figures describe the output the check just verified, so withholding
+    // them would make --check the one journey with no cost statement (§1.3).
+    expect(parsed.budget).toBeDefined();
+    expect(parsed.capacity).toBeDefined();
+    expect(parsed.realisation).toBeDefined();
+  });
+
+  it('omits the budget when the build was refused, as it empties files', async () => {
+    const parsed = JSON.parse((await runCli(['generate', validProjectDir, '--json'])).stdout) as GenerateJson;
+
+    expect(parsed.files).toEqual([]);
+    // A report for code that was not written would describe nothing.
+    expect(Object.keys(parsed)).toEqual(['files', 'diagnostics', 'errors', 'warnings']);
+  });
+
+  it('stamps the package version into a freshly generated project — the 0.7.0 proof', async () => {
+    // Pinned literally, not read from package.json: a test that compares the
+    // stamp against the same file it came from passes at every version and
+    // therefore proves no bump ever happened (PR-04 WO10's carry).
+    expect(packageVersion).toBe('0.7.0');
+    const dir = createProject();
+    expect((await runCli(['generate', dir])).code).toBe(0);
+    const header = readFileSync(join(dir, 'generated/u8g2gl_generated_config.h'), 'utf-8');
+    expect(header).toContain('// generator: 0.7.0');
+    expect((await runCli(['--version'])).stdout.trim()).toBe('0.7.0');
+    // And the goldens are not dragged along by the bump: they are pinned.
+    expect(header).not.toContain('0.0.0-golden');
+  });
+
+  describe('usage errors under --json ([D-16], PR-04 WO5b carry)', () => {
+    it('reports an unknown flag as JSON on stdout with a stable code, exit 2', async () => {
+      const res = await runCli(['generate', '.', '--nonsense', '--json']);
+      const parsed = JSON.parse(res.stdout) as GenerateJson;
+
+      expect(res.code).toBe(2);
+      expect(res.stderr).toBe('');
+      expect(parsed.files).toEqual([]);
+      expect(parsed.errors).toBe(1);
+      expect(parsed.diagnostics).toEqual([
+        {
+          code: 'U8G2GL_USAGE',
+          severity: 'error',
+          file: '',
+          line: 1,
+          column: 1,
+          message: 'Unknown option for generate: --nonsense',
+        },
+      ]);
+    });
+
+    it('reports a flag with no value, and two paths, the same way', async () => {
+      const missingValue = await runCli(['generate', '--target', '--json']);
+      expect(missingValue.code).toBe(2);
+      expect((JSON.parse(missingValue.stdout) as GenerateJson).diagnostics[0]?.code).toBe('U8G2GL_USAGE');
+
+      const twoPaths = await runCli(['generate', 'a', 'b', '--json']);
+      expect(twoPaths.code).toBe(2);
+      expect((JSON.parse(twoPaths.stdout) as GenerateJson).diagnostics[0]?.message).toContain('takes one path');
+    });
+
+    it('still prints prose on stderr without --json, at the same exit status', async () => {
+      const res = await runCli(['generate', '.', '--nonsense']);
+      expect(res.code).toBe(2);
+      expect(res.stderr).toContain('Error: Unknown option for generate: --nonsense');
+      expect(res.stdout).toBe('');
+    });
+
+    it('reports an unknown command and a missing command as JSON too', async () => {
+      const unknown = await runCli(['nonsense', '--json']);
+      expect(unknown.code).toBe(1);
+      expect((JSON.parse(unknown.stdout) as GenerateJson).diagnostics[0]?.code).toBe('U8G2GL_USAGE');
+
+      const none = await runCli(['--json']);
+      expect(none.code).toBe(2);
+      expect((JSON.parse(none.stdout) as GenerateJson).diagnostics[0]?.code).toBe('U8G2GL_USAGE');
+    });
+  });
+
   it('is listed in --help with its --json contract', async () => {
     const res = await runCli(['--help']);
 
     expect(res.stdout).toContain('generate   Validate a project and write its generated C++ files');
-    expect(res.stdout).toContain('{ "files": [{ "path", "action" }], "diagnostics": [...], "errors": N, "warnings": N }');
+    // PR-04 WO12 added the §18 report to the contract, so the help states all
+    // seven keys, that a cost figure is a tagged union, and that codes are stable.
+    expect(res.stdout).toContain('{ "files": [{ "path", "action" }], "diagnostics": [...], "errors": N,');
+    expect(res.stdout).toContain('"warnings": N, "budget": {...}, "capacity": {...}, "realisation": {...} }');
+    expect(res.stdout).toContain('{ "kind": "unmeasured", "reason" }');
+    expect(res.stdout).toContain('breaking change under section 15.4');
   });
 });

@@ -26,7 +26,7 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Target } from '../schema/project.js';
 import type { ScreenPipeline } from '../resolver/index.js';
-import { validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
+import { compareDiagnostics, validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
 import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
 import type { RealisationResult } from './realise/index.js';
 
@@ -129,19 +129,11 @@ export function finaliseDiagnostics(diagnostics: readonly Diagnostic[]): Validat
   }
 
   // --- Step 2: Sort deterministically (§13.9) and count ---
-  // The same comparator validate() uses, so a merged list orders as it would.
-  unique.sort((a, b) => {
-    if (a.file !== b.file) {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    if (a.column !== b.column) {
-      return a.column - b.column;
-    }
-    return a.code.localeCompare(b.code);
-  });
+  // Literally the comparator validate() uses, not a copy of it: this list is
+  // validate()'s output with the loader's diagnostics merged in, so a second
+  // spelling could order the merged list differently from the unmerged one and
+  // the two journeys would disagree about a document (PR-04 WO12).
+  unique.sort(compareDiagnostics);
 
   let errors = 0;
   let warnings = 0;

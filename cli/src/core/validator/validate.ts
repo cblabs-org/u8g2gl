@@ -14,10 +14,18 @@
  *              Geometry is checked for one target — the one `generate` builds, or
  *              the project's first — and the result says which (§7.2, PR-04 WO7b).
  *
+ *              §13.9's diagnostic order lives here, as {@link compareDiagnostics},
+ *              because this is the pass that first establishes it. Every other
+ *              path that orders diagnostics — `check-project.ts`'s merge and the
+ *              CLI's formatter — sorts through this one function, so the order a
+ *              consumer reads can never depend on which path produced the list
+ *              (PR-04 WO5b carry, WO12).
+ *
  * Exports:
  * - ValidateInput: Complete project input model passed to the validator
  * - CheckedTarget: The target geometry was checked against, and its display
  * - ValidateResult: Deterministically ordered diagnostics and error counts
+ * - compareDiagnostics(): §13.9's order — file, line, column, code, by code unit
  * - validate(input): Run all validation passes and return aggregated results
  */
 
@@ -126,6 +134,43 @@ export interface ValidateResult {
 }
 
 /**
+ * @brief §13.9's diagnostic order: file, then line, then column, then code.
+ *
+ * Strings are compared **by UTF-16 code unit**, never with `localeCompare`.
+ * `localeCompare` consults the host's collation, which case-folds and reorders
+ * punctuation — `'a'.localeCompare('B')` is negative on an ICU build and
+ * positive by code unit — so the same project reported its diagnostics in
+ * different orders on different machines, and a `--json` consumer comparing two
+ * CI runs saw a diff that was not there. §13.9 requires one order for one input;
+ * a code-unit comparison is the only one that is a property of the data
+ * (PR-04 WO5b carry, closed in WO12).
+ *
+ * The comparator is total for a diagnostic list: two diagnostics agreeing on all
+ * four keys are the same report, which {@link finaliseDiagnostics}
+ * deduplicates, so no tie needs breaking here and `Array.sort`'s stability is
+ * never relied on.
+ *
+ * @param a First diagnostic.
+ * @param b Second diagnostic.
+ * @return Negative if `a` sorts first, positive if `b` does, 0 if they tie.
+ */
+export function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
+  if (a.file !== b.file) {
+    return a.file < b.file ? -1 : 1;
+  }
+  if (a.line !== b.line) {
+    return a.line - b.line;
+  }
+  if (a.column !== b.column) {
+    return a.column - b.column;
+  }
+  if (a.code !== b.code) {
+    return a.code < b.code ? -1 : 1;
+  }
+  return 0;
+}
+
+/**
  * Runs all validation passes in order and produces sorted diagnostics.
  *
  * Execution sequence:
@@ -188,18 +233,7 @@ export function validate(input: ValidateInput): ValidateResult {
   allDiagnostics.push(...validateRealisation(passInput));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
-  allDiagnostics.sort((a, b) => {
-    if (a.file !== b.file) {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    if (a.column !== b.column) {
-      return a.column - b.column;
-    }
-    return a.code.localeCompare(b.code);
-  });
+  allDiagnostics.sort(compareDiagnostics);
 
   let errors = 0;
   let warnings = 0;

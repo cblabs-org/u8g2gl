@@ -18,6 +18,9 @@
  * - Emission — §13.2's value spelling, the draw-argument order and the
  *   project-level units (emit/). WO10 and WO11 emit through these helpers
  *   rather than spelling a setter call or an argument list of their own.
+ * - Reporting — §18's budget, §18.1's capacities and §13.5's realisation
+ *   (report/). Exported because these are the types `generate --json` publishes
+ *   ([D-16]): a contract a consumer cannot import is not typed.
  */
 
 export { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
@@ -36,3 +39,4 @@ export {
 } from './generate.js';
 export * from './realise/index.js';
 export * from './emit/index.js';
+export * from './report/index.js';

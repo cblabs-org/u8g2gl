@@ -30,6 +30,9 @@ import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
 import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
 import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
+import { buildGenerateReport, type GenerateReport } from '../core/generator/report/index.js';
+import { findTargetDisplay } from '../core/resolver/index.js';
+import { formatBudgetReport } from './format-budget.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
 import type { CheckedTarget } from '../core/validator/index.js';
 import {
@@ -58,6 +61,19 @@ const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate'] as const;
 
 /** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
 const DEFAULT_OUTPUT_DIR = 'generated';
+
+/**
+ * The stable code a usage error carries under `--json` ([D-16], §15.3).
+ *
+ * Before PR-04 WO12 a mistyped flag printed prose on stderr even under `--json`,
+ * so the one consumer the flag exists for — an agent or a CI script — had to
+ * parse a sentence to learn it had called the tool wrongly, or saw empty stdout
+ * and no explanation at all. It is a **CLI** code rather than one of the
+ * document's `DIAGNOSTIC_CODES`: nothing in the project is at fault, so the
+ * diagnostic names no file. Like every code it is public and stable, and
+ * renaming it is a breaking change (§15.4).
+ */
+const USAGE_ERROR_CODE = 'U8G2GL_USAGE';
 
 /**
  * Appended to the firmware output directory to name the editor target's default
@@ -154,9 +170,19 @@ Generate Options:
   errors, and any error means nothing is written. Only files inside the output
   directory are written, and only files carrying the GENERATED header are
   deleted. An unnamed element is an error: use 'validate --fix-names'.
-  --json: { "files": [{ "path", "action" }], "diagnostics": [...], "errors": N, "warnings": N }
+  Every run prints the section 18 budget, the section 18.1 capacities and what
+  each element was realised as. A cost the generator cannot know is reported as
+  'unmeasured' with the reason, never as an estimate (section 1.3).
+  --json: { "files": [{ "path", "action" }], "diagnostics": [...], "errors": N,
+            "warnings": N, "budget": {...}, "capacity": {...}, "realisation": {...} }
           action is created | updated | unchanged | deleted — what was done,
-          or with --check what would be done. "files" is [] when refused.
+          or with --check what would be done. "files" is [] when refused, and
+          budget/capacity/realisation are then absent. Each cost figure is
+          { "kind": "measured", "bytes", "derivation" } or
+          { "kind": "unmeasured", "reason" } — branch on "kind".
+          Diagnostic "code" values are a public, stable API: renaming one is a
+          breaking change under section 15.4. A usage error under --json is JSON
+          too, with code U8G2GL_USAGE and exit status 2.
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -532,24 +558,49 @@ function isTargetKind(value: string): value is TargetKind {
   return (TARGET_KINDS as readonly string[]).includes(value);
 }
 
+// exitWithUsageError
+// A `generate` usage error — a mistyped flag, a missing value, two paths — in the
+// command's own JSON shape under `--json`, or two lines on stderr without it.
+// Exits 2 either way, which is the status a usage error has always had; only the
+// *shape* of the report changes, so a caller reading the status is unaffected
+// ([D-16], PR-04 WO5b carry closed in WO12).
+//   json    — whether --json was given
+//   message — what was wrong with the command line
+function exitWithUsageError(json: boolean, message: string): never {
+  if (json) {
+    const diagnostic: Diagnostic = {
+      code: USAGE_ERROR_CODE,
+      severity: 'error',
+      // No file: the fault is in the command line, not in the project. An empty
+      // path says so, rather than blaming whichever file happened to be named.
+      file: '',
+      line: 1,
+      column: 1,
+      message,
+    };
+    console.log(JSON.stringify({ files: [], diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
+  } else {
+    console.error(`Error: ${message}`);
+    console.error("Run 'u8g2gl --help' for generate's options.");
+  }
+  process.exit(2);
+}
+
 // parseGenerateArgs
 // Parses `generate [path] --target <name> --out <dir> --check
 // --target-kind <kind>`, or reports a
 // usage error and exits 2. Strict, unlike `validate`: a mistyped flag on a
 // command that writes files must not be silently ignored.
 //   args — subcommand arguments, global flags already removed
-function parseGenerateArgs(args: readonly string[]): GenerateArgs {
+//   json — whether --json was given, so the refusal takes the JSON shape too
+function parseGenerateArgs(args: readonly string[], json: boolean): GenerateArgs {
   let path: string | undefined;
   let target: string | undefined;
   let out: string | undefined;
   let check = false;
   let targetKind: TargetKind = 'firmware';
 
-  const usageError = (message: string): never => {
-    console.error(`Error: ${message}`);
-    console.error("Run 'u8g2gl --help' for generate's options.");
-    process.exit(2);
-  };
+  const usageError = (message: string): never => exitWithUsageError(json, message);
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? '';
@@ -628,6 +679,33 @@ function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorV
   }).files;
 }
 
+// reportFor
+// §18's report for a build that generated, built from that build's own
+// realisation, capacities and target — the same model the files were emitted
+// from, so the report cannot describe a different document from the one on disk
+// (§13.11 step 7).
+//   loaded           — the loaded project
+//   result           — its successful generation
+//   generatorVersion — the version stamped into those files
+function reportFor(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateReport {
+  const { realised, capacities, target: targetName } = result;
+  const target = loaded.model.project.targets.find((t) => t.name === targetName);
+  if (realised === undefined || capacities === undefined || target === undefined) {
+    throw new Error('A build that generated carries its realisation, capacities and target.');
+  }
+  const display = findTargetDisplay(target, loaded.model.catalogue);
+  return buildGenerateReport({
+    globals: loaded.model.globals,
+    manifests: loaded.model.manifests,
+    realised,
+    capacities,
+    target,
+    ...(display !== undefined ? { display } : {}),
+    generatorVersion,
+    assets: loaded.assets,
+  });
+}
+
 /**
  * @brief Executes the `generate` subcommand.
  *
@@ -635,12 +713,43 @@ function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorV
  * way, but with not-yet-supported constructs as errors. Any error refuses the
  * build: nothing is written.
  *
- * `--json` contract (§15.3, [D-16]), on stdout:
- * `{ "files": FileChange[], "diagnostics": Diagnostic[], "errors": N, "warnings": N }`,
- * where each `FileChange` is `{ "path", "action" }`, `path` is relative to the
- * output directory, and `action` is `created | updated | unchanged | deleted` —
- * what was done or, under `--check`, what would be done. `files` is `[]` when
- * the build is refused. The §18 budget joins this object in PR-04 WO12.
+ * **`--json` contract (§15.3, [D-16]), on stdout.** Seven keys, in this order:
+ *
+ * ```
+ * {
+ *   "files":       [{ "path", "action" }],   // output-relative; [] when refused
+ *   "diagnostics": [Diagnostic],             // file, line, column order (§13.9)
+ *   "errors":      N,
+ *   "warnings":    N,
+ *   "budget":      BudgetReport,             // §18  — present only on a build
+ *   "capacity":    CapacityReport,           // §18.1, [D-21]
+ *   "realisation": RealisationReport          // §13.5, incl. the [D-18] amendment
+ * }
+ * ```
+ *
+ * `action` is `created | updated | unchanged | deleted` — what was done or, under
+ * `--check`, what would be done. `budget`, `capacity` and `realisation` describe
+ * the build that happened, so they are **absent** when the build was refused,
+ * exactly as `files` is then empty: a report for code that was not written would
+ * describe nothing.
+ *
+ * Every cost figure in `budget` is `{ "kind": "measured", "bytes", "derivation" }`
+ * or `{ "kind": "unmeasured", "reason" }`. A consumer must branch on `kind`; there
+ * is deliberately no numeric field to read when a cost is unknown, because §1.3
+ * forbids reporting a figure the tooling cannot substantiate.
+ *
+ * **Diagnostic codes are public and stable.** A consumer branches on
+ * `diagnostics[].code` — the `DIAGNOSTIC_CODES` table in
+ * `core/schema/diagnostic.ts`, plus the CLI's own {@link USAGE_ERROR_CODE}.
+ * Renaming a code is a breaking change under §15.4 and must be announced with a
+ * migration, exactly as a schema change is; the prose `message` beside it may be
+ * reworded freely. Codes are added, never repurposed: PR-04 WO11b added
+ * `U8G2GL_BOUND_POSITION_HAS_CHILDREN` and `U8G2GL_STRING_TOO_LONG` and
+ * deliberately left `U8G2GL_UNRESOLVED_GEOMETRY`'s string alone when its
+ * TypeScript key was renamed.
+ *
+ * A **usage error** under `--json` is JSON too, never prose on stderr:
+ * `{ "files": [], "diagnostics": [{ "code": "U8G2GL_USAGE", … }], … }` with exit 2.
  *
  * Exit status: 0 on success (under `--check`, only if nothing would change);
  * 1 if refused, or under `--check` if any file would change; 2 on a usage error.
@@ -650,7 +759,7 @@ function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorV
  * @param useColor Whether ANSI colouring is enabled.
  */
 function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
-  const options = parseGenerateArgs(args);
+  const options = parseGenerateArgs(args, json);
 
   // --- Step 1: Load, validate and lay out — all or nothing ---
   const loaded = loadOrExit(options.path, json, { files: [] });
@@ -700,9 +809,29 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
   }
   const drift = changes.filter((c) => c.action !== 'unchanged');
 
-  // --- Step 4: Report ---
+  // --- Step 4: The §18 report, from the model this build emitted from ---
+  // §13.11's last pipeline step, and §1.3's obligation: every `generate` run
+  // states what the project costs, including under `--check`, where nothing was
+  // written but the figures are still the ones the checked output carries.
+  const report = reportFor(loaded, result, generatorVersion);
+
+  // --- Step 5: Report ---
   if (json) {
-    console.log(JSON.stringify({ files: changes, diagnostics, errors, warnings }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          files: changes,
+          diagnostics,
+          errors,
+          warnings,
+          budget: report.budget,
+          capacity: report.capacity,
+          realisation: report.realisation,
+        },
+        null,
+        2,
+      ),
+    );
   } else {
     if (warnings > 0) {
       console.log(`${formatted}\n`);
@@ -719,6 +848,7 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
           formatChanges(changes, false),
       );
     }
+    console.log(`\n${formatBudgetReport(report, { color: useColor })}`);
   }
   process.exit(options.check && drift.length > 0 ? 1 : 0);
 }
@@ -784,6 +914,11 @@ export function runCli(rawArgs: readonly string[]): void {
 
   // --- Step 3: Validate presence of a subcommand ---
   if (!subcommand) {
+    if (json) {
+      // Usage prose on stdout would corrupt the one stream a --json caller
+      // parses, so the refusal takes the JSON shape here too ([D-16]).
+      exitWithUsageError(true, 'No command given. Commands: ' + KNOWN_COMMANDS.join(', ') + '.');
+    }
     printUsage();
     process.exit(2);
   }
@@ -810,6 +945,19 @@ export function runCli(rawArgs: readonly string[]): void {
   }
 
   // --- Step 5: Handle unknown subcommand ---
+  if (json) {
+    // Exit 1, as an unknown command always has: only the shape changes ([D-16]).
+    const diagnostic: Diagnostic = {
+      code: USAGE_ERROR_CODE,
+      severity: 'error',
+      file: '',
+      line: 1,
+      column: 1,
+      message: `Unknown command '${subcommand}'. Commands: ${KNOWN_COMMANDS.join(', ')}.`,
+    };
+    console.log(JSON.stringify({ diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
+    process.exit(1);
+  }
   console.error(`Unknown command: ${subcommand}`);
   console.error(`Available commands: ${KNOWN_COMMANDS.join(', ')}`);
   process.exit(1);

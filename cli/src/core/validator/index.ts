@@ -10,6 +10,7 @@
  *
  * Exports:
  * - validate: Main multi-pass validation function
+ * - compareDiagnostics: §13.9's diagnostic order, by code unit rather than locale
  * - ValidateInput: Parameter contract for validation
  * - ValidateResult: Return contract containing diagnostics and counts
  * - BOOLEAN_VALUES, booleanValueError, enumValueError: the one bool and enum value rules
@@ -18,7 +19,7 @@
  *   validateNotYetSupported, validateRealisation
  */
 
-export { validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
+export { compareDiagnostics, validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
 export { validateSchema } from './validate-schema.js';
 export { validateReferences } from './validate-references.js';
 export { validateDisplay } from './validate-display.js';
