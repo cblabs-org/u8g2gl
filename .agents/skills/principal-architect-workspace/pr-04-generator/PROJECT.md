@@ -1364,6 +1364,30 @@ agreed in the same message, verbatim: *"PR-09 - yes"*. The PA carries it into PR
 entry at wrap-up.
 
 
+### Readability review of the stack — 2026-09-28, and a proposed WO13 (awaiting the owner)
+
+The `readability-reviewer` agent audited the whole PR-04 diff (`ff20f0c..d9e21e0`) against the
+house standards. Its report is `wo-readability/WORKORDER.md`, with the PA's triage at the top.
+
+**Result: P1 0, P2 3, P3 4, P4 0.** Every new or modified file carries a proper header with SPDX; no
+heap, `std::function` or `String` misuse; enums have explicit base types; `mark_dirty()` guarding
+correct everywhere sampled. Nothing found would change behaviour.
+
+**PA spot-checks.** Confirmed: the mis-cased test stub (`test/stubs/U8G2lib.h` against U8G2's real
+`cppsrc/U8g2lib.h`, the reason every runtime header carries a four-branch `__has_include` chain);
+`u8g2gl_xbm.xml`'s redundant `bitmap_mode`; both duplicate inline comparators, which contradict
+`a93f5f9`'s claim of one comparator everywhere; and the stale "Its C++ identifier" comment.
+**One finding is wrong as stated:** `types.test.ts`'s object lists 23 entries, matching its title, so
+the reviewer's "update it to 24" would introduce the error it reports. The defect is the word *all*.
+
+**Ledger growth — the owner's call.** Fixing these needs a twenty-first work order (**WO13**,
+`u8g2gl-generator/wo13-readability`, based on WO12). Under Standing instructions the PA escalates
+ledger growth rather than adding it, so WO13 stays `draft` until the owner approves. Nothing in it
+changes behaviour, and PR-04 could ship without it, with the items carried forward instead.
+
+**Not in WO13:** the validator ↔ generator layering Observation goes to the Chief Architect with
+WO11b f8.
+
 ### WO12 — complete (`2bd6473`, `33a87ce`, `8ccd541`, `58c8fc7`; follow-up `a93f5f9`, `8a853a0`) — the last work order
 
 **Verified independently by the PA on 2026-09-28:**
@@ -1688,6 +1712,7 @@ bind_text is active". WO10b's line items say so.
 
 ## Status Log
 
+- 2026-09-28 — **Readability review complete** (P1 0, P2 3, P3 4, P4 0; nothing behavioural). PA spot-checked and found one finding wrong as stated. Remediation needs a twenty-first work order, so **WO13 is proposed and awaits the owner**; PR-04 can ship without it. Layering Observation held for the Chief Architect bridge.
 - 2026-09-28 — **WO12 complete** (`2bd6473`…`8a853a0`) — **all twenty work orders are done.** Verified independently: 0 warnings, ctest 361, CLI 1044/62, capacities match the header, 0.7.0 stamped while goldens stay pinned, determinism guards non-vacuous under two PA mutations (4 and 12 failures), and the catalogue reorder proven content-identical by parsing both versions. **The framebuffer stop-and-report is upheld against the PA's own work order**: §18 and §5.2 require the figure, so it is reported with its derivation and `ramDerivedBytes` is 1074. Findings placed: 4, 7, 10 → PR-05 obligations; 9 → owner question (`max_len`); 5, 6, 8 → accepted or recorded. **Wrap-up begins**: readability review over the stack.
 - 2026-09-27 — **WO11b complete** (twelve commits, `280cd0e`…`86a3a47`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 948/57, tsc and lint clean; emission byte-identical; rulings 1c and 6, the builtin-font check, and all three follow-up items plus finding 12 confirmed through the built CLI. Three PA premises were wrong and are recorded. Findings placed: 1, 2, 4, 10 → Chief Architect bridge; 7, 8, 11 → wrap-up; 6 → no action. **WO12 revised and dispatched** on `u8g2gl-generator/wo12-budget-determinism`. WO12 is the last work order.
 - 2026-09-19 — **WO10b complete** (`f1cffa9`, `c9b8f96`, `7d6fed9`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 859/56, tsc and lint clean; end to end byte-identical bar the stamp; the defect reintroduced by the PA fails both acceptance tests (15 in all). **Owner confirmed the WO11b reading** and agreed the PR-09 obligation (both verbatim above). WO11b revised (findings 1, 2) and dispatched on `u8g2gl-generator/wo11b-validator-hardening`.
