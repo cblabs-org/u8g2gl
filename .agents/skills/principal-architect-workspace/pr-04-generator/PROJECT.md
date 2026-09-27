@@ -81,7 +81,7 @@ PR-3R found three of its four real defects by unifying duplicated logic. So:
 - [x] **[WO10 — screen emission and compile layer](wo10-emit-screens/WORKORDER.md)** ✅ `3a58ab3` · base WO9 · standard · §13.7, §13.8, §17.1
 - [x] **[WO11 — editor target](wo11-editor-target/WORKORDER.md)** ✅ `61d6972`, `7958d75`, `e527504` · base WO10 · standard · [UD-4], ui_spec §15
 - [x] **[WO10b — bound text reaches the label](wo10b-bound-text/WORKORDER.md)** ✅ `f1cffa9`, `c9b8f96`, `7d6fed9` · `u8g2gl-generator/wo10b-bound-text` · base WO11 · **high** · runtime defect found in WO10 review (owner-approved 2026-09-18; must-fix, 2026-09-19) + CA rulings 1a/1b/2/3
-- [ ] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries, CA rulings 1c/6 (owner-approved 2026-09-18, reading confirmed 2026-09-19)
+- [x] **[WO11b — validator hardening](wo11b-validator-hardening/WORKORDER.md)** ✅ `280cd0e`…`86a3a47` · `u8g2gl-generator/wo11b-validator-hardening` · base WO10b · standard · validate/generate asymmetries from WO9/WO10, WO12's validator carries, CA rulings 1c/6 (owner-approved 2026-09-18, reading confirmed 2026-09-19)
 - [ ] **[WO12 — budget, `--json`, determinism](wo12-budget-determinism/WORKORDER.md)** · base WO11b · standard · §13.9, §18, [D-16]; CLI 0.7.0
 
 **WO2–WO12 were drafted before WO1 ran.** Their line items are revised by the PA
@@ -1364,6 +1364,66 @@ agreed in the same message, verbatim: *"PR-09 - yes"*. The PA carries it into PR
 entry at wrap-up.
 
 
+### WO11b — complete (`280cd0e`, `46b3377`, `f6e294c`, `11642c2`, `2d5d89a`, `a1bed44`; follow-up `19c034b`, `08e64c5`, `47d6954`, `08ce896`, `3ccf5a7`, `86a3a47`)
+
+Interrupted three times — a session limit, a stream stall, then the weekly limit — and resumed each
+time from a clean tree with nothing lost. **Verified independently by the PA on 2026-09-19 and
+2026-09-27:**
+
+- **Placement and scope.** Every commit is on `wo11b-validator-hardening` only, the tree is clean,
+  and the throwaway worktree is gone. Runtime C++, `docs/`, `PROGRAM*`, `.agents/rules` and
+  `extern` are untouched.
+- **Suites, run sequentially, at the tip.** C++ build **0 warnings**, `ctest` **361/361** with the
+  one known skip. CLI **948 tests / 57 files**. `tsc` and lint clean.
+- **Emission unchanged.** The committed fixture regenerates byte-identically apart from the stamp,
+  including after the parser and validator changes.
+- **Headline behaviour through the built CLI**, on throwaway projects under `tmp/`, with `validate`
+  and `generate` agreeing in every case:
+  - **Ruling 6:** a quarter-circle at the display corner (`x=0 y=0 radius=10 segments=lower_right`)
+    passes; the same circle with `segments="all"` is two `U8G2GL_OUT_OF_BOUNDS` errors naming
+    `x - radius`. This is the case the Chief Architect's departure from the PA's recommendation was
+    for, and it behaves as ruled.
+  - **Ruling 1c:** a `<u8g2gl_obj>` with `bind_x` and one child is
+    `U8G2GL_BOUND_POSITION_HAS_CHILDREN`, and the message gives the reason and points to §21 Q-16.
+  - **Builtin fonts:** `u8g2_font_5x7_mrr` is refused as "not a font U8G2 2.36.18 bundles", with
+    near-miss suggestions. The list is 2039 names derived from the pinned submodule, cross-checked
+    between `u8g2.h` and `u8g2_fonts.c`, with a drift test.
+  - **WO10b f1:** `bind_x` with no literal `x` now validates.
+  - **Follow-up:** `truncate="true"` and `bogus="1"` on a `<style>` are both
+    `U8G2GL_UNKNOWN_ATTRIBUTE`, `truncate` carrying its [D-19] remedy; a 10×10 box accepts
+    `radius="4"` and refuses `radius="5"` (the exact U8G2 limit); `invert="yes"` is
+    `U8G2GL_INVALID_ENUM_VALUE`, "it is a boolean".
+- **Base-failure evidence.** 68 tests in `validator-hardening.test.ts` at first dispatch: 53 failed
+  at the base, 51 of them behaviourally. The three follow-up items added 12 more, all behavioural
+  failures, and finding 12 added 11 (10 failing, all behavioural).
+- **Diagnostic codes.** Added: `U8G2GL_BOUND_POSITION_HAS_CHILDREN`, `U8G2GL_STRING_TOO_LONG`.
+  Code strings are unchanged elsewhere: `UNRESOLVED_GEOMETRY` → `UNRESOLVED_VALUE` renames the key
+  only. The TypeScript API renames (`NotYetSupportedPolicy` → `RefusalPolicy`) are pre-1.0 and
+  disclosed.
+
+**Three PA premises corrected by this work order** (all now recorded as lessons):
+
+1. The work order claimed the validator rejected `truncate`. It did not — that [D-19] message
+   appears only in the 0.3 migration path, so `truncate` and *every* unknown `<style>` attribute
+   passed silently. The PA reproduced it and added the item.
+2. `invert="yes"` parsed to `false`, because `getBooleanAttribute` answered `value === 'true'`. Only
+   found because the worker kept looking after its listed items were done.
+3. Pass 1 kept its own value sets for four style properties, a second spelling of the manifest.
+
+**Findings triage**
+
+| # | Finding | Placed |
+|---|---|---|
+| 1 | 522 of U8G2's 2039 fonts cannot be named in `<builtin>` at all, because their names contain capitals (`u8g2_font_helvR08_tr`) and §13.4 requires a lowercase name that doubles as the identifier | **Chief Architect**, next bridge — this blocks real fonts, so it needs a ruling |
+| 2 | U8G2's 191 legacy `u8g_font_*` macros would compile but are refused | **Chief Architect**, same bridge (probably correct to refuse; confirm) |
+| 4 | `style_*` is accepted for any property with a setter, so `style_text` builds, not only §10's nine style properties | **Chief Architect**, same bridge |
+| 6 | A string subject with no `max_len` is not length-checked, because its capacity is a build-overridable macro | **no action**, recorded |
+| 7 | The manifests declare a format on `bind_text`'s string overload, which the runtime does not take | **wrap-up** (manifest fix, now unreachable) |
+| 8 | The validator imports tables from `generator/emit/`, extending the layering wart WO8c accepted | **wrap-up** (layering, with realisation's) |
+| 10 | A radius too large for a *bound* size, or set through a style, reaches U8G2 unguarded at run time | **Chief Architect**, same bridge — pairs with WO10b f6 (bound draw arguments wrap where object bindings clamp) |
+| 11 | The editor registry unit's `static` tables are outside the collision table (internal to one translation unit) | **wrap-up** (note) |
+| 12 | Style property values unchecked | **closed in this work order** (`3ccf5a7`) |
+
 ### WO10b — complete (`f1cffa9`, `c9b8f96`, `7d6fed9`) — bound text draws; rulings 1a/1b/2/3
 
 **Verified independently by the PA on 2026-09-19:**
@@ -1567,6 +1627,7 @@ bind_text is active". WO10b's line items say so.
 
 ## Status Log
 
+- 2026-09-27 — **WO11b complete** (twelve commits, `280cd0e`…`86a3a47`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 948/57, tsc and lint clean; emission byte-identical; rulings 1c and 6, the builtin-font check, and all three follow-up items plus finding 12 confirmed through the built CLI. Three PA premises were wrong and are recorded. Findings placed: 1, 2, 4, 10 → Chief Architect bridge; 7, 8, 11 → wrap-up; 6 → no action. **WO12 revised and dispatched** on `u8g2gl-generator/wo12-budget-determinism`. WO12 is the last work order.
 - 2026-09-19 — **WO10b complete** (`f1cffa9`, `c9b8f96`, `7d6fed9`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 859/56, tsc and lint clean; end to end byte-identical bar the stamp; the defect reintroduced by the PA fails both acceptance tests (15 in all). **Owner confirmed the WO11b reading** and agreed the PR-09 obligation (both verbatim above). WO11b revised (findings 1, 2) and dispatched on `u8g2gl-generator/wo11b-validator-hardening`.
 - 2026-09-19 — **WO11 complete** (`61d6972`, `7958d75`, `e527504`). Verified independently: 0 warnings, ctest 336 (one known skip), CLI 851/56, tsc and lint clean; end to end byte-identical to the fixture bar the stamp; non-vacuity reproduced; no editor symbols in firmware. Findings triaged (3, 4 → WO10b; 6 → WO11b; 2 → WO12; 1, 7, 8 → PR-06; 5 → Chief Architect). **WO10b revised and dispatched** on `u8g2gl-generator/wo10b-bound-text`.
 - 2026-09-19 — **Chief Architect rulings on CA-BRIDGE-2026-09-18 received; stack rebased onto `main` @ `ff20f0c`.** WO11 paused at green partial `6efa6fa` (now `61d6972` after the rebase) for the rebase; 79 commits, no conflicts, tree identical to the old tip plus `main`'s docs. PA swapped §21's Q-12/Q-13 rows as the Chief Architect directed. **Owner approved WO10b as must-fix** ("agree with your recommendation on WO10b"); recorded under Human Approval, with root cause (runtime). Rulings 1a/1b/2/3 → WO10b, 1c/6/`truncate` → WO11b; no new work order. WO11 resumed.

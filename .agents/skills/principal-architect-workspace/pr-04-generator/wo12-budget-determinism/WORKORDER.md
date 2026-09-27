@@ -5,7 +5,7 @@ title: "Budget report, generate --json contract, determinism, CLI 0.7.0"
 branch: u8g2gl-generator/wo12-budget-determinism
 base: u8g2gl-generator/wo11b-validator-hardening
 complexity: standard
-status: draft — PA revises against WO11b's Completion Report before dispatch
+status: dispatched
 ---
 
 # WO12 — Budget, `--json`, determinism
@@ -55,7 +55,7 @@ by test rather than asserted.
 
 ## Line-Item Instructions
 
-- [ ] **§18.1 capacity section:** busiest screen objects `/ 254` with its name,
+- [ ] **§18.1 capacity section:** busiest screen objects `/ 254` with its name (screens and objects are named as the author wrote them, not by their emitted `ui_obj_` identifiers),
       busiest object's bindings with its name, total bindings, styles.
 - [ ] **RAM lines only where derivable:** subject storage from declared sizes
       (`max_len + 1`), capacity counts. Widget `sizeof`, flash and framebuffer
@@ -70,6 +70,12 @@ by test rather than asserted.
       contract unchanged.
 - [ ] **Determinism tests:** generate twice → identical bytes; shuffle file
       discovery order → identical bytes; diagnostics ordered file, line, column.
+- [ ] **Carried from WO11 — the scene file's marker.** `ui_scene.json` cannot carry the GENERATED
+      marker, so the writer never deletes a stale one. Give the writer a way to recognise it (for
+      example a top-level marker key) without special-casing the file name.
+- [ ] **Diagnostic codes in the `--json` contract.** WO11b added `U8G2GL_BOUND_POSITION_HAS_CHILDREN`
+      and `U8G2GL_STRING_TOO_LONG` and renamed one key. The contract documents the code list as
+      public, and says that renaming a code is a breaking change under §15.4.
 - [ ] **Carried from WO5b — locale-independent diagnostic order.** `validate.ts` and
       `check-project.ts` sort with `localeCompare`, so the order can differ between
       machines. §13.9 orders diagnostics by file, then line, then column; compare by
