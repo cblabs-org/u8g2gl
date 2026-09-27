@@ -16,6 +16,7 @@
  */
 
 import { STYLE_PROPERTIES, type StylePropertyKey } from '../schema/globals.js';
+import type { SourceLocation } from '../schema/source-location.js';
 import type {
   BdfFontDecl,
   BuiltinFontDecl,
@@ -31,8 +32,8 @@ import type {
 } from '../schema/globals.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
+  getAttribute,
   getAttributeValue,
-  getBooleanAttribute,
   getChildren,
   getNumberAttribute,
   requireAttribute,
@@ -62,6 +63,7 @@ export function parseStyleDeclarations(
     // (PR-04 WO11b) — `truncate`, which [D-19] deleted, among them.
     const values: Partial<Record<StylePropertyKey, string | boolean | number>> = {};
     const known = new Set<string>(['name']);
+    const written: { attribute: string; spelled: string; value: string; loc?: SourceLocation }[] = [];
     for (const property of STYLE_PROPERTIES) {
       const spellings = [property.attribute, ...(property.aliases ?? [])];
       spellings.forEach((spelling) => known.add(spelling));
@@ -69,12 +71,23 @@ export function parseStyleDeclarations(
       if (spelled === undefined) {
         continue;
       }
+      // Recorded as written, whatever it says, so Pass 1 can hold the text to
+      // the property's type (PR-04 WO11b, finding 12).
+      const text = getAttributeValue(el, spelled) ?? '';
+      const loc = getAttribute(el, spelled)?.loc;
+      written.push({ attribute: property.attribute, spelled, value: text, ...(loc ? { loc } : {}) });
       const value =
         property.kind === 'bool'
-          ? getBooleanAttribute(el, spelled)
+          ? // A boolean is `true` or `false` and nothing else: anything else is
+            // left unset rather than quietly becoming `false`, and Pass 1 reports
+            // it. `getBooleanAttribute` answers `value === 'true'`, which is what
+            // made `invert="yes"` mean `invert="false"`.
+            text === 'true' || text === 'false'
+            ? text === 'true'
+            : undefined
           : property.kind === 'int'
             ? getNumberAttribute(el, spelled, filename, diagnostics)
-            : getAttributeValue(el, spelled);
+            : text;
       if (value !== undefined) {
         values[property.key] = value;
       }
@@ -87,6 +100,7 @@ export function parseStyleDeclarations(
       name,
       ...(values as Partial<Pick<StyleDecl, StylePropertyKey>>),
       ...(unknownAttributes.length > 0 ? { unknownAttributes } : {}),
+      ...(written.length > 0 ? { written } : {}),
       loc: el.loc,
     });
   }

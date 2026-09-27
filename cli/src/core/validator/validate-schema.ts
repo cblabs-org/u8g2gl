@@ -26,7 +26,10 @@
  *              the four built-in constant names are reserved (§7.2), and a prop
  *              may not be both `required` and defaulted. A subject's initial
  *              value must fit its type, and a string's its `max_len` (PR-04
- *              WO11b).
+ *              WO11b). Every `<style>` property is held to the `u8g2gl_obj` prop
+ *              it is applied through, on global and screen-local styles alike,
+ *              through the one bool and enum rule an element's attribute uses
+ *              (value-rules.ts; PR-04 WO11b finding 12).
  *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
@@ -38,17 +41,10 @@ import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
-import {
-  STYLE_PROPERTIES,
-  type BitmapMode,
-  type DrawColor,
-  type FontMode,
-  type StyleDecl,
-  type SubjectDecl,
-  type SubjectType,
-  type TextAlign,
-} from '../schema/globals.js';
+import { STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
 import { findClosest } from '../catalogue/edit-distance.js';
+import { booleanValueError, enumValueError } from './value-rules.js';
+import { COLOR_VALUES } from '../generator/emit/value.js';
 
 const VALID_SCHEMA_VERSION = '0.4';
 
@@ -117,10 +113,6 @@ const VALID_SUBJECT_TYPES: ReadonlySet<SubjectType> = new Set([
   'time',
 ]);
 
-const VALID_DRAW_COLORS: ReadonlySet<DrawColor> = new Set(['0', '1', 'xor']);
-const VALID_TEXT_ALIGNS: ReadonlySet<TextAlign> = new Set(['left', 'center', 'right']);
-const VALID_FONT_MODES: ReadonlySet<FontMode> = new Set(['solid', 'transparent']);
-const VALID_BITMAP_MODES: ReadonlySet<BitmapMode> = new Set(['solid', 'transparent']);
 const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   'R0',
   'R1',
@@ -193,6 +185,48 @@ function unknownStyleAttributes(style: StyleDecl): Diagnostic[] {
       attribute.name === 'truncate' ? undefined : findClosest(attribute.name, spellings),
     ),
   );
+}
+
+// checkStyleValues
+// Every style property a `<style>` writes, against the `u8g2gl_obj` prop of the
+// same name — the prop the style is applied through (§10, `emit/styles.ts`), and
+// the very prop an element's own attribute of that name is checked against. So a
+// style and an element accept exactly the same values, through the one rule in
+// value-rules.ts, and say the same thing when they do not (PR-04 WO11b,
+// finding 12).
+//
+// This replaces four sets Pass 1 kept for `draw_color`, `align`, `font_mode` and
+// `bitmap_mode` — a second spelling of what the manifest already declares, which
+// also ran on global styles only. A `font` is Pass 2's (UNKNOWN_FONT); an `int`
+// is the parser's, which reports a non-integer where it reads it.
+//   style     — the declaration, with its properties as written
+//   manifests — the registry, for the root class's props
+function checkStyleValues(style: StyleDecl, manifests: ValidateInput['manifests']): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const root = manifests.get(ROOT_CLASS_MANIFEST);
+  if (root === undefined) {
+    return diagnostics; // No root manifest: emission cannot spell a style either.
+  }
+  const owner = `<style> '${style.name}'`;
+  for (const { attribute, spelled, value, loc } of style.written ?? []) {
+    const prop = root.api.props.find((candidate) => candidate.name === attribute);
+    if (prop === undefined) {
+      continue; // A property u8g2gl_obj does not declare is a framework defect, not an author's.
+    }
+    const at = loc ?? style.loc;
+    const diagnostic =
+      prop.type === 'bool'
+        ? booleanValueError(value, `'${spelled}' on ${owner}`, at)
+        : prop.type === 'enum'
+          ? enumValueError(value, (prop.values ?? '').split(',').map((member) => member.trim()), spelled, owner, at)
+          : prop.type === 'color'
+            ? enumValueError(value, COLOR_VALUES, spelled, owner, at)
+            : undefined;
+    if (diagnostic !== undefined) {
+      diagnostics.push(diagnostic);
+    }
+  }
+  return diagnostics;
 }
 
 /** The range of a `<time>` subject: Unix seconds, held as `uint32_t` (`set_time`). */
@@ -518,6 +552,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
 
     for (const style of globals.styles ?? []) {
       diagnostics.push(...unknownStyleAttributes(style));
+      diagnostics.push(...checkStyleValues(style, manifests));
       if (!style.name) {
         diagnostics.push(
           createDiagnostic(
@@ -525,50 +560,6 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             "Missing required attribute 'name' on <style>.",
             style.loc,
             'name',
-          ),
-        );
-      }
-      if (style.drawColor && !VALID_DRAW_COLORS.has(style.drawColor)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid drawColor '${style.drawColor}' on style '${style.name}'. Expected one of: ${Array.from(VALID_DRAW_COLORS).join(', ')}.`,
-            style.loc,
-            style.drawColor,
-            Array.from(VALID_DRAW_COLORS),
-          ),
-        );
-      }
-      if (style.align && !VALID_TEXT_ALIGNS.has(style.align)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid align '${style.align}' on style '${style.name}'. Expected one of: ${Array.from(VALID_TEXT_ALIGNS).join(', ')}.`,
-            style.loc,
-            style.align,
-            Array.from(VALID_TEXT_ALIGNS),
-          ),
-        );
-      }
-      if (style.fontMode && !VALID_FONT_MODES.has(style.fontMode)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid fontMode '${style.fontMode}' on style '${style.name}'. Expected one of: ${Array.from(VALID_FONT_MODES).join(', ')}.`,
-            style.loc,
-            style.fontMode,
-            Array.from(VALID_FONT_MODES),
-          ),
-        );
-      }
-      if (style.bitmapMode && !VALID_BITMAP_MODES.has(style.bitmapMode)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid bitmapMode '${style.bitmapMode}' on style '${style.name}'. Expected one of: ${Array.from(VALID_BITMAP_MODES).join(', ')}.`,
-            style.loc,
-            style.bitmapMode,
-            Array.from(VALID_BITMAP_MODES),
           ),
         );
       }
@@ -625,6 +616,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   for (const screen of screens ?? []) {
     for (const style of screen.styles ?? []) {
       diagnostics.push(...unknownStyleAttributes(style));
+      diagnostics.push(...checkStyleValues(style, manifests));
     }
     if (!screen.name) {
       diagnostics.push(

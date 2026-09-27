@@ -12,6 +12,7 @@
  * - validate: Main multi-pass validation function
  * - ValidateInput: Parameter contract for validation
  * - ValidateResult: Return contract containing diagnostics and counts
+ * - BOOLEAN_VALUES, booleanValueError, enumValueError: the one bool and enum value rules
  * - Individual pass functions: validateSchema, validateReferences, validateDisplay,
  *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers,
  *   validateNotYetSupported, validateRealisation
@@ -31,3 +32,4 @@ export {
   type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 export { validateRealisation } from './validate-realisation.js';
+export { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';

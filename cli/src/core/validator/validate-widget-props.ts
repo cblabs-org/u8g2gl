@@ -50,6 +50,7 @@ import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
 import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
+import { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';
 import { GEOMETRY_BINDINGS, INT32_MAX, INT32_MIN, isRectangular, walkExpanded } from '../resolver/index.js';
 import { COLOR_VALUES } from '../generator/emit/value.js';
 import type { PropDef } from '../schema/widget-manifest.js';
@@ -83,8 +84,6 @@ const CENTRING_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter'];
  */
 const BOOLEAN_ATTRIBUTES: readonly string[] = ['hcenter', 'vcenter', 'hidden'];
 
-/** The only values a boolean attribute may take (§7.2). */
-const BOOLEAN_VALUES: readonly string[] = ['true', 'false'];
 
 // booleanAttributesOf
 // Every attribute on one element that must be `true` or `false`: the contract
@@ -522,16 +521,13 @@ function checkEnumValue(node: WidgetNode, attribute: string, manifest: Effective
   if (typeof rawVal !== 'string' || rawVal === '' || rawVal.startsWith('$')) {
     return undefined;
   }
-  const allowedValues = prop.values.split(',').map((v) => v.trim());
-  if (allowedValues.includes(rawVal)) {
-    return undefined;
-  }
-  return createPropDiagnostic(
-    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-    `Invalid value '${rawVal}' for enum property '${prop.name}' on <${node.tag}>. Expected one of: ${allowedValues.join(', ')}.`,
-    node.attributeLocs?.[prop.name] ?? node.loc,
+  // The one rule (value-rules.ts), shared with a `<style>`'s own property.
+  return enumValueError(
     rawVal,
-    findClosest(rawVal, allowedValues),
+    prop.values.split(',').map((member) => member.trim()),
+    prop.name,
+    `<${node.tag}>`,
+    node.attributeLocs?.[prop.name] ?? node.loc,
   );
 }
 
@@ -585,17 +581,11 @@ function screenLevelPlaceholders(node: WidgetNode, manifest: EffectiveManifest):
 //   attribute — `hcenter`, `vcenter` or `hidden`
 function checkBooleanValue(node: WidgetNode, attribute: string): Diagnostic | undefined {
   const value = node.attributes[attribute];
-  if (typeof value !== 'string' || value.startsWith('$') || BOOLEAN_VALUES.includes(value)) {
+  if (typeof value !== 'string') {
     return undefined;
   }
-  return createPropDiagnostic(
-    DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-    `Invalid value '${value}' for '${attribute}' on ${describeNode(node)}: it is a boolean, ` +
-      `'true' or 'false' (§7.2).`,
-    node.attributeLocs?.[attribute] ?? node.loc,
-    value,
-    [...BOOLEAN_VALUES],
-  );
+  // The one rule (value-rules.ts), shared with a `<style>`'s own property.
+  return booleanValueError(value, `'${attribute}' on ${describeNode(node)}`, node.attributeLocs?.[attribute] ?? node.loc);
 }
 
 // checkSubstitutedValues

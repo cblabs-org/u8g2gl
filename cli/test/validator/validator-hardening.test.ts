@@ -926,3 +926,83 @@ describe("a rounded box's radius is checked against its own size: 2*(r+1) <= w, 
     expect(result.validated.errors).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Follow-up 3 — every style property's value is checked, on both kinds of style (finding 12)
+// ---------------------------------------------------------------------------
+
+describe("a <style>'s own property values are checked like an element's (follow-up, finding 12)", () => {
+  const body = '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />';
+
+  it('invert="yes" is reported, not parsed as false, and both journeys refuse it', () => {
+    const result = journeys(body, { styles: '<style name="note" invert="yes" />' });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.INVALID_ENUM_VALUE}:yes`,
+    ]);
+    expect(found[0]?.message).toBe(
+      "Invalid value 'yes' for 'invert' on <style> 'note': it is a boolean, 'true' or 'false' (§7.2).",
+    );
+    expect(found[0]?.suggestions).toEqual(['true', 'false']);
+  });
+
+  it('and the parser no longer turns it into false', () => {
+    const parsed = parseGlobalsFile(
+      '<globals><styles><style name="note" invert="yes" /></styles></globals>',
+      'globals.xml',
+    );
+    expect(parsed.value?.styles[0]?.invert).toBeUndefined();
+  });
+
+  it.each([
+    ['invert="yes"', 'yes'],
+    ['border="1"', '1'],
+    ['align="middle"', 'middle'],
+    ['font_mode="opaque"', 'opaque'],
+    ['bitmap_mode="clear"', 'clear'],
+    ['draw_color="2"', '2'],
+  ])("%s on a screen's own style is refused too", (attribute, value) => {
+    const result = journeys(body, { screenStyles: `    <styles><style name="local" ${attribute} /></styles>\n` });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.file}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.INVALID_ENUM_VALUE}:${SCREEN_FILE}:${value}`,
+    ]);
+  });
+
+  it('names the spelling the author used, alias or not, and suggests the members', () => {
+    const result = journeys(body, { styles: '<style name="note" drawColor="2" fontMode="soild" />' });
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found[0]?.message).toContain("enum property 'drawColor' on <style> 'note'");
+    expect(found[1]?.message).toContain("enum property 'fontMode' on <style> 'note'");
+    expect(found[1]?.suggestions).toContain('solid');
+  });
+
+  it('an element and a style are held to one rule: the same code and wording for one bad value', () => {
+    const style = journeys(body, { styles: '<style name="note" align="middle" />' });
+    const element = journeys(
+      '        <u8g2gl_label name="l" x="0" y="0" width="20" height="10" font="u8g2_font_6x10_mr" align="middle" />',
+    );
+    const messageOf = (result: Journeys): string =>
+      result.validated.diagnostics.filter((d) => d.severity === 'error')[0]?.message ?? '';
+    expect(messageOf(style)).toBe(
+      "Invalid value 'middle' for enum property 'align' on <style> 'note'. Expected one of: left, center, right.",
+    );
+    expect(messageOf(element)).toBe(
+      "Invalid value 'middle' for enum property 'align' on <u8g2gl_label>. Expected one of: left, center, right.",
+    );
+  });
+
+  it('every §10 property with a value of its type still builds, on both kinds of style (controls)', () => {
+    const result = journeys(body, {
+      styles:
+        '<style name="all" font="u8g2_font_6x10_mr" draw_color="xor" invert="true" padding="1" border="false" ' +
+        'radius="2" align="right" font_mode="transparent" bitmap_mode="solid" />',
+      screenStyles: '    <styles><style name="local" drawColor="0" invert="false" align="center" /></styles>\n',
+    });
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+  });
+});

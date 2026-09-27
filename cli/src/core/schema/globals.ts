@@ -146,6 +146,21 @@ export interface StyleDecl {
    * discard the whole of `globals.xml`; Pass 1 reports each (PR-04 WO11b).
    */
   readonly unknownAttributes?: readonly { readonly name: string; readonly loc?: SourceLocation }[];
+  /**
+   * Every style property the `<style>` writes, **as written**, with the spelling
+   * used and where it is: the text a value check needs, which the typed members
+   * above have already lost. Pass 1 holds each to its `u8g2gl_obj` prop, exactly
+   * as it holds an element's attribute (PR-04 WO11b, finding 12) — `invert="yes"`
+   * used to become `false` with nothing said.
+   */
+  readonly written?: readonly {
+    /** The style property's canonical attribute, as {@link STYLE_PROPERTIES} spells it. */
+    readonly attribute: string;
+    /** The spelling the author used, which may be a camelCase alias. */
+    readonly spelled: string;
+    readonly value: string;
+    readonly loc?: SourceLocation;
+  }[];
   /** Source location where this style was declared. */
   readonly loc?: SourceLocation;
 }
