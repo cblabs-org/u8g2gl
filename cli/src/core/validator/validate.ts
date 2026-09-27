@@ -35,6 +35,7 @@ import type { Screen } from '../schema/screen.js';
 import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { DisplayRecord } from '../schema/display-record.js';
 import type { Diagnostic } from '../schema/diagnostic.js';
+import { compareCodeUnits } from '../order.js';
 
 import type { ScreenPipeline } from '../resolver/index.js';
 import type { RealisationResult } from '../generator/realise/index.js';
@@ -156,7 +157,7 @@ export interface ValidateResult {
  */
 export function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
   if (a.file !== b.file) {
-    return a.file < b.file ? -1 : 1;
+    return compareCodeUnits(a.file, b.file);
   }
   if (a.line !== b.line) {
     return a.line - b.line;
@@ -164,10 +165,7 @@ export function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
   if (a.column !== b.column) {
     return a.column - b.column;
   }
-  if (a.code !== b.code) {
-    return a.code < b.code ? -1 : 1;
-  }
-  return 0;
+  return compareCodeUnits(a.code, b.code);
 }
 
 /**

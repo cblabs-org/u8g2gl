@@ -27,6 +27,7 @@
 
 import type { BusFamily, DisplayRecord } from '../schema/display-record.js';
 import { findClosest } from './edit-distance.js';
+import { compareCodeUnits } from '../order.js';
 
 /**
  * Target microcontroller board specification for memory headroom evaluation (§5.2, §18).
@@ -322,7 +323,9 @@ export function identifyDisplay(
     if (first.score !== second.score) {
       return second.score - first.score;
     }
-    return first.record.setup.localeCompare(second.record.setup);
+    // By code unit: `find --json` is a contract, and a caller comparing two
+    // machines' results must not see an order that came from the host (§13.9).
+    return compareCodeUnits(first.record.setup, second.record.setup);
   });
 
   const matches = scored.map((item) => item.record);

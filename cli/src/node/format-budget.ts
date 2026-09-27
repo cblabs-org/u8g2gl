@@ -106,6 +106,17 @@ function costTable(title: string, lines: readonly BudgetLine[], useColor: boolea
   const derived = lines.reduce((sum, line) => (line.figure.kind === MEASURED_KIND ? sum + line.figure.bytes : sum), 0);
   out.push(`    ${'-'.repeat(FIGURE_COLUMN - 4)}`);
   out.push(row('derivable', `${derived} bytes`, `${derived} bytes`));
+
+  // A caveat on a figure that *is* reported goes directly under its own table,
+  // not with the unmeasured reasons below: the two say different things, and a
+  // reader who finds "framebuffer" in a list headed NOT MEASURED has been told
+  // the opposite of the truth.
+  for (const line of lines) {
+    if (line.note === undefined) {
+      continue;
+    }
+    out.push(...wrapReason(`note — ${line.item}: ${line.note}`, '    '));
+  }
   return out;
 }
 

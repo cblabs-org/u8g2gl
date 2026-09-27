@@ -34,7 +34,7 @@
  * Exports:
  * - UNMEASURED_KIND, MEASURED_KIND: the two `Figure` discriminants
  * - Measured, Unmeasured, Figure: a cost line's figure, or why there is none
- * - BudgetLine:         One line of the flash or RAM table
+ * - BudgetLine:         One line of the flash or RAM table, with its figure and caveat
  * - BudgetReport:       §18's report for one build
  * - CapacityEntry:      One [D-21] capacity, with the macro it is emitted as
  * - CapacityReport:     §18.1's report
@@ -102,6 +102,18 @@ export interface BudgetLine {
   /** The names behind `count`, in document order, when naming them helps. */
   readonly names?: readonly string[];
   readonly figure: Figure;
+  /**
+   * A caveat on a figure that **is** reported — what it is not, as distinct from
+   * {@link Measured.derivation}, which is where it came from.
+   *
+   * It exists for the framebuffer. That figure is exact for the constructor the
+   * `<target>` names, and §18 asks for it; but the application builds the `U8G2`
+   * instance itself (§12.1, §13.10) and may build a page-mode or differently
+   * sized one. Reporting the figure and saying so is honest. Refusing to report
+   * a figure the catalogue holds exactly, or reporting it as if it measured the
+   * application's own buffer, would each be a different kind of dishonest.
+   */
+  readonly note?: string;
 }
 
 /** §18's budget for one build. */

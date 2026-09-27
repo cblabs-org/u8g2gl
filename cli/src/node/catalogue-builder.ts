@@ -35,6 +35,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
+import { compareCodeUnits } from '../core/order.js';
 import type {
   BusFamily,
   DisplayBus,
@@ -599,13 +600,18 @@ export function buildCatalogue(u8g2Path: string): BuildCatalogueResult {
   }
 
   // --- Step 6: Deterministically sort catalogue records by setup name ---
-  records.sort((a, b) => a.setup.localeCompare(b.setup));
+  // By code unit, never by locale (§13.9, PR-04 WO12 follow-up). These records
+  // are written into `src/data/catalogue.json`, which is **committed**, so a
+  // host-dependent order would make the same U8G2 submodule produce a different
+  // committed file on a different machine — §13.9's hazard applied to an artefact
+  // the tool ships.
+  records.sort((a, b) => compareCodeUnits(a.setup, b.setup));
 
   // --- Step 7: Build deterministic page-mode replacement map ---
   const pageModeMap: Record<string, string> = {};
 
   // Sort page-mode constructors by class name for determinism
-  pageModeConstructors.sort((a, b) => a.className.localeCompare(b.className));
+  pageModeConstructors.sort((a, b) => compareCodeUnits(a.className, b.className));
 
   for (const ctor of pageModeConstructors) {
     let fullCandidate = ctor.className.replace(/_1_([a-zA-Z0-9_]+)$/, '_F_$1');

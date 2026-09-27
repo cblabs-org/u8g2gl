@@ -23,7 +23,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { generate } from '../../src/core/generator/index.js';
 import { buildGenerateReport, MEASURED_KIND, UNMEASURED_KIND } from '../../src/core/generator/report/index.js';
-import type { BudgetLine, GenerateReport } from '../../src/core/generator/report/index.js';
+import type { BudgetLine, GenerateReport, ReportInput } from '../../src/core/generator/report/index.js';
 import { findTargetDisplay } from '../../src/core/resolver/index.js';
 import { loadProject } from '../../src/node/load-project.js';
 import { formatBudgetReport } from '../../src/node/format-budget.js';
@@ -32,7 +32,11 @@ const GOLDEN_GENERATOR_VERSION = '0.0.0-golden';
 const fixtureDir = resolve(__dirname, 'fixtures/emit-project');
 
 /** Generates the fixture and builds its report, exactly as the CLI does. */
-function reportFixture(): { readonly report: GenerateReport; readonly configHeader: string } {
+function reportFixture(): {
+  readonly report: GenerateReport;
+  readonly configHeader: string;
+  readonly input: ReportInput;
+} {
   const loaded = loadProject(fixtureDir);
   const result = generate({
     ...loaded.model,
@@ -43,7 +47,7 @@ function reportFixture(): { readonly report: GenerateReport; readonly configHead
   const target = loaded.model.project.targets[0];
   expect(target).toBeDefined();
   const display = findTargetDisplay(target!, loaded.model.catalogue);
-  const report = buildGenerateReport({
+  const input: ReportInput = {
     globals: loaded.model.globals,
     manifests: loaded.model.manifests,
     realised: result.realised ?? [],
@@ -52,13 +56,14 @@ function reportFixture(): { readonly report: GenerateReport; readonly configHead
     ...(display !== undefined ? { display } : {}),
     generatorVersion: GOLDEN_GENERATOR_VERSION,
     assets: loaded.assets,
-  });
+  };
+  const report = buildGenerateReport(input);
   const configHeader = result.files.find((f) => f.path === 'u8g2gl_generated_config.h')?.content ?? '';
   expect(configHeader).not.toBe('');
-  return { report, configHeader };
+  return { report, configHeader, input };
 }
 
-const { report, configHeader } = reportFixture();
+const { report, configHeader, input: reportInput } = reportFixture();
 const line = (lines: readonly BudgetLine[], item: string): BudgetLine => {
   const found = lines.find((l) => l.item === item);
   expect(found, `no budget line '${item}'`).toBeDefined();
@@ -117,12 +122,44 @@ describe('§1.3 — no figure the tooling cannot substantiate', () => {
     }
   });
 
-  it('reports the framebuffer as unmeasured, because the application owns the U8G2 instance', () => {
-    const framebuffer = line(report.budget.ram, 'framebuffer');
+  it('reports the framebuffer exactly, sourced, with its caveat beside it and not instead of it', () => {
+    // Reported as unmeasured until the WO12 follow-up. §18 asks for this figure
+    // by name and the catalogue holds it exactly, so withholding it was the
+    // reverse mistake to estimating it: §1.3 forbids a figure the tooling cannot
+    // substantiate, and this one it can.
+    const framebuffer = line(report.budget.ram, 'framebuffer (128x64)');
+    expect(framebuffer.figure).toEqual({
+      kind: MEASURED_KIND,
+      bytes: 1024,
+      derivation: "16x8 tiles x 8 bytes, from U8G2's buffer allocator u8g2_m_16_8_f ([D-14], §5.2)",
+    });
+    // The caveat is a note on a reported figure, so it cannot be mistaken for a
+    // refusal to report one.
+    expect(framebuffer.note).toContain('§13.10');
+    expect(framebuffer.note).toContain("not a measurement of the application's own buffer");
+  });
+
+  it('names the allocator symbol U8G2 really defines, so the figure can be checked against U8G2', () => {
+    const framebuffer = line(report.budget.ram, 'framebuffer (128x64)');
+    expect(framebuffer.figure.kind).toBe(MEASURED_KIND);
+    if (framebuffer.figure.kind === MEASURED_KIND) {
+      // `uint8_t *u8g2_m_16_8_f(uint8_t *page_cnt)` in u8g2_d_memory.c, and the
+      // symbol §5.2 uses as its own worked example for a 128x64 panel.
+      expect(framebuffer.figure.derivation).toContain('u8g2_m_16_8_f');
+      // The bytes are the catalogue's, not parsed out of that name, so the two
+      // cannot disagree.
+      expect(framebuffer.figure.bytes).toBe(16 * 8 * 8);
+    }
+  });
+
+  it('reports the framebuffer as unmeasured only when the catalogue has no record', () => {
+    const noDisplay = buildGenerateReport({ ...reportInput, display: undefined });
+    const framebuffer = line(noDisplay.budget.ram, 'framebuffer');
     expect(framebuffer.figure.kind).toBe(UNMEASURED_KIND);
     if (framebuffer.figure.kind === UNMEASURED_KIND) {
-      expect(framebuffer.figure.reason).toContain('§13.10');
+      expect(framebuffer.figure.reason).toContain('no record');
     }
+    expect(framebuffer.note).toBeUndefined();
   });
 
   it("reports a widget instance's RAM as unmeasured, and names §13.7 as the reason", () => {
@@ -171,7 +208,9 @@ describe('the derivable RAM figures are exact', () => {
   });
 
   it('totals only the measured RAM lines, and calls the total derivable', () => {
-    expect(report.budget.ramDerivedBytes).toBe(17);
+    // 1024 framebuffer + 17 string storage. The framebuffer joined the total in
+    // the WO12 follow-up, which is most of what this report can now substantiate.
+    expect(report.budget.ramDerivedBytes).toBe(1024 + 17);
     expect(formatBudgetReport(report)).toContain('derivable');
     // "total" would be read as the whole static cost, which is not known.
     expect(formatBudgetReport(report)).not.toMatch(/^\s+total\b/m);

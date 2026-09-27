@@ -16,6 +16,8 @@
  * - findClosest(query, candidates, maxDistance?): Rank and filter candidates by distance
  */
 
+import { compareCodeUnits } from '../order.js';
+
 /**
  * @brief Computes the Levenshtein edit distance between two strings.
  *
@@ -119,12 +121,17 @@ export function findClosest(
     }
   }
 
-  // --- Step 2: Sort deterministically: lowest distance first, then alphabetical ---
+  // --- Step 2: Sort deterministically: lowest distance first, then by code unit ---
+  // The tie-break orders the `suggestions` array in the `--json` contract
+  // ([D-16], §15.3), which exists so a caller can *apply* a fix programmatically
+  // — most of them the first suggestion. A locale-dependent tie-break means two
+  // machines can hand the same caller a different first suggestion for the same
+  // typo, so it goes through the one comparator (§13.9, PR-04 WO12 follow-up).
   scored.sort((first, second) => {
     if (first.distance !== second.distance) {
       return first.distance - second.distance;
     }
-    return first.candidate.localeCompare(second.candidate);
+    return compareCodeUnits(first.candidate, second.candidate);
   });
 
   // --- Step 3: Extract and return matched candidates ---

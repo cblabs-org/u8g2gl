@@ -26,6 +26,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { generate } from '../../src/core/generator/index.js';
 import { finaliseDiagnostics } from '../../src/core/generator/index.js';
 import { compareDiagnostics } from '../../src/core/validator/index.js';
+import { compareCodeUnits } from '../../src/core/order.js';
 import type { Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { loadProject } from '../../src/node/load-project.js';
 import { readProjectFiles } from '../../src/node/read-project.js';
@@ -261,3 +262,121 @@ function sourceOf(basename: string): string {
   expect(path, `no source path for ${basename}`).toBeDefined();
   return readFileSync(resolve(__dirname, path as string), 'utf-8');
 }
+
+describe('discovery order is code-unit, not locale (§13.9, WO12 follow-up)', () => {
+  /**
+   * The pair that tells the two orders apart, in filenames an author would
+   * actually write.
+   *
+   * ICU collation weakens the underscore, so `screen_a_1.xml` collates **before**
+   * `screen_a1.xml`; by code unit it sorts **after** it, because `'1'` is 0x31 and
+   * `'_'` is 0x5F. Both are ordinary lowercase screen files. This refutes the
+   * comfortable assumption — which this worker made in its own first report —
+   * that lowercase ASCII project filenames make the locale question academic.
+   */
+  const LOCALE_SENSITIVE = ['screen_a_1.xml', 'screen_a1.xml'] as const;
+
+  /** A project with the two screens whose filenames the two orders disagree about. */
+  function pairProject(): string {
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/order-pair-'));
+    tempDirs.push(dir);
+    mkdirSync(resolve(dir, 'screens'));
+    mkdirSync(resolve(dir, 'widgets/w_1'), { recursive: true });
+    mkdirSync(resolve(dir, 'widgets/w1'), { recursive: true });
+    writeFileSync(
+      resolve(dir, 'u8g2gl.xml'),
+      `<u8g2gl schema="0.4" name="pair" version="1.0.0">
+    <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
+</u8g2gl>
+`,
+    );
+    writeFileSync(
+      resolve(dir, 'globals.xml'),
+      '<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>\n',
+    );
+    for (const tag of ['w_1', 'w1']) {
+      writeFileSync(
+        resolve(dir, `widgets/${tag}/${tag}.xml`),
+        `<widget name="${tag}">
+    <api />
+    <view>
+        <u8g2gl_label name="lbl" x="0" y="0" width="40" height="12" font="u8g2_font_6x10_mr" text="${tag}" />
+    </view>
+</widget>
+`,
+      );
+    }
+    for (const name of ['a_1', 'a1']) {
+      writeFileSync(
+        resolve(dir, `screens/screen_${name}.xml`),
+        `<screen name="${name}">
+    <view>
+        <w_1 name="p_${name}" x="0" y="0" width="40" height="12" />
+        <w1 name="q_${name}" x="44" y="0" width="40" height="12" />
+    </view>
+</screen>
+`,
+      );
+    }
+    return dir;
+  }
+
+  it('is the pair that tells the two orders apart', () => {
+    // Guards the test itself. If a future ICU made collation agree with a
+    // code-unit comparison for this pair, everything below would still pass and
+    // would be proving nothing.
+    expect(LOCALE_SENSITIVE[0].localeCompare(LOCALE_SENSITIVE[1])).toBeLessThan(0);
+    expect(compareCodeUnits(LOCALE_SENSITIVE[0], LOCALE_SENSITIVE[1])).toBeGreaterThan(0);
+  });
+
+  it('loads the two screens in code-unit order, which is not the collated order', () => {
+    const files = readProjectFiles(pairProject());
+    expect(files.screenXmls.map((f) => f.filename)).toEqual([
+      'screens/screen_a1.xml',
+      'screens/screen_a_1.xml',
+    ]);
+    // Said explicitly: under localeCompare this array is the other way round, so
+    // the assertion above fails on the very machine it passes on now.
+    expect(files.screenXmls.map((f) => f.filename)).not.toEqual(
+      [...files.screenXmls.map((f) => f.filename)].sort((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it('loads the two widget manifests in code-unit order too', () => {
+    const files = readProjectFiles(pairProject());
+    expect(files.widgetManifestXmls.map((f) => f.filename)).toEqual([
+      'widgets/w1/w1.xml',
+      'widgets/w_1/w_1.xml',
+    ]);
+  });
+
+  it('emits the screens in that order, which is how the order reaches the bytes', () => {
+    // The point of fixing this sort rather than only the diagnostics: a screen's
+    // position in the load order is its position in the emitted file list and in
+    // ui.hpp, so a collated order would put different bytes in a committed file.
+    const result = generateAt(pairProject());
+    expect(result.files.filter((f) => f.path.startsWith('ui_screen_')).map((f) => f.path)).toEqual([
+      'ui_screen_a1.cpp',
+      'ui_screen_a_1.cpp',
+    ]);
+    const header = result.files.find((f) => f.path === 'ui.hpp')?.content ?? '';
+    expect(header.indexOf('ui_screen_a1_init')).toBeLessThan(header.indexOf('ui_screen_a_1_init'));
+  });
+
+  it('leaves no localeCompare anywhere it could order output', () => {
+    // The diagnostic path was closed in WO12; these four were the rest. The scan
+    // covers the whole of src/, so the next copy — wherever it lands — fails here.
+    for (const source of [
+      '../../src/node/read-project.ts',
+      '../../src/node/catalogue-builder.ts',
+      '../../src/core/catalogue/edit-distance.ts',
+      '../../src/core/catalogue/query.ts',
+    ]) {
+      const code = readFileSync(resolve(__dirname, source), 'utf-8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '');
+      expect(code, `${source} still sorts with localeCompare`).not.toContain('localeCompare');
+    }
+  });
+});

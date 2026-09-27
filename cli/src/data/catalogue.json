@@ -3208,126 +3208,6 @@
     "driver": "u8x8_d_ra8835_nhd_240x128"
   },
   {
-    "setup": "U8G2_S1D15300_100X32_F_2ND_4W_HW_SPI",
-    "controller": "S1D15300",
-    "variant": [
-      "100X32"
-    ],
-    "width": 100,
-    "height": 32,
-    "tiles": {
-      "width": 13,
-      "height": 4
-    },
-    "framebufferBytes": 416,
-    "bus": {
-      "family": "spi",
-      "wiring": "2nd_4w_hardware",
-      "raw": "2ND_4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_s1d15300_100x32"
-  },
-  {
-    "setup": "U8G2_S1D15300_100X32_F_4W_HW_SPI",
-    "controller": "S1D15300",
-    "variant": [
-      "100X32"
-    ],
-    "width": 100,
-    "height": 32,
-    "tiles": {
-      "width": 13,
-      "height": 4
-    },
-    "framebufferBytes": 416,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_hardware",
-      "raw": "4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_s1d15300_100x32"
-  },
-  {
-    "setup": "U8G2_S1D15300_100X32_F_4W_SW_SPI",
-    "controller": "S1D15300",
-    "variant": [
-      "100X32"
-    ],
-    "width": 100,
-    "height": 32,
-    "tiles": {
-      "width": 13,
-      "height": 4
-    },
-    "framebufferBytes": 416,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_software",
-      "raw": "4W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_s1d15300_100x32"
-  },
-  {
-    "setup": "U8G2_S1D15300_100X32_F_6800",
-    "controller": "S1D15300",
-    "variant": [
-      "100X32"
-    ],
-    "width": 100,
-    "height": 32,
-    "tiles": {
-      "width": 13,
-      "height": 4
-    },
-    "framebufferBytes": 416,
-    "bus": {
-      "family": "parallel",
-      "wiring": "6800",
-      "raw": "6800"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_s1d15300_100x32"
-  },
-  {
-    "setup": "U8G2_S1D15300_100X32_F_8080",
-    "controller": "S1D15300",
-    "variant": [
-      "100X32"
-    ],
-    "width": 100,
-    "height": 32,
-    "tiles": {
-      "width": 13,
-      "height": 4
-    },
-    "framebufferBytes": 416,
-    "bus": {
-      "family": "parallel",
-      "wiring": "8080",
-      "raw": "8080"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_s1d15300_100x32"
-  },
-  {
     "setup": "U8G2_S1D15300_100X32I_F_2ND_4W_HW_SPI",
     "controller": "S1D15300",
     "variant": [
@@ -3446,6 +3326,126 @@
       "flipmode": 0
     },
     "driver": "u8x8_d_s1d15300_100x32i"
+  },
+  {
+    "setup": "U8G2_S1D15300_100X32_F_2ND_4W_HW_SPI",
+    "controller": "S1D15300",
+    "variant": [
+      "100X32"
+    ],
+    "width": 100,
+    "height": 32,
+    "tiles": {
+      "width": 13,
+      "height": 4
+    },
+    "framebufferBytes": 416,
+    "bus": {
+      "family": "spi",
+      "wiring": "2nd_4w_hardware",
+      "raw": "2ND_4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_s1d15300_100x32"
+  },
+  {
+    "setup": "U8G2_S1D15300_100X32_F_4W_HW_SPI",
+    "controller": "S1D15300",
+    "variant": [
+      "100X32"
+    ],
+    "width": 100,
+    "height": 32,
+    "tiles": {
+      "width": 13,
+      "height": 4
+    },
+    "framebufferBytes": 416,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_hardware",
+      "raw": "4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_s1d15300_100x32"
+  },
+  {
+    "setup": "U8G2_S1D15300_100X32_F_4W_SW_SPI",
+    "controller": "S1D15300",
+    "variant": [
+      "100X32"
+    ],
+    "width": 100,
+    "height": 32,
+    "tiles": {
+      "width": 13,
+      "height": 4
+    },
+    "framebufferBytes": 416,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_software",
+      "raw": "4W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_s1d15300_100x32"
+  },
+  {
+    "setup": "U8G2_S1D15300_100X32_F_6800",
+    "controller": "S1D15300",
+    "variant": [
+      "100X32"
+    ],
+    "width": 100,
+    "height": 32,
+    "tiles": {
+      "width": 13,
+      "height": 4
+    },
+    "framebufferBytes": 416,
+    "bus": {
+      "family": "parallel",
+      "wiring": "6800",
+      "raw": "6800"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_s1d15300_100x32"
+  },
+  {
+    "setup": "U8G2_S1D15300_100X32_F_8080",
+    "controller": "S1D15300",
+    "variant": [
+      "100X32"
+    ],
+    "width": 100,
+    "height": 32,
+    "tiles": {
+      "width": 13,
+      "height": 4
+    },
+    "framebufferBytes": 416,
+    "bus": {
+      "family": "parallel",
+      "wiring": "8080",
+      "raw": "8080"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_s1d15300_100x32"
   },
   {
     "setup": "U8G2_S1D15300_97X32_F_2ND_4W_HW_SPI",
@@ -20004,6 +20004,156 @@
     "driver": "u8x8_d_ssd1329_96x96_noname"
   },
   {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_2ND_4W_HW_SPI",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "spi",
+      "wiring": "2nd_4w_hardware",
+      "raw": "2ND_4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_2ND_HW_I2C",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "i2c",
+      "wiring": "2nd_hardware",
+      "raw": "2ND_HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_4W_HW_SPI",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_hardware",
+      "raw": "4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_4W_SW_SPI",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_software",
+      "raw": "4W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_HW_I2C",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "i2c",
+      "wiring": "hardware",
+      "raw": "HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
+    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_SW_I2C",
+    "controller": "SSD1362Z",
+    "variant": [
+      "256X64",
+      "OEL1M0033WE"
+    ],
+    "width": 256,
+    "height": 64,
+    "tiles": {
+      "width": 32,
+      "height": 8
+    },
+    "framebufferBytes": 2048,
+    "bus": {
+      "family": "i2c",
+      "wiring": "software",
+      "raw": "SW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 0
+    },
+    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
+  },
+  {
     "setup": "U8G2_SSD1362_206X36_F_2ND_4W_HW_SPI",
     "controller": "SSD1362",
     "variant": [
@@ -20482,156 +20632,6 @@
       "flipmode": 0
     },
     "driver": "u8x8_d_ssd1362_256x64"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_2ND_4W_HW_SPI",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "spi",
-      "wiring": "2nd_4w_hardware",
-      "raw": "2ND_4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_2ND_HW_I2C",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "i2c",
-      "wiring": "2nd_hardware",
-      "raw": "2ND_HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_4W_HW_SPI",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_hardware",
-      "raw": "4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_4W_SW_SPI",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_software",
-      "raw": "4W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_HW_I2C",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "i2c",
-      "wiring": "hardware",
-      "raw": "HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
-  },
-  {
-    "setup": "U8G2_SSD1362Z_256X64_OEL1M0033WE_F_SW_I2C",
-    "controller": "SSD1362Z",
-    "variant": [
-      "256X64",
-      "OEL1M0033WE"
-    ],
-    "width": 256,
-    "height": 64,
-    "tiles": {
-      "width": 32,
-      "height": 8
-    },
-    "framebufferBytes": 2048,
-    "bus": {
-      "family": "i2c",
-      "wiring": "software",
-      "raw": "SW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 0
-    },
-    "driver": "u8x8_d_ssd1362z_256x64_oel1m0033we"
   },
   {
     "setup": "U8G2_SSD1363_256X128_F_2ND_4W_HW_SPI",
@@ -24467,6 +24467,246 @@
     "driver": "u8x8_d_st75256_jlx256128"
   },
   {
+    "setup": "U8G2_ST75256_JLX256160M_F_2ND_4W_HW_SPI",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "spi",
+      "wiring": "2nd_4w_hardware",
+      "raw": "2ND_4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_2ND_HW_I2C",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "i2c",
+      "wiring": "2nd_hardware",
+      "raw": "2ND_HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_3W_HW_SPI",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "spi",
+      "wiring": "3w_hardware",
+      "raw": "3W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_3W_SW_SPI",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "spi",
+      "wiring": "3w_software",
+      "raw": "3W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_4W_HW_SPI",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_hardware",
+      "raw": "4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_4W_SW_SPI",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_software",
+      "raw": "4W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_6800",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "parallel",
+      "wiring": "6800",
+      "raw": "6800"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_8080",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "parallel",
+      "wiring": "8080",
+      "raw": "8080"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_HW_I2C",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "i2c",
+      "wiring": "hardware",
+      "raw": "HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
+    "setup": "U8G2_ST75256_JLX256160M_F_SW_I2C",
+    "controller": "ST75256",
+    "variant": [
+      "JLX256160M"
+    ],
+    "width": 256,
+    "height": 160,
+    "tiles": {
+      "width": 32,
+      "height": 20
+    },
+    "framebufferBytes": 5120,
+    "bus": {
+      "family": "i2c",
+      "wiring": "software",
+      "raw": "SW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 1
+    },
+    "driver": "u8x8_d_st75256_jlx256160m"
+  },
+  {
     "setup": "U8G2_ST75256_JLX256160_ALT_F_2ND_4W_HW_SPI",
     "controller": "ST75256",
     "variant": [
@@ -24955,246 +25195,6 @@
       "flipmode": 1
     },
     "driver": "u8x8_d_st75256_jlx256160"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_2ND_4W_HW_SPI",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "spi",
-      "wiring": "2nd_4w_hardware",
-      "raw": "2ND_4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_2ND_HW_I2C",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "i2c",
-      "wiring": "2nd_hardware",
-      "raw": "2ND_HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_3W_HW_SPI",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "spi",
-      "wiring": "3w_hardware",
-      "raw": "3W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_3W_SW_SPI",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "spi",
-      "wiring": "3w_software",
-      "raw": "3W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_4W_HW_SPI",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_hardware",
-      "raw": "4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_4W_SW_SPI",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_software",
-      "raw": "4W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_6800",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "parallel",
-      "wiring": "6800",
-      "raw": "6800"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_8080",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "parallel",
-      "wiring": "8080",
-      "raw": "8080"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_HW_I2C",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "i2c",
-      "wiring": "hardware",
-      "raw": "HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
-  },
-  {
-    "setup": "U8G2_ST75256_JLX256160M_F_SW_I2C",
-    "controller": "ST75256",
-    "variant": [
-      "JLX256160M"
-    ],
-    "width": 256,
-    "height": 160,
-    "tiles": {
-      "width": 32,
-      "height": 20
-    },
-    "framebufferBytes": 5120,
-    "bus": {
-      "family": "i2c",
-      "wiring": "software",
-      "raw": "SW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 1
-    },
-    "driver": "u8x8_d_st75256_jlx256160m"
   },
   {
     "setup": "U8G2_ST75256_JLX25664_F_2ND_4W_HW_SPI",
@@ -29495,256 +29495,6 @@
     "driver": "u8x8_d_st7567_96x65"
   },
   {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_2ND_4W_HW_SPI",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "spi",
-      "wiring": "2nd_4w_hardware",
-      "raw": "2ND_4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_2ND_HW_I2C",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "i2c",
-      "wiring": "2nd_hardware",
-      "raw": "2ND_HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_3W_HW_SPI",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "spi",
-      "wiring": "3w_hardware",
-      "raw": "3W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_3W_SW_SPI",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "spi",
-      "wiring": "3w_software",
-      "raw": "3W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_4W_HW_SPI",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_hardware",
-      "raw": "4W_HW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_4W_SW_SPI",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "spi",
-      "wiring": "4w_software",
-      "raw": "4W_SW_SPI"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_6800",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "parallel",
-      "wiring": "6800",
-      "raw": "6800"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_8080",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "parallel",
-      "wiring": "8080",
-      "raw": "8080"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_HW_I2C",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "i2c",
-      "wiring": "hardware",
-      "raw": "HW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
-    "setup": "U8G2_ST7567_ENH_DG128064_F_SW_I2C",
-    "controller": "ST7567",
-    "variant": [
-      "ENH",
-      "DG128064"
-    ],
-    "width": 128,
-    "height": 64,
-    "tiles": {
-      "width": 16,
-      "height": 8
-    },
-    "framebufferBytes": 1024,
-    "bus": {
-      "family": "i2c",
-      "wiring": "software",
-      "raw": "SW_I2C"
-    },
-    "xOffset": {
-      "default": 0,
-      "flipmode": 4
-    },
-    "driver": "u8x8_d_st7567_enh_dg128064"
-  },
-  {
     "setup": "U8G2_ST7567_ENH_DG128064I_F_2ND_4W_HW_SPI",
     "controller": "ST7567",
     "variant": [
@@ -29993,6 +29743,256 @@
       "flipmode": 0
     },
     "driver": "u8x8_d_st7567_enh_dg128064i"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_2ND_4W_HW_SPI",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "spi",
+      "wiring": "2nd_4w_hardware",
+      "raw": "2ND_4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_2ND_HW_I2C",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "i2c",
+      "wiring": "2nd_hardware",
+      "raw": "2ND_HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_3W_HW_SPI",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "spi",
+      "wiring": "3w_hardware",
+      "raw": "3W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_3W_SW_SPI",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "spi",
+      "wiring": "3w_software",
+      "raw": "3W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_4W_HW_SPI",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_hardware",
+      "raw": "4W_HW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_4W_SW_SPI",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "spi",
+      "wiring": "4w_software",
+      "raw": "4W_SW_SPI"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_6800",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "parallel",
+      "wiring": "6800",
+      "raw": "6800"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_8080",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "parallel",
+      "wiring": "8080",
+      "raw": "8080"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_HW_I2C",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "i2c",
+      "wiring": "hardware",
+      "raw": "HW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
+  },
+  {
+    "setup": "U8G2_ST7567_ENH_DG128064_F_SW_I2C",
+    "controller": "ST7567",
+    "variant": [
+      "ENH",
+      "DG128064"
+    ],
+    "width": 128,
+    "height": 64,
+    "tiles": {
+      "width": 16,
+      "height": 8
+    },
+    "framebufferBytes": 1024,
+    "bus": {
+      "family": "i2c",
+      "wiring": "software",
+      "raw": "SW_I2C"
+    },
+    "xOffset": {
+      "default": 0,
+      "flipmode": 4
+    },
+    "driver": "u8x8_d_st7567_enh_dg128064"
   },
   {
     "setup": "U8G2_ST7567_ERC12864_F_2ND_4W_HW_SPI",

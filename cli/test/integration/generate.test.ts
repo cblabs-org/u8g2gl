@@ -53,6 +53,7 @@ interface JsonBudgetLine {
   readonly count?: number;
   readonly names?: string[];
   readonly figure: JsonFigure;
+  readonly note?: string;
 }
 
 interface GenerateJson {
@@ -372,11 +373,18 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
       expect(line.figure.reason).toBeTruthy();
       expect(line.figure.bytes).toBeUndefined();
     }
-    const framebuffer = budget!.ram.find((l) => l.item === 'framebuffer');
-    expect(framebuffer?.figure.kind).toBe('unmeasured');
-    expect(framebuffer?.figure.reason).toContain('§13.10');
-    // And the one honest total is named for what it is.
-    expect(budget!.ramDerivedBytes).toBe(0);
+    // The framebuffer, by contrast, *is* reported: §18 asks for it and the
+    // catalogue holds it exactly for this target's setup. Its caveat rides beside
+    // the figure as a note rather than replacing it (WO12 follow-up).
+    const framebuffer = budget!.ram.find((l) => l.item.startsWith('framebuffer'));
+    expect(framebuffer?.item).toBe('framebuffer (128x64)');
+    expect(framebuffer?.figure.kind).toBe('measured');
+    expect(framebuffer?.figure.bytes).toBe(1024);
+    expect(framebuffer?.figure.derivation).toContain('u8g2_m_16_8_f');
+    expect(framebuffer?.note).toContain('§13.10');
+    // This project declares no string subject, so the framebuffer is the whole of
+    // what the report can derive.
+    expect(budget!.ramDerivedBytes).toBe(1024);
     expect(res.stdout).not.toMatch(/\d+ ?% of/);
   });
 

@@ -28,15 +28,19 @@
  *                needs a linker map for a reference build (§18).
  *              - **A widget's `sizeof`.** Same rule: the generator knows a class
  *                is default-constructible and nothing about its fields.
- *              - **The framebuffer.** The application constructs the `U8G2`
- *                instance (§12.1, §13.10), and may construct a page-mode or
- *                differently sized one than the `<target>`'s `setup` names, so
- *                the buffer is not the generator's to report.
  *
  *              What *is* derivable is derived exactly: a string subject's storage
  *              from its declared `max_len + 1` (§8.2), an `<xbm>`'s bytes from
- *              the asset the build compiled in, and every count and capacity
- *              [D-21] emitted.
+ *              the asset the build compiled in, the framebuffer from the
+ *              catalogue's tile dimensions for the target's setup ([D-14], §18),
+ *              and every count and capacity [D-21] emitted.
+ *
+ *              The framebuffer was reported as unmeasured until the WO12
+ *              follow-up. The reasoning — that the application owns the `U8G2`
+ *              instance — was a caveat mistaken for an impossibility: the figure
+ *              is exact for the constructor the `<target>` names, §18 asks for it
+ *              by name, and the caveat belongs beside it as a
+ *              {@link BudgetLine.note}.
  *
  * Exports:
  * - ReportInput:            What building the report needs
@@ -252,10 +256,58 @@ function stringSubjectStorage(input: ReportInput): {
   return { bytes, declared, undeclared };
 }
 
+// framebufferLine
+// §18's framebuffer line. Exact, and sourced: the display catalogue's
+// `framebufferBytes` is `tiles.width * tiles.height * 8`, read from U8G2's own
+// display-info tables ([D-14]), which is the same arithmetic §5.2 describes as
+// "taken from the buffer allocator" and the same figure §18's example prints
+// (`framebuffer (256x64) 2.0 KB <- derived from u8g2_m_32_8_f`).
+//
+// This was reported as unmeasured until the WO12 follow-up, on the reasoning that
+// the application owns the U8G2 instance. That reasoning is a *caveat*, not a
+// reason to withhold a figure the catalogue holds exactly — §1.3 forbids a figure
+// the tooling cannot substantiate, and this one it can — so the caveat is now
+// attached to the reported figure as a note.
+//
+// The allocator symbol is named, because it is how a reader checks the number
+// against U8G2 itself: `u8g2_m_<tilesW>_<tilesH>_f` in `u8g2_d_memory.c`. The
+// bytes come from the catalogue's tile dimensions, never from parsing that name,
+// so the report cannot disagree with the catalogue about the figure while
+// agreeing with it about the symbol.
+//
+// Unmeasured only when the catalogue has no record for the target's setup, which
+// is the one case where there is genuinely nothing to report.
+//   input — the report input; reads `display` and `target`
+function framebufferLine(input: ReportInput): BudgetLine {
+  const { display, target } = input;
+  if (display === undefined) {
+    return {
+      item: 'framebuffer',
+      figure: unmeasured(
+        `the display catalogue has no record for '${target.setup}', so its tile dimensions — and ` +
+          'therefore its buffer size — are not known here ([D-14], §5.2)',
+      ),
+    };
+  }
+  const allocator = `u8g2_m_${display.tiles.width}_${display.tiles.height}_f`;
+  return {
+    item: `framebuffer (${display.width}x${display.height})`,
+    figure: measured(
+      display.framebufferBytes,
+      `${display.tiles.width}x${display.tiles.height} tiles x 8 bytes, from U8G2's buffer allocator ` +
+        `${allocator} ([D-14], §5.2)`,
+    ),
+    note:
+      'the application constructs the U8G2 instance and owns its buffer (§12.1, §13.10), so this is the ' +
+      `full-buffer cost of the setup target '${target.name}' names, not a measurement of the ` +
+      "application's own buffer: a page-mode or differently sized constructor costs something else",
+  };
+}
+
 // ramLines
-// §18's static-RAM table: derived where the document settles the figure, and
-// unmeasured — with the reason — everywhere the size belongs to the runtime or
-// to the application.
+// §18's static-RAM table: derived where the document or the catalogue settles the
+// figure, and unmeasured — with the reason — everywhere the size belongs to the
+// runtime.
 //   input — the report input
 function ramLines(input: ReportInput): readonly BudgetLine[] {
   const { capacities } = input;
@@ -263,14 +315,7 @@ function ramLines(input: ReportInput): readonly BudgetLine[] {
   const objects = input.realised.reduce((sum, screen) => sum + screen.objects.length, 0);
   const observerSlots = capacities.subjects.reduce((sum, entry) => sum + entry.observers, 0);
 
-  const lines: BudgetLine[] = [
-    {
-      item: 'framebuffer',
-      figure: unmeasured(
-        'the application constructs the U8G2 instance and owns its buffer (§12.1, §13.10); it may be a ' +
-          "page-mode or differently sized buffer than the <target>'s setup names",
-      ),
-    },
+  const lines: BudgetLine[] = [framebufferLine(input),
     {
       item: 'element objects',
       count: objects,
