@@ -409,6 +409,10 @@ declared on the string overload of `bind_text`), 8 (the validator imports from `
 11. **The editor registry unit's `static` tables are outside the collision table.**
     - The per-tag tables are keyed by manifest tag, which is unique, so they are collision-free as long as tags are.
     - A third scope in `mangle.ts` for that unit would make this checked rather than argued.
-12. **A style's boolean properties are not value-checked.** `invert="yes"` on a `<style>` still parses to `false`
-    silently, because `getBooleanAttribute` returns `value === 'true'`. Style enum values are checked, but only for
-    global styles.
+12. ~~**A style's boolean properties are not value-checked.**~~ **Closed** by `3ccf5a7` (PA request, 2026-09-27):
+    `validator/value-rules.ts` now holds the one bool and enum rule that an element's attribute, a `style_*` override
+    and a `<style>`'s own property all use; the parser records each §10 property as written and no longer turns
+    `invert="yes"` into `false`; and Pass 1 checks every property against the `u8g2gl_obj` prop the style is applied
+    through, on global **and** screen-local styles, dropping the four sets it kept for `draw_color`, `align`,
+    `font_mode` and `bitmap_mode`. CLI **948 / 57 files**, `ctest` 361, 0 warnings, goldens byte-identical; 10 of the
+    11 new tests fail behaviourally at `08ce896`, the eleventh being the control.
