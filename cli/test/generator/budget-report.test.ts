@@ -254,7 +254,8 @@ describe("[D-18]'s amendment is stated on every run", () => {
 
   it('appears in the human report whether or not it cost this project anything', () => {
     const text = formatBudgetReport(report);
-    expect(text).toContain('classed-element demotion is not yet delivered');
+    expect(text).toContain('Classed-element demotion is not yet delivered');
+    expect(text).toContain("[D-18]'s 2026-09-13 amendment");
     // The amendment's own requirement: the statement is made so that a project
     // it did not bite is not read as the rule's full saving. So it must appear
     // for a project with nothing to demote, too.
@@ -274,7 +275,7 @@ describe("[D-18]'s amendment is stated on every run", () => {
       },
     };
     const empty = formatBudgetReport(nothingToDemote);
-    expect(empty).toContain('classed-element demotion is not yet delivered');
+    expect(empty).toContain('Classed-element demotion is not yet delivered');
     expect(empty).toContain('No object in this project is due to the amendment alone.');
   });
 });
@@ -327,8 +328,9 @@ describe('the report is deterministic (§13.9)', () => {
     const today = new Date().toISOString().slice(0, 10);
     expect(text).not.toContain(today);
     expect(text).not.toMatch(/\d{2}:\d{2}:\d{2}/);
+    // Both occurrences are the amendment's date — its heading and its statement.
     const dates = text.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
-    expect(dates).toEqual(['2026-09-13']);
+    expect(new Set(dates)).toEqual(new Set(['2026-09-13']));
   });
 });
 

@@ -350,7 +350,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     // object only because of [D-18]'s amendment — and the report says so.
     expect(res.stdout).toContain('title');
     expect(res.stdout).toContain('[amendment]');
-    expect(res.stdout).toContain('classed-element demotion is not yet delivered');
+    expect(res.stdout).toContain('Classed-element demotion is not yet delivered');
   });
 
   it('reports every unmeasurable cost as unmeasured, with its reason, and estimates nothing', async () => {

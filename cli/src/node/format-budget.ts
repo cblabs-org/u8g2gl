@@ -235,7 +235,7 @@ function realisationTable(report: GenerateReport, useColor: boolean): string[] {
 function demotionNote(report: GenerateReport, useColor: boolean): string[] {
   const { demotion } = report.realisation;
   const heading = useColor ? `${ANSI.yellow}NOTE${ANSI.reset}` : 'NOTE';
-  const out: string[] = ['', `  ${heading} — classed-element demotion is not yet delivered:`];
+  const out: string[] = ['', `  ${heading} — [D-18]'s 2026-09-13 amendment:`];
   out.push(...wrapReason(demotion.statement, '      '));
   out.push(
     ...wrapReason(
