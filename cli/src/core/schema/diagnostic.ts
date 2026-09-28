@@ -292,6 +292,16 @@ export const DIAGNOSTIC_CODES = {
    * its binding into the draw call (§13.5) and needs no object for it.
    */
   DRAWING_ELEMENT_NEEDS_OBJECT: 'U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT',
+  /**
+   * A `<bdf>` font's `range` attribute is not a well-formed codepoint list (PR-04b
+   * WO2 item 3): an item that is not a decimal or `0x`-prefixed hex number or an
+   * inclusive `lo-hi` pair, an empty item, `lo > hi`, or a number outside what
+   * bdfconv's own map parser accepts (0–0xFFFF — bdfconv encodes a glyph's codepoint
+   * into a `uint16_t`, `bdf_font.h`'s `tga_draw_glyph`). The message names the
+   * offending item; the same grammar module backs both `validate` and `compileBdf`
+   * (one module, so they cannot disagree).
+   */
+  MALFORMED_BDF_RANGE: 'U8G2GL_MALFORMED_BDF_RANGE',
 } as const;
 
 /**

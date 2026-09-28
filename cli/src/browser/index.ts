@@ -5,11 +5,15 @@
  *
  * File: src/browser/index.ts
  * Purpose: Browser-specific integration layer for U8G2GL designer and tools.
- * Description: Stub barrel export for browser-only functionality such as
- *              File System Access API integration and Web Worker bridges.
+ * Description: Re-exports the font compiler (PR-04b WO2), which is isomorphic but whose
+ *              primary browser-side caller is the designer, so it is reachable from here
+ *              without importing all of ../core/index.js. Otherwise a stub barrel for
+ *              browser-only functionality such as File System Access API integration and
+ *              Web Worker bridges, not yet implemented.
  *
  * Exports:
- * - (None yet — placeholder barrel)
+ * - compileBdf(), CompileBdfInput, CompiledFont, FontCompileFailure, CompileBdfResult,
+ *   parseBdfRange(), BdfRangeItem, BdfRangeResult, MAX_BDF_CODEPOINT — from ../core/fonts/index.js
  */
 
-export {};
+export * from '../core/fonts/index.js';

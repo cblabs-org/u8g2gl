@@ -94,7 +94,7 @@ describe('bdfconv-source.json provenance', () => {
     expect(prefixMapFlag).not.toContain(repoRoot);
   });
 
-  it.each(['bdfconv-glue.json', 'bdfconv-wasm.json'] as const)(
+  it.each(['bdfconv-glue.generated.ts', 'bdfconv-wasm.json'] as const)(
     'recorded sha256 for %s matches the committed file',
     (fileName) => {
       const recorded = source.artefacts[fileName];

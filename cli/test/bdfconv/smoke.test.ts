@@ -5,12 +5,16 @@
  *
  * File: test/bdfconv/smoke.test.ts
  * Purpose: Proves the committed Wasm artefact actually converts a BDF font, end to end,
- *          through the runner in src/data/bdfconv/ — not just that it was built. This is
- *          WO1's correctness oracle (PROJECT.md Finding 4): converting U8G2's own
- *          public-domain 4x6.bdf with the flags U8G2 itself used to generate
+ *          through the low-level instance module in src/core/fonts/ — not just that it
+ *          was built. This is WO1's correctness oracle (PROJECT.md Finding 4): converting
+ *          U8G2's own public-domain 4x6.bdf with the flags U8G2 itself used to generate
  *          u8g2_font_4x6_tr reproduces that font's exact 723-byte array, so the Wasm
  *          build path is checked against U8G2's own shipped output rather than only
- *          against itself.
+ *          against itself. WO2 item 1 replaced WO1's `data:` URL loader
+ *          (`src/data/bdfconv/runner.ts`, now deleted) with a statically imported glue
+ *          module; this test now goes through `src/core/fonts/bdfconv-instance.ts`, the
+ *          module compileBdf() itself uses. The more thorough correctness oracle against
+ *          several U8G2 fonts lives in `test/fonts/u8g2-oracle.test.ts` (WO2 item 4).
  * Description: Reads 4x6.bdf from the submodule (never copied, so a submodule bump is
  *              exercised against the current file), converts it, and asserts on the
  *              723-byte array. A second case feeds a malformed BDF: bdfconv does not
@@ -23,7 +27,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { convertBdf, instantiateBdfconv } from '../../src/data/bdfconv/runner.js';
+import { convertBdf, instantiateBdfconv } from '../../src/core/fonts/bdfconv-instance.js';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const cliDir = resolve(testDir, '..', '..');

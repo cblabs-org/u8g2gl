@@ -36,6 +36,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import { parseBdfRange } from '../fonts/bdf-range.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
@@ -644,6 +645,21 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             'src',
           ),
         );
+      }
+      if (font.kind === 'bdf' && font.range !== undefined) {
+        // Same grammar module compileBdf() uses to translate `range` for bdfconv (WO2
+        // item 3), so `validate` and codegen cannot disagree about what a range means.
+        const parsedRange = parseBdfRange(font.range);
+        if (!parsedRange.ok) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.MALFORMED_BDF_RANGE,
+              `Malformed 'range' on BDF font '${font.name}': ${parsedRange.reason}`,
+              font.loc,
+              'range',
+            ),
+          );
+        }
       }
     }
 
