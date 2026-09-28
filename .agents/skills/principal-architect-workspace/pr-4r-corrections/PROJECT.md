@@ -119,3 +119,10 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
 - **2026-09-28 08:55** — Baseline measured in the worktree at `92de668`, each suite alone:
   **CLI 1055 tests / 62 files**, `tsc` and lint clean; **C++ 362 tests, one known skip**
   (`SizeOfReport.ThirtyTwoBitTarget`), 0 warnings. The bridge's 361 / 1044 predate WO14 (+1 / +11).
+- **2026-09-28** — WO1 worker stopped, correctly, after the tables moved green (`e32830f`): moving
+  `realise/` fails exactly one test, `validator-alignment.test.ts` "declares the object ceiling
+  once", which pins the declaring file as `'generator/realise/model.ts'`. **PA ruling:** not a
+  behaviour change — the assertion's intent is *declared once*, and the path it names is the one
+  ruling A moves, so updating the literal implements the ruling. WORKORDER amended to allow
+  exactly that class of edit (location literals of files this WO moves), listed in the report.
+  Worker resumed. Surfaced to the owner in the same turn.

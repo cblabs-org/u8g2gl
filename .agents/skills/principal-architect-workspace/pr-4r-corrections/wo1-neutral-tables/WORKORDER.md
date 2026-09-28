@@ -110,6 +110,14 @@ Separately, **`CPP_KEYWORDS`** exists twice: `resolver/mangle.ts` and
       file may change **only its import paths**. If a test seems to need anything more, you have
       changed behaviour: **stop and report**. The committed goldens (`test/generated_fixture/generated*/`)
       must be byte-identical; regenerate and confirm an empty diff.
+
+      **PA amendment, 2026-09-28 (after the worker's stop, which was correct):** a test that pins
+      *where* something is declared by file path may have that path literal updated **when the
+      path is one this work order moves** — e.g. `validator-alignment.test.ts` "declares the object
+      ceiling once", `'generator/realise/model.ts'` → `'realise/model.ts'`. The assertion's intent
+      (declared once) is unchanged, and the new path is what ruling A requires. Nothing else in a
+      test's body may change; any other case is still stop-and-report. List every such edit in the
+      Completion Report.
 - [ ] Commit in coherent steps (the move; the tables; the guard) — each commit green.
 
 ## Strict Boundary Box
