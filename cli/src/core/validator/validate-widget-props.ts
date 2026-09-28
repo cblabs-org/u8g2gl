@@ -476,8 +476,9 @@ function checkStyles(node: WidgetNode, manifest: EffectiveManifest, atScreenLeve
   }
 
   // --- Step 2: Each override names one of §10's nine, which the element sets, and fits its type ---
-  // The nine this element can take are the only useful suggestions: offering a
-  // setter prop outside them would suggest another refusal.
+  // Unless the plain attribute is the remedy (below), the nine this element can
+  // take are the only useful suggestions: offering a setter prop outside them
+  // would suggest another refusal.
   const settable = manifest.api.props
     .filter((candidate) => candidate.setter !== undefined && isStyleAttribute(candidate.name))
     .map((candidate) => candidate.name);
@@ -486,10 +487,15 @@ function checkStyles(node: WidgetNode, manifest: EffectiveManifest, atScreenLeve
     if (!isStyleAttribute(name)) {
       // Refused even when the element has a setter for it (§10, PR-4R WO2): the
       // one rule the screen model also applies, so no target applies it. When
-      // the element declares the prop, the attribute is what the author meant.
-      const remedy = manifest.api.props.some((candidate) => candidate.name === name)
-        ? ` Write it as the attribute '${name}' instead.`
-        : '';
+      // the element declares the prop, the attribute is what the author meant,
+      // and it is then the only suggestion: suggestions are machine-applicable
+      // ([D-16]), and the closest of the nine by spelling would rewrite the
+      // override into a different property (style_text into style_font).
+      const declared = manifest.api.props.some((candidate) => candidate.name === name);
+      const remedy = declared ? ` Write it as the attribute '${name}' instead.` : '';
+      const suggestions = declared
+        ? [name]
+        : findClosest(name, settable).map((candidate) => `style_${candidate}`);
       diagnostics.push(
         createPropDiagnostic(
           DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
@@ -497,7 +503,7 @@ function checkStyles(node: WidgetNode, manifest: EffectiveManifest, atScreenLeve
             `§10's style properties, ${STYLE_ATTRIBUTES.join(', ')}.${remedy}`,
           node.attributeLocs?.[attribute] ?? node.loc,
           attribute,
-          findClosest(name, settable).map((candidate) => `style_${candidate}`),
+          suggestions,
         ),
       );
       continue;

@@ -11,7 +11,9 @@
  *          `set_text`. Two places decide whether an override applies — Pass 4
  *          and the screen model's `styleOverridesOf` — so each case runs both
  *          journeys, and the firmware and editor targets are checked to apply
- *          exactly what the validator accepts.
+ *          exactly what the validator accepts. PR-4R WO5 adds the refusal's
+ *          suggestion for a prop the element declares (the plain attribute),
+ *          and the emitter's own report of which reason refused an override.
  * Description: One in-memory project per case, real XML parsed so diagnostics
  *              carry real locations. The accepted cases are table-driven over
  *              STYLE_PROPERTIES, with each value drawn from the element's own
@@ -21,11 +23,12 @@
 import { describe, expect, it } from 'vitest';
 import { parseGlobalsFile, parseScreenFile } from '../../src/core/parser/index.js';
 import { checkProject, generate, type GenerateResult, type ProjectModel } from '../../src/core/generator/index.js';
-import { describeScenes } from '../../src/core/generator/emit/index.js';
+import { describeScenes, emitScreenUnit } from '../../src/core/generator/emit/index.js';
 import { styleOverridesOf, type Placement } from '../../src/core/generator/emit/screen-model.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { isStyleAttribute, STYLE_ATTRIBUTES, STYLE_PROPERTIES } from '../../src/core/schema/globals.js';
 import type { PropDef } from '../../src/core/schema/widget-manifest.js';
+import type { ManifestRegistry } from '../../src/core/manifest/index.js';
 import type { ValidateResult } from '../../src/core/validator/index.js';
 import type { ResolvedElement } from '../../src/core/resolver/index.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
@@ -188,13 +191,29 @@ describe('a setter prop outside the nine is refused: UNKNOWN_ATTRIBUTE in both j
     expect(errorsOf(result.generated.diagnostics)).toEqual(errorsOf(result.validated.diagnostics));
   });
 
-  it("suggests only overrides the element can take, from among the nine", () => {
-    const result = journeys(label('style_long_mode="dots"'));
-    const suggestions = result.validated.diagnostics[0]?.suggestions ?? [];
+  // PR-4R WO5 R6: suggestions are machine-applicable ([D-16]). For a prop the
+  // element declares, the message's remedy is the plain attribute, so that is
+  // the one suggestion; the closest of the nine by spelling (style_font for
+  // style_text) would rewrite the override into a different property.
+  it.each([
+    ['style_text="x"', 'text'],
+    ['style_long_mode="dots"', 'long_mode'],
+  ])('%s, naming a prop the element declares, suggests the plain attribute alone', (written, plain) => {
+    const result = journeys(label(written));
+    const refusal = result.validated.diagnostics.find((d) => d.offendingText === `style_${plain}`)!;
+    expect(refusal.message).toContain(`Write it as the attribute '${plain}' instead.`);
+    expect(refusal.suggestions).toEqual([plain]);
+  });
+
+  it('an override naming no prop suggests only overrides the element can take, from among the nine', () => {
+    const result = journeys(label('style_font_mod="transparent"'));
+    const refusal = result.validated.diagnostics.find((d) => d.offendingText === 'style_font_mod')!;
+    expect(refusal.message).not.toContain('Write it as the attribute');
+    const suggestions = refusal.suggestions ?? [];
     for (const suggestion of suggestions) {
       expect(STYLE_ATTRIBUTES.map((attribute) => `style_${attribute}`)).toContain(suggestion);
     }
-    expect(result.validated.diagnostics[0]?.suggestions).toContain('style_font_mode');
+    expect(suggestions).toContain('style_font_mode');
   });
 
   it('style_drawColor stays refused: the aliases are not style_* spellings', () => {
@@ -234,5 +253,54 @@ describe('styleOverridesOf applies the same rule (§10)', () => {
 
   it('still reports a key the element does not declare', () => {
     expect(styleOverridesOf(placementWith({ sparkle: 'true' })).unknown).toEqual(['sparkle']);
+  });
+});
+
+describe('emission says which reason refused an override (PR-4R WO5 R5)', () => {
+  // Pass 4 refuses both cases first, and generate() stops on its errors, so the
+  // emitter's own report is reached only by calling it directly. The document
+  // is generated clean, then the override is put on the resolved element the
+  // emitter places, so the emitter sees exactly what an unvalidated caller
+  // would hand it.
+  function emittedWith(
+    styleOverrides: Record<string, string>,
+    manifests: ManifestRegistry = REGISTRY,
+  ): readonly Diagnostic[] {
+    const result = journeys(label(''));
+    expect(errorsOf(result.generated.diagnostics)).toEqual([]);
+    const resolved = result.generated.resolved![0]!;
+    const element = resolved.elements.find((candidate) => candidate.node.tag === 'u8g2gl_label')!;
+    (element.node as { styleOverrides: Record<string, string> }).styleOverrides = styleOverrides;
+    return emitScreenUnit({ realised: result.generated.realised![0]!, resolved, manifests, stamp: '' }).diagnostics;
+  }
+
+  it('a setter prop outside the nine is refused as not a style override, not for want of a setter', () => {
+    const diagnostics = emittedWith({ text: 'x' });
+    expect(errorsOf(diagnostics)).toEqual([`${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}:style_text`]);
+    expect(diagnostics[0]!.message).toContain('is not a style override');
+    expect(diagnostics[0]!.message).toContain(STYLE_ATTRIBUTES.join(', '));
+    expect(diagnostics[0]!.message).not.toContain('setter');
+  });
+
+  it('one of the nine the element has no setter for is refused for want of a setter (the control)', () => {
+    // Every framework element with an object sets all nine, so the label's
+    // manifest is served without its `font_mode` prop.
+    const withoutFontMode: ManifestRegistry = {
+      get: (tag) => {
+        const manifest = REGISTRY.get(tag);
+        return tag === 'u8g2gl_label' && manifest !== undefined
+          ? { ...manifest, api: { ...manifest.api, props: manifest.api.props.filter((prop) => prop.name !== 'font_mode') } }
+          : manifest;
+      },
+      has: (tag) => REGISTRY.has(tag),
+      tags: REGISTRY.tags,
+      declaredComposites: REGISTRY.declaredComposites,
+      declaredWidgets: REGISTRY.declaredWidgets,
+      diagnostics: REGISTRY.diagnostics,
+    };
+    const diagnostics = emittedWith({ font_mode: 'transparent' }, withoutFontMode);
+    expect(errorsOf(diagnostics)).toEqual([`${DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE}:style_font_mode`]);
+    expect(diagnostics[0]!.message).toContain('no setter to apply it with');
+    expect(diagnostics[0]!.message).not.toContain('is not a style override');
   });
 });
