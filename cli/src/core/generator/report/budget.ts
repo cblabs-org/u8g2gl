@@ -54,6 +54,7 @@ import type { Target } from '../../schema/project.js';
 import { classOf } from '../emit/screen-model.js';
 import { GENERATED_CONFIG_HEADER } from '../emit/generated-config.js';
 import { parseXbm } from '../emit/xbm.js';
+import { compareCodeUnits } from '../../order.js';
 import {
   MAX_OBJECTS_PER_SCREEN,
   walkRealised,
@@ -150,9 +151,9 @@ function elementClassesByOrigin(input: ReportInput): {
       (manifest.origin === 'framework' ? framework : project).add(classOf(manifest).name);
     }
   }
-  // Sorted by code unit, never by insertion or locale, so the same document
-  // reports the same list on every machine (§13.9).
-  const sorted = (names: Set<string>): readonly string[] => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  // Sorted through core/order.ts's compareCodeUnits, never by insertion or
+  // locale, so the same document reports the same list on every machine (§13.9).
+  const sorted = (names: Set<string>): readonly string[] => [...names].sort(compareCodeUnits);
   return { framework: sorted(framework), project: sorted(project) };
 }
 

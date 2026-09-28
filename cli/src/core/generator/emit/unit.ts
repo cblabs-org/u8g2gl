@@ -37,6 +37,7 @@ import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { Capacities } from '../realise/index.js';
+import { compareCodeUnits } from '../../order.js';
 
 /** One emitted file. */
 export interface EmittedUnit {
@@ -89,16 +90,18 @@ export function section(title: string): string {
 /**
  * @brief A sorted, deduplicated include block (§13.9).
  *
- * Sorted by code unit rather than by locale, because a locale-dependent order
- * would make the same project generate different bytes on different machines —
- * the defect §13.9 exists to prevent, and one this repository has already met in
- * its diagnostic ordering (PR-04 WO5b finding 5).
+ * Sorted through {@link compareCodeUnits} rather than by locale, because a
+ * locale-dependent order would make the same project generate different bytes on
+ * different machines — the defect §13.9 exists to prevent, and one this
+ * repository has already met in its diagnostic ordering (PR-04 WO5b finding 5).
+ * `core/order.ts` is the one place that rule is spelled; an inline comparator
+ * here is how it drifts.
  *
  * @param includes Include lines, exactly as they should appear.
  * @return The block, one per line, or `''` when there are none.
  */
 export function includeBlock(includes: readonly string[]): string {
-  const unique = [...new Set(includes)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const unique = [...new Set(includes)].sort(compareCodeUnits);
   return unique.join('\n');
 }
 

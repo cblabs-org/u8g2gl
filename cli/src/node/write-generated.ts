@@ -48,6 +48,7 @@ import {
   type GeneratedFile,
   type GenerateResult,
 } from '../core/generator/index.js';
+import { compareCodeUnits } from '../core/order.js';
 
 /** What writing does to one output path. */
 export type FileAction = 'created' | 'updated' | 'unchanged' | 'deleted';
@@ -107,9 +108,10 @@ function confinedPath(outDir: string, path: string): string {
 }
 
 // listFiles
-// Every regular file under a directory, output-relative, sorted by code unit so
-// the plan's order is the same on every platform. Symlinks are not followed and
-// not listed: the writer never deletes through one.
+// Every regular file under a directory, output-relative, sorted through
+// core/order.ts's compareCodeUnits so the plan's order is the same on every
+// platform. Symlinks are not followed and not listed: the writer never deletes
+// through one.
 //   root     — absolute directory to list
 //   relative — prefix for recursion; '' at the top
 function listFiles(root: string, relative = ''): string[] {
@@ -123,7 +125,7 @@ function listFiles(root: string, relative = ''): string[] {
       found.push(rel);
     }
   }
-  return found.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return found.sort(compareCodeUnits);
 }
 
 /**

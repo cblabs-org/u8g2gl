@@ -31,6 +31,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { compareCodeUnits } from '../core/order.js';
 
 /**
  * A font's declaration in `u8g2.h`, and its definition in `u8g2_fonts.c`. The
@@ -85,5 +86,6 @@ export function parseFontSymbols(clibDir: string): string[] {
   }
 
   // --- Step 3: A deterministic order ---
-  return [...declaredSet].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  // core/order.ts's compareCodeUnits, never locale: §13.9 (see that module).
+  return [...declaredSet].sort(compareCodeUnits);
 }
