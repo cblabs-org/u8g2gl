@@ -15,6 +15,12 @@
  *          a warning, so every conversion in the runtime goes through a helper
  *          here, named for what the value IS (WO4c):
  *
+ *          - a BOUND VALUE — a subject's int32_t value plus its container
+ *            origin, becoming int16_t geometry — u8g2gl_coord_bound(): the sum
+ *            clamped into int16_t. The object path's geometry bindings and
+ *            generated draw calls both go through it, so how an element is
+ *            realised (§13.5, [D-18]) cannot be seen in where it is drawn
+ *            (PR-4R WO4). This is the step BEFORE the conversions below;
  *          - a POSITION (origin, centre) — u8g2gl_coord_pos(): an explicit
  *            two's-complement wrap, because U8G2 is built to take a negative
  *            position that way and clip it to the visible part. A LINE END
@@ -31,11 +37,12 @@
  *          - a REFRESH REGION — u8g2gl_coord_span(): shortened to its on-screen
  *            part, because updateDisplayArea() is not clipped by U8G2.
  *
- * Description: Five inline conversions and the representable maximum. Nothing
+ * Description: Six inline conversions and the representable maximum. Nothing
  *              allocates; nothing depends on int being 32-bit.
  *
  * Exported Functions:
  * - U8G2GL_U8G2_COORD_MAX:        Largest value a u8g2_uint_t holds on this build
+ * - u8g2gl_coord_bound():         Bound value — origin + value, clamped into int16_t
  * - u8g2gl_coord_pos():           Position — explicit wrap; U8G2 clips it
  * - u8g2gl_coord_size():          Size — refuse <= 0 or unrepresentable
  * - u8g2gl_coord_clamp():         Clip corner or line end — clamp into range
@@ -66,6 +73,55 @@
  */
 inline constexpr int32_t U8G2GL_U8G2_COORD_MAX =
     static_cast<int32_t>(std::numeric_limits<u8g2_uint_t>::max());
+
+/**
+ * @brief The geometry a BOUND VALUE gives: @p origin + @p value, clamped into
+ *        int16_t.
+ *
+ * RULE: every subject value that becomes an element's geometry comes through
+ * here, whichever way the element is realised (§13.5): an object's bind_x(),
+ * bind_y(), bind_width() and bind_height() observers (u8g2gl_obj.cpp), and each
+ * bound integer argument of a generated u8g2gl_draw_* call, which the generator
+ * spells `u8g2gl_coord_bound(40, ui_subject_x.get())`. One function, so the two
+ * realisations cannot disagree — design_spec §13.5 requires a value reaching a
+ * draw call to be clamped exactly as the object path clamps it, instead of
+ * wrapping in the draw function's narrower parameter ([D-18], PR-4R WO4).
+ *
+ * Why clamp rather than wrap: subjects are int32_t and geometry is int16_t, and
+ * a wrapped value lands on the opposite side of the display. A clamped one pins
+ * the element at the edge of the coordinate space, which is off the display in
+ * the direction the value was heading.
+ *
+ * The **sum** is clamped, never each term (Chief Architect, 2026-09-19): 40 +
+ * 40000 must pin at INT16_MAX, and -10000 + 40000 is a perfectly good 30000.
+ * The sum is taken in 32 bits, so the value is first bounded to ±65536 to make
+ * overflow impossible. That changes no result: any value beyond it puts the sum
+ * outside int16_t whatever the int16_t origin, so it clamps to the same edge.
+ *
+ * @param origin The container's absolute corner on the value's axis, for a
+ *               position (§7.2). 0 for a position directly on the screen, and
+ *               for a size, which is a length and has no origin.
+ * @param value  The subject's value.
+ * @return The sum, clamped to [INT16_MIN, INT16_MAX].
+ */
+inline int16_t u8g2gl_coord_bound(int16_t origin, int32_t value) {
+    // --- Step 1: Bound the value so the 32-bit sum cannot overflow ---
+    constexpr int32_t kBeyondAnyOrigin = 65536;
+    if (value > kBeyondAnyOrigin) {
+        value = kBeyondAnyOrigin;
+    } else if (value < -kBeyondAnyOrigin) {
+        value = -kBeyondAnyOrigin;
+    }
+
+    // --- Step 2: Add the origin, then clamp the sum into int16_t ---
+    int32_t sum = static_cast<int32_t>(origin) + value;
+    if (sum > INT16_MAX) {
+        sum = INT16_MAX;
+    } else if (sum < INT16_MIN) {
+        sum = INT16_MIN;
+    }
+    return static_cast<int16_t>(sum);
+}
 
 /**
  * @brief Convert a draw POSITION — an origin, end point or centre — by an

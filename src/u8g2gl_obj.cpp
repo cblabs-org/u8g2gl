@@ -23,6 +23,7 @@
  *              and the shared binding pool with its observer callbacks
  */
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 
 #include <cstdio>
@@ -810,16 +811,11 @@ bool u8g2gl_obj::bind_height(u8g2gl_subject_int_base* subject) {
 }
 
 // u8g2gl_bound_coord
-// Reads an int subject for a geometry axis and adds an origin. Subjects are
-// int32_t and geometry is int16_t; clamping rather than truncating means an
-// out-of-range result pins the element at the edge of the coordinate space
-// instead of wrapping it to the opposite side of the display.
-//
-// The **sum** is clamped, never each term (Chief Architect, 2026-09-19): 40 +
-// 40000 must pin at INT16_MAX, and -10000 + 40000 is a perfectly good 30000.
-// The sum is taken in 32 bits, so the value is first bounded to ±65536 to make
-// overflow impossible. That changes no result: any value beyond it puts the sum
-// outside int16_t whatever the int16_t origin, so it clamps to the same edge.
+// Reads an int subject for a geometry axis and adds an origin, clamping the sum
+// into int16_t with u8g2gl_coord_bound() (u8g2gl_coord.h, where the reasoning
+// lives). The clamp is shared with generated draw calls, which spell each bound
+// integer argument through the same helper, so an object and a draw call
+// bound to one subject are placed identically (§13.5, [D-18], PR-4R WO4).
 //   obj     — binding_object() of the handle; nullptr once the slot is inactive
 //   subject — binding_subject() of the handle, an int subject by construction
 //   origin  — added to the value; 0 for a size
@@ -829,20 +825,7 @@ static u8g2gl_obj* u8g2gl_bound_coord(u8g2gl_obj* obj, void* subject, int16_t or
     if (!obj || !subject) {
         return nullptr;
     }
-    constexpr int32_t kBeyondAnyOrigin = 65536;
-    int32_t v = static_cast<u8g2gl_subject_int_base*>(subject)->get();
-    if (v > kBeyondAnyOrigin) {
-        v = kBeyondAnyOrigin;
-    } else if (v < -kBeyondAnyOrigin) {
-        v = -kBeyondAnyOrigin;
-    }
-    int32_t sum = static_cast<int32_t>(origin) + v;
-    if (sum > INT16_MAX) {
-        sum = INT16_MAX;
-    } else if (sum < INT16_MIN) {
-        sum = INT16_MIN;
-    }
-    out = static_cast<int16_t>(sum);
+    out = u8g2gl_coord_bound(origin, static_cast<u8g2gl_subject_int_base*>(subject)->get());
     return obj;
 }
 
