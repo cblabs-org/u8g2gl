@@ -70,3 +70,17 @@ and the `0x`-hex/decimal grammar together, since neither is in the spec today.
 §18's warning about a `range` "that pulls in a full CJK or symbol block" is
 exactly the no-`range` case for a large font, so the budget line WO3 adds makes
 that visible rather than silent.
+
+## 7. Documents now out of date (yours to edit)
+
+- `docs/implementation_plan.md:276` still describes PR-04b as future work.
+- design_spec §14.2 should state what WO4 implemented: the PNG's size must
+  equal the declared size (no resampling); alpha is composited over white;
+  luminance is Rec. 601 in integer arithmetic; `Y < threshold` sets the bit;
+  `threshold` defaults to 128; dither is left-to-right Floyd–Steinberg with the
+  remainder going to the below-right neighbour; Adam7-interlaced PNGs are
+  refused.
+- design_spec §18's illustration should use the budget's actual lines:
+  `fonts (compiled bdf)` (measured), `fonts (builtin)` (unmeasured) and
+  `image data (bitmap arrays)` (measured).
+- §21 Q-2: see item 1 for proposed closing text.

@@ -104,8 +104,8 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 - [x] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** ✅ `8d45c91`…`975ca41` · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
 - [x] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** ✅ `95b3c03`, `9ffc4bf`, `a0f0df9` · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
 - [x] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** ✅ `93e54fa`, `b991378`, `3296112`, `1e46500` · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
-- [ ] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
-- [ ] **WO5 — licences, docs and a migration rehearsal** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · §22.1 wording; departures-board-v3's ten BDFs through the built CLI, compared with its `fonts.cpp`
+- [x] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** ✅ `aee1a57`, `8d31354` · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
+- [ ] **[WO5 — licences, docs and a migration rehearsal](wo5-docs-rehearsal/WORKORDER.md)** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · licence of a converted font; notices audit; npm package carries LICENSE; departures-board-v3's **14** BDFs through the built CLI, compared byte for byte with its `fonts.cpp`
 - [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
 
 WORKORDERs are written just in time, each after its predecessor's Completion
@@ -228,3 +228,31 @@ schema, manifest vocabulary or system design stops and goes to the owner.
 - `<convert>`'s `mode` and `threshold` are currently parsed through an
   unchecked cast and never validated. WO4 validates them, which is existing
   vocabulary, not new schema.
+
+### 2026-09-28 — WO4 ingested
+- **Complete**, one code commit. PA re-ran the suites one after the other,
+  with a clean C++ build: **CLI 1265** (+104), **C++ 383** (+1, one known
+  skip, **zero warnings**); lint and build clean.
+- **PA independent oracle:** a 10x2 RGBA PNG built in Python outside the
+  codebase, covering opaque grey, a pixel exactly at the threshold, alpha 0,
+  alpha 128 over black, pure R/G/B and a width not a multiple of 8. Through
+  the built CLI it gives `65 01 00 02`, **exactly the bytes computed by hand**
+  from WO4's rules.
+- No npm dependency: PNG inflate uses `DecompressionStream`. One image model:
+  `compileProjectAssets` returns `images` + `failedImages` for both `<xbm>`
+  and `<convert>`, and the emitter, budget and editor read only that.
+  `no-ticket-numbers.test.ts` guards generated output against `WO<n>` and
+  `PR-<n>`.
+- Public-surface changes, for the PR description: the budget `--json` item
+  `image data (xbm arrays)` is now `image data (bitmap arrays)`;
+  `GenerateInput.assets` is replaced by compiled `images`;
+  `ConvertImageDecl.mode` is typed `string` and validated. Two new codes:
+  `U8G2GL_IMAGE_CONVERT_FAILED`, `U8G2GL_MISSING_COMPILED_IMAGE`.
+- **Attribution defect:** WO4's two commits say `Co-Authored-By: Claude
+  Sonnet 5.5`, a model that does not exist (workers run on Sonnet 5). Nothing
+  is pushed; the PA corrects the trailer during the pre-submission rebase.
+- Worker's out-of-scope findings (docs, which are the CA's):
+  `implementation_plan.md:276` still calls PR-04b future work; §14.2 and §18
+  should record the `<convert>` rules and the renamed budget line. Added to
+  the CA bridge.
+- Correction to this ledger: departures-board-v3 has **14** BDFs, not ten.
