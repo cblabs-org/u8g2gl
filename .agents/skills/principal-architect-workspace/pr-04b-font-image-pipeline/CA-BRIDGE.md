@@ -96,3 +96,14 @@ All 12 font arrays departures-board-v3 ships are **byte-identical** to what
 `u8g2gl generate` produces from the same BDFs with no `range` (worker-measured
 for all 12; PA-reproduced for two). PR-05's only font work is renaming to
 lowercase `<bdf>` names and switching code to `ui_font_<name>`.
+
+## 9. A standards question the readability review raised
+
+Comments across the codebase cite work orders (`PR-04 WO9`, `WO3 item 5`,
+"the PA rejected…"): hundreds of them in older code. `documentation.md` has no
+rule either way. The reviewer judged them by its "reader who never saw the
+codebase" test. For PR-04b's own additions the PA ruled: rewrite bare tags,
+pointers to workspace files and narrated debate; keep §/[D-n] references and
+measured facts. **Suggest** writing that into `u8g2gl-standards` so the next
+PR doesn't need a ruling, and deciding whether older code is swept once or
+left to decay.

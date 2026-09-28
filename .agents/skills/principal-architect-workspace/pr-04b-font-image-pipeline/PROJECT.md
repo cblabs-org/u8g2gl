@@ -106,7 +106,7 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 - [x] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** ✅ `93e54fa`, `b991378`, `3296112`, `1e46500` · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
 - [x] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** ✅ `aee1a57`, `8d31354` · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
 - [x] **[WO5 — licences, docs and a migration rehearsal](wo5-docs-rehearsal/WORKORDER.md)** ✅ `9791ee0`, `b810c00` · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · licence of a converted font; notices audit; npm package carries LICENSE; departures-board-v3's **14** BDFs through the built CLI, compared byte for byte with its `fonts.cpp`
-- [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
+- [ ] **[WO6 — readability remediation, and three small fixes](wo6-readability/WORKORDER.md)** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · [review](wo6-readability/REVIEW.md) P2/P3; B1 symlink confinement; B2 `ofl` prefix; B3 clean `dist/`
 
 WORKORDERs are written just in time, each after its predecessor's Completion
 Report is ingested, so each can name the API surface the previous one delivered.
@@ -284,3 +284,17 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   says bdfconv is a "build tool, not linked", and the Emscripten row likewise.
   Both now ship in the npm package. The `LICENSE` quote at ~2088 lacks the new
   sentence.
+
+### 2026-09-28 — readability review ingested; WO6 dispatched
+- `readability-reviewer` over `main..wo4-png-convert`: **P1 0 · P2 6 · P3 14 ·
+  P4 5**. It found stale comments left by later work orders, and history
+  narration. Report committed as [wo6-readability/REVIEW.md](wo6-readability/REVIEW.md).
+- **PA ruling on history in comments:** for lines this PR added, rewrite bare
+  ticket tags, pointers to workspace documents a source reader cannot reach,
+  and narrated debate. Keep §/[D-n] references, upstream source pointers, and
+  measured facts stated as facts. No new rule mid-PR; it is suggested to the CA.
+- **Two behaviour defects the reviewer spotted**, both in code this PR
+  extended, go into WO6 with tests: a symlink can escape asset-read
+  confinement (`resolve()`, not `realpath`), and the licence-file prefix `ofl`,
+  which was the PA's own rule, matches `oflow.txt`. Plus WO5's carry: the
+  build starts from an empty `dist/`.
