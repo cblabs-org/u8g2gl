@@ -13,6 +13,13 @@
  *              Detects duplicate identifiers within screen/composite scopes, duplicate manifest declarations, and flags
  *              composite-inlining collisions.
  *
+ *              **One name is exempt: a `<builtin>` font's** (PR-04 WO14, owner's
+ *              ruling 2026-09-28). It is a U8G2 symbol rather than a name the
+ *              author chose, and 522 of the fonts U8G2 bundles carry capitals.
+ *              Pass 2 checks it against the U8G2 catalogue instead. A `<bdf>`'s
+ *              name is the author's and keeps §13.4 in full. The exemption is
+ *              written at the font loop, with its reasoning.
+ *
  * Exports:
  * - validateIdentifiers(input): Runs Pass 7 identifier validation
  */
@@ -285,9 +292,33 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
 
   const seenFonts = new Set<string>();
   for (const f of globals?.fonts ?? []) {
-    const diag = checkNameRule(f.name, f.loc, 'font');
-    if (diag) {
-      diagnostics.push(diag);
+    // A <builtin>'s `name` is exempt from §13.4's identifier rule, deliberately
+    // and by the owner's ruling of 2026-09-28: "Fonts are input - we can't
+    // expect them to follow our naming conventions we should use whatever is
+    // provided and ensure ALL fonts are available." The name is not an
+    // identifier the author chose; it *is* the U8G2 symbol the alias points at
+    // (emit/fonts.ts), and 522 of the 2039 fonts U8G2 bundles carry capitals
+    // (`u8g2_font_helvR08_tr`), which `[a-z][a-z0-9_]*` forbids. Refusing them
+    // here made a fifth of the library unreachable.
+    //
+    // Nothing is loosened by the exemption, because Pass 2 checks the same name
+    // against the catalogue derived from the pinned U8G2 source
+    // (validate-references.ts, U8G2GL_UNKNOWN_FONT) — a strictly narrower test
+    // than §13.4's: only a name U8G2 actually declares is accepted, and every
+    // one of those is already a C identifier, so the alias stays legal.
+    //
+    // **Confined to <builtin>.** A <bdf>'s `name` *is* author-chosen (§14.2), so
+    // §13.4 applies to it in full and `checkNameRule` still runs on it below.
+    // PR-04 WO14 pins that difference with a test.
+    //
+    // §13.4's wording still says every name is lowercase, so this is
+    // deliberately ahead of the spec; the amendment is the Chief Architect's.
+    // Recorded in PROJECT.md, "Owner instruction — WO14, 2026-09-28".
+    if (f.kind !== 'builtin') {
+      const diag = checkNameRule(f.name, f.loc, 'font');
+      if (diag) {
+        diagnostics.push(diag);
+      }
     }
     if (f.name && seenFonts.has(f.name)) {
       diagnostics.push(

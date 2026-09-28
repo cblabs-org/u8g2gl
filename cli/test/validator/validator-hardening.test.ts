@@ -662,6 +662,74 @@ describe('a <builtin> font must be one U8G2 bundles (WO9 f5)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// A <builtin> name may carry capitals; a <bdf> name may not (PR-04 WO14)
+// ---------------------------------------------------------------------------
+
+describe("a <builtin> font's name is exempt from §13.4, and only a <builtin>'s (PR-04 WO14)", () => {
+  /** One of the 522 fonts U8G2 bundles whose name carries capitals. */
+  const CAPITALISED = 'u8g2_font_helvR08_tr';
+
+  const label = (font: string) =>
+    `        <u8g2gl_label name="l" x="0" y="0" width="40" height="10" font="${font}" text="Hi" />`;
+
+  /** The emitted text of one generated file. */
+  const emitted = (result: Journeys, path: string): string =>
+    result.generated.files.find((file) => file.path === path)?.content ?? '';
+
+  it('accepts a capitalised U8G2 font in both journeys', () => {
+    // The owner's ruling of 2026-09-28: a font name is input, not an identifier
+    // the author chose, so all 2039 U8G2 fonts must be reachable.
+    const result = journeys(label(CAPITALISED), { fonts: `<builtin name="${CAPITALISED}" />` });
+    expectAgreement(result);
+    expect(result.validated.errors).toBe(0);
+    expect(result.generated.errors).toBe(0);
+  });
+
+  it('spells the alias identically in its declaration, its definition and its use', () => {
+    // The end-to-end proof is the C++ suite compiling the fixture; this pins the
+    // three spellings agreeing, which is what makes that compile possible.
+    const result = journeys(label(CAPITALISED), { fonts: `<builtin name="${CAPITALISED}" />` });
+    const alias = `ui_font_${CAPITALISED}`;
+    expect(emitted(result, 'ui.hpp')).toContain(`extern const uint8_t* const ${alias};`);
+    expect(emitted(result, 'ui_fonts.cpp')).toContain(`const uint8_t* const ${alias} = ${CAPITALISED};`);
+    expect(emitted(result, 'ui_screen_home.cpp')).toContain(`.set_font(${alias});`);
+  });
+
+  it('still refuses a <builtin> U8G2 does not bundle, capitals and all, with suggestions', () => {
+    // The exemption is from §13.4's shape rule only. Pass 2's catalogue check is
+    // what a <builtin> name is held to, and it is the narrower of the two.
+    const result = journeys(label('u8g2_font_helvR08_xx'), { fonts: '<builtin name="u8g2_font_helvR08_xx" />' });
+    expectAgreement(result);
+    const errors = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(errors.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.UNKNOWN_FONT}:u8g2_font_helvR08_xx`,
+    ]);
+    expect(errors[0]?.suggestions).toContain(CAPITALISED);
+  });
+
+  it("refuses the same capitals in a <bdf> name, because that name is the author's (§13.4)", () => {
+    // The pin that stops the exemption being read as a general relaxation: the
+    // identical string is legal as a <builtin> and illegal as a <bdf>.
+    const result = journeys(label('helvR08'), { fonts: '<bdf name="helvR08" src="fonts/helvR08.bdf" />' });
+    const invalid = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME);
+    expect(invalid.map((d) => d.offendingText)).toEqual(['helvR08']);
+    expect(invalid[0]?.message).toContain('Names must match [a-z][a-z0-9_]*');
+    expect(invalid[0]?.message).toContain("for font");
+  });
+
+  it('holds §13.4 for every other kind of name (controls)', () => {
+    // Subjects, styles, images, screens and elements are unchanged: the
+    // divergence is confined to a <builtin> font's name.
+    const result = journeys('        <u8g2gl_box name="Box" x="0" y="0" width="4" height="4" />', {
+      subjects: '<int name="Level" value="0" />',
+      styles: '<style name="Loud" align="center" />',
+    });
+    const invalid = result.validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME);
+    expect(invalid.map((d) => d.offendingText).sort()).toEqual(['Box', 'Level', 'Loud']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Subject values (WO9 f6) and truncate
 // ---------------------------------------------------------------------------
 

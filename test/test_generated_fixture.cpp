@@ -39,6 +39,7 @@
 #include "ui.hpp"
 
 #include "capacity_probe.h"
+#include "fixture_u8g2_fonts.h"
 #include "U8g2lib.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
@@ -57,7 +58,7 @@ namespace {
 // generator, so a change to what is counted fails a test that names it.
 constexpr uint32_t kFixtureTotalBindings = 7;
 constexpr uint32_t kFixtureBindingsPerObject = 1;
-constexpr uint32_t kFixtureObjectsOnBusiestScreen = 5;  // home: bar, its three children and msg; bounds: 5 too
+constexpr uint32_t kFixtureObjectsOnBusiestScreen = 6;  // bounds, since PR-04 WO14 added `caps` (home has 5)
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not
@@ -416,6 +417,27 @@ TEST(GeneratedFixture, IntBoundLabelDrawsItsFormattedValue) {
     EXPECT_EQ(colder.send_count, 1);
     drawn_with(colder, "-3°C");
     ui_set_temperature(21);
+}
+
+TEST(GeneratedFixture, AFontWhoseU8G2NameCarriesCapitalsIsUsable) {
+    // PR-04 WO14, the owner's ruling of 2026-09-28: every U8G2 font must be
+    // usable, including the 522 whose names carry capitals. `caps` names
+    // u8g2_font_helvR08_tr, which §13.4's lowercase identifier rule would have
+    // refused before UNKNOWN_FONT ever saw it.
+    //
+    // That this file compiles and links is half the proof: the alias is declared
+    // in ui.hpp, defined in ui_fonts.cpp against U8G2's own spelling, and passed
+    // to set_font() in ui_screen_bounds.cpp, so any disagreement between the
+    // three -- a case-folded alias, most obviously -- is a build failure rather
+    // than a wrong pixel. This assertion is the other half: the label really is
+    // drawn with that font's table and not with another.
+    U8G2 display;
+    show(ui_screen_bounds, display);
+    const drawn_label caps = drawn_with(display, "Caps");
+    EXPECT_EQ(caps.font, static_cast<const void*>(ui_font_u8g2_font_helvR08_tr));
+    EXPECT_NE(caps.font, static_cast<const void*>(ui_font_u8g2_font_6x10_mr));
+    EXPECT_EQ(static_cast<const void*>(ui_font_u8g2_font_helvR08_tr),
+              static_cast<const void*>(u8g2_font_helvR08_tr));
 }
 
 TEST(GeneratedFixture, ElementsOwnAttributesWinOverANamedStyle) {

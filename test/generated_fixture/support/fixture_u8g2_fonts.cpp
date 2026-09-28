@@ -19,3 +19,4 @@
 
 const uint8_t u8g2_font_6x10_mr[] = {0x06};
 const uint8_t u8g2_font_5x7_mr[] = {0x05};
+const uint8_t u8g2_font_helvR08_tr[] = {0x08};

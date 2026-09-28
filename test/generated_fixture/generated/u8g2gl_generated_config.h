@@ -42,7 +42,7 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // which is why this header must be included first (§13.7).
 
 // The busiest screen is 'bounds'.
-#define U8G2GL_MAX_OBJECTS_PER_SCREEN 5
+#define U8G2GL_MAX_OBJECTS_PER_SCREEN 6
 
 // The busiest object is 'track_readout'.
 #define U8G2GL_MAX_BINDINGS_PER_OBJ 1

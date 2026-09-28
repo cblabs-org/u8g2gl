@@ -16,6 +16,7 @@ static u8g2gl_label ui_obj_track_readout;  // 1  child of ui_obj_track
 static u8g2gl_label ui_obj_temp;  // 2
 static u8g2gl_label ui_obj_own_font;  // 3
 static u8g2gl_label ui_obj_override;  // 4
+static u8g2gl_label ui_obj_caps;  // 5
 // "track_knob" is not here: no object required (§13.5)
 // "dot" is not here: no object required (§13.5)
 
@@ -29,6 +30,7 @@ static u8g2gl_obj* const ui_screen_bounds_objs[] = {
     &ui_obj_temp,
     &ui_obj_own_font,
     &ui_obj_override,
+    &ui_obj_caps,
 };
 static const uint8_t ui_screen_bounds_parents[] = {
     U8G2GL_NO_PARENT,  // ui_obj_track
@@ -36,6 +38,7 @@ static const uint8_t ui_screen_bounds_parents[] = {
     U8G2GL_NO_PARENT,  // ui_obj_temp
     U8G2GL_NO_PARENT,  // ui_obj_own_font
     U8G2GL_NO_PARENT,  // ui_obj_override
+    U8G2GL_NO_PARENT,  // ui_obj_caps
 };
 
 // --- init: construct, apply styles, set properties, register bindings (§13.7) ---
@@ -66,6 +69,10 @@ void ui_screen_bounds_init() {
     ui_obj_override.set_font(ui_font_u8g2_font_6x10_mr);
     ui_obj_override.set_text("Ovr");
 
+    ui_obj_caps.set_coords(0, 26, 60, 10);
+    ui_obj_caps.set_font(ui_font_u8g2_font_helvR08_tr);
+    ui_obj_caps.set_text("Caps");
+
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
     // Each bind_*() returns false only when a pool is full. The pools are
@@ -89,6 +96,7 @@ uint32_t ui_screen_bounds_tick(uint32_t now_ms) {
     next = u8g2gl_min(next, ui_obj_temp.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_own_font.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_override.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_caps.tick(now_ms));
     return next;
 }
 
@@ -108,13 +116,14 @@ void ui_screen_bounds_render(U8G2& display) {
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 2);  // ui_obj_temp
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 3);  // ui_obj_own_font
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 4);  // ui_obj_override
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 5);  // ui_obj_caps
 }
 
 // --- The screen descriptor ui_handler() drives (§12.4) ---
 u8g2gl_screen ui_screen_bounds = {
     ui_screen_bounds_objs,
     ui_screen_bounds_parents,
-    5,
+    6,
     ui_screen_bounds_init,
     ui_screen_bounds_activate,
     ui_screen_bounds_deactivate,

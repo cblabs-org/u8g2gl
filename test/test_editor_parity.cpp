@@ -100,6 +100,10 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
     EXPECT_TRUE(host->load(U8G2GL_EDITOR_SCENE_PATH)) << host->error();
     host->provide_font("u8g2_font_6x10_mr", u8g2_font_6x10_mr);
     host->provide_font("u8g2_font_5x7_mr", u8g2_font_5x7_mr);
+    // PR-04 WO14: the scene names this font exactly as U8G2 does, capitals and
+    // all, so the editor journey resolves it by the same string the firmware
+    // alias is spelled from.
+    host->provide_font("u8g2_font_helvR08_tr", u8g2_font_helvR08_tr);
     host->provide_image("icon_wifi", ui_image_icon_wifi);
     EXPECT_TRUE(host->set_string("station_name", v.station));
     EXPECT_TRUE(host->set_string("service_message", v.message));

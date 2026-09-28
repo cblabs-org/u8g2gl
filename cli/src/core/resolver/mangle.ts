@@ -245,7 +245,43 @@ export function subjectSetterIdentifier(subject: string): string {
   return `ui_set_${subject}`;
 }
 
-/** `ui_font_small_9`. */
+/**
+ * @brief A font's alias: `ui_font_` + its name, **verbatim** —
+ *        `ui_font_small_9`, and `ui_font_u8g2_font_helvR08_tr`.
+ *
+ * **The mangling rule for a `<builtin>` is the identity, and that is a decision**
+ * (PR-04 WO14). The owner ruled on 2026-09-28 that every U8G2 font must be
+ * usable, so the 522 bundled names carrying capitals reach this function, and
+ * something has to guarantee `ui_font_<name>` is still a legal C++ identifier.
+ * Three properties are required of whatever rule is chosen — deterministic,
+ * total over the catalogue, and injective across it — and the identity is the
+ * only candidate that gets all three for free:
+ *
+ * - **Total and legal, by construction.** A U8G2 font name *is* a C identifier:
+ *   it is the very symbol `u8g2.h` declares the array with, so it already
+ *   matches `[A-Za-z_][A-Za-z0-9_]*` and contains no `__`. Prefixing `ui_font_`
+ *   preserves both. `mangle.test.ts` asserts this over all 2039 names rather
+ *   than trusting the argument.
+ * - **Injective, unconditionally.** The identity cannot map two names together.
+ *   Every folding rule can, and the obvious one — lowercasing — is safe on
+ *   today's catalogue only by luck: it survives 2039 names with no collision,
+ *   but `u8g2_font_helvR08_tr` and a future `..._helvr08_tr` would fold onto one
+ *   alias, and the failure would arrive as a U8G2 release rather than as
+ *   anything in this repository. A rule whose correctness depends on a
+ *   dependency not adding a name is not a rule.
+ * - **Readable, which is §13.4's whole purpose.** The alias names the U8G2 array
+ *   it points at, letter for letter, so a reader matches `<builtin
+ *   name="u8g2_font_helvR08_tr">` to `ui_font_u8g2_font_helvR08_tr =
+ *   u8g2_font_helvR08_tr` by eye. A case-folded alias would be the one place in
+ *   generated code where the C++ stops spelling the XML.
+ *
+ * A collision is still never resolved by renaming: two fonts producing one alias
+ * goes through {@link mangleIdentifiers}'s table as `U8G2GL_NAME_COLLISION`
+ * naming both, exactly as for any other identifier.
+ *
+ * An author-chosen name — a `<bdf>`'s — reaches here having passed §13.4 in
+ * Pass 7, so the identity is right for it too.
+ */
 export function fontIdentifier(font: string): string {
   return `ui_font_${font}`;
 }

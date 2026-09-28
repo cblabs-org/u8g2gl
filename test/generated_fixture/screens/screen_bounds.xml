@@ -22,5 +22,12 @@
              center. -->
         <u8g2gl_label name="override" x="64" y="38" width="60" height="10"
                       font="u8g2_font_6x10_mr" style="loud" style_align="right" text="Ovr" />
+
+        <!-- PR-04 WO14: a font whose U8G2 name carries capitals. It exists to be
+             compiled: the alias ui_font_u8g2_font_helvR08_tr is declared in
+             ui.hpp, defined in ui_fonts.cpp and passed to set_font() here, and
+             the three spellings must agree or this unit will not build. -->
+        <u8g2gl_label name="caps" x="0" y="26" width="60" height="10"
+                      font="u8g2_font_helvR08_tr" text="Caps" />
     </view>
 </screen>

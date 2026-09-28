@@ -15,3 +15,6 @@ const uint8_t* const ui_font_u8g2_font_6x10_mr = u8g2_font_6x10_mr;
 
 // u8g2_font_5x7_mr: a U8G2 built-in, referenced rather than compiled (§14.1).
 const uint8_t* const ui_font_u8g2_font_5x7_mr = u8g2_font_5x7_mr;
+
+// u8g2_font_helvR08_tr: a U8G2 built-in, referenced rather than compiled (§14.1).
+const uint8_t* const ui_font_u8g2_font_helvR08_tr = u8g2_font_helvR08_tr;

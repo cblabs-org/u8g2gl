@@ -8,9 +8,15 @@
  *          prefixing, reserved spellings created by joining two valid names, and
  *          the collision rule — a hard error naming both sources, never a rename.
  * Description: Expands parsed screens and composites, then mangles.
+ *
+ *              The last block is PR-04 WO14's proof obligation: the font alias
+ *              run over every one of the 2039 names U8G2 bundles, asserting the
+ *              rule is total, injective and legal C++ — including the 522 names
+ *              that carry capitals.
  */
 
 import { describe, expect, it } from 'vitest';
+import U8G2_FONTS from '../../src/data/u8g2-fonts.json' with { type: 'json' };
 import { parseScreenFile, parseWidgetManifestFile } from '../../src/core/parser/index.js';
 import {
   childIdentifier,
@@ -245,5 +251,81 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
     const build = () =>
       mangle([screen(['        <wd_x name="a" x="0" y="0" width="8" height="8" />', '        <u8g2gl_box name="a_b" x="0" y="10" width="4" height="4" />'].join('\n'))], [WD_X]);
     expect(JSON.stringify(build())).toBe(JSON.stringify(build()));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The font alias over the whole U8G2 catalogue (PR-04 WO14)
+// ---------------------------------------------------------------------------
+
+describe("every U8G2 font's alias is legal and unique (PR-04 WO14)", () => {
+  const FONTS: readonly string[] = U8G2_FONTS;
+
+  /** A legal C++ identifier: §13.4's shape, widened to the capitals U8G2 uses. */
+  const LEGAL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  it('maps all 2039 names to legal, distinct identifiers — the rule is total and injective', () => {
+    // The set this runs over is the catalogue itself, not a sample: a rule that
+    // holds for the names someone thought to write down is not a rule.
+    expect(FONTS.length).toBe(2039);
+    expect(FONTS.filter((name) => /[A-Z]/.test(name)).length).toBe(522);
+
+    const byIdentifier = new Map<string, string>();
+    const illegal: string[] = [];
+    const collisions: string[] = [];
+    for (const name of FONTS) {
+      const identifier = fontIdentifier(name);
+      if (!LEGAL_IDENTIFIER.test(identifier) || identifier.includes('__')) {
+        illegal.push(identifier);
+      }
+      const first = byIdentifier.get(identifier);
+      if (first === undefined) {
+        byIdentifier.set(identifier, name);
+      } else {
+        collisions.push(`${first} and ${name} both mangle to ${identifier}`);
+      }
+    }
+
+    expect(illegal).toEqual([]);
+    expect(collisions).toEqual([]);
+    // Total: every name produced exactly one identifier, none dropped.
+    expect(byIdentifier.size).toBe(FONTS.length);
+  });
+
+  it('spells a capitalised name verbatim, so the alias names the U8G2 array it points at', () => {
+    expect(fontIdentifier('u8g2_font_helvR08_tr')).toBe('ui_font_u8g2_font_helvR08_tr');
+    expect(fontIdentifier('u8g2_font_6x10_mr')).toBe('ui_font_u8g2_font_6x10_mr');
+  });
+
+  it('is deterministic — every name gives the same identifier on a second pass', () => {
+    expect(FONTS.map(fontIdentifier)).toEqual(FONTS.map(fontIdentifier));
+  });
+
+  it('folds nothing, because case folding is only accidentally safe on this catalogue', () => {
+    // Lowercasing survives today's 2039 names with no collision — which is why
+    // it is the trap: its safety is a property of U8G2's current release, not of
+    // the rule. Two names differing only in case fold onto one alias, and the
+    // identity does not.
+    expect(new Set(FONTS.map((name) => name.toLowerCase())).size).toBe(FONTS.length);
+
+    const differByCaseOnly = ['u8g2_font_helvR08_tr', 'u8g2_font_helvr08_tr'];
+    expect(new Set(differByCaseOnly.map((name) => name.toLowerCase())).size).toBe(1);
+    expect(new Set(differByCaseOnly.map(fontIdentifier)).size).toBe(2);
+  });
+
+  it('puts a capitalised font in the collision table like any other identifier', () => {
+    // The alias is registered in the global table, so it is collision-checked by
+    // the one rule every other identifier goes through — no separate path.
+    const globals: Globals = {
+      ...EMPTY_GLOBALS,
+      fonts: [
+        { kind: 'builtin', name: 'u8g2_font_helvR08_tr' },
+        { kind: 'builtin', name: 'u8g2_font_6x10_mr' },
+      ],
+    };
+    const table = mangle([screen('        <u8g2gl_box name="b" x="0" y="0" width="4" height="4" />')], [], globals);
+    expect(table.diagnostics).toEqual([]);
+    const fonts = table.global.filter((entry) => entry.source.kind === 'font').map((entry) => entry.identifier);
+    expect(fonts).toEqual(['ui_font_u8g2_font_helvR08_tr', 'ui_font_u8g2_font_6x10_mr']);
   });
 });
