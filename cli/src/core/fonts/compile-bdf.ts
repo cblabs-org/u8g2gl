@@ -130,9 +130,10 @@ export async function compileBdf(input: CompileBdfInput): Promise<CompileBdfResu
   // --- Step 4: zero glyphs is a failure, not a degenerate success (WO1 Finding 2: a
   //     malformed BDF exits 0 with "Glyphs: 0/0"; a range matching nothing does too) ---
   if (parsed.value.selectedGlyphs === 0) {
+    const rangeDescription = input.range !== undefined ? `range '${input.range}'` : 'the default range';
     const reason =
       parsed.value.totalGlyphs > 0
-        ? `range '${input.range}' selected no glyphs from a font with ${parsed.value.totalGlyphs} glyph(s).`
+        ? `${rangeDescription} selected no glyphs from a font with ${parsed.value.totalGlyphs} glyph(s).`
         : 'the BDF file has no usable glyphs (bdfconv reported "Glyphs: 0/0").';
     return { ok: false, reason: `No glyphs compiled: ${reason}`, stderr: stderrLines };
   }
