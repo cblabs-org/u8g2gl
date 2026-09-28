@@ -59,6 +59,17 @@
 #include <cstdio>
 #include <initializer_list>
 
+/**
+ * @brief The attribute real U8G2 places on every font array (u8x8.h's
+ *        `U8X8_FONT_SECTION`, PR-04b WO3b): `.progmem.<name>` on AVR,
+ *        `.text.<name>` on AVR32, empty everywhere else — including this
+ *        host build, so it expands to nothing here, exactly as it does on
+ *        real U8G2's own default branch.
+ */
+#ifndef U8G2_FONT_SECTION
+#define U8G2_FONT_SECTION(name)
+#endif
+
 /** @brief U8G2's pixel coordinate type; uint16_t because U8G2_16BIT is on. */
 typedef uint16_t u8g2_uint_t;
 

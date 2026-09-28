@@ -59,7 +59,7 @@ namespace {
 // generator, so a change to what is counted fails a test that names it.
 constexpr uint32_t kFixtureTotalBindings = 7;
 constexpr uint32_t kFixtureBindingsPerObject = 1;
-constexpr uint32_t kFixtureObjectsOnBusiestScreen = 6;  // bounds, since PR-04 WO14 added `caps` (home has 5)
+constexpr uint32_t kFixtureObjectsOnBusiestScreen = 8;  // bounds, since PR-04b WO3b added the two <bdf> labels (home has 5)
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not

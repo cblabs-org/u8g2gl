@@ -31,6 +31,7 @@ import type { Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { loadProject } from '../../src/node/load-project.js';
 import { readProjectFiles } from '../../src/node/read-project.js';
 import { formatDiagnostics } from '../../src/node/format-diagnostic.js';
+import { compileProjectAssets } from '../../src/core/assets/index.js';
 
 const GOLDEN_GENERATOR_VERSION = '0.0.0-golden';
 const committedFixture = resolve(__dirname, '../../../test/generated_fixture');
@@ -42,18 +43,30 @@ afterAll(() => {
   }
 });
 
-/** Generates a project at the fixed golden version, as every expectation is made. */
-function generateAt(dir: string): ReturnType<typeof generate> {
+/**
+ * Generates a project at the fixed golden version, as every expectation is
+ * made. Compiles every `<bdf>` first (PR-04b WO3 item 3) — the committed
+ * fixture declares two since PR-04b WO3b, so a plain `generate()` with no
+ * `compiledAssets` would refuse it with `U8G2GL_MISSING_COMPILED_FONT`.
+ */
+async function generateAt(dir: string): Promise<ReturnType<typeof generate>> {
   const loaded = loadProject(dir);
-  const result = generate({ ...loaded.model, generatorVersion: GOLDEN_GENERATOR_VERSION, assets: loaded.assets });
+  const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
+  const result = generate({
+    ...loaded.model,
+    generatorVersion: GOLDEN_GENERATOR_VERSION,
+    assets: loaded.assets,
+    compiledAssets,
+    bdfLicenceFiles: loaded.bdfLicenceFiles,
+  });
   expect(result.errors, JSON.stringify(result.diagnostics.slice(0, 2))).toBe(0);
   return result;
 }
 
 describe('generating twice gives identical bytes (§13.9)', () => {
-  it('holds for the committed compile fixture, file for file and in emission order', () => {
-    const first = generateAt(committedFixture);
-    const second = generateAt(committedFixture);
+  it('holds for the committed compile fixture, file for file and in emission order', async () => {
+    const first = await generateAt(committedFixture);
+    const second = await generateAt(committedFixture);
 
     // Paths in order, not just as a set: emission order is draw order and file
     // order, and a reordered file list is a diff in u8g2gl.xml-driven output.
@@ -64,18 +77,18 @@ describe('generating twice gives identical bytes (§13.9)', () => {
     expect(first.files.length).toBeGreaterThan(5);
   });
 
-  it('holds across a fresh process boundary, which is where a Map or Set order would differ', () => {
+  it('holds across a fresh process boundary, which is where a Map or Set order would differ', async () => {
     // The two calls above share one module instance. This one re-reads the
     // project from disk into a new model, so anything keyed on object identity
     // or insertion order rather than on the document would diverge here.
-    const first = generateAt(committedFixture);
-    const fresh = generateAt(committedFixture);
+    const first = await generateAt(committedFixture);
+    const fresh = await generateAt(committedFixture);
     expect(JSON.stringify(fresh.capacities)).toBe(JSON.stringify(first.capacities));
     expect(fresh.files.map((f) => f.content).join('\u0000')).toBe(first.files.map((f) => f.content).join('\u0000'));
   });
 
-  it('carries no timestamp and no absolute path into any emitted file', () => {
-    for (const file of generateAt(committedFixture).files) {
+  it('carries no timestamp and no absolute path into any emitted file', async () => {
+    for (const file of (await generateAt(committedFixture)).files) {
       expect(file.content, file.path).not.toMatch(/\d{4}-\d{2}-\d{2}/);
       expect(file.content, file.path).not.toMatch(/\/Users\//);
     }
@@ -128,7 +141,7 @@ describe('file-discovery order cannot reach the emitted bytes (§13.9)', () => {
   // `test/node/read-project-order.test.ts`, which mocks `node:fs` and therefore
   // has to be a file of its own.
 
-  it('part 1: the loader hands emission one canonical order, by code unit', () => {
+  it('part 1: the loader hands emission one canonical order, by code unit', async () => {
     const dir = threeScreenProject();
     const files = readProjectFiles(dir);
     const names = files.screenXmls.map((f) => f.filename);
@@ -136,7 +149,7 @@ describe('file-discovery order cannot reach the emitted bytes (§13.9)', () => {
     expect(names).toEqual(['screens/screen_alpha.xml', 'screens/screen_beta.xml', 'screens/screen_gamma.xml']);
     expect(names).toEqual([...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
 
-    const generated = generateAt(dir).files.filter((f) => f.path.startsWith('ui_screen_')).map((f) => f.path);
+    const generated = (await generateAt(dir)).files.filter((f) => f.path.startsWith('ui_screen_')).map((f) => f.path);
     expect(generated).toEqual(['ui_screen_alpha.cpp', 'ui_screen_beta.cpp', 'ui_screen_gamma.cpp']);
   });
 
@@ -351,11 +364,11 @@ describe('discovery order is code-unit, not locale (§13.9, WO12 follow-up)', ()
     ]);
   });
 
-  it('emits the screens in that order, which is how the order reaches the bytes', () => {
+  it('emits the screens in that order, which is how the order reaches the bytes', async () => {
     // The point of fixing this sort rather than only the diagnostics: a screen's
     // position in the load order is its position in the emitted file list and in
     // ui.hpp, so a collated order would put different bytes in a committed file.
-    const result = generateAt(pairProject());
+    const result = await generateAt(pairProject());
     expect(result.files.filter((f) => f.path.startsWith('ui_screen_')).map((f) => f.path)).toEqual([
       'ui_screen_a1.cpp',
       'ui_screen_a_1.cpp',

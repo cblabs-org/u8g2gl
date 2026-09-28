@@ -29,5 +29,14 @@
              the three spellings must agree or this unit will not build. -->
         <u8g2gl_label name="caps" x="0" y="26" width="60" height="10"
                       font="u8g2_font_helvR08_tr" text="Caps" />
+
+        <!-- PR-04b WO3b item 3/5: <bdf> fonts, drawn exactly as a <builtin>
+             is — set_font takes the same ui_font_* pointer either way, so
+             this is what proves emission goes through the emitter for a
+             compiled font too, on firmware and in the editor host alike. -->
+        <u8g2gl_label name="bdf_4x6" x="64" y="14" width="60" height="8"
+                      font="font_4x6" text="4x6!" />
+        <u8g2gl_label name="bdf_arrow" x="90" y="26" width="30" height="8"
+                      font="font_arrow_mini" text="A" />
     </view>
 </screen>

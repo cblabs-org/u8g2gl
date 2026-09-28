@@ -19,8 +19,9 @@
 
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { generate } from '../../src/core/generator/index.js';
+import { compileProjectAssets } from '../../src/core/assets/index.js';
 import {
   describeScenes,
   emitEditorFiles,
@@ -205,9 +206,19 @@ interface SceneScreen {
   readonly elements: readonly SceneElement[];
 }
 
-function fixtureScene(): { readonly scene: Record<string, unknown>; readonly result: ReturnType<typeof generate> } {
+async function fixtureScene(): Promise<{ readonly scene: Record<string, unknown>; readonly result: ReturnType<typeof generate> }> {
   const loaded = loadProject(fixtureDir);
-  const result = generate({ ...loaded.model, generatorVersion: '0.0.0-golden', assets: loaded.assets });
+  // Every <bdf> compiled first (PR-04b WO3 item 3) — the fixture declares two
+  // since PR-04b WO3b, so generate() would otherwise refuse with
+  // U8G2GL_MISSING_COMPILED_FONT.
+  const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
+  const result = generate({
+    ...loaded.model,
+    generatorVersion: '0.0.0-golden',
+    assets: loaded.assets,
+    compiledAssets,
+    bdfLicenceFiles: loaded.bdfLicenceFiles,
+  });
   const scene = describeScenes({
     project: {
       project: loaded.model.project,
@@ -216,6 +227,8 @@ function fixtureScene(): { readonly scene: Record<string, unknown>; readonly res
       capacities: result.capacities!,
       manifests: loaded.model.manifests,
       assets: loaded.assets,
+      compiledFonts: compiledAssets.fonts,
+      bdfLicenceFiles: loaded.bdfLicenceFiles,
       stamp: '',
     },
     realised: result.realised!,
@@ -235,9 +248,15 @@ function element(screen: SceneScreen, name: string): SceneElement {
 }
 
 describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
-  const { scene, result } = fixtureScene();
-  const screens = scene.screens as readonly SceneScreen[];
+  let scene: Record<string, unknown>;
+  let result: ReturnType<typeof generate>;
+  let screens: readonly SceneScreen[];
   const byName = (name: string): SceneScreen => screens.find((screen) => screen.name === name)!;
+
+  beforeAll(async () => {
+    ({ scene, result } = await fixtureScene());
+    screens = scene.screens as readonly SceneScreen[];
+  });
 
   it('describes every subject and supplies no value', () => {
     const subjects = scene.subjects as readonly Record<string, unknown>[];
@@ -367,8 +386,9 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     expect(scene.version).toBe(2);
   });
 
-  it('is emitted as ui_scene.json beside the registry, deterministically', () => {
+  it('is emitted as ui_scene.json beside the registry, deterministically', async () => {
     const loaded = loadProject(fixtureDir);
+    const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
     const input = {
       project: loaded.model.project,
       globals: loaded.model.globals,
@@ -378,6 +398,8 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
       manifests: loaded.model.manifests,
       capacities: result.capacities!,
       assets: loaded.assets,
+      compiledFonts: compiledAssets.fonts,
+      bdfLicenceFiles: loaded.bdfLicenceFiles,
       generatorVersion: '0.0.0-golden',
       target: 'host',
     };
