@@ -17,11 +17,13 @@
  *              screen; `render()` mirrors the firmware render function's draw
  *              order, evaluating a draw call's guard with the registry's own
  *              comparison and reading bound arguments from subjects at draw
- *              time, as firmware's `ui_subject_x.get()` does (§13.5).
+ *              time, as firmware's `ui_subject_x.get()` does (§13.5), clamped
+ *              with the origin by the runtime's own u8g2gl_coord_bound().
  */
 #include "editor_host.h"
 
 #include "U8g2lib.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_types.h"
 
@@ -435,7 +437,8 @@ bool editor_host::visible(const scene_json& element, bool* shown) {
 
 // draw_call
 // Draw-by-name: each argument placed by its param's name; a bound one read from
-// its subject now, as firmware reads `ui_subject_x.get()` at draw time; an absent
+// its subject now and clamped with its origin, as firmware's
+// `u8g2gl_coord_bound(origin, ui_subject_x.get())` is at draw time; an absent
 // one left NONE for the thunk's default.
 bool editor_host::draw_call(U8G2& display, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
@@ -465,10 +468,16 @@ bool editor_host::draw_call(U8G2& display, const scene_json& element) {
                 return fail(name + "." + param + ": unknown subject");
             }
             arg = u8g2gl_editor_read_subject(slot->base, slot->type);
-            // A bound position is container-relative (§7.2): firmware draws
-            // `origin + subject.get()`, so the host adds the same origin.
-            if (argument.has("origin")) {
-                arg.integer += argument.get("origin").as_int();
+            // A bound integer is placed exactly as firmware places it: firmware
+            // draws `u8g2gl_coord_bound(origin, subject.get())`, so the host
+            // calls the same helper — the object path's clamp — rather than
+            // adding the origin itself (§13.5, PR-4R WO4). A bound position is
+            // container-relative (§7.2) and carries its origin in the scene; a
+            // size carries none and clamps with 0, as firmware spells it.
+            if (arg.type == U8G2GL_EDITOR_INT) {
+                const int16_t origin =
+                    argument.has("origin") ? static_cast<int16_t>(argument.get("origin").as_int()) : 0;
+                arg.integer = u8g2gl_coord_bound(origin, arg.integer);
             }
         } else if (!value_for(drawing->params[index].type, argument.get("value"), name + "." + param, &arg)) {
             return false;

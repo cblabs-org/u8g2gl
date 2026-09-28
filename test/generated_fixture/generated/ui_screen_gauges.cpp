@@ -6,6 +6,7 @@
 
 #include "ui.hpp"
 
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
@@ -84,7 +85,7 @@ void ui_screen_gauges_render(U8G2& display) {
     // and saves and restores draw state, so nothing paints outside its
     // container and a hidden container hides its children (§11.3). A draw
     // call has no object, so its visibility is the build-time guard (§13.5).
-    u8g2gl_draw_box(display, 4, 20, ui_subject_level.get(), 6, true, 0);  // level_bar: no object (§13.5)
+    u8g2gl_draw_box(display, 4, 20, u8g2gl_coord_bound(0, ui_subject_level.get()), 6, true, 0);  // level_bar: no object (§13.5)
     u8g2gl_draw_circle(display, 100, 40, 10, false, U8G2GL_DRAW_SEGMENT_UPPER_LEFT);  // dial: no object (§13.5)
     u8g2gl_render_object(display, ui_screen_gauges_objs, ui_screen_gauges_parents, 0);  // ui_obj_panel
     if (!ui_obj_panel.is_hidden()) {

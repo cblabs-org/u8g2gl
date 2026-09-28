@@ -348,7 +348,7 @@ describe('draw calls — guards, hoisting and absolute coordinates (§13.5)', ()
   });
 
   it('reads a bound value from the subject at draw time', () => {
-    expect(render).toContain('    u8g2gl_draw_box(display, 4, 50, ui_subject_level.get(), 6, true, 0);');
+    expect(render).toContain('    u8g2gl_draw_box(display, 4, 50, u8g2gl_coord_bound(0, ui_subject_level.get()), 6, true, 0);');
   });
 
   it('turns a bound hidden flag into its clearing comparison', () => {
@@ -364,6 +364,12 @@ describe('draw calls — guards, hoisting and absolute coordinates (§13.5)', ()
     expect(unit).toContain(
       '#include "u8g2gl/u8g2gl_draw.h"\n#include "u8g2gl/u8g2gl_label.h"\n#include "u8g2gl/u8g2gl_obj.h"',
     );
+  });
+
+  it('includes the coordinate header beside the draw header, for u8g2gl_coord_bound() (PR-4R WO4)', () => {
+    // A bound draw argument is spelled through u8g2gl_coord_bound(), which
+    // u8g2gl_draw.h does not declare; the unit includes it itself, sorted.
+    expect(unit).toContain('#include "u8g2gl/u8g2gl_coord.h"\n#include "u8g2gl/u8g2gl_draw.h"\n');
   });
 });
 
@@ -462,7 +468,7 @@ describe('bound positions are container-relative (§7.2, [D-20] amendment, rulin
 
   it("adds a draw call's container origin into its bound argument", () => {
     // The composite's knob is bound inside a container at (40, 20).
-    expect(render).toContain('        u8g2gl_draw_box(display, 40 + ui_subject_level.get(), 20, 4, 4, true, 0);');
+    expect(render).toContain('        u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_level.get()), 20, 4, 4, true, 0);');
   });
 
   it("passes an object's container origin to bind_x and bind_y as a literal", () => {
@@ -470,8 +476,8 @@ describe('bound positions are container-relative (§7.2, [D-20] amendment, rulin
     expect(init).toContain('    ui_obj_box_knob_label.bind_y(&ui_subject_count, 20);');
   });
 
-  it('leaves a screen-level bound position as its value — the control', () => {
-    expect(render).toContain('    u8g2gl_draw_box(display, ui_subject_level.get(), 50, 2, 2, true, 0);');
+  it('spells a screen-level bound position with origin 0 — the control', () => {
+    expect(render).toContain('    u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_level.get()), 50, 2, 2, true, 0);');
     expect(init).toContain('    ui_obj_free.bind_x(&ui_subject_level, 0);');
     expect(init).toContain('    ui_obj_free.bind_y(&ui_subject_count, 0);');
   });

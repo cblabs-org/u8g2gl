@@ -41,12 +41,14 @@
 // radius 0, so this cannot route through u8g2gl_draw_box(), which picks
 // drawFrame at radius 0. It applies the same rules (u8g2gl_coord.h): the origin
 // wraps explicitly, so a border partly off the left or top edge draws its
-// visible part; the size must be positive; the corner radius is clamped, 0
-// meaning square corners.
+// visible part; the size must be positive; the corner radius is clamped to
+// 2r <= min(w, h) of this layer (u8g2gl_coord_corner_radius()), 0 meaning
+// square corners. Clamping per layer is what keeps each inner layer of a thick
+// border, which is smaller than the button, inside its own box.
 //   display  — U8G2 display driver instance
 //   x, y     — layer origin; may be negative
 //   w, h     — layer size
-//   r        — corner radius, >= 0
+//   r        — requested corner radius; clamped to this layer
 static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
                                int16_t w, int16_t h, int16_t r) {
     u8g2_uint_t uw = 0;
@@ -55,7 +57,7 @@ static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
         return;
     }
     display.drawRFrame(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw, uh,
-                       u8g2gl_coord_clamp(r));
+                       u8g2gl_coord_corner_radius(r, w, h));
 }
 
 // u8g2gl_button::set_text

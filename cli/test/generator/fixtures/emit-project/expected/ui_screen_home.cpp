@@ -7,6 +7,7 @@
 #include "ui.hpp"
 
 #include "u8g2gl/u8g2gl_clock.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
@@ -144,7 +145,7 @@ void ui_screen_home_render(U8G2& display) {
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 3);  // ui_obj_lvl_a
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 4);  // ui_obj_lvl_b
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 5);  // ui_obj_lvl_c
-    u8g2gl_draw_box(display, 4, 40, ui_subject_level.get(), 6, true, 0);  // level_bar: no object (§13.5)
+    u8g2gl_draw_box(display, 4, 40, u8g2gl_coord_bound(0, ui_subject_level.get()), 6, true, 0);  // level_bar: no object (§13.5)
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 6);  // ui_obj_clock
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 7);  // ui_obj_wifi
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 8);  // ui_obj_scroller

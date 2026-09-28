@@ -268,6 +268,58 @@ TEST(EditorParity, BoundsScreenWithAMovedKnobAndANewTemperature) {
     EXPECT_TRUE(drew_text(editor, "30°C"));
 }
 
+// --- Bound draw-call arguments clamp, on both targets (PR-4R WO4, §13.5) ---
+// Before WO4 both targets wrapped an out-of-range bound argument in the draw
+// function's int16_t parameter, identically, so the call-for-call comparison
+// passed on wrapped values. The asserted values below are the object path's:
+// origin plus value, clamped into int16_t by u8g2gl_coord_bound().
+
+TEST(EditorParity, BoundsScreenWithAKnobBeyondInt16OnBothTargets) {
+    // knob_x = 40000: track_knob at 40 + 40000 and dot at 40000 both clamp to
+    // INT16_MAX. Before WO4 both logs held 40040 and 40000.
+    fixture_values v;
+    v.knob_x = 40000;
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware, &editor));
+    EXPECT_EQ(count_op(firmware, "drawBox"), 2);
+    EXPECT_EQ(firmware.last_draw_box_x, INT16_MAX);   // dot
+    EXPECT_EQ(editor.last_draw_box_x, INT16_MAX);
+
+    // knob_x = -40000: both clamp to INT16_MIN, which U8G2 is given as its
+    // two's-complement position, 32768. Before WO4: 25576 and 25536, on screen.
+    v.knob_x = -40000;
+    U8G2 firmware_low;
+    U8G2 editor_low;
+    EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware_low, &editor_low));
+    EXPECT_EQ(count_op(firmware_low, "drawBox"), 2);
+    EXPECT_EQ(firmware_low.last_draw_box_x, 32768);
+    EXPECT_EQ(editor_low.last_draw_box_x, 32768);
+}
+
+TEST(EditorParity, GaugesScreenWithABoundWidthBeyondInt16OnBothTargets) {
+    // level_bar's width is bound, with no origin: a size clamps with origin 0,
+    // as the object path's bind_width does. level = 40000 clamps to INT16_MAX
+    // and draws; before WO4 it wrapped to -25536 and was refused as a size.
+    fixture_values v;
+    v.level = 40000;
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_gauges_render, "gauges", v, &firmware, &editor));
+    EXPECT_EQ(count_op(firmware, "drawBox"), 1);
+    EXPECT_EQ(firmware.last_draw_box_w, INT16_MAX);
+    EXPECT_EQ(editor.last_draw_box_w, INT16_MAX);
+
+    // level = -40000 clamps to INT16_MIN, a negative size: nothing is drawn.
+    // Before WO4 it wrapped to 25536 and drew a box that wide.
+    v.level = -40000;
+    U8G2 firmware_low;
+    U8G2 editor_low;
+    EXPECT_TRUE(same_screen(ui_screen_gauges_render, "gauges", v, &firmware_low, &editor_low));
+    EXPECT_EQ(count_op(firmware_low, "drawBox"), 0);
+    EXPECT_EQ(count_op(editor_low, "drawBox"), 0);
+}
+
 TEST(EditorParity, TheSceneSuppliesNoSubjectValues) {
     // The host starts from zero values and must be given them (ui_spec §4.1):
     // editor_host::load() refuses a scene whose subjects carry a value, so a

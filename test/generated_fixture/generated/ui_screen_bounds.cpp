@@ -6,6 +6,7 @@
 
 #include "ui.hpp"
 
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
@@ -109,10 +110,10 @@ void ui_screen_bounds_render(U8G2& display) {
     // call has no object, so its visibility is the build-time guard (§13.5).
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 0);  // ui_obj_track
     if (!ui_obj_track.is_hidden()) {
-        u8g2gl_draw_box(display, 40 + ui_subject_knob_x.get(), 10, 4, 4, true, 0);  // track_knob: no object (§13.5)
+        u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_knob_x.get()), 10, 4, 4, true, 0);  // track_knob: no object (§13.5)
     }
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 1);  // ui_obj_track_readout
-    u8g2gl_draw_box(display, ui_subject_knob_x.get(), 40, 2, 2, true, 0);  // dot: no object (§13.5)
+    u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_knob_x.get()), 40, 2, 2, true, 0);  // dot: no object (§13.5)
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 2);  // ui_obj_temp
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 3);  // ui_obj_own_font
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 4);  // ui_obj_override

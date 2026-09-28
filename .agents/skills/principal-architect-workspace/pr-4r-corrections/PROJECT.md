@@ -70,13 +70,22 @@ WO5 readability), and the following rulings, pasted by the owner **verbatim**:
 > I will add the bound to the spec once WO3 confirms it empirically, so the
 > number is written down once and cited by both paths.
 
+## Owner instruction — 2026-09-28 12:07 BST, verbatim
+
+> continue - merge #6 and continue as suggested with radious bound.  Please mae sure you report findings on that to the CE at the end of the implementation
+
+So: **WO1 merged** as #6 (`ca398ac`); **the radius bound is `2r <= min(w,h)`**, the PA's measured
+bound, for both the validator and the runtime, in place of ruling C's `r <= min(w,h) - 1`; and the
+measurement goes to the Chief Architect in a bridge when PR-4R's implementation is complete.
+Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D stands.
+
 ## Work Order Decomposition
 
 - [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
-- [ ] **WO2 — inline `style_*` restricted to §10's nine** · `u8g2gl-4r/wo2-style-overrides` · base `main` after WO1 · standard · item 2
-- [ ] **WO3 — the runtime clamps a rounded box's radius** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · **HELD: ruling C's number, see below**
-- [ ] **WO4 — bound draw-call arguments clamp as objects do** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
-- [ ] **WO5 — readability review and remediation** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
+- [x] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** ✅ `e26d623` · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
+- [x] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** ✅ `afe599b` · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
+- [x] **[WO4 — bound draw-call arguments clamp as objects do](wo4-bound-arg-clamp/WORKORDER.md)** ✅ `7f71f7f` · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
+- [x] **[WO5 — readability review and remediation](wo5-readability/WORKORDER.md)** ✅ `dc4e198` · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
 WORKORDERs for WO2–WO5 are written at dispatch, against the code as it then stands.
 
@@ -109,7 +118,7 @@ So `2r <= min(w,h)` is the exact boundary: nothing it admits is wrong, nothing i
 It keeps every aim of ruling C: it **relaxes** WO11b (r=5 at 10×10 now passes), admits every
 capsule including the switch's default `r = h/2`, and warns on nothing. Only the number differs.
 
-**WO3 is held** until the Chief Architect confirms the bound. WO1 and WO2 do not depend on it.
+**Resolved by the owner, 12:07:** WO3 uses `2r <= min(w,h)`; the Chief Architect gets the measurement in the closing bridge.
 
 ## Status Log
 
@@ -134,3 +143,60 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   `resolver/mangle.ts:49`) carried to WO5. Worker findings carried: plain-object colour lookup in
   `emit/value.ts` (unreachable today); location-pinning tests make every move a test edit;
   `schema/index.ts` exports types only (public API deliberately unchanged). WO1 opened as its own PR.
+- **2026-09-28 12:07** — Owner merged-on-instruction: #6 merged (`ca398ac`); radius bound set to
+  `2r <= min(w,h)` (quoted above). Local `main` fast-forwarded; WO2 branched from `ca398ac` and
+  dispatched. PR-04b may be released.
+- **2026-09-28** — **WO2 complete, `e26d623`.** PA verified, each suite alone: CLI **1079 / 64**,
+  `tsc`, lint clean; C++ 0 warnings, 362 / one skip; goldens unchanged; no existing assertion
+  changed. One rule (`isStyleAttribute`, `schema/globals.ts`) used by validator and emission. The
+  worker also applied it in `missingRequired()` (a refused override no longer satisfies `required`)
+  and the substituted-value check; both follow from the rule and are accepted. Carried to WO5:
+  `emit/screen.ts`'s `unknown` message is stale for a non-§10 setter prop (unreachable via the CLI);
+  `style_text` suggests `style_font` where the useful remedy is the plain attribute; a `style_*` on a
+  drawing element is refused with the setter message rather than §13.5's. WO3 dispatched on
+  `u8g2gl-4r/wo3-radius-clamp`.
+- **2026-09-28** — **WO3 complete, `afe599b`.** PA verified from a clean configure, each suite alone:
+  CLI **1082 / 64**, `tsc`, lint clean; C++ 0 warnings, **374 / one skip**, including
+  `RealU8g2RoundedBoxBound.*` (#327, #328) linking the pinned U8G2 C sources: every radius the
+  helper returns stays inside the box over 14 sizes, and `min/2 + 1` draws outside at every one —
+  **the bound is confirmed empirically in the suite**, both directions. `u8g2gl_coord_corner_radius()`
+  used by `u8g2gl_draw_box`, the button (fill, single and concentric borders) and the switch (track
+  and handle, replacing its private clamps). Default-switch pin at 12 sizes × off/on, values
+  captured from the base runtime, and shown to fail if the bound is tightened. Validator relaxed to
+  `2*r <= w, h`; three existing cases moved with the boundary only (listed in the WORKORDER).
+  Runtime 0.5.0. Goldens unchanged. **For the CA bridge:** ruling D's "r = h/2 inside the bound for
+  any h >= 2" holds only when h <= w (narrow switches were already clamped to w/2); a style radius
+  is only ever checked at draw time; the box manifest's `radius` help does not state the bound.
+  **Carried to WO5:** `u8g2gl_draw.h`'s `u8g2gl_draw_box()` docs and Coordinates table omit the clamp.
+  WO4 dispatched.
+- **2026-09-28** — WO4 worker stopped, correctly, with the helper committed green (`e8e21a4`,
+  object path now calls `u8g2gl_coord_bound()`, behaviour unchanged). Two gaps in the PA's box:
+  generated units need `#include "u8g2gl/u8g2gl_coord.h"` (`emit/screen.ts`, outside the box), and
+  the 0.8.0 bump needs version literals changed in `generate.test.ts`. **PA ruling:** both granted
+  (WORKORDER amendment); the same-class two-realisation test is not expressible before PR-09 and
+  the worker's label-vs-box construction is accepted. Runtime stays 0.5.0. Worker resumed.
+  **For the CA bridge (worker finding):** draw calls are not clipped to their container while objects
+  are, so a draw-call child overhanging its container paints outside it: realisation is observable
+  through clipping too. Not in PR-4R's mandate.
+- **2026-09-28** — **WO4 complete, `7f71f7f`.** PA verified from a clean configure, each suite alone:
+  CLI **1083 / 64**, `tsc`, lint clean; C++ 0 warnings, **377 / one skip**; built CLI reports
+  **0.8.0**. Golden diff reviewed: the `u8g2gl_coord.h` include and bound-argument spellings only
+  (`u8g2gl_coord_bound(40, ui_subject_knob_x.get())`). Object path, firmware draw calls and the
+  editor host all clamp through one helper; parity tests now agree on clamped values where at the
+  base they agreed on wrapped ones (+40000 drew at x=40040, −40000 at 25576, on screen). **For the
+  CA bridge:** §13.5's example no longer matches emitted text; draw calls are not clipped to their
+  container (realisation observable through clipping); a bound `time` subject reaches the helper as
+  `uint32_t`, so epochs above INT32_MAX go negative on both targets; the same-class two-realisation
+  case is inexpressible before PR-09.
+- **2026-09-28** — Readability review over WO2–WO4: no P1; P2 `u8g2gl_draw.h` docs stale after WO3;
+  P3 "BOUND" used twice in `u8g2gl_coord.h`; P4 dashes. With WO1's P4 and the carried message
+  fixes, these make WO5, dispatched. Not carried (for the CA): a `style_*` on a drawing element is
+  refused with the setter message rather than §13.5's; the box manifest's `radius` help omits the
+  bound.
+- **2026-09-28** — **WO5 complete, `dc4e198`.** PA verified from a clean configure, each suite alone:
+  CLI **1087 / 64**, `tsc`, lint clean; C++ 0 warnings, **377 / one skip**; goldens unchanged;
+  lockfile diff the two version fields. One WO2-added assertion changed under R6's permission.
+- **2026-09-28** — **PR-4R implementation complete.** Chief Architect bridge written, carrying the
+  radius measurement as the owner instructed:
+  [CA-BRIDGE-2026-09-28-PR4R.md](CA-BRIDGE-2026-09-28-PR4R.md). Stack WO2–WO5 pushed and opened as
+  one PR against `main` @ `ca398ac`.

@@ -22,6 +22,8 @@
  * - BitmapMode: Bitmap rendering background mode ('solid' | 'transparent')
  * - StyleDecl: Named style properties definition
  * - StylePropertyKey, StyleProperty, STYLE_PROPERTIES: §10's style properties, the one list
+ * - STYLE_ATTRIBUTES: The nine canonical attributes, derived from STYLE_PROPERTIES
+ * - isStyleAttribute(): Whether a `style_<name>` override names one of the nine (§10)
  * - styleProperties(): A style's declared properties by attribute, in applied order
  * - FontDecl: Discriminated union of font definitions (BDF or U8G2 built-in)
  * - BdfFontDecl: Custom BDF font definition with optional glyph range
@@ -218,6 +220,38 @@ export const STYLE_PROPERTIES: readonly StyleProperty[] = [
   { key: 'fontMode', attribute: 'font_mode', setter: 'set_font_mode', kind: 'text', aliases: ['fontMode'] },
   { key: 'bitmapMode', attribute: 'bitmap_mode', setter: 'set_bitmap_mode', kind: 'text', aliases: ['bitmapMode'] },
 ];
+
+/**
+ * §10's nine style attributes, canonical snake_case, in {@link STYLE_PROPERTIES}
+ * order — derived from that table, never written out a second time. The order
+ * is the table's so a message listing them is the same on every run (§13.9).
+ */
+export const STYLE_ATTRIBUTES: readonly string[] = STYLE_PROPERTIES.map((property) => property.attribute);
+
+/**
+ * @brief Whether `name` is one of §10's nine style properties, and so may be
+ *        overridden inline as `style_<name>`.
+ *
+ * **The one rule for inline overrides** (PR-4R WO2). §10 restricts `style_*` to
+ * the nine: `style_` tells a reader "this is styling", and a general per-element
+ * override of any prop that happens to have a setter is a different feature,
+ * which §1.5 says waits for a demonstrated need. The validator refuses what
+ * fails it and the screen model applies only what passes it, so the firmware
+ * and editor targets can never apply an override the validator refused.
+ *
+ * Canonical spellings only: the camelCase `aliases` are spellings `<style>` has
+ * always accepted, and are deliberately not extended to `style_*` — no prop is
+ * named `drawColor`, so `style_drawColor` has never been applicable.
+ *
+ * Passing is necessary, not sufficient: the element must also have a setter
+ * prop of that name to apply it through ([D-17]).
+ *
+ * @param name The overridden property, without the `style_` prefix.
+ * @return true for exactly the nine {@link STYLE_ATTRIBUTES}.
+ */
+export function isStyleAttribute(name: string): boolean {
+  return STYLE_ATTRIBUTES.includes(name);
+}
 
 /**
  * @brief A style's declared properties, by attribute, in the order the styles

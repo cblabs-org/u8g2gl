@@ -41,6 +41,7 @@
 #include "capacity_probe.h"
 #include "fixture_u8g2_fonts.h"
 #include "U8g2lib.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_obj.h"
@@ -402,6 +403,63 @@ TEST(GeneratedFixture, BoundPositionsAreContainerRelative) {
     EXPECT_EQ(moved_boxes[1].args[0], 12);
     EXPECT_EQ(drawn_with(moved, "K").x, 52);
     ui_set_knob_x(5);
+}
+
+TEST(GeneratedFixture, ABoundPositionClampsTheSameWhicheverWayItIsRealised) {
+    // PR-4R WO4, design_spec §13.5 (final paragraph) and [D-18]: realisation is
+    // a generator outcome, so it must not be observable. track's knob and
+    // readout carry the same binding, bind_x="$position" (knob_x), inside the
+    // same container (track, x=40), and are realised differently: knob is a
+    // draw call, readout an object. They cannot be one class today — a drawing
+    // element has no class to be an object of, and the §13.5 conditions that
+    // would force one (<event_cb>, <focus_ring>) are refused until PR-09 — so
+    // the comparison is of the position each realisation resolves the binding
+    // to: the object's clamped x, and the x the draw call hands U8G2.
+    //
+    // Out of range, the object path clamps the **sum** into int16_t (Chief
+    // Architect, 2026-09-19). Before WO4 the draw call passed 40 + 40000 to an
+    // int16_t parameter and it wrapped: U8G2 was given 40040 where the object
+    // stood at 32767, and for 40 - 40000 it was given 25576 — on screen —
+    // where the object stood at -32768. dot, on the screen itself (origin 0),
+    // wrapped the same way, to 40000 and 25536.
+    //
+    // At the extremes the object is clipped out by its container and draws
+    // nothing; the draw call is off-screen in the same direction and U8G2 draws
+    // nothing of it. In range both draw, at the same x (the control).
+    struct bound_case {
+        int32_t value;
+        int16_t knob_x;   // origin 40, clamped
+        int16_t dot_x;    // origin 0, clamped
+    };
+    const bound_case cases[] = {
+        {5, 45, 5},                      // in range: agrees before and after WO4
+        {40000, INT16_MAX, INT16_MAX},   // 40 + 40000 = 40040, beyond int16_t
+        {-40000, INT16_MIN, INT16_MIN},  // 40 - 40000 = -39960, beyond int16_t
+    };
+    const u8g2gl_obj* readout = ui_screen_bounds.objs[1];  // ui_obj_track_readout
+    for (const bound_case& c : cases) {
+        SCOPED_TRACE(c.value);
+        ui_set_knob_x(c.value);
+        U8G2 display;
+        show(ui_screen_bounds, display);
+
+        // The object path: bind_x(&knob_x, 40), clamped by the runtime.
+        EXPECT_EQ(readout->get_x(), c.knob_x);
+
+        // The draw-call path reaches U8G2 at the same x, through the position
+        // conversion u8g2gl_draw_box() applies to any x.
+        const std::vector<u8g2_stub_call> boxes = logged(display, "drawBox");
+        ASSERT_EQ(boxes.size(), 2u);
+        EXPECT_EQ(boxes[0].args[0], u8g2gl_coord_pos(readout->get_x()));  // track_knob
+        EXPECT_EQ(boxes[0].args[0], u8g2gl_coord_pos(c.knob_x));
+        EXPECT_EQ(boxes[1].args[0], u8g2gl_coord_pos(c.dot_x));  // dot
+    }
+
+    // The control, drawn by both: the object's recorded text is at the knob's x.
+    ui_set_knob_x(5);
+    U8G2 display;
+    show(ui_screen_bounds, display);
+    EXPECT_EQ(drawn_with(display, "K").x, logged(display, "drawBox")[0].args[0]);
 }
 
 TEST(GeneratedFixture, IntBoundLabelDrawsItsFormattedValue) {

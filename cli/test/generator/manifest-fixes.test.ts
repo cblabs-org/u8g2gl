@@ -102,7 +102,7 @@ describe('fix 2 — drawing geometry is not required where a binding or anchor s
   it("validates and emits §8.4's own bound-width box, which has no width attribute", () => {
     const box = '<u8g2gl_box name="bar" x="4" y="20" height="6" bind_width="level" />';
     expect(errors(validateScreen(box))).toEqual([]);
-    expect(screenUnit(generateScreen(box))).toContain('u8g2gl_draw_box(display, 4, 20, ui_subject_level.get(), 6, true, 0);');
+    expect(screenUnit(generateScreen(box))).toContain('u8g2gl_draw_box(display, 4, 20, u8g2gl_coord_bound(0, ui_subject_level.get()), 6, true, 0);');
   });
 
   it('validates an anchor-positioned box, and emits the resolved position', () => {

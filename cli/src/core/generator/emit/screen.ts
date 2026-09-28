@@ -63,6 +63,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
+import { isStyleAttribute, STYLE_ATTRIBUTES } from '../../schema/globals.js';
 import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import {
@@ -113,6 +114,17 @@ export interface ScreenEmitInput {
 
 /** The runtime header declaring `u8g2gl_draw_*` (§6.2). */
 const DRAW_HEADER = '#include "u8g2gl/u8g2gl_draw.h"';
+
+/**
+ * The runtime header declaring `u8g2gl_coord_bound()`, which every bound integer
+ * draw argument is spelled through (`draw-args.ts`, PR-4R WO4). Emitted with
+ * {@link DRAW_HEADER} in every unit that has draw calls, not only where one is
+ * bound: deciding that here would re-derive draw-args' rule a second time, and
+ * the header holds only inline functions, so an unused include costs nothing.
+ * `u8g2gl_draw.h` deliberately does not include it — it forward-declares U8G2
+ * rather than pull in `U8g2lib.h`, which this header needs.
+ */
+const COORD_HEADER = '#include "u8g2gl/u8g2gl_coord.h"';
 
 /** `ui_screen_home.cpp` (§13.7). */
 export function screenUnitPath(screen: string): string {
@@ -181,9 +193,10 @@ function propertyLines(object: RealisedElement, placement: Placement): string[] 
 // It runs before "set properties" (INIT_STEPS), so an attribute the element
 // sets itself wins over both.
 //
-// No validator pass checks `style_*` values today, so a value the prop's type
-// cannot spell, or a key the element does not declare, is reported here rather
-// than thrown.
+// Pass 4 (checkStyles) refuses these overrides first, and generate() stops on
+// its errors, so through the CLI nothing here is reached. Emission still
+// reports them, rather than throwing or applying them, because its entry
+// points are exported and must never apply an override the validator refuses.
 function styleLines(object: RealisedElement, placement: Placement, context: ScreenContext): string[] {
   const node = placement.absolute.node;
   const lines = namedStyles(node).map(
@@ -205,13 +218,20 @@ function styleLines(object: RealisedElement, placement: Placement, context: Scre
       );
     }
   }
-  // What is left names a property this element does not declare.
+  // What is left was not applied for one of two reasons (PR-4R WO2), and the
+  // message says which: the key is not one of §10's nine, whether or not the
+  // element has a setter for it; or it is, and the element has no setter to
+  // apply it with. The same split, and wording, as Pass 4's checkStyles().
   for (const key of overrides.unknown) {
+    const reason = isStyleAttribute(key)
+      ? `overrides '${key}', which <${node.tag}> does not declare as a property it sets, so there is no ` +
+        `setter to apply it with (§10, [D-17]).`
+      : `is not a style override: inline overrides are limited to §10's style properties, ` +
+        `${STYLE_ATTRIBUTES.join(', ')}.`;
     context.diagnostics.push(
       emissionError(
         DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
-        `'style_${key}' on <${node.tag}> '${object.identifier}' overrides '${key}', which <${node.tag}> does ` +
-          `not declare as a property, so there is no setter to apply it with (§10, [D-17]).`,
+        `'style_${key}' on <${node.tag}> '${object.identifier}' ${reason}`,
         node.attributeLocs?.[`style_${key}`] ?? node.loc,
         `style_${key}`,
       ),
@@ -432,7 +452,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   // --- Step 2: The includes this unit needs, sorted (§13.9) ---
   const includes = objects.map((object) => classOf(placed(object).manifest).include);
   if (realised.drawOrder.some((step) => step.kind === 'draw_calls')) {
-    includes.push(DRAW_HEADER);
+    includes.push(DRAW_HEADER, COORD_HEADER);
   }
 
   // --- Step 3: Each part of the unit, in §13.12's order ---

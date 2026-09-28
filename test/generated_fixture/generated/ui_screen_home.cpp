@@ -7,6 +7,7 @@
 #include "ui.hpp"
 
 #include "u8g2gl/u8g2gl_clock.h"
+#include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
