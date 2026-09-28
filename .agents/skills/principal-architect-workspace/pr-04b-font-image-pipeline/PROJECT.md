@@ -101,9 +101,10 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 ## Work Order Decomposition
 
 - [x] **[WO1 — bdfconv as a committed Wasm artefact](wo1-bdfconv-wasm/WORKORDER.md)** ✅ `c14086f`…`004fb17` · `u8g2gl-fonts/wo1-bdfconv-wasm` · base `main` @ `453f9f3` · standard · findings 1–3; [Q-2]; notices row
-- [ ] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
-- [ ] **WO3 — `<bdf>` through `generate`** · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · finding 8; refusal removed; emitter, editor target, budget, fixture, real-U8G2 C++ test; CLI 0.9.0
-- [ ] **WO4 — `<convert>`: PNG to XBM** · `u8g2gl-fonts/wo4-png-convert` · base WO3 · standard · one image model shared with `<xbm>`; parity; notices row for any decoder dependency
+- [x] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** ✅ `8d45c91`…`975ca41` · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
+- [ ] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
+- [ ] **WO3b — the fixture, real U8G2, and the editor target** · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
+- [ ] **WO4 — `<convert>`: PNG to XBM** · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · one image model shared with `<xbm>`; parity; notices row for any decoder dependency
 - [ ] **WO5 — licences, docs and a migration rehearsal** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · §22.1 wording; departures-board-v3's ten BDFs through the built CLI, compared with its `fonts.cpp`
 - [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
 
@@ -148,3 +149,27 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   call it with bytes before `generate`.
 - bdfconv's map grammar (`bdf_map.c`) writes hex as `$20`, not `0x20`, and has
   `*`, `~` exclusion and `>` remap. Its default map is `*`.
+
+### 2026-09-28 — WO2 ingested
+- **Complete**, 3 code commits, CLI **1138** (+41). PA re-ran suite, lint and
+  build: green. `src/core/fonts/` has no Node API use.
+- `compileBdf` is byte-exact against four U8G2 arrays (`4x6_tr` 723 B, `4x6_tf`
+  1451 B, `4x6_tn` 152 B, `6x13_tr` 1056 B), read by an independent reader. A
+  browser bundle run in a bare `vm` context gives identical results. Output is
+  stable across cwd, TZ, TMPDIR and LANG. The glue is now a statically imported
+  module; the Wasm hash is unchanged.
+- Declared array length is always literal length + 1 (the implicit NUL), and
+  the parser checks this rather than assuming it.
+- `range` rejects bdfconv's own `*`, `~`, `>`, `$`; the maximum codepoint is
+  0xFFFF (bdfconv's glyph encoding is `uint16_t`).
+- **PA error, found in review:** WO2's WORKORDER said an absent `range` maps
+  to bdfconv's `*`. `bdf_map.c:174` defines `*` as 32–255, so fonts with glyphs
+  above 255 would silently lose them. The correct default is `0-65535` (no
+  filter, and what departures-board-v3 passes). Carried as WO3 item 1.
+- **WO3 split** into WO3 (the CLI path) and WO3b (committed C++ fixture,
+  real-U8G2 test, editor target) before dispatch, because the C++ and editor
+  halves need CMake and a different verification loop.
+- **PA naming decision for WO3:** the compiled array is `static`
+  `ui_fontdata_<name>` with `ui_font_<name>` a pointer to it, so `ui.hpp` keeps
+  one declaration form for both font kinds. `ui_font_<name>_data` was rejected:
+  it collides with a `<bdf>` named `<name>_data`.
