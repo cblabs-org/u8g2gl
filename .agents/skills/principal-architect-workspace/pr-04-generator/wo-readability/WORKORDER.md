@@ -110,7 +110,7 @@ no `mark_dirty()` omissions were found in the C++ surface this stack touches.
 
 ### P2 — Convention violation with consequence
 
-- [ ] **`test/stubs/U8G2lib.h` is mis-cased.** The real U8G2 header is
+- [x] **`test/stubs/U8G2lib.h` is mis-cased.** The real U8G2 header is
   `U8g2lib.h` (lowercase `g`), confirmed against every reference to it elsewhere
   in this stack (e.g. `CMakeLists.txt:80`, `include/u8g2gl/u8g2gl_state_saver.h:70`).
   The stub's actual filename is `U8G2lib.h` (capital `G2`). This is not merely
@@ -128,7 +128,7 @@ no `mark_dirty()` omissions were found in the C++ surface this stack touches.
   authoritative stub" should not itself be misspelled against what it stands in
   for).
 
-- [ ] **`include/u8g2gl/manifests/u8g2gl_xbm.xml` redeclares `bitmap_mode`**,
+- [x] **`include/u8g2gl/manifests/u8g2gl_xbm.xml` redeclares `bitmap_mode`**,
   which its base class already declares identically. `u8g2gl_xbm.xml` extends
   `u8g2gl_obj` (line 2), and `u8g2gl_obj.xml:18` already declares
   `<prop name="bitmap_mode" type="enum" setter="set_bitmap_mode" values="solid,transparent" default="solid" emit="U8G2GL_BITMAP_MODE_{VALUE^^}" .../>`
@@ -142,7 +142,7 @@ no `mark_dirty()` omissions were found in the C++ surface this stack touches.
   should not affect emitted code — if it does, that is a separate defect to
   surface rather than fix here).
 
-- [ ] **Two inline code-unit comparators duplicate `compareCodeUnits`**, despite
+- [x] **Two inline code-unit comparators duplicate `compareCodeUnits`**, despite
   commit `a93f5f9` ("report,order: report the framebuffer; one code-unit
   comparator everywhere") claiming exactly this consolidation was done —
   it missed these two:
@@ -166,7 +166,7 @@ no `mark_dirty()` omissions were found in the C++ surface this stack touches.
 **These are the priority category for this review — they actively mislead,
 not merely omit.**
 
-- [ ] **`cli/src/core/generator/realise/model.ts:183` and `:197`** (and the
+- [x] **`cli/src/core/generator/realise/model.ts:183` and `:197`** (and the
   identical claim at `cli/src/core/resolver/expand.ts:128`) call `identifier`
   "its C++ identifier" / "the C++ identifier (§13.4)". It is not: it is the
   pre-emission name (author's `name`, mangled/prefixed by enclosing composite
@@ -194,7 +194,7 @@ not merely omit.**
   the XML element, not the C++ variable. Regenerate the fixture and update the
   golden comparison.
 
-- [ ] **`cli/src/core/parser/parse-widget-tree.ts:378-379`** describes `wd_` as
+- [x] **`cli/src/core/parser/parse-widget-tree.ts:378-379`** describes `wd_` as
   one of the "framework and custom widget prefixes" being stripped, alongside
   `u8g2gl_` and `ui_`, implying it is a reserved/framework prefix. It is not:
   `cli/src/core/resolver/mangle.ts:77-81` records the Chief Architect's explicit
@@ -213,7 +213,7 @@ not merely omit.**
   is not, see `resolver/mangle.ts`), but because a `wd_`-named widget's own tag
   already reads as the identifier stem without repeating it."
 
-- [ ] **Stale test titles / headers** (four items, each a one-line or one-block
+- [x] **Stale test titles / headers** (four items, each a one-line or one-block
   fix, group as one pass):
   - `cli/test/schema/types.test.ts:97` — title reads `'contains all 23 required
     diagnostic codes with correct U8G2GL prefixes'`, but the `expectedCodes`
@@ -244,15 +244,15 @@ not merely omit.**
 
 ## Verification Requirement
 
-- [ ] `cd cli && npm test` — all suites pass, none weakened.
-- [ ] `cd cli && npm run typecheck` (or `tsc --noEmit`) — zero errors.
-- [ ] Golden/determinism suites (`emit-golden.test.ts`, `determinism.test.ts`)
+- [x] `cd cli && npm test` — all suites pass, none weakened.
+- [x] `cd cli && npm run typecheck` (or `tsc --noEmit`) — zero errors.
+- [x] Golden/determinism suites (`emit-golden.test.ts`, `determinism.test.ts`)
       still report the fixture regenerating **unchanged**, except where a P2
       item's comment says otherwise (none currently do; confirm this holds
       after the `bitmap_mode` removal and both comparator swaps).
-- [ ] `cmake -S . -B build -DU8G2GL_BUILD_TESTS=ON && cmake --build build && ctest --test-dir build --output-on-failure` —
+- [x] `cmake -S . -B build -DU8G2GL_BUILD_TESTS=ON && cmake --build build && ctest --test-dir build --output-on-failure` —
       zero warnings, all tests pass.
-- [ ] No behavioural change: `git diff` for every P2/P3 item should touch only
+- [x] No behavioural change: `git diff` for every P2/P3 item should touch only
       comments, doc blocks, a file rename, and (for the two comparator items)
       an import plus a one-line function body replacement whose output is
       provably identical to the code it replaces.
@@ -348,4 +348,155 @@ it.
 
 ## Completion Report
 
-<!-- Written by the remediation worker at task completion -->
+**Complete, 2026-09-28.** Branch `u8g2gl-generator/wo13-readability`, base commit
+`ef82f31`. Three commits, all on a green build, nothing pushed and nothing tagged.
+
+| SHA | What |
+|---|---|
+| `7f0d66e` | `fix(test,runtime)`: the stub rename and the `__has_include` ladders |
+| `8ed89fd` | `refactor(cli)`: one code-unit comparator everywhere |
+| `eeea457` | `docs(cli,test,manifests)`: the stale comments, the manifest, the test headers |
+
+### Verification
+
+Every suite run **alone**, on an otherwise idle tree.
+
+| Check | Result |
+|---|---|
+| `cli`: `npx vitest run` | **1045 passed / 62 files** (baseline 1044; +1 is the new diagnostic-prefix test) |
+| `cli`: `npx tsc --noEmit` | zero errors |
+| `cli`: `npm run lint` | clean (`eslint .` + `tsc -p tsconfig.test.json`) |
+| C++: `cmake --build build` | **zero warnings**, zero errors under `-Wall -Wextra -Wpedantic` |
+| C++: `ctest --test-dir build` | **361/361 passed**, one known skip (`SizeOfReport.ThirtyTwoBitTarget`) |
+
+### Byte-identical generated output — the proof
+
+Two independent checks, because the first is the suite's own and the second is
+not.
+
+1. **Through the suite.** `emit-golden.test.ts`, `determinism.test.ts`,
+   `compile-fixture.test.ts` and `generate-editor.test.ts` all pass. The last
+   two fail if regenerating the committed fixture changes a byte.
+2. **Through the built CLI**, independently. `npm run build` in `cli/`, then
+   `generate test/generated_fixture --out …` and the same with
+   `--target-kind editor --out …` into a throwaway directory under `tmp/`, and a
+   file-by-file `diff -r` against the committed `generated/` and
+   `generated_editor/`. **Both identical**, the sole difference being the
+   `// generator:` stamp — the committed fixture is stamped `0.0.0-golden` by the
+   test harness's pinned version, while the real CLI stamps `0.7.0`. That
+   difference is pre-existing (`git show ef82f31:…/generated/ui.hpp` carries the
+   same `0.0.0-golden`), which is also why `generate --check` exits 1 on this
+   fixture on this branch and on the base commit alike.
+3. **The decisive one.** `git diff --stat ef82f31..HEAD -- test/generated_fixture/generated
+   test/generated_fixture/generated_editor cli/test/golden` is **empty**. No
+   committed generated file or golden moved by a single byte.
+
+No diagnostic's text changed either.
+
+### What was done about each `__has_include` branch
+
+Every runtime header and source that includes U8G2 carried the same four-branch
+ladder: `<U8G2lib.h>`, `<U8g2lib.h>`, `"U8G2lib.h"`, `"U8g2lib.h"`. After the
+stub rename (`test/stubs/U8G2lib.h` → `U8g2lib.h`):
+
+- **Both capital-`G2` branches removed, in all 12 files.** Certainly dead: real
+  U8G2's header is `U8g2lib.h` (`extern/u8g2/cppsrc/U8g2lib.h`, which the root
+  `CMakeLists.txt:80` checks for by that exact name), the Arduino library spells
+  it the same way, and after the rename nothing in this repository offers the
+  other spelling. Nothing can now select them.
+- **`<U8g2lib.h>` kept as the first branch.** It is what every build resolves.
+- **`"U8g2lib.h"` kept as the fallback.** *Not* certainly dead, so it stays: the
+  quoted form searches the including file's own directory before falling back to
+  the bracket search, so a user build that places U8G2 only on a quoted-only
+  search path would still resolve. Removing it would be a portability regression
+  that no test in this repository could catch.
+- **`#else class U8G2;`** kept, unchanged, in `u8g2gl_helpers.h` and
+  `u8g2gl_state_saver.h` — those two are usable without U8G2 on the path at all.
+- Each surviving ladder carries a why-comment naming the three places the
+  spelling comes from and what the fallback covers, so the next reader does not
+  have to re-derive it.
+
+`test/generated_fixture/support/u8g2_case/U8g2lib.h` — the forwarding shim that
+existed *only* because of the misspelling, as its own header said — is deleted,
+and `u8g2gl_fixture_fonts` now takes `test/stubs` on its include path directly.
+
+### Line items
+
+| Item | Done |
+|---|---|
+| P2-1 stub rename | ✅ renamed, every reference updated across 34 files, ladders collapsed, shim deleted |
+| P2-2 `u8g2gl_xbm.xml` `bitmap_mode` | ✅ removed, bundle rebuilt (`npm run build:manifests`), output byte-identical |
+| P2-3 duplicate comparators | ✅ **four**, not two — see below |
+| P3-1 `identifier` "C++ identifier" | ✅ `model.ts` ×2, `expand.ts` ×2, and two more the review missed |
+| P3-2 generated "busiest object" comment | ⚠️ **not done — see Declined** |
+| P3-3 `wd_` prefix comment | ✅ reworded, with the ruling and a do-not-reconcile note |
+| P3-4 stale test titles / headers | ✅ all four, plus two more placeholder headers |
+
+**P2-3 was four sites, not two.** The review named `emit/unit.ts` and
+`write-generated.ts`. A grep for the same lambda found two more:
+`generator/report/budget.ts:155` (the §18 report's framework/project class
+lists) and `node/font-symbol-builder.ts:88` (the font symbol table). All four now
+call `compareCodeUnits`, which is that lambda by definition, so output cannot
+move. Leaving two behind would have repeated exactly the miss `a93f5f9` made.
+
+**P3-1 was six sites, not three.** Besides the three named, `resolver/provenance.ts`
+(the file header and `InstantiationSite.identifier`, whose own example `bar_clk`
+gave the lie away) and `realise/capacities.ts:81` (`busiestObject`) made the same
+claim.
+
+**P3-4, the `types.test.ts` finding, was wrong as written.** The object lists
+**23** entries, matching the title's number — counted, not assumed. The defect is
+the word *all*: `DiagnosticCode` now carries 46 codes, several added in WO11b and
+WO12. The title is now "pins the twenty-three codes the schema shipped with to
+their exact strings", with a comment saying not to renumber it, and a **new test**
+asserts the prefix rule across the *whole* set (`U8G2GL_` + key), encoding the one
+deliberate exception — `UNRESOLVED_VALUE: 'U8G2GL_UNRESOLVED_GEOMETRY'`, the
+WO11b key-only rename that kept the public code string. That is the assertion the
+old title was reaching for, and it cannot go stale as codes are added.
+
+### Declined, and why
+
+- **P3-2, the generated config's "busiest object" comment.** The finding is
+  correct: `u8g2gl_generated_config.h:47` reads `// The busiest object is
+  'track_readout'.` while the C++ variable is `ui_obj_track_readout`. Both fixes
+  the review offers — emitting `ui_obj_<identifier>`, or rewording the note —
+  **change emitted bytes**, which the dispatch forbids outright ("if a fix would
+  change emitted bytes or any diagnostic's text, stop and report it instead of
+  doing it"). Recorded here instead. What *was* done is a why-comment at
+  `emit/generated-config.ts`'s Step 2 stating that these notes are mangled names
+  rather than C++ variables, and that the wording is a known finding — so the
+  next author does not rediscover it. **Recommend: a one-line follow-up that
+  emits `ui_obj_<identifier>` and regenerates the goldens.**
+- **Font-name validation** — untouched, per the PA's exclusion.
+- **The `validator/` ↔ `generator/` layering Observation** — untouched; it is the
+  Chief Architect's, and goes in the next bridge with WO11b f8.
+- **`docs/` and `PROGRAM*.md`** — untouched.
+
+### Findings surfaced, not fixed
+
+1. **`generate --check` exits 1 on the committed fixture through the built CLI**,
+   on this branch *and* on `ef82f31`. Cause: the committed fixture is stamped
+   `// generator: 0.0.0-golden` (the test harness pins the version so the golden
+   does not churn on every CLI release), so the real CLI, stamping `0.7.0`, sees
+   ten files as out of date. Harmless today — the suite regenerates with the
+   pinned stamp and compares bytes — but it means the fixture cannot be
+   `--check`ed by hand, and anyone who tries will think the tree is dirty. Worth
+   a note in the fixture's own README or an `--expect-generator` escape hatch.
+2. **`test/test_style.cpp` and `test/test_smoke.cpp` were outside PR-04's diff**
+   (`git diff --name-only ff20f0c..d9e21e0` does not list them) but carried the
+   same "Description: Implementation of <filename>" anti-pattern. They are fixed
+   here rather than reported, because this WORKORDER's own "Uncertain" note asks
+   for the `grep -rn "Description: Implementation of"` pass "before considering
+   this class of defect closed", and both files were already being touched by the
+   stub rename. That grep is now clean across `test/`, `include/`, `src/` and
+   `cli/`. Flagging the scope departure explicitly so the PA can rule on it.
+3. **`src/*.cpp`'s `Description:` fields are thin** — e.g. `u8g2gl_switch.cpp`
+   reads "Implementation of set_value, get_value, tick, and render methods". Not
+   the anti-pattern (it names real symbols), but it is a list of members where
+   documentation.md §1 asks for a `Purpose:` saying why the module exists. Nine
+   runtime `.cpp` files are in this shape. A separate, larger pass.
+4. **The `RealU8g2` acceptance target is compile-only on the host's
+   filesystem**, which on macOS is case-insensitive. The rename removes the
+   hazard rather than testing it: nothing in CI proves a case-sensitive
+   filesystem resolves these includes. If the programme adds a Linux runner, this
+   is one of the things it would newly cover.
