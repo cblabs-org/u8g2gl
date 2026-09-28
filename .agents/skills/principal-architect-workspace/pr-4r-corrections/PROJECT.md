@@ -70,11 +70,20 @@ WO5 readability), and the following rulings, pasted by the owner **verbatim**:
 > I will add the bound to the spec once WO3 confirms it empirically, so the
 > number is written down once and cited by both paths.
 
+## Owner instruction — 2026-09-28 12:07 BST, verbatim
+
+> continue - merge #6 and continue as suggested with radious bound.  Please mae sure you report findings on that to the CE at the end of the implementation
+
+So: **WO1 merged** as #6 (`ca398ac`); **the radius bound is `2r <= min(w,h)`**, the PA's measured
+bound, for both the validator and the runtime, in place of ruling C's `r <= min(w,h) - 1`; and the
+measurement goes to the Chief Architect in a bridge when PR-4R's implementation is complete.
+Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D stands.
+
 ## Work Order Decomposition
 
 - [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
-- [ ] **WO2 — inline `style_*` restricted to §10's nine** · `u8g2gl-4r/wo2-style-overrides` · base `main` after WO1 · standard · item 2
-- [ ] **WO3 — the runtime clamps a rounded box's radius** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · **HELD: ruling C's number, see below**
+- [ ] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
+- [ ] **WO3 — the runtime clamps a rounded box's radius** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
 - [ ] **WO4 — bound draw-call arguments clamp as objects do** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
 - [ ] **WO5 — readability review and remediation** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
@@ -109,7 +118,7 @@ So `2r <= min(w,h)` is the exact boundary: nothing it admits is wrong, nothing i
 It keeps every aim of ruling C: it **relaxes** WO11b (r=5 at 10×10 now passes), admits every
 capsule including the switch's default `r = h/2`, and warns on nothing. Only the number differs.
 
-**WO3 is held** until the Chief Architect confirms the bound. WO1 and WO2 do not depend on it.
+**Resolved by the owner, 12:07:** WO3 uses `2r <= min(w,h)`; the Chief Architect gets the measurement in the closing bridge.
 
 ## Status Log
 
@@ -134,3 +143,6 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   `resolver/mangle.ts:49`) carried to WO5. Worker findings carried: plain-object colour lookup in
   `emit/value.ts` (unreachable today); location-pinning tests make every move a test edit;
   `schema/index.ts` exports types only (public API deliberately unchanged). WO1 opened as its own PR.
+- **2026-09-28 12:07** — Owner merged-on-instruction: #6 merged (`ca398ac`); radius bound set to
+  `2r <= min(w,h)` (quoted above). Local `main` fast-forwarded; WO2 branched from `ca398ac` and
+  dispatched. PR-04b may be released.
