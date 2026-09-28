@@ -210,3 +210,146 @@ complete | partial | blocked
 ### Blockers
 (none)
 ```
+
+---
+
+## Completion Report
+
+### Status
+complete
+
+### Changes Made
+- `cli/src/node/build-bdfconv.ts` — new. Regeneration script modelled on
+  `build-catalogue.ts`: finds `emcc` via `--emsdk`/`EMSDK`/`PATH`, refuses to
+  build unless it reports exactly Emscripten 5.0.3, builds bdfconv's sorted
+  `.c` sources into `tmp/bdfconv-build/`, and writes the committed artefact
+  and its provenance record. Wired as `npm run build:bdfconv`.
+- `cli/src/data/bdfconv/bdfconv-glue.json` — new, generated. Emscripten's
+  `MODULARIZE`+`EXPORT_ES6` JS glue, as one JSON string field (`source`).
+- `cli/src/data/bdfconv/bdfconv-wasm.json` — new, generated. The compiled
+  Wasm's raw bytes, base64-encoded, as one JSON string field (`base64`).
+- `cli/src/data/bdfconv/bdfconv-source.json` — new, generated. U8G2 tag and
+  commit, Emscripten version and commit, the exact flags (with the
+  machine-specific `-ffile-prefix-map` value replaced by a placeholder — see
+  Decisions Made), the Wasm's sha256, and the sha256 of each committed
+  artefact file.
+- `cli/src/data/bdfconv/runner.ts` — new, hand-written. The thin runner the
+  Line-Item Instructions ask for: `instantiateBdfconv()` turns the two JSON
+  modules back into a running Emscripten instance with no `fetch`, no
+  `node:fs` and no `import.meta.url` resolution, by dynamically importing the
+  glue source from a `data:` URL and passing the decoded Wasm bytes as
+  `wasmBinary` directly; `convertBdf()` runs one conversion. WO2 owns the real
+  font-compiler API and may replace this outright.
+- `cli/test/bdfconv/provenance.test.ts` — new. Cross-checks
+  `bdfconv-source.json`'s U8G2 commit against `catalogue-source.json`'s and
+  against the submodule's own pinned gitlink (`git ls-tree HEAD extern/u8g2`,
+  read independently of `readU8g2Source()`), and recomputes sha256 over every
+  committed artefact file against the recorded value. 8 tests.
+- `cli/test/bdfconv/smoke.test.ts` — new. The correctness-oracle test
+  (Finding 4): converts U8G2's own `4x6.bdf` and asserts the output contains
+  `test_font[723]`. A second case feeds a malformed BDF and asserts on the
+  actual observed behaviour (see Dead Ends & Warnings). 2 tests.
+- `cli/package.json` — added `build:bdfconv` script; added
+  `src/data/bdfconv/bdfconv-glue.json`, `src/data/bdfconv/bdfconv-wasm.json`
+  and `LICENSES/` to `files`. No new runtime dependency; version untouched
+  (0.8.0).
+- `cli/LICENSES/bdfconv-BSD-2-Clause.txt` — new. bdfconv's BSD-2-Clause notice,
+  now required because the compiled binary ships in the package (binary
+  redistribution).
+- `cli/LICENSES/emscripten-glue-MIT.txt` — new. Emscripten's MIT notice for the
+  generated JS glue, which also ships.
+- `THIRD-PARTY-NOTICES.md` — amended the U8G2 row (the "nothing is copied into
+  published packages" line stops being true of the compiled bdfconv binary)
+  and added an Emscripten row for the build-time-only toolchain whose
+  generated output ships.
+
+### Measurements
+- **Rebuild determinism (same path, different path):** Built twice from
+  `extern/u8g2` via `npm run build:bdfconv` — `bdfconv-glue.json` and
+  `bdfconv-wasm.json` byte-identical across both runs. Then built a third time
+  from bdfconv's sources copied into `tmp/elsewhere-u8g2/` (a different
+  absolute path) — Wasm sha256 `53b98823…ae982` matched exactly across all
+  three builds. Without `-ffile-prefix-map`, the same three-way comparison
+  showed the compiler's absolute source path leaking into the `.wasm` as
+  debug-info strings (confirmed with `strings bdfconv.wasm | grep /Users`);
+  adding the flag eliminated it. This is why the flag is in the recorded set.
+- **unifont_jp.bdf conversion:** With the recorded flags (`-sALLOW_MEMORY_GROWTH=1`
+  included), converting U8G2's largest bundled BDF (9.4 MB, no `-m`
+  restriction) through the committed artefact succeeds in ~80 ms, producing a
+  10,650-character output. Without memory growth, the same conversion throws
+  `RuntimeError: Aborted(OOM)` after ~56 ms — confirmed before adding the flag,
+  reconfirmed passing after.
+- **Artefact size, committed and packed:** `bdfconv-glue.json` 60,341 bytes,
+  `bdfconv-wasm.json` 77,299 bytes, `bdfconv-source.json` 788 bytes — 148 KB
+  committed under `cli/src/data/bdfconv/`. Raw Wasm is 57,958 bytes.
+  `npm pack --dry-run`: the artefact appears twice (once under `src/data/`, once
+  compiled to `dist/data/`) plus `runner.js`/`.d.ts` and the two `LICENSES/`
+  files, contributing roughly 284 KB of the packed tarball's total 670 KB
+  (399 files). `npm pack --dry-run` confirms both `LICENSES/*.txt` files are
+  listed.
+- **Node imports in glue (grep result):** No `node:` import and no
+  `require("node...")` anywhere in the committed glue source. The only
+  substring match for `node:` is `node:current`, an unrelated object property
+  name inside the glue's own MEMFS path-walking code, not an import.
+
+### Decisions Made
+- **A base64 data module, not `-sSINGLE_FILE`.** Tried `-sSINGLE_FILE=1` first
+  (embeds the Wasm as base64 inside the glue itself, one file). It works, but
+  the resulting JS text already contains raw base64-as-binary-string bytes,
+  and the `data:` URL trick this runner needs to import the glue with no disk
+  write requires base64-encoding *that whole text* a second time — nearly
+  doubling the effective encoding overhead for no benefit, and making "sha256
+  of the Wasm" mean something indirect (hashing base64 text embedded inside
+  JS, not the Wasm bytes themselves). Building glue and Wasm as two separate
+  artefacts, each base64-encoded exactly once, keeps `bdfconv-source.json`'s
+  `wasm.sha256` a literal, direct hash of the real binary, and each committed
+  file's own sha256 is what's actually written to disk.
+- **`locateFile` must be supplied even though `wasmBinary` is also supplied.**
+  Measured: instantiating with `{ wasmBinary }` alone throws `TypeError:
+  Invalid URL`. The glue unconditionally calls `findWasmBinary()` during init
+  to compute a cache-key string, even when `wasmBinary` is already present;
+  its fallback path does `new URL("bdfconv.wasm", import.meta.url)`, which is
+  invalid because `import.meta.url` is itself the `data:` URL the glue was
+  imported from. Passing `locateFile: (path) => path` takes the other branch
+  and the returned string is never read, since `wasmBinary` takes priority.
+  This is recorded here because it is exactly the kind of thing WO2 would
+  otherwise lose an hour to rediscovering.
+- **`-ffile-prefix-map`'s value is recorded as a placeholder, not the literal
+  path.** The flag's left-hand side is necessarily this machine's absolute
+  checkout path at build time, but baking that literal path into a *committed*
+  provenance file would make `bdfconv-source.json` differ across checkouts
+  with no input change — the determinism rule (typescript.md §5) this
+  repository holds generated output to. `bdfconv-source.json` records
+  `-ffile-prefix-map=<bdfconv-source-dir>=bdfconv`; the build script always
+  uses the real path at build time, which is what the flag's effect actually
+  depends on.
+- **`@vite-ignore` on the dynamic `import()`.** Vitest (via Vite's module
+  transform) tries to statically analyse dynamic `import()` calls and failed
+  on the runtime-built `data:` URL with the same `Invalid URL` symptom before
+  the `locateFile` fix was even reached. The directive tells the bundler this
+  specifier is deliberately dynamic; it has no effect on plain Node.
+
+### Dead Ends & Warnings
+- **A malformed BDF does not throw or exit non-zero.** The WORKORDER
+  anticipated "a malformed BDF produces a failure the test can observe
+  (non-zero status or thrown `ExitStatus`)". Measured behaviour: `callMain`
+  returns normally, and bdfconv writes a degenerate `Glyphs: 0/0` font. This
+  is Finding 2 in the wild — the same `printf("%s", NULL)` undefined-behaviour
+  path a BDF with no `COPYRIGHT` hits — just reached from a different kind of
+  bad input. `smoke.test.ts` was written to assert on the actual observed
+  output (`"Glyphs: 0/0"`) rather than a throw that does not occur. Anyone
+  building error handling on top of this artefact should not assume a bad
+  file causes a thrown exception — it does not, reliably.
+- **`readAsync`'s `fetch` call is present but unreachable dead code** in the
+  committed glue, because `ENVIRONMENT=web` plus always-supplied `wasmBinary`
+  means the branch that calls it is never taken. Confirmed by running fully
+  offline. Worth knowing if a future audit greps for `fetch(` and is alarmed
+  to find one match.
+
+### Out-of-Scope Findings
+(none beyond what PROJECT.md already recorded as Findings 1–4, all reproduced
+above rather than re-derived)
+
+### Blockers
+(none)
+
