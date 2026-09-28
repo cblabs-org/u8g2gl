@@ -50,8 +50,7 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
-  // PR-04 WO5b, updated PR-04b WO3: valid-project's two <bdf> fonts now compile
-  // (WO3 removed the refusal), so only its <focus_ring> (PR-09) is valid as
+  // valid-project's two <bdf> fonts compile, so only its <focus_ring> (PR-09) is valid as
   // authored but not generated yet — `validate` passes with exactly that one
   // warning, and `generate` refuses the same project
   // (test/integration/generate.test.ts).

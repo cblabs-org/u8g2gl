@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/helpers/browser-bundle.ts
- * Purpose: The one harness the Node/browser parity tests share (PR-04b WO2 item 5
- *          for fonts, WO4 item 5 for images): bundle a `src/core/` entry for a
- *          browser and run it in a place that has only what a browser has. Moved
- *          out of `test/fonts/parity.test.ts` so the image parity test reuses it
- *          instead of growing a second copy that could drift.
+ * Purpose: The one harness the Node/browser parity tests share (fonts and images): bundle a `src/core/` entry for a
+ *          browser and run it in a place that has only what a browser has. Shared by
+ *          `test/fonts/parity.test.ts` and `test/images/parity.test.ts`, so there
+ *          is one harness and no second copy that could drift.
  * Description: Bundles the entry with esbuild, `platform: 'browser'`,
  *              `format: 'iife'` — nothing is marked external, so a `node:`
  *              built-in anywhere in the dependency graph fails the build here

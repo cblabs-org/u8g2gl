@@ -5,9 +5,8 @@
  *
  * File: test/helpers/u8g2-font-reader.ts
  * Purpose: One named array's bytes, read out of `extern/u8g2/csrc/u8g2_fonts.c`,
- *          independent of `src/core/fonts/bdfconv-output.ts`. Originally
- *          `u8g2-oracle.test.ts`'s own reader (PR-04b WO2 item 4); moved here
- *          in PR-04b WO3 so WO3's own oracle assertion (a `<bdf>` compiled
+ *          independent of `src/core/fonts/bdfconv-output.ts`. Shared so
+ *          the font oracle test and the oracle assertion (a `<bdf>` compiled
  *          through `generate()` matches `u8g2_font_4x6_tr` byte for byte) can
  *          use the identical reader rather than a second copy that could drift
  *          from it.

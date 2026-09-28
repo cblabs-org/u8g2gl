@@ -45,8 +45,8 @@ afterAll(() => {
 
 /**
  * Generates a project at the fixed golden version, as every expectation is
- * made. Compiles every `<bdf>` first (PR-04b WO3 item 3) — the committed
- * fixture declares two since PR-04b WO3b, so a plain `generate()` with no
+ * made. Compiles every `<bdf>` first — the committed
+ * fixture declares two, so a plain `generate()` with no
  * `compiledAssets` would refuse it with `U8G2GL_MISSING_COMPILED_FONT`.
  */
 async function generateAt(dir: string): Promise<ReturnType<typeof generate>> {

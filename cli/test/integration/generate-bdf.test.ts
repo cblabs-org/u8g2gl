@@ -4,12 +4,10 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/integration/generate-bdf.test.ts
- * Purpose: End-to-end `<bdf>` determinism through the built CLI (PR-04b WO3
- *          item 7): two runs from different working directories and `TZ`
+ * Purpose: End-to-end `<bdf>` determinism through the built CLI: two runs from different working directories and `TZ`
  *          values produce byte-identical trees, and no absolute path leaks
- *          into a generated file — the same guarantee WO1 measured for
- *          bdfconv itself and WO2 measured for compileBdf(), now proven
- *          through `u8g2gl generate` end to end.
+ *          into a generated file — the same guarantee bdfconv itself and
+ *          compileBdf() give, proven through `u8g2gl generate` end to end.
  * Description: Runs `dist/node/cli.js generate` in two child processes against
  *              copies of the same project, one per throwaway directory, with
  *              different `cwd` and `TZ`.
@@ -98,7 +96,7 @@ afterAll(() => {
   }
 });
 
-describe('<bdf> determinism through the built CLI (PR-04b WO3 item 7)', () => {
+describe('<bdf> determinism through the built CLI', () => {
   it('produces byte-identical output across cwd and TZ, with no absolute path in it', async () => {
     const dir = createProject();
     const outA = join(dir, 'out-a');
@@ -112,8 +110,8 @@ describe('<bdf> determinism through the built CLI (PR-04b WO3 item 7)', () => {
     expect(snapshot(outA)).toEqual(snapshot(outB));
 
     // No absolute path anywhere in the generated tree — the same guarantee
-    // WO1 measured for bdfconv's own -ffile-prefix-map and WO2 for
-    // compileBdf(), carried through generate()'s own emission.
+    // bdfconv's own -ffile-prefix-map gives for the wasm and compileBdf() for its
+    // result, carried through generate()'s own emission.
     for (const [path, content] of snapshot(outA)) {
       expect(content, path).not.toContain(dir);
       expect(content, path).not.toMatch(/\/(Users|home)\//);

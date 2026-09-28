@@ -70,10 +70,8 @@ describe('validate orchestrator integration', () => {
     const input = loadValidProject();
     const result = validate(input);
 
-    // PR-04 WO5b, updated PR-04b WO3: the fixture's <bdf> fonts used to be
-    // valid-but-refused (decision 3) — WO3 removed that refusal, so they no
-    // longer raise anything here (validate() never compiles a font; only
-    // generate() does, through compileProjectAssets()).
+    // The fixture's <bdf> fonts raise nothing here (validate() never compiles a
+    // font; only generate() does, through compileProjectAssets()).
     expect(result.errors).toBe(0);
     expect(result.warnings).toBe(0);
     expect(result.diagnostics.map((d) => d.code)).toEqual([]);

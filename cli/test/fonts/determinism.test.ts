@@ -5,14 +5,14 @@
  *
  * File: test/fonts/determinism.test.ts
  * Purpose: Proves compileBdf() is deterministic across everything that legitimately
- *          differs between two build machines (PR-04b WO2 item 6, typescript.md §5
+ *          differs between two build machines (typescript.md §5
  *          determinism) — working directory, timezone, TMPDIR and locale — and that
  *          nothing in a compiled result leaks the absolute path of the repository or the
- *          input file. WO1 already measured bdfconv itself is deterministic across cwd and
- *          TZ (PROJECT.md); this proves compileBdf()'s own layer (range translation,
+ *          input file. bdfconv itself is deterministic across cwd and
+ *          TZ (measured); this proves compileBdf()'s own layer (range translation,
  *          output parsing) adds no non-determinism of its own.
  * Description: Compiles the same fonts in two child Node processes that differ in
- *              `cwd`, `TZ` (UTC vs Pacific/Chatham — the two extremes measured in WO1),
+ *              `cwd`, `TZ` (UTC vs Pacific/Chatham — the two extremes measured),
  *              `TMPDIR` and `LANG`, each writing its result's sha256 (and the compiled
  *              bytes themselves) to a scratch file under tmp/ (rule 02) for this process to
  *              compare. A worker script (determinism-worker.mjs, generated into the same

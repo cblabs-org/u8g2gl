@@ -5,12 +5,12 @@
  *
  * File: test/images/parity.test.ts
  * Purpose: Proves `<convert>`'s conversion gives the same bytes in Node and in a
- *          browser (PR-04b WO4 item 5), which is what lets the designer and the
+ *          browser, which is what lets the designer and the
  *          CLI generate the same image from the same PNG (§13.9). Not by reading
  *          the source for Node-isms: by bundling `src/core/images/index.ts` for a
  *          browser and running it where only browser globals exist.
- * Description: Uses the shared harness (`test/helpers/browser-bundle.ts`, moved
- *              out of the fonts parity test). The sandbox adds
+ * Description: Uses the shared harness (`test/helpers/browser-bundle.ts`, shared
+ *              with the fonts parity test). The sandbox adds
  *              `DecompressionStream` — a browser global, and the one thing the
  *              decoder needs beyond the language — and nothing else. For a set
  *              of PNGs covering every colour type, both modes and a failing

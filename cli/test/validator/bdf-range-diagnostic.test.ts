@@ -5,7 +5,7 @@
  *
  * File: test/validator/bdf-range-diagnostic.test.ts
  * Purpose: Proves `validate` reports a malformed `<bdf range>` against the declaration's
- *          own location, through the real schema pass (PR-04b WO2 item 3) — not just that
+ *          own location, through the real schema pass — not just that
  *          parseBdfRange() itself rejects it (bdf-range.test.ts covers the grammar).
  * Description: Same `validateSchema` direct-call pattern as schema.test.ts, with a `<bdf>`
  *              font declaration in globals.fonts.

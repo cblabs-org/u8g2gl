@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/assets/compile-project-assets.test.ts
- * Purpose: Unit-level coverage of compileProjectAssets() (PR-04b WO3 item 3): the
+ * Purpose: Unit-level coverage of compileProjectAssets(): the
  *          async step both hosts must call before generate(). Covers every
  *          diagnostic it raises, that results and diagnostics come out in
  *          declaration order regardless of which font's compile settles first,
  *          that a successfully compiled font's bytes are exactly compileBdf()'s
- *          own, that `offendingText` follows images.ts's own `src` convention,
- *          and that `failedFonts` names every font that did not compile
- *          (PR-04b WO3b item 1).
+ *          own, that `offendingText` is the declaration's `src`,
+ *          and that `failedFonts` names every font that did not compile.
  * Description: Builds a `Globals` value directly (no XML parsing needed — this
  *              module reads only `globals.fonts`) and an in-memory asset map, so
  *              these tests exercise the isomorphic core with no filesystem.
@@ -78,9 +77,8 @@ describe('compileProjectAssets()', () => {
       severity: 'error',
       file: 'globals.xml',
       line: 20,
-      // images.ts's own convention (PR-04b WO3b item 1): the declaration's
-      // `src`, not its `name` — generate()'s guard reads `failedFonts` instead
-      // of this field now, so nothing needs the name recoverable from here.
+      // The declaration's `src`, not its `name` — generate()'s guard reads
+      // `failedFonts`, so nothing needs the name recoverable from here.
       offendingText: 'fonts/missing.bdf',
     });
     expect(result.diagnostics[0]?.message).toContain('fonts/missing.bdf');

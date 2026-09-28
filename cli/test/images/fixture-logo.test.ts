@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/images/fixture-logo.test.ts
- * Purpose: Keeps the committed `<convert>` fixture image honest (PR-04b WO4
- *          item 5): the PNG in `test/generated_fixture/assets/` must be exactly
+ * Purpose: Keeps the committed `<convert>` fixture image honest: the PNG in `test/generated_fixture/assets/` must be exactly
  *          what `test/fixtures/make-fixture-logo.ts` writes, byte for byte, so it
  *          can always be regenerated and never drifts into a binary nobody can
  *          explain.

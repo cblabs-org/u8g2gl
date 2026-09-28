@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/fonts/bdf-range.test.ts
- * Purpose: Unit tests for the `<bdf range>` grammar (PR-04b WO2 item 3) — the translator
+ * Purpose: Unit tests for the `<bdf range>` grammar — the translator
  *          both `validate` and compileBdf() share.
  * Description: Covers the accepted grammar (decimal, 0x/0X hex, single codepoints,
  *              inclusive lo-hi pairs, whitespace tolerance, radix-preserving translation

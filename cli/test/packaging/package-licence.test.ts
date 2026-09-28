@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/packaging/package-licence.test.ts
- * Purpose: Proves the published npm package carries its licence (PR-04b WO5
- *          item 3). npm includes a LICENSE only from the package directory,
+ * Purpose: Proves the published npm package carries its licence. npm includes a LICENSE only from the package directory,
  *          so `cli/LICENSE` is a committed copy of the repository's; this
  *          test fails the moment the two differ, and again if the package
  *          list stops naming a file that no longer exists.

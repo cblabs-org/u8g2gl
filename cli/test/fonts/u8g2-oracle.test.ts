@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/fonts/u8g2-oracle.test.ts
- * Purpose: compileBdf()'s correctness oracle (PR-04b WO2 item 4). Converts BDF files from
+ * Purpose: compileBdf()'s correctness oracle. Converts BDF files from
  *          `extern/u8g2/tools/font/bdf/` with the same map U8G2's own `build.c` used to
  *          generate the matching array in `extern/u8g2/csrc/u8g2_fonts.c`, translated into
  *          our `<bdf range>` grammar, and asserts byte-for-byte equality with the array
  *          U8G2 actually ships. A U8G2 submodule bump that changes the converter's output
  *          fails this build — that is the point of an oracle test, not an accident of one.
- * Description: Covers `u8g2_font_4x6_tr` (723 bytes, PA-measured in PROJECT.md), one `_tf`
+ * Description: Covers `u8g2_font_4x6_tr` (723 bytes, as measured), one `_tf`
  *              variant, one `_tn` variant, and `u8g2_font_6x13_tr` from a different BDF
- *              family, all built with `-b 0` (the only mode this WO ever builds). Every
+ *              family, all built with `-b 0` (the only mode `<bdf>` builds with). Every
  *              `build.c` map row measured for these fonts writes its optional `>map_to`
  *              override equal to its own range's `lo` (`bdf_map.c`: `map_to = range_from`
  *              is already the default when `>` is omitted), so it translates losslessly
@@ -21,8 +21,8 @@
  *              The expected side is read by `../helpers/u8g2-font-reader.ts`, deliberately
  *              not `src/core/fonts/bdfconv-output.ts` — sharing one parser would let one bug
  *              in understanding bdfconv's C-string-literal grammar cancel out on both sides
- *              of the comparison instead of failing it. PR-04b WO3 moved the reader there
- *              (out of this file) so its own oracle assertion — a `<bdf>` compiled through
+ *              of the comparison instead of failing it. The reader lives in a shared helper
+ *              so the oracle assertion — a `<bdf>` compiled through
  *              `generate()` matches `u8g2_font_4x6_tr` byte for byte — reuses it rather than
  *              copying it.
  */

@@ -60,8 +60,9 @@
 #include <initializer_list>
 
 /**
- * @brief The attribute real U8G2 places on every font array (u8x8.h's
- *        `U8X8_FONT_SECTION`, PR-04b WO3b): `.progmem.<name>` on AVR,
+ * @brief The stub for `U8G2_FONT_SECTION` (u8g2.h), which real U8G2 forwards
+ *        to `U8X8_FONT_SECTION` (u8x8.h) and places on every font array:
+ *        `.progmem.<name>` on AVR,
  *        `.text.<name>` on AVR32, empty everywhere else — including this
  *        host build, so it expands to nothing here, exactly as it does on
  *        real U8G2's own default branch.

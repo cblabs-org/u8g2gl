@@ -14,10 +14,10 @@
  * Description: Generates through the built `dist/`, with the same fixed version
  *              the tests use, and writes each fixture's expectations in place.
  *              Every `<bdf>` is compiled and every image produced first through
- *              `compileProjectAssets()` (PR-04b WO3 item 3, WO4), exactly as the CLI's own `generate` command
+ *              `compileProjectAssets()`, exactly as the CLI's own `generate` command
  *              does — `generate()` itself never compiles a font, and a fixture
  *              declaring one would otherwise refuse with
- *              `U8G2GL_MISSING_COMPILED_FONT` (PR-04b WO3b item 3).
+ *              `U8G2GL_MISSING_COMPILED_FONT`.
  *              Run `npx tsc` first, then review every line of the diff — and,
  *              for the compile fixture, rebuild and run the C++ suite, because
  *              its output is compiled and executed there.
@@ -54,7 +54,7 @@ const FIXTURES = [
 
 for (const { project, expected, editor } of FIXTURES) {
   const loaded = loadProject(project);
-  // Asynchronous, and run before generate() (PR-04b WO3 item 3) — the same
+  // Asynchronous, and run before generate() — the same
   // step the CLI's own `generate` command runs (src/node/cli.ts).
   const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
   const result = generate({

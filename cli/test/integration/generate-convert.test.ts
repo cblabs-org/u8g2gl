@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/integration/generate-convert.test.ts
- * Purpose: End-to-end `<convert>` through the built CLI (PR-04b WO4 item 5, 7):
+ * Purpose: End-to-end `<convert>` through the built CLI:
  *          two runs from different working directories and `TZ` values produce
  *          byte-identical trees for a project using both conversion modes; the
  *          budget and the emitted provenance comments say what the images cost
@@ -108,7 +108,7 @@ afterAll(() => {
   }
 });
 
-describe('<convert> through the built CLI (PR-04b WO4)', () => {
+describe('<convert> through the built CLI', () => {
   it('produces byte-identical output across cwd and TZ, with no absolute path in it', async () => {
     const dir = createProject();
     const outA = join(dir, 'out-a');

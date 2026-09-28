@@ -5,19 +5,16 @@
  *
  * File: test/generator/no-ticket-numbers.test.ts
  * Purpose: Generated code goes into users' repositories, so it must not carry
- *          this project's internal work-order or PR numbers (PR-04b WO4 item 6).
- *          WO3b found three such strings by grep; this makes that class of
- *          defect break the build instead of waiting for the next grep.
+ *          this project's internal work-order or PR numbers. This makes that class
+ *          of defect break the build instead of waiting for someone to grep.
  * Description: Generates the committed compile fixture for both targets
  *              (firmware and editor) exactly as the fixture tests do, and fails
  *              naming the file and line of any output matching `WO<digit>` or
  *              `PR-<digit>`. The fixture exercises every emitter the generator
  *              has: subjects, styles, both font kinds, both image kinds, three
- *              screens, a composite and the editor scene.
- *
- *              This changes output for an unchanged input (three strings were
- *              reworded), which rules/03 says needs a generator version bump;
- *              0.9.0 is that bump and is unreleased, so no further bump.
+ *              screens, a composite and the editor scene. The pattern is
+ *              `\b(WO|PR-)\d`; requiring the digit keeps ordinary words such as
+ *              `WORLD` from matching.
  */
 
 import { dirname, resolve } from 'node:path';

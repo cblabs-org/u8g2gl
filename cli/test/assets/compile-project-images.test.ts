@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/assets/compile-project-images.test.ts
- * Purpose: Coverage of the image half of compileProjectAssets() (PR-04b WO4
- *          item 3, 5): `<xbm>` and `<convert>` both arriving as one image map,
- *          the `<xbm>` diagnostics keeping the code, text and location they had
- *          when images.ts raised them, the `<convert>` size-mismatch message,
+ * Purpose: Coverage of the image half of compileProjectAssets(): `<xbm>` and
+ *          `<convert>` both arriving as one image map,
+ *          the `<xbm>` diagnostics' code, text and location, the `<convert>` size-mismatch message,
  *          and `failedImages` naming every declaration that produced nothing.
  */
 

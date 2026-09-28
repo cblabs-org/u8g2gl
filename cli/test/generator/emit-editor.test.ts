@@ -208,9 +208,8 @@ interface SceneScreen {
 
 async function fixtureScene(): Promise<{ readonly scene: Record<string, unknown>; readonly result: ReturnType<typeof generate> }> {
   const loaded = loadProject(fixtureDir);
-  // Every <bdf> compiled first (PR-04b WO3 item 3) — the fixture declares two
-  // since PR-04b WO3b, so generate() would otherwise refuse with
-  // U8G2GL_MISSING_COMPILED_FONT.
+  // Every <bdf> compiled first — the fixture declares two, so generate()
+  // would otherwise refuse with U8G2GL_MISSING_COMPILED_FONT.
   const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
   const result = generate({
     ...loaded.model,

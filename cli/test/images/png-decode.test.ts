@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/images/png-decode.test.ts
- * Purpose: Pins the PNG decoder (PR-04b WO4 item 1, 5): every colour type at
+ * Purpose: Pins the PNG decoder: every colour type at
  *          every bit depth the specification allows, all five scanline filters,
  *          palettes with and without tRNS, several IDAT chunks, and each input
  *          the decoder must refuse with a reason rather than a throw.

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/generator/emit-fonts.test.ts
- * Purpose: `<bdf>` through `generate()` (PR-04b WO3): the oracle byte match end
+ * Purpose: `<bdf>` through `generate()`: the oracle byte match end
  *          to end (not just compileBdf() in isolation — u8g2-oracle.test.ts
  *          already has that), `ui.hpp`'s declaration, the budget's measured
  *          line, document-order interleaving with `<builtin>`, two `<bdf>`s
@@ -69,7 +69,7 @@ async function generateWith(globalsXml: string, screenBody: string, assets: Read
   return generate(input);
 }
 
-describe('<bdf> through generate() (PR-04b WO3)', () => {
+describe('<bdf> through generate()', () => {
   it('emits bytes matching u8g2_font_4x6_tr, end to end through generate()', async () => {
     const globalsXml = `<globals><fonts><bdf name="small_9" src="fonts/4x6.bdf" range="0x20-0x7F" /></fonts></globals>\n`;
     const screenBody = `<u8g2gl_label name="lbl" x="0" y="0" width="128" height="12" font="small_9" text="Hi" />`;
@@ -200,8 +200,8 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
     expect(codes).toContain('U8G2GL_MISSING_COMPILED_FONT');
   });
 
-  // The guard's three cases (PR-04b WO3b item 1), now driven by
-  // compiledAssets.failedFonts rather than by reading offendingText: a font
+  // The guard's three cases, driven by compiledAssets.failedFonts rather than
+  // by reading offendingText: a font
   // that compiled, one whose compile failed (compileProjectAssets() already
   // reported it — the guard must not pile on a second, misleading diagnostic),
   // and one never submitted to compileProjectAssets() at all.
@@ -264,7 +264,7 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
   });
 });
 
-describe('emitFontsUnit() — comment sanitisation (PR-04b WO3 item 5)', () => {
+describe('emitFontsUnit() — comment sanitisation', () => {
   // A hand-built CompiledFont with header fields designed to attack a `//`
   // comment: an embedded newline (would end the comment early and let the
   // next line become code), a literal `*/`, and a very long string.

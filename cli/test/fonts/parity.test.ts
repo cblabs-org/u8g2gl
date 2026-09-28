@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/fonts/parity.test.ts
- * Purpose: Proves compileBdf() behaves identically in Node and in a browser (PR-04b WO2
- *          item 5, the Objective's central claim) — not by inspecting the source for
+ * Purpose: Proves compileBdf() behaves identically in Node and in a browser — not by inspecting the source for
  *          Node-isms, but by actually bundling the public entry for a browser and running
  *          it somewhere that only has what a browser has.
  * Description: Bundles `src/core/fonts/index.ts` and runs it in a bare vm sandbox through the
- *              shared harness (`test/helpers/browser-bundle.ts`, moved there by PR-04b WO4
- *              so the image parity test reuses it). The sandbox carries only what this code
+ *              shared harness (`test/helpers/browser-bundle.ts`, which the image parity test
+ *              reuses). The sandbox carries only what this code
  *              needs and a browser has (`WebAssembly`, `TextEncoder`, `TextDecoder`, `atob`, `btoa`,
  *              `console`, `URL`) — no `require`, `process`, `Buffer` or `global`, since
  *              nothing adds them to the sandbox and a fresh V8 context does not inherit
@@ -18,7 +17,7 @@
  *              is compared against a direct Node call: identical bytes, identical glyph
  *              counts, identical failure reasons. A global the vm context needs that a
  *              browser lacks is treated as a defect in the code, not a reason to widen the
- *              sandbox (WORKORDER: "fix the code, don't add the global").
+ *              sandbox (fix the code, don't add the global).
  */
 
 import { readFileSync } from 'node:fs';

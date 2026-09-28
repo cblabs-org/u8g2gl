@@ -41,8 +41,8 @@ const PROJECT_XML = `<u8g2gl schema="0.4" name="gen" version="1.0.0">
 const BUILTIN_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>
 `;
 
-// <focus_ring> is the not-yet-supported construct this suite reaches for: PR-04b
-// removed the <bdf> and <convert> refusals, so only PR-08/PR-09 constructs remain.
+// <focus_ring> is the not-yet-supported construct this suite reaches for: <bdf>
+// and <convert> build, so only PR-08/PR-09 constructs remain.
 function screenXml(screen: string, label: string | undefined, focusRing = false): string {
   const name = label === undefined ? '' : ` name="${label}"`;
   const ring = focusRing ? `\n        <focus_ring wrap="true"><entry name="${label}" /></focus_ring>` : '';

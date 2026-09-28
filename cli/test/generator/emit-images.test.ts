@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/generator/emit-images.test.ts
- * Purpose: `<convert>` through `generate()` (PR-04b WO4 item 3, 4): a converted
+ * Purpose: `<convert>` through `generate()`: a converted
  *          image is emitted exactly as an `<xbm>` is, with a provenance
  *          comment; the §18 budget measures it; the editor scene lists it; and
  *          `generate()` refuses loudly when the host skipped the asset step,
@@ -69,7 +69,7 @@ function inputOf(): GenerateInput {
   };
 }
 
-describe('<convert> through generate() (PR-04b WO4)', () => {
+describe('<convert> through generate()', () => {
   it('emits a converted image like an <xbm>, with a provenance comment', async () => {
     const base = inputOf();
     const compiledAssets = await compileProjectAssets({ globals: base.globals, assets: ASSETS });

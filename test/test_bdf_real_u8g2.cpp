@@ -9,7 +9,7 @@
  * File: test/test_bdf_real_u8g2.cpp
  *
  * Purpose: Proves that a compiled `<bdf>` font is what real U8G2 consumes
- *          (PR-04b WO3b item 4) — not the host stub's recording of setFont(),
+ *          — not the host stub's recording of setFont(),
  *          which never decodes a font at all. test/CMakeLists.txt compiles
  *          the fixture's generated `ui_fonts.cpp` a third time, against real
  *          U8G2's own headers and C sources (tag 2.36.18), so a U8G2 bump
@@ -26,14 +26,14 @@
  *                (`u8g2_GetMaxCharHeight`, `u8g2_GetAscent`, `u8g2_GetDescent`,
  *                `u8g2_GetStrWidth`) is derived independently from the BDF
  *                text itself (`FONTBOUNDINGBOX`, per-glyph `DWIDTH`/`BBX`),
- *                per the WORKORDER — never read back from U8G2's own output,
- *                which would make the test circular.
+ *                — never read back from U8G2's own output, which would make
+ *                the test circular.
  *
  *              - `font_arrow_mini` (a hand-written MIT fixture with no
  *                `range`) draws its below-0x20 and above-0xFF glyphs with
  *                `u8g2_DrawGlyph` into a real, full-buffer `u8g2_t`, and every
  *                set pixel is compared against the BDF's own `BITMAP` rows —
- *                the test that proves the absent-`range` fix (WO3 item 1)
+ *                the test that proves the absent-`range` fix
  *                reaches the screen, not just the compiled array.
  *
  *              How the metrics were derived (real U8G2's own source, read
@@ -196,7 +196,7 @@ TEST(BdfRealU8g2, Font4x6MetricsMatchWhatTheBdfItselfSays) {
 //
 // Three glyphs, every one *declaring* BBX "5 7 0 -1" (width 5, height 7, x 0,
 // y -1) and DWIDTH "5 0" (test/generated_fixture/assets/fonts/custom/arrow_mini.bdf,
-// written for this WORKORDER, so these are exactly the values that file's own
+// written for this test, so these are exactly the values that file's own
 // BITMAP rows were drawn against — but, as for font_4x6 above, `-b 0` crops
 // every glyph's bbx to its own ink before it reaches the compiled array:
 //   ctrl_bell   ENCODING 7     rows 00 70 70 70 00 00 00 (below 0x20)

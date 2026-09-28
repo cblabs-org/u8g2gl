@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/images/png-to-xbm.test.ts
- * Purpose: Pins the `<convert>` arithmetic (PR-04b WO4 item 5): alpha over
+ * Purpose: Pins the `<convert>` arithmetic: alpha over
  *          white, Rec. 601 luminance, the strict `Y < threshold` polarity, the
  *          default threshold, XBM packing at a width that is not a multiple of
  *          8, and Floyd-Steinberg dithering with its one documented rounding

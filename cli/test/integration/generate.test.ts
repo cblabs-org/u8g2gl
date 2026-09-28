@@ -169,8 +169,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
         .map((d) => `${d.code} ${d.file}:${d.line}:${d.column} ${d.message}`);
 
     expect(res.code).toBe(1);
-    // Only <focus_ring> remains not-yet-supported since PR-04b WO3 removed the
-    // <bdf> refusal — valid-project's two <bdf> fonts now compile.
+    // Only <focus_ring> is not-yet-supported: valid-project's two <bdf> fonts compile.
     expect(located(validated.diagnostics)).toHaveLength(1);
     expect(located(generated.diagnostics)).toEqual(located(validated.diagnostics));
     expect(validated.diagnostics.every((d) => d.severity === 'warning')).toBe(true);
@@ -366,7 +365,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     // Not one flash cost is claimed for this project except the image and
     // compiled-font arrays, which are the only flash bytes the generator
     // writes itself — and it declares no <xbm> or <bdf>, so both lines are an
-    // exact 0 rather than a guess (PR-04b WO3 item 6).
+    // exact 0 rather than a guess.
     for (const line of budget!.flash) {
       if (line.item === 'image data (bitmap arrays)' || line.item === 'fonts (compiled bdf)') {
         expect(line.figure).toMatchObject({ kind: 'measured', bytes: 0 });
@@ -461,9 +460,8 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
   it('stamps the package version into a freshly generated project — the 0.9.0 proof', async () => {
     // Pinned literally, not read from package.json: a test that compares the
     // stamp against the same file it came from passes at every version and
-    // therefore proves no bump ever happened (PR-04 WO10's carry; PR-04b WO3
-    // bumped 0.8.0 -> 0.9.0, a new capability with no existing valid input's
-    // output changing).
+    // therefore proves no bump ever happened (the 0.9.0 bump was a new
+    // capability, with no existing valid input's output changing).
     expect(packageVersion).toBe('0.9.0');
     const dir = createProject();
     expect((await runCli(['generate', dir])).code).toBe(0);

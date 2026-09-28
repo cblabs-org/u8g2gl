@@ -111,8 +111,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const found = deferred(validateNotYetSupported(inputWith()));
     const byText = new Map(found.map((d) => [d.offendingText, d]));
 
-    // <bdf> and <convert> are no longer reported: PR-04b removed their
-    // refusals — both build now.
+    // <bdf> and <convert> are not reported: both build.
     expect(found.map((d) => d.offendingText).sort()).toEqual(
       ['column', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
     );

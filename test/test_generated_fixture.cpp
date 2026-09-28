@@ -59,7 +59,7 @@ namespace {
 // generator, so a change to what is counted fails a test that names it.
 constexpr uint32_t kFixtureTotalBindings = 7;
 constexpr uint32_t kFixtureBindingsPerObject = 1;
-constexpr uint32_t kFixtureObjectsOnBusiestScreen = 9;  // bounds: two <bdf> labels since PR-04b WO3b, the <convert> image since WO4 (home has 5)
+constexpr uint32_t kFixtureObjectsOnBusiestScreen = 9;  // bounds: a slider, the <convert> image, a box and six labels, two of them on <bdf> fonts (home has 5)
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not
@@ -377,7 +377,7 @@ drawn_label drawn_with(const U8G2& display, const char* text) {
 }  // namespace
 
 TEST(GeneratedFixture, ConvertedImageIsDrawnLikeAnXbm) {
-    // PR-04b WO4: logo_mark is a <convert>, converted from a PNG at generate
+    // logo_mark is a <convert>, converted from a PNG at generate
     // time, and reaches the display through the same set_src() / drawXBMP path
     // an <xbm> does — one bitmap, at the position and size the screen gave it.
     U8G2 display;

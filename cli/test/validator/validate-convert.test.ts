@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/validator/validate-convert.test.ts
- * Purpose: `validate` judges `<convert>`'s own attributes (PR-04b WO4 item 2):
+ * Purpose: `validate` judges `<convert>`'s own attributes:
  *          `mode` is `threshold` or `dither`, `threshold` an integer 0..255,
  *          `width` and `height` positive integers — and does it without reading
  *          or converting anything, so it works on a project whose PNG is absent.
@@ -42,7 +42,7 @@ function validateConvert(attributes: string) {
   }).diagnostics.filter((d) => d.severity === 'error');
 }
 
-describe('validate — <convert> attributes (PR-04b WO4)', () => {
+describe('validate — <convert> attributes', () => {
   it('accepts a well-formed declaration, and never looks for the PNG', () => {
     expect(validateConvert('width="16" height="16"')).toEqual([]);
     expect(validateConvert('width="16" height="16" mode="dither" threshold="90"')).toEqual([]);

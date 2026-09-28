@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/fonts/compile-bdf.test.ts
- * Purpose: Unit-level coverage of compileBdf() itself (PR-04b WO2 item 2) beyond the
- *          oracle, parity and determinism tests: BDF header fields, the "(null)" guard
- *          (WO1 Finding 2), every FontCompileFailure path, and concurrency safety.
+ * Purpose: Unit-level coverage of compileBdf() itself beyond the
+ *          oracle, parity and determinism tests: BDF header fields, the "(null)" guard, every FontCompileFailure path, and concurrency safety.
  * Description: The oracle test (u8g2-oracle.test.ts) already proves byte-exact output
  *              against U8G2's own shipped arrays; this file proves the surrounding
  *              contract — failures are returned, never thrown, and concurrent calls do not
@@ -59,7 +58,7 @@ describe('compileBdf() — failures are returned, never thrown', () => {
     expect(result.stderr).toEqual([]);
   });
 
-  it('fails with "no glyphs" on a malformed BDF (WO1 Finding 2: bdfconv exits 0)', async () => {
+  it('fails with "no glyphs" on a malformed BDF (bdfconv exits 0 with `Glyphs: 0/0`)', async () => {
     const malformed = new TextEncoder().encode('this is not a BDF file\n');
     const result = await compileBdf({ bdf: malformed, identifier: 'malformed_bdf' });
     expect(result.ok).toBe(false);

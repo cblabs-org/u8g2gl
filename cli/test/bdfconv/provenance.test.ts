@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/bdfconv/provenance.test.ts
- * Purpose: Guards the one invariant WO1 exists to protect: the catalogue, the bundled
+ * Purpose: Guards the one invariant the bdfconv artefact depends on: the catalogue, the bundled
  *          font list and the bdfconv converter must all trace to the same U8G2 commit,
  *          and the committed Wasm artefact must be exactly the bytes bdfconv-source.json
  *          says it is. A submodule bump that silently changes one without the others
  *          would otherwise surface only as a mysterious font-rendering difference far
- *          downstream (PROJECT.md Finding 4's correctness oracle depends on this).
+ *          downstream (the correctness oracle in smoke.test.ts depends on this).
  * Description: Compares bdfconv-source.json's recorded U8G2 commit against
  *              catalogue-source.json's and against the submodule's own pinned gitlink
  *              (read directly with `git ls-tree`, independent of readU8g2Source()), then
@@ -85,8 +85,8 @@ describe('bdfconv-source.json provenance', () => {
   });
 
   it('records the -ffile-prefix-map flag without a literal machine path', () => {
-    // The flag must be present (it is what keeps the artefact path-independent — see
-    // the Completion Report's Decisions Made), but its recorded form uses a placeholder
+    // The flag must be present (it is what keeps the artefact path-independent: without it
+    // the compiler embeds the build path in the wasm), but its recorded form uses a placeholder
     // rather than this machine's absolute checkout path, so the file itself stays
     // reproducible across checkouts (typescript.md §5 determinism).
     const prefixMapFlag = source.flags.find((flag) => flag.startsWith('-ffile-prefix-map='));

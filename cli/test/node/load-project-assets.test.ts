@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/load-project-assets.test.ts
- * Purpose: `loadProject()`'s PR-04b WO3 additions: a `<bdf>`'s `src` is read as
- *          bytes into the same asset channel an `<xbm>` uses (item 2), and the
- *          licence-file rule beside it (item 5) — none, one and several
- *          matches, project-relative and sorted.
+ * Purpose: `loadProject()`'s asset reading: a `<bdf>`'s `src` is read as
+ *          bytes into the same asset channel an `<xbm>` uses, and the
+ *          licence-file rule beside it — none, one and several
+ *          matches, project-relative and sorted — and the project boundary
+ *          (symlinks, and the `ofl` file-name rule).
  * Description: Loads throwaway projects written under the git-ignored cli/tmp/,
  *              exactly as test/node/load-project.test.ts does.
  */
@@ -67,7 +68,7 @@ afterAll(() => {
   }
 });
 
-describe('loadProject() — asset bytes (PR-04b WO3 item 2)', () => {
+describe('loadProject() — asset bytes', () => {
   it('reads a <bdf> src as bytes, keyed by its declared path, byte for byte', () => {
     const dir = createProject({});
     const loaded = loadProject(dir);
@@ -88,7 +89,7 @@ describe('loadProject() — asset bytes (PR-04b WO3 item 2)', () => {
   });
 });
 
-describe('loadProject() — <bdf> licence files (PR-04b WO3 item 5)', () => {
+describe('loadProject() — <bdf> licence files', () => {
   it('finds none when nothing beside the BDF looks like a licence', () => {
     const dir = createProject({});
     const loaded = loadProject(dir);
