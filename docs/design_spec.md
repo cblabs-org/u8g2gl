@@ -1098,7 +1098,7 @@ Monochrome collapses the styling domain to a small set:
 <u8g2gl_label text="Title"><style name="header" /></u8g2gl_label>
 ```
 
-Inline overrides use the `style_` prefix: `style_invert="true"`.
+Inline overrides use the `style_` prefix: `style_invert="true"`. Inline overrides are restricted to the nine properties in the table above: `style_` tells a reader "this is styling", and a general per-element override of any property that happens to have a setter is a different feature, which §1.5 says waits for a demonstrated need.
 
 **An element's own attributes win over a named style**, and so do its inline `style_` overrides: an attribute on the element is the more specific statement of intent, the same rule CSS and LVGL use. That applies to styles applied later too — a `focus_style` (§12) must not overwrite a property the element set itself. The generator handles init by applying named styles before properties (§13.7). The runtime must keep the rule when it applies styles at run time, which means tracking which properties the element set itself.
 
@@ -1436,6 +1436,14 @@ XML names are author-facing; C++ identifiers are generated. The mapping is total
 
 **Every emitted object is named `ui_obj_<name>`** (2026-09-19). A bare name collides with the C standard library: an element called `clock` became `static u8g2gl_clock clock;`, which conflicts with `clock()` from `<time.h>` whenever that header is visible — and Arduino makes a lot of headers visible. A list of reserved C names can never be complete, because what's reserved depends on the platform's headers. A prefix removes the whole class of collision. The prefix is a fixed family, not the screen's name, because a screen's name could itself collide: a screen called `subject`, `font`, `image`, `style` or `screen` would put its objects in the same namespace as `ui_subject_*` and the other generated families. The screen's name wouldn't add uniqueness anyway, because each screen's objects are `static` in that screen's own translation unit. Application code never refers to these objects ([D-20] §4), so the prefix breaks nothing that code depends on.
 
+**A `<builtin>` font's `name` is a U8G2 symbol, not an author-chosen name** (2026-09-28). The owner ruled: *"Fonts are input - we can't expect them to follow our naming conventions we should use whatever is provided and ensure ALL fonts are available."* A `<builtin>` name is therefore validated against the font list derived from the pinned U8G2 submodule — 2039 names in 2.36.18 — and is **exempt from the `[a-z][a-z0-9_]*` rule above**. 522 of those names contain capitals (`u8g2_font_helvR08_tr`, `u8g2_font_ncenB12_tr`), so the rule would otherwise put a quarter of U8G2's fonts, the Helvetica and Century Schoolbook families among them, out of reach.
+
+**The name is not mangled.** A U8G2 font name already *is* the C identifier `u8g2.h` declares the array with, so `ui_font_` + the name is legal as it stands, and identity keeps the mapping one-to-one. Verified across the catalogue: all 2039 match `[A-Za-z_][A-Za-z0-9_]*`, none contains `__`, and 2039 names give 2039 distinct aliases. **Do not lowercase them.** Lowercasing collides with nothing in 2.36.18, which is exactly the trap: a later `..._helvr08_tr` beside `..._helvR08_tr` would fold two different fonts onto one alias, and it would arrive as a dependency bump rather than as a change someone reviewed. The alias reads redundantly — `ui_font_u8g2_font_helvR08_tr` — and that redundancy is the price of identity, not a wart to tidy away.
+
+**`<bdf>` names are author-chosen and keep the rule in full.** Nothing else is exempt: subjects, styles, images, screens, elements and composites are unchanged.
+
+**U8G2's 191 legacy `u8g_font_*` macros are refused**, even though they would compile. They are 1.x compatibility aliases for fonts the modern names already reach, so accepting them would double the name surface and buy no capability. The diagnostic says so, and points at the `u8g2_font_*` form.
+
 ### 13.5 Realisation — when an object is emitted
 
 Per **[D-18]** this is one rule, applied per instance:
@@ -1517,6 +1525,8 @@ Realisation is **observable in the budget** (§18) and reported by `--json`
 ([D-16]), stating per element whether an object was emitted and which condition
 caused it.
 
+**Realisation must not be observable.** [D-18] makes object-or-draw-calls a generator outcome and never an authoring category, and that only holds if both produce the same behaviour. So a value reaching a draw call is **clamped exactly as the object path clamps it** — into `int16_t`, after the container origin is added (§7.2) — instead of wrapping in whatever narrower parameter the draw function happens to take. The same XML must behave the same way on either side of the realisation rule, because the author never chose the side.
+
 ### 13.6 Composite expansion
 
 A composite (§6.4) produces a **container object** plus its children. Expansion
@@ -1552,6 +1562,8 @@ concrete elements.
 
 
 Per screen, one `.cpp`. Plus one `ui.hpp` umbrella; one unit each for subjects, fonts, images and styles (`ui_styles.cpp`); and `ui.cpp`, which holds `ui_init()` and the frame-dirty observers. There is one observer per subject rather than per screen (§13.5), so they can't live in a screen's unit.
+
+**The editor target emits different units from the same build** ([UD-4], §13.1). `generate --target-kind editor` writes the designer's class registry (`ui_editor_registry.cpp`) and a scene description (`ui_scene.json`) into `<output dir>_editor` by default, in place of the firmware units. `--target-kind firmware` is the default. The scene description carries a format version — 2 as of PR-04, which added the bound origin — so the designer can refuse a description it doesn't understand instead of misreading one. Both targets are generated from the same validated project, and a parity test renders each and compares the draw calls one for one. That equality is what entitles the designer's canvas to call itself pixel-exact ([D-9]). The `--json` contract ([D-16]) reports the emitted paths for whichever target ran.
 
 ```cpp
 void ui_screen_home_init();        // once at boot: construct, configure, bind

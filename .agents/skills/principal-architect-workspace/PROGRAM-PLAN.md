@@ -33,7 +33,8 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 | PR-02 | U8G2GL | CLI: schema, validator, display catalogue, `find`, `--json` | main | ✅ **MERGED #2** |
 | PR-03 | U8G2GL | Widget set + `[U-1]` element identity | PR-01 | ✅ **MERGED #3** |
 | PR-3R | U8G2GL | ★ Interim remediation to `[D-18]`–`[D-21]`, schema 0.4 | PR-03 | ✅ **MERGED #4** |
-| **PR-04** | U8G2GL | Generator XML→C++ per §13: realisation, composite expansion, build-time layout, mangling, generated capacities `[D-21]`, **editor-target registry `[UD-4]`** | PR-3R | **NEXT — awaiting PA handoff** |
+| PR-04 | U8G2GL | Generator XML→C++ per §13: realisation, composite expansion, build-time layout, mangling, generated capacities `[D-21]`, editor-target registry `[UD-4]` | PR-3R | ✅ **MERGED #5** — 21 WOs, C++ 361 / CLI 1044 |
+| **PR-4R** | U8G2GL | ★ Interim remediation from PR-04's findings: clamp bound draw-call arguments as the object path does (realisation must not be observable, [D-18]); restrict inline `style_*` to §10's nine; runtime clamps a rounded box's radius at draw time; move shared validator/generator lookup tables to a neutral module | PR-04 | **NEXT** — may run ∥ PR-04b |
 | PR-04b | U8G2GL | **Font and image pipeline:** `<bdf>` through `bdfconv` in Wasm [Q-2], PNG→XBM `<convert>`. Split out of PR-04, which refuses both with a named error | PR-04 | Pending — **on the critical path** |
 | PR-05 | foundation | Integration module, build hooks, first board migrated. **Owed by PR-04:** a compile check against real U8G2 headers for the ESP-IDF build — PR-04 WO4c covers Arduino only. **Also owed by PR-04 (WO12, 2026-09-28):** `generate()` returns its report (§13.11 ends "emit → report", and the isomorphic designer needs it); `--check` reports a directory that would be removed; and the budget report's `§` and em dashes tested on a legacy Windows console | PR-04 + **PR-04b** | Pending |
 | PR-06 | U8G2GL | Wasm renderer + snapshot harness. **Owed by PR-04:** a container-edge pixel test against real U8G2 — (a) an element whose clip is exactly its bounds, drawing to its last column and row; (b) a frame partly off the left edge, confirming wrapped origins draw their visible part; (c) a clipped line, allowing ~1px endpoint rounding (WO4c T1) and a corner pixel at the clipping bound (T2). Plus a compile check against real U8G2 headers for the Wasm build. **Also owed by PR-04 (WO11, WO10b, WO11b, 2026-09-27):** a subject observer cannot be removed, so an editor host that rebuilds a scene leaks observer slots and a reused binding slot can be driven by a stale observer, and rebinding text adds a second observer; the editor runtime uses default capacities, which the Wasm build must size; and an out-of-range `int` wraps silently when it reaches a narrower setter, so the host validates values first | PR-3R | Pending — may run ∥ PR-04 |
@@ -88,6 +89,9 @@ Licence: code BSD-2-Clause, fonts per-group. A notices row in both repos.
 - **PR-04 ∥ PR-06** — both build against §13 and `[UD-4]`. PR-06's dynamic
   construction consumes PR-04's editor registry, so **agree the registry's shape
   before either PA starts**, or one of them writes it twice.
+- **PR-4R ∥ PR-04b** — different areas (runtime, draw-arg emission and the
+  validator, against the font and image pipeline), but both touch
+  `cli/src/core/generator/emit/`. Watch that seam; serialise if it gets busy.
 - **PR-05** strictly after PR-04 **and PR-04b**. departures-board-v3's screens use
   custom BDF fonts (`NatRailTall12`, `RailClockMega13`, `NatRailClockLarge9` and
   others), so the first board migration can't finish without `bdfconv`. [Q-2]

@@ -1080,3 +1080,75 @@ as a separate paragraph.
 
 The edits were made through a worktree on `main`. PR-04's PA was on
 `u8g2gl-generator/wo11-editor-target`, and its tree was not touched.
+
+---
+
+## Session — 2026-09-28 · PR-04 merged (#5); rulings; PR-4R raised
+
+**PR-04 is merged as [#5](https://github.com/cblabs-org/u8g2gl/pull/5).** Twenty-one
+work orders. **C++ 361 tests** (one known skip), **CLI 1044 tests across 62
+files**, zero warnings, `tsc` and lint clean. Schema 0.4, CLI 0.7.0, runtime
+0.4.0. The generator emits C++ that compiles and runs, and the editor target
+emits a class registry and a scene description from the same validated build.
+
+All five rulings of 2026-09-19 were delivered: `ui_obj_` naming, styles before
+properties, container-relative bound positions, no children under a
+position-bound container, and bounds checked on what is drawn — a quarter-circle
+at a display corner passes where its full circle is refused.
+
+### Verified rather than accepted
+
+The font findings drive a permanent spec amendment, so they were checked against
+the pinned submodule instead of taken from the report. All of it holds: **2039
+`u8g2_font_*` symbols, 522 containing capitals**, every one a valid C identifier,
+none containing `__`, and **zero collisions after case-folding** — which is
+precisely why lowercasing is a trap rather than a solution. It looks safe today
+and would fold two fonts onto one alias at some future dependency bump. 191
+legacy `u8g_font_*` macros, as reported.
+
+### Rulings
+
+1. **Font names — §13.4 amended.** A `<builtin>`'s `name` is a U8G2 symbol, not
+   an author-chosen name: validated against the derived list, exempt from the
+   `[a-z][a-z0-9_]*` rule, and **not mangled**, because a U8G2 font name already
+   is the C identifier. `<bdf>` names keep the rule in full. The alias reads
+   redundantly (`ui_font_u8g2_font_helvR08_tr`), and the spec now says that
+   redundancy is the price of identity, so nobody tidies it into a collision.
+   The implementation (WO14) ran ahead of the spec on the owner's instruction;
+   the spec now matches what was built, and the PA offered to change the code
+   instead if the wording differed. It doesn't.
+2. **Legacy `u8g_font_*` stays refused.** 1.x aliases for fonts the modern names
+   already reach; accepting them would double the name surface for no capability.
+3. **Clamp bound draw-call arguments** exactly as the object path clamps them.
+   The argument is stronger than consistency: [D-18] makes realisation a
+   generator outcome and *never* an authoring category, and wrapping on one path
+   while clamping on the other makes realisation observable — which breaks the
+   decision itself. §13.5 now says so.
+4. **Inline `style_*` is restricted to §10's nine properties.** A general
+   per-element override is a different feature (§1.5).
+5. **The runtime clamps a rounded box's radius at draw time.** Where the size is
+   bound or the radius arrives through a style, the value exists only at run
+   time, and U8G2's `w - r - r` wraps below `2r`.
+6. **§13.7 now describes the editor target** — `--target-kind`,
+   `ui_editor_registry.cpp`, `ui_scene.json`, the `_editor` output directory, the
+   scene format version, and the parity test that makes the canvas pixel-exact.
+7. **Shared lookup tables belong to neither layer.** The validator and generator
+   importing each other's tables makes them mutually dependent, and whichever
+   direction someone picked first becomes permanent by accident. They move to a
+   neutral module both import. Added to the standards skill, since the PA rightly
+   noted the standards were silent.
+
+### PR-4R raised
+
+Items 3, 4, 5 and 7 are code, and they don't belong in PR-04b, which is the font
+and image pipeline — runtime clamps inside an asset-pipeline PR would be
+incoherent. They go to **PR-4R**, a small interim remediation, as PR-3R was. It
+may run alongside PR-04b; both touch `cli/src/core/generator/emit/`, so that seam
+is the thing to watch.
+
+### Owner decisions recorded by the PA
+
+WO13 (readability remediation) approved and delivered. WO10b delivered — the
+bound-label defect that would have broken the Phase 1 exit criterion. `max_len`
+stays optional: requiring it would make the runtime reserve the maximum
+everywhere and so *add* the RAM the figure was meant to expose.

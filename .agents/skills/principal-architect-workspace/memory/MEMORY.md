@@ -4,18 +4,19 @@
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — PR-01/02/03/3R merged; PR-04 generator next, awaiting PA handoff |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — PR-01/02/03/3R/04 merged (#5); PR-4R and PR-04b next; editor track (E-1..3) still placeholders |
 
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-01-runtime-core | **Complete** — 5/5 WOs, 75 tests, 0 warnings | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-01-runtime-core/PROJECT.md) |
-| pr-03-widgets | **Complete** — 9/9 WOs, merged as #3. Settled [U-1] | Firmware Runtime / Host Tooling | [PROJECT.md](../pr-03-widgets/PROJECT.md) |
-| pr-02-cli-schema | **Complete** — 6/6 WOs, 121 tests, 0 warnings. Branch tip: `u8g2gl-cli/wo6-cli-integration` (`23c2dd6`). ui_spec §15 deferred as WO7 | Host Tooling | [PROJECT.md](../pr-02-cli-schema/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
 |---|---|---|---|
+| [pr-04-generator](../pr-04-generator/PROJECT.md) | 2026-09-28 | Host Tooling / Firmware Runtime | 21 WOs, merged #5. Generator emits compiling C++, plus the editor target (registry + scene JSON). C++ 361 / CLI 1044. Every U8G2 font usable |
+| [pr-03-widgets](../pr-03-widgets/PROJECT.md) | 2026-09-10 | Firmware Runtime / Host Tooling | 9 WOs, merged #3. Settled [U-1] element identity |
+| [pr-02-cli-schema](../pr-02-cli-schema/PROJECT.md) | 2026-09-09 | Host Tooling | 6 WOs, merged #2. Schema, validator, display catalogue |
+| [pr-01-runtime-core](../pr-01-runtime-core/PROJECT.md) | 2026-09-08 | Firmware Runtime | 7 WOs, merged #1. Object model, subjects, styles, frame gate |
 | [pr-3r-remediation](../pr-3r-remediation/PROJECT.md) | 2026-09-13 | Firmware Runtime / Host Tooling | 12 WOs. Realigned merged PR-01/02/03 to [D-18]-[D-21], schema 0.4. C++ 240 / CLI 266, zero warnings. Three of four defects found by unifying duplicated logic |
 
 ## Older Projects

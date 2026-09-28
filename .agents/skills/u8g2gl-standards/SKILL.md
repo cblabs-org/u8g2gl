@@ -163,6 +163,13 @@ These come from the design spec and are enforced in review:
   counts objects and bindings from the document and emits the constants.
   `u8g2gl_config.h`'s defaults exist for hand-written use only. Do not respond to
   a capacity problem by raising a default in generated-code paths.
+- **A lookup table two layers share lives in neither of them.** `validator/` and
+  `generator/` both need the same tables — style properties, colour values, the
+  realisation rule. Copying one is worse, because [D-17] makes this knowledge
+  data and two copies drift apart. Importing across the two layers is also wrong:
+  it makes them mutually dependent, and the direction someone picks first becomes
+  permanent by accident. Put the table in a neutral module both import, such as
+  `core/schema/`.
 
 ## 4.1 Current design baseline — read before writing any element code
 
