@@ -223,35 +223,197 @@ fix it.
 
 ## Completion Report (written by the worker at task completion)
 
-```markdown
 ---
 ## Completion Report
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path` — what changed and why
+- `cli/src/node/build-bdfconv.ts` — item 1: the glue is now written as a real,
+  statically importable ES module (`bdfconv-glue.generated.ts`, a
+  `// @ts-nocheck`/`/* eslint-disable */` copy of Emscripten's own EXPORT_ES6
+  output) instead of a JSON-wrapped string loaded through a `data:` URL
+  dynamic import. `bdfconv-source.json`'s `artefacts` key is renamed to
+  match; `wasm.sha256` is byte-for-byte unchanged (rebuilt from the same
+  pinned Emscripten 5.0.3, same flags, same U8G2 commit).
+- `cli/src/data/bdfconv/bdfconv-glue.generated.ts` — regenerated artefact
+  (item 1). `bdfconv-glue.json` deleted.
+- `cli/src/data/bdfconv/bdfconv-wasm.json`, `bdfconv-source.json` —
+  regenerated/updated for the new artefact filename; wasm bytes unchanged.
+- `cli/src/data/bdfconv/runner.ts` — deleted (WO1's `data:` URL loader,
+  superseded by `bdfconv-instance.ts`).
+- `cli/src/core/fonts/bdfconv-instance.ts` — new. The low-level "boot one
+  module instance, run one conversion" glue, replacing `runner.ts`; used by
+  both `compileBdf()` and `test/bdfconv/smoke.test.ts`.
+- `cli/src/core/fonts/bdfconv-output.ts` — new. Parses bdfconv's `-b 0` C
+  output (header + the full C string-literal grammar: octal escapes,
+  adjacent-literal concatenation) into exact array bytes.
+- `cli/src/core/fonts/bdf-range.ts` — new (item 3). The `<bdf range>`
+  grammar: parse, validate, translate to bdfconv's `-m` syntax.
+- `cli/src/core/fonts/compile-bdf.ts` — new (item 2). `compileBdf()`, the
+  public API.
+- `cli/src/core/fonts/index.ts` — new. Barrel: `compileBdf` + types,
+  `parseBdfRange` + types.
+- `cli/src/core/index.ts`, `cli/src/browser/index.ts` — export the fonts
+  barrel.
+- `cli/src/core/schema/diagnostic.ts` — new code
+  `U8G2GL_MALFORMED_BDF_RANGE`.
+- `cli/src/core/validator/validate-schema.ts` — validates `<bdf range>`
+  through `parseBdfRange()`, reporting `MALFORMED_BDF_RANGE` at the font
+  declaration's location.
+- `cli/test/bdfconv/smoke.test.ts` — repointed at `bdfconv-instance.ts`.
+- `cli/test/bdfconv/provenance.test.ts` — repointed at the renamed artefact.
+- `cli/test/fonts/u8g2-oracle.test.ts` — new (item 4). 4 fonts, byte-exact
+  against `u8g2_fonts.c`, read by an independent small reader.
+- `cli/test/fonts/parity.test.ts` — new (item 5). esbuild browser bundle run
+  in a `node:vm` sandbox; 3 fonts + 2 failure cases, byte/text-identical to
+  direct Node calls.
+- `cli/test/fonts/determinism.test.ts` — new (item 6). Two child processes,
+  cwd/TZ/TMPDIR/LANG varied; identical sha256; no leaked absolute path.
+- `cli/test/fonts/bdf-range.test.ts`, `cli/test/validator/bdf-range-diagnostic.test.ts`,
+  `cli/test/fonts/compile-bdf.test.ts` — unit coverage for the grammar, the
+  validator diagnostic, header fields, every failure path, and concurrency.
 
 ### The API WO3 will call
-<!-- Exact exported names, signatures and import paths. WO3's WORKORDER is written from this. -->
+```ts
+// cli/src/core/fonts/index.ts (also re-exported from core/index.ts and browser/index.ts)
+
+export function compileBdf(input: CompileBdfInput): Promise<CompileBdfResult>;
+
+interface CompileBdfInput {
+  readonly bdf: Uint8Array;       // the BDF file's raw bytes
+  readonly identifier: string;    // the array name, passed to bdfconv's -n
+  readonly range?: string;        // the <bdf range> attribute, untranslated
+}
+
+interface CompiledFont {
+  readonly bytes: Uint8Array;         // exactly declaredLength bytes, incl. trailing NUL
+  readonly declaredLength: number;    // === bytes.length
+  readonly selectedGlyphs: number;
+  readonly totalGlyphs: number;
+  readonly fontName: string | undefined;   // never "(null)"
+  readonly copyright: string | undefined;  // never "(null)"
+}
+
+interface FontCompileFailure {
+  readonly ok: false;
+  readonly reason: string;            // human-readable; names the offending range item
+  readonly stderr: readonly string[]; // bdfconv's own stderr lines, [] if never invoked
+}
+
+type CompileBdfResult = ({ readonly ok: true } & CompiledFont) | FontCompileFailure;
+
+// Same grammar module the validator uses for <bdf range> — call it directly if WO3's
+// emitter needs to re-check a range without invoking bdfconv (it should not need to).
+export function parseBdfRange(range: string): BdfRangeResult;
+export const MAX_BDF_CODEPOINT = 0xffff;
+```
+WO3 needs no other export from `src/core/fonts/`; `bdfconv-instance.ts` and
+`bdfconv-output.ts` are internal and deliberately not re-exported.
 
 ### Measurements
-- Declared length vs literal length:
-- Oracle fonts and byte counts:
-- Timings:
-- Sweep of U8G2's -b 0 BDFs:
-- Glue-delivery change: old vs new artefact hashes; wasm sha256 unchanged?
+- **Declared length vs literal length**: always `declaredLength === literal
+  bytes + 1`. bdfconv's writer (`bdf_font.c`, `bf_WriteU8G2CByFP`) always
+  emits exactly `target_cnt-1+extra1` explicit bytes for a declared size of
+  `target_cnt+extra1` — the array's final byte is always the C compiler's
+  own implicit NUL terminator for the string literal, never a byte bdfconv
+  wrote itself. `bdfconv-output.ts` verifies this relationship on every
+  parse rather than assuming it, and fails rather than guess if it doesn't
+  hold.
+- **Oracle fonts and byte counts** (`u8g2-oracle.test.ts`, all byte-exact
+  against `extern/u8g2/csrc/u8g2_fonts.c`): `u8g2_font_4x6_tr` 723 bytes,
+  `u8g2_font_4x6_tf` 1451 bytes, `u8g2_font_4x6_tn` 152 bytes,
+  `u8g2_font_6x13_tr` 1056 bytes (different BDF family). Every `build.c` map
+  row measured for these translates losslessly into our `<bdf range>`
+  grammar: `bdf_map.c`'s optional `>map_to` override is always redundant
+  with its own default (`map_to = range_from` when `>` is omitted), and
+  every row `build.c` writes for `-b 0` fonts sets it to exactly that value,
+  so dropping it (our grammar has no `>` operator) loses nothing.
+- **Timings** (measured on this machine; instance creation included, one
+  fresh instance per call as required):
+  - `4x6.bdf`, no range: 8.3 ms; with `range="0x20-0x7F"`: 2.5 ms
+  - `unifont.bdf`, no range: 55.5 ms; with `range="0x20-0x7F"`: 52.5 ms
+- **Byte size, `range="0x20-0x7F"`, three BDF sizes**: `4x6.bdf` → 723
+  bytes; `6x13.bdf` → 1056 bytes; `unifont.bdf` → 1272 bytes.
+- **Sweep of U8G2's `-b 0` BDFs** (every `build.c` row with the `BM_T` bit,
+  364 distinct `.bdf` files under `extern/u8g2/tools/font/bdf/`, compiled
+  with bdfconv's own default map `*`, not a permanent test): **363/364
+  succeed.** One failure: `waffle-10.bdf` — bdfconv's default map (`32-255`)
+  selects zero glyphs; the BDF's own glyphs are evidently encoded outside
+  that range (`CHARSET_ENCODING "1"`, not ISO 10646 — build.c never builds
+  this file with the bare default map either; it always supplies an
+  explicit custom map for it). Not a `compileBdf()` defect — a font whose
+  encoding requires a non-default range still requires the author to supply
+  one, which is the documented contract.
+- **Glue-delivery change**: `wasm.sha256` unchanged —
+  `53b988238fd2b191e2d29dcdc1714b5f9a9761d8abc4a35cbbd1d5d06cbae982`, both
+  before and after item 1, confirming only the delivery mechanism moved.
+  Artefact hash is for a different file (`bdfconv-glue.generated.ts` vs the
+  deleted `bdfconv-glue.json`) so is not directly comparable; recorded as
+  `9fd5e9a6979d096362e922e864a84d9c399eeee59a309886d2d1584b0db30eaf`.
 
 ### Decisions Made
-- Decision and rationale
+- **Directory name** `src/core/fonts/` (as the WORKORDER already named it) —
+  kept as-is; nothing in `u8g2gl-standards` suggested otherwise for a
+  feature directory under `core/`.
+- **`bdfconv-instance.ts` lives in `src/core/fonts/`, not `src/data/bdfconv/`**
+  — it is compileBdf()'s own low-level glue, not a data artefact; only the
+  generated glue/wasm/source-provenance files stay in `data/bdfconv/`.
+- **`range` grammar has no `>map_to` operator** — the WORKORDER's own
+  examples (build.c's map rows) never need one that isn't redundant with
+  the default, and adding it would mean `<bdf range>` could silently
+  reindex a font's array positions, a much larger authoring surface than
+  "which glyphs are included." Left out; flagged to the PA if a future WO
+  needs it (see Out-of-Scope Findings).
+- **Max codepoint 0xFFFF** — measured from `bdf_font.h`'s
+  `tga_draw_glyph(unsigned x, unsigned y, uint16_t encoding, ...)`: nothing
+  above a `uint16_t` can ever be rendered by bdfconv's own glyph selection,
+  so validating it here (rather than letting bdfconv truncate silently) is
+  strictly more honest.
+- **Concurrency test also runs the same inputs sequentially** and asserts
+  concurrent results match their sequential counterparts, not just that
+  they don't throw — a subtler race (e.g. two instances sharing global
+  Emscripten state) would produce wrong bytes without an exception.
+- **Parity test rebuilds the input `Uint8Array` inside the vm sandbox's own
+  realm** rather than passing the host's instance across — avoids any
+  cross-realm `instanceof` assumption the bundled Emscripten glue might
+  make, and is closer to what a real browser page would do (its own
+  `Uint8Array`, not one from another realm).
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, what to avoid
+- **`vm.createContext(sandbox)` does not reflect built-ins back onto the
+  sandbox object** — `sandbox.Uint8Array` is `undefined` from the host side
+  even though code *running inside* the context sees it fine. Fetch such
+  values as the completion value of a tiny script run in that context
+  (`vm.runInContext('Uint8Array', sandbox)`) instead of reading them off
+  the object you passed to `createContext`.
+- **The first oracle-test reader attempt stopped at the wrong `;`** — a
+  literal `;` byte can appear unescaped inside a compiled font array
+  (ASCII, not one of bdfconv's always-escaped bytes), so a naive
+  `[\s\S]*?;` regex for "read up to the end of the statement" truncates
+  early. The real end is `";` (closing quote immediately followed by
+  semicolon) — checked in both the oracle test's independent reader and
+  (already correctly, by construction) in `bdfconv-output.ts`.
+- **bdfconv never emits `\"` or `\\`** — bytes 34 and 92 are always in its
+  octal-escaped set (`bf_WriteU8G2CByFP`'s condition list), so a backslash
+  in its output is always followed by 1–3 octal digits and nothing else.
+  Simplifies the parser considerably versus handling the full general C
+  escape grammar; said so in `bdfconv-output.ts`'s file header rather than
+  leaving it implicit.
 
 ### Out-of-Scope Findings
-- Finding and suggested action
+- **`waffle-10.bdf`** (and potentially other BDFs with non-default
+  encodings) needs an explicit `range` to compile through `compileBdf()` —
+  expected given the documented contract, but worth a note for whichever WO
+  writes end-user documentation (WO5): the default range is not universally
+  safe, unlike U8G2's own `build.c`, which always supplies an explicit map
+  for such fonts.
+- **`>map_to` is unsupported** in `<bdf range>` (see Decisions Made). Every
+  case measured against `build.c` doesn't need it, but a future author
+  wanting to remap a font's array indices (not just filter which glyphs
+  are included) would need a schema change. Flag for the PA/owner if it
+  comes up; not needed for WO3.
 
 ### Blockers
 (none)
-```
