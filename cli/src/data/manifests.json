@@ -61,6 +61,6 @@
   },
   {
     "filename": "u8g2gl_xbm.xml",
-    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_xbm\" extends=\"u8g2gl_obj\">\n  <api>\n    <prop name=\"src\" type=\"image\" setter=\"set_src\" required=\"true\"\n          help=\"Monochrome XBM image asset source.\" />\n    <prop name=\"bitmap_mode\" type=\"enum\" setter=\"set_bitmap_mode\"\n          values=\"solid,transparent\" default=\"solid\"\n          emit=\"U8G2GL_BITMAP_MODE_{VALUE^^}\"\n          help=\"Bitmap rendering mode (solid background or transparent).\" />\n  </api>\n</widget>\n"
+    "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<widget name=\"u8g2gl_xbm\" extends=\"u8g2gl_obj\">\n  <api>\n    <!-- `bitmap_mode` is NOT declared here: u8g2gl_obj declares it identically\n         and every element inherits it. A redeclaration would be a second\n         spelling of one property, which is what [D-17] exists to prevent. -->\n    <prop name=\"src\" type=\"image\" setter=\"set_src\" required=\"true\"\n          help=\"Monochrome XBM image asset source.\" />\n  </api>\n</widget>\n"
   }
 ]

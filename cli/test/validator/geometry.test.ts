@@ -6,8 +6,11 @@
  * File: test/validator/geometry.test.ts
  * Purpose: Verification tests for Pass 6 layout geometry and bounds validation (§7.2, §15.1).
  * Description: Asserts detection of over-constrained anchors (simultaneous specification
- *              of origin, dimension, and opposite edge) and checks out-of-bounds positioning
- *              against target display catalogue resolutions.
+ *              of origin, dimension, and opposite edge) and of out-of-bounds positioning.
+ *              Bounds are checked against the element's **immediate containing
+ *              element** ([D-20]), which is the display only for a screen-level
+ *              element: a child of a composite or a box is held to that
+ *              container's rectangle, not to the target display's resolution.
  */
 
 import { describe, expect, it } from 'vitest';

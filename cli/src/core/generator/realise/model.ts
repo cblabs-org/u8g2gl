@@ -180,7 +180,11 @@ export type VisibilityTerm =
       readonly kind: 'ancestor_visible';
       /** That ancestor's index in the screen's object array. */
       readonly objectIndex: number;
-      /** Its C++ identifier (§13.4). */
+      /**
+       * That ancestor's mangled name (§13.4) — **not** its C++ variable, which
+       * is this value prefixed with `ui_obj_` (see `emit/screen.ts`'s
+       * `objectIdentifier()`).
+       */
       readonly identifier: string;
     }
   | {
@@ -194,7 +198,13 @@ export type VisibilityTerm =
 export interface RealisedElement {
   /** The expanded element this decision is about — its source, name and instantiation chain. */
   readonly element: ExpandedElement;
-  /** Its C++ identifier (§13.4), prefixed by each enclosing instance. Empty when unnamed. */
+  /**
+   * Its mangled name (§13.4): the author's `name`, prefixed by each enclosing
+   * composite instance. Empty when unnamed. This is **not** the emitted C++
+   * variable — that is this value prefixed with `ui_obj_`, applied by
+   * `emit/screen.ts`'s `objectIdentifier()`. Grepping generated C++ for this
+   * string alone will not find the declaration.
+   */
   readonly identifier: string;
   /** What it becomes (§13.5). */
   readonly realisation: Realisation;

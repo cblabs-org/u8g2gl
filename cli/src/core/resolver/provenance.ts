@@ -12,7 +12,7 @@
  *          of "which instance", shared by expansion, mangling and the validator
  *          passes that run on the expanded tree.
  * Description: An instantiation site records one composite instance: its tag,
- *              its name as written, the C++ identifier its children are
+ *              its name as written, the mangled name its children are
  *              prefixed with, and where it is written. A chain of sites,
  *              outermost first, locates an element through nested composites.
  *              Diagnostics keep their own location (the element in its
@@ -36,7 +36,7 @@ export interface InstantiationSite {
   readonly tag: string;
   /** The instance's `name` as written, e.g. `clk`. */
   readonly name: string;
-  /** The instance's own C++ identifier, which prefixes its children (§13.4) — e.g. `bar_clk`. */
+  /** The instance's own mangled name, which prefixes its children (§13.4) — e.g. `bar_clk`. Emission adds `ui_obj_`. */
   readonly identifier: string;
   /** Where the instance element is written. */
   readonly loc?: SourceLocation;

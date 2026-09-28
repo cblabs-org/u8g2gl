@@ -8,7 +8,7 @@
  *          elements. A composite's `<view>` is a template ([D-18]); until it is
  *          copied into each instance with the instance's arguments substituted,
  *          nothing downstream can know what a `$title_subject` binds, where
- *          `right="52"` puts an element, or what its C++ identifier is. Doing it
+ *          `right="52"` puts an element, or what its mangled name is. Doing it
  *          once, here, is what lets the type checker, the geometry check and —
  *          from WO8 — realisation and flattening all see the same tree.
  * Description: For each composite instance:
@@ -125,7 +125,11 @@ export interface ExpandedElement {
   readonly source: WidgetNode;
   /** The `name` as written; empty when the element has none. */
   readonly name: string;
-  /** The C++ identifier (§13.4): `name`, prefixed by each enclosing instance. Empty without a name. */
+  /**
+   * The mangled name (§13.4): `name`, prefixed by each enclosing instance.
+   * Empty without a name. It is **not** the emitted C++ variable — emission
+   * prefixes it with `ui_obj_` (`emit/screen.ts`'s `objectIdentifier()`).
+   */
   readonly identifier: string;
   /** Composite instances this element was expanded through, outermost first; empty at screen level. */
   readonly instantiation: readonly InstantiationSite[];

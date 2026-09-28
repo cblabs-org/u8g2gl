@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_xbm" extends="u8g2gl_obj">
   <api>
+    <!-- `bitmap_mode` is NOT declared here: u8g2gl_obj declares it identically
+         and every element inherits it. A redeclaration would be a second
+         spelling of one property, which is what [D-17] exists to prevent. -->
     <prop name="src" type="image" setter="set_src" required="true"
           help="Monochrome XBM image asset source." />
-    <prop name="bitmap_mode" type="enum" setter="set_bitmap_mode"
-          values="solid,transparent" default="solid"
-          emit="U8G2GL_BITMAP_MODE_{VALUE^^}"
-          help="Bitmap rendering mode (solid background or transparent)." />
   </api>
 </widget>

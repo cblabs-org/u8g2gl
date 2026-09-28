@@ -375,8 +375,16 @@ function synthesiseName(
   context: WidgetParseContext,
 ): void {
   // --- Step 1: Reduce the tag to a §13.4-conformant identifier stem ---
-  // Strip framework and custom widget prefixes (u8g2gl_, wd_, ui_) so the
-  // auto-generated identifier conforms to §13.4 and passes name validation.
+  // Strip `u8g2gl_` and `ui_` — §13.4's reserved prefixes, so an auto-generated
+  // name built from the tag would be rejected by name validation — and,
+  // separately, `wd_`. `wd_` is NOT reserved: it is deliberately absent from
+  // RESERVED_IDENTIFIER_PREFIXES (Chief Architect ruling 2026-09-16, see
+  // resolver/mangle.ts), because by [D-12] a tag *is* its C++ class name and
+  // `wd_` names classes users write (§6.6). It is stripped here only because
+  // `wd_service_list`'s unnamed child reads better as `service_list_0` than as
+  // `wd_service_list_0` — a readability choice, not a reservation. Do not
+  // "reconcile" this list with the reserved one by adding `wd_` back; that
+  // regression has already been made once.
   const baseTag = (el.name.replace(/^(u8g2gl_|wd_|ui_)/, '') || el.name)
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_')

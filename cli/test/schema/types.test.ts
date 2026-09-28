@@ -94,7 +94,13 @@ describe('Schema Types', () => {
   });
 
   describe('Diagnostic types and codes', () => {
-    it('contains all 23 required diagnostic codes with correct U8G2GL prefixes', () => {
+    // The title used to claim "all 23" codes. It was never all of them — it is a
+    // spot-check of the twenty-three the schema shipped with, and `DiagnosticCode`
+    // has carried more since (WO11b and WO12 added several). Naming it as the
+    // subset it is, and asserting the *whole* set's prefix rule separately below,
+    // is what the old title was reaching for. Do not renumber it as codes are
+    // added — that is the other test's job.
+    it('pins the twenty-three codes the schema shipped with to their exact strings', () => {
       const expectedCodes: Record<string, DiagnosticCode> = {
         UNKNOWN_FONT: 'U8G2GL_UNKNOWN_FONT',
         UNKNOWN_IMAGE: 'U8G2GL_UNKNOWN_IMAGE',
@@ -123,6 +129,23 @@ describe('Schema Types', () => {
 
       for (const [key, value] of Object.entries(expectedCodes)) {
         expect(DIAGNOSTIC_CODES[key as keyof typeof DIAGNOSTIC_CODES]).toBe(value);
+      }
+    });
+
+    it('gives every code in DiagnosticCode the U8G2GL_ prefix, with one recorded exception', () => {
+      // §15.3 and [D-16] make the code string a stable public API, so every entry
+      // must be `U8G2GL_` + its key. The single exception is deliberate and
+      // documented on the constant: `UNRESOLVED_VALUE` keeps the code string
+      // `U8G2GL_UNRESOLVED_GEOMETRY` because the key was renamed in WO11b and
+      // renaming the code would have broken every consumer branching on it.
+      const renamedKeys: Readonly<Record<string, DiagnosticCode>> = {
+        UNRESOLVED_VALUE: 'U8G2GL_UNRESOLVED_GEOMETRY',
+      };
+
+      const entries = Object.entries(DIAGNOSTIC_CODES);
+      expect(entries.length).toBeGreaterThan(0);
+      for (const [key, code] of entries) {
+        expect(code).toBe(renamedKeys[key] ?? `U8G2GL_${key}`);
       }
     });
 

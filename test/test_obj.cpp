@@ -7,7 +7,28 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_obj.cpp
- * Description: Implementation of test_obj.cpp
+ * Purpose: Holds u8g2gl_obj — the base every widget inherits — to the two
+ *          contracts the rest of the library assumes without checking. First,
+ *          that every mutator which changes what is drawn calls mark_dirty(),
+ *          and that one which changes nothing does not: §11.2 gates
+ *          sendBuffer() on the frame dirty flag, so a missed mark_dirty()
+ *          leaves the display stale on a static screen and works on an animated
+ *          one — a defect that has already shipped once (set_hidden(),
+ *          set_disabled()). Second, that the flat parent-index hierarchy answers
+ *          "am I visible?" and "where may I draw?" correctly, since no widget
+ *          walks it itself.
+ *
+ * Description: Geometry and the per-axis setters, including the [D-20] bound
+ *              geometry rules (a bound position adds its container's origin, a
+ *              bound size does not, and the sum is clamped rather than each
+ *              term); flags, dirty tracking and object size; a mark_dirty()
+ *              pair — changed and unchanged — for every setter on the object
+ *              and its style; style application; parent index; the default
+ *              tick/render lifecycle. Then the hierarchy helpers in
+ *              u8g2gl_tree.h (effective visibility, effective clip, rectangle
+ *              intersection), the u8g2gl_state_saver RAII guard, and the
+ *              partial-refresh tile arithmetic, whose off-display and
+ *              non-tile-aligned cases are the ones that produce stale columns.
  */
 #include <gtest/gtest.h>
 #include <iostream>

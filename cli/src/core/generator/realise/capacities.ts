@@ -78,7 +78,11 @@ export interface Capacities {
   readonly busiestScreen?: string;
   /** `U8G2GL_MAX_BINDINGS_PER_OBJ` — the most any one object needs. */
   readonly maxBindingsPerObject: number;
-  /** The object that needs it, by C++ identifier; absent when nothing binds. */
+  /**
+   * The object that needs it, by mangled name (§13.4) — the XML element's name,
+   * **not** the emitted C++ variable, which is this value prefixed with
+   * `ui_obj_`. Reported verbatim in the generated config's note.
+   */
   readonly busiestObject?: string;
   /** `U8G2GL_MAX_TOTAL_BINDINGS` — the true sum, never objects × max ([D-21]). */
   readonly totalBindings: number;
