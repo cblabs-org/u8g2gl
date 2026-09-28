@@ -410,16 +410,16 @@ TEST(GeneratedFixture, ABoundPositionClampsTheSameWhicheverWayItIsRealised) {
     // a generator outcome, so it must not be observable. track's knob and
     // readout carry the same binding, bind_x="$position" (knob_x), inside the
     // same container (track, x=40), and are realised differently: knob is a
-    // draw call, readout an object. They cannot be one class today -- a drawing
+    // draw call, readout an object. They cannot be one class today — a drawing
     // element has no class to be an object of, and the §13.5 conditions that
-    // would force one (<event_cb>, <focus_ring>) are refused until PR-09 -- so
+    // would force one (<event_cb>, <focus_ring>) are refused until PR-09 — so
     // the comparison is of the position each realisation resolves the binding
     // to: the object's clamped x, and the x the draw call hands U8G2.
     //
     // Out of range, the object path clamps the **sum** into int16_t (Chief
     // Architect, 2026-09-19). Before WO4 the draw call passed 40 + 40000 to an
     // int16_t parameter and it wrapped: U8G2 was given 40040 where the object
-    // stood at 32767, and for 40 - 40000 it was given 25576 -- on screen --
+    // stood at 32767, and for 40 - 40000 it was given 25576 — on screen —
     // where the object stood at -32768. dot, on the screen itself (origin 0),
     // wrapped the same way, to 40000 and 25536.
     //

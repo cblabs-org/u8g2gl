@@ -29,8 +29,8 @@
  *          - a SIZE (width, height, length, circle radius) — u8g2gl_coord_size():
  *            <= 0 is refused (nothing to draw), and so is a size u8g2_uint_t
  *            cannot hold; the caller then draws nothing;
- *          - a BOUND (clip-window corner, clipped line end point) —
- *            u8g2gl_coord_clamp(): clamped into range;
+ *          - a RANGE-CLAMPED VALUE (clip-window corner, clipped line end
+ *            point) — u8g2gl_coord_clamp(): clamped into range, never wrapped;
  *          - a rounded box's CORNER RADIUS — u8g2gl_coord_corner_radius():
  *            clamped to 2r <= min(w, h) of the shape being drawn, because U8G2
  *            draws far outside the box beyond that (PR-4R WO3);
@@ -187,7 +187,8 @@ inline bool u8g2gl_coord_size(int32_t value, u8g2_uint_t& out) {
 }
 
 /**
- * @brief Clamp a BOUND into U8G2's coordinate range.
+ * @brief Convert a RANGE-CLAMPED VALUE by clamping it into U8G2's coordinate
+ *        range.
  *
  * For clip-window corners and clipped line end points, which must not wrap (see
  * u8g2gl_coord_pos()). A rounded box's corner radius has a tighter bound that

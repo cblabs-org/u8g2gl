@@ -46,12 +46,12 @@
  *              (validate-identifiers.ts), not collisions. Isomorphic.
  *
  * Exports:
- * - RESERVED_IDENTIFIER_PREFIXES: §13.4's reserved prefixes
+ * - RESERVED_IDENTIFIER_PREFIXES:     §13.4's reserved prefixes
  * - CPP_KEYWORDS:                     §13.4's reserved keywords (re-exported from schema/cpp-keywords.ts)
  * - SCREEN_FUNCTIONS, SCREEN_TABLES:  Suffixes of each screen's generated symbols
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
- * - OBJECT_IDENTIFIER_PREFIX:          `ui_obj_`, the emitted objects' family
+ * - OBJECT_IDENTIFIER_PREFIX:         `ui_obj_`, the emitted objects' family
  * - EDITOR_REGISTRY_FUNCTION, UI_INIT_FUNCTION, SUBJECTS_INIT_FUNCTION,
  *   STYLES_INIT_FUNCTION, RUNTIME_HANDLER_FUNCTION: the fixed names in the `ui_`
  *   namespace, each spelled once and each in the collision table

@@ -57,6 +57,17 @@
  *              | triangle edges)                         | in signed arithmetic,   |
  *              |                                         | then u8g2gl_coord_clamp;|
  *              |                                         | never wrapped           |
+ *              | rounded box corner radius               | u8g2gl_coord_corner_    |
+ *              | (u8g2gl_draw_box)                       | radius(): clamped to    |
+ *              |                                         | 2r <= min(w, h); one    |
+ *              |                                         | that clamps to 0 draws  |
+ *              |                                         | square                  |
+ *
+ *              A bound value comes one step earlier: generated code clamps each
+ *              bound integer argument through u8g2gl_coord_bound() — origin plus
+ *              subject value, clamped into int16_t — before it reaches these
+ *              functions, exactly as the object path clamps a bound position
+ *              (§13.5). The conversions above then apply to the result.
  *
  *              The same rules apply to the widgets that issue these U8G2 calls
  *              directly. Two exceptions to the wrap: u8g2gl_apply_clip() clamps
@@ -104,11 +115,11 @@ enum u8g2gl_draw_segment_t : uint8_t {
 
 /**
  * @brief Draw a box (filled or outline rectangle), optionally with rounded
- * corners.
+ * corners, its radius clamped to the box.
  *
  * Matches `include/u8g2gl/manifests/u8g2gl_box.xml`: `filled` selects between
- * U8G2's `drawBox`/`drawFrame`, and `radius > 0` selects the rounded variants
- * `drawRBox`/`drawRFrame` instead.
+ * U8G2's `drawBox`/`drawFrame`, and a radius still `> 0` after clamping selects
+ * the rounded variants `drawRBox`/`drawRFrame` instead.
  *
  * @param display U8G2 display context to draw into.
  * @param x       Left edge, in device pixels.
@@ -116,7 +127,10 @@ enum u8g2gl_draw_segment_t : uint8_t {
  * @param width   Width in pixels. `<= 0` draws nothing.
  * @param height  Height in pixels. `<= 0` draws nothing.
  * @param filled  Whether the box is filled or an outline frame.
- * @param radius  Corner radius in pixels. `<= 0` draws square corners.
+ * @param radius  Corner radius in pixels. `<= 0` draws square corners. A radius
+ *                past `2r <= min(width, height)` is clamped down to that bound,
+ *                not refused, and one that clamps to 0 (a 1-pixel side) draws
+ *                square corners; see u8g2gl_coord_corner_radius().
  */
 void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
                       int16_t height, bool filled = true, int16_t radius = 0);

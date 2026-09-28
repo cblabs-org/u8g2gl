@@ -470,7 +470,7 @@ bool editor_host::draw_call(U8G2& display, const scene_json& element) {
             arg = u8g2gl_editor_read_subject(slot->base, slot->type);
             // A bound integer is placed exactly as firmware places it: firmware
             // draws `u8g2gl_coord_bound(origin, subject.get())`, so the host
-            // calls the same helper -- the object path's clamp -- rather than
+            // calls the same helper — the object path's clamp — rather than
             // adding the origin itself (§13.5, PR-4R WO4). A bound position is
             // container-relative (§7.2) and carries its origin in the scene; a
             // size carries none and clamps with 0, as firmware spells it.
