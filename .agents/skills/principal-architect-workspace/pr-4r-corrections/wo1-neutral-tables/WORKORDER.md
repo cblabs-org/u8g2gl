@@ -72,7 +72,7 @@ Separately, **`CPP_KEYWORDS`** exists twice: `resolver/mangle.ts` and
 
 ## Line-Item Instructions
 
-- [ ] **Measure the baseline first**, in this worktree, each suite alone: CLI `npx vitest run`
+- [x] **Measure the baseline first**, in this worktree, each suite alone: CLI `npx vitest run`
       (PA measured **1055 tests / 62 files**), `tsc`, lint; C++ `cmake --build build` (0 warnings)
       and `ctest` (**362, one known skip `SizeOfReport.ThirtyTwoBitTarget`**). If your numbers
       differ, record both and continue.
@@ -82,7 +82,7 @@ Separately, **`CPP_KEYWORDS`** exists twice: `resolver/mangle.ts` and
       `manifest/` and `resolver/`; confirm that. Keep `generator/index.ts`'s public re-exports
       working (re-exporting from `../realise/` is the allowed direction), so the package's public
       API surface is unchanged.
-- [ ] **Move the shared tables into `cli/src/core/schema/`**, next to the data they describe:
+- [x] **Move the shared tables into `cli/src/core/schema/`**, next to the data they describe:
   - the draw-colour **values** beside `DrawColor` in `schema/globals.ts`, as one `const` list the
     `DrawColor` type is derived from, so the type and the list cannot drift. The C++ enumerator
     spellings (`U8G2GL_COLOR_*`) are emission knowledge and **stay in `emit/value.ts`**, keyed so
@@ -94,7 +94,7 @@ Separately, **`CPP_KEYWORDS`** exists twice: `resolver/mangle.ts` and
   - `namedStyles()` beside `WidgetNode` in `schema/widget-node.ts`;
   - `CPP_KEYWORDS` into one schema module, used by both `resolver/mangle.ts` and
     `validator/validate-identifiers.ts`; delete the second copy.
-- [ ] **If any two copies of a table differ when you unify them, STOP and report** in the
+- [x] **If any two copies of a table differ when you unify them, STOP and report** in the
       Completion Report — which entries, where. Do not pick one. A difference is a finding, not a
       merge conflict. (Re-diff `CPP_KEYWORDS` yourself before deleting a copy.)
 - [ ] **Add a layering test**, `cli/test/architecture/layering.test.ts` (or the nearest existing
@@ -132,7 +132,7 @@ No behaviour change of any kind: no message wording, no diagnostic codes, no ord
 - [ ] Layering test added, and shown to fail on a re-added forbidden import
 - [ ] Every pre-existing test passes; test-file diffs are import lines only (show `git diff --stat`
       of `cli/test/` and confirm)
-- [ ] Goldens unchanged
+- [x] Goldens unchanged
 
 ## Verification Requirement
 
@@ -150,6 +150,103 @@ Out-of-scope findings go in the Completion Report. Do not fix, do not file.
 
 ## Completion Report
 
-*(Worker fills this in: status; baseline and final counts; where each table landed and why; any
-difference found between copies; the layering test and proof it bites; test-file diff stat;
-golden diff; built-CLI run; boundary; findings.)*
+**Status: PARTIAL — stopped at the realise move, as the brief requires.** Tables done and
+committed green (`e32830f`). The `realise/` move, and the layering test that depends on it, are
+**not committed**: the move needs one test edit that is not an import line. Awaiting the PA's
+ruling (below); ready to finish in minutes once given.
+
+### The blocker
+
+`cli/test/validator/validator-alignment.test.ts:255–258`, *"declares the object ceiling once"*,
+scans `src/core` and asserts that `MAX_OBJECTS_PER_SCREEN` is declared in exactly
+`'generator/realise/model.ts'`. That is an assertion, not an import, and it pins the very path
+ruling A moves. Trial run of the full move (every importer updated, `tsc` clean):
+
+```
+× ... declares the object ceiling once
+AssertionError: expected [ 'realise/model.ts' ] to deeply equal [ 'generator/realise/model.ts' ]
+Tests  1 failed | 1054 passed (1055)
+```
+
+It is the **only** failure. The ceiling is still declared once; only its path moved, so this is
+not a behaviour change, but the rule says a test may change its import lines only, so the choice
+is the PA's. The one-line change needed: `'generator/realise/model.ts'` → `'realise/model.ts'`.
+No other test depends on a moved path: the other source-scanning guards (style spellings only in
+`schema/globals.ts`, reserved prefixes only in `resolver/mangle.ts`, `TOO_MANY_OBJECTS` raised
+only in `validate-realisation.ts`) all still pass.
+
+The trial is kept, uncommitted, as `tmp/wo1/realise-move-trial.patch` in the worktree
+(git-ignored): `git mv` with history, the four `File:` headers, and every importer (3 validator,
+2 generator, `generator/index.ts`'s `export * from '../realise/index.js'`, 2 report, 8 emit).
+Still to do on resumption: the test line above, `generator/index.ts:17`'s header comment, the
+layering test, and a commit. Confirmed during the trial: `realise/` imports only `schema/`,
+`manifest/` and `resolver/`.
+
+### Baseline and final counts (each suite alone)
+
+| | Baseline @ `d5174c5` | After `e32830f` |
+|---|---|---|
+| CLI `vitest` | 1055 / 62 files | 1055 / 62 files |
+| `tsc --noEmit`, `npm run lint` | clean | clean |
+| C++ `cmake --build build` | 0 warnings | 0 warnings |
+| `ctest` | 362, 1 known skip (`SizeOfReport.ThirtyTwoBitTarget`) | same |
+
+Same as the PA's figures.
+
+### Where each table landed
+
+| Table | Was | Now | Why there |
+|---|---|---|---|
+| draw-colour values | `COLOR_VALUES` in `emit/value.ts`, derived from the enumerator map | `COLOR_VALUES = ['0','1','xor'] as const` in `schema/globals.ts`; `DrawColor = (typeof COLOR_VALUES)[number]` | beside the type, so the type is derived from the list |
+| `U8G2GL_COLOR_*` spellings | `emit/value.ts`, `Record<string,string>` | stays in `emit/value.ts`, now `Record<DrawColor,string>` | emission knowledge; the compiler requires one enumerator per value |
+| `styleProperties()` | `emit/styles.ts` | `schema/globals.ts`, beside `STYLE_PROPERTIES` | reads that table and `StyleDecl` only |
+| `FLAG_COMPARISONS` | `emit/screen-model.ts` | `schema/widget-node.ts`, beside `BindingChild` | keyed by `BindingChild.type`, so the module that owns the directive's shape owns what it may compare |
+| `namedStyles()` | `emit/screen-model.ts` | `schema/widget-node.ts`, beside `WidgetNode` | reads `WidgetNode` only |
+| `CPP_KEYWORDS` | two copies: `resolver/mangle.ts`, `validator/validate-identifiers.ts` | one, new `schema/cpp-keywords.ts` | no existing schema module owns C++ spelling rules; `mangle.ts` re-exports it, because `resolver/index.ts` is outside the box and the public `CPP_KEYWORDS` export must not move |
+
+Two small, behaviour-identical adjustments that the typing forced:
+`validate-widget-props.ts` now reads `(COLOR_VALUES as readonly string[]).includes(value)`, the
+house precedent set by `RECTANGLE`. `value.ts` still looks a colour up by the raw string, through a
+string-keyed view of the typed map, so its semantics are exactly as before (see finding 1).
+Three comments the move made stale were corrected (`validate-types.ts` ×2, `editor-registry.ts` ×1).
+
+### Differences between copies
+
+**None.** I re-diffed `CPP_KEYWORDS` myself (`tmp/wo1/diff-keywords.mjs`): 93 entries each, no
+entry in only one, same order. The new module was diffed against the mangle copy the same way:
+identical. The colour values also matched their only other statement, the old `DrawColor` union
+(`'0' | '1' | 'xor'`).
+
+### Layering test
+
+**Not yet written.** It cannot pass until `realise/` moves: three validator files import
+`generator/realise/` today. It will be written on resumption, and shown to fail on a re-added
+forbidden import at that point.
+
+### Tests, goldens, CLI, API, boundary
+
+- Test-file diff `main..HEAD -- cli/test`: `emit-editor.test.ts | 3 ++-`, the import of
+  `FLAG_COMPARISONS` only. No assertion touched.
+- Goldens: `refresh-goldens.mjs` through a fresh `dist/` → `git diff` of
+  `test/generated_fixture/` and `cli/test/generator/fixtures/`: **0 lines**.
+- Built CLI, against the base's captured output: `validate`, `--json validate`,
+  `generate --check` (firmware and editor), and full `generate --out` for both targets: all
+  **byte-identical** (`tmp/wo1/cli-compare.sh`). Note that `generate --check` exits 1 at the base
+  as well, because goldens are stamped `0.0.0-golden` and the CLI stamps `0.7.0`. That is
+  expected, and it is the only difference.
+- Public API: runtime export names of `dist/core/index.js`, 156 before and after, identical.
+- `git diff --name-only main..HEAD`: my commit touches only Boundary-Box paths (`generator/emit/`
+  import lines and moved exports, `schema/`, `validator/`, `resolver/mangle.ts`, one test import).
+  The `.agents/.../pr-4r-corrections/` entries come from the PA's ledger commit `d5174c5`.
+
+### Findings (out of scope, not fixed)
+
+1. **`emit/value.ts` colour lookup reads the prototype chain.** `COLOR_ENUMERATORS[value]` on a
+   plain object literal returns `Object`'s constructor for `value = 'constructor'` (or
+   `'toString'`, …) instead of `undefined`, so `cppValue` would emit a function's source rather
+   than throw. It cannot happen today, because Pass 4 refuses any colour outside `COLOR_VALUES`
+   first. I kept the behaviour unchanged. A `Map` or an `isDrawColor` guard would close it.
+2. **Source-scanning tests pin file paths.** `validator-alignment.test.ts` (this blocker) and
+   `validator-hardening.test.ts` (`schema/globals.ts`, `resolver/mangle.ts`, …) assert where a
+   thing is declared by path. That is valuable, but it makes every move a test edit. A future
+   refactor rule could say that such path literals count as import-like.
