@@ -140,35 +140,57 @@ Anything outside the boundary box goes under *Out-of-Scope Findings*. Do not
 file issues and do not fix it.
 
 ---
-
-## Completion Report (written by the worker at task completion)
-
-```markdown
----
 ## Completion Report
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Review items
 | Item | Done / skipped | Note |
 |---|---|---|
+| P2 budget.ts orphaned `flashLines` banner | Done | Stray line removed, banner restored above `flashLines`. Also corrected the header's "Any flash figure" (Observation 4). |
+| P2 compile-project-assets.ts stale `images.ts` pointers (4) | Done | Reworded to stand alone. |
+| P2 cli.ts editor-target comment | Done | Replaced with the reviewer's wording. |
+| P2 CMake / stub `U8G2_FONT_SECTION` location | Done | Verified: defined in `u8g2.h:188`, forwards to `u8x8.h`'s `U8X8_FONT_SECTION`. |
+| P2 validate-not-yet-supported.ts | Done | "decision 1 fixes the set"; misplaced bullet removed. `diagnostic.ts` line wrap fixed. |
+| P2 emit/images.ts "now" | Done | Reworded as instructed; code untouched. |
+| P3 stale headers (load-project, cli, validate-schema, generate `@param`) | Done | |
+| P3 `Exports:` lists (png-to-xbm, convert-decl, bdfconv-instance) | Done | `bdfconv-output.ts` already matched. |
+| P3 build-bdfconv.ts flag rationale | Done | All nine emcc flags now explained; workspace pointers dropped; provenance test named. |
+| P3 compile-bdf.ts `-b 0` / `-f 1` | Done | From bdfconv `main.c` help text (see Decisions). |
+| P3 emitFontsUnit and compileProjectAssets step breakdowns | Done | |
+| P3 `mode` cast why-comment | Done | |
+| P3 `~line 605` | Done | Dropped. |
+| P3 minor doc defects (prefix wording, fragment, images.ts params, `.image`/`.font` docs, `HEIGHT_DEFINE`) | Done | |
+| P3 history narration, source | Done | Every listed file. |
+| P3 history narration, tests, C++ tests, CMake, stub | Done | Titles changed as well as comments; no CI or script filters on them. |
+| P3 no-ticket-numbers header | Done | Release note dropped; one sentence on the regex kept. |
+| P4 byteLines helper, `locOf` reuse, `module` rename, `headerMatch[1]!`, unreachable `continue` | Skipped | Each is a code edit, not a comment; the box says comments only outside B1-B3. |
 
-### B1–B3
-- B1:
-- B2 (which prefixes got the boundary rule):
-- B3 (npm pack listing, stale files):
+### B1-B3
+- B1: `isInsideProject` compares `realpathSync` of root and target; an unresolvable (absent) target falls back to the old lexical check, so missing-file behaviour is unchanged. Tests: escaping symlink treated as outside (fails without the fix), in-project symlink still read, project root reached through a symlink still works. Commit d488648.
+- B2 (which prefixes got the boundary rule): only `ofl` (`/^ofl(?:$|[._-])/`). `license`, `licence` and `copying` stay loose: `COPYING3` and `LICENSES.txt` are real licence names a boundary rule would reject. Tests accept `OFL`, `OFL.txt`, `OFL-1.1.txt`, `ofl_license`; reject `oflow.txt`, `offer.txt`, `oflx`. Commit d327038.
+- B3 (npm pack listing, stale files): `build` is now `node scripts/clean-dist.mjs && tsc`. `npm pack --dry-run` lists no `bdfconv-glue.json` and no file without a source; a planted `dist/zz-stale.txt` is gone after a build. Test in `cli/test/packaging/clean-build.test.ts`. Commit 3d4e8ff.
 
 ### Generated output
-- Fixture regenerates byte-identically? Any B2 effect?
+- Fixture regenerates byte-identically? Yes: `refresh-goldens.mjs` reports every file unchanged and `git status` is clean afterwards. `git diff --stat` on the fixtures is empty. No emitted string was edited. Any B2 effect: none on the fixtures (no `ofl*` file beside a fixture BDF).
 
 ### Suite counts
-- CLI / C++ / warnings:
+- CLI / C++ / warnings: CLI 1281 passed (baseline 1268; +13 new tests), lint and `tsc` clean, build clean. C++ 383 passed, 1 skipped (`SizeOfReport.ThirtyTwoBitTarget`), zero warnings.
 
 ### Decisions Made
+- `-b 0` and `-f 1`, quoted from `extern/u8g2/tools/font/bdfconv/main.c`: `-b 0` is "Most compact, glyph bitmap is minimal" (modes 1-3 pad to the font's height/width); `-f 1` is "u8g2 font" (`0` is a ucglib font, `2` an uncompressed 8x8 font forcing `-b 3`). Recorded as a block comment above the argv in `compile-bdf.ts`. I did not repeat the review's claim that `-b 0` is "what U8G2's shipped fonts use", which I could not verify from the source.
+- `ofl` only got the boundary rule (reason above).
+- P4 code edits skipped (boundary box).
+- Absent target in `isInsideProject`: lexical fallback, so a dangling symlink pointing outside is not read either (the read fails).
+- Rewrote only lines this PR added; older `PR-04 WOnn` references were left.
+- The `-sENVIRONMENT=web` rationale is worded as "web loader only, nothing Node-specific", not the review's "fetch-free path", which contradicts the supplied `wasmBinary`.
 
 ### Out-of-Scope Findings
+- `cli/test/integration/fixtures/valid-project/globals.xml` carries an XML comment citing "PR-04b WO2" and "PR-04b WO3". Not in the review's list; left.
+- `cli/test/validator/validate.test.ts` (around line 219) carries an older "WORKORDER testing requirement" reference, pre-existing.
+- `budget.ts` header says "Three costs" but lists two bullets (pre-existing).
+- Hundreds of older `PR-04 WOnn` history references remain in untouched code, as the review anticipated (its Observation 1, for the Chief Architect).
 
 ### Blockers
 (none)
-```
