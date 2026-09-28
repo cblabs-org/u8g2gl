@@ -102,8 +102,8 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 
 - [x] **[WO1 — bdfconv as a committed Wasm artefact](wo1-bdfconv-wasm/WORKORDER.md)** ✅ `c14086f`…`004fb17` · `u8g2gl-fonts/wo1-bdfconv-wasm` · base `main` @ `453f9f3` · standard · findings 1–3; [Q-2]; notices row
 - [x] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** ✅ `8d45c91`…`975ca41` · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
-- [ ] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
-- [ ] **WO3b — the fixture, real U8G2, and the editor target** · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
+- [x] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** ✅ `95b3c03`, `9ffc4bf`, `a0f0df9` · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
+- [ ] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
 - [ ] **WO4 — `<convert>`: PNG to XBM** · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · one image model shared with `<xbm>`; parity; notices row for any decoder dependency
 - [ ] **WO5 — licences, docs and a migration rehearsal** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · §22.1 wording; departures-board-v3's ten BDFs through the built CLI, compared with its `fonts.cpp`
 - [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
@@ -173,3 +173,23 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   `ui_fontdata_<name>` with `ui_font_<name>` a pointer to it, so `ui.hpp` keeps
   one declaration form for both font kinds. `ui_font_<name>_data` was rejected:
   it collides with a `<bdf>` named `<name>_data`.
+
+### 2026-09-28 — WO3 ingested
+- **Complete**, CLI **1158** (+20), CLI **0.9.0**. PA re-ran suite, lint and
+  build: green.
+- Absent `range` is now 0–65535. A sweep of all 396 BDFs in U8G2's tree
+  compiles 396/396, including `waffle-10.bdf`, which failed under `*`.
+- **PA end-to-end through the built CLI**, using `test/generated_fixture`
+  plus two departures-board-v3 fonts copied into `tmp/`: WeatherIcons16 with no
+  `range` (10/10 glyphs, 225 B) and NatRailSmall9 with `0x20-0x7F` (947 B,
+  matching the PA's native bdfconv measurement at session start). The budget
+  shows `fonts (compiled bdf) (2)  1172 bytes`, measured. Two runs from
+  different cwd and TZ gave identical trees, with no absolute paths.
+- **PA review findings carried into WO3b:** (1) `generate()` infers which
+  fonts failed from diagnostics' `offendingText`, which is presentation data
+  driving control flow; replaced by an explicit failed set. (2) The emitted
+  provenance comment contains "WO3 item 1", an internal ticket in the user's
+  generated code.
+- The public-domain `4x6.bdf` is now copied into
+  `cli/test/integration/fixtures/valid-project/fonts/` (12.9k lines). WO5's
+  notices pass must cover it.
