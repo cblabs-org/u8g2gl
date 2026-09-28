@@ -72,7 +72,7 @@ WO5 readability), and the following rulings, pasted by the owner **verbatim**:
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
+- [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
 - [ ] **WO2 — inline `style_*` restricted to §10's nine** · `u8g2gl-4r/wo2-style-overrides` · base `main` after WO1 · standard · item 2
 - [ ] **WO3 — the runtime clamps a rounded box's radius** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · **HELD: ruling C's number, see below**
 - [ ] **WO4 — bound draw-call arguments clamp as objects do** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
@@ -126,3 +126,11 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   ruling A moves, so updating the literal implements the ruling. WORKORDER amended to allow
   exactly that class of edit (location literals of files this WO moves), listed in the report.
   Worker resumed. Surfaced to the owner in the same turn.
+- **2026-09-28** — **WO1 complete, `44953ac`.** PA verified independently, each suite alone: CLI
+  **1059 / 63 files** (1055 + 4 layering tests), `tsc` and lint clean; C++ 0 warnings, **362, one
+  known skip**. Test-body edits: the one approved location literal plus one import line. Layering
+  test re-proved by the PA (a `schema/` → `validator/` import fails, naming file and edge). No
+  difference between table copies. Readability review: no P1–P3; one P4 (header whitespace,
+  `resolver/mangle.ts:49`) carried to WO5. Worker findings carried: plain-object colour lookup in
+  `emit/value.ts` (unreachable today); location-pinning tests make every move a test edit;
+  `schema/index.ts` exports types only (public API deliberately unchanged). WO1 opened as its own PR.
