@@ -125,7 +125,7 @@ describe('drawCallFor() — manifest declaration order is parameter order (WO2)'
       '<u8g2gl_box name="b" x="4" y="20" width="60" height="6" bind_width="level" />',
       'b',
     );
-    expect(call.args).toEqual(['4', '20', 'ui_subject_level.get()', '6', 'true', '0']);
+    expect(call.args).toEqual(['4', '20', 'u8g2gl_coord_bound(0, ui_subject_level.get())', '6', 'true', '0']);
   });
 
   it('resolves an expression to a literal before emitting it ([D-7])', () => {

@@ -114,6 +114,17 @@ export interface ScreenEmitInput {
 /** The runtime header declaring `u8g2gl_draw_*` (§6.2). */
 const DRAW_HEADER = '#include "u8g2gl/u8g2gl_draw.h"';
 
+/**
+ * The runtime header declaring `u8g2gl_coord_bound()`, which every bound integer
+ * draw argument is spelled through (`draw-args.ts`, PR-4R WO4). Emitted with
+ * {@link DRAW_HEADER} in every unit that has draw calls, not only where one is
+ * bound: deciding that here would re-derive draw-args' rule a second time, and
+ * the header holds only inline functions, so an unused include costs nothing.
+ * `u8g2gl_draw.h` deliberately does not include it — it forward-declares U8G2
+ * rather than pull in `U8g2lib.h`, which this header needs.
+ */
+const COORD_HEADER = '#include "u8g2gl/u8g2gl_coord.h"';
+
 /** `ui_screen_home.cpp` (§13.7). */
 export function screenUnitPath(screen: string): string {
   return `ui_screen_${screen}.cpp`;
@@ -432,7 +443,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   // --- Step 2: The includes this unit needs, sorted (§13.9) ---
   const includes = objects.map((object) => classOf(placed(object).manifest).include);
   if (realised.drawOrder.some((step) => step.kind === 'draw_calls')) {
-    includes.push(DRAW_HEADER);
+    includes.push(DRAW_HEADER, COORD_HEADER);
   }
 
   // --- Step 3: Each part of the unit, in §13.12's order ---

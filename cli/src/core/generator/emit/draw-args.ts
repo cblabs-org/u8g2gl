@@ -23,9 +23,16 @@
  *              1. **bound** ([D-20]) — the value is read from the subject at
  *                 draw time, because a full-frame redraw ([D-4]) means a
  *                 stateless element need not store it (§13.5). A bound
- *                 *position* is container-relative (§7.2), so its container's
- *                 absolute origin is added: `40 + ui_subject_x.get()`. Which
- *                 origin is `placement.ts`'s answer; this module only spells it;
+ *                 *integer* is spelled through the runtime's
+ *                 `u8g2gl_coord_bound()`, which adds the origin and clamps the
+ *                 sum into `int16_t` exactly as the object path's bindings do:
+ *                 `u8g2gl_coord_bound(40, ui_subject_x.get())`. A bound
+ *                 *position* is container-relative (§7.2), so the origin is its
+ *                 container's absolute corner; a position on the screen, and a
+ *                 size, which has no origin, pass 0. One spelling, zero
+ *                 included, so how an element is realised is not observable
+ *                 ([D-18], PR-4R WO4). Which origin is `placement.ts`'s answer;
+ *                 this module only spells it;
  *              2. **written** — the literal the resolver settled, taken from
  *                 whichever of the resolved geometry, endpoints/radii or `int`
  *                 properties holds it, never re-parsed from the attribute text;
@@ -37,6 +44,7 @@
  *
  * Exports:
  * - SUBJECT_READ_SUFFIX: How a bound value is read at draw time
+ * - BOUND_INTEGER_HELPER: The runtime function a bound integer argument is spelled through
  * - DrawCall:            A free function and its argument list
  * - DrawCallInput:       What assembling one needs
  * - DrawFunction:        A drawing element's function and argument props
@@ -66,6 +74,29 @@ import { cppValue } from './value.js';
  */
 export const SUBJECT_READ_SUFFIX = '.get()';
 
+/**
+ * The runtime function every bound **integer** draw argument is spelled
+ * through: `u8g2gl_coord_bound(origin, ui_subject_x.get())`.
+ *
+ * design_spec §13.5, final paragraph: a value reaching a draw call is clamped
+ * exactly as the object path clamps it — into `int16_t`, after the container
+ * origin is added (§7.2) — instead of wrapping in whatever narrower parameter
+ * the draw function takes. Spelling the call through the helper the object
+ * path's bindings use (`include/u8g2gl/u8g2gl_coord.h`) makes that one clamp
+ * rather than two that agree, which is what keeps realisation unobservable
+ * ([D-18], PR-4R WO4). The editor host clamps with the same helper.
+ *
+ * The rule, without exceptions: the origin is always spelled, `0` included —
+ * for a position on the screen and for a size, which has no origin and clamps
+ * as the object path's `bind_width` / `bind_height` do. A bound argument of any
+ * other type (a `bool`, a colour) is not geometry and is read unwrapped; no
+ * shipped drawing manifest binds one today.
+ *
+ * design_spec §13.5's example still writes the unclamped read; the emitted text
+ * differs from it, and the difference is reported rather than resolved here.
+ */
+export const BOUND_INTEGER_HELPER = 'u8g2gl_coord_bound';
+
 /** One `u8g2gl_draw_*` call, ready for a caller to spell as a statement. */
 export interface DrawCall {
   /** The free function, e.g. `u8g2gl_draw_box` (§6.2). */
@@ -92,7 +123,9 @@ export interface DrawFunction {
  *
  * A `bound` source's `origin` is what is added to the subject's value: the
  * container's absolute origin for a bound position (§7.2), undefined for any
- * other bound prop.
+ * other bound prop. The firmware call spells undefined as `0`
+ * ({@link BOUND_INTEGER_HELPER}); the scene leaves it out, and the editor host
+ * reads its absence as 0, so the two clamp the same sum.
  */
 export type DrawArgumentSource =
   | {
@@ -288,12 +321,14 @@ export function drawCallFor(input: DrawCallInput): DrawCall {
   const args = drawArgumentSources(input).map((source) => {
     switch (source.kind) {
       case 'bound': {
-        // A zero origin is not spelled: a screen-level element's bound
-        // position reads exactly as its value, as §13.5's example writes it.
+        // A bound integer is clamped with its origin by the object path's own
+        // helper; see BOUND_INTEGER_HELPER for the rule and why zero is spelled.
         const read = `${subjectIdentifier(source.binding.subject)}${SUBJECT_READ_SUFFIX}`;
-        return source.origin === undefined || source.origin === 0
-          ? read
-          : `${cppValue({ name: 'origin', type: 'int' }, String(source.origin))} + ${read}`;
+        if (source.prop.type !== 'int') {
+          return read;
+        }
+        const origin = cppValue({ name: 'origin', type: 'int' }, String(source.origin ?? 0));
+        return `${BOUND_INTEGER_HELPER}(${origin}, ${read})`;
       }
       case 'written':
       case 'default':

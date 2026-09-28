@@ -252,7 +252,7 @@ describe('a binding or a named style satisfies required (WO10b f1)', () => {
     const result = journeys('        <u8g2gl_box name="dot" bind_x="offset" y="40" width="2" height="2" />');
     expectAgreement(result);
     expect(result.validated.errors).toBe(0);
-    expect(screenUnit(result)).toContain('u8g2gl_draw_box(display, ui_subject_offset.get(), 40, 2, 2, true, 0);');
+    expect(screenUnit(result)).toContain('u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_offset.get()), 40, 2, 2, true, 0);');
   });
 
   it('bind_y on an object with no literal y: built, the axis passed as 0 and set by its binding', () => {
