@@ -23,20 +23,24 @@
  *          - a SIZE (width, height, length, circle radius) — u8g2gl_coord_size():
  *            <= 0 is refused (nothing to draw), and so is a size u8g2_uint_t
  *            cannot hold; the caller then draws nothing;
- *          - a BOUND (clip-window corner) or a CORNER RADIUS —
+ *          - a BOUND (clip-window corner, clipped line end point) —
  *            u8g2gl_coord_clamp(): clamped into range;
+ *          - a rounded box's CORNER RADIUS — u8g2gl_coord_corner_radius():
+ *            clamped to 2r <= min(w, h) of the shape being drawn, because U8G2
+ *            draws far outside the box beyond that (PR-4R WO3);
  *          - a REFRESH REGION — u8g2gl_coord_span(): shortened to its on-screen
  *            part, because updateDisplayArea() is not clipped by U8G2.
  *
- * Description: Four inline conversions and the representable maximum. Nothing
+ * Description: Five inline conversions and the representable maximum. Nothing
  *              allocates; nothing depends on int being 32-bit.
  *
  * Exported Functions:
- * - U8G2GL_U8G2_COORD_MAX:  Largest value a u8g2_uint_t holds on this build
- * - u8g2gl_coord_pos():     Position — explicit wrap; U8G2 clips it
- * - u8g2gl_coord_size():    Size — refuse <= 0 or unrepresentable
- * - u8g2gl_coord_clamp():   Clip corner or corner radius — clamp into range
- * - u8g2gl_coord_span():    Refresh region — shorten to the non-negative part
+ * - U8G2GL_U8G2_COORD_MAX:        Largest value a u8g2_uint_t holds on this build
+ * - u8g2gl_coord_pos():           Position — explicit wrap; U8G2 clips it
+ * - u8g2gl_coord_size():          Size — refuse <= 0 or unrepresentable
+ * - u8g2gl_coord_clamp():         Clip corner or line end — clamp into range
+ * - u8g2gl_coord_corner_radius(): Rounded-box radius — clamp to [0, min(w,h)/2]
+ * - u8g2gl_coord_span():          Refresh region — shorten to the non-negative part
  */
 #ifndef U8G2GL_COORD_H
 #define U8G2GL_COORD_H
@@ -127,12 +131,11 @@ inline bool u8g2gl_coord_size(int32_t value, u8g2_uint_t& out) {
 }
 
 /**
- * @brief Clamp a BOUND or CORNER RADIUS into U8G2's coordinate range.
+ * @brief Clamp a BOUND into U8G2's coordinate range.
  *
  * For clip-window corners and clipped line end points, which must not wrap (see
- * u8g2gl_coord_pos()), and for
- * the corner radius of a rounded box, where 0 is a valid value meaning square
- * corners rather than an empty shape.
+ * u8g2gl_coord_pos()). A rounded box's corner radius has a tighter bound that
+ * depends on the box, and goes through u8g2gl_coord_corner_radius() instead.
  *
  * @param value Signed value.
  * @return 0 for a negative value, U8G2GL_U8G2_COORD_MAX for one above it,
@@ -146,6 +149,50 @@ inline u8g2_uint_t u8g2gl_coord_clamp(int32_t value) {
         return static_cast<u8g2_uint_t>(U8G2GL_U8G2_COORD_MAX);
     }
     return static_cast<u8g2_uint_t>(value);
+}
+
+/**
+ * @brief Clamp a rounded box's CORNER RADIUS to the bound 2r <= min(w, h).
+ *
+ * RULE: every radius passed to drawRBox() or drawRFrame() comes through here,
+ * clamped against the size of the shape actually being drawn. The validator
+ * refuses a literal radius past the same bound at build time
+ * (checkCornerRadius(), cli/src/core/validator/validate-geometry.ts); this is
+ * the draw-time half, for a size that is bound or a radius that arrives through
+ * a style, which the validator cannot see.
+ *
+ * Why this number — measured, not reasoned (PR-4R WO3; harness and full output
+ * in .agents/skills/principal-architect-workspace/pr-4r-corrections/evidence/rbox-bound/):
+ * u8g2_DrawRBox() and u8g2_DrawRFrame() (extern/u8g2/csrc/u8g2_box.c, U8G2
+ * 2.36.18: lines 121–123 and 134–136, and 183–188) compute the band between the
+ * corners as ww = w - r - r and hh = h - r - r in u8g2_uint_t. Once 2r > w, ww
+ * wraps, the `ww >= 3` test that follows passes, and U8G2 draws a box of the
+ * wrapped width, clipped only by the display. Measured across sizes and every
+ * radius, each r with 2r <= min(w, h) draws nothing outside the box and each r
+ * with 2r > min(w, h) does, from 70 to 1753 stray pixels: the bound is exact in
+ * both directions. test/test_rbox_bound.cpp keeps that measurement against the
+ * pinned U8G2, so a U8G2 bump that moves the boundary fails there.
+ *
+ * 2r == min(w, h) is a capsule — the corner discs meet — and is the intended
+ * look (the switch's default r = h / 2), so it is not reduced. Integer division
+ * makes min(w, h) / 2 the largest r with 2r <= min(w, h) for odd sizes too:
+ * 11 gives 5.
+ *
+ * A radius that clamps to 0 means square corners. A caller that chooses between
+ * the square and rounded primitives (u8g2gl_draw_box()) must clamp first and
+ * choose on the result, so that such a radius behaves exactly as a literal 0.
+ *
+ * @param radius Requested radius; negative means 0.
+ * @param width  Width of the shape being drawn.
+ * @param height Height of the shape being drawn. A width or height <= 0 gives 0.
+ * @return The radius in [0, min(width, height) / 2], also held to
+ *         U8G2GL_U8G2_COORD_MAX.
+ */
+inline u8g2_uint_t u8g2gl_coord_corner_radius(int32_t radius, int32_t width,
+                                              int32_t height) {
+    const int32_t smaller = (width < height) ? width : height;
+    const int32_t bound = (smaller > 0) ? smaller / 2 : 0;
+    return u8g2gl_coord_clamp((radius > bound) ? bound : radius);
 }
 
 /**

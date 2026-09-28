@@ -945,16 +945,19 @@ describe('an unknown attribute on a <style> is reported like one on an element (
 // Follow-up 2 — a box's radius fits its own size (finding 5)
 // ---------------------------------------------------------------------------
 
-describe("a rounded box's radius is checked against its own size: 2*(r+1) <= w, h (follow-up, finding 5)", () => {
+// PR-4R WO3 relaxed the bound from WO11b's 2*(r+1) to the measured 2*r (see
+// checkCornerRadius()). The three cases that sat on the old boundary moved with
+// it — each still one pixel over, or exactly at, the limit it names.
+describe("a rounded box's radius is checked against its own size: 2*r <= w, h (follow-up, finding 5; PR-4R WO3)", () => {
   const box = (attributes: string): string => `        <u8g2gl_box name="b" x="0" y="0" ${attributes} />`;
 
   it('one pixel too large for the width is refused in both journeys, at the radius', () => {
-    const result = journeys(box('width="10" height="20" radius="5"'));
+    const result = journeys(box('width="10" height="20" radius="6"'));
     expectAgreement(result);
     const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
-    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([`${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:5`]);
-    expect(found[0]?.message).toContain('2*(radius+1) = 12 <= width');
-    expect(found[0]?.message).toContain('Use radius <= 4');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([`${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:6`]);
+    expect(found[0]?.message).toContain('2*radius = 12 <= width');
+    expect(found[0]?.message).toContain('Use radius <= 5');
   });
 
   it("radius=500 on a 10×10 box (the PA's case) fails against both sizes", () => {
@@ -967,7 +970,7 @@ describe("a rounded box's radius is checked against its own size: 2*(r+1) <= w, 
   });
 
   it('inside a template it is the template’s defect: reported once for two instances', () => {
-    const pill = composite('pill', '', '        <u8g2gl_box name="shape" x="0" y="0" width="8" height="8" radius="4" filled="false" />');
+    const pill = composite('pill', '', '        <u8g2gl_box name="shape" x="0" y="0" width="8" height="8" radius="5" filled="false" />');
     const result = journeys(
       [
         '        <pill name="a" x="0" y="0" width="10" height="10" />',
@@ -985,13 +988,50 @@ describe("a rounded box's radius is checked against its own size: 2*(r+1) <= w, 
   it('the exact limit, radius 0, and a bound size are not refused (controls)', () => {
     const result = journeys(
       [
-        box('width="10" height="10" radius="4"'),
+        box('width="10" height="10" radius="5"'),
         '        <u8g2gl_box name="plain" x="20" y="0" width="1" height="1" radius="0" />',
         '        <u8g2gl_box name="grown" x="30" y="0" bind_width="level" height="40" radius="15" />',
       ].join('\n'),
     );
     expectAgreement(result);
     expect(result.validated.errors).toBe(0);
+  });
+
+  // PR-4R WO3: the measured boundary, both sides of it.
+  it('a capsule, radius = min(w,h)/2, is accepted with no diagnostic of any severity', () => {
+    const result = journeys(
+      [
+        box('width="10" height="10" radius="5"'),
+        '        <u8g2gl_box name="pill" x="20" y="0" width="30" height="12" radius="6" filled="false" />',
+        '        <u8g2gl_box name="tall" x="60" y="0" width="8" height="40" radius="4" />',
+      ].join('\n'),
+    );
+    expectAgreement(result);
+    expect(result.validated.diagnostics).toEqual([]);
+  });
+
+  it('radius = min(w,h)/2 + 1 is refused, against the smaller side only', () => {
+    const result = journeys(box('width="30" height="12" radius="7"'));
+    expectAgreement(result);
+    const found = result.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([`${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:7`]);
+    expect(found[0]?.message).toContain('2*radius = 14 <= height');
+    expect(found[0]?.message).toContain('Use radius <= 6');
+  });
+
+  it('an odd size rounds down: 11 accepts radius 5 and refuses 6', () => {
+    const accepted = journeys(box('width="11" height="11" radius="5"'));
+    expectAgreement(accepted);
+    expect(accepted.validated.diagnostics).toEqual([]);
+
+    const refused = journeys(box('width="11" height="11" radius="6"'));
+    expectAgreement(refused);
+    const found = refused.validated.diagnostics.filter((d) => d.severity === 'error');
+    expect(found.map((d) => `${d.code}:${d.offendingText ?? ''}`)).toEqual([
+      `${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:6`,
+      `${DIAGNOSTIC_CODES.OUT_OF_BOUNDS}:6`,
+    ]);
+    expect(found[0]?.message).toContain('Use radius <= 5');
   });
 });
 

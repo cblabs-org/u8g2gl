@@ -42,7 +42,7 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 4  ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 5  ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements

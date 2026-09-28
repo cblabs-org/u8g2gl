@@ -396,6 +396,51 @@ add_test(NAME RealU8g2.RuntimeCompilesAgainstRealHeaders
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target u8g2gl_real_u8g2
 )
 
+# --- Real U8G2: the rounded-box radius bound, measured (PR-4R WO3) ---
+# u8g2gl_coord_corner_radius() clamps to 2r <= min(w, h) because that is where
+# U8G2's own drawRBox/drawRFrame stop drawing outside the box. This executable
+# keeps that measurement: it links U8G2's real C sources and draws into a full
+# buffer, asserting the helper's radii stay inside and one more does not.
+#
+#   - Its own executable, never linking `u8g2gl` or test/stubs: the stub
+#     declares U8G2 too, and the two must not meet in one link. It uses only the
+#     header-only u8g2gl_coord.h.
+#   - The C sources are listed, not globbed: exactly what drawing into a
+#     full buffer needs. u8g2_d_setup.c is left out on purpose — it holds every
+#     display's setup function and would pull in every driver — so the test
+#     inlines the one setup it uses. A U8G2 bump that adds a dependency fails
+#     the link here, visibly.
+#   - U8G2's warnings are not ours: its include path is SYSTEM and its sources
+#     are built with -w, as a separate library. The test source itself is held
+#     to -Wall -Wextra -Wpedantic.
+enable_language(C)
+set(U8G2GL_U8G2_BOUND_SOURCES
+    u8g2_box.c u8g2_buffer.c u8g2_circle.c u8g2_d_memory.c u8g2_font.c
+    u8g2_hvline.c u8g2_intersection.c u8g2_kerning.c u8g2_ll_hvline.c
+    u8g2_setup.c u8x8_8x8.c u8x8_byte.c u8x8_cad.c u8x8_capture.c
+    u8x8_d_ssd1306_128x64_noname.c u8x8_display.c u8x8_gpio.c u8x8_setup.c
+    u8x8_u16toa.c
+)
+list(TRANSFORM U8G2GL_U8G2_BOUND_SOURCES PREPEND ${U8G2GL_U8G2_DIR}/csrc/)
+add_library(u8g2gl_u8g2_csrc STATIC ${U8G2GL_U8G2_BOUND_SOURCES})
+target_include_directories(u8g2gl_u8g2_csrc SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_options(u8g2gl_u8g2_csrc PRIVATE -w)
+
+add_executable(test_rbox_bound
+    test_rbox_bound.cpp
+)
+target_include_directories(test_rbox_bound PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test_rbox_bound PRIVATE
+    u8g2gl_u8g2_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_rbox_bound PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_rbox_bound)
+
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is
 # committed output of `u8g2gl generate` (cli/test/generator/compile-fixture.test.ts

@@ -93,17 +93,16 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 3: Compute track corner radius ---
     // If style specifies a radius, use it; otherwise default to a capsule pill shape (h / 2).
-    // Radius is clamped to half dimensions to prevent U8G2 corner overflow artifacts.
-    int16_t r = (style_.radius > 0) ? style_.radius : static_cast<int16_t>(h_ / 2);
-    if (r > w_ / 2) {
-        r = static_cast<int16_t>(w_ / 2);
-    }
-    if (r > h_ / 2) {
-        r = static_cast<int16_t>(h_ / 2);
-    }
-    if (r < 0) {
-        r = 0;
-    }
+    // The radius is clamped to 2r <= min(w, h) by u8g2gl_coord_corner_radius(),
+    // the one statement of the bound; past it U8G2 draws outside the box. It
+    // replaces private clamps to w / 2 and h / 2, which were the same bound
+    // (floor(min(w, h) / 2) == min(w / 2, h / 2)), so no call argument changes
+    // (ruling D). The default h / 2 is inside it whenever h <= w; a narrow
+    // switch is held to w / 2, as before. Switch.DefaultCallArgumentsPinned
+    // holds the arguments to the pre-helper values.
+    const int16_t requested_r =
+        (style_.radius > 0) ? style_.radius : static_cast<int16_t>(h_ / 2);
+    const u8g2_uint_t r = u8g2gl_coord_corner_radius(requested_r, w_, h_);
 
     // --- Step 4: Draw switch track ---
     // Outer rounded rectangle frame covering the full widget bounds.
@@ -111,15 +110,13 @@ void u8g2gl_switch::render(U8G2& display) {
     // drawFrame/drawBox whenever a radius reaches 0; the switch always draws
     // rounded shapes. Rules from u8g2gl_coord.h: origins wrap explicitly, so a
     // switch partly off the left or top edge draws its visible part; sizes must
-    // be positive (Step 1 guarantees it for the track); corner radii are
-    // clamped, 0 meaning square corners.
+    // be positive (Step 1 guarantees it for the track).
     u8g2_uint_t track_w = 0;
     u8g2_uint_t track_h = 0;
     if (!u8g2gl_coord_size(w_, track_w) || !u8g2gl_coord_size(h_, track_h)) {
         return;
     }
-    display.drawRFrame(u8g2gl_coord_pos(x_), u8g2gl_coord_pos(y_), track_w, track_h,
-                       u8g2gl_coord_clamp(r));
+    display.drawRFrame(u8g2gl_coord_pos(x_), u8g2gl_coord_pos(y_), track_w, track_h, r);
 
     // --- Step 5: Compute handle geometry ---
     // Handle is inset by 1 pixel from the track border.
@@ -135,14 +132,11 @@ void u8g2gl_switch::render(U8G2& display) {
     int16_t handle_x = value_ ? static_cast<int16_t>(x_ + (w_ / 2))
                               : static_cast<int16_t>(x_ + 1);
 
-    // Scale handle corner radius proportionally to fit inside the track curvature
-    int16_t handle_r = (r > 1) ? static_cast<int16_t>(r - 1) : 0;
-    if (handle_r > handle_w / 2) {
-        handle_r = static_cast<int16_t>(handle_w / 2);
-    }
-    if (handle_r > handle_h / 2) {
-        handle_r = static_cast<int16_t>(handle_h / 2);
-    }
+    // One pixel tighter than the track so the handle sits inside its curvature,
+    // then held to the handle's own box by the same bound as the track.
+    const int32_t handle_requested_r = (r > 1) ? static_cast<int32_t>(r) - 1 : 0;
+    const u8g2_uint_t handle_r =
+        u8g2gl_coord_corner_radius(handle_requested_r, handle_w, handle_h);
 
     // --- Step 6: Draw switch handle ---
     // Filled rounded rectangle indicating current toggle state.
@@ -150,6 +144,6 @@ void u8g2gl_switch::render(U8G2& display) {
     u8g2_uint_t handle_uh = 0;
     if (u8g2gl_coord_size(handle_w, handle_uw) && u8g2gl_coord_size(handle_h, handle_uh)) {
         display.drawRBox(u8g2gl_coord_pos(handle_x), u8g2gl_coord_pos(handle_y), handle_uw,
-                         handle_uh, u8g2gl_coord_clamp(handle_r));
+                         handle_uh, handle_r);
     }
 }

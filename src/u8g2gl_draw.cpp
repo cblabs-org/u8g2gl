@@ -42,7 +42,8 @@
 // rounded), after refusing a size that is non-positive or unrepresentable.
 //   display — U8G2 display driver instance
 //   filled  — drawBox/drawRBox vs drawFrame/drawRFrame
-//   radius  — > 0 selects the rounded variant
+//   radius  — clamped to 2r <= min(width, height); > 0 after clamping selects
+//             the rounded variant
 void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
                       int16_t height, bool filled, int16_t radius) {
     // --- Step 1: Convert the size, or draw nothing ---
@@ -54,9 +55,15 @@ void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
     const u8g2_uint_t ux = u8g2gl_coord_pos(x);
     const u8g2_uint_t uy = u8g2gl_coord_pos(y);
 
-    // --- Step 2: Dispatch to the matching U8G2 primitive ---
-    u8g2_uint_t ur = 0;
-    if (u8g2gl_coord_size(radius, ur)) {
+    // --- Step 2: Clamp the corner radius to this box ---
+    // Before choosing square or rounded: a radius that clamps to 0 (a 1-pixel
+    // side) must select drawBox/drawFrame exactly as a literal 0 does. A size
+    // that is bound, or a radius from a style, reaches here unchecked by the
+    // validator; see u8g2gl_coord_corner_radius() for the bound.
+    const u8g2_uint_t ur = u8g2gl_coord_corner_radius(radius, width, height);
+
+    // --- Step 3: Dispatch to the matching U8G2 primitive ---
+    if (ur > 0) {
         if (filled) {
             display.drawRBox(ux, uy, uw, uh, ur);
         } else {

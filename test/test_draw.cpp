@@ -15,7 +15,8 @@
  *          suite could stop being a smoke test. Degenerate geometry
  *          (zero/negative width, height or radius) is still checked
  *          separately: it must be a silent no-op rather than undefined
- *          behaviour.
+ *          behaviour. A rounded box's radius is held to 2r <= min(w, h) of the
+ *          box drawn (PR-4R WO3), read from the call log.
  *
  * Description: GoogleTest suite covering all eight primitives — box, circle,
  *              ellipse, hline, line, pixel, triangle and vline.
@@ -23,6 +24,8 @@
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_draw.h"
 #include "U8g2lib.h"
+
+#include <string>
 
 // --- u8g2gl_draw_box ---
 
@@ -99,6 +102,125 @@ TEST(DrawBox, NegativeWidthIsNoOp) {
     EXPECT_EQ(display.draw_frame_count, 0);
     EXPECT_EQ(display.draw_rbox_count, 0);
     EXPECT_EQ(display.draw_rframe_count, 0);
+}
+
+// --- u8g2gl_draw_box: the corner-radius bound (PR-4R WO3) ---
+// Past 2r <= min(w, h) U8G2's rounded boxes draw far outside the box
+// (u8g2gl_coord_corner_radius(); measured in test_rbox_bound.cpp), so the
+// radius is clamped at draw time to the box actually drawn. These read the call
+// log, so a second or stray rounded call would be seen too.
+
+namespace {
+
+// Asserts the log holds exactly one call, `op`, and returns its arguments.
+const int32_t* only_call(const U8G2& display, const char* op) {
+    EXPECT_EQ(display.call_log_count, 1);
+    if (display.call_log_count != 1) {
+        return nullptr;
+    }
+    EXPECT_STREQ(display.call_log[0].op, op);
+    return display.call_log[0].args;
+}
+
+}  // namespace
+
+TEST(DrawBoxRadiusBound, RadiusAboveHalfTheSizeIsClampedFilledAndOutline) {
+    // 10x20 box, r = 9: the bound is min(10, 20) / 2 = 5.
+    for (bool filled : {true, false}) {
+        SCOPED_TRACE(filled ? "filled" : "outline");
+        U8G2 display;
+        u8g2gl_draw_box(display, 1, 2, 10, 20, filled, 9);
+        const int32_t* args = only_call(display, filled ? "drawRBox" : "drawRFrame");
+        ASSERT_NE(args, nullptr);
+        EXPECT_EQ(args[0], 1);
+        EXPECT_EQ(args[1], 2);
+        EXPECT_EQ(args[2], 10);
+        EXPECT_EQ(args[3], 20);
+        EXPECT_EQ(args[4], 5);
+    }
+}
+
+TEST(DrawBoxRadiusBound, NoRadiusReachingU8g2ExceedsTheBound) {
+    // Every radius from 0 to beyond both sides, at odd, even and non-square
+    // sizes: whatever is issued satisfies 2r <= min(w, h), and a radius already
+    // inside the bound is passed through unchanged.
+    const int sizes[][2] = {{10, 10}, {11, 11}, {20, 8}, {8, 20}, {7, 12}, {2, 2}, {3, 9}};
+    for (const auto& size : sizes) {
+        const int w = size[0];
+        const int h = size[1];
+        const int smaller = (w < h) ? w : h;
+        for (int r = 0; r <= smaller + 2; ++r) {
+            for (bool filled : {true, false}) {
+                SCOPED_TRACE(testing::Message() << w << "x" << h << " r=" << r
+                                                << (filled ? " filled" : " outline"));
+                U8G2 display;
+                u8g2gl_draw_box(display, 0, 0, static_cast<int16_t>(w),
+                                static_cast<int16_t>(h), filled, static_cast<int16_t>(r));
+                ASSERT_EQ(display.call_log_count, 1);
+                const u8g2_stub_call& call = display.call_log[0];
+                const bool rounded = std::string(call.op) == "drawRBox" ||
+                                     std::string(call.op) == "drawRFrame";
+                const int32_t issued = rounded ? call.args[4] : 0;
+                EXPECT_LE(2 * issued, smaller);
+                EXPECT_EQ(issued, (2 * r <= smaller) ? r : smaller / 2);
+            }
+        }
+    }
+}
+
+TEST(DrawBoxRadiusBound, SmallRuntimeSizeClampsTheRadius) {
+    // The bound-size case: a literal radius the validator accepted against the
+    // authored size, drawn at a size that shrank at run time. w = 6, r = 5 -> 3.
+    U8G2 display;
+    u8g2gl_draw_box(display, 4, 4, 6, 30, true, 5);
+    const int32_t* args = only_call(display, "drawRBox");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[2], 6);
+    EXPECT_EQ(args[4], 3);
+
+    U8G2 outline;
+    u8g2gl_draw_box(outline, 4, 4, 30, 6, false, 5);
+    args = only_call(outline, "drawRFrame");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[3], 6);
+    EXPECT_EQ(args[4], 3);
+}
+
+TEST(DrawBoxRadiusBound, RadiusClampingToZeroSelectsSquarePrimitive) {
+    // w = 1: min(1, h) / 2 = 0, so the box is square, and it must be drawn with
+    // drawBox / drawFrame exactly as a literal radius of 0 is — never drawRBox
+    // with r = 0.
+    U8G2 filled;
+    u8g2gl_draw_box(filled, 2, 3, 1, 10, true, 4);
+    const int32_t* args = only_call(filled, "drawBox");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[0], 2);
+    EXPECT_EQ(args[1], 3);
+    EXPECT_EQ(args[2], 1);
+    EXPECT_EQ(args[3], 10);
+
+    U8G2 outline;
+    u8g2gl_draw_box(outline, 2, 3, 10, 1, false, 4);
+    args = only_call(outline, "drawFrame");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[2], 10);
+    EXPECT_EQ(args[3], 1);
+}
+
+TEST(DrawBoxRadiusBound, NegativeRadiusDrawsSquareCornersAsBefore) {
+    U8G2 filled;
+    u8g2gl_draw_box(filled, 1, 2, 10, 20, true, -3);
+    const int32_t* args = only_call(filled, "drawBox");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[2], 10);
+    EXPECT_EQ(args[3], 20);
+
+    U8G2 outline;
+    u8g2gl_draw_box(outline, 1, 2, 10, 20, false, -3);
+    args = only_call(outline, "drawFrame");
+    ASSERT_NE(args, nullptr);
+    EXPECT_EQ(args[2], 10);
+    EXPECT_EQ(args[3], 20);
 }
 
 // --- u8g2gl_draw_circle ---

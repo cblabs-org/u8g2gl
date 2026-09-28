@@ -12,7 +12,8 @@
  *          zero-copy text assignment, border stroke width configuration, dirty
  *          tracking, static idle lifecycle, single and nested border rendering,
  *          focus state visual inversion (§12.2), disabled state interaction,
- *          text centering, polymorphism, and memory limits.
+ *          text centering, polymorphism, memory limits, and the corner-radius
+ *          bound applied to a style radius at draw time (PR-4R WO3).
  *
  * Description: GoogleTest test cases covering the complete specification of
  *              u8g2gl_button.
@@ -228,6 +229,121 @@ TEST(Button, BorderPartlyOffEdgeDrawsWithWrappedOrigin) {
 // PR-04 WO10b: the button's manifest declares bind_text, and its render()
 // read only the literal, the same defect as the label's. A bound button draws
 // the subject's text, in preference to a literal set in either order.
+// --- PR-4R WO3: a style radius larger than the button is clamped at draw time ---
+// A radius arriving through a style is invisible to the validator, and past
+// 2r <= min(w, h) U8G2 draws far outside the box (u8g2gl_coord_corner_radius()).
+// Each rounded call is read from the call log and held to the bound of the box
+// it actually draws — for nested borders, each layer's own size.
+
+namespace {
+
+// One drawRBox / drawRFrame from the log: its op and its x, y, w, h, r.
+struct rounded_call {
+    std::string op;
+    int32_t args[5];
+};
+
+// Collects every rounded-box call, in order, and asserts none breaks the bound.
+int collect_rounded(const U8G2& display, rounded_call* out, int capacity) {
+    int n = 0;
+    for (int i = 0; i < display.call_log_count && n < capacity; ++i) {
+        const u8g2_stub_call& call = display.call_log[i];
+        const std::string op = call.op;
+        if (op != "drawRBox" && op != "drawRFrame") {
+            continue;
+        }
+        rounded_call& rc = out[n++];
+        rc.op = op;
+        for (int a = 0; a < 5; ++a) {
+            rc.args[a] = call.args[a];
+        }
+        const int32_t smaller = (rc.args[2] < rc.args[3]) ? rc.args[2] : rc.args[3];
+        EXPECT_LE(2 * rc.args[4], smaller)
+            << op << " " << rc.args[2] << "x" << rc.args[3] << " r=" << rc.args[4];
+    }
+    return n;
+}
+
+}  // namespace
+
+TEST(ButtonRadiusBound, StyleRadiusLargerThanButtonIsClamped) {
+    u8g2gl_button btn;
+    btn.set_coords(3, 4, 40, 10);
+    btn.set_radius(12);   // bound for 40x10 is 5
+
+    U8G2 display;
+    btn.render(display);
+
+    rounded_call calls[4];
+    ASSERT_EQ(collect_rounded(display, calls, 4), 1);
+    EXPECT_EQ(calls[0].op, "drawRFrame");
+    EXPECT_EQ(calls[0].args[0], 3);
+    EXPECT_EQ(calls[0].args[1], 4);
+    EXPECT_EQ(calls[0].args[2], 40);
+    EXPECT_EQ(calls[0].args[3], 10);
+    EXPECT_EQ(calls[0].args[4], 5);
+}
+
+TEST(ButtonRadiusBound, FocusedFillAndBorderAreBothClamped) {
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 9, 30);   // odd, narrow: bound is 9 / 2 = 4
+    btn.set_radius(20);
+    btn.set_invert(true);
+
+    U8G2 display;
+    btn.render(display);
+
+    rounded_call calls[4];
+    ASSERT_EQ(collect_rounded(display, calls, 4), 2);
+    EXPECT_EQ(calls[0].op, "drawRBox");     // the focus fill
+    EXPECT_EQ(calls[0].args[4], 4);
+    EXPECT_EQ(calls[1].op, "drawRFrame");   // the border
+    EXPECT_EQ(calls[1].args[4], 4);
+}
+
+TEST(ButtonRadiusBound, NestedBorderClampsEachLayerToItsOwnSize) {
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 40, 10);
+    btn.set_border_width(3);
+    btn.set_radius(12);
+
+    U8G2 display;
+    btn.render(display);
+
+    // Layer i is inset by i on every side and asks for radius 12 - i; each is
+    // held to half its own height: 40x10 -> 5, 38x8 -> 4, 36x6 -> 3.
+    rounded_call calls[4];
+    ASSERT_EQ(collect_rounded(display, calls, 4), 3);
+    const int32_t expected[3][5] = {
+        {0, 0, 40, 10, 5},
+        {1, 1, 38, 8, 4},
+        {2, 2, 36, 6, 3},
+    };
+    for (int layer = 0; layer < 3; ++layer) {
+        SCOPED_TRACE(testing::Message() << "layer " << layer);
+        EXPECT_EQ(calls[layer].op, "drawRFrame");
+        for (int a = 0; a < 5; ++a) {
+            EXPECT_EQ(calls[layer].args[a], expected[layer][a]) << "argument " << a;
+        }
+    }
+}
+
+TEST(ButtonRadiusBound, RadiusInsideTheBoundIsUnchanged) {
+    // A capsule — 2r == h — is the bound itself and passes through untouched.
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 40, 10);
+    btn.set_border_width(2);
+    btn.set_radius(5);
+
+    U8G2 display;
+    btn.render(display);
+
+    rounded_call calls[4];
+    ASSERT_EQ(collect_rounded(display, calls, 4), 2);
+    EXPECT_EQ(calls[0].args[4], 5);   // 40x10, capsule
+    EXPECT_EQ(calls[1].args[4], 4);   // 38x8,  capsule
+}
+
 TEST(Button, BoundStringSubjectIsTheTextDrawn) {
     u8g2gl_subject_string_n<8> caption;
     caption.set("Go");
