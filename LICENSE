@@ -35,3 +35,7 @@ licensing conditions of each U8G2 font group, see:
 Fonts you supply yourself (referenced via <bdf>) remain yours, under
 whatever terms they carry. Compiling them into your firmware is your
 decision and your responsibility.
+
+Converting a font does not change its licence: a font compiled from a
+BDF file with <bdf> is the same work under the same terms, and the array
+U8G2GL generates carries whatever terms the BDF carried.

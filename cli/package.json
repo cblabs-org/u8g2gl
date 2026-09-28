@@ -24,7 +24,6 @@
     "src/data/catalogue.json",
     "src/data/manifests.json",
     "src/data/page-mode-map.json",
-    "src/data/bdfconv/bdfconv-glue.json",
     "src/data/bdfconv/bdfconv-wasm.json",
     "LICENSES/"
   ],
