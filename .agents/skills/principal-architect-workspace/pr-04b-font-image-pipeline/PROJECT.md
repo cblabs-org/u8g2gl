@@ -106,7 +106,7 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 - [x] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** ✅ `93e54fa`, `b991378`, `3296112`, `1e46500` · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
 - [x] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** ✅ `aee1a57`, `8d31354` · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
 - [x] **[WO5 — licences, docs and a migration rehearsal](wo5-docs-rehearsal/WORKORDER.md)** ✅ `9791ee0`, `b810c00` · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · licence of a converted font; notices audit; npm package carries LICENSE; departures-board-v3's **14** BDFs through the built CLI, compared byte for byte with its `fonts.cpp`
-- [ ] **[WO6 — readability remediation, and three small fixes](wo6-readability/WORKORDER.md)** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · [review](wo6-readability/REVIEW.md) P2/P3; B1 symlink confinement; B2 `ofl` prefix; B3 clean `dist/`
+- [x] **[WO6 — readability remediation, and three small fixes](wo6-readability/WORKORDER.md)** ✅ `d488648`…`456d25e` · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · [review](wo6-readability/REVIEW.md) P2/P3; B1 symlink confinement; B2 `ofl` prefix; B3 clean `dist/`
 
 WORKORDERs are written just in time, each after its predecessor's Completion
 Report is ingested, so each can name the API surface the previous one delivered.
@@ -298,3 +298,47 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   confinement (`resolve()`, not `realpath`), and the licence-file prefix `ofl`,
   which was the PA's own rule, matches `oflow.txt`. Plus WO5's carry: the
   build starts from an empty `dist/`.
+
+### 2026-09-28 — WO6 ingested; stack submitted
+- **Complete.** B1 (`realpath` confinement), B2 (`ofl` word boundary) and B3
+  (build cleans `dist/`) each come with tests; the readability pass covers all
+  P2 and P3 items. P4 code edits were skipped as outside a comment-only box.
+  PA verification: **CLI 1281**, lint and build clean, and the generated
+  fixture is byte-identical. The only non-comment source changes are B1 and
+  B2. Final C++ on the tip from a clean build: **383**, one known skip, **zero
+  warnings**.
+- `main` has not moved (`453f9f3`), so no rebase was needed.
+- **Attribution:** the PA planned to rewrite WO4's "Sonnet 5.5" trailers. An
+  audit found WO4–WO6 each wrote "Sonnet 5.5" independently, after being told
+  to name the model as their own system context names it; WO3b wrote "Sonnet
+  5"; and WO1–WO3 copied the template's "Opus 5.5". The PA's own model list is
+  not better evidence than the workers' self-report, so history is **not**
+  rewritten. The inconsistency is disclosed in the PR description instead.
+
+## Project Wrap-Up
+
+**Outcome.** `<bdf>` and `<convert>` work end to end in the CLI, and in the
+browser through the same core code. The schema is unchanged, the CLI is 0.9.0,
+C++ is 383 (+6) and the CLI suite is 1281 (+194). The decomposition grew from
+6 to 7 WOs (WO3 split before dispatch). [Q-2] is settled by measurement: a
+Wasm bdfconv, committed with provenance. PR-05 is unblocked: departures-board-v3's
+12 font arrays reproduce byte for byte.
+
+**Lessons for future PRs.**
+- **Measure before decomposing.** Four findings taken in the first hour
+  (determinism, Wasm equals native, the U8G2 oracle, identical vendored
+  source) shaped every WO and none was later refuted.
+- **The PA's own instructions need the same review as the workers' code.**
+  The `*` = 32–255 default and the loose `ofl` prefix were both PA errors,
+  caught in review before anything consumed them.
+- **Independent oracles catch what shared parsers hide.** The PA's own first
+  comparison parser failed on a literal `;` byte, the trap WO2 had recorded,
+  which is exactly why every oracle in this PR reads the expected side with
+  separate code.
+- **Name the model honestly in trailers.** Template attribution lines get
+  copied verbatim; ask workers to name themselves.
+
+**Unresolved:** the nine CA-bridge items (none blocking); older code's
+work-order references in comments (the CA's standards question); P4
+readability items (shared `byteLines` helper and similar), left for a later
+pass.

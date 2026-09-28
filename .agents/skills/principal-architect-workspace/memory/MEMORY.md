@@ -9,7 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
-| pr-04b-font-image-pipeline | **Active** — WO1/6 (bdfconv Wasm). Worktree `../U8G2GL-04b`, branches `u8g2gl-fonts/wo<N>-*`, base `main` @ `453f9f3` | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
+| pr-04b-font-image-pipeline | **Submitted** — 7/7 WOs, PR from `u8g2gl-fonts/wo6-readability`. C++ 383 / CLI 1281, CLI 0.9.0. CA bridge: 9 items | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
