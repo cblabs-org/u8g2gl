@@ -566,7 +566,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     '}',
     '',
     section('activate / deactivate (§12.4)'),
-    '// Nothing to do: events and focus are not generated until PR-09, and',
+    '// Nothing to do: this build generates no event or focus handling, and',
     '// u8g2gl_set_active_screen() already marks the new screen dirty.',
     `void ${fn('activate')}() {}`,
     '',

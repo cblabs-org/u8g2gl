@@ -368,7 +368,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     // writes itself — and it declares no <xbm> or <bdf>, so both lines are an
     // exact 0 rather than a guess (PR-04b WO3 item 6).
     for (const line of budget!.flash) {
-      if (line.item === 'image data (xbm arrays)' || line.item === 'fonts (compiled bdf)') {
+      if (line.item === 'image data (bitmap arrays)' || line.item === 'fonts (compiled bdf)') {
         expect(line.figure).toMatchObject({ kind: 'measured', bytes: 0 });
         continue;
       }

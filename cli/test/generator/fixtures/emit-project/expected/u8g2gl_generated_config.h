@@ -7,7 +7,7 @@
 #ifndef U8G2GL_GENERATED_CONFIG_H
 #define U8G2GL_GENERATED_CONFIG_H
 
-// Reaching the runtime library as well as the generated units (WO4 F5, §16).
+// Reaching the runtime library as well as the generated units (§16).
 //
 // The binding pool is sized inside src/u8g2gl_obj.cpp, which is compiled as
 // part of the library and never includes this header. A project that included

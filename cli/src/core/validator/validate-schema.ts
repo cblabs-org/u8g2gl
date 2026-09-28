@@ -43,6 +43,7 @@ import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import { COLOR_VALUES, STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
+import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
 
@@ -683,6 +684,21 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             'src',
           ),
         );
+      }
+      if (img.kind === 'convert') {
+        // §14.2: the attributes `<convert>` already has, judged from the one
+        // definition the asset step also consults.
+        for (const problem of convertDeclProblems(img.name, img)) {
+          diagnostics.push(
+            createDiagnostic(
+              problem.attribute === 'mode' ? DIAGNOSTIC_CODES.INVALID_ENUM_VALUE : DIAGNOSTIC_CODES.TYPE_MISMATCH,
+              problem.message,
+              img.loc,
+              problem.offendingText,
+              problem.suggestions,
+            ),
+          );
+        }
       }
     }
   }

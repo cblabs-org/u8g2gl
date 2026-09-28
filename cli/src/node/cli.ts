@@ -30,7 +30,6 @@ import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
 import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
 import { compileProjectAssets, type CompileProjectAssetsResult } from '../core/assets/index.js';
-import type { CompiledFont } from '../core/fonts/index.js';
 import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
 import { buildGenerateReport, type GenerateReport } from '../core/generator/report/index.js';
 import { findTargetDisplay } from '../core/resolver/index.js';
@@ -666,7 +665,7 @@ function editorFilesOf(
   loaded: LoadedProject,
   result: GenerateResult,
   generatorVersion: string,
-  compiledFonts: ReadonlyMap<string, CompiledFont>,
+  compiledAssets: CompileProjectAssetsResult,
 ): GenerateResult['files'] {
   const { realised, resolved, capacities, target } = result;
   if (realised === undefined || resolved === undefined || capacities === undefined || target === undefined) {
@@ -680,8 +679,8 @@ function editorFilesOf(
     resolved,
     manifests: loaded.model.manifests,
     capacities,
-    assets: loaded.assets,
-    compiledFonts,
+    images: compiledAssets.images,
+    compiledFonts: compiledAssets.fonts,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
     generatorVersion,
     target,
@@ -700,7 +699,7 @@ function reportFor(
   loaded: LoadedProject,
   result: GenerateResult,
   generatorVersion: string,
-  compiledFonts: ReadonlyMap<string, CompiledFont>,
+  compiledAssets: CompileProjectAssetsResult,
 ): GenerateReport {
   const { realised, capacities, target: targetName } = result;
   const target = loaded.model.project.targets.find((t) => t.name === targetName);
@@ -716,8 +715,8 @@ function reportFor(
     target,
     ...(display !== undefined ? { display } : {}),
     generatorVersion,
-    assets: loaded.assets,
-    compiledFonts,
+    images: compiledAssets.images,
+    compiledFonts: compiledAssets.fonts,
   });
 }
 
@@ -776,7 +775,7 @@ function reportFor(
 async function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): Promise<void> {
   const options = parseGenerateArgs(args, json);
 
-  // --- Step 1: Load, compile every <bdf> font, validate and lay out — all or nothing ---
+  // --- Step 1: Load, compile every <bdf> font and produce every image, validate and lay out — all or nothing ---
   const loaded = loadOrExit(options.path, json, { files: [] });
   const generatorVersion = generatorVersionOrExit(json);
   // Asynchronous, and run before generate() (PR-04b WO3 item 3: generate()
@@ -792,7 +791,6 @@ async function handleGenerateCommand(args: readonly string[], json: boolean, use
     ...loaded.model,
     ...(options.target !== undefined ? { target: options.target } : {}),
     generatorVersion,
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -802,7 +800,7 @@ async function handleGenerateCommand(args: readonly string[], json: boolean, use
   // model with succeeded, so it can never describe a document `generate` refuses.
   const written: GenerateResult =
     options.targetKind === 'editor' && errors === 0
-      ? { ...result, files: editorFilesOf(loaded, result, generatorVersion, compiledAssets.fonts) }
+      ? { ...result, files: editorFilesOf(loaded, result, generatorVersion, compiledAssets) }
       : result;
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
 
@@ -841,7 +839,7 @@ async function handleGenerateCommand(args: readonly string[], json: boolean, use
   // §13.11's last pipeline step, and §1.3's obligation: every `generate` run
   // states what the project costs, including under `--check`, where nothing was
   // written but the figures are still the ones the checked output carries.
-  const report = reportFor(loaded, result, generatorVersion, compiledAssets.fonts);
+  const report = reportFor(loaded, result, generatorVersion, compiledAssets);
 
   // --- Step 5: Report ---
   if (json) {

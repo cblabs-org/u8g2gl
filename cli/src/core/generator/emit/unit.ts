@@ -12,11 +12,10 @@
  * Description: An emitter takes what the whole project declares and returns one
  *              file's text plus any diagnostics it raised. It returns diagnostics
  *              rather than throwing because some defects only emission can see:
- *              a subject's `value` is never type-checked by the validator, and an
- *              `.xbm` asset is not read until here, so both are **author**
- *              errors that must become diagnostics (typescript.md §4). A value
- *              the validator *should* have caught is different, and the value
- *              helper throws for that.
+ *              a subject's `value` is never type-checked by the validator, so it
+ *              is an **author** error that must become a diagnostic
+ *              (typescript.md §4). A value the validator *should* have caught is
+ *              different, and the value helper throws for that.
  *
  *              Every unit opens with its header stamp and carries no timestamp,
  *              lists its declarations in document order, and sorts its includes
@@ -38,6 +37,7 @@ import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { Capacities } from '../../realise/index.js';
 import type { CompiledFont } from '../../fonts/index.js';
+import type { XbmImage } from '../../images/index.js';
 import { compareCodeUnits } from '../../order.js';
 
 /** One emitted file. */
@@ -70,16 +70,15 @@ export interface ProjectEmitInput {
    */
   readonly manifests: ManifestRegistry;
   /**
-   * Asset file **bytes** by the `src` path each declaration names, supplied by
-   * `src/node/` because `src/core/` may not read files (typescript.md §1). An
-   * absent entry is a missing asset, reported as a diagnostic.
-   *
-   * Bytes, not text (PR-04b WO3 item 2): a BDF may be Latin-1 and WO4's PNGs
-   * are binary, so the one asset channel carries bytes and each unit decodes
-   * what it needs — `images.ts` decodes an `<xbm>`'s bytes as UTF-8 text,
-   * because an XBM file is itself C source.
+   * Every image the project declares, `<xbm>` and `<convert>` alike, already
+   * produced and keyed by its declared `name` — from `compileProjectAssets()`
+   * (PR-04b WO4), run before `generate()` because PNG decoding is
+   * asynchronous and emission is not. The one image model: this unit, the §18
+   * budget and the editor target all read this map and nothing else, so an
+   * image cannot be measured one way and emitted another. A declaration with no
+   * entry failed in that step and refuses the build before emission.
    */
-  readonly assets: ReadonlyMap<string, Uint8Array>;
+  readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font already compiled, keyed by its declared `name`
    * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before

@@ -10,16 +10,18 @@
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_xbm.h"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
 static u8g2gl_obj ui_obj_track;  // 0  composite container
 static u8g2gl_label ui_obj_track_readout;  // 1  child of ui_obj_track
-static u8g2gl_label ui_obj_temp;  // 2
-static u8g2gl_label ui_obj_own_font;  // 3
-static u8g2gl_label ui_obj_override;  // 4
-static u8g2gl_label ui_obj_caps;  // 5
-static u8g2gl_label ui_obj_bdf_4x6;  // 6
-static u8g2gl_label ui_obj_bdf_arrow;  // 7
+static u8g2gl_xbm ui_obj_logo;  // 2
+static u8g2gl_label ui_obj_temp;  // 3
+static u8g2gl_label ui_obj_own_font;  // 4
+static u8g2gl_label ui_obj_override;  // 5
+static u8g2gl_label ui_obj_caps;  // 6
+static u8g2gl_label ui_obj_bdf_4x6;  // 7
+static u8g2gl_label ui_obj_bdf_arrow;  // 8
 // "track_knob" is not here: no object required (§13.5)
 // "dot" is not here: no object required (§13.5)
 
@@ -30,6 +32,7 @@ static u8g2gl_label ui_obj_bdf_arrow;  // 7
 static u8g2gl_obj* const ui_screen_bounds_objs[] = {
     &ui_obj_track,
     &ui_obj_track_readout,
+    &ui_obj_logo,
     &ui_obj_temp,
     &ui_obj_own_font,
     &ui_obj_override,
@@ -40,6 +43,7 @@ static u8g2gl_obj* const ui_screen_bounds_objs[] = {
 static const uint8_t ui_screen_bounds_parents[] = {
     U8G2GL_NO_PARENT,  // ui_obj_track
     0,  // ui_obj_track_readout
+    U8G2GL_NO_PARENT,  // ui_obj_logo
     U8G2GL_NO_PARENT,  // ui_obj_temp
     U8G2GL_NO_PARENT,  // ui_obj_own_font
     U8G2GL_NO_PARENT,  // ui_obj_override
@@ -64,6 +68,9 @@ void ui_screen_bounds_init() {
     ui_obj_track_readout.set_coords(0, 16, 20, 10);  // x: set by its binding below
     ui_obj_track_readout.set_font(ui_font_u8g2_font_5x7_mr);
     ui_obj_track_readout.set_text("K");
+
+    ui_obj_logo.set_coords(8, 4, 16, 16);
+    ui_obj_logo.set_src(ui_image_logo_mark);
 
     ui_obj_temp.set_coords(0, 50, 60, 10);
     ui_obj_temp.set_font(ui_font_u8g2_font_6x10_mr);
@@ -97,7 +104,7 @@ void ui_screen_bounds_init() {
 }
 
 // --- activate / deactivate (§12.4) ---
-// Nothing to do: events and focus are not generated until PR-09, and
+// Nothing to do: this build generates no event or focus handling, and
 // u8g2gl_set_active_screen() already marks the new screen dirty.
 void ui_screen_bounds_activate() {}
 
@@ -108,6 +115,7 @@ uint32_t ui_screen_bounds_tick(uint32_t now_ms) {
     uint32_t next = U8G2GL_IDLE;
     next = u8g2gl_min(next, ui_obj_track.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_track_readout.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_logo.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_temp.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_own_font.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_override.tick(now_ms));
@@ -129,20 +137,21 @@ void ui_screen_bounds_render(U8G2& display) {
         u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_knob_x.get()), 10, 4, 4, true, 0);  // track_knob: no object (§13.5)
     }
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 1);  // ui_obj_track_readout
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 2);  // ui_obj_logo
     u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_knob_x.get()), 40, 2, 2, true, 0);  // dot: no object (§13.5)
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 2);  // ui_obj_temp
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 3);  // ui_obj_own_font
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 4);  // ui_obj_override
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 5);  // ui_obj_caps
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 6);  // ui_obj_bdf_4x6
-    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 7);  // ui_obj_bdf_arrow
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 3);  // ui_obj_temp
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 4);  // ui_obj_own_font
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 5);  // ui_obj_override
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 6);  // ui_obj_caps
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 7);  // ui_obj_bdf_4x6
+    u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 8);  // ui_obj_bdf_arrow
 }
 
 // --- The screen descriptor ui_handler() drives (§12.4) ---
 u8g2gl_screen ui_screen_bounds = {
     ui_screen_bounds_objs,
     ui_screen_bounds_parents,
-    8,
+    9,
     ui_screen_bounds_init,
     ui_screen_bounds_activate,
     ui_screen_bounds_deactivate,

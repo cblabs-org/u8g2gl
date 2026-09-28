@@ -111,17 +111,16 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const found = deferred(validateNotYetSupported(inputWith()));
     const byText = new Map(found.map((d) => [d.offendingText, d]));
 
-    // <bdf> is no longer reported: PR-04b WO3 removed its refusal — it compiles now.
+    // <bdf> and <convert> are no longer reported: PR-04b removed their
+    // refusals — both build now.
     expect(found.map((d) => d.offendingText).sort()).toEqual(
-      ['column', 'convert', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
+      ['column', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
     );
     for (const pr9 of ['focus_ring', 'event_cb', 'screen_load_event', 'screen_back_event']) {
       expect(byText.get(pr9)?.message).toContain('PR-09');
     }
     expect(byText.get('column')?.message).toContain('PR-08');
     expect(byText.get('column')?.message).toContain('<wd_list>');
-    expect(byText.get('convert')?.message).toContain("<convert> image 'logo'");
-    expect(byText.get('convert')?.message).toContain('PR-04b');
   });
 
   it('locates each construct where it is declared', () => {
@@ -136,14 +135,14 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     expect(at('screen_back_event')).toBe('screens/screen_home.xml:6:13');
     expect(at('column')).toBe('screens/screen_home.xml:9:13');
     expect(at('focus_ring')).toBe('screens/screen_home.xml:11:9');
-    expect(at('convert')).toMatch(/^globals\.xml:6:/);
   });
 
-  it('reports nothing for builtin fonts, xbm images, and plain elements', () => {
+  it('reports nothing for builtin fonts, xbm and convert images, and plain elements', () => {
     const found = deferred(validateNotYetSupported(inputWith())).map((d) => d.message).join('\n');
 
     expect(found).not.toContain('u8g2_font_6x10_mr');
     expect(found).not.toContain("'icon'");
+    expect(found).not.toContain("'logo'");
     expect(found).not.toContain('<u8g2gl_label>');
   });
 
@@ -152,7 +151,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const warned = deferred(validate({ ...inputWith(), refusalPolicy: 'warning' }).diagnostics);
     const refused = deferred(validate({ ...inputWith(), refusalPolicy: 'error' }).diagnostics);
 
-    expect(byDefault).toHaveLength(6);
+    expect(byDefault).toHaveLength(5);
     expect(byDefault).toEqual(warned);
     expect(warned.every((d) => d.severity === 'warning')).toBe(true);
     expect(refused.every((d) => d.severity === 'error')).toBe(true);

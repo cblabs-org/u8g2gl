@@ -79,6 +79,7 @@ extern const uint8_t* const ui_font_font_arrow_mini;
 
 // --- Images (§14.2) ---
 extern const uint8_t ui_image_icon_wifi[];
+extern const uint8_t ui_image_logo_mark[];
 
 // --- Screens (§13.7) ---
 

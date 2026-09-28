@@ -5,8 +5,9 @@
  *
  * File: src/browser/index.ts
  * Purpose: Browser-specific integration layer for U8G2GL designer and tools.
- * Description: Re-exports the font compiler (PR-04b WO2) and the project asset
- *              compile step (PR-04b WO3), which are isomorphic but whose primary
+ * Description: Re-exports the font compiler (PR-04b WO2), the image decoder and
+ *              converter (PR-04b WO4) and the project asset compile step
+ *              (PR-04b WO3), which are isomorphic but whose primary
  *              browser-side caller is the designer, so both are reachable from
  *              here without importing all of ../core/index.js. Otherwise a stub
  *              barrel for browser-only functionality such as File System Access
@@ -15,9 +16,12 @@
  * Exports:
  * - compileBdf(), CompileBdfInput, CompiledFont, FontCompileFailure, CompileBdfResult,
  *   parseBdfRange(), BdfRangeItem, BdfRangeResult, MAX_BDF_CODEPOINT — from ../core/fonts/index.js
+ * - parseXbm(), decodePng(), convertPng(), rgbaToXbm(), XbmImage and friends —
+ *   from ../core/images/index.js
  * - compileProjectAssets(), CompileProjectAssetsInput, CompileProjectAssetsResult —
  *   from ../core/assets/index.js
  */
 
 export * from '../core/fonts/index.js';
+export * from '../core/images/index.js';
 export * from '../core/assets/index.js';

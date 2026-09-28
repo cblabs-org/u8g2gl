@@ -41,8 +41,10 @@ import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import type { Globals } from '../../src/core/schema/globals.js';
 import type { Screen } from '../../src/core/schema/screen.js';
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
+import type { CompileProjectAssetsResult } from '../../src/core/assets/index.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
+import { xbmCompiledAssets } from '../helpers/compiled-assets.js';
 
 /** §13.12's target: 256x64, so its worked geometry resolves as the spec prints it. */
 const WIDE = 'U8G2_SH1122_256X64_F_3W_HW_SPI';
@@ -489,20 +491,15 @@ describe('generate() carries the realised model and the capacities', () => {
    * would put an undefined `ui_image_*` symbol into generated code and turn a
    * clear diagnostic into a link error.
    */
-  const ASSETS: ReadonlyMap<string, Uint8Array> = new Map([
-    [
-      'images/wifi.xbm',
-      new TextEncoder().encode(
-        ['#define wifi_width 8', '#define wifi_height 8', 'static unsigned char wifi_bits[] = {',
-         '   0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00 };', ''].join('\n'),
-      ),
-    ],
-  ]);
+  const ASSETS = xbmCompiledAssets({
+    icon_wifi: ['#define wifi_width 8', '#define wifi_height 8', 'static unsigned char wifi_bits[] = {',
+      '   0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00 };', ''].join('\n'),
+  });
 
   function model(
     body: string,
     composites: readonly WidgetManifest[],
-  ): ProjectModel & { readonly assets: ReadonlyMap<string, Uint8Array> } {
+  ): ProjectModel & { readonly compiledAssets: CompileProjectAssetsResult } {
     return {
       project: parseProjectFile(PROJECT_XML, 'u8g2gl.xml').value!,
       globals: globals(),
@@ -511,7 +508,7 @@ describe('generate() carries the realised model and the capacities', () => {
       catalogue: CATALOGUE,
       loadDiagnostics: [],
       hasProjectManifest: true,
-      assets: ASSETS,
+      compiledAssets: ASSETS,
     };
   }
 

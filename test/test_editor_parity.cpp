@@ -110,6 +110,8 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
     host->provide_font("font_4x6", ui_font_font_4x6);
     host->provide_font("font_arrow_mini", ui_font_font_arrow_mini);
     host->provide_image("icon_wifi", ui_image_icon_wifi);
+    // PR-04b WO4: a <convert> image is an image like any other to the host.
+    host->provide_image("logo_mark", ui_image_logo_mark);
     EXPECT_TRUE(host->set_string("station_name", v.station));
     EXPECT_TRUE(host->set_string("service_message", v.message));
     EXPECT_TRUE(host->set_bool("wifi_connected", v.wifi));

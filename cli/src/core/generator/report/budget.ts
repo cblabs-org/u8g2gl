@@ -30,8 +30,8 @@
  *                is default-constructible and nothing about its fields.
  *
  *              What *is* derivable is derived exactly: a string subject's storage
- *              from its declared `max_len + 1` (§8.2), an `<xbm>`'s bytes from
- *              the asset the build compiled in, the framebuffer from the
+ *              from its declared `max_len + 1` (§8.2), an image's bytes (`<xbm>`
+ *              or `<convert>`) from the image the build emitted, the framebuffer from the
  *              catalogue's tile dimensions for the target's setup ([D-14], §18),
  *              and every count and capacity [D-21] emitted.
  *
@@ -54,7 +54,7 @@ import type { Target } from '../../schema/project.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import { classOf } from '../emit/screen-model.js';
 import { GENERATED_CONFIG_HEADER } from '../emit/generated-config.js';
-import { parseXbm } from '../emit/xbm.js';
+import type { XbmImage } from '../../images/index.js';
 import { compareCodeUnits } from '../../order.js';
 import {
   MAX_OBJECTS_PER_SCREEN,
@@ -93,11 +93,11 @@ export interface ReportInput {
   /** The CLI version stamped into the build (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Asset bytes by the `src` path each declaration names (PR-04b WO3 item 2) —
-   * the same map emission compiled the `<xbm>` arrays from, so the byte count
-   * reported is the byte count emitted.
+   * Every image this build produced, keyed by its declared `name` (PR-04b
+   * WO4) — the same map emission wrote the arrays from, so the byte count
+   * reported is the byte count emitted, for `<xbm>` and `<convert>` alike.
    */
-  readonly assets: ReadonlyMap<string, Uint8Array>;
+  readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font this build compiled, keyed by its declared `name`
    * (PR-04b WO3 item 6) — the same map emission wrote the arrays from, so the
@@ -165,32 +165,22 @@ function elementClassesByOrigin(input: ReportInput): {
 }
 
 // imageDataBytes
-// The exact bytes the `<xbm>` arrays add, read from the very assets emission
-// compiled in. Derivable, so it is derived: §18's own purpose includes catching
-// an asset that is far larger than the project needs, and an author cannot see
-// that in XML. An asset that is absent or malformed refuses the build before the
-// report is built, so a missing entry here can only be a `<convert>`, which is
-// refused too — either way it contributes nothing rather than a guess.
-//   input — the report input; reads `globals.images` and `assets`
+// The exact bytes the image arrays add, read from the very image map emission
+// wrote them from (PR-04b WO4): `<xbm>` and `<convert>` alike, so a converted
+// image is measured, not guessed. Derivable, so it is derived: §18's own
+// purpose includes catching an asset that is far larger than the project needs,
+// and an author cannot see that in XML. A declaration with no entry failed in
+// the asset step and refuses the build, so no report is built for it.
+//   input — the report input; reads `globals.images` and `images`
 function imageDataBytes(input: ReportInput): { readonly bytes: number; readonly names: readonly string[] } {
   let bytes = 0;
   const names: string[] = [];
   for (const image of input.globals.images ?? []) {
-    if (image.kind !== 'xbm') {
+    const produced = input.images.get(image.name);
+    if (produced === undefined) {
       continue;
     }
-    const assetBytes = input.assets.get(image.src);
-    if (assetBytes === undefined) {
-      continue;
-    }
-    // The same decode images.ts applies (PR-04b WO3 item 2): the one asset
-    // channel carries bytes, and an XBM file is itself C source.
-    const text = new TextDecoder('utf-8').decode(assetBytes);
-    const parsed = parseXbm(text);
-    if ('reason' in parsed) {
-      continue; // Malformed: emission refuses the build, so no report is built for it.
-    }
-    bytes += parsed.bytes.length;
+    bytes += produced.bytes.length;
     names.push(image.name);
   }
   return { bytes, names };
@@ -220,7 +210,7 @@ function compiledBdfFontBytes(input: ReportInput): { readonly bytes: number; rea
   return { bytes, names };
 }
 
-// §18's flash table. Every line is unmeasured except the `<xbm>` arrays and a
+// §18's flash table. Every line is unmeasured except the image arrays and a
 // compiled `<bdf>` font's arrays, whose bytes the generator emits itself and
 // therefore knows exactly.
 //   input — the report input
@@ -262,7 +252,7 @@ function flashLines(input: ReportInput): readonly BudgetLine[] {
       ),
     },
     {
-      item: 'image data (xbm arrays)',
+      item: 'image data (bitmap arrays)',
       count: images.names.length,
       names: images.names,
       figure: measured(images.bytes, 'the byte count of the arrays this build emits (§14.2)'),
@@ -528,7 +518,7 @@ function realisationReport(realised: readonly RealisedScreen[]): RealisationRepo
  * two renderings of one arithmetic ([D-21], PR-04 WO8c).
  *
  * @param input The build's globals, manifests, realisation, capacities, target
- *              and assets, and the generator version stamped into it.
+ *              and images, and the generator version stamped into it.
  * @return The three reports `generate --json` carries. Deterministic for a given
  *         document (§13.9): every list is in document order or sorted by code
  *         unit, and nothing is read from a `Set`'s iteration order.

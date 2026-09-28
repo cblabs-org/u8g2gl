@@ -64,7 +64,6 @@ async function generateWith(globalsXml: string, screenBody: string, assets: Read
     loadDiagnostics: [],
     hasProjectManifest: true,
     generatorVersion: '9.9.9',
-    assets,
     compiledAssets,
   };
   return generate(input);
@@ -149,7 +148,6 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
       loadDiagnostics: [],
       hasProjectManifest: true,
       generatorVersion: '9.9.9',
-      assets,
       compiledAssets,
     });
     expect(result.errors).toBe(0);
@@ -165,7 +163,7 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
       target,
       display: findTargetDisplay(target, CATALOGUE),
       generatorVersion: '9.9.9',
-      assets,
+      images: compiledAssets.images,
       compiledFonts: compiledAssets.fonts,
     });
 
@@ -257,7 +255,6 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
       loadDiagnostics: [],
       hasProjectManifest: true,
       generatorVersion: '9.9.9',
-      assets,
       compiledAssets,
     });
 
@@ -294,7 +291,7 @@ describe('emitFontsUnit() — comment sanitisation (PR-04b WO3 item 5)', () => {
         subjects: [],
       },
       manifests: frameworkRegistry(),
-      assets: new Map(),
+      images: new Map(),
       compiledFonts: new Map([[font.name, HOSTILE]]),
       stamp: '// stamp\n',
     };
@@ -347,7 +344,7 @@ describe('fontDeclarations() — both kinds share one declared form', () => {
       screens: [],
       capacities: { maxObjectsPerScreen: 0, maxBindingsPerObject: 0, totalBindings: 0, styles: 0, styleNames: [], subjects: [] },
       manifests: frameworkRegistry(),
-      assets: new Map(),
+      images: new Map(),
       stamp: '',
     };
     const declarations = fontDeclarations(input);

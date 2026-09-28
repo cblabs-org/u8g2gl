@@ -273,10 +273,7 @@ function parseImages(
       const height =
         getNumberAttribute(child, 'height', filename, diagnostics) ??
         parseInt(heightAttr?.value ?? '0', 10);
-      const mode = getAttributeValue(child, 'mode') as
-        | 'threshold'
-        | 'dither'
-        | undefined;
+      const mode = getAttributeValue(child, 'mode');
       const threshold = getNumberAttribute(
         child,
         'threshold',

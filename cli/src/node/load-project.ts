@@ -83,15 +83,14 @@ export interface LoadedProject {
   /**
    * Asset file **bytes** by the `src` path its declaration names (§14.1,
    * §14.2, PR-04b WO3 item 2), for the emitters and `compileProjectAssets()`
-   * to compile into generated code. Covers both an `<xbm>`'s and a `<bdf>`'s
-   * `src` — a `<convert>` image is refused before emission (WO4), so reading
-   * one would be work for a build that cannot finish.
+   * to compile into generated code. Covers an `<xbm>`'s, a `<convert>`'s and a
+   * `<bdf>`'s `src`.
    *
    * Read here because `src/core/` may not touch the filesystem
    * (typescript.md §1): emission is isomorphic and takes the bytes as a
    * parameter, which is also what lets the designer supply them from editor
    * buffers instead of from disk. An asset that could not be read is simply
-   * absent, and the images emitter or `compileProjectAssets()` reports it
+   * absent, and `compileProjectAssets()` reports it
    * against its own declaration.
    */
   readonly assets: ReadonlyMap<string, Uint8Array>;
@@ -282,13 +281,11 @@ function isInsideProject(projectRoot: string, absolute: string): boolean {
 // The bytes of every asset the document declares, keyed by the `src` path the
 // declaration names (§14.1, §14.2, PR-04b WO3 item 2).
 //
-// An `<xbm>`'s and a `<bdf>`'s `src` only: a `<convert>` image is refused
-// before emission (WO4), so reading it would be work for a build that cannot
-// finish.
+// An `<xbm>`'s, a `<convert>`'s and a `<bdf>`'s `src`.
 //
 // A `src` that resolves outside the project directory is skipped rather than
-// read. A skipped or unreadable asset is left absent, and the images emitter
-// or `compileProjectAssets()` reports it with the declaration's own location —
+// read. A skipped or unreadable asset is left absent, and
+// `compileProjectAssets()` reports it with the declaration's own location —
 // a missing file is the author's defect, not the loader's, so nothing is
 // thrown here.
 //   projectRoot — absolute project directory, or undefined for a single file
@@ -300,7 +297,7 @@ function readAssets(projectRoot: string | undefined, globals: Globals): Readonly
   }
   const sources: string[] = [];
   for (const image of globals.images ?? []) {
-    if (image.kind === 'xbm' && image.src !== '') {
+    if (image.src !== '') {
       sources.push(image.src);
     }
   }
@@ -320,7 +317,7 @@ function readAssets(projectRoot: string | undefined, globals: Globals): Readonly
     try {
       assets.set(src, new Uint8Array(readFileSync(absolute)));
     } catch {
-      // Absent: reported by the images emitter or compileProjectAssets(), against the declaration.
+      // Absent: reported by compileProjectAssets(), against the declaration.
     }
   }
   return assets;

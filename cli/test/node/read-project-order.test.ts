@@ -112,7 +112,7 @@ function project(): string {
 /** Generates a project at the fixed golden version. */
 function generateAt(dir: string): ReturnType<typeof generate> {
   const loaded = loadProject(dir);
-  const result = generate({ ...loaded.model, generatorVersion: GOLDEN_GENERATOR_VERSION, assets: loaded.assets });
+  const result = generate({ ...loaded.model, generatorVersion: GOLDEN_GENERATOR_VERSION });
   expect(result.errors, JSON.stringify(result.diagnostics.slice(0, 2))).toBe(0);
   return result;
 }

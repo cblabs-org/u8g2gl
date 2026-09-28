@@ -215,7 +215,6 @@ async function fixtureScene(): Promise<{ readonly scene: Record<string, unknown>
   const result = generate({
     ...loaded.model,
     generatorVersion: '0.0.0-golden',
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -226,7 +225,7 @@ async function fixtureScene(): Promise<{ readonly scene: Record<string, unknown>
       screens: loaded.model.screens,
       capacities: result.capacities!,
       manifests: loaded.model.manifests,
-      assets: loaded.assets,
+      images: compiledAssets.images,
       compiledFonts: compiledAssets.fonts,
       bdfLicenceFiles: loaded.bdfLicenceFiles,
       stamp: '',
@@ -397,7 +396,7 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
       resolved: result.resolved!,
       manifests: loaded.model.manifests,
       capacities: result.capacities!,
-      assets: loaded.assets,
+      images: compiledAssets.images,
       compiledFonts: compiledAssets.fonts,
       bdfLicenceFiles: loaded.bdfLicenceFiles,
       generatorVersion: '0.0.0-golden',

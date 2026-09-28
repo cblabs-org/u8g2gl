@@ -167,8 +167,7 @@ export const DIAGNOSTIC_CODES = {
   /**
    * The document uses a construct the schema accepts but the generator does not
    * build yet — focus rings, events and screen navigation (PR-09), collections
-   * and composites with their own C++ class (PR-08), `<bdf>` fonts and `<convert>`
-   * images (PR-04b). The message names the PR that delivers it.
+   * and composites with their own C++ class (PR-08). The message names the PR that delivers it.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
    * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).
@@ -325,6 +324,24 @@ export const DIAGNOSTIC_CODES = {
    * with no data, or crash.
    */
   MISSING_COMPILED_FONT: 'U8G2GL_MISSING_COMPILED_FONT',
+  /**
+   * A `<convert>` image's PNG could not be turned into an XBM (PR-04b WO4): the
+   * file is not a PNG, is corrupt or truncated, holds an unknown critical
+   * chunk, is Adam7 interlaced, or its size is not the size the declaration
+   * gives. The message says which, and names the declaration and the file.
+   */
+  IMAGE_CONVERT_FAILED: 'U8G2GL_IMAGE_CONVERT_FAILED',
+  /**
+   * `generate` has no image for an `<xbm>` or `<convert>` it is about to emit
+   * (PR-04b WO4) — the image counterpart of `MISSING_COMPILED_FONT`. Emission
+   * never reads or converts an asset itself: `compileProjectAssets()` must run
+   * first and hand its result to `generate()` as
+   * `GenerateInput.compiledAssets`. A missing image with no accompanying
+   * `MISSING_FILE`, `TYPE_MISMATCH` or `IMAGE_CONVERT_FAILED` for the same
+   * declaration means the host forgot to call it; a programming error, not
+   * the author's.
+   */
+  MISSING_COMPILED_IMAGE: 'U8G2GL_MISSING_COMPILED_IMAGE',
 } as const;
 
 /**

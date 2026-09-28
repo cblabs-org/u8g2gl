@@ -25,7 +25,7 @@
  * Exports:
  * - cppValue, cppStringLiteral, cppEnumerator (value.ts) — §13.2's type mapping
  * - drawCallFor, DrawCall, DrawCallInput, SUBJECT_READ_SUFFIX (draw-args.ts)
- * - parseXbm, XbmImage (xbm.ts)
+ * - parseXbm, XbmImage (images/xbm.ts)
  * - EmittedUnit, ProjectEmitInput, section, includeBlock (unit.ts)
  * - The per-unit emitters and their file names, including the screen unit
  *   (screen.ts), `ui.cpp` (ui-init.ts) and the coordinate translation they share
@@ -43,6 +43,7 @@ import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import type { Capacities, RealisedScreen } from '../../realise/index.js';
+import type { XbmImage } from '../../images/index.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import { formatHeaderStamp } from '../header.js';
 import { emitGeneratedConfigHeader, GENERATED_CONFIG_HEADER } from './generated-config.js';
@@ -64,7 +65,7 @@ export {
   type DrawCall,
   type DrawCallInput,
 } from './draw-args.js';
-export { parseXbm, type XbmImage, type XbmParseError } from './xbm.js';
+export { parseXbm, type XbmImage, type XbmParseError } from '../../images/xbm.js';
 export {
   declarationError,
   includeBlock,
@@ -110,8 +111,8 @@ export interface ProjectEmissionInput {
   readonly manifests: ManifestRegistry;
   /** WO8b's counted capacities ([D-21]). Emitted, never recounted. */
   readonly capacities: Capacities;
-  /** Asset bytes by `src` path, read by `src/node/` (PR-04b WO3 item 2). */
-  readonly assets: ReadonlyMap<string, Uint8Array>;
+  /** Every image, produced by `compileProjectAssets()` and keyed by declared name (PR-04b WO4). */
+  readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font already compiled, keyed by its declared `name`
    * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before
@@ -199,7 +200,7 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
       screens: input.screens,
       capacities: input.capacities,
       manifests: input.manifests,
-      assets: input.assets,
+      images: input.images,
       compiledFonts: input.compiledFonts,
       bdfLicenceFiles: input.bdfLicenceFiles,
       stamp: stampFor(plan.source === 'project' ? projectSource : globalsSource),
@@ -284,7 +285,7 @@ export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
       screens: input.screens,
       capacities: input.capacities,
       manifests: input.manifests,
-      assets: input.assets,
+      images: input.images,
       compiledFonts: input.compiledFonts,
       bdfLicenceFiles: input.bdfLicenceFiles,
       stamp: '',

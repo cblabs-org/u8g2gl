@@ -93,7 +93,7 @@ function editorOverrides(result: Journeys): readonly { readonly name: string }[]
       screens: result.project.screens,
       capacities: result.generated.capacities!,
       manifests: REGISTRY,
-      assets: new Map(),
+      images: new Map(),
       stamp: '',
     },
     realised: result.generated.realised!,

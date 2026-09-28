@@ -40,7 +40,6 @@ async function regenerate(): Promise<ReturnType<typeof generate>> {
   return generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -77,7 +76,6 @@ async function regenerateEditor(): Promise<readonly { path: string; content: str
   const result = generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -92,7 +90,7 @@ async function regenerateEditor(): Promise<readonly { path: string; content: str
     resolved: result.resolved,
     manifests: loaded.model.manifests,
     capacities: result.capacities,
-    assets: loaded.assets,
+    images: compiledAssets.images,
     compiledFonts: compiledAssets.fonts,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
     generatorVersion: GOLDEN_GENERATOR_VERSION,

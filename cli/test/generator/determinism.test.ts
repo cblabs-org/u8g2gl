@@ -55,7 +55,6 @@ async function generateAt(dir: string): Promise<ReturnType<typeof generate>> {
   const result = generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -159,14 +158,12 @@ describe('file-discovery order cannot reach the emitted bytes (§13.9)', () => {
     const forwards = generate({
       ...loaded.model,
       generatorVersion: GOLDEN_GENERATOR_VERSION,
-      assets: loaded.assets,
-    });
+      });
     const backwards = generate({
       ...loaded.model,
       screens: [...loaded.model.screens].reverse(),
       generatorVersion: GOLDEN_GENERATOR_VERSION,
-      assets: loaded.assets,
-    });
+      });
 
     expect(backwards.errors).toBe(0);
     // Reversing the screens really does change the output — the file list order

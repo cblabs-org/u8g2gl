@@ -41,27 +41,23 @@ const PROJECT_XML = `<u8g2gl schema="0.4" name="gen" version="1.0.0">
 const BUILTIN_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>
 `;
 
-// <convert>, not <bdf>: PR-04b WO3 removed the <bdf> refusal, so <convert> is
-// now the not-yet-supported construct this suite reaches for (WO4 still
-// refuses it). The screens below reference u8g2_font_6x10_mr, so it is still
-// declared alongside the <convert> image.
-const CONVERT_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts><images><convert name="logo" src="images/logo.png" width="16" height="16" /></images></globals>
-`;
-
-function screenXml(screen: string, label: string | undefined): string {
+// <focus_ring> is the not-yet-supported construct this suite reaches for: PR-04b
+// removed the <bdf> and <convert> refusals, so only PR-08/PR-09 constructs remain.
+function screenXml(screen: string, label: string | undefined, focusRing = false): string {
   const name = label === undefined ? '' : ` name="${label}"`;
+  const ring = focusRing ? `\n        <focus_ring wrap="true"><entry name="${label}" /></focus_ring>` : '';
   return `<screen name="${screen}">
     <view>
-        <u8g2gl_label${name} x="0" y="0" width="128" height="12" font="u8g2_font_6x10_mr" text="Hi" />
+        <u8g2gl_label${name} x="0" y="0" width="128" height="12" font="u8g2_font_6x10_mr" text="Hi" />${ring}
     </view>
 </screen>
 `;
 }
 
 /** A two-screen project model, as the loader would build it. */
-function model(options: { globals?: string; unnamed?: boolean } = {}): ProjectModel {
+function model(options: { globals?: string; unnamed?: boolean; focusRing?: boolean } = {}): ProjectModel {
   const loadDiagnostics: Diagnostic[] = [];
-  const home = parseScreenFile(screenXml('home', options.unnamed ? undefined : 'home_title'), 'screens/screen_home.xml');
+  const home = parseScreenFile(screenXml('home', options.unnamed ? undefined : 'home_title', options.focusRing), 'screens/screen_home.xml');
   const settings = parseScreenFile(screenXml('settings', 'settings_title'), 'screens/screen_settings.xml');
   loadDiagnostics.push(...home.diagnostics, ...settings.diagnostics);
   return {
@@ -137,7 +133,7 @@ describe('generate() (PR-04 WO5b)', () => {
   });
 
   it('refuses a not-yet-supported construct that validate only warns about — same code and location', () => {
-    const input = model({ globals: CONVERT_GLOBALS_XML });
+    const input = model({ focusRing: true });
     const validated = checkProject(input, 'warning');
     const generated = generate({ ...input, generatorVersion: '1.0.0' });
 

@@ -59,7 +59,7 @@ namespace {
 // generator, so a change to what is counted fails a test that names it.
 constexpr uint32_t kFixtureTotalBindings = 7;
 constexpr uint32_t kFixtureBindingsPerObject = 1;
-constexpr uint32_t kFixtureObjectsOnBusiestScreen = 8;  // bounds, since PR-04b WO3b added the two <bdf> labels (home has 5)
+constexpr uint32_t kFixtureObjectsOnBusiestScreen = 9;  // bounds: two <bdf> labels since PR-04b WO3b, the <convert> image since WO4 (home has 5)
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not
@@ -375,6 +375,21 @@ drawn_label drawn_with(const U8G2& display, const char* text) {
 }
 
 }  // namespace
+
+TEST(GeneratedFixture, ConvertedImageIsDrawnLikeAnXbm) {
+    // PR-04b WO4: logo_mark is a <convert>, converted from a PNG at generate
+    // time, and reaches the display through the same set_src() / drawXBMP path
+    // an <xbm> does — one bitmap, at the position and size the screen gave it.
+    U8G2 display;
+    show(ui_screen_bounds, display);
+
+    const std::vector<u8g2_stub_call> bitmaps = logged(display, "drawXBMP");
+    ASSERT_EQ(bitmaps.size(), 1u);
+    EXPECT_EQ(bitmaps[0].args[0], 8);   // logo: x
+    EXPECT_EQ(bitmaps[0].args[1], 4);   // y
+    EXPECT_EQ(bitmaps[0].args[2], 16);  // width
+    EXPECT_EQ(bitmaps[0].args[3], 16);  // height
+}
 
 TEST(GeneratedFixture, BoundPositionsAreContainerRelative) {
     // Ruling 1 (§7.2, [D-20] amendment): track sits at x=40. Its knob (a draw

@@ -6,6 +6,9 @@
         <!-- Ruling 1: bound positions are container-relative. -->
         <slider name="track" x="40" y="10" width="60" height="20" />
 
+        <!-- PR-04b WO4: a <convert> image, drawn like any bitmap. -->
+        <u8g2gl_xbm name="logo" x="8" y="4" width="16" height="16" src="logo_mark" />
+
         <!-- ...and on the screen, a bound position is its value (no literal x). -->
         <u8g2gl_box name="dot" bind_x="knob_x" y="40" width="2" height="2" />
 

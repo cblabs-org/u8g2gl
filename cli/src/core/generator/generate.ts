@@ -22,9 +22,14 @@
  *              screen's unit — objects, parent tables, draw calls — from the
  *              same realisation and resolution.
  *
- *              Emission can raise diagnostics of its own, for the two defects no
- *              pass can see — an unreadable `<xbm>` asset and a subject's
- *              declared value — and they refuse the build like any other error.
+ *              Images and fonts arrive already produced, from
+ *              `compileProjectAssets()` (asynchronous, so it runs before this
+ *              synchronous function): `compiledAssets.images` and `.fonts`. A
+ *              declaration with neither an entry nor a recorded failure means
+ *              the host skipped that step and is refused loudly. Emission can
+ *              raise a diagnostic of its own for a defect no pass can see — a
+ *              subject's declared value — and it refuses the build like any
+ *              other error.
  *
  * Exports:
  * - GENERATE_REFUSAL_POLICY: Always 'error' — the build refuses what it cannot emit
@@ -35,7 +40,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import type { BdfFontDecl } from '../schema/globals.js';
+import type { BdfFontDecl, ImageDecl } from '../schema/globals.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
@@ -44,6 +49,7 @@ import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-pr
 import { emitProjectFiles } from './emit/index.js';
 import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from '../realise/index.js';
 import type { CompiledFont } from '../fonts/index.js';
+import type { XbmImage } from '../images/index.js';
 import type { CompileProjectAssetsResult } from '../assets/index.js';
 
 /**
@@ -62,27 +68,17 @@ export interface GenerateInput extends ProjectModel {
   /** Version of the CLI running, stamped into every file (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Asset file **bytes** by the `src` path its declaration names (§14.1,
-   * §14.2, PR-04b WO3 item 2) — an `<xbm>`'s bytes and a `<bdf>`'s source are
-   * both compiled into the generated code, so emission needs them.
-   *
-   * Passed in rather than read, because this module is isomorphic and
-   * `src/core/` may not touch the filesystem (typescript.md §1): the Node
-   * loader reads them from disk and the designer will supply them from editor
-   * buffers. Absent is the same as empty — the images emitter reports any asset
-   * it needed and did not get.
-   */
-  readonly assets?: ReadonlyMap<string, Uint8Array>;
-  /**
-   * Every `<bdf>` font already compiled, and any diagnostic compiling one
+   * Every `<bdf>` font already compiled and every image already produced (an
+   * `<xbm>` parsed, a `<convert>` converted), and any diagnostic doing so
    * raised — from `compileProjectAssets()`, run **before** `generate()`
-   * because it is asynchronous and this function is not (PR-04b WO3 item 3).
+   * because it is asynchronous and this function is not (PR-04b WO3 item 3,
+   * WO4).
    *
    * Absent means the host never called it. `generate()` treats that as a
    * programming error rather than a silently empty build: any `<bdf>` the
-   * document declares is reported as `U8G2GL_MISSING_COMPILED_FONT` rather
-   * than emitted with no data, or dropped without a trace as it would be if
-   * a build simply skipped fonts it did not recognise.
+   * document declares is reported as `U8G2GL_MISSING_COMPILED_FONT`, and any
+   * image as `U8G2GL_MISSING_COMPILED_IMAGE`, rather than emitted with no
+   * data, or dropped without a trace.
    */
   readonly compiledAssets?: CompileProjectAssetsResult;
   /**
@@ -213,31 +209,59 @@ function missingCompiledFontDiagnostic(font: BdfFontDecl): Diagnostic {
   };
 }
 
-// compiledFontDiagnostics
-// Every diagnostic generate() owes its caller about <bdf> compilation: the
-// asset compile step's own diagnostics (a missing source file, or bdfconv
-// failing — both located and named by compileProjectAssets()), plus a loud,
-// internal-error diagnostic for any <bdf> that is neither compiled nor already
-// known to have failed there — which can only mean the host never called
-// compileProjectAssets() at all, or silently dropped a font it returned.
+// missingCompiledImageDiagnostic
+// The internal-error diagnostic for an image generate() has no entry for — see
+// GenerateInput.compiledAssets's doc comment. The image counterpart of
+// missingCompiledFontDiagnostic().
+//   image — the declaration with no entry
+function missingCompiledImageDiagnostic(image: ImageDecl): Diagnostic {
+  const loc = image.loc;
+  return {
+    code: DIAGNOSTIC_CODES.MISSING_COMPILED_IMAGE,
+    severity: 'error',
+    file: loc?.file ?? '',
+    line: loc?.line ?? 1,
+    column: loc?.column ?? 1,
+    message:
+      `Image '${image.name}' has no produced entry. 'u8g2gl generate' never reads or converts an image itself — ` +
+      `the host must call compileProjectAssets() first and pass its result as GenerateInput.compiledAssets ` +
+      `— so this means that step was never run, or it silently dropped this image.`,
+    offendingText: image.name,
+  };
+}
+
+// compiledAssetDiagnostics
+// Every diagnostic generate() owes its caller about asset compilation: the
+// asset compile step's own diagnostics (a missing source file, bdfconv or the
+// PNG converter failing — all located and named by compileProjectAssets()),
+// plus a loud, internal-error diagnostic for any <bdf> or image that is
+// neither produced nor already known to have failed there — which can only mean
+// the host never called compileProjectAssets() at all, or silently dropped an
+// entry it returned.
 //
-// The guard is driven by compiledAssets.failedFonts, an explicit set of font
-// names (PR-04b WO3b item 1) — not by re-reading `offendingText` off the asset
-// diagnostics, which is presentation data free to be reworded; WO3 read it for
-// exactly this decision, so rewording a diagnostic used to silently change
-// which fonts this guard fired for.
-//   input         — generate's own input; reads `globals.fonts` and `compiledAssets`
-//   compiledFonts — input.compiledAssets?.fonts ?? new Map()
-function compiledFontDiagnostics(
+// The guard is driven by compiledAssets.failedFonts and .failedImages, explicit
+// sets of names (PR-04b WO3b item 1, WO4) — not by re-reading `offendingText`
+// off the asset diagnostics, which is presentation data free to be reworded.
+//   input          — generate's own input; reads `globals` and `compiledAssets`
+//   compiledFonts  — input.compiledAssets?.fonts ?? new Map()
+//   compiledImages — input.compiledAssets?.images ?? new Map()
+function compiledAssetDiagnostics(
   input: GenerateInput,
   compiledFonts: ReadonlyMap<string, CompiledFont>,
+  compiledImages: ReadonlyMap<string, XbmImage>,
 ): readonly Diagnostic[] {
   const assetDiagnostics = input.compiledAssets?.diagnostics ?? [];
   const failedFonts = input.compiledAssets?.failedFonts ?? new Set<string>();
+  const failedImages = input.compiledAssets?.failedImages ?? new Set<string>();
   const missing: Diagnostic[] = [];
   for (const font of input.globals.fonts ?? []) {
     if (font.kind === 'bdf' && !compiledFonts.has(font.name) && !failedFonts.has(font.name)) {
       missing.push(missingCompiledFontDiagnostic(font));
+    }
+  }
+  for (const image of input.globals.images ?? []) {
+    if (!compiledImages.has(image.name) && !failedImages.has(image.name)) {
+      missing.push(missingCompiledImageDiagnostic(image));
     }
   }
   return [...assetDiagnostics, ...missing];
@@ -304,7 +328,11 @@ export function generate(input: GenerateInput): GenerateResult {
   // function is not (PR-04b WO3 item 3); its result, and the diagnostics it
   // raised, arrive through `input.compiledAssets`.
   const compiledFonts = input.compiledAssets?.fonts ?? new Map<string, CompiledFont>();
-  const checked = finaliseDiagnostics([...validated.diagnostics, ...compiledFontDiagnostics(input, compiledFonts)]);
+  const compiledImages = input.compiledAssets?.images ?? new Map<string, XbmImage>();
+  const checked = finaliseDiagnostics([
+    ...validated.diagnostics,
+    ...compiledAssetDiagnostics(input, compiledFonts, compiledImages),
+  ]);
   if (checked.errors > 0) {
     return { files: [], ...checked, ...('code' in target ? {} : { target: target.name }) };
   }
@@ -341,17 +369,16 @@ export function generate(input: GenerateInput): GenerateResult {
           resolved: pipeline.resolution.screens,
           manifests: input.manifests,
           capacities,
-          assets: input.assets ?? new Map<string, Uint8Array>(),
+          images: compiledImages,
           compiledFonts,
           bdfLicenceFiles: input.bdfLicenceFiles ?? new Map<string, readonly string[]>(),
           generatorVersion: input.generatorVersion,
           target: target.name,
         });
 
-  // Emission sees two defects validation cannot: an `<xbm>` asset, which is not
-  // read until now, and a subject's declared `value`, which no pass type-checks.
-  // Both are the author's, so they refuse the build exactly as a validation
-  // error does — a partial set is never written ([D-11]).
+  // Emission sees a defect validation cannot: a subject's declared `value`,
+  // which no pass type-checks. It is the author's, so it refuses the build
+  // exactly as a validation error does — a partial set is never written ([D-11]).
   const finalised = finaliseDiagnostics([...checked.diagnostics, ...emitted.diagnostics]);
   if (finalised.errors > 0) {
     return { files: [], ...finalised, target: target.name };

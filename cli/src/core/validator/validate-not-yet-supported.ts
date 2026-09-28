@@ -22,9 +22,9 @@
  *                `<screen_back_event>` → PR-09 (decision 1)
  *              - collection `<element>` children (§9), and a composite that also
  *                has a C++ class (`view` + `extends`) → PR-08 (decision 1)
- *              - `<convert>` images → PR-04b (decision 3, WO4). `<bdf>` fonts
- *                were here too until PR-04b WO3 removed the entry: they compile
- *                through `bdfconv` now (`compileProjectAssets()`, `generate.ts`).
+ *              `<bdf>` fonts and `<convert>` images were here too until PR-04b
+ *              removed their entries: both build now, through
+ *              `compileProjectAssets()` (`generate.ts`).
  *
  * Exports:
  * - RefusalPolicy:                'warning' (authoring) or 'error' (build)
@@ -72,7 +72,6 @@ export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 // cannot disagree with each other, and so each PR finds its own entries here.
 const FOCUS_AND_EVENTS_PR = 'PR-09';
 const COLLECTIONS_AND_CLASSED_COMPOSITES_PR = 'PR-08';
-const FONT_AND_IMAGE_PIPELINE_PR = 'PR-04b';
 
 // deferredDiagnostic
 // Builds one NOT_YET_SUPPORTED diagnostic at the caller's policy severity.
@@ -178,8 +177,7 @@ function checkView(
  *              every diagnostic, defaulting to
  *              {@link DEFAULT_REFUSAL_POLICY}.
  * @return One `U8G2GL_NOT_YET_SUPPORTED` diagnostic per construct: screens, then
- *         declared composites, then globals' `<convert>` images, each in
- *         document order. `validate()` sorts the combined result.
+ *         declared composites, each in document order. `validate()` sorts the combined result.
  */
 export function validateNotYetSupported(input: ValidateInput): readonly Diagnostic[] {
   const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
@@ -207,24 +205,6 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
       );
     }
     checkView(composite.view, input, severity, diagnostics);
-  }
-
-  // --- Step 3: Asset pipeline — converted images ---
-  // `<bdf>` fonts compile now (PR-04b WO3 item 4) and are no longer reported
-  // here; the message names the declaration and the tool that is missing, so
-  // WO4 can replace this <convert> entry alone when its turn comes.
-  for (const image of input.globals?.images ?? []) {
-    if (image.kind === 'convert') {
-      diagnostics.push(
-        deferredDiagnostic(
-          severity,
-          `<convert> image '${image.name}' is not yet supported: build-time PNG-to-XBM conversion (§14) — ` +
-            `${refusalClause(FONT_AND_IMAGE_PIPELINE_PR)}. Declare an <xbm> image meanwhile.`,
-          image.loc,
-          'convert',
-        ),
-      );
-    }
   }
 
   return diagnostics;

@@ -13,8 +13,8 @@
  *          catching anything.
  * Description: Generates through the built `dist/`, with the same fixed version
  *              the tests use, and writes each fixture's expectations in place.
- *              Every `<bdf>` is compiled first through `compileProjectAssets()`
- *              (PR-04b WO3 item 3), exactly as the CLI's own `generate` command
+ *              Every `<bdf>` is compiled and every image produced first through
+ *              `compileProjectAssets()` (PR-04b WO3 item 3, WO4), exactly as the CLI's own `generate` command
  *              does — `generate()` itself never compiles a font, and a fixture
  *              declaring one would otherwise refuse with
  *              `U8G2GL_MISSING_COMPILED_FONT` (PR-04b WO3b item 3).
@@ -60,7 +60,6 @@ for (const { project, expected, editor } of FIXTURES) {
   const result = generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
@@ -86,7 +85,7 @@ for (const { project, expected, editor } of FIXTURES) {
       resolved: result.resolved,
       manifests: loaded.model.manifests,
       capacities: result.capacities,
-      assets: loaded.assets,
+      images: compiledAssets.images,
       compiledFonts: compiledAssets.fonts,
       bdfLicenceFiles: loaded.bdfLicenceFiles,
       generatorVersion: GOLDEN_GENERATOR_VERSION,

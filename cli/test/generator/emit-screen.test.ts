@@ -32,6 +32,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnos
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
+import { xbmCompiledAssets } from '../helpers/compiled-assets.js';
 
 const DISPLAY_128 = 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C';
 const DISPLAY_256 = 'U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI';
@@ -144,7 +145,7 @@ function generateProject(options: Options): GenerateResult {
     loadDiagnostics,
     hasProjectManifest: true,
     generatorVersion: '0.0.0-test',
-    assets: new Map([['assets/icon_wifi.xbm', new TextEncoder().encode(XBM)]]),
+    compiledAssets: xbmCompiledAssets({ icon_wifi: XBM }),
   });
 }
 

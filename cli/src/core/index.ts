@@ -18,6 +18,7 @@
  * - Resolver — coordinate arithmetic, anchors, resolved model — from ./resolver/index.js
  * - Generator — checkProject, header stamp, generate() — from ./generator/index.js
  * - Fonts — compileBdf(), the <bdf range> grammar — from ./fonts/index.js
+ * - Images — the image model, PNG decode and <convert> conversion — from ./images/index.js
  * - Assets — compileProjectAssets(), the async step before generate() — from ./assets/index.js
  */
 
@@ -29,4 +30,5 @@ export * from './validator/index.js';
 export * from './resolver/index.js';
 export * from './generator/index.js';
 export * from './fonts/index.js';
+export * from './images/index.js';
 export * from './assets/index.js';

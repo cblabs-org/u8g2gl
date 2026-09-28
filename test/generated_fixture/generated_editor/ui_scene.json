@@ -89,15 +89,17 @@
     "font_arrow_mini"
   ],
   "images": [
-    "icon_wifi"
+    "icon_wifi",
+    "logo_mark"
   ],
   "screens": [
     {
       "name": "bounds",
-      "objects": 8,
+      "objects": 9,
       "parents": [
         null,
         0,
+        null,
         null,
         null,
         null,
@@ -206,12 +208,41 @@
           "flags": []
         },
         {
+          "name": "logo",
+          "tag": "u8g2gl_xbm",
+          "realisation": "object",
+          "source": {
+            "file": "screens/screen_bounds.xml",
+            "line": 10,
+            "column": 9
+          },
+          "class": "u8g2gl_xbm",
+          "object": 2,
+          "parent": null,
+          "rect": [
+            8,
+            4,
+            16,
+            16
+          ],
+          "properties": [
+            {
+              "name": "src",
+              "value": "logo_mark"
+            }
+          ],
+          "styles": [],
+          "style_overrides": [],
+          "bindings": [],
+          "flags": []
+        },
+        {
           "name": "dot",
           "tag": "u8g2gl_box",
           "realisation": "draw_calls",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 10,
+            "line": 13,
             "column": 9
           },
           "arguments": [
@@ -242,11 +273,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 13,
+            "line": 16,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 2,
+          "object": 3,
           "parent": null,
           "rect": [
             0,
@@ -278,11 +309,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 18,
+            "line": 21,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 3,
+          "object": 4,
           "parent": null,
           "rect": [
             64,
@@ -313,11 +344,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 23,
+            "line": 26,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 4,
+          "object": 5,
           "parent": null,
           "rect": [
             64,
@@ -353,11 +384,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 30,
+            "line": 33,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 5,
+          "object": 6,
           "parent": null,
           "rect": [
             0,
@@ -386,11 +417,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 37,
+            "line": 40,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 6,
+          "object": 7,
           "parent": null,
           "rect": [
             64,
@@ -419,11 +450,11 @@
           "realisation": "object",
           "source": {
             "file": "screens/screen_bounds.xml",
-            "line": 39,
+            "line": 42,
             "column": 9
           },
           "class": "u8g2gl_label",
-          "object": 7,
+          "object": 8,
           "parent": null,
           "rect": [
             90,

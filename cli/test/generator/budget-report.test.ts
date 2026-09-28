@@ -21,6 +21,7 @@
 
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { compileProjectAssets } from '../../src/core/assets/index.js';
 import { generate } from '../../src/core/generator/index.js';
 import { buildGenerateReport, MEASURED_KIND, UNMEASURED_KIND } from '../../src/core/generator/report/index.js';
 import type { BudgetLine, GenerateReport, ReportInput } from '../../src/core/generator/report/index.js';
@@ -32,16 +33,17 @@ const GOLDEN_GENERATOR_VERSION = '0.0.0-golden';
 const fixtureDir = resolve(__dirname, 'fixtures/emit-project');
 
 /** Generates the fixture and builds its report, exactly as the CLI does. */
-function reportFixture(): {
+async function reportFixture(): Promise<{
   readonly report: GenerateReport;
   readonly configHeader: string;
   readonly input: ReportInput;
-} {
+}> {
   const loaded = loadProject(fixtureDir);
+  const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
   const result = generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
+    compiledAssets,
   });
   expect(result.errors).toBe(0);
   const target = loaded.model.project.targets[0];
@@ -55,8 +57,8 @@ function reportFixture(): {
     target: target!,
     ...(display !== undefined ? { display } : {}),
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
-    compiledFonts: new Map(),
+    images: compiledAssets.images,
+    compiledFonts: compiledAssets.fonts,
   };
   const report = buildGenerateReport(input);
   const configHeader = result.files.find((f) => f.path === 'u8g2gl_generated_config.h')?.content ?? '';
@@ -64,7 +66,7 @@ function reportFixture(): {
   return { report, configHeader, input };
 }
 
-const { report, configHeader, input: reportInput } = reportFixture();
+const { report, configHeader, input: reportInput } = await reportFixture();
 const line = (lines: readonly BudgetLine[], item: string): BudgetLine => {
   const found = lines.find((l) => l.item === item);
   expect(found, `no budget line '${item}'`).toBeDefined();
@@ -116,7 +118,7 @@ describe('§18.1 capacities agree with the generated header, exactly ([D-21])', 
 describe('§1.3 — no figure the tooling cannot substantiate', () => {
   it('reports every flash cost as unmeasured except the arrays it emits itself', () => {
     for (const flashLine of report.budget.flash) {
-      if (flashLine.item === 'image data (xbm arrays)' || flashLine.item === 'fonts (compiled bdf)') {
+      if (flashLine.item === 'image data (bitmap arrays)' || flashLine.item === 'fonts (compiled bdf)') {
         continue;
       }
       expect(flashLine.figure.kind, `${flashLine.item} claims a flash figure`).toBe(UNMEASURED_KIND);
@@ -226,7 +228,7 @@ describe('the derivable RAM figures are exact', () => {
 
   it("reports an <xbm>'s bytes exactly, from the asset the build compiled in", () => {
     // 16x16 is 2 bytes a row, 32 bytes — the figure ui_images.cpp states.
-    expect(line(report.budget.flash, 'image data (xbm arrays)').figure).toEqual({
+    expect(line(report.budget.flash, 'image data (bitmap arrays)').figure).toEqual({
       kind: MEASURED_KIND,
       bytes: 32,
       derivation: 'the byte count of the arrays this build emits (§14.2)',
@@ -346,8 +348,8 @@ describe('the RAM budget is reported, never turned into a percentage', () => {
 });
 
 describe('the report is deterministic (§13.9)', () => {
-  it('builds byte-identically twice, including its class lists', () => {
-    const again = reportFixture();
+  it('builds byte-identically twice, including its class lists', async () => {
+    const again = await reportFixture();
     expect(JSON.stringify(again.report)).toBe(JSON.stringify(report));
     expect(formatBudgetReport(again.report)).toBe(formatBudgetReport(report));
   });
