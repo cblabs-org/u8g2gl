@@ -1084,10 +1084,16 @@ Monochrome collapses the styling domain to a small set:
 | `invert` | `true` / `false` | XOR region (selection highlighting) |
 | `padding` | int px | Internal spacing |
 | `border` | `true` / `false` | 1px outline |
-| `radius` | int px | Rounded corners |
+| `radius` | int px | Rounded corners. Bounded: `2 · radius ≤ min(width, height)` — see below |
 | `align` | `left` / `center` / `right` | Text alignment |
 | `font_mode` | `solid` / `transparent` | Text background |
 | `bitmap_mode` | `solid` / `transparent` | XBM background |
+
+**A rounded box's corner radius satisfies `2 · radius ≤ min(width, height)`.** The validator refuses a literal radius beyond it, and the runtime clamps a radius known only at run time — a bound size, or a radius arriving through a style — to the same bound, so both paths agree. At equality the corner discs meet and the shape is a capsule. That is intended, and it is what `u8g2gl_switch` draws by default.
+
+Past the bound, the band U8G2 draws between the corner discs — `w - r - r`, `u8g2_box.c:121-123` — wraps in `u8g2_uint_t`, the `>= 3` guard that follows still passes, and the box paints across the display.
+
+**This bound was measured, not derived.** An earlier Chief Architect ruling set `radius ≤ min(width, height) − 1` by reasoning from the corner-centre arithmetic, and missed that the band wraps first: measurement refused it, because 30 of 68 radii it accepted drew outside the box — a 10×10 box at `r=6` set 1310 pixels outside itself. It is recorded here so the looser bound is not reintroduced by the same reasoning. `RealU8g2RoundedBoxBound.*` links U8G2's own C sources and sweeps 14 sizes across both primitives, so a dependency bump that moves the boundary fails the build rather than the display.
 
 ```xml
 <styles>
@@ -1462,7 +1468,8 @@ Concretely, an object is emitted when *any* of the following holds:
 - it has an `<event_cb>` or event child;
 - it is a member of a `<focus_ring>`;
 - it is a composite, or has children;
-- a parent composite's generated code holds a typed pointer to it.
+- a parent composite's generated code holds a typed pointer to it;
+- it sits inside a container and its geometry is **bound**. Draw calls are not clipped to their container, so an overhanging draw-call child would paint where the same element as an object would be clipped, and realisation must not be observable ([D-18]). A child whose geometry is *literal* needs no such rule: §7.2 already refuses one that overhangs its container, so draw calls and an object agree.
 
 Otherwise the generator emits draw calls. **Nothing about the element's tag
 decides this** — a `<u8g2gl_label>` may be either, and so may a `<u8g2gl_box>`.
@@ -1478,6 +1485,8 @@ if (ui_subject_wifi.get())                                      // bound hidden
     u8g2gl_draw_disc(d, 250, 4, 2);
 u8g2gl_draw_box(d, 4, 20, ui_subject_level.get(), 6, true, 0);  // bound width
 ```
+
+**The illustration is simplified.** A bound integer argument is emitted through the same clamp the object path uses — `u8g2gl_coord_bound(<container origin>, <subject read>)` — so both realisations agree, as the rule at the end of this section requires. The bare reads above show *where* the value is read, not the exact call.
 
 Two consequences:
 

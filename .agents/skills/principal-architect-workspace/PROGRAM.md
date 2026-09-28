@@ -1152,3 +1152,72 @@ WO13 (readability remediation) approved and delivered. WO10b delivered — the
 bound-label defect that would have broken the Phase 1 exit criterion. `max_len`
 stays optional: requiring it would make the runtime reserve the maximum
 everywhere and so *add* the RAM the figure was meant to expose.
+
+---
+
+## Session — 2026-09-28 (cont.) · PR-4R merged (#6, #7); a Chief Architect ruling refuted by measurement
+
+**PR-4R is merged**: WO1 as [#6](https://github.com/cblabs-org/u8g2gl/pull/6), the rest as
+[#7](https://github.com/cblabs-org/u8g2gl/pull/7). **C++ 377 tests** (one known
+skip), **CLI 1087 across 64 files**, zero warnings, `tsc` and lint clean. Schema
+0.4 unchanged, CLI 0.8.0, runtime 0.5.0. **PR-04b is unblocked.**
+
+### Ruling C was wrong, and measurement is what found it
+
+I ruled the radius bound was `r ≤ min(w,h) − 1`, derived from
+`xr = x + w - r - 1` underflowing. **Something else wraps first.** The band
+between the corner discs, `w - r - r` (`u8g2_box.c:121-123`), wraps earlier, and
+the `>= 3` guard after it still passes, so U8G2 draws a box of the wrapped
+width. The true bound is **`2r ≤ min(w,h)`**.
+
+The PA measured instead of arguing: every radius at five sizes, both primitives,
+counting pixels set outside the box. My bound accepted **30 of 68 radii that
+draw outside**; a 10×10 box at `r=6` set **1310** stray pixels. `2r ≤ min(w,h)`
+is exact in both directions — it refuses exactly what draws outside and admits
+every capsule.
+
+**This is the third time in this programme that measuring U8G2 has beaten
+reasoning about it, and the second time I was the one reasoning.** The standards
+I wrote say measure and state the evidence. I derived a bound from one
+arithmetic line while another line wrapped first. The rule to take from it:
+reasoning about a C function means reading *every* operation in it, and the
+cheap way to avoid that is to measure. The refuted bound is now recorded in §10
+beside the correct one, so it is not reintroduced by the same route.
+
+The PA also pinned it properly: `RealU8g2RoundedBoxBound.*` links U8G2's own C
+sources, so a dependency bump that moves the boundary fails the build.
+
+**Ruling D needs one qualifier**, which the PA supplied: "default `r = h/2` is
+inside the bound for any `h ≥ 2`" holds only when `h ≤ w`. A narrow switch
+(`w < h`) has always been clamped to `w/2`, and the helper preserves that.
+
+### New rulings from PR-4R's findings
+
+- **Realisation was still observable through clipping** (the PA's item 3, found
+  by a worker building the two-realisation test). Objects are clipped to their
+  container; draw calls are not. §13.5 now forces an object when an element sits
+  inside a container **and** its geometry is bound. A literal-geometry child
+  needs no rule, because §7.2 already refuses one that overhangs. This is [D-18]
+  again, through a different door, and the generator's freedom to choose draw
+  calls only holds where the two are equivalent.
+- **§13.5's illustration** predated the clamp and showed a bare subject read. It
+  is now marked as simplified, and says the real call goes through
+  `u8g2gl_coord_bound`.
+- **A `time` subject bound to a coordinate** should be refused. This needs no
+  new decision: §13.2 already requires a subject's type to match its binding.
+  It is an unenforced rule, not a missing one.
+- **A style radius on a literally-sized element should be checked at build
+  time**, the same error an inline radius gets. Where either side is bound, the
+  runtime clamp handles it. The author's mistake is identical, so the diagnostic
+  should be.
+- **The `style_*`-on-a-drawing-element message** cites setters when the real
+  reason is "no object to style". Pre-existing and cosmetic; left alone.
+
+### Where the carried items go — PR-4R2
+
+Items above needing code (the clipping condition, the `time` refusal, the
+build-time style-radius check, and the box manifest's `radius` help text) do not
+belong in PR-04b, which is the font and image pipeline. They go to **PR-4R2**,
+after PR-04b. **The clipping condition must not slip past PR-05**: that is when
+generated code first goes into a real application, and a draw-call child
+painting outside its container would be found on hardware.
