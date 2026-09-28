@@ -83,8 +83,8 @@ Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D 
 
 - [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
 - [x] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** ✅ `e26d623` · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
-- [ ] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
-- [ ] **WO4 — bound draw-call arguments clamp as objects do** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
+- [x] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** ✅ `afe599b` · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
+- [ ] **[WO4 — bound draw-call arguments clamp as objects do](wo4-bound-arg-clamp/WORKORDER.md)** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
 - [ ] **WO5 — readability review and remediation** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
 WORKORDERs for WO2–WO5 are written at dispatch, against the code as it then stands.
@@ -155,3 +155,17 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   `style_text` suggests `style_font` where the useful remedy is the plain attribute; a `style_*` on a
   drawing element is refused with the setter message rather than §13.5's. WO3 dispatched on
   `u8g2gl-4r/wo3-radius-clamp`.
+- **2026-09-28** — **WO3 complete, `afe599b`.** PA verified from a clean configure, each suite alone:
+  CLI **1082 / 64**, `tsc`, lint clean; C++ 0 warnings, **374 / one skip**, including
+  `RealU8g2RoundedBoxBound.*` (#327, #328) linking the pinned U8G2 C sources: every radius the
+  helper returns stays inside the box over 14 sizes, and `min/2 + 1` draws outside at every one —
+  **the bound is confirmed empirically in the suite**, both directions. `u8g2gl_coord_corner_radius()`
+  used by `u8g2gl_draw_box`, the button (fill, single and concentric borders) and the switch (track
+  and handle, replacing its private clamps). Default-switch pin at 12 sizes × off/on, values
+  captured from the base runtime, and shown to fail if the bound is tightened. Validator relaxed to
+  `2*r <= w, h`; three existing cases moved with the boundary only (listed in the WORKORDER).
+  Runtime 0.5.0. Goldens unchanged. **For the CA bridge:** ruling D's "r = h/2 inside the bound for
+  any h >= 2" holds only when h <= w (narrow switches were already clamped to w/2); a style radius
+  is only ever checked at draw time; the box manifest's `radius` help does not state the bound.
+  **Carried to WO5:** `u8g2gl_draw.h`'s `u8g2gl_draw_box()` docs and Coordinates table omit the clamp.
+  WO4 dispatched.
