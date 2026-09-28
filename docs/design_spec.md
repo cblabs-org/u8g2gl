@@ -710,7 +710,7 @@ A user-authored element whose body is a `<view>` of other elements. No C++.
 
         <u8g2gl_clock name="clock"
             right="0" y="0" width="40" height="#parent_height"
-            format="HH:MM" font="clock_small_7" blink="true"
+            format="hh_mm" font="clock_small_7" blink="true"
             bind_time="system_time" />
     </view>
 </widget>
@@ -1179,8 +1179,8 @@ uint32_t tick(now_ms)          → ms until this widget next needs a tick
 └── Return own next deadline (UINT32_MAX if idle)
 
 render(display)
-├── Framework constructs u8g2gl_state_saver (RAII: font, draw colour, clip window)
-├── Framework calls setClipWindow(x, y, x+w-1, y+h-1)
+├── Framework constructs u8g2gl_state_saver (RAII: draw colour and font only)
+├── Framework calls setClipWindow(x, y, x+w, y+h) — far corner excluded
 ├── Widget draws
 └── StateSaver destructor restores previous state
 ```
@@ -1188,6 +1188,8 @@ render(display)
 Two phases, not three. Widgets do not clear their own background — `clearBuffer()` already did (**[D-4]**).
 
 `tick()` returns its own next deadline, and `ui_handler()` returns the minimum across all widgets ([D-15]). A widget knows this cheaply: a clock blinking at 500 ms returns the remainder to the next toggle, a scrolling label returns its step interval, a static label returns `UINT32_MAX`. Widget authors who do not care may return `UINT32_MAX` and lose nothing but the sleep hint.
+
+**The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver saves draw colour and font only** — U8G2 exposes no getter for the clip window, font mode or bitmap mode, so none of those can be restored. Clip lifetime is therefore the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards.
 
 The clip window is set by the framework, not the widget. It is containment insurance: a widget that miscalculates a text width cannot corrupt its neighbours. It costs two comparisons per drawn pixel and is worth it.
 
@@ -1369,7 +1371,7 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 | `<prop>` type | XML value | Emitted C++ | Validation |
 |---|---|---|---|
-| `int` | `12`, `#const`, expression | `int32_t` literal — **`int16_t` for coordinates** | Resolved to a literal at build time (§7.2). Coordinates must fit `int16_t`, then are bounds-checked against their container |
+| `int` | `12`, `#const`, expression | `int32_t` literal — **`int16_t` for coordinates** | Resolved to a literal at build time (§7.2). A **resolved coordinate** must fit `int16_t`, then is bounds-checked against its container |
 | `bool` | `true` / `false` | `true` / `false` | — |
 | `string` | text | `"..."` escaped, `PROGMEM` where the setter takes a `__FlashStringHelper` | Escaped for C++ string literals |
 | `enum` | one of `values` | enumerator via `emit` pattern | Must be a member of `values` |
@@ -1430,7 +1432,7 @@ XML names are author-facing; C++ identifiers are generated. The mapping is total
 | Image | `<xbm name="icon_wifi">` | `ui_image_icon_wifi` |
 | Style | `<style name="header">` | `ui_style_header` |
 
-**Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_`, `ui_`, `wd_`, or matching a C++ keyword. Composite instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
+**Rules.** Names match `[a-z][a-z0-9_]*` — lowercase, no leading digit, no double underscore. Reserved: anything beginning `u8g2gl_` (framework) or `ui_` (generated), or matching a C++ keyword. **`wd_` is not reserved**: by [D-12] an element's tag *is* its C++ class name, so `wd_` names classes users write (`wd_service_list`, §6.6) and the generator never produces one — reserving it would forbid the convention §6.6 recommends. Composite instance names prefix their children with `_`. **A collision after mangling is a hard generate-time error naming both sources** — never silently renamed, because a silent rename would make the generated code stop matching the XML the author is reading.
 
 **Every emitted object is named `ui_obj_<name>`** (2026-09-19). A bare name collides with the C standard library: an element called `clock` became `static u8g2gl_clock clock;`, which conflicts with `clock()` from `<time.h>` whenever that header is visible — and Arduino makes a lot of headers visible. A list of reserved C names can never be complete, because what's reserved depends on the platform's headers. A prefix removes the whole class of collision. The prefix is a fixed family, not the screen's name, because a screen's name could itself collide: a screen called `subject`, `font`, `image`, `style` or `screen` would put its objects in the same namespace as `ui_subject_*` and the other generated families. The screen's name wouldn't add uniqueness anyway, because each screen's objects are `static` in that screen's own translation unit. Application code never refers to these objects ([D-20] §4), so the prefix breaks nothing that code depends on.
 
@@ -1589,7 +1591,7 @@ Generated output is a committed artefact ([D-11]) and appears in review diffs. I
 
 - objects and calls emitted in document order — never hash or set order;
 - includes sorted lexicographically;
-- **no timestamps** — the header carries source path, schema version, and generator version only, so regenerating an unchanged project produces an empty diff;
+- **no timestamps** — the header carries source path, schema version, generator version and the target it was generated for, and nothing else, so regenerating an unchanged project produces an empty diff. The target is an *input* to the generator (§7.3), so recording it does not weaken determinism: the same inputs still produce the same bytes;
 - floating point never appears in output (all arithmetic is integer, §7.2);
 - diagnostics ordered by file, then line, then column.
 
@@ -2023,8 +2025,9 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-8** | **Repeaters.** A `<view>` is a static structure, so it can express "three carriages" but not "N carriages" (§6.5). A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be *designed* rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not. Schema surface, so §1.5 applies: defer until a real screen demonstrates the need | Phase 2 |
 | **Q-9** | **`setter=` has a third meaning.** On a `<bind>`, `setter=` names a *prop*, not a method: `<bind name="bind_width" setter="width">`. §13.1 says [D-18] removed `setter=`'s double meaning by introducing `draw=`, and this is a third one. Kept as-is for PR-04, because new manifest vocabulary needs a demonstrated need (§1.5). Resolve at the next schema bump — `prop=` is the obvious candidate | Next schema bump |
 | **Q-10** | **Text properties live on the base object.** `font`, `align` and text binding are on `u8g2gl_obj`, so every element inherits them — including a box or a line that can't use them. The editor's property panel will show them. That conflicts with the standards' "do not grow `u8g2gl_obj` to serve one widget". Options: an intermediate text base class, or leave the C++ as it is and hide the properties per manifest. Decide before E-2 builds the property panel on top of it | E-2 |
-| **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue. **Resolution path (2026-09-14):** U8G2 becomes a git submodule pinned to 2.36.18; the builder uses it by default and records its commit | PR-04 (WO4c) |
+| **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue. **CLOSED by PR-04 WO4c (2026-09-15):** U8G2 is a git submodule at `extern/u8g2` pinned to 2.36.18, the builder defaults to it, and the tag and commit are recorded in `cli/src/data/catalogue-source.json` — a sibling file, so the `CATALOGUE` export's shape is unchanged | **Closed** |
 | **Q-12** | **`bind_src` / `bind_glyph`.** §6.3 used to list them, but no manifest declared them and nothing in the runtime implemented them, so they've been removed. Binding an image or icon glyph to a subject — a Wi-Fi strength icon, say — is the likely first real need. This is additive, a minor bump. Defer until a screen needs it | Phase 2 |
+| **Q-13** | **`$prop` interpolation inside text.** A whole-value `$name` substitutes; `text="Hi $who"` does not, and is a hard error as of PR-04 (WO7b) rather than passing `$who` through to generated output. Interpolation is additive, so §1.5 applies: defer until a real composite needs a composed string, then decide at the next schema bump | Next schema bump |
 | **Q-14** | **Send only dirty tiles.** [D-4]'s redraw stays full-frame. The question is whether to *send* only the tiles covered by the union of dirty object bounds, including each moved or hidden object's previous bounds, using U8G2's `updateDisplayArea()`. Measure bus time per frame, whole buffer against dirty tiles only, on I²C and on SPI, for one real departures-board screen. Adopt it only if the saving matters. U8G2 can also cap how many tiles go out per call, which fits `ui_handler()`'s cooperative scheduling ([D-15]). Prior art: UiUiUi ([concept.md §4.2](concept.md)) | Q-4 / Phase 1 exit |
 | **Q-15** | **A "cards" element** — one container showing exactly one of its children, chosen by an integer subject, equivalent to UiUiUi's `UICards`. Today this takes `bind_flag_if` on every child, which is clumsy. It would switch between modes or pages within one region of a screen — the mechanism a carousel would drive. It is *not* a modal: modals need overlays and z-order beyond document order, which ui_spec §7.3 excludes, and a cards element needs neither. It would be a *mechanism*. Carousel *policy* stays in `modules/U8G2GLDisplay`, as ui_spec §7.3 already rules. It adds schema surface, so §1.5 applies: defer until E-3's navigation design or a departures-board carousel actually needs it | E-3 |
 | **Q-16** | **Children that follow their container.** Schema 0.4 forbids children inside a container whose position is bound (§7.2), because children's positions are fixed at build time. That rules out sliding panels and carousels — the very cases where you'd bind a container's position. Lifting it needs no layout pass: the runtime already walks each object's ancestors every frame for clipping and visibility ([A-3]), and adding up the ancestors' origins in that same walk would move children with their parent. That's translation, not layout, so [D-7] and [D-20] still hold. It touches every render path, so it waits until a real screen needs it — probably alongside Q-15 in E-3 | E-3 |

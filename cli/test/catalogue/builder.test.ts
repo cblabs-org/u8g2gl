@@ -4,45 +4,50 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/catalogue/builder.test.ts
- * Purpose: Integration tests for the U8G2 display catalogue builder (§5.2, [D-14]).
+ * Purpose: Integration tests for the U8G2 display catalogue builder (§5.2, [D-14])
+ *          and for the source record that makes the committed catalogue
+ *          reproducible (Q-11).
  * Description: Verifies parsing of authoritative u8x8_display_info_t structs,
- *              driver symbol resolution, constructor class matching, and page-mode mapping.
- *              Gracefully skips when the local U8G2 source tree is unavailable.
+ *              driver symbol resolution, constructor class matching, page-mode
+ *              mapping, both U8G2 source layouts, and that the committed
+ *              catalogue-source.json names the commit of the pinned submodule.
+ *              Reads U8G2 from extern/u8g2 only, so the suite behaves the same on
+ *              every machine; it skips when the submodule is not initialised.
+ *              The Arduino release layout is exercised with a synthetic tree.
  */
 
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
-import { buildCatalogue, parseDisplayInfoStructs } from '../../src/node/catalogue-builder.js';
+import {
+  buildCatalogue,
+  parseDisplayInfoStructs,
+  readU8g2Source,
+  resolveU8g2Layout,
+} from '../../src/node/catalogue-builder.js';
 
-function getU8g2Path(): string {
-  const envPath = process.env['U8G2_PATH'];
-  if (envPath && existsSync(envPath)) {
-    return envPath;
-  }
-  const defaultPath = resolve(
-    homedir(),
-    'Documents/Projects/departures-board/.pio/libdeps/esp32dev/U8g2'
-  );
-  return defaultPath;
-}
+const testDir = dirname(fileURLToPath(import.meta.url));
+const cliDir = resolve(testDir, '..', '..');
+const u8g2Path = resolve(cliDir, '..', 'extern', 'u8g2');
+const isSubmoduleAvailable = existsSync(resolve(u8g2Path, 'cppsrc', 'U8g2lib.h'));
 
-const u8g2Path = getU8g2Path();
-const isU8g2Available = existsSync(u8g2Path);
+// U8G2 2.36.18's git tag holds 205 u8x8_display_info_t structs. (Its Arduino
+// release holds 206, because it still ships u8x8_d_st7301.c beside the renamed
+// u8x8_d_st7302.c; the catalogue built from either is identical.)
+const PINNED_STRUCT_COUNT = 205;
 
-describe.runIf(isU8g2Available)('U8G2 Catalogue Builder Integration (§5.2)', () => {
-  it('parses exactly 206 display_info structs across driver files', () => {
-    const clibDir = resolve(u8g2Path, 'src', 'clib');
-    const structs = parseDisplayInfoStructs(clibDir);
-    expect(structs).toHaveLength(206);
+describe.runIf(isSubmoduleAvailable)('U8G2 Catalogue Builder Integration (§5.2)', () => {
+  it('parses every display_info struct across driver files', () => {
+    const structs = parseDisplayInfoStructs(resolveU8g2Layout(u8g2Path).clibDir);
+    expect(structs).toHaveLength(PINNED_STRUCT_COUNT);
   });
 
   it('builds the full catalogue with expected struct and constructor counts', () => {
     const result = buildCatalogue(u8g2Path);
 
-    // Assert 206 display_info structs found
-    expect(result.structCount).toBe(206);
+    expect(result.structCount).toBe(PINNED_STRUCT_COUNT);
 
     // Assert the number of full-buffer constructors is reasonable (>= 700)
     expect(result.fullBufferCount).toBeGreaterThanOrEqual(700);
@@ -83,5 +88,52 @@ describe.runIf(isU8g2Available)('U8G2 Catalogue Builder Integration (§5.2)', ()
     const fullBufferEquivalent = result.pageModeMap[pageModeName];
 
     expect(fullBufferEquivalent).toBe('U8G2_SSD1306_128X64_NONAME_F_HW_I2C');
+  });
+});
+
+describe.runIf(isSubmoduleAvailable)('U8G2 source layout and provenance (Q-11)', () => {
+  it('resolves the git repository layout of the pinned submodule', () => {
+    const layout = resolveU8g2Layout(u8g2Path);
+    expect(layout.clibDir).toBe(resolve(u8g2Path, 'csrc'));
+    expect(layout.headerPath).toBe(resolve(u8g2Path, 'cppsrc', 'U8g2lib.h'));
+  });
+
+  it('rejects a directory that is not a U8G2 source tree', () => {
+    expect(() => resolveU8g2Layout(testDir)).toThrow(/Not a U8G2 source tree/);
+  });
+
+  it('reads the pinned submodule as U8G2 2.36.18 at a full commit hash', () => {
+    const source = readU8g2Source(u8g2Path);
+    expect(source.tag).toBe('2.36.18');
+    expect(source.commit).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('records no commit for a directory that is not the top of its own checkout', () => {
+    // cli/test sits inside the U8G2GL checkout. Asking git there would answer
+    // with U8G2GL's commit, which identifies no U8G2 source at all.
+    expect(readU8g2Source(testDir)).toEqual({ tag: null, commit: null });
+  });
+
+  it('the committed catalogue-source.json names the commit extern/u8g2 is checked out at', () => {
+    const recordPath = resolve(cliDir, 'src', 'data', 'catalogue-source.json');
+    const record: unknown = JSON.parse(readFileSync(recordPath, 'utf8'));
+    expect(record).toEqual({ u8g2: readU8g2Source(u8g2Path) });
+  });
+});
+
+describe('U8G2 Arduino release layout', () => {
+  it('resolves src/clib and src/U8g2lib.h in a synthetic release tree', () => {
+    // A synthetic tree, so the layout is tested identically on every machine.
+    const root = mkdtempSync(join(tmpdir(), 'u8g2gl-release-layout-'));
+    try {
+      mkdirSync(join(root, 'src', 'clib'), { recursive: true });
+      writeFileSync(join(root, 'src', 'U8g2lib.h'), '', 'utf8');
+
+      const layout = resolveU8g2Layout(root);
+      expect(layout.clibDir).toBe(join(root, 'src', 'clib'));
+      expect(layout.headerPath).toBe(join(root, 'src', 'U8g2lib.h'));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

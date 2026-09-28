@@ -98,7 +98,8 @@ describe('parseWidgetManifestFile (composite: a <widget> with a <view>)', () => 
     expect(xbmWidget.tag).toBe('u8g2gl_xbm');
     expect(xbmWidget.attributes.src).toBe('icon_wifi');
     expect(xbmWidget.children).toHaveLength(1);
-    expect(xbmWidget.children[0]?.kind).toBe('binding');
+    const xbmChild = xbmWidget.children[0];
+    expect(xbmChild !== undefined && 'kind' in xbmChild ? xbmChild.kind : undefined).toBe('binding');
 
     const clockWidget = composite.view!.children[2]!;
     expect(clockWidget.tag).toBe('u8g2gl_clock');

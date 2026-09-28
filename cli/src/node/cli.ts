@@ -6,33 +6,35 @@
  *
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
- *          for XML validation, display queries, and display catalogue enumeration.
+ *          for XML validation, code generation, display queries, and display
+ *          catalogue enumeration.
  * Description: Command parser and subcommand router supporting global flags
- *              (--json, --no-color, --version, --help) and subcommands (validate, find, catalogue),
- *              including validate's --fix-names write-back of generated element names.
- *              Wires the isomorphic display catalogue query engine and schema validator
- *              into human-readable compiler-style diagnostics (§15.1) and JSON output (§15.3, [D-16]).
+ *              (--json, --no-color, --version, --help) and subcommands (validate,
+ *              generate, find, catalogue). `validate` and `generate` share one load
+ *              path (load-project.ts) and one validation (checkProject), differing
+ *              only in the not-yet-supported severity: `validate` warns, `generate`
+ *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
+ *              element names back; `generate` never invents identity (ui_spec §16.1).
+ *              Output is compiler-style diagnostics (§15.1) or JSON (§15.3, [D-16]).
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
+ *
+ * `generate --target-kind editor` (PR-04 WO11, [UD-4]) writes the editor target —
+ * the registry unit and the scene description — from the same validated build
+ * the firmware units come from, into `<output dir>_editor` by default.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
-import {
-  parseProjectFile,
-  parseGlobalsFile,
-  parseScreenFile,
-  parseWidgetManifestFile,
-} from '../core/parser/index.js';
-import { validate } from '../core/validator/index.js';
+import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
+import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
+import { buildGenerateReport, type GenerateReport } from '../core/generator/report/index.js';
+import { findTargetDisplay } from '../core/resolver/index.js';
+import { formatBudgetReport } from './format-budget.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
-import type { U8g2glProject } from '../core/schema/project.js';
-import type { Globals } from '../core/schema/globals.js';
-import type { Screen } from '../core/schema/screen.js';
-import type { WidgetManifest } from '../core/schema/widget-manifest.js';
+import type { CheckedTarget } from '../core/validator/index.js';
 import {
   identifyDisplay,
   sourceDisplay,
@@ -49,11 +51,39 @@ import {
   formatCompareResult,
   formatCatalogueSummary,
 } from './format-display.js';
-import { readProjectFiles, getProjectFileMap } from './read-project.js';
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
+import { getGeneratorVersion } from './generator-version.js';
+import { loadProject, type LoadedProject } from './load-project.js';
+import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
-const KNOWN_COMMANDS = ['validate', 'find', 'catalogue'] as const;
+const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate'] as const;
+
+/** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
+const DEFAULT_OUTPUT_DIR = 'generated';
+
+/**
+ * The stable code a usage error carries under `--json` ([D-16], §15.3).
+ *
+ * Before PR-04 WO12 a mistyped flag printed prose on stderr even under `--json`,
+ * so the one consumer the flag exists for — an agent or a CI script — had to
+ * parse a sentence to learn it had called the tool wrongly, or saw empty stdout
+ * and no explanation at all. It is a **CLI** code rather than one of the
+ * document's `DIAGNOSTIC_CODES`: nothing in the project is at fault, so the
+ * diagnostic names no file. Like every code it is public and stable, and
+ * renaming it is a breaking change (§15.4).
+ */
+const USAGE_ERROR_CODE = 'U8G2GL_USAGE';
+
+/**
+ * Appended to the firmware output directory to name the editor target's default
+ * one (PR-04 WO11). A sibling, never a subdirectory: the writer deletes stale
+ * GENERATED files anywhere beneath the directory it writes, so an editor
+ * directory inside `generated/` would be deleted by the next firmware run, and
+ * editor output written into `generated/` itself would delete the firmware
+ * units.
+ */
+const EDITOR_OUTPUT_SUFFIX = '_editor';
 
 /**
  * Standard microcontroller internal SRAM budgets in bytes (§5.2, §18).
@@ -73,21 +103,28 @@ const KNOWN_TARGET_RAM: Record<string, number> = {
 };
 
 /**
- * @brief Reads the package version from package.json.
+ * @brief The generator version, or a clear failure.
  *
- * Resolves package.json relative to import.meta.url so it functions
- * correctly in both transpiled dist and local test environments.
+ * The lookup itself lives in `generator-version.ts`, where it can be tested:
+ * this module calls `runCli()` at load, so a test importing it would run the
+ * CLI. It throws rather than defaulting, because the version is stamped into
+ * committed output (PR-04 WO5b finding 6) — so the throw is turned into one
+ * plain message and a non-zero exit here, never a stack trace.
  *
- * @return Semantic version string, or fallback '0.3.0' if unreadable.
+ * @param json Whether the caller is in `--json` mode.
+ * @return The version. Exits the process if it cannot be determined.
  */
-function getPackageVersion(): string {
+function generatorVersionOrExit(json: boolean): string {
   try {
-    const pkgUrl = new URL('../../package.json', import.meta.url);
-    const content = readFileSync(fileURLToPath(pkgUrl), 'utf8');
-    const parsed = JSON.parse(content) as { version?: string };
-    return parsed.version ?? '0.3.0';
-  } catch {
-    return '0.3.0';
+    return getGeneratorVersion();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (json) {
+      console.log(JSON.stringify({ files: [], diagnostics: [], errors: 1, warnings: 0, error: message }, null, 2));
+    } else {
+      console.error(message);
+    }
+    process.exit(1);
   }
 }
 
@@ -99,6 +136,7 @@ function printUsage(): void {
 
 Commands:
   validate   Validate a U8G2GL XML project or file against the schema
+  generate   Validate a project and write its generated C++ files
   find       Query the display catalogue for matching displays
   catalogue  Display summary from the display catalogue
 
@@ -113,6 +151,38 @@ Validate Options:
     --fix-names   Generate names for unnamed elements, write them into the
                   source files, then re-validate. Without it, an unnamed
                   element is an error: the build never invents identity.
+  Constructs 'generate' does not build yet are reported as warnings.
+  --json: { "diagnostics": [...], "errors": N, "warnings": N }
+          (+ "fixedNames": [{ "file", "names" }] with --fix-names)
+
+Generate Options:
+  u8g2gl generate [path]                       Generate from a project directory (default: .)
+    --target <name>  Target to generate for (default: the first <target>)
+    --out <dir>      Output directory (default: the project's <output dir>,
+                     else generated/ in the project)
+    --check          Write nothing; exit 1 if any file would change (CI check)
+    --target-kind <firmware|editor>
+                     What to generate (default: firmware). 'editor' writes the
+                     designer's class registry (ui_editor_registry.cpp) and scene
+                     description (ui_scene.json) instead of the firmware units,
+                     by default into <output dir>${EDITOR_OUTPUT_SUFFIX}
+  Runs the same validation as 'validate', but constructs not built yet are
+  errors, and any error means nothing is written. Only files inside the output
+  directory are written, and only files carrying the GENERATED header are
+  deleted. An unnamed element is an error: use 'validate --fix-names'.
+  Every run prints the section 18 budget, the section 18.1 capacities and what
+  each element was realised as. A cost the generator cannot know is reported as
+  'unmeasured' with the reason, never as an estimate (section 1.3).
+  --json: { "files": [{ "path", "action" }], "diagnostics": [...], "errors": N,
+            "warnings": N, "budget": {...}, "capacity": {...}, "realisation": {...} }
+          action is created | updated | unchanged | deleted — what was done,
+          or with --check what would be done. "files" is [] when refused, and
+          budget/capacity/realisation are then absent. Each cost figure is
+          { "kind": "measured", "bytes", "derivation" } or
+          { "kind": "unmeasured", "reason" } — branch on "kind".
+          Diagnostic "code" values are a public, stable API: renaming one is a
+          breaking change under section 15.4. A usage error under --json is JSON
+          too, with code U8G2GL_USAGE and exit status 2.
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -310,6 +380,50 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
   console.log(formatIdentifyResult(result, { color: useColor }));
 }
 
+// exitWithFatal
+// Reports a failure that stops a command before any diagnostics exist — a
+// missing path, a project the loader cannot read — in the command's own JSON
+// shape or as one error line, then exits 1.
+//   json      — whether --json was given
+//   file      — the path the failure concerns, as the user typed it
+//   message   — what went wrong
+//   jsonExtra — command-specific fields the JSON contract always carries
+function exitWithFatal(
+  json: boolean,
+  file: string,
+  message: string,
+  jsonExtra: Record<string, unknown> = {},
+): never {
+  if (json) {
+    const diagnostic: Diagnostic = { code: 'U8G2GL_MISSING_FILE', severity: 'error', file, line: 1, column: 1, message };
+    console.log(
+      JSON.stringify({ ...jsonExtra, diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2),
+    );
+  } else {
+    console.error(`Error: ${message}`);
+  }
+  process.exit(1);
+}
+
+// loadOrExit
+// Loads a project through the shared load path, or reports why it cannot be
+// loaded and exits. `validate` and `generate` both come through here, so they
+// read the same files the same way.
+//   targetArg — path as the user typed it
+//   json      — whether --json was given
+//   jsonExtra — command-specific JSON fields for a failure report
+function loadOrExit(targetArg: string, json: boolean, jsonExtra: Record<string, unknown>): LoadedProject {
+  const targetPath = resolve(process.cwd(), targetArg);
+  if (!existsSync(targetPath)) {
+    exitWithFatal(json, targetArg, `Path does not exist: ${targetArg}`, jsonExtra);
+  }
+  try {
+    return loadProject(targetPath, { label: targetArg });
+  } catch (err) {
+    exitWithFatal(json, 'u8g2gl.xml', err instanceof Error ? err.message : String(err), jsonExtra);
+  }
+}
+
 /**
  * @brief Executes the `validate` subcommand across a project directory or single XML file.
  *
@@ -319,11 +433,12 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
  * - Default human-readable output renders compiler-style diagnostics with source lines and carets.
  * - Exits 0 on clean (no errors), 1 on errors.
  *
- * Parsing uses the default `'error'` missing-name policy: an unnamed element is
+ * Loading uses the default `'error'` missing-name policy: an unnamed element is
  * an error and no identity is invented. `--fix-names` runs a `'generate'` pass
  * first, writes the names into the source files, and then validates the
  * rewritten files through this same path — so the fixed project is genuinely
- * re-validated rather than assumed clean.
+ * re-validated rather than assumed clean. Constructs `generate` does not build
+ * yet are warnings here (`U8G2GL_NOT_YET_SUPPORTED`), and errors under `generate`.
  *
  * @param args Subcommand arguments.
  * @param json Whether to output JSON.
@@ -335,288 +450,48 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   // a path, or `validate --fix-names` alone would look for a file called
   // '--fix-names'.
   const targetArg = args.find((a) => !a.startsWith('-')) ?? '.';
-  const targetPath = resolve(process.cwd(), targetArg);
+  const failureExtra = fixNames ? { fixedNames: [] } : {};
 
-  if (!existsSync(targetPath)) {
-    const notFoundMsg = `Path does not exist: ${targetArg}`;
-    if (json) {
-      console.log(
-        JSON.stringify(
-          {
-            diagnostics: [
-              {
-                code: 'U8G2GL_MISSING_FILE',
-                severity: 'error',
-                file: targetArg,
-                line: 1,
-                column: 1,
-                message: notFoundMsg,
-              },
-            ],
-            errors: 1,
-            warnings: 0,
-          },
-          null,
-          2,
-        ),
-      );
-      process.exit(1);
-    }
-    console.error(`Error: ${notFoundMsg}`);
-    process.exit(1);
+  if (!existsSync(resolve(process.cwd(), targetArg))) {
+    exitWithFatal(json, targetArg, `Path does not exist: ${targetArg}`);
   }
 
-  // --- Step 1b: Optional write-back pass, before anything is loaded ---
+  // --- Step 1: Optional write-back pass, before anything is loaded ---
   // The fix runs first and writes to disk, so the load below reads the
   // rewritten files and the validation that follows is a genuine re-validation.
   let fixedNames: readonly NameFixRecord[] = [];
   if (fixNames) {
     try {
-      fixedNames = fixMissingNames(targetPath, targetArg);
+      fixedNames = fixMissingNames(resolve(process.cwd(), targetArg), targetArg);
     } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (json) {
-        console.log(
-          JSON.stringify(
-            {
-              diagnostics: [
-                {
-                  code: 'U8G2GL_MISSING_FILE',
-                  severity: 'error',
-                  file: targetArg,
-                  line: 1,
-                  column: 1,
-                  message: errMsg,
-                },
-              ],
-              errors: 1,
-              warnings: 0,
-              fixedNames: [],
-            },
-            null,
-            2,
-          ),
-        );
-        process.exit(1);
-      }
-      console.error(`Error: ${errMsg}`);
-      process.exit(1);
+      exitWithFatal(json, targetArg, err instanceof Error ? err.message : String(err), failureExtra);
     }
   }
 
-  const stat = statSync(targetPath);
-  const allDiagnostics: Diagnostic[] = [];
-  const fileContentMap = new Map<string, string>();
+  // --- Step 2: Load and validate through the path `generate` shares ---
+  const loaded = loadOrExit(targetArg, json, failureExtra);
+  const { diagnostics, errors, warnings, checkedTarget } = checkProject(loaded.model, 'warning');
 
-  let parsedProject: U8g2glProject = {
-    // Not a version literal: an unparsed project has no schema to name, and
-    // hardcoding one of our own only rots the next time the schema bumps
-    // (PR-3R WO9 removed a stale '0.3' default for exactly this reason).
-    schema: '',
-    name: 'unnamed',
-    version: '1.0.0',
-    targets: [],
-  };
-  let parsedGlobals: Globals = {
-    consts: [],
-    subjects: [],
-    styles: [],
-    fonts: [],
-    images: [],
-  };
-  const parsedScreens: Screen[] = [];
-  const parsedComponents: WidgetManifest[] = [];
-  const parsedWidgets: WidgetManifest[] = [];
-
-  // [D-18]: one element vocabulary — a composite is a WidgetManifest whose
-  // `<api>` carries a `<view>` (PR-3R WO9). `parseWidgetManifestFile` parses
-  // both shapes through the one `<widget>` root; this is the single place
-  // that sorts a parsed manifest into the `components` or `widgetManifests`
-  // bucket `validate()` still expects, matching pre-WO9 discovery
-  // (`components/` vs `widgets/`) without reviving a second parse path.
-  function bucketWidgetManifest(manifest: WidgetManifest): void {
-    if (manifest.view) {
-      parsedComponents.push(manifest);
-    } else {
-      parsedWidgets.push(manifest);
-    }
-  }
-
-  if (stat.isDirectory()) {
-    // --- Directory: Load standard project structure via readProjectFiles ---
-    let projectFiles;
-    try {
-      projectFiles = readProjectFiles(targetPath);
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (json) {
-        console.log(
-          JSON.stringify(
-            {
-              diagnostics: [
-                {
-                  code: 'U8G2GL_MISSING_FILE',
-                  severity: 'error',
-                  file: 'u8g2gl.xml',
-                  line: 1,
-                  column: 1,
-                  message: errMsg,
-                },
-              ],
-              errors: 1,
-              warnings: 0,
-            },
-            null,
-            2,
-          ),
-        );
-        process.exit(1);
-      }
-      console.error(`error: u8g2gl.xml:1:1\n   ${errMsg}`);
-      process.exit(1);
-    }
-
-    const loadedMap = getProjectFileMap(projectFiles);
-    for (const [k, v] of loadedMap.entries()) {
-      fileContentMap.set(k, v);
-    }
-
-    // 1. Parse project manifest
-    const projRes = parseProjectFile(projectFiles.projectXml, 'u8g2gl.xml');
-    allDiagnostics.push(...projRes.diagnostics);
-    if (projRes.value) {
-      parsedProject = projRes.value;
-    }
-
-    // 2. Parse globals
-    if (projectFiles.globalsXml) {
-      const globRes = parseGlobalsFile(projectFiles.globalsXml, 'globals.xml');
-      allDiagnostics.push(...globRes.diagnostics);
-      if (globRes.value) {
-        parsedGlobals = globRes.value;
-      }
-    }
-
-    // 3. Parse screens
-    for (const screen of projectFiles.screenXmls) {
-      const scrRes = parseScreenFile(screen.content, screen.filename);
-      allDiagnostics.push(...scrRes.diagnostics);
-      if (scrRes.value) {
-        parsedScreens.push(scrRes.value);
-      }
-    }
-
-    // 4. Parse widget manifests — plain widgets and composites alike ([D-18])
-    for (const widget of projectFiles.widgetManifestXmls) {
-      const widRes = parseWidgetManifestFile(widget.content, widget.filename);
-      allDiagnostics.push(...widRes.diagnostics);
-      if (widRes.value) {
-        bucketWidgetManifest(widRes.value);
-      }
-    }
-  } else {
-    // --- Single file validation ---
-    const fileXml = readFileSync(targetPath, 'utf-8');
-    fileContentMap.set(targetArg, fileXml);
-
-    const match = fileXml.match(/<([a-zA-Z0-9_]+)/);
-    const rootTag = match ? match[1] : '';
-
-    if (rootTag === 'u8g2gl') {
-      const res = parseProjectFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedProject = res.value;
-      }
-    } else if (rootTag === 'globals') {
-      const res = parseGlobalsFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedGlobals = res.value;
-      }
-    } else if (rootTag === 'screen') {
-      const res = parseScreenFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        parsedScreens.push(res.value);
-      }
-    } else if (rootTag === 'widget' || rootTag === 'component') {
-      // A '<component>' root is a hard error, not a dead end: dispatching it
-      // here (rather than silently matching nothing) lets
-      // parseWidgetManifestFile raise its named [D-18] migration diagnostic
-      // the same way the directory-mode path does.
-      const res = parseWidgetManifestFile(fileXml, targetArg);
-      allDiagnostics.push(...res.diagnostics);
-      if (res.value) {
-        bucketWidgetManifest(res.value);
-      }
-    }
-  }
-
-  // --- Step 2: Execute Schema & Semantic Validation ---
-  const valResult = validate({
-    project: parsedProject,
-    globals: parsedGlobals,
-    screens: parsedScreens,
-    components: parsedComponents,
-    widgetManifests: parsedWidgets,
-    catalogue: CATALOGUE,
-  });
-  allDiagnostics.push(...valResult.diagnostics);
-
-  // --- Step 3: Deduplicate and sort deterministically ---
-  const seen = new Set<string>();
-  const uniqueDiagnostics: Diagnostic[] = [];
-
-  for (const d of allDiagnostics) {
-    const key = `${d.file}:${d.line}:${d.column}:${d.code}:${d.message}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueDiagnostics.push(d);
-    }
-  }
-
-  uniqueDiagnostics.sort((a, b) => {
-    if (a.file !== b.file) {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    if (a.column !== b.column) {
-      return a.column - b.column;
-    }
-    return a.code.localeCompare(b.code);
-  });
-
-  let errorCount = 0;
-  let warningCount = 0;
-  for (const d of uniqueDiagnostics) {
-    if (d.severity === 'error') {
-      errorCount++;
-    } else if (d.severity === 'warning') {
-      warningCount++;
-    }
-  }
-
-  // --- Step 4: Emit JSON or Human-Readable Output ---
+  // --- Step 3: Emit JSON or human-readable output ---
   if (json) {
     // Machine-readable contract (§15.3, [D-16]). `fixedNames` is present only
     // when --fix-names was requested, so the existing contract is unchanged for
-    // every caller that does not ask for the fix.
+    // every caller that does not ask for the fix. `target` — the target geometry
+    // was checked against (PR-04 WO7b) — is present when the project declares one.
     console.log(
       JSON.stringify(
         {
-          diagnostics: uniqueDiagnostics,
-          errors: errorCount,
-          warnings: warningCount,
+          diagnostics,
+          errors,
+          warnings,
+          ...(checkedTarget ? { target: checkedTarget } : {}),
           ...(fixNames ? { fixedNames } : {}),
         },
         null,
         2,
       ),
     );
-    process.exit(errorCount > 0 ? 1 : 0);
+    process.exit(errors > 0 ? 1 : 0);
   }
 
   if (fixNames) {
@@ -632,30 +507,350 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
     }
   }
 
-  if (errorCount > 0) {
-    const formatted = formatDiagnostics(
-      uniqueDiagnostics,
-      (f) => fileContentMap.get(f),
-      { color: useColor },
-    );
+  const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
+  const targetLine = describeCheckedTarget(checkedTarget, loaded.model.hasProjectManifest);
+  const withTarget = (summary: string): string => (targetLine ? `${targetLine}\n${summary}` : summary);
+  if (errors > 0) {
     console.error(formatted);
-    console.error(`\nValidation failed: ${errorCount} error(s), ${warningCount} warning(s).`);
+    console.error(`\n${withTarget(`Validation failed: ${errors} error(s), ${warnings} warning(s).`)}`);
+    process.exit(1);
+  }
+  if (warnings > 0) {
+    console.log(formatted);
+    console.log(`\n${withTarget(`Validation passed: 0 errors, ${warnings} warning(s).`)}`);
+    process.exit(0);
+  }
+  console.log(withTarget('Validation passed: 0 errors, 0 warnings.'));
+  process.exit(0);
+}
+
+// describeCheckedTarget
+// The line `validate` prints naming the target geometry was checked against
+// (PR-04 WO7b): `generate --target` checks another, so the author must be able
+// to see which one `validate` meant. Undefined for a lone file, which has no target.
+//   target              — from checkProject
+//   hasProjectManifest  — whether a u8g2gl.xml was loaded
+function describeCheckedTarget(target: CheckedTarget | undefined, hasProjectManifest: boolean): string | undefined {
+  if (target === undefined) {
+    return hasProjectManifest ? 'No <target> declared: geometry bounds were not checked.' : undefined;
+  }
+  if (target.display === undefined) {
+    return `Target '${target.name}' (${target.setup}) has no display in the catalogue: geometry bounds were not checked.`;
+  }
+  return (
+    `Geometry checked against target '${target.name}' (${target.setup}, ` +
+    `${target.display.width}x${target.display.height}); 'generate --target' checks the target it builds.`
+  );
+}
+
+/** Parsed `generate` arguments. */
+interface GenerateArgs {
+  readonly path: string;
+  readonly target?: string;
+  readonly out?: string;
+  readonly check: boolean;
+  readonly targetKind: TargetKind;
+}
+
+// isTargetKind
+// Whether a --target-kind value names a generation target.
+function isTargetKind(value: string): value is TargetKind {
+  return (TARGET_KINDS as readonly string[]).includes(value);
+}
+
+// exitWithUsageError
+// A `generate` usage error — a mistyped flag, a missing value, two paths — in the
+// command's own JSON shape under `--json`, or two lines on stderr without it.
+// Exits 2 either way, which is the status a usage error has always had; only the
+// *shape* of the report changes, so a caller reading the status is unaffected
+// ([D-16], PR-04 WO5b carry closed in WO12).
+//   json    — whether --json was given
+//   message — what was wrong with the command line
+function exitWithUsageError(json: boolean, message: string): never {
+  if (json) {
+    const diagnostic: Diagnostic = {
+      code: USAGE_ERROR_CODE,
+      severity: 'error',
+      // No file: the fault is in the command line, not in the project. An empty
+      // path says so, rather than blaming whichever file happened to be named.
+      file: '',
+      line: 1,
+      column: 1,
+      message,
+    };
+    console.log(JSON.stringify({ files: [], diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
+  } else {
+    console.error(`Error: ${message}`);
+    console.error("Run 'u8g2gl --help' for generate's options.");
+  }
+  process.exit(2);
+}
+
+// parseGenerateArgs
+// Parses `generate [path] --target <name> --out <dir> --check
+// --target-kind <kind>`, or reports a
+// usage error and exits 2. Strict, unlike `validate`: a mistyped flag on a
+// command that writes files must not be silently ignored.
+//   args — subcommand arguments, global flags already removed
+//   json — whether --json was given, so the refusal takes the JSON shape too
+function parseGenerateArgs(args: readonly string[], json: boolean): GenerateArgs {
+  let path: string | undefined;
+  let target: string | undefined;
+  let out: string | undefined;
+  let check = false;
+  let targetKind: TargetKind = 'firmware';
+
+  const usageError = (message: string): never => exitWithUsageError(json, message);
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? '';
+    if (arg === '--check') {
+      check = true;
+    } else if (arg === '--target-kind') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        usageError(`${arg} requires a value: ${TARGET_KINDS.join(' or ')}.`);
+      }
+      i++;
+      if (value === undefined || !isTargetKind(value)) {
+        usageError(`Unknown target kind '${value ?? ''}'; expected ${TARGET_KINDS.join(' or ')}.`);
+      } else {
+        targetKind = value;
+      }
+    } else if (arg === '--target' || arg === '--out') {
+      const value = args[i + 1];
+      if (value === undefined || value.startsWith('-')) {
+        usageError(`${arg} requires a value.`);
+      }
+      i++;
+      if (arg === '--target') {
+        target = value;
+      } else {
+        out = value;
+      }
+    } else if (arg.startsWith('-')) {
+      usageError(`Unknown option for generate: ${arg}`);
+    } else if (path === undefined) {
+      path = arg;
+    } else {
+      usageError(`generate takes one path; got '${path}' and '${arg}'.`);
+    }
+  }
+
+  return {
+    path: path ?? '.',
+    ...(target !== undefined ? { target } : {}),
+    ...(out !== undefined ? { out } : {}),
+    check,
+    targetKind,
+  };
+}
+
+/** Output-relative change list as the user reads it, one line per file. */
+function formatChanges(changes: readonly FileChange[], check: boolean): string {
+  const verb: Record<FileChange['action'], string> = check
+    ? { created: 'would create', updated: 'would update', unchanged: 'unchanged', deleted: 'would delete' }
+    : { created: 'created', updated: 'updated', unchanged: 'unchanged', deleted: 'deleted' };
+  return changes.map((c) => `  ${verb[c.action]}: ${c.path}`).join('\n');
+}
+
+// editorFilesOf
+// The editor target's files for a build that generated: the same project model,
+// realisation, resolution and capacities firmware emission used.
+//   loaded           — the loaded project
+//   result           — its successful firmware generation
+//   generatorVersion — the version the firmware files were stamped with
+function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateResult['files'] {
+  const { realised, resolved, capacities, target } = result;
+  if (realised === undefined || resolved === undefined || capacities === undefined || target === undefined) {
+    throw new Error('A build that generated carries its realisation, resolution, capacities and target.');
+  }
+  return emitEditorFiles({
+    project: loaded.model.project,
+    globals: loaded.model.globals,
+    screens: loaded.model.screens,
+    realised,
+    resolved,
+    manifests: loaded.model.manifests,
+    capacities,
+    assets: loaded.assets,
+    generatorVersion,
+    target,
+  }).files;
+}
+
+// reportFor
+// §18's report for a build that generated, built from that build's own
+// realisation, capacities and target — the same model the files were emitted
+// from, so the report cannot describe a different document from the one on disk
+// (§13.11 step 7).
+//   loaded           — the loaded project
+//   result           — its successful generation
+//   generatorVersion — the version stamped into those files
+function reportFor(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateReport {
+  const { realised, capacities, target: targetName } = result;
+  const target = loaded.model.project.targets.find((t) => t.name === targetName);
+  if (realised === undefined || capacities === undefined || target === undefined) {
+    throw new Error('A build that generated carries its realisation, capacities and target.');
+  }
+  const display = findTargetDisplay(target, loaded.model.catalogue);
+  return buildGenerateReport({
+    globals: loaded.model.globals,
+    manifests: loaded.model.manifests,
+    realised,
+    capacities,
+    target,
+    ...(display !== undefined ? { display } : {}),
+    generatorVersion,
+    assets: loaded.assets,
+  });
+}
+
+/**
+ * @brief Executes the `generate` subcommand.
+ *
+ * Loads the project through the path `validate` uses and validates it the same
+ * way, but with not-yet-supported constructs as errors. Any error refuses the
+ * build: nothing is written.
+ *
+ * **`--json` contract (§15.3, [D-16]), on stdout.** Seven keys, in this order:
+ *
+ * ```
+ * {
+ *   "files":       [{ "path", "action" }],   // output-relative; [] when refused
+ *   "diagnostics": [Diagnostic],             // file, line, column order (§13.9)
+ *   "errors":      N,
+ *   "warnings":    N,
+ *   "budget":      BudgetReport,             // §18  — present only on a build
+ *   "capacity":    CapacityReport,           // §18.1, [D-21]
+ *   "realisation": RealisationReport          // §13.5, incl. the [D-18] amendment
+ * }
+ * ```
+ *
+ * `action` is `created | updated | unchanged | deleted` — what was done or, under
+ * `--check`, what would be done. `budget`, `capacity` and `realisation` describe
+ * the build that happened, so they are **absent** when the build was refused,
+ * exactly as `files` is then empty: a report for code that was not written would
+ * describe nothing.
+ *
+ * Every cost figure in `budget` is `{ "kind": "measured", "bytes", "derivation" }`
+ * or `{ "kind": "unmeasured", "reason" }`. A consumer must branch on `kind`; there
+ * is deliberately no numeric field to read when a cost is unknown, because §1.3
+ * forbids reporting a figure the tooling cannot substantiate.
+ *
+ * **Diagnostic codes are public and stable.** A consumer branches on
+ * `diagnostics[].code` — the `DIAGNOSTIC_CODES` table in
+ * `core/schema/diagnostic.ts`, plus the CLI's own {@link USAGE_ERROR_CODE}.
+ * Renaming a code is a breaking change under §15.4 and must be announced with a
+ * migration, exactly as a schema change is; the prose `message` beside it may be
+ * reworded freely. Codes are added, never repurposed: PR-04 WO11b added
+ * `U8G2GL_BOUND_POSITION_HAS_CHILDREN` and `U8G2GL_STRING_TOO_LONG` and
+ * deliberately left `U8G2GL_UNRESOLVED_GEOMETRY`'s string alone when its
+ * TypeScript key was renamed.
+ *
+ * A **usage error** under `--json` is JSON too, never prose on stderr:
+ * `{ "files": [], "diagnostics": [{ "code": "U8G2GL_USAGE", … }], … }` with exit 2.
+ *
+ * Exit status: 0 on success (under `--check`, only if nothing would change);
+ * 1 if refused, or under `--check` if any file would change; 2 on a usage error.
+ *
+ * @param args Subcommand arguments.
+ * @param json Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
+ */
+function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
+  const options = parseGenerateArgs(args, json);
+
+  // --- Step 1: Load, validate and lay out — all or nothing ---
+  const loaded = loadOrExit(options.path, json, { files: [] });
+  const generatorVersion = generatorVersionOrExit(json);
+  const result = generate({
+    ...loaded.model,
+    ...(options.target !== undefined ? { target: options.target } : {}),
+    generatorVersion,
+    assets: loaded.assets,
+  });
+  const { diagnostics, errors, warnings } = result;
+  // The editor target is emitted from this very build — its realisation,
+  // resolution and capacities — and only when the firmware emission it shares a
+  // model with succeeded, so it can never describe a document `generate` refuses.
+  const written: GenerateResult =
+    options.targetKind === 'editor' && errors === 0 ? { ...result, files: editorFilesOf(loaded, result, generatorVersion) } : result;
+  const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
+
+  if (errors > 0 || loaded.projectRoot === undefined) {
+    if (json) {
+      console.log(JSON.stringify({ files: [], diagnostics, errors, warnings }, null, 2));
+    } else {
+      console.error(formatted);
+      console.error(`\nGeneration refused: ${errors} error(s), ${warnings} warning(s). Nothing was written.`);
+    }
     process.exit(1);
   }
 
-  if (warningCount > 0) {
-    const formatted = formatDiagnostics(
-      uniqueDiagnostics,
-      (f) => fileContentMap.get(f),
-      { color: useColor },
-    );
-    console.log(formatted);
-    console.log(`\nValidation passed: 0 errors, ${warningCount} warning(s).`);
-    process.exit(0);
-  }
+  // --- Step 2: Decide the output directory ---
+  // --out is relative to where the command runs; <output dir> is relative to
+  // the project, because the project file is what declares it.
+  const firmwareDir = loaded.model.project.output?.dir ?? DEFAULT_OUTPUT_DIR;
+  const outDir = options.out !== undefined
+    ? resolve(process.cwd(), options.out)
+    : resolve(
+        loaded.projectRoot,
+        options.targetKind === 'editor' ? `${firmwareDir.replace(/[/\\]+$/, '')}${EDITOR_OUTPUT_SUFFIX}` : firmwareDir,
+      );
+  const outLabel = relative(process.cwd(), outDir).split(sep).join('/') || '.';
 
-  console.log('Validation passed: 0 errors, 0 warnings.');
-  process.exit(0);
+  // --- Step 3: Check or write ---
+  let changes: readonly FileChange[];
+  try {
+    changes = options.check ? planGeneratedWrite(outDir, written.files) : writeGenerated(outDir, written);
+  } catch (err) {
+    exitWithFatal(json, outLabel, err instanceof Error ? err.message : String(err), { files: [] });
+  }
+  const drift = changes.filter((c) => c.action !== 'unchanged');
+
+  // --- Step 4: The §18 report, from the model this build emitted from ---
+  // §13.11's last pipeline step, and §1.3's obligation: every `generate` run
+  // states what the project costs, including under `--check`, where nothing was
+  // written but the figures are still the ones the checked output carries.
+  const report = reportFor(loaded, result, generatorVersion);
+
+  // --- Step 5: Report ---
+  if (json) {
+    console.log(
+      JSON.stringify(
+        {
+          files: changes,
+          diagnostics,
+          errors,
+          warnings,
+          budget: report.budget,
+          capacity: report.capacity,
+          realisation: report.realisation,
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    if (warnings > 0) {
+      console.log(`${formatted}\n`);
+    }
+    if (options.check) {
+      console.log(
+        drift.length === 0
+          ? `Generated files in ${outLabel} are up to date (target '${result.target}').`
+          : `Generated files in ${outLabel} are out of date (target '${result.target}'):\n${formatChanges(drift, true)}`,
+      );
+    } else {
+      console.log(
+        `Generated ${written.files.length} ${options.targetKind} file(s) in ${outLabel} for target '${result.target}':\n` +
+          formatChanges(changes, false),
+      );
+    }
+    console.log(`\n${formatBudgetReport(report, { color: useColor })}`);
+  }
+  process.exit(options.check && drift.length > 0 ? 1 : 0);
 }
 
 /**
@@ -713,12 +908,17 @@ export function runCli(rawArgs: readonly string[]): void {
   }
 
   if (showVersion) {
-    console.log(getPackageVersion());
+    console.log(generatorVersionOrExit(json));
     return;
   }
 
   // --- Step 3: Validate presence of a subcommand ---
   if (!subcommand) {
+    if (json) {
+      // Usage prose on stdout would corrupt the one stream a --json caller
+      // parses, so the refusal takes the JSON shape here too ([D-16]).
+      exitWithUsageError(true, 'No command given. Commands: ' + KNOWN_COMMANDS.join(', ') + '.');
+    }
     printUsage();
     process.exit(2);
   }
@@ -739,7 +939,25 @@ export function runCli(rawArgs: readonly string[]): void {
     return;
   }
 
+  if (subcommand === 'generate') {
+    handleGenerateCommand(subcommandArgs, json, useColor);
+    return;
+  }
+
   // --- Step 5: Handle unknown subcommand ---
+  if (json) {
+    // Exit 1, as an unknown command always has: only the shape changes ([D-16]).
+    const diagnostic: Diagnostic = {
+      code: USAGE_ERROR_CODE,
+      severity: 'error',
+      file: '',
+      line: 1,
+      column: 1,
+      message: `Unknown command '${subcommand}'. Commands: ${KNOWN_COMMANDS.join(', ')}.`,
+    };
+    console.log(JSON.stringify({ diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
+    process.exit(1);
+  }
   console.error(`Unknown command: ${subcommand}`);
   console.error(`Available commands: ${KNOWN_COMMANDS.join(', ')}`);
   process.exit(1);

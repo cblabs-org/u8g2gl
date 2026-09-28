@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A user-written composite carrying §6.6's recommended `wd_` prefix. The
+     validator rejected exactly this name until the Chief Architect un-reserved
+     `wd_` in §13.4 (2026-09-16): by [D-12] a tag *is* its C++ class name, so
+     `wd_` names classes users write and the generator never produces one. This
+     fixture is here so the convention is covered by a test rather than by its
+     absence (PR-04 WO8c). -->
+<widget name="wd_badge">
+    <api>
+        <prop name="caption" type="string" default="Badge" />
+    </api>
+    <view>
+        <u8g2gl_label name="wd_caption" x="0" y="0" width="48" height="10" font="small_9" text="$caption" />
+    </view>
+</widget>

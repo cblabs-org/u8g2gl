@@ -27,6 +27,7 @@
  * - createWidgetParseContext: Build a context seeded from a document's elements
  * - parseWidgetTree: Parse an array of child elements into WidgetNode AST nodes
  * - parseWidgetNode: Recursively parse a single element into a WidgetNode
+ * - hiddenAttributeValue: The boolean rule for `hidden`, keeping a `$prop` placeholder as text
  */
 
 import type {
@@ -221,6 +222,34 @@ function allocateName(allocator: NameAllocator, cleanTag: string): string {
   return generatedName;
 }
 
+/** The only values a boolean attribute may take (§7.2). */
+const BOOLEAN_TEXT: readonly string[] = ['true', 'false'];
+
+/**
+ * @brief The parsed value of a `hidden` attribute: `"true"` and `"false"` are
+ *        booleans; anything else — a `$prop` placeholder, or a value that is
+ *        simply not a boolean — stays text.
+ *
+ * Two defects shaped this rule, and both were silent:
+ * - Converting `hidden="$p"` to a boolean lost the reference before composite
+ *   expansion could substitute it, so every such element became visible (PR-04
+ *   WO7 F6). Expansion substitutes the placeholder and applies this same
+ *   function to the argument, so the rule is spelled once.
+ * - The old rule was `text === 'true'`, which quietly turned `hidden="yes"`
+ *   into `false` — the element rendered, and nothing said why (PR-04 WO7b 3).
+ *   Keeping the text instead lets Pass 4 hold `hidden` to the strictness §7.2
+ *   gives `hcenter` / `vcenter`, rather than guessing on the author's behalf.
+ *
+ * So a non-boolean value survives parsing deliberately: this function decides
+ * what the document *says*, and the validator decides whether it is allowed.
+ *
+ * @param text The attribute value as written, or as substituted.
+ * @return A boolean for `"true"` / `"false"`, or the text unchanged.
+ */
+export function hiddenAttributeValue(text: string): string | boolean {
+  return BOOLEAN_TEXT.includes(text) ? text === 'true' : text;
+}
+
 /**
  * Recursively parses a single RawXmlElement into a WidgetNode.
  * Enforces [U-1] element identity per the context's {@link MissingNamePolicy}.
@@ -256,7 +285,7 @@ export function parseWidgetNode(
       attributes['focus_style'] = attr.value;
       attributeLocs['focusStyle'] = attr.loc;
     } else if (attr.name === 'hidden') {
-      attributes['hidden'] = attr.value === 'true';
+      attributes['hidden'] = hiddenAttributeValue(attr.value);
     } else {
       attributes[attr.name] = attr.value;
     }
@@ -346,8 +375,16 @@ function synthesiseName(
   context: WidgetParseContext,
 ): void {
   // --- Step 1: Reduce the tag to a §13.4-conformant identifier stem ---
-  // Strip framework and custom widget prefixes (u8g2gl_, wd_, ui_) so the
-  // auto-generated identifier conforms to §13.4 and passes name validation.
+  // Strip `u8g2gl_` and `ui_` — §13.4's reserved prefixes, so an auto-generated
+  // name built from the tag would be rejected by name validation — and,
+  // separately, `wd_`. `wd_` is NOT reserved: it is deliberately absent from
+  // RESERVED_IDENTIFIER_PREFIXES (Chief Architect ruling 2026-09-16, see
+  // resolver/mangle.ts), because by [D-12] a tag *is* its C++ class name and
+  // `wd_` names classes users write (§6.6). It is stripped here only because
+  // `wd_service_list`'s unnamed child reads better as `service_list_0` than as
+  // `wd_service_list_0` — a readability choice, not a reservation. Do not
+  // "reconcile" this list with the reserved one by adding `wd_` back; that
+  // regression has already been made once.
   const baseTag = (el.name.replace(/^(u8g2gl_|wd_|ui_)/, '') || el.name)
     .toLowerCase()
     .replace(/[^a-z0-9_]/g, '_')

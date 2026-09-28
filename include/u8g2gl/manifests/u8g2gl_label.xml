@@ -30,7 +30,7 @@
                 long_mode is scroll or scroll_circular." />
     <bind name="bind_text" type="string" setter="bind_text"
           fmt="bind_text_fmt" />
-    <bind name="bind_text_int" type="int" setter="bind_text"
+    <bind name="bind_text" type="int" setter="bind_text"
           fmt="bind_text_fmt" />
   </api>
 </widget>

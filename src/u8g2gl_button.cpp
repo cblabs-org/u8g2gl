@@ -14,20 +14,49 @@
  *          UTF-8 label text rendering. Operates statically with U8G2GL_IDLE
  *          lifecycle to maximize microcontroller sleep opportunities ([D-15]).
  *
+ *          Its label is the bound subject's text when bind_text() (inherited)
+ *          is active, otherwise the literal — the same rule u8g2gl_label
+ *          follows; before PR-04 WO10b render() read only the literal, so a
+ *          bound button drew no label.
+ *
  * Description: Implementation of set_text, get_text, set_border_width,
  *              get_border_width, tick, and render methods for u8g2gl_button.
  */
 #include "u8g2gl/u8g2gl_button.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
+
+// draw_border_rframe
+// Draws one border layer. The button has always called drawRFrame, even at
+// radius 0, so this cannot route through u8g2gl_draw_box(), which picks
+// drawFrame at radius 0. It applies the same rules (u8g2gl_coord.h): the origin
+// wraps explicitly, so a border partly off the left or top edge draws its
+// visible part; the size must be positive; the corner radius is clamped, 0
+// meaning square corners.
+//   display  — U8G2 display driver instance
+//   x, y     — layer origin; may be negative
+//   w, h     — layer size
+//   r        — corner radius, >= 0
+static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
+                               int16_t w, int16_t h, int16_t r) {
+    u8g2_uint_t uw = 0;
+    u8g2_uint_t uh = 0;
+    if (!u8g2gl_coord_size(w, uw) || !u8g2gl_coord_size(h, uh)) {
+        return;
+    }
+    display.drawRFrame(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw, uh,
+                       u8g2gl_coord_clamp(r));
+}
 
 // u8g2gl_button::set_text
 // Stores pointer to the button label text and flags the object as dirty.
@@ -93,13 +122,11 @@ void u8g2gl_button::render(U8G2& display) {
     bool is_focused = !has_flag(U8G2GL_FLAG_DISABLED) && style_.invert;
 
     // --- Step 4: Draw background inversion if focused ---
+    // u8g2gl_draw_box() issues exactly the call this did — drawRBox when
+    // rounded, drawBox otherwise — and owns the coordinate conversion for both.
     if (is_focused) {
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
-        if (style_.radius > 0) {
-            display.drawRBox(x_, y_, w_, h_, style_.radius);
-        } else {
-            display.drawBox(x_, y_, w_, h_);
-        }
+        u8g2gl_draw_box(display, x_, y_, w_, h_, true, style_.radius);
     }
 
     // --- Step 5: Draw border frame(s) ---
@@ -108,7 +135,7 @@ void u8g2gl_button::render(U8G2& display) {
     if (border_width_ > 0) {
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
         if (border_width_ == 1) {
-            display.drawRFrame(x_, y_, w_, h_, style_.radius);
+            draw_border_rframe(display, x_, y_, w_, h_, style_.radius);
         } else {
             for (uint8_t i = 0; i < border_width_; ++i) {
                 int16_t bx = static_cast<int16_t>(x_ + i);
@@ -119,13 +146,20 @@ void u8g2gl_button::render(U8G2& display) {
                     break;
                 }
                 int16_t br = (style_.radius > i) ? static_cast<int16_t>(style_.radius - i) : 0;
-                display.drawRFrame(bx, by, bw, bh, br);
+                draw_border_rframe(display, bx, by, bw, bh, br);
             }
         }
     }
 
     // --- Step 6: Render label text ---
-    if (text_ == nullptr || text_[0] == '\0') {
+    // A binding wins over the literal whichever was set first, and is read now,
+    // at render time, into a stack buffer (none per button). Nothing is cached
+    // from the text, so the inherited on_text_binding_changed() — mark dirty —
+    // is all a change needs.
+    char buffer[U8G2GL_BOUND_TEXT_BUFFER_SIZE];
+    const char* bound = bound_text(buffer, sizeof(buffer));
+    const char* text = bound != nullptr ? bound : text_;
+    if (text == nullptr || text[0] == '\0') {
         return;
     }
 
@@ -138,12 +172,12 @@ void u8g2gl_button::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // Vertical centering within button bounds
-    int font_height = display.getAscent() - display.getDescent();
+    int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int y_offset = (h_ > 0) ? (h_ - font_height) / 2 : 0;
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
 
     // Horizontal centering (or alignment override if explicitly styled)
-    int text_width = display.getUTF8Width(text_);
+    int text_width = static_cast<int>(display.getUTF8Width(text));
     int16_t draw_x = static_cast<int16_t>(x_ + (w_ - text_width) / 2);
 
     if (style_.has(U8G2GL_STYLE_ALIGN)) {
@@ -154,5 +188,6 @@ void u8g2gl_button::render(U8G2& display) {
         }
     }
 
-    display.drawUTF8(draw_x, draw_y, text_);
+    // Origins wrap explicitly and U8G2 clips them — see u8g2gl_coord_pos().
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text);
 }

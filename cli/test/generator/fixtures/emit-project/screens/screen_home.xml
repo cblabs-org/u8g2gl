@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="home">
+    <styles>
+        <!-- Overrides the global `body`: one ui_style_body, one pool slot, which
+             is how mangle.ts keys it and how the capacity was counted. -->
+        <style name="body" font="u8g2_font_6x10_mr" align="right" />
+    </styles>
+    <view>
+        <wd_badge name="badge" x="0" y="0" width="60" height="12" caption="Live" />
+
+        <!-- No object: nothing refers to it and it carries no state (§13.5). -->
+        <u8g2gl_hline name="rule" x="0" y="13" width="128" />
+
+        <u8g2gl_label name="title" x="0" y="16" width="64" height="10"
+                      font="u8g2_font_6x10_mr" bind_text="station_name" align="left">
+            <style name="header" />
+        </u8g2gl_label>
+
+        <!-- Three objects observing `level` ... -->
+        <u8g2gl_label name="lvl_a" x="0" y="28" width="40" height="10"
+                      font="u8g2_font_6x10_mr" bind_width="level" style="body" />
+        <u8g2gl_label name="lvl_b" x="44" y="28" width="40" height="10"
+                      font="u8g2_font_6x10_mr" bind_width="level" />
+        <u8g2gl_label name="lvl_c" x="88" y="28" width="40" height="10"
+                      font="u8g2_font_6x10_mr" bind_width="level" />
+
+        <!-- ... and one draw-call element, which costs the subject exactly one
+             frame-dirty observer however many such elements there are (§13.5). -->
+        <u8g2gl_box name="level_bar" x="4" y="40" width="60" height="6"
+                    bind_width="level" filled="true" radius="0" />
+
+        <u8g2gl_clock name="clock" x="88" y="52" width="40" height="10"
+                      font="u8g2_font_6x10_mr" bind_time="system_time" format="hh_mm" blink="true" />
+
+        <u8g2gl_xbm name="wifi" x="0" y="52" width="16" height="10" src="icon_wifi">
+            <bind_flag_if_eq subject="wifi_connected" ref_value="0" flag="hidden" />
+        </u8g2gl_xbm>
+
+        <!-- `scroll_px_per_sec` is a non-coordinate `int` property written as an
+             expression: it must reach emission as the literal 20 (§13.2). -->
+        <u8g2gl_label name="scroller" x="20" y="52" width="60" height="10"
+                      font="u8g2_font_6x10_mr" text="Hi" long_mode="scroll"
+                      scroll_px_per_sec="#bar_height + 8" />
+    </view>
+</screen>

@@ -7,7 +7,28 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_obj.cpp
- * Description: Implementation of test_obj.cpp
+ * Purpose: Holds u8g2gl_obj — the base every widget inherits — to the two
+ *          contracts the rest of the library assumes without checking. First,
+ *          that every mutator which changes what is drawn calls mark_dirty(),
+ *          and that one which changes nothing does not: §11.2 gates
+ *          sendBuffer() on the frame dirty flag, so a missed mark_dirty()
+ *          leaves the display stale on a static screen and works on an animated
+ *          one — a defect that has already shipped once (set_hidden(),
+ *          set_disabled()). Second, that the flat parent-index hierarchy answers
+ *          "am I visible?" and "where may I draw?" correctly, since no widget
+ *          walks it itself.
+ *
+ * Description: Geometry and the per-axis setters, including the [D-20] bound
+ *              geometry rules (a bound position adds its container's origin, a
+ *              bound size does not, and the sum is clamped rather than each
+ *              term); flags, dirty tracking and object size; a mark_dirty()
+ *              pair — changed and unchanged — for every setter on the object
+ *              and its style; style application; parent index; the default
+ *              tick/render lifecycle. Then the hierarchy helpers in
+ *              u8g2gl_tree.h (effective visibility, effective clip, rectangle
+ *              intersection), the u8g2gl_state_saver RAII guard, and the
+ *              partial-refresh tile arithmetic, whose off-display and
+ *              non-tile-aligned cases are the ones that produce stale columns.
  */
 #include <gtest/gtest.h>
 #include <iostream>
@@ -16,10 +37,11 @@
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_config.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_helpers.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 TEST(Obj, DefaultConstruction) {
     u8g2gl_obj obj;
@@ -179,6 +201,124 @@ TEST(Obj, PerAxisSettersMarkDirty) {
     obj.set_h(8);
     EXPECT_EQ(obj.get_h(), 8);
     EXPECT_TRUE(obj.is_dirty());
+}
+
+// --- PR-04 WO3: geometry bindings ([D-20]) ---
+// A bound axis must reach the display on a static screen: nothing animates to
+// force a frame, so the binding itself has to gate it via the frame dirty flag
+// (§11.2). This is the failure mode set_coords() had before PR-3R WO1.
+TEST(Obj, BindWidthUpdatesGeometryAndGatesStaticFrame) {
+    u8g2gl_screen screen{};
+    u8g2gl_set_active_screen(&screen);
+
+    u8g2gl_subject_int level;
+    level.set(10);
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_width(&level));
+    EXPECT_EQ(obj.get_w(), 10);   // current value applied immediately
+
+    screen.dirty = false;
+    obj.clear_dirty();
+    level.set(42);
+    EXPECT_EQ(obj.get_w(), 42);
+    EXPECT_TRUE(obj.is_dirty());
+    EXPECT_TRUE(screen.dirty);
+
+    // Same value again: no change, no frame.
+    screen.dirty = false;
+    obj.clear_dirty();
+    level.set(42);
+    EXPECT_FALSE(screen.dirty);
+
+    u8g2gl_set_active_screen(nullptr);
+}
+
+TEST(Obj, BindEachAxisDrivesItsSetter) {
+    u8g2gl_subject_int sx, sy, sh;
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_x(&sx, 0));
+    ASSERT_TRUE(obj.bind_y(&sy, 0));
+    ASSERT_TRUE(obj.bind_height(&sh));
+    sx.set(3);
+    sy.set(-4);
+    sh.set(70000);   // outside int16_t: clamped, not wrapped
+    EXPECT_EQ(obj.get_x(), 3);
+    EXPECT_EQ(obj.get_y(), -4);
+    EXPECT_EQ(obj.get_h(), INT16_MAX);
+    EXPECT_FALSE(obj.bind_x(nullptr, 0));
+}
+
+// --- Bound positions are container-relative (§7.2, [D-20] amendment, WO10b) ---
+
+TEST(Obj, BoundPositionAddsTheContainerOrigin) {
+    // A child of a container at (40, 30) bound to 5 is at 45; the generator
+    // emits the container's absolute origin as bind_x's literal.
+    u8g2gl_subject_int offset(5);
+    u8g2gl_subject_int drop(2);
+    u8g2gl_obj child;
+    ASSERT_TRUE(child.bind_x(&offset, 40));
+    ASSERT_TRUE(child.bind_y(&drop, 30));
+    EXPECT_EQ(child.get_x(), 45);
+    EXPECT_EQ(child.get_y(), 32);
+
+    // The origin stays with the binding: every later value is relative too.
+    offset.set(-7);
+    EXPECT_EQ(child.get_x(), 33);
+    drop.set(0);
+    EXPECT_EQ(child.get_y(), 30);
+}
+
+TEST(Obj, ScreenLevelBoundPositionIsItsValue) {
+    u8g2gl_subject_int x(5);
+    u8g2gl_obj obj;
+    ASSERT_TRUE(obj.bind_x(&x, 0));
+    EXPECT_EQ(obj.get_x(), 5);
+}
+
+TEST(Obj, BoundPositionClampsTheSumNotEachTerm) {
+    u8g2gl_subject_int v(0);
+    u8g2gl_obj obj;
+
+    // A value outside int16_t that the origin brings back inside: clamping the
+    // value first would give 32767 - 10000 = 22767; the sum is 30000.
+    v.set(40000);
+    ASSERT_TRUE(obj.bind_x(&v, -10000));
+    EXPECT_EQ(obj.get_x(), 30000);
+    v.set(-40000);
+    u8g2gl_obj low;
+    ASSERT_TRUE(low.bind_x(&v, 10000));
+    EXPECT_EQ(low.get_x(), -30000);
+
+    // Sums past each edge pin at it, never wrap.
+    u8g2gl_subject_int w(1);
+    u8g2gl_obj high;
+    ASSERT_TRUE(high.bind_x(&w, INT16_MAX));
+    EXPECT_EQ(high.get_x(), INT16_MAX);
+    w.set(-1);
+    u8g2gl_obj under;
+    ASSERT_TRUE(under.bind_y(&w, INT16_MIN));
+    EXPECT_EQ(under.get_y(), INT16_MIN);
+
+    // And at the int32_t extremes, where a naive 32-bit sum would overflow.
+    u8g2gl_subject_int extreme(INT32_MAX);
+    u8g2gl_obj top;
+    ASSERT_TRUE(top.bind_x(&extreme, INT16_MIN));
+    EXPECT_EQ(top.get_x(), INT16_MAX);
+    extreme.set(INT32_MIN);
+    EXPECT_EQ(top.get_x(), INT16_MIN);
+    u8g2gl_subject_int bottom_value(INT32_MIN);
+    u8g2gl_obj bottom;
+    ASSERT_TRUE(bottom.bind_y(&bottom_value, INT16_MAX));
+    EXPECT_EQ(bottom.get_y(), INT16_MIN);
+}
+
+TEST(Obj, BoundSizeTakesNoOrigin) {
+    // A width is a length: it is not moved by any container.
+    u8g2gl_subject_int width(12);
+    u8g2gl_obj obj;
+    obj.set_coords(40, 0, 1, 1);
+    ASSERT_TRUE(obj.bind_width(&width));
+    EXPECT_EQ(obj.get_w(), 12);
 }
 
 TEST(Obj, PerAxisSettersUnchangedDoNotMarkDirty) {
@@ -542,11 +682,11 @@ TEST(StateSaver, SavesAndRestores) {
         display.setDrawColor(2);
         display.setFont(&font2);
         EXPECT_EQ(display.getDrawColor(), 2);
-        EXPECT_EQ(display.getFont(), &font2);
+        EXPECT_EQ(display.getU8g2()->font, &font2);
     }
 
     EXPECT_EQ(display.getDrawColor(), 1);
-    EXPECT_EQ(display.getFont(), &font1);
+    EXPECT_EQ(display.getU8g2()->font, &font1);
 }
 
 TEST(PartialRefresh, TileAligned) {
@@ -557,6 +697,25 @@ TEST(PartialRefresh, TileAligned) {
     EXPECT_EQ(display.last_ty, 0);
     EXPECT_EQ(display.last_tw, 2);
     EXPECT_EQ(display.last_th, 2);
+}
+
+TEST(PartialRefresh, NegativeOriginRefreshesOnlyVisiblePart) {
+    U8G2 display;
+    // Pixels -12..7 by -10..5: only 0..7 by 0..5 is on the display, one tile.
+    // Tile arithmetic on the raw origin would give tx = -1, which U8G2's
+    // uint8_t tile argument receives as 255 (WO4c).
+    u8g2gl_partial_refresh(display, -12, -10, 20, 16);
+    EXPECT_EQ(display.update_display_area_count, 1);
+    EXPECT_EQ(display.last_tx, 0);
+    EXPECT_EQ(display.last_ty, 0);
+    EXPECT_EQ(display.last_tw, 1);
+    EXPECT_EQ(display.last_th, 1);
+}
+
+TEST(PartialRefresh, WhollyOffDisplayRefreshesNothing) {
+    U8G2 display;
+    u8g2gl_partial_refresh(display, -16, 0, 16, 8);
+    EXPECT_EQ(display.update_display_area_count, 0);
 }
 
 TEST(PartialRefresh, NonAligned) {

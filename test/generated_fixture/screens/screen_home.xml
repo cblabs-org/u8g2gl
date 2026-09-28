@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- design_spec §13.12's worked example, verbatim but for the font name (§13.12
+     names a BDF font, which PR-04 refuses). -->
+<screen name="home">
+    <view>
+        <status_bar name="bar" x="0" y="0" width="#screen_width" height="11"
+                    title_subject="station_name" />
+        <u8g2gl_hline name="rule" x="0" y="11" width="#screen_width" />
+        <u8g2gl_label name="msg" x="0" y="16" right="0" height="12"
+                      bind_text="service_message" font="u8g2_font_6x10_mr" align="center" />
+    </view>
+</screen>

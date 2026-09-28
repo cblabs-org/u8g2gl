@@ -17,13 +17,14 @@
  *              for the u8g2gl_glyph widget.
  */
 #include "u8g2gl/u8g2gl_glyph.h"
+#include "u8g2gl/u8g2gl_coord.h"
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
@@ -69,5 +70,7 @@ void u8g2gl_glyph::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 3: Draw glyph ---
-    display.drawGlyph(x_, y_, glyph_);
+    // The origin wraps explicitly; U8G2's glyph renderer clips a glyph partly
+    // off the left or top edge to its visible part — see u8g2gl_coord_pos().
+    display.drawGlyph(u8g2gl_coord_pos(x_), u8g2gl_coord_pos(y_), glyph_);
 }

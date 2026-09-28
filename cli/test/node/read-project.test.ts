@@ -28,16 +28,13 @@ describe('readProjectFiles', () => {
     expect(projectFiles.screenXmls.length).toBeGreaterThanOrEqual(1);
     expect(projectFiles.screenXmls[0]?.filename).toBe('screens/screen_home.xml');
     // Widget manifests include both plain widgets and composites ([D-18]) —
-    // the fixture's status_bar is a composite (a <widget> with a <view>).
-    expect(projectFiles.widgetManifestXmls.length).toBeGreaterThanOrEqual(2);
+    // the fixture's status_bar is a composite (a <widget> with a <view>). The
+    // fixture no longer carries a copy of u8g2gl_label's manifest (PR-04 WO1):
+    // framework manifests come from the CLI's bundle, never from widgets/.
+    expect(projectFiles.widgetManifestXmls.length).toBeGreaterThanOrEqual(1);
     expect(
       projectFiles.widgetManifestXmls.some(
         (w) => w.filename === 'widgets/status_bar/status_bar.xml',
-      ),
-    ).toBe(true);
-    expect(
-      projectFiles.widgetManifestXmls.some(
-        (w) => w.filename === 'widgets/u8g2gl_label/u8g2gl_label.xml',
       ),
     ).toBe(true);
   });
@@ -50,7 +47,6 @@ describe('readProjectFiles', () => {
     expect(map.has('globals.xml')).toBe(true);
     expect(map.has('screens/screen_home.xml')).toBe(true);
     expect(map.has('widgets/status_bar/status_bar.xml')).toBe(true);
-    expect(map.has('widgets/u8g2gl_label/u8g2gl_label.xml')).toBe(true);
   });
 
   it('throws descriptive error if u8g2gl.xml is missing', () => {

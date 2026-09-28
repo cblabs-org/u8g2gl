@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- design_spec §6.4's composite, as §13.12 instantiates it. The only change
+     is the fonts: §6.4 names BDF fonts, which PR-04 refuses (PR-04b). -->
+<widget name="status_bar">
+    <api>
+        <prop name="title_subject" type="subject" default="station_name" />
+        <prop name="wifi_subject"  type="subject" default="wifi_connected" />
+        <prop name="font"          type="font"    default="u8g2_font_6x10_mr" />
+    </api>
+
+    <view>
+        <u8g2gl_label name="location"
+            x="0" y="0" right="52" height="#parent_height"
+            bind_text="$title_subject" font="$font" long_mode="scroll" />
+
+        <u8g2gl_xbm name="wifi_icon"
+            right="40" y="0" width="12" height="#parent_height"
+            src="icon_wifi">
+            <bind_flag_if_eq subject="$wifi_subject" ref_value="0" flag="hidden" />
+        </u8g2gl_xbm>
+
+        <u8g2gl_clock name="clock"
+            right="0" y="0" width="40" height="#parent_height"
+            format="hh_mm" font="u8g2_font_5x7_mr" blink="true"
+            bind_time="system_time" />
+    </view>
+</widget>

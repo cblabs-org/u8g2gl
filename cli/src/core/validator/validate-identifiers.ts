@@ -5,13 +5,20 @@
  *
  * File: src/core/validator/validate-identifiers.ts
  * Purpose: Pass 7 — Validates naming rules, reserved identifiers, C++ keywords,
- *          duplicate names, and component-inlining collisions (§13.4, §15.1).
+ *          duplicate names, duplicate manifests, and composite-inlining collisions (§13.4, §15.1).
  * Description: Checks that identifier names conform to [a-z][a-z0-9_]*, contain no
- *              double underscores, avoid reserved prefixes (u8g2gl_, ui_, wd_),
+ *              double underscores, avoid reserved prefixes (u8g2gl_, ui_),
  *              and do not collide with C++ keywords. Enforces [U-1] element identity
  *              (every widget element must possess a valid, non-empty name).
- *              Detects duplicate identifiers within screen/component scopes and flags
- *              component-inlining collisions.
+ *              Detects duplicate identifiers within screen/composite scopes, duplicate manifest declarations, and flags
+ *              composite-inlining collisions.
+ *
+ *              **One name is exempt: a `<builtin>` font's** (PR-04 WO14, owner's
+ *              ruling 2026-09-28). It is a U8G2 symbol rather than a name the
+ *              author chose, and 522 of the fonts U8G2 bundles carry capitals.
+ *              Pass 2 checks it against the U8G2 catalogue instead. A `<bdf>`'s
+ *              name is the author's and keeps §13.4 in full. The exemption is
+ *              written at the font loop, with its reasoning.
  *
  * Exports:
  * - validateIdentifiers(input): Runs Pass 7 identifier validation
@@ -20,9 +27,9 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { mangleIdentifiers, RESERVED_IDENTIFIER_PREFIXES } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
-
-const RESERVED_PREFIXES = ['u8g2gl_', 'ui_', 'wd_'] as const;
+import { pipelineOf } from './shared-model.js';
 
 /** Complete list of standard C++ keywords. */
 const CPP_KEYWORDS: ReadonlySet<string> = new Set([
@@ -167,8 +174,9 @@ function checkNameRule(
     );
   }
 
-  // No reserved prefixes
-  for (const prefix of RESERVED_PREFIXES) {
+  // No reserved prefixes — §13.4's one list, shared with the mangler, which
+  // applies it to the identifiers that only exist after prefixing.
+  for (const prefix of RESERVED_IDENTIFIER_PREFIXES) {
     if (name.startsWith(prefix)) {
       return createIdDiagnostic(
         DIAGNOSTIC_CODES.INVALID_NAME,
@@ -211,9 +219,7 @@ function walkNodes(
  */
 export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { globals, screens, components, project } = input;
-
-  const componentMap = new Map((components ?? []).map((c) => [c.name, c]));
+  const { globals, screens, manifests, project } = input;
 
   // --- 1. Validate targets in project ---
   for (const target of project?.targets ?? []) {
@@ -286,9 +292,33 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
 
   const seenFonts = new Set<string>();
   for (const f of globals?.fonts ?? []) {
-    const diag = checkNameRule(f.name, f.loc, 'font');
-    if (diag) {
-      diagnostics.push(diag);
+    // A <builtin>'s `name` is exempt from §13.4's identifier rule, deliberately
+    // and by the owner's ruling of 2026-09-28: "Fonts are input - we can't
+    // expect them to follow our naming conventions we should use whatever is
+    // provided and ensure ALL fonts are available." The name is not an
+    // identifier the author chose; it *is* the U8G2 symbol the alias points at
+    // (emit/fonts.ts), and 522 of the 2039 fonts U8G2 bundles carry capitals
+    // (`u8g2_font_helvR08_tr`), which `[a-z][a-z0-9_]*` forbids. Refusing them
+    // here made a fifth of the library unreachable.
+    //
+    // Nothing is loosened by the exemption, because Pass 2 checks the same name
+    // against the catalogue derived from the pinned U8G2 source
+    // (validate-references.ts, U8G2GL_UNKNOWN_FONT) — a strictly narrower test
+    // than §13.4's: only a name U8G2 actually declares is accepted, and every
+    // one of those is already a C identifier, so the alias stays legal.
+    //
+    // **Confined to <builtin>.** A <bdf>'s `name` *is* author-chosen (§14.2), so
+    // §13.4 applies to it in full and `checkNameRule` still runs on it below.
+    // PR-04 WO14 pins that difference with a test.
+    //
+    // §13.4's wording still says every name is lowercase, so this is
+    // deliberately ahead of the spec; the amendment is the Chief Architect's.
+    // Recorded in PROJECT.md, "Owner instruction — WO14, 2026-09-28".
+    if (f.kind !== 'builtin') {
+      const diag = checkNameRule(f.name, f.loc, 'font');
+      if (diag) {
+        diagnostics.push(diag);
+      }
     }
     if (f.name && seenFonts.has(f.name)) {
       diagnostics.push(
@@ -346,9 +376,6 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
     }
 
     const seenElementNames = new Set<string>();
-    const directElementMap = new Map<string, SourceLocation | undefined>();
-    const componentInstances: { instanceName: string; componentName: string; loc?: SourceLocation }[] =
-      [];
 
     walkNodes(screen.view?.children ?? [], (node) => {
       const name = node.attributes.name;
@@ -381,68 +408,59 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         );
       } else {
         seenElementNames.add(name);
-        directElementMap.set(name, nameLoc);
-      }
-
-      if (componentMap.has(node.tag)) {
-        componentInstances.push({
-          instanceName: name,
-          componentName: node.tag,
-          loc: nameLoc,
-        });
       }
     });
-
-    // 3a. Component inlining collision check (§13.4)
-    for (const inst of componentInstances) {
-      const comp = componentMap.get(inst.componentName);
-      if (comp?.view?.children) {
-        walkNodes(comp.view.children, (child) => {
-          const childName = child.attributes.name;
-          if (typeof childName === 'string' && childName) {
-            const inlinedName = `${inst.instanceName}_${childName}`;
-            if (directElementMap.has(inlinedName)) {
-              diagnostics.push(
-                createIdDiagnostic(
-                  DIAGNOSTIC_CODES.NAME_COLLISION,
-                  `Component-inlining name collision: inlined element '${inlinedName}' from component '${inst.componentName}' (instance '${inst.instanceName}') collides with element '${inlinedName}' in screen '${screen.name}'.`,
-                  inst.loc,
-                  inlinedName,
-                ),
-              );
-            }
-          }
-        });
-      }
-    }
   }
 
-  // --- 4. Validate components ---
-  const seenComponentNames = new Set<string>();
+  // --- 3a. §13.4 mangling: every generated identifier, collision-checked ---
+  // One `mangleIdentifiers` call over the expanded tree, replacing the one-level
+  // inlining check this pass used to run (PR-04 WO7 F1). That check compared a
+  // screen-level name against the children of a directly instantiated composite
+  // and nothing else: it never saw a nested composite (`bar_clk_digits`), never
+  // saw two composite children colliding with each other or with a global
+  // identifier, and named only one of the two sources. §13.4 requires a hard
+  // error naming both, so the module that builds the identifiers is also the one
+  // that checks them, and `generate` refuses on what it raises.
+  const expansion = pipelineOf(input).expansion;
+  diagnostics.push(...mangleIdentifiers({ globals, screens: expansion.screens }).diagnostics);
 
-  for (const comp of components ?? []) {
-    const compDiag = checkNameRule(comp.name, comp.loc, 'component');
+  // --- 4. Duplicate manifest declarations of one tag (F7, PR-04 WO3) ---
+  // Every declared manifest, plain widget or composite: [D-18] has one element
+  // vocabulary, and before WO3 only two composites sharing a tag were caught,
+  // so two plain widgets did not even warn and the registry silently kept the
+  // first. Framework shadowing is excluded upstream and reported by the
+  // registry itself.
+  const firstDeclaration = new Map<string, (typeof manifests.declaredWidgets)[number]>();
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    if (!manifest.name) {
+      continue;
+    }
+    const first = firstDeclaration.get(manifest.name);
+    if (first === undefined) {
+      firstDeclaration.set(manifest.name, manifest);
+      continue;
+    }
+    const firstFile = first.loc?.file ?? '(unknown file)';
+    const secondFile = manifest.loc?.file ?? '(unknown file)';
+    diagnostics.push(
+      createIdDiagnostic(
+        DIAGNOSTIC_CODES.DUPLICATE_NAME,
+        `Duplicate manifest for element <${manifest.name}>: declared by '${firstFile}' and '${secondFile}'.`,
+        manifest.loc,
+        manifest.name,
+      ),
+    );
+  }
+
+  // --- 5. Validate composites ---
+  for (const comp of manifests.declaredComposites) {
+    const compDiag = checkNameRule(comp.name, comp.loc, 'composite');
     if (compDiag) {
       diagnostics.push(compDiag);
     }
-    if (comp.name && seenComponentNames.has(comp.name)) {
-      diagnostics.push(
-        createIdDiagnostic(
-          DIAGNOSTIC_CODES.DUPLICATE_NAME,
-          `Duplicate component name '${comp.name}'.`,
-          comp.loc,
-          comp.name,
-        ),
-      );
-    } else if (comp.name) {
-      seenComponentNames.add(comp.name);
-    }
 
-    // `comp.api` is an ApiBlock post-WO5b (comp is a WidgetManifest, not a
-    // retired `Component`) — reach through `.props` for the same bare list
-    // this loop has always walked. No behaviour change.
     for (const prop of comp.api?.props ?? []) {
-      const propDiag = checkNameRule(prop.name, prop.loc, 'component property');
+      const propDiag = checkNameRule(prop.name, prop.loc, 'composite property');
       if (propDiag) {
         diagnostics.push(propDiag);
       }
@@ -455,7 +473,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         diagnostics.push(
           createIdDiagnostic(
             DIAGNOSTIC_CODES.MISSING_NAME,
-            `Element <${node.tag}> in component '${comp.name}' is missing a required 'name' attribute.`,
+            `Element <${node.tag}> in composite '${comp.name}' is missing a required 'name' attribute.`,
             node.loc,
             node.tag,
           ),
@@ -473,7 +491,7 @@ export function validateIdentifiers(input: ValidateInput): readonly Diagnostic[]
         diagnostics.push(
           createIdDiagnostic(
             DIAGNOSTIC_CODES.DUPLICATE_NAME,
-            `Duplicate element name '${name}' in component '${comp.name}'.`,
+            `Duplicate element name '${name}' in composite '${comp.name}'.`,
             nameLoc,
             name,
           ),

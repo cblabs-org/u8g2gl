@@ -5,7 +5,9 @@
  *
  * File: vitest.config.ts
  * Purpose: Vitest test runner configuration for U8G2GL CLI and core.
- * Description: Configures test file patterns and execution environment.
+ * Description: Configures test file patterns and execution environment, and
+ *              builds dist/ before any test runs so the integration tests never
+ *              execute a stale CLI (see test/helpers/build-dist.ts).
  */
 
 import { defineConfig } from 'vitest/config';
@@ -13,5 +15,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.ts'],
+    globalSetup: ['test/helpers/build-dist.ts'],
   },
 });

@@ -58,6 +58,7 @@ export {
   parseWidgetTree,
   parseWidgetNode,
   createWidgetParseContext,
+  hiddenAttributeValue,
 } from './parse-widget-tree.js';
 export type { NameAllocator, WidgetParseContext } from './parse-widget-tree.js';
 export {

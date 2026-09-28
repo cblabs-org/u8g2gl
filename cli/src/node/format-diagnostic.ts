@@ -20,6 +20,7 @@
  */
 
 import type { Diagnostic, Severity } from '../core/schema/diagnostic.js';
+import { compareDiagnostics } from '../core/validator/index.js';
 
 /**
  * Configuration options for human-readable diagnostic formatting.
@@ -205,19 +206,11 @@ export function formatDiagnostics(
   fileLookup?: (filename: string) => string | undefined,
   options?: FormatDiagnosticOptions,
 ): string {
-  // Sort deterministically
-  const sorted = [...diagnostics].sort((a, b) => {
-    if (a.file !== b.file) {
-      return a.file.localeCompare(b.file);
-    }
-    if (a.line !== b.line) {
-      return a.line - b.line;
-    }
-    if (a.column !== b.column) {
-      return a.column - b.column;
-    }
-    return a.code.localeCompare(b.code);
-  });
+  // Sort deterministically (§13.9), through the validator's own comparator
+  // rather than a third copy of it: the human output and the --json array must
+  // list the same diagnostics in the same order, or a reader comparing the two
+  // sees a disagreement the tool invented (PR-04 WO12).
+  const sorted = [...diagnostics].sort(compareDiagnostics);
 
   return sorted
     .map((d) => formatDiagnostic(d, fileLookup?.(d.file), options))

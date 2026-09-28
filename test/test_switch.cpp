@@ -20,7 +20,7 @@
 #include "u8g2gl/u8g2gl_switch.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_types.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <iostream>
 #include <string>
 
@@ -128,6 +128,31 @@ TEST(Switch, RenderDegenerateGeometry) {
     EXPECT_EQ(display.draw_rbox_count, 0);
 }
 
+// WO4c ruling (H1): a switch partly off the left and top edges is drawn with
+// explicitly wrapped origins, which U8G2 clips to the visible part — not
+// skipped, as the first pass did.
+TEST(Switch, PartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_switch sw;
+    sw.set_coords(-5, -2, 30, 14);
+    sw.set_value(false);
+
+    U8G2 display;
+    sw.render(display);
+
+    ASSERT_EQ(display.draw_rframe_count, 1);
+    EXPECT_EQ(display.last_draw_rframe_x, 65531);
+    EXPECT_EQ(display.last_draw_rframe_y, 65534);
+    EXPECT_EQ(display.last_draw_rframe_w, 30);
+    EXPECT_EQ(display.last_draw_rframe_h, 14);
+
+    // Handle off position: (-5 + 1, -2 + 1) = (-4, -1), wrapped.
+    ASSERT_EQ(display.draw_rbox_count, 1);
+    EXPECT_EQ(display.last_draw_rbox_x, 65532);
+    EXPECT_EQ(display.last_draw_rbox_y, 65535);
+    EXPECT_EQ(display.last_draw_rbox_w, 14);
+    EXPECT_EQ(display.last_draw_rbox_h, 12);
+}
+
 TEST(Switch, InheritsFromObj) {
     u8g2gl_switch sw;
     sw.set_coords(5, 5, 20, 10);
@@ -145,6 +170,33 @@ TEST(Switch, InheritsFromObj) {
     obj->render(display);
     EXPECT_EQ(display.draw_rframe_count, 1);
     EXPECT_EQ(display.draw_rbox_count, 1);
+}
+
+// PR-04 WO2: bind_value was declared by the manifest but never implemented.
+TEST(Switch, BindValueUpdatesFromSubjectAndMarksDirty) {
+    u8g2gl_subject_bool subject(true);
+    u8g2gl_switch sw;
+    ASSERT_TRUE(sw.bind_value(&subject));
+
+    // Applied at bind time, not on the first change.
+    EXPECT_TRUE(sw.get_value());
+    EXPECT_TRUE(sw.is_dirty());
+
+    sw.clear_dirty();
+    subject.set(false);
+    EXPECT_FALSE(sw.get_value());
+    EXPECT_TRUE(sw.is_dirty());
+
+    // The rendered handle follows the bound state (thumb left when OFF).
+    sw.set_coords(0, 0, 20, 10);
+    U8G2 display;
+    sw.render(display);
+    EXPECT_EQ(display.last_draw_rbox_x, 1);
+
+    // A re-notification of an unchanged value is not a repaint (§11.2).
+    sw.clear_dirty();
+    subject.notify();
+    EXPECT_FALSE(sw.is_dirty());
 }
 
 TEST(Switch, SizeOf) {

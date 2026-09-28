@@ -94,7 +94,13 @@ describe('Schema Types', () => {
   });
 
   describe('Diagnostic types and codes', () => {
-    it('contains all 23 required diagnostic codes with correct U8G2GL prefixes', () => {
+    // The title used to claim "all 23" codes. It was never all of them — it is a
+    // spot-check of the twenty-three the schema shipped with, and `DiagnosticCode`
+    // has carried more since (WO11b and WO12 added several). Naming it as the
+    // subset it is, and asserting the *whole* set's prefix rule separately below,
+    // is what the old title was reaching for. Do not renumber it as codes are
+    // added — that is the other test's job.
+    it('pins the twenty-three codes the schema shipped with to their exact strings', () => {
       const expectedCodes: Record<string, DiagnosticCode> = {
         UNKNOWN_FONT: 'U8G2GL_UNKNOWN_FONT',
         UNKNOWN_IMAGE: 'U8G2GL_UNKNOWN_IMAGE',
@@ -123,6 +129,23 @@ describe('Schema Types', () => {
 
       for (const [key, value] of Object.entries(expectedCodes)) {
         expect(DIAGNOSTIC_CODES[key as keyof typeof DIAGNOSTIC_CODES]).toBe(value);
+      }
+    });
+
+    it('gives every code in DiagnosticCode the U8G2GL_ prefix, with one recorded exception', () => {
+      // §15.3 and [D-16] make the code string a stable public API, so every entry
+      // must be `U8G2GL_` + its key. The single exception is deliberate and
+      // documented on the constant: `UNRESOLVED_VALUE` keeps the code string
+      // `U8G2GL_UNRESOLVED_GEOMETRY` because the key was renamed in WO11b and
+      // renaming the code would have broken every consumer branching on it.
+      const renamedKeys: Readonly<Record<string, DiagnosticCode>> = {
+        UNRESOLVED_VALUE: 'U8G2GL_UNRESOLVED_GEOMETRY',
+      };
+
+      const entries = Object.entries(DIAGNOSTIC_CODES);
+      expect(entries.length).toBeGreaterThan(0);
+      for (const [key, code] of entries) {
+        expect(code).toBe(renamedKeys[key] ?? `U8G2GL_${key}`);
       }
     });
 
@@ -288,17 +311,27 @@ describe('Schema Types', () => {
 
       const commonAttrs: CommonAttributes = {
         name: 'btn_wifi',
-        x: '0',
-        y: '0',
-        width: '128',
-        height: '12',
         focusStyle: 'selected',
       };
+
+      // Geometry is a manifest property, not common to every element (PR-04 WO6),
+      // so it rides the index signature. Never called: it exists to fail
+      // type-checking if `x` is ever made common again.
+      const geometryIsNotCommon = (): CommonAttributes => ({
+        name: 'n',
+        // @ts-expect-error — `x` is not a CommonAttributes member
+        x: '0',
+      });
+      expect(typeof geometryIsNotCommon).toBe('function');
 
       const buttonNode: WidgetNode = {
         tag: 'u8g2gl_button',
         attributes: {
           ...commonAttrs,
+          x: '0',
+          y: '0',
+          width: '128',
+          height: '12',
           text: 'Wi-Fi',
         },
         styleOverrides: { invert: 'true' },
@@ -490,9 +523,16 @@ describe('Schema Types', () => {
   describe('Compile-time immutability (readonly assertions)', () => {
     it('ensures interfaces enforce readonly constraints at compile time', () => {
       const loc: SourceLocation = { file: 'test.xml', line: 1, column: 1 };
-      // Verify properties cannot be reassigned (compile-time type safety):
-      // @ts-expect-error - readonly property cannot be reassigned
-      // loc.file = 'other.xml';
+      // Verify properties cannot be reassigned (compile-time type safety). The
+      // closures below are never called: each exists only so that its
+      // expect-error directive fails `npm run lint` (tsconfig.test.json) if the
+      // property ever stops being readonly. Commented-out assignments, as these
+      // were before PR-04 WO3, checked nothing.
+      const reassignLoc = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        loc.file = 'other.xml';
+      };
+      expect(typeof reassignLoc).toBe('function');
       expect(loc.file).toBe('test.xml');
 
       const project: U8g2glProject = {
@@ -501,8 +541,11 @@ describe('Schema Types', () => {
         version: '1.0',
         targets: [],
       };
-      // @ts-expect-error - readonly property cannot be reassigned
-      // project.schema = '0.5';
+      const reassignProject = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        project.schema = '0.5';
+      };
+      expect(typeof reassignProject).toBe('function');
       expect(project.schema).toBe('0.4');
 
       const diag: Diagnostic = {
@@ -513,8 +556,11 @@ describe('Schema Types', () => {
         column: 1,
         message: 'missing attribute',
       };
-      // @ts-expect-error - readonly property cannot be reassigned
-      // diag.code = 'OTHER';
+      const reassignDiag = (): void => {
+        // @ts-expect-error - readonly property cannot be reassigned
+        diag.code = 'OTHER';
+      };
+      expect(typeof reassignDiag).toBe('function');
       expect(diag.code).toBe(DIAGNOSTIC_CODES.MISSING_REQUIRED);
     });
   });

@@ -22,6 +22,7 @@ import {
 import { validate, type ValidateInput } from '../../src/core/validator/index.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
+import { frameworkRegistry } from '../helpers/manifest-registry.js';
 
 describe('validate orchestrator integration', () => {
   const validDir = resolve(__dirname, 'fixtures', 'valid');
@@ -37,10 +38,11 @@ describe('validate orchestrator integration', () => {
       resolve(validDir, 'widgets', 'status_bar', 'status_bar.xml'),
       'utf-8',
     );
-    const widgetXml = readFileSync(
-      resolve(validDir, 'widgets', 'u8g2gl_label', 'u8g2gl_label.xml'),
-      'utf-8',
-    );
+    // A user composite carrying §6.6's `wd_` prefix. §13.4 reserved `wd_` until
+    // the Chief Architect un-reserved it (2026-09-16), which is why WO7 had to
+    // rename this fixture's ancestor; it is back so a test covers the
+    // convention rather than its absence (PR-04 WO8c).
+    const badgeXml = readFileSync(resolve(validDir, 'widgets', 'wd_badge', 'wd_badge.xml'), 'utf-8');
 
     const project = parseProjectFile(projectXml, 'u8g2gl.xml').value!;
     const globals = parseGlobalsFile(globalsXml, 'globals.xml').value!;
@@ -51,28 +53,42 @@ describe('validate orchestrator integration', () => {
       componentXml,
       'widgets/status_bar/status_bar.xml',
     ).value!;
-    const widget = parseWidgetManifestFile(
-      widgetXml,
-      'widgets/u8g2gl_label/u8g2gl_label.xml',
-    ).value!;
+    const badge = parseWidgetManifestFile(badgeXml, 'widgets/wd_badge/wd_badge.xml').value!;
 
+    // The fixture ships no copy of u8g2gl_label's manifest (PR-04 WO1): the
+    // label comes from the bundled framework manifests, as it does in the CLI.
     return {
       project,
       globals,
       screens: [screen],
-      components: [component],
-      widgetManifests: [widget],
+      manifests: frameworkRegistry([component, badge]),
       catalogue: CATALOGUE,
     };
   }
 
-  it('valid project fixture produces 0 errors and 0 warnings', () => {
+  it('valid project fixture produces 0 errors, and warns only about constructs generate does not build yet', () => {
     const input = loadValidProject();
     const result = validate(input);
 
+    // PR-04 WO5b: the fixture's <bdf> fonts are valid as authored but refused by
+    // `generate` until PR-04b, so validation reports them as warnings (decision 3).
     expect(result.errors).toBe(0);
-    expect(result.warnings).toBe(0);
-    expect(result.diagnostics).toHaveLength(0);
+    expect(result.warnings).toBe(2);
+    expect(result.diagnostics.map((d) => d.code)).toEqual([
+      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
+      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
+    ]);
+  });
+
+  // §6.6 recommends `wd_` for user elements and §13.4 reserved it, so a
+  // composite named as the spec recommends was rejected — the contradiction the
+  // Chief Architect resolved in favour of §6.6 (2026-09-16, ruling 2).
+  it('accepts a wd_-named composite, its wd_-named child, and its instance', () => {
+    const result = validate(loadValidProject());
+    const names = result.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME);
+
+    expect(names).toEqual([]);
+    expect(result.errors).toBe(0);
   });
 
   it('collects multiple errors across files without early bail', () => {

@@ -50,12 +50,16 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
+  // PR-04 WO5b: valid-project's two <bdf> fonts (PR-04b) and its <focus_ring>
+  // (PR-09) are valid as authored but not generated yet, so `validate` passes
+  // with exactly those three warnings — and `generate` refuses the same project
+  // (test/integration/generate.test.ts).
   it('u8g2gl validate valid-project/ -> exit 0, no output on stderr', async () => {
     const res = await runCliSubprocess(['validate', validProjectDir]);
 
     expect(res.code).toBe(0);
     expect(res.stderr.trim()).toBe('');
-    expect(res.stdout).toContain('Validation passed: 0 errors, 0 warnings.');
+    expect(res.stdout).toContain('Validation passed: 0 errors, 3 warning(s).');
   });
 
   it('u8g2gl validate valid-project/ --json -> valid JSON, errors: 0', async () => {
@@ -63,14 +67,33 @@ describe('U8G2GL CLI End-to-End Integration', () => {
 
     expect(res.code).toBe(0);
     const parsed = JSON.parse(res.stdout) as {
-      diagnostics: unknown[];
+      diagnostics: Array<{ code: string; severity: string }>;
       errors: number;
       warnings: number;
     };
     expect(parsed.errors).toBe(0);
-    expect(parsed.warnings).toBe(0);
+    expect(parsed.warnings).toBe(3);
     expect(Array.isArray(parsed.diagnostics)).toBe(true);
-    expect(parsed.diagnostics).toHaveLength(0);
+    expect(parsed.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual([
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+      'warning U8G2GL_NOT_YET_SUPPORTED',
+    ]);
+  });
+
+  it('u8g2gl validate says which target geometry was checked against, in text and in --json (PR-04 WO7b)', async () => {
+    const text = await runCliSubprocess(['validate', validProjectDir]);
+    expect(text.stdout).toContain(
+      "Geometry checked against target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C, 128x64); " +
+        "'generate --target' checks the target it builds.",
+    );
+
+    const json = JSON.parse((await runCliSubprocess(['validate', validProjectDir, '--json'])).stdout) as { target?: unknown };
+    expect(json.target).toEqual({
+      name: 'primary',
+      setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
+      display: { width: 128, height: 64 },
+    });
   });
 
   it('u8g2gl validate broken-project/ -> exit 1, diagnostics on stderr', async () => {
@@ -103,6 +126,112 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(codes).toContain('U8G2GL_UNKNOWN_DISPLAY');
     expect(codes).toContain('U8G2GL_MISSING_REQUIRED');
     expect(codes).toContain('U8G2GL_INVALID_NAME');
+  });
+
+  // --- PR-04 WO1: the framework manifests reach the CLI ---
+  describe('framework manifests (PR-04 WO1)', () => {
+    const tempDirs: string[] = [];
+
+    /** A minimal project with one <u8g2gl_label> screen and no widgets/ at all. */
+    function createLabelProject(): string {
+      mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+      const dir = mkdtempSync(resolve(__dirname, '../../tmp/framework-manifests-'));
+      tempDirs.push(dir);
+      mkdirSync(join(dir, 'screens'), { recursive: true });
+      writeFileSync(
+        join(dir, 'u8g2gl.xml'),
+        `<u8g2gl schema="0.4" name="label_only" version="1.0.0">
+    <targets>
+        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
+    </targets>
+</u8g2gl>
+`,
+      );
+      // A <builtin> font, not <bdf>: this project tests manifests, and a <bdf>
+      // font is a not-yet-supported warning since PR-04 WO5b.
+      writeFileSync(
+        join(dir, 'globals.xml'),
+        '<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>\n',
+      );
+      // `draw_color` is declared only on u8g2gl_obj: it validates only if
+      // `extends` is resolved, not merely if u8g2gl_label's manifest is found.
+      writeFileSync(
+        join(dir, 'screens/screen_home.xml'),
+        `<screen name="home">
+    <view>
+        <u8g2gl_label name="title" x="0" y="0" width="128" height="12" font="u8g2_font_6x10_mr"
+                      text="Hi" long_mode="dots" draw_color="1" />
+    </view>
+</screen>
+`,
+      );
+      return dir;
+    }
+
+    afterAll(() => {
+      for (const dir of tempDirs) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('validates a project using <u8g2gl_label> with no local copy of its manifest', async () => {
+      const res = await runCliSubprocess(['validate', createLabelProject(), '--json']);
+      const parsed = JSON.parse(res.stdout) as { diagnostics: unknown[]; errors: number };
+
+      expect(parsed.diagnostics).toEqual([]);
+      expect(res.code).toBe(0);
+    });
+
+    it('rejects a project copy of a framework manifest, naming both sources', async () => {
+      const dir = createLabelProject();
+      mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
+      writeFileSync(
+        join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
+        readFileSync(resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml'), 'utf-8'),
+      );
+
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; file: string; message: string }>;
+      };
+      const shadow = parsed.diagnostics.find(
+        (d) => d.code === 'U8G2GL_SHADOWED_FRAMEWORK_MANIFEST',
+      );
+
+      expect(res.code).toBe(1);
+      expect(shadow).toBeDefined();
+      expect(shadow?.file).toBe('widgets/u8g2gl_label/u8g2gl_label.xml');
+      expect(shadow?.message).toContain('widgets/u8g2gl_label/u8g2gl_label.xml');
+      expect(shadow?.message).toContain('u8g2gl/manifests/u8g2gl_label.xml');
+    });
+
+    // --- PR-04 WO5a: WO1 F5, single-file validation of a framework manifest ---
+    it('validates a single framework manifest file without reporting it as shadowing itself', async () => {
+      const labelManifest = resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml');
+      const res = await runCliSubprocess(['validate', labelManifest, '--json']);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; file: string }>;
+      };
+
+      expect(parsed.diagnostics.map((d) => d.code)).not.toContain('U8G2GL_SHADOWED_FRAMEWORK_MANIFEST');
+      // The file stands in for its bundled copy and is itself clean.
+      expect(parsed.diagnostics.filter((d) => d.file.endsWith('u8g2gl_label.xml'))).toEqual([]);
+    });
+
+    it('still reports a single-file project copy of a framework manifest as shadowing', async () => {
+      const dir = createLabelProject();
+      const copy = join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml');
+      mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
+      writeFileSync(
+        copy,
+        readFileSync(resolve(__dirname, '../../../include/u8g2gl/manifests/u8g2gl_label.xml'), 'utf-8'),
+      );
+
+      const res = await runCliSubprocess(['validate', copy, '--json']);
+      const parsed = JSON.parse(res.stdout) as { diagnostics: Array<{ code: string }> };
+
+      expect(parsed.diagnostics.map((d) => d.code)).toContain('U8G2GL_SHADOWED_FRAMEWORK_MANIFEST');
+    });
   });
 
   it('u8g2gl find "SSD1306 128x64 i2c" -> output contains "SSD1306"', async () => {
@@ -170,10 +299,12 @@ describe('WO9: validate --fix-names end-to-end', () => {
 </u8g2gl>
 `;
 
+  // A <builtin> font, not <bdf>: these tests are about names, and a <bdf> font
+  // is a not-yet-supported warning since PR-04 WO5b.
   const globalsXml = `<?xml version="1.0" encoding="UTF-8"?>
 <globals>
     <fonts>
-        <bdf name="small_9" src="fonts/small_9.bdf" />
+        <builtin name="u8g2_font_6x10_mr" />
     </fonts>
 </globals>
 `;
@@ -182,8 +313,8 @@ describe('WO9: validate --fix-names end-to-end', () => {
 <screen name="home">
     <!-- keep this comment -->
     <view>
-        <u8g2gl_label y="0" x="0" width="128" height="12" font="small_9" text="a" />
-        <u8g2gl_label x="0" y="20" width="128" height="12" font="small_9" text="b" />
+        <u8g2gl_label y="0" x="0" width="128" height="12" font="u8g2_font_6x10_mr" text="a" />
+        <u8g2gl_label x="0" y="20" width="128" height="12" font="u8g2_font_6x10_mr" text="b" />
     </view>
 </screen>
 `;
@@ -195,21 +326,11 @@ describe('WO9: validate --fix-names end-to-end', () => {
   function createTempProject(): string {
     const dir = mkdtempSync(resolve(__dirname, '../../tmp/fix-names-'));
     mkdirSync(join(dir, 'screens'), { recursive: true });
-    mkdirSync(join(dir, 'widgets/u8g2gl_label'), { recursive: true });
     writeFileSync(join(dir, 'u8g2gl.xml'), projectXml, 'utf-8');
     writeFileSync(join(dir, 'globals.xml'), globalsXml, 'utf-8');
     writeFileSync(join(dir, 'screens/screen_home.xml'), unnamedScreenXml, 'utf-8');
-    // Reuse the committed label manifest: without it the rewritten screen would
-    // still fail on U8G2GL_UNKNOWN_WIDGET and the revalidation assertions would
-    // be measuring the wrong thing.
-    writeFileSync(
-      join(dir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
-      readFileSync(
-        join(validProjectDir, 'widgets/u8g2gl_label/u8g2gl_label.xml'),
-        'utf-8',
-      ),
-      'utf-8',
-    );
+    // No widgets/ copy of u8g2gl_label's manifest: since PR-04 WO1 the CLI
+    // bundles the framework manifests, and a project copy is a hard error.
     return dir;
   }
 

@@ -19,9 +19,10 @@
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_progress_bar.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_types.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <iostream>
 #include <string>
 
@@ -54,6 +55,55 @@ TEST(ProgressBar, SetValueClamped) {
     bar.clear_dirty();
     bar.set_value(200);
     EXPECT_EQ(bar.get_value(), 100);
+}
+
+// PR-04 WO4 (carried W3): set_value() used to mark dirty unconditionally, so
+// writing an unchanged value scheduled a frame (§11.2). Check the object's flag
+// and the active screen's frame flag: the frame flag is what gates sendBuffer().
+TEST(ProgressBar, SameValueSetLeavesFrameClean) {
+    u8g2gl_screen screen{};
+    u8g2gl_set_active_screen(&screen);
+    u8g2gl_progress_bar bar;
+
+    // --- Instant: an identical value ---
+    bar.set_value(50);
+    EXPECT_TRUE(bar.is_dirty());
+    EXPECT_TRUE(screen.dirty);
+    bar.clear_dirty();
+    screen.dirty = false;
+
+    bar.set_value(50);
+    EXPECT_FALSE(bar.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+
+    // --- Instant: different requests that clamp to the same value ---
+    bar.set_value(150);
+    EXPECT_TRUE(screen.dirty);
+    bar.clear_dirty();
+    screen.dirty = false;
+
+    bar.set_value(200);
+    EXPECT_FALSE(bar.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+
+    // --- Animated: re-setting the target neither dirties nor restarts ---
+    u8g2gl_progress_bar anim;
+    anim.set_animate_duration_ms(1000);
+    anim.set_value(100);
+    anim.tick(0);                     // animation starts at t=0
+    anim.tick(500);
+    uint8_t midway = anim.get_value();
+    anim.clear_dirty();
+    screen.dirty = false;
+
+    anim.set_value(100);
+    EXPECT_FALSE(anim.is_dirty());
+    EXPECT_FALSE(screen.dirty);
+    anim.tick(1000);                  // a restart would still be mid-way here
+    EXPECT_GT(midway, 0);
+    EXPECT_EQ(anim.get_value(), 100);
+
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST(ProgressBar, InstantTransition) {
@@ -219,6 +269,30 @@ TEST(ProgressBar, RenderAnimationUpdate) {
     EXPECT_GT(display.update_display_area_count, 0);
 }
 
+// WO4c ruling (H1): a bar partly off the left and top edges draws its track and
+// fill from explicitly wrapped origins, which U8G2 clips to the visible part.
+TEST(ProgressBar, TrackPartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_progress_bar bar;
+    bar.set_coords(-5, -3, 42, 12);
+    bar.set_fill_style(U8G2GL_FILL_SOLID);
+    bar.set_value(50);
+
+    U8G2 display;
+    bar.render(display);
+
+    ASSERT_EQ(display.draw_frame_count, 1);
+    EXPECT_EQ(display.last_draw_frame_x, 65531);
+    EXPECT_EQ(display.last_draw_frame_y, 65533);
+    EXPECT_EQ(display.last_draw_frame_w, 42);
+    EXPECT_EQ(display.last_draw_frame_h, 12);
+
+    ASSERT_EQ(display.draw_box_count, 1);
+    EXPECT_EQ(display.last_draw_box_x, 65532);   // -4
+    EXPECT_EQ(display.last_draw_box_y, 65534);   // -2
+    EXPECT_EQ(display.last_draw_box_w, 20);
+    EXPECT_EQ(display.last_draw_box_h, 10);
+}
+
 TEST(ProgressBar, InheritsFromObj) {
     u8g2gl_progress_bar bar;
     bar.set_coords(5, 10, 50, 10);
@@ -235,6 +309,49 @@ TEST(ProgressBar, InheritsFromObj) {
     U8G2 display;
     obj->render(display);
     EXPECT_EQ(display.draw_frame_count, 1);
+}
+
+// PR-04 WO2: bind_value was declared by the manifest but never implemented.
+TEST(ProgressBar, BindValueUpdatesFromSubjectAndMarksDirty) {
+    u8g2gl_subject_int subject(40);
+    u8g2gl_progress_bar bar;
+    ASSERT_TRUE(bar.bind_value(&subject));
+
+    // Applied at bind time; animate_duration_ms is 0, so it snaps.
+    EXPECT_EQ(bar.get_value(), 40u);
+    EXPECT_TRUE(bar.is_dirty());
+
+    bar.clear_dirty();
+    subject.set(75);
+    EXPECT_EQ(bar.get_value(), 75u);
+    EXPECT_TRUE(bar.is_dirty());
+
+    // Out-of-range ints clamp before narrowing to a percentage, rather than
+    // wrapping (300 would otherwise become 44, -1 would become 255 -> 100).
+    subject.set(300);
+    EXPECT_EQ(bar.get_value(), 100u);
+    subject.set(-1);
+    EXPECT_EQ(bar.get_value(), 0u);
+
+    // A notification that leaves the clamped target unchanged is not a repaint.
+    bar.clear_dirty();
+    subject.set(-50);
+    EXPECT_EQ(bar.get_value(), 0u);
+    EXPECT_FALSE(bar.is_dirty());
+}
+
+TEST(ProgressBar, BindValueAnimatesLikeSetValue) {
+    u8g2gl_subject_int subject(0);
+    u8g2gl_progress_bar bar;
+    bar.set_animate_duration_ms(100);
+    ASSERT_TRUE(bar.bind_value(&subject));
+
+    subject.set(100);
+    EXPECT_EQ(bar.get_target_value(), 100u);
+    EXPECT_EQ(bar.get_value(), 0u);
+    bar.tick(0);
+    bar.tick(100);
+    EXPECT_EQ(bar.get_value(), 100u);
 }
 
 TEST(ProgressBar, SizeOf) {

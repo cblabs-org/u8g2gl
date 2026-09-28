@@ -14,19 +14,29 @@
  *          design where the widget holds a const char* pointer rather than an
  *          internal buffer, eliminating RAM duplication on constrained MCUs.
  *
+ *          What it draws is decided in one place, current_text(): a bound
+ *          subject's text when bind_text() is active, otherwise the literal
+ *          set_text() text. Before PR-04 WO10b every path here read only the
+ *          literal, so a bound label drew nothing at all.
+ *
  * Description: Implementation of set_text, get_text, long_mode accessors,
- *              scroll configuration, tick, render and its two per-mode
- *              helpers, and render_animation_update for u8g2gl_label.
+ *              scroll configuration, current_text and the text-binding hook,
+ *              tick, render and its two per-mode helpers, and
+ *              render_animation_update for u8g2gl_label.
  */
 #include "u8g2gl/u8g2gl_label.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
+#include "u8g2gl/u8g2gl_tree.h"
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
@@ -41,16 +51,45 @@
 void u8g2gl_label::set_text(const char* text) {
     if (text_ != text) {
         text_ = text;
-        needs_layout_ = true;
-        scroll_finished_ = false;
-        mark_dirty();
+        invalidate_text();
     }
 }
 
 // u8g2gl_label::get_text
-// Accessor for the active text pointer.
+// Accessor for the literal text pointer; see current_text() for what is drawn.
 const char* u8g2gl_label::get_text() const {
     return text_;
+}
+
+// u8g2gl_label::invalidate_text
+// The drawn text changed: its measured width is stale, so dots and the
+// scrolling modes re-measure on the next render (which also rewinds the
+// marquee), a finished dwell starts over, and a frame is scheduled.
+void u8g2gl_label::invalidate_text() {
+    needs_layout_ = true;
+    scroll_finished_ = false;
+    mark_dirty();
+}
+
+// u8g2gl_label::on_text_binding_changed
+// A bound subject changed, or was just bound. For a string subject the pointer
+// the label draws is the subject's own buffer, unchanged by set(), so no
+// pointer comparison could notice the new text — the width has to be
+// invalidated here, on the notification itself.
+void u8g2gl_label::on_text_binding_changed() {
+    invalidate_text();
+}
+
+// u8g2gl_label::current_text
+// The text this label draws now. An active binding wins over the literal
+// whichever was set first — the manifest's "Overridden when bind_text is
+// active" — because the binding is consulted first on every read rather than
+// copied into text_ when it fires.
+//   buffer — U8G2GL_BOUND_TEXT_BUFFER_SIZE bytes on the caller's stack, for a
+//            formatted int subject
+const char* u8g2gl_label::current_text(char (&buffer)[U8G2GL_BOUND_TEXT_BUFFER_SIZE]) const {
+    const char* bound = bound_text(buffer, sizeof(buffer));
+    return bound != nullptr ? bound : text_;
 }
 
 // u8g2gl_label::set_long_mode
@@ -141,7 +180,9 @@ uint32_t u8g2gl_label::tick(uint32_t now_ms) {
     }
 
     // --- Step 1: Guard null or empty text ---
-    if (text_ == nullptr || text_[0] == '\0') {
+    char buffer[U8G2GL_BOUND_TEXT_BUFFER_SIZE];
+    const char* text = current_text(buffer);
+    if (text == nullptr || text[0] == '\0') {
         return U8G2GL_IDLE;
     }
 
@@ -247,8 +288,13 @@ uint32_t u8g2gl_label::tick(uint32_t now_ms) {
 // Draws the text onto the display, dispatching to the per-long_mode path.
 //   display — U8G2 display driver instance
 void u8g2gl_label::render(U8G2& display) {
-    // --- Step 1: Early exit if text is null or empty ---
-    if (text_ == nullptr || text_[0] == '\0') {
+    // --- Step 1: Resolve the text; early exit if null or empty ---
+    // The bound value is read here, at render time, into a stack buffer:
+    // U8G2GL_BOUND_TEXT_BUFFER_SIZE bytes for the duration of this call and
+    // none per label. U8G2 only draws from the pointer, so nothing outlives it.
+    char buffer[U8G2GL_BOUND_TEXT_BUFFER_SIZE];
+    const char* text = current_text(buffer);
+    if (text == nullptr || text[0] == '\0') {
         return;
     }
 
@@ -259,12 +305,14 @@ void u8g2gl_label::render(U8G2& display) {
     // the text's pixel width, so the measurement is shared across them rather
     // than duplicated ([D-19]'s cost accounting: "dots mode needs text
     // measurement too, so message_width_ and needs_layout_ are shared rather
-    // than added").
+    // than added"). A bound text keeps the cache honest through
+    // on_text_binding_changed(), which invalidates it on every change, so a
+    // bound label pays the measurement once per change, not once per frame.
     if (needs_layout_ && long_mode_ != U8G2GL_LONG_CLIP) {
         if (style_.font != nullptr) {
             display.setFont(style_.font);
         }
-        message_width_ = static_cast<int16_t>(display.getUTF8Width(text_));
+        message_width_ = static_cast<int16_t>(display.getUTF8Width(text));
         overflow_ = (w_ > 0) && (message_width_ > w_);
         needs_scroll_ = overflow_ &&
             (long_mode_ == U8G2GL_LONG_SCROLL || long_mode_ == U8G2GL_LONG_SCROLL_CIRCULAR);
@@ -286,15 +334,15 @@ void u8g2gl_label::render(U8G2& display) {
     // setFontPosTop() is the framework standard (the Y coordinate is the top
     // of glyph bounding boxes). getAscent() is positive, getDescent() negative,
     // so (ascent - descent) gives total glyph box height.
-    int font_height = display.getAscent() - display.getDescent();
+    int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int y_offset = (h_ > 0) ? (h_ - font_height) / 2 : 0;
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
 
     // --- Step 5: Dispatch to the mode's render path ---
     if (long_mode_ == U8G2GL_LONG_SCROLL || long_mode_ == U8G2GL_LONG_SCROLL_CIRCULAR) {
-        render_scroll(display, draw_y);
+        render_scroll(display, text, draw_y);
     } else {
-        render_static(display, draw_y, long_mode_ == U8G2GL_LONG_DOTS);
+        render_static(display, text, draw_y, long_mode_ == U8G2GL_LONG_DOTS);
     }
 }
 
@@ -306,15 +354,22 @@ void u8g2gl_label::render(U8G2& display) {
 // preserved here rather than "cleaned up" because a move must not alter
 // behaviour.
 //   display — U8G2 display driver instance
+//   text    — the text to draw, already resolved by render()
 //   draw_y  — vertically-centered top y, already computed by render()
-void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
+void u8g2gl_label::render_scroll(U8G2& display, const char* text, int16_t draw_y) {
     if (needs_scroll_) {
-        // Marquee scrolling: clip to widget bounds and draw with scroll offset.
-        if (w_ > 0 && h_ > 0) {
-            display.setClipWindow(x_, y_, x_ + w_ - 1, y_ + h_ - 1);
-        }
-        display.drawUTF8(static_cast<int16_t>(x_ - scroll_x_), draw_y, text_);
-        display.setMaxClipWindow();
+        // Marquee scrolling: draw with the scroll offset and set no clip. The
+        // framework's clip (§11.3) — this label's bounds intersected with every
+        // ancestor's — is already in force. Setting a clip of the label's own
+        // bounds here, then resetting to the full display, used to replace that
+        // clip, so a scrolling label inside a narrower container painted outside
+        // the container (WO4 F6). U8G2 cannot report the clip, so a widget has
+        // no way to narrow it and put it back; it must leave it alone.
+        //
+        // x_ - scroll_x_ is negative on every step once the marquee starts; it
+        // wraps explicitly and U8G2 draws the visible part (u8g2gl_coord_pos()).
+        display.drawUTF8(u8g2gl_coord_pos(x_ - scroll_x_), u8g2gl_coord_pos(draw_y),
+                         text);
         return;
     }
 
@@ -333,7 +388,7 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
             ? x_
             : static_cast<int16_t>(x_ + (w_ - message_width_) / 2);
     }
-    display.drawUTF8(draw_x, draw_y, text_);
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text);
 }
 
 // u8g2gl_label::render_static
@@ -350,12 +405,13 @@ void u8g2gl_label::render_scroll(U8G2& display, int16_t draw_y) {
 // clear-then-redraw idiom u8g2gl_scrolling_label already used for partial
 // refresh (render_animation_update(), below), so it introduces no new pattern.
 //   display — U8G2 display driver instance
+//   text    — the text to draw, already resolved by render()
 //   draw_y  — vertically-centered top y, already computed by render()
 //   dots    — true to overdraw the ellipsis when text overflows
-void u8g2gl_label::render_static(U8G2& display, int16_t draw_y, bool dots) {
+void u8g2gl_label::render_static(U8G2& display, const char* text, int16_t draw_y, bool dots) {
     // clip has no measurement (Step 2 skips it), so its overflow test uses the
     // live width; dots always measures in Step 2, so message_width_ is current.
-    int text_width = dots ? message_width_ : display.getUTF8Width(text_);
+    int text_width = dots ? message_width_ : static_cast<int>(display.getUTF8Width(text));
 
     int16_t draw_x = x_;
     if (style_.align == U8G2GL_ALIGN_CENTER) {
@@ -366,16 +422,17 @@ void u8g2gl_label::render_static(U8G2& display, int16_t draw_y, bool dots) {
     // For U8G2GL_ALIGN_LEFT, draw_x remains x_.
 
     // drawUTF8 is used rather than drawStr for full UTF-8 Unicode character
-    // support.
-    display.drawUTF8(draw_x, draw_y, text_);
+    // support. Centred or right-aligned text wider than the label starts left
+    // of it, so this origin can be negative: see u8g2gl_coord_pos().
+    display.drawUTF8(u8g2gl_coord_pos(draw_x), u8g2gl_coord_pos(draw_y), text);
 
     if (dots && overflow_) {
-        int dots_width = display.getUTF8Width("...");
+        int dots_width = static_cast<int>(display.getUTF8Width("..."));
         int16_t dots_x = static_cast<int16_t>(x_ + w_ - dots_width);
         display.setDrawColor(0);
-        display.drawBox(dots_x, y_, dots_width, h_);
+        u8g2gl_draw_box(display, dots_x, y_, static_cast<int16_t>(dots_width), h_);
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
-        display.drawUTF8(dots_x, draw_y, "...");
+        display.drawUTF8(u8g2gl_coord_pos(dots_x), u8g2gl_coord_pos(draw_y), "...");
     }
 }
 
@@ -391,7 +448,9 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
     }
 
     // --- Step 1: Early exit if text is null or empty ---
-    if (text_ == nullptr || text_[0] == '\0') {
+    char buffer[U8G2GL_BOUND_TEXT_BUFFER_SIZE];
+    const char* text = current_text(buffer);
+    if (text == nullptr || text[0] == '\0') {
         return;
     }
 
@@ -400,7 +459,7 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
         if (style_.font != nullptr) {
             display.setFont(style_.font);
         }
-        message_width_ = static_cast<int16_t>(display.getUTF8Width(text_));
+        message_width_ = static_cast<int16_t>(display.getUTF8Width(text));
         overflow_ = (w_ > 0) && (message_width_ > w_);
         needs_scroll_ = overflow_;
         reset_scroll();
@@ -421,10 +480,20 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
     if (scroll_x_ != old_scroll_x) {
         // Clear own bounding box first ([D-5])
         display.setDrawColor(0);
-        display.drawBox(x_, y_, w_, h_);
+        u8g2gl_draw_box(display, x_, y_, w_, h_);
 
-        // Re-render text with active style and clip window
-        render(display);
+        // Re-render text inside the label's own bounds. This path runs outside
+        // u8g2gl_render_object(), while the main loop is blocked, so no
+        // framework clip is in force — render() no longer sets one — and the
+        // marquee would otherwise draw across the whole row. The label has no
+        // access to its ancestry here, so its own bounds are the best clip
+        // available; the reset matches what the render wrapper leaves between
+        // objects.
+        const u8g2gl_rect bounds = { x_, y_, w_, h_ };
+        if (u8g2gl_apply_clip(display, bounds)) {
+            render(display);
+            display.setMaxClipWindow();
+        }
 
         // Hardware partial update to avoid full frame transfer
         u8g2gl_partial_refresh(display, x_, y_, w_, h_);

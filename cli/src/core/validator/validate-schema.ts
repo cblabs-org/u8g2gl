@@ -11,10 +11,25 @@
  *              attribute values match expected primitive types and enum sets.
  *              Enforces schema version "0.4", refusing the superseded "0.3"
  *              with a specific migration diagnostic rather than a generic
- *              mismatch (§15.4, PR-3R WO8). Also enforces the 254-object
- *              structural ceiling per screen ([A-3], [D-21], PR-3R WO7) — a
- *              hard error, not a tunable, since it comes from `parent_index_`
- *              being a `uint8_t`.
+ *              mismatch (§15.4, PR-3R WO8).
+ *
+ *              The 254-object ceiling is **not** checked here. This pass used to
+ *              count objects structurally, and that count predated [D-18]: it
+ *              skipped composite containers and counted `draw=`-only elements,
+ *              both inverted by that decision, so it could report fewer objects
+ *              than a screen really has. Pass 9 enforces the ceiling against
+ *              realisation's exact count instead (`validate-realisation.ts`,
+ *              PR-04 WO8c).
+ *
+ *              Declarations are checked where they are declared (PR-04 WO7b): an
+ *              `<int>` constant's value must be an integer literal within int32,
+ *              the four built-in constant names are reserved (§7.2), and a prop
+ *              may not be both `required` and defaulted. A subject's initial
+ *              value must fit its type, and a string's its `max_len` (PR-04
+ *              WO11b). Every `<style>` property is held to the `u8g2gl_obj` prop
+ *              it is applied through, on global and screen-local styles alike,
+ *              through the one bool and enum rule an element's attribute uses
+ *              (value-rules.ts; PR-04 WO11b finding 12).
  *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
@@ -23,11 +38,34 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropType, WidgetManifest } from '../schema/widget-manifest.js';
-import type { WidgetNodeChild } from '../schema/widget-node.js';
-import type { SubjectType, DrawColor, TextAlign, FontMode, BitmapMode } from '../schema/globals.js';
+import type { PropDef, PropType } from '../schema/widget-manifest.js';
+import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
+import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
+import { STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
+import { findClosest } from '../catalogue/edit-distance.js';
+import { booleanValueError, enumValueError } from './value-rules.js';
+import { COLOR_VALUES } from '../generator/emit/value.js';
 
 const VALID_SCHEMA_VERSION = '0.4';
+
+/**
+ * The prefix §13.4 fixes every generated identifier at, and the only value
+ * `<output prefix>` may name (see section 1b).
+ *
+ * Spelled here because `mangle.ts` builds it into each per-kind spelling helper
+ * (`ui_screen_${screen}_${fn}`) rather than exporting it as one constant; there
+ * is no single symbol to import. Recorded as a finding rather than fixed,
+ * because `mangle.ts` is outside this work order's boundary.
+ */
+const GENERATED_IDENTIFIER_PREFIX = 'ui_';
+
+/**
+ * [D-19]'s remedy for `truncate`, spelled once: the §15.4 migration table below
+ * names it for a 0.3 project, and Pass 1 names it for a `<style>` in any
+ * project that still writes it (PR-04 WO11b follow-up), so an author who
+ * writes it is told why rather than only that it is unknown.
+ */
+const TRUNCATE_REMOVED = "'truncate' is removed: use long_mode=\"clip\" ([D-19])";
 
 /**
  * The §15.4 migration table for the one superseded schema version this CLI
@@ -45,7 +83,7 @@ const SCHEMA_0_3_MIGRATIONS: readonly string[] = [
     "'components/x/' to 'widgets/x/' ([D-18])",
   "the 'components/' directory is removed: use one 'widgets/' directory " +
     'for all user elements ([D-18])',
-  "'truncate' is removed: use long_mode=\"clip\" ([D-19])",
+  TRUNCATE_REMOVED,
   "'<u8g2gl_scrolling_label>' is removed: use " +
     '\'<u8g2gl_label long_mode="scroll_circular">\' — the old widget wrapped ' +
     "continuously, which is 'scroll_circular'; 'scroll' reverses at each end " +
@@ -55,13 +93,6 @@ const SCHEMA_0_3_MIGRATIONS: readonly string[] = [
   "manifest 'setter=' naming a U8G2 call becomes 'draw=' naming a runtime " +
     'free function ([D-18])',
 ];
-
-/**
- * Structural object ceiling ([A-3], [D-21]). `parent_index_` is a `uint8_t`
- * and `U8G2GL_NO_PARENT` consumes one value, so a screen can hold at most
- * this many objects — a property of the object model, not a tunable.
- */
-const MAX_OBJECTS_PER_SCREEN = 254;
 
 const VALID_PROP_TYPES: ReadonlySet<PropType> = new Set([
   'int',
@@ -82,10 +113,6 @@ const VALID_SUBJECT_TYPES: ReadonlySet<SubjectType> = new Set([
   'time',
 ]);
 
-const VALID_DRAW_COLORS: ReadonlySet<DrawColor> = new Set(['0', '1', 'xor']);
-const VALID_TEXT_ALIGNS: ReadonlySet<TextAlign> = new Set(['left', 'center', 'right']);
-const VALID_FONT_MODES: ReadonlySet<FontMode> = new Set(['solid', 'transparent']);
-const VALID_BITMAP_MODES: ReadonlySet<BitmapMode> = new Set(['solid', 'transparent']);
 const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   'R0',
   'R1',
@@ -96,53 +123,6 @@ const VALID_ROTATIONS: ReadonlySet<string> = new Set([
   '180',
   '270',
 ]);
-
-/**
- * Counts the elements a screen's tree structurally contributes toward the
- * 254-object ceiling ([A-3]).
- *
- * This is a conservative over-count, not the generator's future exact
- * accounting (PR-04's half of [D-21]): every ordinary widget node counts as
- * one, even a `draw=`-only primitive that will ultimately compile to a free
- * function and consume no object slot at all (design_spec.md line ~246). A
- * composite instantiation (found in `composites`) is not itself counted —
- * [D-18] inlines it, so its own template's children are counted in its place
- * — which is what actually lands in the generated object array. Counting
- * every ordinary node can only over-flag a screen relative to the
- * generator's later, more precise count; it can never miss a real overflow,
- * which is the property this hard error exists to guarantee before PR-04
- * exists to compute the exact figure.
- *
- * Composite cycles are guarded against here independently of Pass 2's own
- * cycle detector (`validateReferences`), since Pass 1 runs first and a cycle
- * would otherwise recurse forever; `visiting` breaks the loop and lets the
- * dedicated diagnostic in Pass 2 report it properly.
- */
-function countScreenObjects(
-  nodes: readonly WidgetNodeChild[],
-  composites: ReadonlyMap<string, WidgetManifest>,
-  visiting: ReadonlySet<string>,
-): number {
-  let count = 0;
-  for (const child of nodes) {
-    if (!('tag' in child) || typeof child.tag !== 'string') {
-      continue;
-    }
-    const composite = composites.get(child.tag);
-    if (composite) {
-      if (visiting.has(child.tag)) {
-        continue; // Cycle — reported by Pass 2, not double-counted here.
-      }
-      const nextVisiting = new Set(visiting);
-      nextVisiting.add(child.tag);
-      count += countScreenObjects(composite.view?.children ?? [], composites, nextVisiting);
-    } else {
-      count += 1;
-      count += countScreenObjects(child.children ?? [], composites, visiting);
-    }
-  }
-  return count;
-}
 
 function createDiagnostic(
   code: string,
@@ -163,12 +143,203 @@ function createDiagnostic(
   };
 }
 
+// outputDirEscapes
+// Whether an `<output dir>` could name anything outside the project (§13.10).
+// Lexical, because `src/core/` may not use `node:path` (typescript.md §1) — and
+// lexical is the stricter reading anyway: an absolute path is refused outright
+// rather than accepted because it happens to point inside the project today, and
+// a Windows-style `\` or drive letter is refused for the same reason.
+//
+// The rule: no absolute path, no backslash, and the running depth must never go
+// negative as the segments are walked. A trailing `..` that only returns to the
+// project root — `a/..` — is a strange way to write `.`, and `.` itself is the
+// project root, which is not a directory generation may own either, so a net
+// depth of zero is refused as well.
+//   dir — the declared directory, exactly as written
+function outputDirEscapes(dir: string): boolean {
+  const trimmed = dir.trim();
+  if (trimmed === '' || trimmed.startsWith('/') || trimmed.includes('\\') || /^[A-Za-z]:/.test(trimmed)) {
+    return true;
+  }
+  let depth = 0;
+  for (const segment of trimmed.split('/')) {
+    if (segment === '' || segment === '.') {
+      continue;
+    }
+    if (segment === '..') {
+      depth--;
+      if (depth < 0) {
+        return true;
+      }
+      continue;
+    }
+    depth++;
+  }
+  return depth === 0;
+}
+
+// checkRequiredWithDefault
+// A prop declaring both `required="true"` and a `default` (PR-04 WO7 F10). A
+// required prop is always given, so its default can never apply, and expansion
+// and Pass 4 disagreed about whether an instance omitting it is missing it. An
+// error at the declaration; OVERCONSTRAINED, as for a prop declaring both
+// `setter` and `draw` — one declaration saying two incompatible things.
+//   prop  — the declared prop
+//   owner — prose naming its manifest: "composite 'card'"
+function checkRequiredWithDefault(prop: PropDef, owner: string): Diagnostic | undefined {
+  if (prop.required !== true || prop.default === undefined) {
+    return undefined;
+  }
+  return createDiagnostic(
+    DIAGNOSTIC_CODES.OVERCONSTRAINED,
+    `Prop '${prop.name}' in ${owner} declares both required="true" and default="${prop.default}"; ` +
+      `a required prop is always given, so its default can never apply. Remove one.`,
+    prop.loc,
+    'required, default',
+  );
+}
+
+// unknownStyleAttributes
+// UNKNOWN_ATTRIBUTE for each attribute a `<style>` writes that is neither `name`
+// nor a §10 style property — the same code, severity and wording an unknown
+// attribute on an element gets (Pass 4), with the closest property suggested.
+// Until PR-04 WO11b the style parser simply dropped them, so
+// `<style truncate="true" bogus="1">` passed both journeys in silence. The
+// properties are STYLE_PROPERTIES, the one list; `truncate` keeps [D-19]'s remedy.
+//   style — the declaration, with the attributes the parser did not recognise
+function unknownStyleAttributes(style: StyleDecl): Diagnostic[] {
+  const spellings = STYLE_PROPERTIES.flatMap((property) => [property.attribute, ...(property.aliases ?? [])]);
+  return (style.unknownAttributes ?? []).map((attribute) =>
+    createDiagnostic(
+      DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+      attribute.name === 'truncate'
+        ? `Unknown attribute 'truncate' on <style>: ${TRUNCATE_REMOVED}.`
+        : `Unknown attribute '${attribute.name}' on <style>.`,
+      attribute.loc ?? style.loc,
+      attribute.name,
+      attribute.name === 'truncate' ? undefined : findClosest(attribute.name, spellings),
+    ),
+  );
+}
+
+// checkStyleValues
+// Every style property a `<style>` writes, against the `u8g2gl_obj` prop of the
+// same name — the prop the style is applied through (§10, `emit/styles.ts`), and
+// the very prop an element's own attribute of that name is checked against. So a
+// style and an element accept exactly the same values, through the one rule in
+// value-rules.ts, and say the same thing when they do not (PR-04 WO11b,
+// finding 12).
+//
+// This replaces four sets Pass 1 kept for `draw_color`, `align`, `font_mode` and
+// `bitmap_mode` — a second spelling of what the manifest already declares, which
+// also ran on global styles only. A `font` is Pass 2's (UNKNOWN_FONT); an `int`
+// is the parser's, which reports a non-integer where it reads it.
+//   style     — the declaration, with its properties as written
+//   manifests — the registry, for the root class's props
+function checkStyleValues(style: StyleDecl, manifests: ValidateInput['manifests']): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const root = manifests.get(ROOT_CLASS_MANIFEST);
+  if (root === undefined) {
+    return diagnostics; // No root manifest: emission cannot spell a style either.
+  }
+  const owner = `<style> '${style.name}'`;
+  for (const { attribute, spelled, value, loc } of style.written ?? []) {
+    const prop = root.api.props.find((candidate) => candidate.name === attribute);
+    if (prop === undefined) {
+      continue; // A property u8g2gl_obj does not declare is a framework defect, not an author's.
+    }
+    const at = loc ?? style.loc;
+    const diagnostic =
+      prop.type === 'bool'
+        ? booleanValueError(value, `'${spelled}' on ${owner}`, at)
+        : prop.type === 'enum'
+          ? enumValueError(value, (prop.values ?? '').split(',').map((member) => member.trim()), spelled, owner, at)
+          : prop.type === 'color'
+            ? enumValueError(value, COLOR_VALUES, spelled, owner, at)
+            : undefined;
+    if (diagnostic !== undefined) {
+      diagnostics.push(diagnostic);
+    }
+  }
+  return diagnostics;
+}
+
+/** The range of a `<time>` subject: Unix seconds, held as `uint32_t` (`set_time`). */
+const TIME_MAX = 4294967295;
+
+// checkSubjectValue
+// A subject's initial `value` against its declared type (§8.1), and a string's
+// against its `max_len` (§8.2). Until PR-04 WO11b no pass checked either (WO9
+// finding 6): emission caught a non-integer int or a bool that was neither
+// `true` nor `false`, as TYPE_MISMATCH — the code used here, so both journeys
+// name it alike — and nothing at all caught an int outside int32_t, a time
+// outside uint32_t, or a string longer than its buffer, which the runtime would
+// silently truncate. The same trimming emission applies to a non-string value.
+//   subject — the declaration
+function checkSubjectValue(subject: SubjectDecl): Diagnostic | undefined {
+  const declared = subject.default;
+  if (declared === undefined || declared === '') {
+    return undefined;
+  }
+  const mismatch = (why: string): Diagnostic =>
+    createDiagnostic(
+      DIAGNOSTIC_CODES.TYPE_MISMATCH,
+      `Subject '${subject.name}' is ${subject.type === 'int' ? 'an' : 'a'} <${subject.type}> whose value ` +
+        `'${declared}' ${why} (§8.1).`,
+      subject.loc,
+      declared,
+    );
+  const value = declared.trim();
+
+  switch (subject.type) {
+    case 'bool':
+      return value === 'true' || value === 'false' ? undefined : mismatch("is neither 'true' nor 'false'");
+    case 'int':
+    case 'time': {
+      if (!/^-?\d+$/.test(value)) {
+        return mismatch('is not an integer');
+      }
+      const number = Number(value);
+      if (subject.type === 'int' && (number < INT32_MIN || number > INT32_MAX)) {
+        return mismatch(`is outside int32_t (${INT32_MIN}..${INT32_MAX})`);
+      }
+      if (subject.type === 'time' && (number < 0 || number > TIME_MAX)) {
+        return mismatch(`is outside 0..${TIME_MAX}: a time is Unix seconds, held unsigned`);
+      }
+      return undefined;
+    }
+    case 'string': {
+      // `max_len` counts the bytes the buffer holds before its terminator (§8.2),
+      // and the runtime copies bytes, so a non-ASCII character counts as its
+      // UTF-8 length.
+      if (subject.maxLen === undefined) {
+        return undefined;
+      }
+      const bytes = new TextEncoder().encode(declared).length;
+      if (bytes <= subject.maxLen) {
+        return undefined;
+      }
+      const characters = [...declared].length;
+      return createDiagnostic(
+        DIAGNOSTIC_CODES.STRING_TOO_LONG,
+        `Subject '${subject.name}' has max_len="${subject.maxLen}", but its value '${declared}' is ${bytes} ` +
+          `bytes${characters !== bytes ? ` (${characters} characters, UTF-8)` : ''}, so it would not fit its buffer ` +
+          `and the runtime would silently cut it short (§8.2).`,
+        subject.loc,
+        declared,
+      );
+    }
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Validates document schema structure, version, and required attributes.
  */
 export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { project, globals, screens, components, widgetManifests } = input;
+  const { project, globals, screens, manifests } = input;
 
   // --- 1. Project-level schema validation ---
   if (project) {
@@ -261,6 +432,61 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         }
       }
     }
+
+    // --- 1b. <output prefix> cannot be honoured (§13.4, PR-04 WO9) ---
+    // `<output prefix>` has been parsed since PR-02 and read by nothing, so an
+    // author could set it and quietly get `ui_` anyway (PR-04 WO5b finding 4).
+    // It cannot be made to mean anything: §13.4 fixes every generated identifier
+    // at `ui_` — `ui_screen_home_init`, `ui_subject_temperature`,
+    // `ui_style_header` — and §13.7's file names are that same stem, so a prefix
+    // could only rename the files while the identifiers inside them kept `ui_`.
+    // That is precisely the mismatch §13.4's "never silently renamed" rule
+    // exists to prevent: generated code must read against the author's XML.
+    //
+    // So it is diagnosed rather than accepted silently. `prefix="ui_"` is
+    // allowed: it asks for exactly what the generator already does, so it is a
+    // redundant restatement rather than a request that cannot be met, and
+    // erroring on it would reject a harmless document.
+    // --- 1c. <output dir> must stay inside the project (§13.10, PR-04 WO12) ---
+    // §13.10 draws the boundary and the writer enforces it *relative to the
+    // directory it is handed* — so `dir="../src"` validated cleanly and the
+    // writer, pointed at the application's own sources, would happily delete any
+    // file there carrying the GENERATED marker. Checked lexically rather than by
+    // resolving a real path, because this module is isomorphic and `src/core/`
+    // may not touch the filesystem or `node:path` (typescript.md §1); a lexical
+    // check is also the stricter one, since it refuses an absolute path outright
+    // instead of asking whether it happens to land inside the project today.
+    const dir = project.output?.dir;
+    if (dir !== undefined && outputDirEscapes(dir)) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.OUTPUT_DIR_OUTSIDE_PROJECT,
+          `'dir="${dir}"' on <output> resolves outside the project. §13.10 generates only into the ` +
+            `configured output directory and never into the application's own sources, and the writer ` +
+            `deletes stale generated files anywhere beneath the directory it is given. Name a ` +
+            `directory inside the project, such as dir="generated".`,
+          project.output?.loc ?? project.loc,
+          dir,
+          ['generated'],
+        ),
+      );
+    }
+
+    const prefix = project.output?.prefix;
+    if (prefix !== undefined && prefix !== GENERATED_IDENTIFIER_PREFIX) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+          `'prefix="${prefix}"' on <output> cannot be honoured: §13.4 fixes every generated ` +
+            `identifier at '${GENERATED_IDENTIFIER_PREFIX}', and the generated file names are that ` +
+            `same stem, so a prefix would leave the file names disagreeing with the identifiers ` +
+            `inside them. Remove it, or write prefix="${GENERATED_IDENTIFIER_PREFIX}".`,
+          project.output?.loc ?? project.loc,
+          prefix,
+          [GENERATED_IDENTIFIER_PREFIX],
+        ),
+      );
+    }
   }
 
   // --- 2. Globals schema validation ---
@@ -305,6 +531,45 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             'value',
           ),
         );
+      } else if (c.type === 'int') {
+        // §7.2: constants are validated where they are declared, not only where
+        // used — an unused bad constant was otherwise never reported. The literal
+        // rule is the resolver's own, so declaration and use cannot disagree.
+        const literal = integerLiteralValue(c.value);
+        if (literal === undefined) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.NON_INTEGER_CONSTANT,
+              `Constant '${c.name}' is an <int> whose value '${c.value}' is not an integer literal (§7.2).`,
+              c.loc,
+              c.value,
+            ),
+          );
+        } else if (literal < INT32_MIN || literal > INT32_MAX) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.INTEGER_OVERFLOW,
+              `Constant '${c.name}' has value ${c.value}, outside the int32_t range ` +
+                `(${INT32_MIN}..${INT32_MAX}) an <int> holds (§13.2).`,
+              c.loc,
+              c.value,
+            ),
+          );
+        }
+      }
+      // §7.2: the built-in constant names are reserved. A <const> of that name
+      // could never be used — the built-in always wins — so it is an error at the
+      // declaration rather than a silent shadow.
+      if (c.name && BUILTIN_CONSTANTS.includes(c.name)) {
+        diagnostics.push(
+          createDiagnostic(
+            DIAGNOSTIC_CODES.INVALID_NAME,
+            `Constant name '${c.name}' is reserved: '#${c.name}' is a built-in the resolver supplies ` +
+              `(§7.2), so this declaration could never be used. Rename it.`,
+            c.loc,
+            c.name,
+          ),
+        );
       }
     }
 
@@ -339,9 +604,15 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           ),
         );
       }
+      const valueDiagnostic = checkSubjectValue(s);
+      if (valueDiagnostic) {
+        diagnostics.push(valueDiagnostic);
+      }
     }
 
     for (const style of globals.styles ?? []) {
+      diagnostics.push(...unknownStyleAttributes(style));
+      diagnostics.push(...checkStyleValues(style, manifests));
       if (!style.name) {
         diagnostics.push(
           createDiagnostic(
@@ -349,50 +620,6 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             "Missing required attribute 'name' on <style>.",
             style.loc,
             'name',
-          ),
-        );
-      }
-      if (style.drawColor && !VALID_DRAW_COLORS.has(style.drawColor)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid drawColor '${style.drawColor}' on style '${style.name}'. Expected one of: ${Array.from(VALID_DRAW_COLORS).join(', ')}.`,
-            style.loc,
-            style.drawColor,
-            Array.from(VALID_DRAW_COLORS),
-          ),
-        );
-      }
-      if (style.align && !VALID_TEXT_ALIGNS.has(style.align)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid align '${style.align}' on style '${style.name}'. Expected one of: ${Array.from(VALID_TEXT_ALIGNS).join(', ')}.`,
-            style.loc,
-            style.align,
-            Array.from(VALID_TEXT_ALIGNS),
-          ),
-        );
-      }
-      if (style.fontMode && !VALID_FONT_MODES.has(style.fontMode)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid fontMode '${style.fontMode}' on style '${style.name}'. Expected one of: ${Array.from(VALID_FONT_MODES).join(', ')}.`,
-            style.loc,
-            style.fontMode,
-            Array.from(VALID_FONT_MODES),
-          ),
-        );
-      }
-      if (style.bitmapMode && !VALID_BITMAP_MODES.has(style.bitmapMode)) {
-        diagnostics.push(
-          createDiagnostic(
-            DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid bitmapMode '${style.bitmapMode}' on style '${style.name}'. Expected one of: ${Array.from(VALID_BITMAP_MODES).join(', ')}.`,
-            style.loc,
-            style.bitmapMode,
-            Array.from(VALID_BITMAP_MODES),
           ),
         );
       }
@@ -446,8 +673,11 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   }
 
   // --- 3. Screen schema validation ---
-  const compositeMap = new Map((components ?? []).map((c) => [c.name, c]));
   for (const screen of screens ?? []) {
+    for (const style of screen.styles ?? []) {
+      diagnostics.push(...unknownStyleAttributes(style));
+      diagnostics.push(...checkStyleValues(style, manifests));
+    }
     if (!screen.name) {
       diagnostics.push(
         createDiagnostic(
@@ -483,44 +713,29 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
       }
     }
 
-    // The structural object ceiling ([A-3], [D-21]): `parent_index_` is a
-    // `uint8_t` and `U8G2GL_NO_PARENT` consumes one value, so 254 objects is
-    // where the object model runs out, not a tunable a project can raise.
-    const objectCount = countScreenObjects(screen.view?.children ?? [], compositeMap, new Set());
-    if (objectCount > MAX_OBJECTS_PER_SCREEN) {
-      diagnostics.push(
-        createDiagnostic(
-          DIAGNOSTIC_CODES.TOO_MANY_OBJECTS,
-          `Screen '${screen.name}' has ${objectCount} objects, exceeding the structural ` +
-            `ceiling of ${MAX_OBJECTS_PER_SCREEN} (parent_index_ is a uint8_t and ` +
-            `U8G2GL_NO_PARENT consumes one value).`,
-          screen.loc,
-          screen.name,
-        ),
-      );
-    }
   }
 
-  // --- 4. Component schema validation ---
-  for (const component of components ?? []) {
+  // --- 4. Composite schema validation ---
+  // Declared, not effective, manifests: these checks are about what a file
+  // itself declares, so an inherited prop is reported once, against its owner.
+  for (const component of manifests.declaredComposites) {
     if (!component.name) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.MISSING_REQUIRED,
-          "Missing required attribute 'name' on <component>.",
+          "Missing required attribute 'name' on composite <widget>.",
           component.loc,
           'name',
         ),
       );
     }
-    // `component.api` is an ApiBlock post-WO5b (component is a WidgetManifest,
-    // not a retired `Component`) — reach through `.props`. No behaviour change.
+
     for (const prop of component.api?.props ?? []) {
       if (!prop.name) {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'name' on <prop> in component '${component.name}'.`,
+            `Missing required attribute 'name' on <prop> in composite '${component.name}'.`,
             prop.loc,
             'name',
           ),
@@ -530,7 +745,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.MISSING_REQUIRED,
-            `Missing required attribute 'type' on prop '${prop.name}' in component '${component.name}'.`,
+            `Missing required attribute 'type' on prop '${prop.name}' in composite '${component.name}'.`,
             prop.loc,
             'type',
           ),
@@ -539,18 +754,22 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         diagnostics.push(
           createDiagnostic(
             DIAGNOSTIC_CODES.INVALID_ENUM_VALUE,
-            `Invalid type '${prop.type}' on prop '${prop.name}' in component '${component.name}'. Expected one of: ${Array.from(VALID_PROP_TYPES).join(', ')}.`,
+            `Invalid type '${prop.type}' on prop '${prop.name}' in composite '${component.name}'. Expected one of: ${Array.from(VALID_PROP_TYPES).join(', ')}.`,
             prop.loc,
             prop.type,
             Array.from(VALID_PROP_TYPES),
           ),
         );
       }
+      const contradiction = checkRequiredWithDefault(prop, `composite '${component.name}'`);
+      if (contradiction) {
+        diagnostics.push(contradiction);
+      }
     }
   }
 
   // --- 5. Widget manifest schema validation ---
-  for (const manifest of widgetManifests ?? []) {
+  for (const manifest of manifests.declaredWidgets) {
     if (!manifest.name) {
       diagnostics.push(
         createDiagnostic(
@@ -561,11 +780,53 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         ),
       );
     }
-    if (!manifest.extends) {
+    // The `extends` rule (PR-04 WO3). `extends` names real C++ inheritance
+    // (§6.5), so whether it is required follows from whether there is a class:
+    //   - `setter=` props mean a class, which must name its base — except the
+    //     root class manifest, which is the base;
+    //   - `draw=` props only mean a drawing element with no class ([D-18]),
+    //     which therefore has nothing to extend;
+    //   - a composite (declaredComposites, not this loop) needs none, because
+    //     the registry supplies u8g2gl_obj.
+    // A manifest with neither kind of prop is left alone: an `<api>` with no
+    // new props is how §6.5 says to give an existing class a manifest.
+    //
+    // A manifest mixing the two kinds (PR-04 WO5a) is reported instead of either
+    // `extends` diagnostic: [D-18] gives an element one emission target or the
+    // other, so neither `extends` answer would be right until it picks one. A
+    // single prop carrying both is the per-prop OVERCONSTRAINED error below,
+    // not a mixed manifest, so each kind is found among props declaring only it.
+    const props = manifest.api?.props ?? [];
+    const hasSetterProp = props.some((p) => p.setter !== undefined);
+    const setterOnlyProp = props.find((p) => p.setter !== undefined && p.draw === undefined);
+    const drawOnlyProp = props.find((p) => p.draw !== undefined && p.setter === undefined);
+    if (setterOnlyProp && drawOnlyProp) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.MIXED_EMISSION_TARGETS,
+          `Widget '${manifest.name}' mixes emission targets: prop '${setterOnlyProp.name}' declares ` +
+            `setter="${setterOnlyProp.setter}" and prop '${drawOnlyProp.name}' declares ` +
+            `draw="${drawOnlyProp.draw}". A manifest declares setter= props (an element with a ` +
+            `class) or draw= props (a drawing element), never both ([D-18], §13.1).`,
+          manifest.loc,
+          `${setterOnlyProp.name}, ${drawOnlyProp.name}`,
+        ),
+      );
+    } else if (hasSetterProp && !manifest.extends && manifest.name !== ROOT_CLASS_MANIFEST) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.MISSING_REQUIRED,
           `Missing required attribute 'extends' on widget '${manifest.name}'.`,
+          manifest.loc,
+          'extends',
+        ),
+      );
+    } else if (isDrawingElement(manifest) && manifest.extends !== undefined) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.DRAWING_ELEMENT_EXTENDS,
+          `Drawing element '${manifest.name}' declares extends="${manifest.extends}", but a ` +
+            `drawing element (draw= props only) has no class to inherit from; remove 'extends'.`,
           manifest.loc,
           'extends',
         ),
@@ -601,6 +862,10 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             Array.from(VALID_PROP_TYPES),
           ),
         );
+      }
+      const contradiction = checkRequiredWithDefault(prop, `widget '${manifest.name}'`);
+      if (contradiction) {
+        diagnostics.push(contradiction);
       }
       // A property reaches the display through exactly one of two emission
       // targets ([D-18], §13.1): `setter` for a method on the element's own

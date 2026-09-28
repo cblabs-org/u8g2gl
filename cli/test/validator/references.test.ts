@@ -10,10 +10,39 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { validateReferences } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import type { Screen } from '../../src/core/schema/screen.js';
+import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
+
+/** Composites every test starts with. */
+const BASE_COMPOSITES: readonly WidgetManifest[] = [
+  {
+    name: 'status_bar',
+    api: { props: [], bindings: [], elements: [] },
+    view: { children: [] },
+  },
+  {
+    name: 'battery_badge',
+    api: { props: [], bindings: [], elements: [] },
+    view: { children: [] },
+  },
+];
+
+/** Plain widgets every test starts with. */
+const BASE_WIDGETS: readonly WidgetManifest[] = [
+  {
+    name: 'u8g2gl_label',
+    extends: 'u8g2gl_obj',
+    api: {
+      props: [{ name: 'font', type: 'font', setter: 'set_font' }],
+      bindings: [{ name: 'bind_text', type: 'string', setter: 'bind_text' }],
+      elements: [],
+    },
+  },
+];
 
 describe('validateReferences', () => {
   const baseInput: ValidateInput = {
@@ -40,29 +69,7 @@ describe('validateReferences', () => {
       images: [{ name: 'icon_wifi', kind: 'xbm', src: 'wifi.xbm' }],
     },
     screens: [],
-    components: [
-      {
-        name: 'status_bar',
-        api: { props: [], bindings: [], elements: [] },
-        view: { children: [] },
-      },
-      {
-        name: 'battery_badge',
-        api: { props: [], bindings: [], elements: [] },
-        view: { children: [] },
-      },
-    ],
-    widgetManifests: [
-      {
-        name: 'u8g2gl_label',
-        extends: 'u8g2gl_obj',
-        api: {
-          props: [{ name: 'font', type: 'font', setter: 'set_font' }],
-          bindings: [{ name: 'bind_text', type: 'string', setter: 'bind_text' }],
-          elements: [],
-        },
-      },
-    ],
+    manifests: registryOf([...BASE_COMPOSITES, ...BASE_WIDGETS]),
     catalogue: [],
   };
 
@@ -228,14 +235,15 @@ describe('validateReferences', () => {
       const diagnostics = validateReferences({
         ...baseInput,
         screens: [screen],
-        widgetManifests: [
-          ...baseInput.widgetManifests,
+        manifests: registryOf([
+          ...BASE_COMPOSITES,
+          ...BASE_WIDGETS,
           {
             name: tag,
             extends: 'u8g2gl_obj',
             api: { props: [], bindings: [], elements: [] },
           },
-        ],
+        ]),
       });
 
       expect(
@@ -248,7 +256,8 @@ describe('validateReferences', () => {
   it('flags a misspelled element tag nested inside a composite template', () => {
     const diagnostics = validateReferences({
       ...baseInput,
-      components: [
+      manifests: registryOf([
+        ...BASE_WIDGETS,
         {
           name: 'status_bar',
           api: { props: [], bindings: [], elements: [] },
@@ -263,7 +272,7 @@ describe('validateReferences', () => {
             ],
           },
         },
-      ],
+      ]),
     });
 
     const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_WIDGET);
@@ -275,7 +284,8 @@ describe('validateReferences', () => {
   it('reports a direct self-cycle (A -> A) naming the path', () => {
     const diagnostics = validateReferences({
       ...baseInput,
-      components: [
+      manifests: registryOf([
+        ...BASE_WIDGETS,
         {
           name: 'a',
           api: { props: [], bindings: [], elements: [] },
@@ -285,7 +295,7 @@ describe('validateReferences', () => {
             ],
           },
         },
-      ],
+      ]),
     });
 
     const diag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.CIRCULAR_REFERENCE);
@@ -296,7 +306,8 @@ describe('validateReferences', () => {
   it('reports an indirect cycle (A -> B -> A) naming the full path, once', () => {
     const diagnostics = validateReferences({
       ...baseInput,
-      components: [
+      manifests: registryOf([
+        ...BASE_WIDGETS,
         {
           name: 'a',
           api: { props: [], bindings: [], elements: [] },
@@ -315,7 +326,7 @@ describe('validateReferences', () => {
             ],
           },
         },
-      ],
+      ]),
     });
 
     const cycleDiags = diagnostics.filter(
@@ -384,7 +395,7 @@ describe('validateReferences', () => {
       const diagnostics = validateReferences({
         ...baseInput,
         screens: [screen],
-        widgetManifests: [...baseInput.widgetManifests, xbmManifest],
+        manifests: registryOf([...BASE_COMPOSITES, ...BASE_WIDGETS, xbmManifest]),
       });
 
       const imageDiag = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.UNKNOWN_IMAGE);

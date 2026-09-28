@@ -22,15 +22,17 @@
  *              render_animation_update.
  */
 #include "u8g2gl/u8g2gl_progress_bar.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
@@ -42,6 +44,14 @@
 void u8g2gl_progress_bar::set_value(uint8_t percent) {
     if (percent > 100) {
         percent = 100;
+    }
+
+    // Change guard, compared after clamping so 150 and 200 are the same value.
+    // Compared against the target, not the displayed value: re-setting the
+    // current target mid-animation must not restart the interpolation, and
+    // must not schedule a frame for a picture that has not changed (§11.2).
+    if (percent == target_percent_) {
+        return;
     }
 
     if (anim_duration_ms_ > 0) {
@@ -82,6 +92,36 @@ void u8g2gl_progress_bar::set_show_percent_text(bool show) {
         show_percent_text_ = show;
         mark_dirty();
     }
+}
+
+// u8g2gl_progress_bar::bind_value
+// Binds the target percentage to an int subject through the base object's
+// shared pool, so it is counted like every other binding ([D-21]).
+//   subject — int subject to observe; must outlive this bar
+bool u8g2gl_progress_bar::bind_value(u8g2gl_subject_int_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_INT, &u8g2gl_progress_bar::on_value_changed);
+}
+
+// u8g2gl_progress_bar::on_value_changed
+// Observer callback registered only by bind_value(), so the downcast is safe.
+// Clamps in int32_t before narrowing: set_value() takes uint8_t, and casting
+// first would turn -1 into 255 (clamped to 100) and 300 into 44. The change
+// guard is set_value()'s own, so a subject re-notifying an unchanged value does
+// not schedule a frame (§11.2); it is not repeated here.
+//   binding — handle from add_value_binding(); inactive after destruction
+void u8g2gl_progress_bar::on_value_changed(void* binding) {
+    auto* bar = static_cast<u8g2gl_progress_bar*>(binding_object(binding));
+    auto* subject = static_cast<u8g2gl_subject_int_base*>(binding_subject(binding));
+    if (!bar || !subject) {
+        return;
+    }
+    int32_t value = subject->get();
+    if (value < 0) {
+        value = 0;
+    } else if (value > 100) {
+        value = 100;
+    }
+    bar->set_value(static_cast<uint8_t>(value));
 }
 
 // u8g2gl_progress_bar::get_value
@@ -180,7 +220,11 @@ void u8g2gl_progress_bar::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 3: Draw outer track frame ---
-    display.drawFrame(x_, y_, w_, h_);
+    // The frame, fill and stipple pixels go through the u8g2gl_draw_* functions,
+    // which issue exactly the U8G2 calls this used to and own their coordinate
+    // conversion (rules in u8g2gl_draw.h and u8g2gl_coord.h). A bar partly off
+    // the left or top edge draws its visible part.
+    u8g2gl_draw_box(display, x_, y_, w_, h_, false);
 
     // --- Step 4: Calculate fill width ---
     int16_t inner_w = static_cast<int16_t>(w_ - 2);
@@ -195,14 +239,16 @@ void u8g2gl_progress_bar::render(U8G2& display) {
             bool toggle = (i % 2 == 0);
             for (int16_t row = 0; row < inner_h; row++) {
                 if ((row + (toggle ? 0 : 1)) % 2 == 0) {
-                    display.drawPixel(x_ + 1 + i, y_ + 1 + row);
+                    u8g2gl_draw_pixel(display, static_cast<int16_t>(x_ + 1 + i),
+                                      static_cast<int16_t>(y_ + 1 + row));
                 }
             }
         }
     } else {
         // Solid fill
         if (fill > 0) {
-            display.drawBox(x_ + 1, y_ + 1, fill, inner_h);
+            u8g2gl_draw_box(display, static_cast<int16_t>(x_ + 1),
+                            static_cast<int16_t>(y_ + 1), fill, inner_h);
         }
     }
 
@@ -212,12 +258,13 @@ void u8g2gl_progress_bar::render(U8G2& display) {
         char buf[8];
         snprintf(buf, sizeof(buf), "%u%%", current_percent_);
 
-        int text_w = display.getUTF8Width(buf);
-        int font_height = display.getAscent() - display.getDescent();
+        int text_w = static_cast<int>(display.getUTF8Width(buf));
+        int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
         int16_t text_x = static_cast<int16_t>(x_ + (w_ - text_w) / 2);
         int16_t text_y = static_cast<int16_t>(y_ + (h_ - font_height) / 2);
 
-        display.drawUTF8(text_x, text_y, buf);
+        // Origins wrap explicitly and U8G2 clips them — see u8g2gl_coord_pos().
+        display.drawUTF8(u8g2gl_coord_pos(text_x), u8g2gl_coord_pos(text_y), buf);
     }
 }
 
@@ -232,7 +279,7 @@ void u8g2gl_progress_bar::render_animation_update(U8G2& display, uint32_t now_ms
     if (current_percent_ != old_percent) {
         // Clear own bounding box first ([D-5])
         display.setDrawColor(0);
-        display.drawBox(x_, y_, w_, h_);
+        u8g2gl_draw_box(display, x_, y_, w_, h_);
 
         // Re-render
         render(display);

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <globals>
     <consts>
-        <int name="screen_width" value="128" />
-        <int name="screen_height" value="64" />
+        <int name="layout_width" value="128" />
+        <int name="layout_height" value="64" />
     </consts>
 
     <subjects>

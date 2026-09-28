@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <!-- §13.12's subjects. -->
+        <string name="station_name" value="Euston" max_len="16" />
+        <string name="service_message" value="On time" max_len="32" />
+        <bool name="wifi_connected" value="true" />
+        <time name="system_time" value="0" />
+
+        <!-- Read only by draw calls on the gauges screen, so each costs exactly
+             one frame-dirty observer and no pool slot (§13.5, [D-21]). -->
+        <int name="level" value="10" />
+
+        <!-- Drives the panel composite's hidden flag. -->
+        <bool name="show_panel" value="false" />
+
+        <!-- The bounds screen (PR-04 WO10b): a position bound inside a
+             container and on the screen, and an int drawn through a format. -->
+        <int name="knob_x" value="5" />
+        <int name="temperature" value="21" />
+    </subjects>
+
+    <styles>
+        <style name="note" align="right" />
+        <!-- The bounds screen: a style whose font an element's own font= and
+             style_font override must both beat (§10), and which sets font_mode,
+             so the editor applies a style property only u8g2gl_obj declares. -->
+        <style name="loud" font="u8g2_font_5x7_mr" align="center" font_mode="transparent" />
+    </styles>
+
+    <fonts>
+        <!-- §13.12 names BDF fonts, which PR-04 refuses (PR-04b); U8G2
+             built-ins stand in for them. -->
+        <builtin name="u8g2_font_6x10_mr" />
+        <builtin name="u8g2_font_5x7_mr" />
+
+        <!-- PR-04 WO14: one of the 522 U8G2 fonts whose name carries capitals.
+             A <builtin>'s name is a U8G2 symbol, not a name the author chose, so
+             it is exempt from §13.4's lowercase rule (owner's ruling,
+             2026-09-28) and the alias spells it verbatim. Compiled and drawn on
+             the bounds screen, so the exemption is proved end to end rather than
+             only in the validator. -->
+        <builtin name="u8g2_font_helvR08_tr" />
+    </fonts>
+
+    <images>
+        <xbm name="icon_wifi" src="assets/icon_wifi.xbm" />
+    </images>
+</globals>

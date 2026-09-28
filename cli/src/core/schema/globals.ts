@@ -21,6 +21,7 @@
  * - FontMode: Font rendering background mode ('solid' | 'transparent')
  * - BitmapMode: Bitmap rendering background mode ('solid' | 'transparent')
  * - StyleDecl: Named style properties definition
+ * - StylePropertyKey, StyleProperty, STYLE_PROPERTIES: §10's style properties, the one list
  * - FontDecl: Discriminated union of font definitions (BDF or U8G2 built-in)
  * - BdfFontDecl: Custom BDF font definition with optional glyph range
  * - BuiltinFontDecl: Direct U8G2 C font identifier definition
@@ -134,15 +135,75 @@ export interface StyleDecl {
   readonly radius?: number;
   /** Text alignment within element width. */
   readonly align?: TextAlign;
-  /** If true, appends ellipsis when text overflows bounding width. */
-  readonly truncate?: boolean;
   /** Font drawing mode. */
   readonly fontMode?: FontMode;
   /** Bitmap drawing mode. */
   readonly bitmapMode?: BitmapMode;
+  /**
+   * Attributes written on the `<style>` that are neither `name` nor a style
+   * property ({@link STYLE_PROPERTIES}), with where each is written. The parser
+   * records them rather than reporting them, so a mistyped attribute cannot
+   * discard the whole of `globals.xml`; Pass 1 reports each (PR-04 WO11b).
+   */
+  readonly unknownAttributes?: readonly { readonly name: string; readonly loc?: SourceLocation }[];
+  /**
+   * Every style property the `<style>` writes, **as written**, with the spelling
+   * used and where it is: the text a value check needs, which the typed members
+   * above have already lost. Pass 1 holds each to its `u8g2gl_obj` prop, exactly
+   * as it holds an element's attribute (PR-04 WO11b, finding 12) — `invert="yes"`
+   * used to become `false` with nothing said.
+   */
+  readonly written?: readonly {
+    /** The style property's canonical attribute, as {@link STYLE_PROPERTIES} spells it. */
+    readonly attribute: string;
+    /** The spelling the author used, which may be a camelCase alias. */
+    readonly spelled: string;
+    readonly value: string;
+    readonly loc?: SourceLocation;
+  }[];
   /** Source location where this style was declared. */
   readonly loc?: SourceLocation;
 }
+
+/** The `StyleDecl` members that are style properties (§10). */
+export type StylePropertyKey = 'font' | 'drawColor' | 'invert' | 'padding' | 'border' | 'radius' | 'align' | 'fontMode' | 'bitmapMode';
+
+/** One style property of §10's table. */
+export interface StyleProperty {
+  /** The `StyleDecl` member. */
+  readonly key: StylePropertyKey;
+  /**
+   * The attribute as `<style>` spells it, which is also the element `<prop>` of
+   * the same name (§10). The editor applies a style through those props, and
+   * the value is spelled through that prop's declaration.
+   */
+  readonly attribute: string;
+  /** The `u8g2gl_style` setter that applies it. */
+  readonly setter: string;
+  /** How the parser reads it: text, a `true`/`false` switch, or an integer. */
+  readonly kind: 'text' | 'bool' | 'int';
+  /** camelCase spellings the parser has always also accepted. */
+  readonly aliases?: readonly string[];
+}
+
+/**
+ * §10's style properties — **the one list** of what a `<style>` may set. The
+ * parser reads a style through it, Pass 1 reports any other attribute against
+ * it, and the styles unit emits each property through it (PR-04 WO11b; moved
+ * here from `emit/styles.ts`, where it was the emitter's alone and the parser
+ * kept a second, implicit list). `truncate` is not here: [D-19] deleted it.
+ */
+export const STYLE_PROPERTIES: readonly StyleProperty[] = [
+  { key: 'font', attribute: 'font', setter: 'set_font', kind: 'text' },
+  { key: 'drawColor', attribute: 'draw_color', setter: 'set_draw_color', kind: 'text', aliases: ['drawColor'] },
+  { key: 'invert', attribute: 'invert', setter: 'set_invert', kind: 'bool' },
+  { key: 'padding', attribute: 'padding', setter: 'set_padding', kind: 'int' },
+  { key: 'border', attribute: 'border', setter: 'set_border', kind: 'bool' },
+  { key: 'radius', attribute: 'radius', setter: 'set_radius', kind: 'int' },
+  { key: 'align', attribute: 'align', setter: 'set_align', kind: 'text' },
+  { key: 'fontMode', attribute: 'font_mode', setter: 'set_font_mode', kind: 'text', aliases: ['fontMode'] },
+  { key: 'bitmapMode', attribute: 'bitmap_mode', setter: 'set_bitmap_mode', kind: 'text', aliases: ['bitmapMode'] },
+];
 
 /**
  * Discriminated union of font declarations supported in `<fonts>`.

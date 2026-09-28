@@ -15,16 +15,25 @@
  *          widget's own deadline ([D-15]).
  *
  * Description: Tick-source registration, active-screen management, frame-level
- *              dirty gating, and the ui_handler entry points
+ *              dirty gating, the ui_handler entry points, the two calls
+ *              generated code makes into the frame — the per-object render
+ *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
+ *              and u8g2gl_apply_clip(), the single owner of the clip-corner
+ *              convention
  */
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_state_saver.h"
+#include "u8g2gl/u8g2gl_tree.h"
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+#include <type_traits>
+
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
@@ -82,6 +91,120 @@ void u8g2gl_mark_dirty() {
     if (s_active_screen) {
         s_active_screen->dirty = true;
     }
+}
+
+// Generated code passes u8g2gl_frame_dirty_observer straight to add_observer().
+// Proving the signature here makes a drift in u8g2gl_observer_cb a library
+// build error rather than a generated-code build error in someone's project.
+static_assert(
+    std::is_same<decltype(&u8g2gl_frame_dirty_observer), u8g2gl_observer_cb>::value,
+    "u8g2gl_frame_dirty_observer must match u8g2gl_observer_cb"
+);
+
+// u8g2gl_frame_dirty_observer
+// Adapts u8g2gl_mark_dirty() to the observer signature. There is deliberately
+// no per-subject or per-screen state: whichever screen is active is the one
+// that may show the value.
+//   user_data — unused
+void u8g2gl_frame_dirty_observer(void* /*user_data*/) {
+    u8g2gl_mark_dirty();
+}
+
+// u8g2gl_render_object
+// Renders one object with the framework's containment around it: effective
+// visibility, effective clip, saved font and colour.
+//   display — the application's U8G2 instance
+//   objs    — flat object array in document order
+//   parents — parallel parent-index array, or nullptr for each object's own
+//   index   — object to render
+void u8g2gl_render_object(
+    U8G2& display,
+    u8g2gl_obj* const* objs,
+    const uint8_t* parents,
+    uint8_t index
+) {
+    // --- Step 1: Skip an object hidden by itself or any ancestor ---
+    // This also rejects a null array or a null entry on the chain, so objs[index]
+    // is safe to dereference below.
+    if (!u8g2gl_is_effectively_visible(objs, parents, index)) {
+        return;
+    }
+
+    // --- Step 2: Skip an object with nothing left to draw into ---
+    // An empty clip is the normal outcome for an element wholly outside its
+    // container; there is no pixel it could legitimately set.
+    const u8g2gl_rect clip = u8g2gl_effective_clip(objs, parents, index);
+    if (clip.w <= 0 || clip.h <= 0) {
+        return;
+    }
+
+    // --- Step 3: Draw inside saved state and the effective clip ---
+    // The saver is constructed before the clip is applied so its lifetime spans
+    // the whole render; it does not touch the clip either way.
+    u8g2gl_state_saver saver(display);
+    if (!u8g2gl_apply_clip(display, clip)) {
+        // Wholly above or left of the display: no pixel to draw into.
+        return;
+    }
+    objs[index]->render(display);
+
+    // --- Step 4: Reset the clip this function set ---
+    // The state saver cannot restore the clip: U8G2 has no clip getter. The full
+    // display is the right state to leave, because no object's clip is ever
+    // nested inside another's active clip — each is computed from its ancestors
+    // in Step 2.
+    display.setMaxClipWindow();
+}
+
+// u8g2gl_apply_clip
+// Converts a rect to setClipWindow() corners. The convention (exclusive second
+// corner) and the evidence for it are documented on the declaration, which is
+// the one place to change if PR-06's pixel test disagrees.
+//   display — receives the clip window
+//   clip    — region in device pixels; may be empty or partly negative
+bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip) {
+    // --- Step 1: Reject a rect with no area ---
+    if (clip.w <= 0 || clip.h <= 0) {
+        return false;
+    }
+
+    // --- Step 2: Compute the corners, exclusive at the far edge ---
+    // In int32_t: x + w can leave int16_t, and int may be 16-bit.
+    int32_t x0 = clip.x;
+    int32_t y0 = clip.y;
+    int32_t x1 = static_cast<int32_t>(clip.x) + clip.w;
+    int32_t y1 = static_cast<int32_t>(clip.y) + clip.h;
+
+    // --- Step 3: Clamp both corners to the display ---
+    // U8G2 takes unsigned coordinates, so a negative near corner would wrap to
+    // a huge value rather than clip. The far corner is clamped too, so the
+    // window never names a column or row past the display and always fits
+    // u8g2_uint_t, whatever its width on this build.
+    const int32_t display_w = static_cast<int32_t>(display.getDisplayWidth());
+    const int32_t display_h = static_cast<int32_t>(display.getDisplayHeight());
+    if (x0 < 0) {
+        x0 = 0;
+    }
+    if (y0 < 0) {
+        y0 = 0;
+    }
+    if (x1 > display_w) {
+        x1 = display_w;
+    }
+    if (y1 > display_h) {
+        y1 = display_h;
+    }
+
+    // --- Step 4: Reject a rect with no pixel on the display ---
+    // With an exclusive far corner, x1 <= x0 means no column survives: the rect
+    // lay wholly left of, or wholly right of, the display (likewise rows).
+    if (x1 <= x0 || y1 <= y0) {
+        return false;
+    }
+
+    display.setClipWindow(u8g2gl_coord_clamp(x0), u8g2gl_coord_clamp(y0),
+                          u8g2gl_coord_clamp(x1), u8g2gl_coord_clamp(y1));
+    return true;
 }
 
 // ui_handler

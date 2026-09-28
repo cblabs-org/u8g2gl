@@ -17,13 +17,14 @@
  *              for the u8g2gl_switch widget.
  */
 #include "u8g2gl/u8g2gl_switch.h"
+#include "u8g2gl/u8g2gl_coord.h"
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
@@ -43,6 +44,27 @@ void u8g2gl_switch::set_value(bool on) {
 // Returns true if switch is ON, false if OFF.
 bool u8g2gl_switch::get_value() const {
     return value_;
+}
+
+// u8g2gl_switch::bind_value
+// Binds the toggle state to a bool subject through the base object's shared
+// pool, so it is counted like every other binding ([D-21]).
+//   subject — bool subject to observe; must outlive this switch
+bool u8g2gl_switch::bind_value(u8g2gl_subject_bool_base* subject) {
+    return add_value_binding(subject, U8G2GL_SUBJECT_BOOL, &u8g2gl_switch::on_value_changed);
+}
+
+// u8g2gl_switch::on_value_changed
+// Observer callback registered only by bind_value(), so the downcast is safe.
+// Delegates to set_value(), which already guards mark_dirty() on a change.
+//   binding — handle from add_value_binding(); inactive after destruction
+void u8g2gl_switch::on_value_changed(void* binding) {
+    auto* sw = static_cast<u8g2gl_switch*>(binding_object(binding));
+    auto* subject = static_cast<u8g2gl_subject_bool_base*>(binding_subject(binding));
+    if (!sw || !subject) {
+        return;
+    }
+    sw->set_value(subject->get());
 }
 
 // u8g2gl_switch::tick
@@ -85,7 +107,19 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 4: Draw switch track ---
     // Outer rounded rectangle frame covering the full widget bounds.
-    display.drawRFrame(x_, y_, w_, h_, r);
+    // Converted here rather than through u8g2gl_draw_box(), which would pick
+    // drawFrame/drawBox whenever a radius reaches 0; the switch always draws
+    // rounded shapes. Rules from u8g2gl_coord.h: origins wrap explicitly, so a
+    // switch partly off the left or top edge draws its visible part; sizes must
+    // be positive (Step 1 guarantees it for the track); corner radii are
+    // clamped, 0 meaning square corners.
+    u8g2_uint_t track_w = 0;
+    u8g2_uint_t track_h = 0;
+    if (!u8g2gl_coord_size(w_, track_w) || !u8g2gl_coord_size(h_, track_h)) {
+        return;
+    }
+    display.drawRFrame(u8g2gl_coord_pos(x_), u8g2gl_coord_pos(y_), track_w, track_h,
+                       u8g2gl_coord_clamp(r));
 
     // --- Step 5: Compute handle geometry ---
     // Handle is inset by 1 pixel from the track border.
@@ -112,5 +146,10 @@ void u8g2gl_switch::render(U8G2& display) {
 
     // --- Step 6: Draw switch handle ---
     // Filled rounded rectangle indicating current toggle state.
-    display.drawRBox(handle_x, handle_y, handle_w, handle_h, handle_r);
+    u8g2_uint_t handle_uw = 0;
+    u8g2_uint_t handle_uh = 0;
+    if (u8g2gl_coord_size(handle_w, handle_uw) && u8g2gl_coord_size(handle_h, handle_uh)) {
+        display.drawRBox(u8g2gl_coord_pos(handle_x), u8g2gl_coord_pos(handle_y), handle_uw,
+                         handle_uh, u8g2gl_coord_clamp(handle_r));
+    }
 }

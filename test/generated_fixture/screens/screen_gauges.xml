@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A static screen: nothing on it animates, so once a subject change has been
+     drawn, ui_handler() must return U8G2GL_IDLE. -->
+<screen name="gauges">
+    <view>
+        <!-- §8.4's own example: a bound width and no width attribute at all. A
+             draw call, so the width is read from the subject at draw time. -->
+        <u8g2gl_box name="level_bar" x="4" y="20" height="6" bind_width="level" />
+
+        <!-- A non-default segment, which needs the manifest's emit= pattern. -->
+        <u8g2gl_circle name="dial" x="100" y="40" radius="10" segments="upper_left" />
+
+        <!-- Hidden until show_panel is true. Its draw-call child and its object
+             child must both stay undrawn while it is hidden. -->
+        <panel name="panel" x="0" y="30" width="60" height="20">
+            <bind_flag_if_eq subject="show_panel" ref_value="false" flag="hidden" />
+        </panel>
+
+        <!-- An object hidden outright: the render wrapper must skip it. -->
+        <u8g2gl_label name="ghost" x="64" y="54" width="40" height="10"
+                      font="u8g2_font_6x10_mr" text="Ghost" hidden="true" />
+
+        <!-- A draw call with its own bound hidden flag. -->
+        <u8g2gl_pixel name="blip" x="120" y="2">
+            <bind_flag_if_eq subject="wifi_connected" ref_value="false" flag="hidden" />
+        </u8g2gl_pixel>
+    </view>
+</screen>

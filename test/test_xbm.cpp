@@ -19,7 +19,7 @@
 #include "u8g2gl/u8g2gl_xbm.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_types.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <iostream>
 #include <string>
 
@@ -90,6 +90,32 @@ TEST(Xbm, RenderDrawsXBMP) {
     EXPECT_EQ(display.last_draw_xbmp_bitmap, s_mock_xbm_bits);
     EXPECT_EQ(display.getDrawColor(), static_cast<uint8_t>(U8G2GL_COLOR_1));
     EXPECT_EQ(display.last_bitmap_mode, static_cast<uint8_t>(U8G2GL_BITMAP_MODE_TRANSPARENT));
+}
+
+TEST(Xbm, PartlyOffEdgeDrawsWithWrappedOrigin) {
+    // WO4c ruling (H1): the origin wraps explicitly and U8G2's XBM drawing
+    // clips to the visible part, so a bitmap partly off the left or top edge is
+    // drawn, not skipped. A size <= 0 still draws nothing.
+    u8g2gl_xbm xbm;
+    xbm.set_coords(-4, 2, 8, 8);
+    xbm.set_src(s_mock_xbm_bits);
+
+    U8G2 display;
+    xbm.render(display);
+    ASSERT_EQ(display.draw_xbmp_count, 1);
+    EXPECT_EQ(display.last_draw_xbmp_x, 65532);
+    EXPECT_EQ(display.last_draw_xbmp_y, 2);
+    EXPECT_EQ(display.last_draw_xbmp_w, 8);
+    EXPECT_EQ(display.last_draw_xbmp_h, 8);
+
+    xbm.set_coords(2, -1, 8, 8);
+    xbm.render(display);
+    ASSERT_EQ(display.draw_xbmp_count, 2);
+    EXPECT_EQ(display.last_draw_xbmp_y, 65535);
+
+    xbm.set_coords(2, 2, 0, 8);
+    xbm.render(display);
+    EXPECT_EQ(display.draw_xbmp_count, 2);
 }
 
 TEST(Xbm, InheritsFromObj) {

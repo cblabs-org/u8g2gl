@@ -30,6 +30,7 @@
  *
  *     Time input:
  *     - set_time():           Update current time using raw epoch seconds
+ *     - bind_time():          Drive the time from a time subject (§6.3, §8.1)
  *
  *     Query:
  *     - get_format():         Query configured clock format
@@ -119,6 +120,22 @@ public:
      */
     void set_time(uint32_t epoch_seconds);
 
+    /**
+     * @brief Drive the displayed time from a time subject.
+     *
+     * The clock's primary binding (§6.3) and the call §13.12's generated code
+     * emits for `bind_time=`. The subject's current value is applied at once,
+     * and every later change goes through set_time(), so the frame is marked
+     * dirty only when the time actually changes.
+     *
+     * Consumes one binding-pool slot and one observer slot on @p subject.
+     *
+     * @param subject Time subject (Unix epoch seconds). Must outlive this object.
+     * @return false if @p subject is null, or the binding pool or the subject's
+     *         observer capacity is exhausted; no binding is registered.
+     */
+    bool bind_time(u8g2gl_subject_time_base* subject);
+
     // --- Query ---
 
     /**
@@ -192,6 +209,12 @@ public:
     void render_animation_update(U8G2& display, uint32_t now_ms) override;
 
 private:
+    /**
+     * @brief Observer callback for bind_time(); applies the subject's value.
+     * @param binding Binding handle from u8g2gl_obj::add_value_binding().
+     */
+    static void on_time_changed(void* binding);
+
     // Members ordered largest-alignment-first to prevent struct padding holes:
     // pointer (8B) -> uint32_t (4B) -> uint8_t/bool/enum (1B)
     const uint8_t* secondary_font_ = nullptr;            ///< Optional font for seconds digits

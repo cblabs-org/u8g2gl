@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <consts>
+        <int name="bar_height" value="12" />
+    </consts>
+
+    <subjects>
+        <!-- max_len="16" is 16 usable characters, so 17 bytes of storage (§8.2).
+             The value carries a double quote, a backslash and a non-ASCII
+             character — the three things a C++ string literal must escape
+             (§13.2) — and is 15 characters, so it fits without truncation. -->
+        <string name="station_name" value="Euston &quot;A&quot;\caf&#233;" max_len="16" />
+        <!-- Bound by three objects and one draw-call element, so its observer
+             count is 3 + 1 frame-dirty = 4 (§13.5, [D-21]). -->
+        <int name="level" value="3" />
+        <bool name="wifi_connected" value="true" />
+        <time name="system_time" value="0" />
+    </subjects>
+
+    <styles>
+        <style name="header" font="u8g2_font_6x10_mr" align="center" draw_color="1" border="true" radius="2" />
+        <style name="body" font="u8g2_font_6x10_mr" align="left" />
+    </styles>
+
+    <fonts>
+        <!-- A U8G2 built-in: referenced, never compiled (§14.1). -->
+        <builtin name="u8g2_font_6x10_mr" />
+    </fonts>
+
+    <images>
+        <xbm name="icon_wifi" src="assets/icon_wifi.xbm" />
+    </images>
+</globals>

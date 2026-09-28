@@ -121,6 +121,11 @@ export function parseWidgetManifest(
   const bindings: BindDef[] = [];
   const elements: ElementDef[] = [];
 
+  // A composite's own `<api>` props are template parameters (§6.4, §13.6):
+  // expansion substitutes them into the `<view>`, and the container is a plain
+  // `u8g2gl_obj` with no such method, so nothing may call a setter for one.
+  const isComposite = getChild(root, 'view') !== undefined;
+
   const apiEl = getChild(root, 'api');
   if (apiEl) {
     for (const child of apiEl.children) {
@@ -132,11 +137,14 @@ export function parseWidgetManifest(
         // [D-18]: a property reaches the display through exactly one emission
         // target — `setter=` (a method on the element's class) or `draw=` (a
         // free `u8g2gl_draw_*` function for a classless drawing element,
-        // §6.2). A manifest naming neither keeps the pre-[D-18] `set_<name>`
-        // default rather than silently becoming a draw call.
+        // §6.2). A plain widget's prop naming neither keeps the pre-[D-18]
+        // `set_<name>` default rather than silently becoming a draw call. A
+        // composite's template parameter gets no invented setter at all (PR-04
+        // WO11b, WO10 finding 1): emission used to have to filter
+        // `set_title_subject(…)` back out, because it would not compile.
         const setterAttr = getAttributeValue(child, 'setter');
         const drawAttr = getAttributeValue(child, 'draw');
-        const setter = setterAttr ?? (drawAttr ? undefined : `set_${propName}`);
+        const setter = setterAttr ?? (drawAttr || isComposite ? undefined : `set_${propName}`);
         const defaultVal = getAttributeValue(child, 'default');
         const required = getBooleanAttribute(child, 'required');
         const isAnimated = getBooleanAttribute(child, 'animated');
@@ -236,16 +244,24 @@ export function parseWidgetManifest(
 
   // --- Composite view (§6.4, [D-18]) ---
   // One element vocabulary means a composite is this same `<widget>` root
-  // with a `<view>` child, not a second tag. A plain widget manifest has no
-  // `<view>` and keeps its `extends` (defaulting to 'u8g2gl_obj'); a
-  // composite has no C++ class of its own, so `extends` is left unset for
-  // exactly the reason widget-manifest.ts documents on the field.
+  // with a `<view>` child, not a second tag. Both shapes keep `extends`
+  // exactly as written (PR-04 WO7). A composite normally declares none — it
+  // has no C++ class of its own — but one that does is claiming a class, which
+  // Pass 8 refuses until PR-08. Dropping it here made that refusal unreachable
+  // from real XML (PR-04 WO5b F1): the author's `extends` vanished silently.
+  //
+  // No default is filled in here (PR-04 WO2, F2). Defaulting a missing
+  // `extends` to 'u8g2gl_obj' made validate-schema.ts's "missing required
+  // 'extends'" diagnostic unreachable and made u8g2gl_obj appear to extend
+  // itself. The one legitimate default — a composite realises as u8g2gl_obj
+  // (§13.12) — is applied by the manifest registry, where it is visible.
+  const extendsVal = getAttributeValue(root, 'extends');
+  const declaredExtends = extendsVal !== undefined ? { extends: extendsVal } : {};
   const viewEl = getChild(root, 'view');
   if (!viewEl) {
-    const extendsVal = getAttributeValue(root, 'extends') ?? 'u8g2gl_obj';
     return {
       name,
-      extends: extendsVal,
+      ...declaredExtends,
       api: apiBlock,
       loc: root.loc,
     };
@@ -267,6 +283,7 @@ export function parseWidgetManifest(
 
   return {
     name,
+    ...declaredExtends,
     api: apiBlock,
     view,
     loc: root.loc,

@@ -16,18 +16,22 @@
  *              related geometry helpers
  *
  * Exported Functions:
- * - u8g2gl_min(): Minimum of two uint32_t values
- * - u8g2gl_max(): Maximum of two uint32_t values
+ * - u8g2gl_partial_refresh(): Push one pixel region of the buffer, in tiles
  */
 #ifndef U8G2GL_HELPERS_H
 #define U8G2GL_HELPERS_H
 
-#if __has_include(<U8G2lib.h>)
-#include <U8G2lib.h>
-#elif __has_include(<U8g2lib.h>)
+#include "u8g2gl_coord.h"
+
+#include <cstdint>
+
+// U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
+// pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
+// the host test stub (test/stubs/) all spell it that way. The quoted fallback
+// covers a build that puts U8G2 only on the quoted search path; the forward
+// declaration keeps this header usable where U8G2 is not on the path at all.
+#if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
-#elif __has_include("U8G2lib.h")
-#include "U8G2lib.h"
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #else
@@ -42,13 +46,30 @@ class U8G2;
  * conversion is wrong, and wrong in a way that produces stale columns on the
  * display rather than an error.
  *
+ * A region partly left of or above the display refreshes only its on-screen
+ * part, and a region with no on-screen part refreshes nothing. Tile arguments
+ * are uint8_t in U8G2, so they are clamped at 255.
+ *
  * @param d Display instance.
- * @param x Left edge of the region, in pixels.
- * @param y Top edge, in pixels.
+ * @param x Left edge of the region, in pixels; may be negative.
+ * @param y Top edge, in pixels; may be negative.
  * @param w Width in pixels.
  * @param h Height in pixels.
  */
 inline void u8g2gl_partial_refresh(U8G2& d, int x, int y, int w, int h) {
+    // --- Step 1: Shorten the region to its part at non-negative coordinates ---
+    // Refreshing the visible part of a region is exactly what refreshing the
+    // whole region would have pushed. Tile arithmetic on a negative origin
+    // would instead truncate toward zero, and the tile arguments are unsigned.
+    u8g2_uint_t ux = 0;
+    u8g2_uint_t uy = 0;
+    u8g2_uint_t uw = 0;
+    u8g2_uint_t uh = 0;
+    if (!u8g2gl_coord_span(x, w, ux, uw) || !u8g2gl_coord_span(y, h, uy, uh)) {
+        return;
+    }
+
+    // --- Step 2: Convert pixels to tiles ---
     // The tile origin rounds *down*, so the region starts up to 7 pixels left of
     // and above the requested rectangle. The width must therefore cover that
     // slack as well as the rectangle itself.
@@ -58,10 +79,19 @@ inline void u8g2gl_partial_refresh(U8G2& d, int x, int y, int w, int h) {
     // 0..2, but (12+7)/8 yields 2 tiles — pixels 0..15 — leaving columns 16 and
     // 17 showing whatever was there before. Adding (x % 8) before rounding up
     // accounts for it. Same reasoning vertically.
-    int tx = x / 8, ty = y / 8;
-    int tw = ((x % 8) + w + 7) / 8;
-    int th = ((y % 8) + h + 7) / 8;
-    d.updateDisplayArea(tx, ty, tw, th);
+    const int32_t tx = ux / 8;
+    const int32_t ty = uy / 8;
+    const int32_t tw = ((ux % 8) + static_cast<int32_t>(uw) + 7) / 8;
+    const int32_t th = ((uy % 8) + static_cast<int32_t>(uh) + 7) / 8;
+
+    // --- Step 3: Narrow to U8G2's uint8_t tile arguments ---
+    // U8G2 describes every display's size in uint8_t tiles, so no real display
+    // reaches 255; the clamp only stops an oversized region from wrapping.
+    const int32_t max_tile = 255;
+    d.updateDisplayArea(static_cast<uint8_t>(tx > max_tile ? max_tile : tx),
+                        static_cast<uint8_t>(ty > max_tile ? max_tile : ty),
+                        static_cast<uint8_t>(tw > max_tile ? max_tile : tw),
+                        static_cast<uint8_t>(th > max_tile ? max_tile : th));
 }
 
 #endif // U8G2GL_HELPERS_H

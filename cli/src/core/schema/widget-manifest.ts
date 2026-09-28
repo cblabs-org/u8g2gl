@@ -18,10 +18,9 @@
  *          carries a `<view>` (§6.4). WO5 folded the pre-[D-18] `Component`/`ComponentProp`
  *          pair's *prop* half into this file; WO5b finishes the merge by retiring `Component`
  *          itself — a composite is now literally a `WidgetManifest`, not a second interface
- *          with the same shape. `extends` becomes optional for exactly this reason: a real
- *          widget names the C++ class it extends, but a composite has no class of its own —
- *          it is inlined into its constituent elements at build time (§13.4) — so nothing is
- *          gained by inventing a placeholder value where [D-18] never asked for one.
+ *          with the same shape. `extends` is optional because only a class-backed widget has a
+ *          C++ class to name: a composite realises as `u8g2gl_obj` and inherits it through
+ *          the manifest registry, and a drawing element has no class at all ([D-18]).
  * Description: Immutable interfaces for WidgetManifest, ApiBlock, property definitions,
  *              binding slots, and collection element arguments.
  *
@@ -45,11 +44,13 @@ export interface WidgetManifest {
   /** Widget class tag name (e.g. "u8g2gl_label", "wd_service_list"). */
   readonly name: string;
   /**
-   * C++ base class extended by this widget (e.g. "u8g2gl_obj"). Optional
-   * because a composite (this manifest carrying a `view`, [D-18]) has no C++
-   * class of its own to extend — it is inlined into its constituent elements
-   * rather than compiled to a class. Always present on a real widget manifest;
-   * `validate-schema.ts` still enforces that for the `<widget>` path.
+   * C++ base class extended by this widget (e.g. "u8g2gl_obj"), exactly as
+   * declared — the parser supplies no default (PR-04 WO2). Absent on three
+   * kinds of manifest: the root class manifest `u8g2gl_obj`; a drawing
+   * element (`draw=` props only), which has no class ([D-18]) and for which
+   * declaring one is an error; and a composite (carrying a `view`), which the
+   * registry gives `u8g2gl_obj` as its base. Any other manifest with `setter=`
+   * props requires it — see `validate-schema.ts` (PR-04 WO3).
    */
   readonly extends?: string;
   /** Public API manifest defining accepted properties, bindings, and elements. */

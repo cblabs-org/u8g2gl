@@ -21,7 +21,7 @@
 #include "u8g2gl/u8g2gl_clock.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_types.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <iostream>
 #include <string>
 
@@ -179,6 +179,48 @@ TEST(Clock, InheritsFromObj) {
     U8G2 display;
     obj->render(display);
     EXPECT_GT(display.draw_utf8_count, 0);
+}
+
+// PR-04 WO2: bind_time is the clock's primary binding (§6.3) and the call
+// §13.12's generated code makes; it did not exist before this work order.
+TEST(Clock, BindTimeRendersBoundSubject) {
+    u8g2gl_subject_time subject(3661);   // 01:01:01
+    u8g2gl_clock clock;
+    ASSERT_TRUE(clock.bind_time(&subject));
+
+    // The current value is applied at bind time, not on the first change.
+    EXPECT_EQ(clock.get_time(), 3661u);
+    EXPECT_TRUE(clock.is_dirty());
+
+    U8G2 display;
+    clock.render(display);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "01");
+
+    // A change reaches the clock, marks it dirty, and is what renders.
+    clock.clear_dirty();
+    subject.set(7322);                   // 02:02:02
+    EXPECT_EQ(clock.get_time(), 7322u);
+    EXPECT_TRUE(clock.is_dirty());
+    display.draw_utf8_count = 0;
+    clock.render(display);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "02");
+
+    // A re-notification of an unchanged value is not a repaint (§11.2).
+    clock.clear_dirty();
+    subject.notify();
+    EXPECT_FALSE(clock.is_dirty());
+}
+
+TEST(Clock, BindTimeNotificationAfterDestructionIsSafe) {
+    u8g2gl_subject_time subject(0);
+    {
+        u8g2gl_clock clock;
+        ASSERT_TRUE(clock.bind_time(&subject));
+    }
+    // The destroyed clock's pool slot is inactive, so this must be a no-op
+    // rather than a write through a dangling pointer.
+    subject.set(60);
+    SUCCEED();
 }
 
 TEST(Clock, SizeOf) {

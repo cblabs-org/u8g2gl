@@ -114,3 +114,15 @@ missing mode.
 
 Credit where due: the worker flagged the contradiction rather than inventing
 bounce timing that no document specified.
+
+## Amendment — 2026-09-16, after PR-04 WO5a
+
+**`bind_text_int` no longer exists.** This record's context section describes
+`bind_text` and `bind_text_int` as separate declarations. PR-04 WO5a removed the
+second: a binding name may now be declared once per accepted subject type, so
+`u8g2gl_label.xml` declares `bind_text` twice — `type="string"` and `type="int"` —
+both naming the same `bind_text` setter. §8.4 always described binding an int
+through `bind_text`; `bind_text_int` was manifest vocabulary the spec never had.
+
+The text above is left as written: it records what was true when the decision was
+taken.

@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_hline">
   <api>
-    <prop name="x" type="int" draw="u8g2gl_draw_hline" required="true" help="Left edge" />
-    <prop name="y" type="int" draw="u8g2gl_draw_hline" required="true" help="Top edge" />
-    <prop name="width" type="int" draw="u8g2gl_draw_hline" required="true" help="Length in pixels" />
+    <prop name="x" type="int" draw="u8g2gl_draw_hline" help="Left edge" />
+    <prop name="y" type="int" draw="u8g2gl_draw_hline" help="Top edge" />
+    <prop name="width" type="int" draw="u8g2gl_draw_hline" help="Length in pixels" />
+    <bind name="bind_x" type="int" setter="x" />
+    <bind name="bind_y" type="int" setter="y" />
+    <bind name="bind_width" type="int" setter="width" />
   </api>
 </widget>

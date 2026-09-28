@@ -26,6 +26,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { COMPONENT_REMOVED_MIGRATION } from '../core/parser/parse-widget-manifest.js';
+import { compareCodeUnits } from '../core/order.js';
 
 /**
  * An XML file loaded from a project directory, preserving its relative path.
@@ -112,7 +113,13 @@ export function readProjectFiles(dir: string): ProjectFiles {
         });
       }
     }
-    screenXmls.sort((a, b) => a.filename.localeCompare(b.filename));
+    // By code unit, never by locale (§13.9, PR-04 WO12 follow-up). This order
+    // reaches the emitted bytes: screens are emitted in the order they are
+    // loaded, one `.cpp` each, and `ui.hpp` declares them in that order. ICU
+    // collation weakens the underscore, so `screen_a_1.xml` collates *before*
+    // `screen_a1.xml` and sorts *after* it by code unit — two ordinary lowercase
+    // filenames, generating different bytes on two machines.
+    screenXmls.sort((a, b) => compareCodeUnits(a.filename, b.filename));
   }
 
   // --- Step 4: Glob widgets/*/[name].xml (plain widgets and composites alike) ---
@@ -141,7 +148,9 @@ export function readProjectFiles(dir: string): ProjectFiles {
         });
       }
     }
-    widgetManifestXmls.sort((a, b) => a.filename.localeCompare(b.filename));
+    // Same rule, same reason: manifest order is registration order, and a
+    // diagnostic about two manifests can name whichever was seen first.
+    widgetManifestXmls.sort((a, b) => compareCodeUnits(a.filename, b.filename));
   }
 
   return {

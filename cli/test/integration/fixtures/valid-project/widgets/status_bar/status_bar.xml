@@ -2,7 +2,7 @@
 <widget name="status_bar">
     <api>
         <prop name="title" type="string" default="Title" />
-        <prop name="font"  type="font"   default="small_9" required="true" />
+        <prop name="font"  type="font"   default="small_9" />
     </api>
     <view>
         <u8g2gl_label name="bar_label" x="0" y="0" width="128" height="12" font="$font" text="$title" />

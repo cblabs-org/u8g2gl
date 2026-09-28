@@ -7,12 +7,23 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_smoke.cpp
- * Description: Implementation of test_smoke.cpp
+ * Purpose: The build's canary. It asserts the handful of facts every other
+ *          suite silently depends on — that the sentinel constants and enum
+ *          values still have the numeric values generated code and the flag
+ *          bitmask were written against, and that the host U8G2 test double
+ *          compiles and records a call. If this suite fails, nothing else in
+ *          test/ is worth reading yet.
+ *
+ * Description: Four tests: the U8G2GL_* sentinels and flag bits; the align and
+ *              colour enumerators, whose numeric order the generated
+ *              `U8G2GL_ALIGN_*` emission relies on; u8g2gl_min()'s saturating
+ *              behaviour at U8G2GL_IDLE; and a construct-and-draw round trip
+ *              through the stub.
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_config.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 TEST(Smoke, TypeConstants) {
     EXPECT_EQ(U8G2GL_IDLE, UINT32_MAX);

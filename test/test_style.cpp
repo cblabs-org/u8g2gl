@@ -7,7 +7,20 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_style.cpp
- * Description: Implementation of test_style.cpp
+ * Purpose: Pins u8g2gl_style's set-flag semantics, which is the whole reason
+ *          styles can be layered at all. A style records which properties were
+ *          *set*, not merely their values, so merging one over another
+ *          overwrites only the set ones and an inline attribute can still beat
+ *          a named style. Get that wrong and every screen using more than one
+ *          style silently renders with the wrong property.
+ *
+ * Description: The style value type — defaults, the set-flag a setter raises,
+ *              setting every property, clear(), and the four merge cases (set
+ *              over set, set over unset, onto empty, repeated). Then applying
+ *              styles through u8g2gl_obj: a named style, an inline override
+ *              beating it, several styles stacking in order, and a reported
+ *              sizeof for u8g2gl_style and u8g2gl_obj so a footprint change
+ *              shows up in the test log ([D-1]'s static-footprint promise).
  */
 #include <gtest/gtest.h>
 #include <iostream>

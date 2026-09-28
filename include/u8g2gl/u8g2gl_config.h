@@ -18,6 +18,24 @@
  *          Where the generator knows the real number it should emit a
  *          right-sized type instead of relying on these (§13).
  *
+ *          Generated-config inclusion order ([D-21], §13.7): `u8g2gl generate`
+ *          emits `u8g2gl_generated_config.h`, holding the capacities counted
+ *          from the document. That header must be seen BEFORE this one. Every
+ *          value below is wrapped in #ifndef, so whatever the generated header
+ *          defined wins and these defaults fill only the gaps. Include it the
+ *          other way round and the defaults are defined first, so the generated
+ *          values are ignored or redefined.
+ *
+ *          The order must hold in every translation unit that reads a
+ *          capacity, including the runtime library's own sources — not only
+ *          the generated files. `U8G2GL_MAX_TOTAL_BINDINGS` and
+ *          `U8G2GL_MAX_BINDINGS_PER_OBJ` are read only inside
+ *          src/u8g2gl_obj.cpp, where they size the static binding pool, so a
+ *          library compiled without the generated header keeps the defaults
+ *          however the generated code includes it. This file does not include
+ *          the generated header itself, because the runtime cannot know where a
+ *          project's `generated/` directory lives.
+ *
  * Description: Observer, object, style, string, and binding capacities, each
  *              guarded by #ifndef so a project can override it
  *

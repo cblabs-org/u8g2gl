@@ -10,13 +10,16 @@
  *
  * Exports:
  * - validate: Main multi-pass validation function
+ * - compareDiagnostics: §13.9's diagnostic order, by code unit rather than locale
  * - ValidateInput: Parameter contract for validation
  * - ValidateResult: Return contract containing diagnostics and counts
+ * - BOOLEAN_VALUES, booleanValueError, enumValueError: the one bool and enum value rules
  * - Individual pass functions: validateSchema, validateReferences, validateDisplay,
- *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers
+ *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers,
+ *   validateNotYetSupported, validateRealisation
  */
 
-export { validate, type ValidateInput, type ValidateResult } from './validate.js';
+export { compareDiagnostics, validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
 export { validateSchema } from './validate-schema.js';
 export { validateReferences } from './validate-references.js';
 export { validateDisplay } from './validate-display.js';
@@ -24,3 +27,10 @@ export { validateWidgetProps } from './validate-widget-props.js';
 export { validateTypes } from './validate-types.js';
 export { validateGeometry } from './validate-geometry.js';
 export { validateIdentifiers } from './validate-identifiers.js';
+export {
+  validateNotYetSupported,
+  DEFAULT_REFUSAL_POLICY,
+  type RefusalPolicy,
+} from './validate-not-yet-supported.js';
+export { validateRealisation } from './validate-realisation.js';
+export { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';

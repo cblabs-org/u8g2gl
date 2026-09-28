@@ -7,10 +7,13 @@
  * Purpose: Verification tests for Pass 7 identifier naming and collision rules (§13.4, §15.1).
  * Description: Asserts identifier syntax compliance ([a-z][a-z0-9_]*), rejection of uppercase,
  *              leading digits, double underscores, reserved prefixes (u8g2gl_, ui_, wd_),
- *              C++ keywords, scope duplicates, and component-inlining collisions.
+ *              C++ keywords, scope duplicates, and the §13.4 mangled-identifier
+ *              collisions this pass now delegates to `mangleIdentifiers` over the
+ *              expanded tree (PR-04 WO8a).
  */
 
 import { describe, expect, it } from 'vitest';
+import { registryOf } from '../helpers/manifest-registry.js';
 import { validateIdentifiers } from '../../src/core/validator/index.js';
 import type { ValidateInput } from '../../src/core/validator/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
@@ -32,8 +35,7 @@ describe('validateIdentifiers', () => {
       images: [{ name: 'logo_img', kind: 'xbm', src: 'logo.xbm' }],
     },
     screens: [],
-    components: [],
-    widgetManifests: [],
+    manifests: registryOf([]),
     catalogue: [],
   };
 
@@ -122,7 +124,11 @@ describe('validateIdentifiers', () => {
     expect(invalidNameDiags.some((d) => d.offendingText === 'TitleLabel')).toBe(true);
   });
 
-  it('rejects reserved prefixes (u8g2gl_, ui_, wd_) on non-widget identifiers', () => {
+  // §13.4 reserves the framework's prefix and generated code's, and no longer
+  // reserves `wd_`: by [D-12] a tag *is* its C++ class name, so `wd_` names
+  // classes users write (§6.6) and the generator never produces one (Chief
+  // Architect ruling, 2026-09-16).
+  it('rejects reserved prefixes (u8g2gl_, ui_) and accepts wd_, which §13.4 no longer reserves', () => {
     const screen: Screen = {
       name: 'home',
       view: {
@@ -157,7 +163,7 @@ describe('validateIdentifiers', () => {
     const invalidDiags = diagnostics.filter(
       (d) => d.code === DIAGNOSTIC_CODES.INVALID_NAME,
     );
-    expect(invalidDiags).toHaveLength(3);
+    expect(invalidDiags.map((d) => d.offendingText)).toEqual(['u8g2gl_custom', 'ui_label']);
   });
 
   it('rejects C++ keywords as identifiers', () => {
@@ -237,7 +243,12 @@ describe('validateIdentifiers', () => {
     expect(dupDiag?.message).toContain("Duplicate element name 'same_name'");
   });
 
-  it('detects component-inlining name collision with U8G2GL_NAME_COLLISION (§13.4)', () => {
+  // PR-04 WO8a: this pass used to run its own one-level inlining check, which
+  // compared a screen-level name against the children of a directly
+  // instantiated composite and named only one of the two sources. It is retired
+  // in favour of `mangleIdentifiers` over the expanded tree (WO7 F1), which
+  // §13.4 requires to name both.
+  it('reports a mangled collision naming both sources (§13.4)', () => {
     // Instance "bar" of component "status_bar" with child "title"
     // Screen also contains element "bar_title"
     const statusBarComponent = {
@@ -277,16 +288,109 @@ describe('validateIdentifiers', () => {
 
     const diagnostics = validateIdentifiers({
       ...baseInput,
-      components: [statusBarComponent],
+      manifests: registryOf([statusBarComponent]),
       screens: [screenWithCollision],
     });
 
-    const collisionDiag = diagnostics.find(
-      (d) => d.code === DIAGNOSTIC_CODES.NAME_COLLISION,
-    );
-    expect(collisionDiag).toBeDefined();
-    expect(collisionDiag?.severity).toBe('error');
-    expect(collisionDiag?.offendingText).toBe('bar_title');
-    expect(collisionDiag?.message).toContain('Component-inlining name collision');
+    const collisions = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NAME_COLLISION);
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0]?.severity).toBe('error');
+    expect(collisions[0]?.offendingText).toBe('bar_title');
+    // Both sources, which the retired check could not do: the composite's child
+    // and the screen element that mangles to the same C++ identifier.
+    expect(collisions[0]?.message).toContain("C++ identifier 'ui_obj_bar_title' is generated twice");
+    expect(collisions[0]?.message).toContain("<u8g2gl_label> 'title'");
+    expect(collisions[0]?.message).toContain("<u8g2gl_label> 'bar_title'");
+    expect(collisions[0]?.message).toContain('never renames');
+    expect(collisions[0]?.message).not.toContain('Composite-inlining');
+  });
+
+  it('reports a collision through a nested composite, which the retired check never saw', () => {
+    // inner's child "digits" inside instance "clk" of outer, instantiated as
+    // "bar", mangles to bar_clk_digits — two composites deep, so the old
+    // one-level check could not reach it.
+    const inner = {
+      name: 'clock_face',
+      api: { props: [], bindings: [], elements: [] },
+      view: {
+        children: [
+          { tag: 'u8g2gl_label', attributes: { name: 'digits' }, children: [], styleOverrides: {} },
+        ],
+      },
+    };
+    const outer = {
+      name: 'clock_bar',
+      api: { props: [], bindings: [], elements: [] },
+      view: {
+        children: [{ tag: 'clock_face', attributes: { name: 'clk' }, children: [], styleOverrides: {} }],
+      },
+    };
+
+    const diagnostics = validateIdentifiers({
+      ...baseInput,
+      manifests: registryOf([inner, outer]),
+      screens: [
+        {
+          name: 'main_screen',
+          view: {
+            children: [
+              { tag: 'clock_bar', attributes: { name: 'bar' }, children: [], styleOverrides: {} },
+              { tag: 'u8g2gl_label', attributes: { name: 'bar_clk_digits' }, children: [], styleOverrides: {} },
+            ],
+          },
+        },
+      ],
+    });
+
+    const collisions = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NAME_COLLISION);
+    expect(collisions.map((d) => d.offendingText)).toEqual(['bar_clk_digits']);
+    expect(collisions[0]?.message).toContain("<u8g2gl_label> 'digits'");
+  });
+
+  // --- PR-04 WO3 F7: duplicate manifests are diagnosed for every element ---
+  describe('duplicate manifest declarations', () => {
+    const plain = (file: string) => ({
+      name: 'wd_meter',
+      extends: 'u8g2gl_obj',
+      api: { props: [], bindings: [], elements: [] },
+      loc: { file, line: 2, column: 1 },
+    });
+    const composite = (file: string) => ({
+      name: 'status_bar',
+      api: { props: [], bindings: [], elements: [] },
+      view: { children: [] },
+      loc: { file, line: 2, column: 1 },
+    });
+
+    it('reports two plain widget manifests declaring one tag, naming both files', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([plain('widgets/a/wd_meter.xml'), plain('widgets/b/wd_meter.xml')]),
+      });
+      const dup = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME);
+      expect(dup).toHaveLength(1);
+      expect(dup[0]?.message).toBe(
+        "Duplicate manifest for element <wd_meter>: declared by 'widgets/a/wd_meter.xml' and 'widgets/b/wd_meter.xml'.",
+      );
+      expect(dup[0]?.file).toBe('widgets/b/wd_meter.xml');
+    });
+
+    it('still reports two composites declaring one tag, on the same path', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([composite('widgets/a/bar.xml'), composite('widgets/b/bar.xml')]),
+      });
+      const dup = diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME);
+      expect(dup).toHaveLength(1);
+      expect(dup[0]?.message).toContain("'widgets/a/bar.xml' and 'widgets/b/bar.xml'");
+    });
+
+    it('reports nothing for distinct tags', () => {
+      const diagnostics = validateIdentifiers({
+        ...baseInput,
+        manifests: registryOf([plain('widgets/a/wd_meter.xml'), composite('widgets/b/bar.xml')]),
+      });
+      expect(diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.DUPLICATE_NAME)).toEqual([]);
+    });
   });
 });

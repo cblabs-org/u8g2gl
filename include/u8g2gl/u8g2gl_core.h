@@ -30,12 +30,20 @@
  *     - ui_handler(): The main handler for rendering and ticking
  *     - u8g2gl_mark_dirty(): Mark the active screen dirty
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
+ *
+ *     Support for generated code (§11.3, §13.5):
+ *     - u8g2gl_render_object():        Render one object with visibility, clip and state saved
+ *     - u8g2gl_frame_dirty_observer(): Subject observer that marks the active screen dirty
+ *
+ *     Clipping:
+ *     - u8g2gl_apply_clip():           The one place a rect becomes a setClipWindow() call
  */
 #ifndef U8G2GL_CORE_H
 #define U8G2GL_CORE_H
 
 #include "u8g2gl_types.h"
 #include "u8g2gl_obj.h"
+#include "u8g2gl_tree.h"
 #include <cstdint>
 
 // Forward declare
@@ -96,6 +104,107 @@ u8g2gl_screen* u8g2gl_get_active_screen();
  * dominates the cost of a frame.
  */
 void u8g2gl_mark_dirty();
+
+/**
+ * @brief Subject observer that marks the active screen dirty.
+ *
+ * Has the u8g2gl_observer_cb signature, so it registers directly on any subject:
+ *
+ * @code
+ * ui_subject_level.add_observer(nullptr, u8g2gl_frame_dirty_observer);
+ * @endcode
+ *
+ * It exists for elements the generator compiles to draw calls (§13.5). Those
+ * read a bound value at draw time and have no object observing the subject, so
+ * without this nothing would schedule a frame when the value changes. The
+ * generator registers it once per such subject — not once per binding, and not
+ * once per screen, because u8g2gl_mark_dirty() already targets whichever screen
+ * is active.
+ *
+ * @param user_data Ignored; pass nullptr. Present only to match
+ *                  u8g2gl_observer_cb.
+ */
+void u8g2gl_frame_dirty_observer(void* user_data);
+
+// --- Clipping ---
+
+/**
+ * @brief Set the display's clip window to a rectangle. The single owner of
+ *        U8G2's clip-corner convention; no other runtime code calls
+ *        setClipWindow().
+ *
+ * CLIP-CORNER CONVENTION — THE FAR CORNER IS EXCLUSIVE, SETTLED FROM SOURCE.
+ * A rect {x, y, w, h} becomes setClipWindow(x, y, x + w, y + h), so the rect's
+ * last column (x + w - 1) and last row (y + h - 1) remain drawable. design_spec
+ * §11.3's x+w-1, y+h-1 form would lose the last column and row.
+ *
+ * Source: U8G2 2.36.18, now pinned at extern/u8g2. u8g2.h:352/354 document
+ * clip_x1 and clip_y1 as "(excluded)", and u8g2_clip_intersection2()
+ * (u8g2_hvline.c), which clips every line U8G2 draws against the window,
+ * agrees: it clips "against c (included) to d (excluded)".
+ *
+ * PR-06's container-edge pixel test — an object whose clip is exactly its
+ * bounds, drawing its last column and row — now guards this convention rather
+ * than discovering it. If it ever fails, change this function and nothing
+ * else; Core.ApplyClipPinsExclusiveCornerConvention pins it on the host.
+ *
+ * Both corners are clamped to the display before they are converted to U8G2's
+ * unsigned coordinate type: the near corner at 0, because a negative origin
+ * would otherwise wrap to a huge value rather than clip, and the far corner at
+ * the display's width and height. A rect with no pixel on the display is
+ * rejected.
+ *
+ * @param display U8G2 instance whose clip window is set.
+ * @param clip    Region to allow drawing into, in device pixels.
+ * @return true if the clip window was set. false — and the display untouched —
+ *         if the rect is empty or lies wholly outside the display; the caller
+ *         must then draw nothing, because the previous clip is still in force.
+ */
+bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip);
+
+// --- Per-object rendering ---
+
+/**
+ * @brief Render one object of a screen's flat tree inside the framework's
+ *        containment (§11.3).
+ *
+ * In order: skips the object if it or any ancestor is hidden; skips it if its
+ * effective clip (own bounds intersected with every ancestor's) is empty;
+ * otherwise saves draw colour and font with u8g2gl_state_saver, sets the clip
+ * window to the effective clip through u8g2gl_apply_clip(), calls the object's
+ * render(), and resets the clip window to the full display.
+ *
+ * Clip lifetime is this function's responsibility, not the state saver's: it
+ * sets the clip, renders, and resets it. U8G2 cannot report its clip window, so
+ * nothing can save and restore it, and a widget must not set one of its own —
+ * it would replace the ancestor-intersected clip rather than narrow it.
+ *
+ * Generated screen render functions call this once per object in document
+ * order, and the editor build calls the same function, so the firmware and the
+ * editor cannot contain two versions of the rule. The arguments are exactly a
+ * u8g2gl_screen's arrays: `u8g2gl_render_object(d, s.objs, s.parents, i)`.
+ *
+ * @param display U8G2 instance to draw into.
+ * @param objs    The screen's object array, in document order. A null array or a
+ *                null entry on the ancestry chain renders nothing.
+ * @param parents The parallel parent-index array, or nullptr to use each
+ *                object's own parent index (as for u8g2gl_effective_clip()).
+ * @param index   Index of the object to render. Not bounds-checked — the arrays
+ *                carry no length — so it must be less than the screen's
+ *                object count.
+ *
+ * @note On return the clip window is the full display, not whatever it was
+ *       before the call. U8G2 has no getter for the clip window, so it cannot be
+ *       saved; and because each object's clip is computed from its ancestors
+ *       rather than nested inside a parent's active clip, the full display is
+ *       the correct state between objects.
+ */
+void u8g2gl_render_object(
+    U8G2& display,
+    u8g2gl_obj* const* objs,
+    const uint8_t* parents,
+    uint8_t index
+);
 
 // --- The main handler ---
 

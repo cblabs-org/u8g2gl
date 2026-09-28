@@ -20,8 +20,9 @@
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_button.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_subject.h"
 #include "u8g2gl/u8g2gl_types.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <iostream>
 #include <string>
 
@@ -196,6 +197,66 @@ TEST(Button, RenderDegenerateGeometry) {
     EXPECT_EQ(display.draw_rframe_count, 0);
     EXPECT_EQ(display.draw_utf8_count, 0);
     EXPECT_EQ(display.draw_box_count, 0);
+}
+
+// WO4c ruling (H1): a border partly off the left and top edges is drawn with
+// explicitly wrapped origins, which U8G2 clips to the visible part.
+TEST(Button, BorderPartlyOffEdgeDrawsWithWrappedOrigin) {
+    u8g2gl_button btn;
+    btn.set_coords(-5, -2, 40, 16);   // default border width 1
+
+    U8G2 display;
+    btn.render(display);
+
+    ASSERT_EQ(display.draw_rframe_count, 1);
+    EXPECT_EQ(display.last_draw_rframe_x, 65531);
+    EXPECT_EQ(display.last_draw_rframe_y, 65534);
+    EXPECT_EQ(display.last_draw_rframe_w, 40);
+    EXPECT_EQ(display.last_draw_rframe_h, 16);
+
+    // Nested borders: every layer is drawn, the outer one wrapped.
+    u8g2gl_button nested;
+    nested.set_coords(-1, 0, 40, 16);
+    nested.set_border_width(2);
+    U8G2 display2;
+    nested.render(display2);
+    EXPECT_EQ(display2.draw_rframe_count, 2);
+    EXPECT_EQ(display2.last_draw_rframe_x, 0);   // inner layer at (-1 + 1, 0 + 1)
+    EXPECT_EQ(display2.last_draw_rframe_y, 1);
+}
+
+// PR-04 WO10b: the button's manifest declares bind_text, and its render()
+// read only the literal, the same defect as the label's. A bound button draws
+// the subject's text, in preference to a literal set in either order.
+TEST(Button, BoundStringSubjectIsTheTextDrawn) {
+    u8g2gl_subject_string_n<8> caption;
+    caption.set("Go");
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 60, 20);
+    btn.set_text("Literal");
+    ASSERT_TRUE(btn.bind_text(&caption));
+
+    U8G2 display;
+    btn.render(display);
+    EXPECT_EQ(display.draw_utf8_count, 1);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "Go");
+
+    caption.set("Stop");
+    btn.set_text("Later literal");
+    U8G2 after;
+    btn.render(after);
+    EXPECT_STREQ(after.last_draw_utf8_buf, "Stop");
+}
+
+TEST(Button, BoundIntSubjectIsFormatted) {
+    u8g2gl_subject_int count(3);
+    u8g2gl_button btn;
+    btn.set_coords(0, 0, 60, 20);
+    ASSERT_TRUE(btn.bind_text(&count, "%d left"));
+
+    U8G2 display;
+    btn.render(display);
+    EXPECT_STREQ(display.last_draw_utf8_buf, "3 left");
 }
 
 TEST(Button, InheritsFromObj) {
