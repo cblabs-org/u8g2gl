@@ -165,6 +165,20 @@ describe('loadProject() — <bdf> licence files (PR-04b WO3 item 5)', () => {
   });
 });
 
+describe('loadProject() — the ofl licence name', () => {
+  it.each(['OFL', 'OFL.txt', 'OFL-1.1.txt', 'ofl_license'])('accepts %s', (name) => {
+    const dir = createProject({ extraFiles: { [`fonts/${name}`]: 'OFL\n' } });
+
+    expect(loadProject(dir).bdfLicenceFiles.get('small_9')).toEqual([`fonts/${name}`]);
+  });
+
+  it.each(['oflow.txt', 'offer.txt', 'oflx'])('rejects %s', (name) => {
+    const dir = createProject({ extraFiles: { [`fonts/${name}`]: 'not a licence\n' } });
+
+    expect(loadProject(dir).bdfLicenceFiles.has('small_9')).toBe(false);
+  });
+});
+
 describe('loadProject() — symlinks and the project boundary', () => {
   it('treats a symlinked <bdf> src that points outside the project as outside', () => {
     const dir = createProject({});

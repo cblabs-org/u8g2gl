@@ -336,13 +336,25 @@ function readAssets(projectRoot: string | undefined, globals: Globals): Readonly
   return assets;
 }
 
-/** Filenames (case-insensitive) taken as licence provenance regardless of the BDF's own name (§14.1). */
-const GENERIC_LICENCE_PREFIXES = ['license', 'licence', 'copying', 'ofl'];
+/**
+ * Lower-case name prefixes taken as licence provenance regardless of the BDF's
+ * own name (§14.1); a file matches when its lower-cased name starts with one.
+ */
+const GENERIC_LICENCE_PREFIXES = ['license', 'licence', 'copying'];
+
+/**
+ * The SIL Open Font Licence's usual file names (`OFL.txt`, `OFL-1.1.txt`,
+ * `ofl_license`): `ofl` followed by the end of the name, or by `.`, `-` or `_`.
+ * A bare `ofl` prefix would also take `oflow.txt`. The other prefixes stay
+ * loose on purpose: `COPYING3`, `LICENSES.txt` and `LICENSE2` are real licence
+ * file names that a boundary rule would reject.
+ */
+const OFL_LICENCE_NAME = /^ofl(?:$|[._-])/;
 
 // bdfLicenceFilesFor
 // The sorted, project-relative licence-like files found in one <bdf>'s own
 // directory (§14.1, PR-04b WO3 item 5): a file whose name starts, case-
-// insensitively, with 'license', 'licence', 'copying' or 'ofl', or is named
+// insensitively, with 'license', 'licence' or 'copying', or is an OFL name (see OFL_LICENCE_NAME), or is named
 // '<bdf-stem>.license'/'<bdf-stem>.licence' with any extension. Convenience
 // provenance, never a diagnostic (§14.1) — an unreadable directory or a src
 // outside the project simply yields no licence files.
@@ -367,7 +379,7 @@ function bdfLicenceFilesFor(projectRoot: string, font: { readonly src: string })
   const stem = basename(font.src, extname(font.src)).toLowerCase();
   const matches = entries.filter((name) => {
     const lower = name.toLowerCase();
-    if (GENERIC_LICENCE_PREFIXES.some((prefix) => lower.startsWith(prefix))) {
+    if (GENERIC_LICENCE_PREFIXES.some((prefix) => lower.startsWith(prefix)) || OFL_LICENCE_NAME.test(lower)) {
       return true;
     }
     return lower === `${stem}.license` || lower === `${stem}.licence` ||
