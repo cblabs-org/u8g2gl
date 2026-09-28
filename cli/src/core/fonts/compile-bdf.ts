@@ -6,8 +6,10 @@
  * File: src/core/fonts/compile-bdf.ts
  * Purpose: PR-04b WO2's public API — one asynchronous, platform-neutral function that
  *          turns a BDF file's bytes into a U8G2 font array's bytes, behaving identically
- *          in Node and in a browser. Not wired into `generate` here (WO3's job); the
- *          `<bdf>` refusal in `validate-not-yet-supported.ts` stays until then.
+ *          in Node and in a browser. Wired into `generate` by WO3's
+ *          `compileProjectAssets()` (`src/core/assets/`), which calls this for every
+ *          `<bdf>` before `generate()` runs; the `<bdf>` refusal in
+ *          `validate-not-yet-supported.ts` is gone (WO3 item 4).
  * Description: Translates and validates `range` (bdf-range.ts), runs bdfconv through one
  *              fresh Wasm module instance (bdfconv-instance.ts — WO1's finding: one
  *              instance serves exactly one conversion), and parses its C output
@@ -17,6 +19,13 @@
  *              nothing) all come back as a FontCompileFailure with a human-readable reason
  *              and bdfconv's own stderr lines.
  *
+ *              **PR-04b WO3 item 1 correction:** an absent `range` means every glyph
+ *              (`0-MAX_BDF_CODEPOINT`), not bdfconv's own default map `*`. WO2's WORKORDER
+ *              said to use `*`, but `bdf_map.c:174` defines `*` as 32–255, so a font with
+ *              glyphs above 255 — an icon font, departures-board-v3's weather and Wi-Fi
+ *              fonts — would silently lose them. `<bdf range>` documents itself as an
+ *              optional *filter* (globals.ts), so its absence must mean unfiltered.
+ *
  * Exports:
  * - CompileBdfInput:    The BDF bytes, the `-n` identifier, and an optional `<bdf range>`
  * - CompiledFont:       The compiled array bytes plus glyph counts and BDF header fields
@@ -25,7 +34,7 @@
  * - compileBdf():       Compiles one BDF file to a U8G2 font array
  */
 
-import { parseBdfRange } from './bdf-range.js';
+import { MAX_BDF_CODEPOINT, parseBdfRange } from './bdf-range.js';
 import { convertBdf, instantiateBdfconv } from './bdfconv-instance.js';
 import { parseBdfconvOutput } from './bdfconv-output.js';
 
@@ -35,7 +44,11 @@ export interface CompileBdfInput {
   readonly bdf: Uint8Array;
   /** The array's name, e.g. 'ui_font_small_9' — passed to bdfconv's `-n`. */
   readonly identifier: string;
-  /** The `<bdf range>` attribute, untranslated. Omitted means bdfconv's own default, `*`. */
+  /**
+   * The `<bdf range>` attribute, untranslated. Omitted means every glyph
+   * (`0-MAX_BDF_CODEPOINT`) — a filter that selects nothing is not the same as no
+   * filter (WO3 item 1).
+   */
   readonly range?: string;
 }
 
@@ -78,7 +91,10 @@ export type CompileBdfResult = ({ readonly ok: true } & CompiledFont) | FontComp
  */
 export async function compileBdf(input: CompileBdfInput): Promise<CompileBdfResult> {
   // --- Step 1: translate and validate `range` before touching bdfconv at all ---
-  let bdfconvMap = '*'; // bdfconv's own default (main.c) when no range is given
+  // Absent range means unfiltered — every glyph up to bdfconv's own maximum
+  // codepoint — never bdfconv's own default map `*` (32-255, WO3 item 1: WO2's
+  // WORKORDER was wrong here, see the file header).
+  let bdfconvMap = `0-${MAX_BDF_CODEPOINT}`;
   if (input.range !== undefined) {
     const parsedRange = parseBdfRange(input.range);
     if (!parsedRange.ok) {

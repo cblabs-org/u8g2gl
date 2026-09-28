@@ -18,10 +18,13 @@
  *              is already the default when `>` is omitted), so it translates losslessly
  *              into our grammar, which has no `>` operator, by simply dropping it.
  *
- *              The expected side is read by this file's own small reader, deliberately not
- *              `src/core/fonts/bdfconv-output.ts` — sharing one parser would let one bug in
- *              understanding bdfconv's C-string-literal grammar cancel out on both sides of
- *              the comparison instead of failing it.
+ *              The expected side is read by `../helpers/u8g2-font-reader.ts`, deliberately
+ *              not `src/core/fonts/bdfconv-output.ts` — sharing one parser would let one bug
+ *              in understanding bdfconv's C-string-literal grammar cancel out on both sides
+ *              of the comparison instead of failing it. PR-04b WO3 moved the reader there
+ *              (out of this file) so its own oracle assertion — a `<bdf>` compiled through
+ *              `generate()` matches `u8g2_font_4x6_tr` byte for byte — reuses it rather than
+ *              copying it.
  */
 
 import { readFileSync } from 'node:fs';
@@ -29,69 +32,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { compileBdf } from '../../src/core/fonts/compile-bdf.js';
+import { readU8g2FontArray } from '../helpers/u8g2-font-reader.js';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const cliDir = resolve(testDir, '..', '..');
 const repoRoot = resolve(cliDir, '..');
 const bdfDir = resolve(repoRoot, 'extern', 'u8g2', 'tools', 'font', 'bdf');
 const u8g2FontsC = resolve(repoRoot, 'extern', 'u8g2', 'csrc', 'u8g2_fonts.c');
-
-/**
- * @brief This test's own reader for one named array in u8g2_fonts.c.
- *
- * Deliberately independent of bdfconv-output.ts: matches every double-quoted segment with
- * a regular expression (rather than a hand-rolled character walk), then decodes each with
- * a `replace()` callback (rather than an index-driven loop) — a different shape of code
- * checking the same C grammar, so a shared misunderstanding cannot cancel out.
- *
- * @param name The array's identifier, e.g. 'u8g2_font_4x6_tr'.
- * @return The array's declared length and its exact bytes, including the trailing NUL a C
- *         compiler appends to the final string literal.
- */
-function readU8g2FontArray(name: string): { readonly declaredLength: number; readonly bytes: Uint8Array } {
-  const source = readFileSync(u8g2FontsC, 'utf8');
-  // The body ends at the closing quote immediately followed by ';' — a literal ';' byte
-  // inside the array (printable ASCII, not one of bdfconv's always-escaped bytes) is
-  // written out unescaped, so a bare '[\s\S]*?;' would stop at that instead.
-  const declPattern = new RegExp(`const uint8_t ${name}\\[(\\d+)\\] U8G2_FONT_SECTION\\("${name}"\\) = \\n([\\s\\S]*?");`);
-  const declMatch = declPattern.exec(source);
-  if (!declMatch) {
-    throw new Error(`readU8g2FontArray: '${name}' not found in u8g2_fonts.c`);
-  }
-  const declaredLength = Number(declMatch[1]);
-  const body = declMatch[2]!;
-
-  const segmentPattern = /"((?:[^"\\]|\\.)*)"/g;
-  const rawSegments = [...body.matchAll(segmentPattern)].map((m) => m[1]!);
-  if (rawSegments.length === 0) {
-    throw new Error(`readU8g2FontArray: no string literal for '${name}'`);
-  }
-
-  const bytes: number[] = [];
-  for (const raw of rawSegments) {
-    // Decode octal escapes (bdfconv never emits any other escape form — see
-    // bdfconv-output.ts's file header) via a global replace callback: each match consumes
-    // 1-3 octal digits, matching the same greedy-then-stop rule a C compiler applies.
-    raw.replace(/\\([0-7]{1,3})|([\s\S])/g, (_match, octal: string | undefined, literal: string | undefined) => {
-      if (octal !== undefined) {
-        bytes.push(parseInt(octal, 8));
-      } else if (literal !== undefined) {
-        bytes.push(literal.charCodeAt(0));
-      }
-      return '';
-    });
-  }
-  // The compiler's own implicit NUL terminator for the (concatenated) string literal is
-  // always the array's final byte.
-  bytes.push(0);
-
-  if (bytes.length !== declaredLength) {
-    throw new Error(
-      `readU8g2FontArray: '${name}' decoded to ${bytes.length} bytes, declared length is ${declaredLength}`
-    );
-  }
-  return { declaredLength, bytes: Uint8Array.from(bytes) };
-}
 
 interface OracleCase {
   readonly bdfFile: string;
@@ -115,7 +62,7 @@ const ORACLE_CASES: readonly OracleCase[] = [
 describe('compileBdf() — U8G2 oracle', () => {
   it.each(ORACLE_CASES)('reproduces $arrayName byte for byte', async ({ bdfFile, arrayName, range }) => {
     const bdfBytes = readFileSync(resolve(bdfDir, bdfFile));
-    const expected = readU8g2FontArray(arrayName);
+    const expected = readU8g2FontArray(u8g2FontsC, arrayName);
 
     const result = await compileBdf({ bdf: bdfBytes, identifier: arrayName, range });
 
