@@ -145,9 +145,9 @@ export function parseBdfRange(range: string): BdfRangeResult {
     mapParts.push(formatBdfconvNumber(item, value));
   }
 
-  if (items.length === 0) {
-    return { ok: false, reason: `Range '${range}' has no items.` };
-  }
-
+  // items.length === rawItems.length here: every loop iteration above either returns an
+  // error or pushes exactly one item, and String.prototype.split() always yields at least
+  // one element — including for range === '' (a single empty item, already rejected above
+  // as "Empty range item"). There is no reachable path to an empty result.
   return { ok: true, items, bdfconvMap: mapParts.join(',') };
 }
