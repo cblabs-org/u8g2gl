@@ -19,9 +19,18 @@
  *              point into — project files and the bundled framework manifests
  *              (WO1 F9) — so human output can always print the source line.
  *
+ *              For a project directory it also reads the asset bytes every
+ *              `<xbm>`, `<convert>` and `<bdf>` `src` names (`assets`) and finds the
+ *              licence files beside each `<bdf>` (`bdfLicenceFiles`). Both are done
+ *              here because `src/core/` may not touch the filesystem or list a
+ *              directory. A `src` that resolves outside the project root, by path
+ *              or through a symlink, is left absent rather than read
+ *              ([D-11], §13.10); `compileProjectAssets()` reports the absence
+ *              against the declaration.
+ *
  * Exports:
  * - LoadProjectOptions:  Display label and an injectable framework bundle
- * - LoadedProject:       Project model, project root and source texts
+ * - LoadedProject:       Project model, project root, source texts, asset bytes and licence files
  * - loadProject():       Load a directory or single file
  */
 
@@ -82,7 +91,7 @@ export interface LoadedProject {
   readonly fileContents: ReadonlyMap<string, string>;
   /**
    * Asset file **bytes** by the `src` path its declaration names (§14.1,
-   * §14.2, PR-04b WO3 item 2), for the emitters and `compileProjectAssets()`
+   * §14.2), for the emitters and `compileProjectAssets()`
    * to compile into generated code. Covers an `<xbm>`'s, a `<convert>`'s and a
    * `<bdf>`'s `src`.
    *
@@ -96,8 +105,8 @@ export interface LoadedProject {
   readonly assets: ReadonlyMap<string, Uint8Array>;
   /**
    * Licence-like files found beside each `<bdf>`'s own source file, keyed by
-   * font `name`, sorted and project-relative (§14.1's provenance rule,
-   * PR-04b WO3 item 5) — a directory listing, which `src/core/` may not do
+   * font `name`, sorted and project-relative (§14.1's provenance rule)
+   * — a directory listing, which `src/core/` may not do
    * (typescript.md §1) and which emission therefore cannot discover itself.
    */
   readonly bdfLicenceFiles: ReadonlyMap<string, readonly string[]>;
@@ -292,9 +301,8 @@ function isInsideProject(projectRoot: string, absolute: string): boolean {
 
 // readAssets
 // The bytes of every asset the document declares, keyed by the `src` path the
-// declaration names (§14.1, §14.2, PR-04b WO3 item 2).
-//
-// An `<xbm>`'s, a `<convert>`'s and a `<bdf>`'s `src`.
+// declaration names (§14.1, §14.2): the `src` of every `<xbm>`, `<convert>`
+// and `<bdf>`.
 //
 // A `src` that resolves outside the project directory is skipped rather than
 // read. A skipped or unreadable asset is left absent, and
@@ -353,9 +361,9 @@ const OFL_LICENCE_NAME = /^ofl(?:$|[._-])/;
 
 // bdfLicenceFilesFor
 // The sorted, project-relative licence-like files found in one <bdf>'s own
-// directory (§14.1, PR-04b WO3 item 5): a file whose name starts, case-
-// insensitively, with 'license', 'licence' or 'copying', or is an OFL name (see OFL_LICENCE_NAME), or is named
-// '<bdf-stem>.license'/'<bdf-stem>.licence' with any extension. Convenience
+// directory (§14.1): a file whose name starts, case-insensitively, with
+// 'license', 'licence' or 'copying', or is an OFL name (see OFL_LICENCE_NAME),
+// or is named '<bdf-stem>.license'/'<bdf-stem>.licence' with any extension. Convenience
 // provenance, never a diagnostic (§14.1) — an unreadable directory or a src
 // outside the project simply yields no licence files.
 //   projectRoot — absolute project directory

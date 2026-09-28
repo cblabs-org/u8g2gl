@@ -5,8 +5,7 @@
  *
  * File: src/core/fonts/bdf-range.ts
  * Purpose: Owns the `<bdf range>` attribute's grammar so the validator and compileBdf()
- *          cannot disagree about what a range means (PR-3R's lesson: unify, not
- *          duplicate) — PR-04b WO2 item 3.
+ *          cannot disagree about what a range means: there is one definition of it.
  * Description: Accepts a comma-separated list of codepoints and inclusive `lo-hi` ranges,
  *              each written as a decimal number or a `0x`/`0X`-prefixed hex number
  *              (whitespace around items tolerated), and translates it into bdfconv's own

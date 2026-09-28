@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/assets/compile-project-assets.ts
- * Purpose: The seam WO1 named and WO3 fills: `generate()` is synchronous but
+ * Purpose: `generate()` is synchronous but
  *          `compileBdf()` and PNG decompression are not, so compiling every
  *          `<bdf>` font and producing every image a project declares has to
  *          happen in one asynchronous step *before* `generate()` runs, and its
@@ -29,15 +29,14 @@
  *              because `generate()` refuses a document with a validation error
  *              before this step's caller has any reason to run it.
  *
- *              Every diagnostic's `offendingText` follows the same convention
- *              `images.ts` uses for `<xbm>` (the declaration's own `src`) —
- *              PR-04b WO3b item 1 moved `generate()`'s "the host forgot to call
- *              this" guard off of parsing that field, so nothing here needs the
- *              font's name recoverable from a presentation field any more.
- *              {@link CompileProjectAssetsResult.failedFonts} is the explicit
- *              set the guard drives from instead.
+ *              Every asset diagnostic's `offendingText` is the declaration's own
+ *              `src`. `generate()`'s "the host forgot to call this" guard does
+ *              not parse that field: {@link CompileProjectAssetsResult.failedFonts}
+ *              and {@link CompileProjectAssetsResult.failedImages} are the
+ *              explicit sets it uses, so a presentation field stays free to be
+ *              reworded.
  *
- *              **Images (PR-04b WO4).** The same step produces every image,
+ *              **Images.** The same step produces every image,
  *              whatever its kind: an `<xbm>` is parsed by `parseXbm()`, a
  *              `<convert>` is decoded and converted by `convertPng()`, and both
  *              arrive as the one `XbmImage` model in
@@ -101,7 +100,7 @@ export interface CompileProjectAssetsResult {
   readonly diagnostics: readonly Diagnostic[];
   /**
    * Declared `name` of every `<bdf>` that did not compile — explicit data for
-   * `generate()`'s "the host forgot to call this" guard (PR-04b WO3b item 1),
+   * `generate()`'s "the host forgot to call this" guard,
    * rather than a control-flow decision inferred by reading a diagnostic's
    * `offendingText` (a presentation field, free to be reworded).
    */
@@ -116,11 +115,9 @@ export interface CompileProjectAssetsResult {
 
 // missingBdfSource
 // The diagnostic for a <bdf> whose src file did not come through in `assets` —
-// missing, unreadable, or outside the project root, the same condition
-// images.ts's missingAsset() reports for an <xbm>, applied to a <bdf>'s source.
-// offendingText is font.src, images.ts's own convention (PR-04b WO3b item 1) —
-// the guard that used to read this field is now driven by
-// CompileProjectAssetsResult.failedFonts instead.
+// missing, unreadable, or outside the project root. offendingText is the
+// declaration's `src`, for every asset diagnostic in this module, so all four
+// read the same way.
 //   font — the declaration
 function missingBdfSource(font: BdfFontDecl): Diagnostic {
   return {
@@ -140,7 +137,7 @@ function missingBdfSource(font: BdfFontDecl): Diagnostic {
 // bdfCompileFailed
 // The diagnostic for a <bdf> whose bytes were read but that bdfconv could not
 // compile — compileBdf()'s own reason, plus its stderr lines if it ran at all.
-// offendingText is font.src, images.ts's own convention (PR-04b WO3b item 1).
+// offendingText is the declaration's `src`.
 //   font   — the declaration
 //   reason — compileBdf()'s human-readable reason
 //   stderr — bdfconv's own stderr lines, [] if it never ran
@@ -167,8 +164,7 @@ function locOf(loc: SourceLocation | undefined): { readonly file: string; readon
 
 // missingImageSource
 // The diagnostic for an image whose src file did not come through in `assets`.
-// MISSING_FILE, as for a <bdf>. The <xbm> text is exactly what images.ts said
-// before this step took the job over (PR-04b WO4 item 3).
+// MISSING_FILE, as for a <bdf>.
 //   image — the declaration
 function missingImageSource(image: ImageDecl): Diagnostic {
   const what =
@@ -188,7 +184,7 @@ function missingImageSource(image: ImageDecl): Diagnostic {
 
 // badXbm
 // The diagnostic for an <xbm> whose bytes were read but are not usable XBM.
-// TYPE_MISMATCH and this text, unchanged from when images.ts raised it.
+// TYPE_MISMATCH: the file is not XBM at all.
 //   image  — the declaration
 //   reason — parseXbm()'s reason
 function badXbm(image: XbmImageDecl, reason: string): Diagnostic {
@@ -252,6 +248,7 @@ async function produceImage(image: ImageDecl, assets: ReadonlyMap<string, Uint8A
 
   // --- Step 3b: <convert> — decode, convert, and hold it to the declared size ---
   const converted = await convertPng(bytes, {
+    // Safe: Step 1 returned for any mode `convertDeclProblems` rejects.
     ...(image.mode !== undefined ? { mode: image.mode as 'threshold' | 'dither' } : {}),
     ...(image.threshold !== undefined ? { threshold: image.threshold } : {}),
   });
@@ -298,11 +295,10 @@ type FontOutcome =
 export async function compileProjectAssets(input: CompileProjectAssetsInput): Promise<CompileProjectAssetsResult> {
   const bdfFonts = (input.globals.fonts ?? []).filter((font): font is BdfFontDecl => font.kind === 'bdf');
 
+  // --- Step 1: Compile every <bdf> font ---
   // Concurrent, but Promise.all's result array is in the same order as
   // `bdfFonts` regardless of which compile settles first, so the fonts map and
-  // diagnostics list below are always built in declaration order (§13.9) —
-  // the WORKORDER's "may run them concurrently, but results ... must come out
-  // in declaration order".
+  // diagnostics list below are always built in declaration order (§13.9).
   const outcomes: readonly FontOutcome[] = await Promise.all(
     bdfFonts.map(async (font): Promise<FontOutcome> => {
       const bytes = input.assets.get(font.src);
@@ -317,11 +313,13 @@ export async function compileProjectAssets(input: CompileProjectAssetsInput): Pr
     }),
   );
 
-  // Images likewise: concurrent, collected in declaration order.
+  // --- Step 2: Produce every image ---
+  // Likewise concurrent, collected in declaration order.
   const imageOutcomes: readonly ImageOutcome[] = await Promise.all(
     (input.globals.images ?? []).map((image) => produceImage(image, input.assets)),
   );
 
+  // --- Step 3: Collect outcomes into the maps and the failure sets ---
   const fonts = new Map<string, CompiledFont>();
   const images = new Map<string, XbmImage>();
   const diagnostics: Diagnostic[] = [];

@@ -8,7 +8,7 @@
  *          does not build yet, and the PR that will build it. Without it a
  *          document using a focus ring would validate cleanly and then either be
  *          refused obscurely by `generate` or, worse, generate without its focus
- *          ring. The Chief Architect's PR-04 decisions 1 and 3 fix the set; this
+ *          ring. The Chief Architect's PR-04 decision 1 fixes the set; this
  *          module is the one place that lists it, so each later PR deletes its own
  *          entry here when it lands.
  * Description: The severity is a parameter, not a branch — the same shape as the
@@ -22,9 +22,6 @@
  *                `<screen_back_event>` → PR-09 (decision 1)
  *              - collection `<element>` children (§9), and a composite that also
  *                has a C++ class (`view` + `extends`) → PR-08 (decision 1)
- *              `<bdf>` fonts and `<convert>` images were here too until PR-04b
- *              removed their entries: both build now, through
- *              `compileProjectAssets()` (`generate.ts`).
  *
  * Exports:
  * - RefusalPolicy:                'warning' (authoring) or 'error' (build)

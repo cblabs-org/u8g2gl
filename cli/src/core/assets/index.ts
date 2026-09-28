@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/assets/index.ts
- * Purpose: Barrel export for the project asset compile step (PR-04b WO3 item 3):
+ * Purpose: Barrel export for the project asset compile step:
  *          the one asynchronous function both hosts call before `generate()`.
  * Description: Re-exports compileProjectAssets() and its types.
  *

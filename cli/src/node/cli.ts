@@ -15,14 +15,17 @@
  *              only in the not-yet-supported severity: `validate` warns, `generate`
  *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
  *              element names back; `generate` never invents identity (ui_spec §16.1).
+ *              `generate` first runs the asynchronous asset step
+ *              (`compileProjectAssets()`: every `<bdf>` compiled, every image
+ *              produced) and hands its result to the synchronous `generate()`.
+ *              `generate --target-kind editor` ([UD-4]) writes the editor target —
+ *              the registry unit and the scene description — from the same
+ *              validated build the firmware units come from, into
+ *              `<output dir>_editor` by default.
  *              Output is compiler-style diagnostics (§15.1) or JSON (§15.3, [D-16]).
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
- *
- * `generate --target-kind editor` (PR-04 WO11, [UD-4]) writes the editor target —
- * the registry unit and the scene description — from the same validated build
- * the firmware units come from, into `<output dir>_editor` by default.
  */
 
 import { existsSync } from 'node:fs';
@@ -778,11 +781,9 @@ async function handleGenerateCommand(args: readonly string[], json: boolean, use
   // --- Step 1: Load, compile every <bdf> font and produce every image, validate and lay out — all or nothing ---
   const loaded = loadOrExit(options.path, json, { files: [] });
   const generatorVersion = generatorVersionOrExit(json);
-  // Asynchronous, and run before generate() (PR-04b WO3 item 3: generate()
-  // itself is synchronous and never compiles a font). Every command that
-  // emits calls this first — --check and --json below share this one call,
-  // and so does the editor target, because both read from `result`, which
-  // this build's compiledAssets already flow into.
+  // Asynchronous, so it runs before the synchronous generate(). The same
+  // result is passed to generate(), the editor target and the budget report, so
+  // all three read one set of compiled fonts and images.
   const compiledAssets: CompileProjectAssetsResult = await compileProjectAssets({
     globals: loaded.model.globals,
     assets: loaded.assets,

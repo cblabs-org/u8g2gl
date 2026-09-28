@@ -6,10 +6,10 @@
  * File: src/core/fonts/bdfconv-output.ts
  * Purpose: Parses bdfconv's `-b 0` C output — the header comment and the array's C
  *          string-literal grammar — into the bytes a C compiler would actually place in
- *          the array (PR-04b WO2 item 2). This is the one place that grammar is decoded;
+ *          the array. This is the one place that grammar is decoded;
  *          nothing else in `compileBdf()` inspects the C text directly.
- * Description: Reads `bf_WriteU8G2CByFP` (`extern/u8g2/tools/font/bdfconv/bdf_font.c`,
- *              ~line 605) to know exactly what it writes: a `/* ... *\/` header naming
+ * Description: Reads `bf_WriteU8G2CByFP` (`extern/u8g2/tools/font/bdfconv/bdf_font.c`)
+ *              to know exactly what it writes: a `/* ... *\/` header naming
  *              Fontname, Copyright and `Glyphs: selected/total`; then
  *              `const uint8_t <name>[N] U8G2_FONT_SECTION("<name>") = ` followed by one or
  *              more double-quoted string-literal segments (C's adjacent-literal
@@ -150,7 +150,7 @@ export function parseBdfconvOutput(source: string, identifier: string): BdfconvO
   const totalGlyphs = Number(glyphsMatch[2]);
 
   // bdfconv prints the literal string "(null)" via printf("%s", NULL) when the BDF
-  // supplies no FONT/COPYRIGHT property (WO1 Finding 2) — never surface that as real text.
+  // supplies no FONT/COPYRIGHT property — never surface that as real text.
   const fontNameMatch = /Fontname:\s*(.*)\r?\n/.exec(header);
   const copyrightMatch = /Copyright:\s*(.*)\r?\n/.exec(header);
   const rawFontName = fontNameMatch?.[1]?.trim();

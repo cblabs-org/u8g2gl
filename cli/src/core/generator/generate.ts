@@ -71,8 +71,7 @@ export interface GenerateInput extends ProjectModel {
    * Every `<bdf>` font already compiled and every image already produced (an
    * `<xbm>` parsed, a `<convert>` converted), and any diagnostic doing so
    * raised — from `compileProjectAssets()`, run **before** `generate()`
-   * because it is asynchronous and this function is not (PR-04b WO3 item 3,
-   * WO4).
+   * because it is asynchronous and this function is not.
    *
    * Absent means the host never called it. `generate()` treats that as a
    * programming error rather than a silently empty build: any `<bdf>` the
@@ -83,8 +82,8 @@ export interface GenerateInput extends ProjectModel {
   readonly compiledAssets?: CompileProjectAssetsResult;
   /**
    * Licence-like files found beside each `<bdf>`'s own source file, keyed by
-   * font `name`, sorted and project-relative (§14.1's provenance rule,
-   * PR-04b WO3 item 5) — a directory listing, which `src/core/` may not do
+   * font `name`, sorted and project-relative (§14.1's provenance rule)
+   * — a directory listing, which `src/core/` may not do
    * (typescript.md §1). Absent is the same as empty: no licence line is
    * emitted for a font with no entry.
    */
@@ -191,7 +190,7 @@ function resolveTarget(input: GenerateInput): Target | Diagnostic {
 
 // missingCompiledFontDiagnostic
 // The internal-error diagnostic for a <bdf> generate() has no compiled entry
-// for (PR-04b WO3 item 3) — see GenerateInput.compiledAssets's doc comment.
+// for; see GenerateInput.compiledAssets's doc comment.
 //   font — the declaration with no entry
 function missingCompiledFontDiagnostic(font: BdfFontDecl): Diagnostic {
   const loc = font.loc;
@@ -240,7 +239,7 @@ function missingCompiledImageDiagnostic(image: ImageDecl): Diagnostic {
 // entry it returned.
 //
 // The guard is driven by compiledAssets.failedFonts and .failedImages, explicit
-// sets of names (PR-04b WO3b item 1, WO4) — not by re-reading `offendingText`
+// sets of names — not by re-reading `offendingText`
 // off the asset diagnostics, which is presentation data free to be reworded.
 //   input          — generate's own input; reads `globals` and `compiledAssets`
 //   compiledFonts  — input.compiledAssets?.fonts ?? new Map()
@@ -275,7 +274,12 @@ function compiledAssetDiagnostics(
  * errors. If any error remains, no files are produced. Never throws for a user
  * error.
  *
- * @param input Loaded project, target name and generator version.
+ * @param input Loaded project, target name and generator version, plus
+ *              `compiledAssets` (every `<bdf>` compiled and every image
+ *              produced by `compileProjectAssets()`; without it a project that
+ *              declares either is refused with `MISSING_COMPILED_FONT` or
+ *              `MISSING_COMPILED_IMAGE`) and `bdfLicenceFiles` (the licence files
+ *              found beside each `<bdf>`, for the provenance comment).
  * @return Files in emission order (empty on any error), and sorted diagnostics.
  */
 export function generate(input: GenerateInput): GenerateResult {
@@ -325,7 +329,7 @@ export function generate(input: GenerateInput): GenerateResult {
     realisation,
   );
   // Never compiled here — `compileProjectAssets()` is asynchronous and this
-  // function is not (PR-04b WO3 item 3); its result, and the diagnostics it
+  // function is not; its result, and the diagnostics it
   // raised, arrive through `input.compiledAssets`.
   const compiledFonts = input.compiledAssets?.fonts ?? new Map<string, CompiledFont>();
   const compiledImages = input.compiledAssets?.images ?? new Map<string, XbmImage>();

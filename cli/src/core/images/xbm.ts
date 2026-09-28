@@ -51,6 +51,7 @@ export interface XbmParseError {
 
 /** A `#define <anything>_width 16` line. */
 const WIDTH_DEFINE = /#define\s+\w*_width\s+(\d+)/;
+/** A `#define <anything>_height 16` line. */
 const HEIGHT_DEFINE = /#define\s+\w*_height\s+(\d+)/;
 
 /** The byte array's braces. XBM declares exactly one array. */

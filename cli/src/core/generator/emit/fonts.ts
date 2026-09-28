@@ -10,7 +10,7 @@
  *          default path: it needs no `bdfconv`, no packaging, and no licensing
  *          consideration beyond linking U8G2.
  * Description: Emits `ui_font_<name>` as a pointer to the U8G2 array a
- *              `<builtin>` declaration names, and, since PR-04b WO3, as a
+ *              `<builtin>` declaration names, and as a
  *              pointer to a compiled array this unit writes itself for a
  *              `<bdf>` declaration — every other unit refers to a font through
  *              §13.4's identifier rather than through a U8G2 symbol or a
@@ -55,14 +55,15 @@ const BYTES_PER_LINE = 16;
 /**
  * The longest a BDF-derived field (`FONT`, `COPYRIGHT`) may print in a
  * comment. A BDF is author input reaching generated C++ through nothing more
- * than string formatting, so it is capped rather than trusted (§13.9, WO3
- * item 5) — an enormous `COPYRIGHT` would otherwise bloat every regeneration
- * for no reason a reader could see.
+ * than string formatting, so it is capped rather than trusted (§13.9) — an
+ * enormous `COPYRIGHT` would otherwise bloat every regeneration for no
+ * reason a reader could see.
  */
 const MAX_COMMENT_FIELD_LENGTH = 200;
 
 /** One emitted font alias. */
 export interface FontDeclaration {
+  /** The `<builtin>` or `<bdf>` declaration this alias is emitted for. */
   readonly font: FontDecl;
   /** `ui_font_<name>` (§13.4). */
   readonly identifier: string;
@@ -74,12 +75,12 @@ export interface FontDeclaration {
 }
 
 // sanitiseCommentField
-// Makes BDF-derived text safe inside a generated `//` comment (WO3 item 5): a
+// Makes BDF-derived text safe inside a generated `//` comment: a
 // BDF is author input reaching generated C++ through nothing but string
 // formatting, so it must not be able to inject a newline (which would end the
 // comment early and let the next line become code), a raw control character,
 // or a literal `*/` (harmless in a `//` comment today, but sanitised anyway
-// per the WORKORDER, since nothing here should depend on which comment style
+// as a precaution, since nothing here should depend on which comment style
 // a future refactor chooses). Capped at MAX_COMMENT_FIELD_LENGTH so an
 // oversized field cannot bloat every regeneration.
 //   text — raw text from the BDF (a FONT or COPYRIGHT property)
@@ -96,7 +97,7 @@ function sanitiseCommentField(text: string): string {
 }
 
 // rangeDescription
-// The provenance comment's `range: ...` clause (WO3 item 5's example).
+// The provenance comment's `range: ...` clause.
 //   font     — the <bdf> declaration; only `range` is read
 //   compiled — its compiled result, for the glyph counts
 function rangeDescription(font: BdfFontDecl, compiled: CompiledFont): string {
@@ -105,7 +106,7 @@ function rangeDescription(font: BdfFontDecl, compiled: CompiledFont): string {
 }
 
 // compiledFontComment
-// The provenance comment above a compiled <bdf>'s array (§14.1, WO3 item 5).
+// The provenance comment above a compiled <bdf>'s array (§14.1).
 //   font          — the declaration
 //   compiled      — its compiled result
 //   licenceFiles  — sorted, project-relative licence-like files beside the BDF
@@ -155,7 +156,7 @@ function byteLines(bytes: Uint8Array): string[] {
  * Both font kinds: a `<builtin>`'s `name` **is** the U8G2 font array
  * identifier (`globals.ts`), so its alias is `ui_font_<name> = <name>`; a
  * `<bdf>`'s alias points at this unit's own `ui_fontdata_<name>` array
- * (§13.4, WO3 item 5).
+ * (§13.4).
  *
  * @param input Globals.
  * @return One entry per declared font, in declaration order (§13.9).
@@ -196,6 +197,7 @@ export function emitFontsUnit(input: ProjectEmitInput): EmittedUnit {
     lines.push('// globals.xml declares no fonts.');
   }
   for (const { font, identifier, array } of declarations) {
+    // --- Step 1: Alias each <builtin> ---
     if (font.kind === 'builtin') {
       lines.push(
         '',
@@ -205,7 +207,7 @@ export function emitFontsUnit(input: ProjectEmitInput): EmittedUnit {
       continue;
     }
 
-    // --- A compiled <bdf> (WO3 item 5) ---
+    // --- Step 2: Compile-guard then emit each <bdf> ---
     const compiled = compiledFonts.get(font.name);
     if (compiled === undefined) {
       throw new Error(

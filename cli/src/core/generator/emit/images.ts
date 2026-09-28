@@ -60,6 +60,7 @@ const BYTES_PER_LINE = 12;
 
 /** One emitted image array. */
 export interface ImageDeclaration {
+  /** The `<xbm>` or `<convert>` declaration this array is emitted for. */
   readonly image: ImageDecl;
   /** `ui_image_<name>` (§13.4). */
   readonly identifier: string;
@@ -87,7 +88,9 @@ export function imageDeclarations(input: ProjectEmitInput): readonly ImageDeclar
 // provenance
 // The comment lines above one array: where the image came from and how.
 //   image     — the declaration
-//   width, height, byteCount — the produced image's size
+//   width     — the produced image's width in pixels
+//   height    — the produced image's height in pixels
+//   byteCount — the size of the produced array, in bytes
 function provenance(image: ImageDecl, width: number, height: number, byteCount: number): string[] {
   if (image.kind === 'xbm') {
     return [
@@ -122,8 +125,9 @@ function byteLines(bytes: readonly number[]): string[] {
  * @brief Emits the images unit (§14.2).
  *
  * @param input Globals, the produced images and this file's stamp.
- * @return The unit. Its diagnostics are always empty now: an unreadable or
- *         malformed asset is reported by `compileProjectAssets()`.
+ * @return The unit. Diagnostics are always empty: an unreadable or malformed
+ *         asset is reported by `compileProjectAssets()`. The field exists
+ *         because every unit emitter returns `EmittedUnit`.
  */
 export function emitImagesUnit(input: ProjectEmitInput): EmittedUnit {
   const diagnostics: Diagnostic[] = [];

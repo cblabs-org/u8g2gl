@@ -31,6 +31,14 @@
  *              through the one bool and enum rule an element's attribute uses
  *              (value-rules.ts; PR-04 WO11b finding 12).
  *
+ *              Two `<globals>` checks reuse a definition owned elsewhere, so
+ *              `validate` and the build cannot disagree: a `<bdf range>` is checked
+ *              by `parseBdfRange()` (`MALFORMED_BDF_RANGE`), the module
+ *              `compileBdf()` also translates the range with; a `<convert>`'s
+ *              `mode`, `threshold` and size are checked by `convertDeclProblems()`,
+ *              the same function that keeps the asset step from converting one the
+ *              validator rejects.
+ *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
  */
@@ -648,8 +656,8 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         );
       }
       if (font.kind === 'bdf' && font.range !== undefined) {
-        // Same grammar module compileBdf() uses to translate `range` for bdfconv (WO2
-        // item 3), so `validate` and codegen cannot disagree about what a range means.
+        // Same grammar module compileBdf() uses to translate `range` for bdfconv, so
+        // `validate` and codegen cannot disagree about what a range means.
         const parsedRange = parseBdfRange(font.range);
         if (!parsedRange.ok) {
           diagnostics.push(

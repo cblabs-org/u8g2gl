@@ -21,7 +21,9 @@
  *              structurally unknowable to the generator and are always
  *              unmeasured:
  *
- *              - **Any flash figure.** §13.7 forbids the generator assuming
+ *              - **Any flash figure for code or a `<builtin>` font.** (The
+ *                arrays the generator emits itself, images and compiled `<bdf>`
+ *                fonts, are measured exactly.) §13.7 forbids the generator assuming
  *                anything about a runtime class's size or layout, so the runtime
  *                core, the element classes and a `<builtin>` font's compiled
  *                array are all the runtime's and U8G2's business. Measuring them
@@ -93,14 +95,14 @@ export interface ReportInput {
   /** The CLI version stamped into the build (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Every image this build produced, keyed by its declared `name` (PR-04b
-   * WO4) — the same map emission wrote the arrays from, so the byte count
+   * Every image this build produced, keyed by its declared `name` —
+   * the same map emission wrote the arrays from, so the byte count
    * reported is the byte count emitted, for `<xbm>` and `<convert>` alike.
    */
   readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font this build compiled, keyed by its declared `name`
-   * (PR-04b WO3 item 6) — the same map emission wrote the arrays from, so the
+   * — the same map emission wrote the arrays from, so the
    * flash figure reported is the flash figure emitted.
    */
   readonly compiledFonts: ReadonlyMap<string, CompiledFont>;
@@ -166,7 +168,7 @@ function elementClassesByOrigin(input: ReportInput): {
 
 // imageDataBytes
 // The exact bytes the image arrays add, read from the very image map emission
-// wrote them from (PR-04b WO4): `<xbm>` and `<convert>` alike, so a converted
+// wrote them from: `<xbm>` and `<convert>` alike, so a converted
 // image is measured, not guessed. Derivable, so it is derived: §18's own
 // purpose includes catching an asset that is far larger than the project needs,
 // and an author cannot see that in XML. A declaration with no entry failed in
@@ -186,11 +188,9 @@ function imageDataBytes(input: ReportInput): { readonly bytes: number; readonly 
   return { bytes, names };
 }
 
-// flashLines
 // compiledBdfFontBytes
 // The exact bytes every compiled <bdf> font's array adds — sourced from the
-// same `compiledFonts` map emission wrote the arrays from (PR-04b WO3 item 6),
-// never recomputed: `declaredLength` is bdfconv's own array length, the same
+// same `compiledFonts` map emission wrote the arrays from, never recomputed: `declaredLength` is bdfconv's own array length, the same
 // figure fonts.ts emits as `ui_fontdata_<name>[declaredLength]`.
 //   input — the report input; reads `globals.fonts` and `compiledFonts`
 function compiledBdfFontBytes(input: ReportInput): { readonly bytes: number; readonly names: readonly string[] } {
@@ -210,6 +210,7 @@ function compiledBdfFontBytes(input: ReportInput): { readonly bytes: number; rea
   return { bytes, names };
 }
 
+// flashLines
 // §18's flash table. Every line is unmeasured except the image arrays and a
 // compiled `<bdf>` font's arrays, whose bytes the generator emits itself and
 // therefore knows exactly.

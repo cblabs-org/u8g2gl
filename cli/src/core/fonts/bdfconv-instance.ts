@@ -5,20 +5,20 @@
  *
  * File: src/core/fonts/bdfconv-instance.ts
  * Purpose: Boots one bdfconv Wasm module instance from the committed artefact and runs
- *          one BDF-to-C conversion through it — the low-level glue compileBdf() (WO2 item
- *          2) and the artefact's own smoke test share, so there is exactly one place that
+ *          one BDF-to-C conversion through it — the low-level glue compileBdf() and
+ *          the artefact's own smoke test share, so there is exactly one place that
  *          knows how to turn the committed JSON/module pair into a callable instance.
- *          Replaces WO1's `src/data/bdfconv/runner.ts`, which loaded the glue through a
- *          `data:` URL dynamic import; WO2 item 1 made the glue a real, statically
- *          importable ES module, so that indirection is gone.
+ *          The glue is a real, statically importable ES module: a `data:` URL
+ *          dynamic import would not survive a Content-Security-Policy or a bundler.
  * Description: Imports the generated glue module statically (`bdfconv-glue.generated.ts`)
  *              and the embedded Wasm bytes as a JSON module, decodes the bytes, and
  *              instantiates with `wasmBinary` supplied directly so the glue never reaches
- *              its own fetch-based loading path (WO1 finding). `locateFile` is kept for
- *              the same reason WO1 needed it — the glue calls `findWasmBinary()` during
- *              init to compute a cache key even when `wasmBinary` is already supplied.
+ *              its own fetch-based loading path. `locateFile` is still required: the
+ *              glue calls `findWasmBinary()` during init to compute a cache key even
+ *              when `wasmBinary` is already supplied.
  *
  * Exports:
+ * - BdfconvFS:                The Emscripten in-memory filesystem surface callers need
  * - BdfconvModule:            The instantiated module's FS and callMain surface
  * - BdfconvConversion:        Outcome of one convertBdf() call
  * - BdfconvInstanceOptions:   Optional stdout/stderr sinks for one instance
@@ -46,7 +46,7 @@ export interface BdfconvModule {
    * Runs bdfconv's `main()` with the given argv.
    *
    * Under `-sEXIT_RUNTIME=1`, U8G2's own `exit()` surfaces as a thrown Emscripten
-   * `ExitStatus` rather than a normal return (WO1 finding). Callers must catch it and
+   * `ExitStatus` rather than a normal return. Callers must catch it and
    * inspect `status` instead of treating any throw as a crash. One module instance serves
    * exactly one conversion — do not call this twice on the same instance.
    */

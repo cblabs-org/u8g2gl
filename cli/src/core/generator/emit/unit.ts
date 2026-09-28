@@ -71,8 +71,8 @@ export interface ProjectEmitInput {
   readonly manifests: ManifestRegistry;
   /**
    * Every image the project declares, `<xbm>` and `<convert>` alike, already
-   * produced and keyed by its declared `name` — from `compileProjectAssets()`
-   * (PR-04b WO4), run before `generate()` because PNG decoding is
+   * produced and keyed by its declared `name` — from `compileProjectAssets()`,
+   * run before `generate()` because PNG decoding is
    * asynchronous and emission is not. The one image model: this unit, the §18
    * budget and the editor target all read this map and nothing else, so an
    * image cannot be measured one way and emitted another. A declaration with no
@@ -81,7 +81,7 @@ export interface ProjectEmitInput {
   readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font already compiled, keyed by its declared `name`
-   * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before
+   * — from `compileProjectAssets()`, run before
    * `generate()` because it is asynchronous and this emitter is not. Optional
    * because most emit inputs (the editor target's nested project model, most
    * tests) never emit `<bdf>` bytes and so never need it; `fonts.ts` treats an

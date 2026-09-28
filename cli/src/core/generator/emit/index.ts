@@ -111,11 +111,11 @@ export interface ProjectEmissionInput {
   readonly manifests: ManifestRegistry;
   /** WO8b's counted capacities ([D-21]). Emitted, never recounted. */
   readonly capacities: Capacities;
-  /** Every image, produced by `compileProjectAssets()` and keyed by declared name (PR-04b WO4). */
+  /** Every image, produced by `compileProjectAssets()` and keyed by declared name. */
   readonly images: ReadonlyMap<string, XbmImage>;
   /**
    * Every `<bdf>` font already compiled, keyed by its declared `name`
-   * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before
+   * — from `compileProjectAssets()`, run before
    * `generate()`. Optional: absent is the same as empty, and only matters to a
    * build that declares a `<bdf>`.
    */

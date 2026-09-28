@@ -278,7 +278,7 @@ export function fontIdentifier(font: string): string {
 
 /**
  * @brief A compiled `<bdf>` font's own array: `ui_fontdata_` + its name —
- *        `ui_fontdata_small_9` (PR-04b WO3 item 5).
+ *        `ui_fontdata_small_9`.
  *
  * `ui_font_<name>` is declared once, in `ui.hpp`, as `extern const uint8_t*
  * const` for **both** font kinds (`fontIdentifier()`), so no consumer can tell
@@ -286,8 +286,8 @@ export function fontIdentifier(font: string): string {
  * second, distinct symbol to hold the array itself, which `ui_font_<name>`
  * then points at.
  *
- * `ui_fontdata_<name>`, not `ui_font_<name>_data`: the PA rejected the latter
- * during WO2→WO3 handoff because it collides with a `<bdf>` legitimately named
+ * `ui_fontdata_<name>`, not `ui_font_<name>_data`: `ui_font_<name>_data` is
+ * rejected because it collides with a `<bdf>` legitimately named
  * `<name>_data` — `ui_font_small_data` would be ambiguous between font `small`
  * (suffixed `_data`) and font `small_data` (unsuffixed). `ui_fontdata_` is a
  * distinct family inside the reserved `ui_` prefix (§13.4 forbids an author

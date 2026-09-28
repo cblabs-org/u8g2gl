@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/node/build-bdfconv.ts
- * Purpose: Regenerates the committed bdfconv Wasm artefact (§14, PR-04b WO1) so `<bdf>`
+ * Purpose: Regenerates the committed bdfconv Wasm artefact (§14.1) so `<bdf>`
  *          fonts compile identically in the CLI (Node) and the designer (browser) with
  *          no Emscripten dependency at install or test time — the same
  *          "measure once, commit the artefact, verify the recorded hashes" pattern
@@ -15,7 +15,7 @@
  *              refused unless it reports exactly the pinned version — a silent version
  *              drift here would make the committed artefact's provenance a lie. Writes the
  *              glue source into src/data/bdfconv/ as a real, statically importable ES
- *              module (WO2 item 1 — a `data:` URL dynamic import cannot survive a
+ *              module (a `data:` URL dynamic import cannot survive a
  *              browser's Content-Security-Policy, and no bundler can see through it), and
  *              the raw Wasm bytes as a JSON module (so tsc's `resolveJsonModule` copies it
  *              into dist/ the same way it already does for catalogue.json). Records U8G2's
@@ -36,22 +36,34 @@ import { fileURLToPath } from 'node:url';
 import { readU8g2Source } from './catalogue-builder.js';
 
 /**
- * Emscripten version bdfconv is built with. Measured 2026-09-28 (PROJECT.md Finding 3):
- * this version, installed read-only at the pinned emsdk location, produces a Wasm module
+ * Emscripten version bdfconv is built with. Measured 2026-09-28: this version, installed read-only at the pinned emsdk location, produces a Wasm module
  * whose output is byte-identical to native bdfconv. Any other version refuses to build
  * rather than silently shipping an artefact nobody measured.
  */
 const PINNED_EMSCRIPTEN_VERSION = '5.0.3';
 
 /**
- * Recorded emcc flags (WORKORDER "What is already measured", plus two additions made and
- * justified during WO1 — see the Completion Report's Decisions Made):
+ * Recorded emcc flags, with why each is there:
+ * - `-O2`: optimised code, as for any shipped artefact.
+ * - `-w`: silence compiler warnings from U8G2's own C sources, which this build
+ *   does not own and cannot change.
+ * - `-sMODULARIZE` and `-sEXPORT_ES6`: the glue is one ES module whose default
+ *   export is a factory, so it can be imported statically.
+ * - `-sENVIRONMENT=web`: only the web loader is compiled in, so the glue imports
+ *   nothing Node-specific and runs unchanged in a browser and in Node (the bytes
+ *   are supplied by the caller, see `bdfconv-instance.ts`).
+ * - `-sEXIT_RUNTIME=1`: bdfconv's `exit()` surfaces as a thrown `ExitStatus`,
+ *   which `convertBdf()` catches to read the exit status.
+ * - `-sINVOKE_RUN=0`: `main()` does not run at load; the caller runs it with
+ *   its own argv through `callMain`.
+ * - `-sEXPORTED_RUNTIME_METHODS=FS,callMain`: the two runtime surfaces the
+ *   caller uses, the in-memory filesystem and `callMain`.
  * - `-sALLOW_MEMORY_GROWTH=1`: the default heap OOMs converting U8G2's largest bundled
  *   BDF (unifont_jp.bdf, 9.4 MB) with no `-m` restriction; growth fixes it.
  * - `-ffile-prefix-map` (appended in code, since its value is this machine's absolute
  *   source path): without it, the compiler embeds that absolute path as debug-info
  *   strings in the .wasm, which would make two checkouts at different paths produce
- *   different bytes from identical source — measured and confirmed during WO1.
+ *   different bytes from identical source — measured and confirmed.
  */
 const EMCC_BASE_FLAGS = [
   '-O2',
@@ -167,8 +179,8 @@ function main(): void {
 
   console.log(`[u8g2gl] Building bdfconv from: ${bdfconvSrcDir}`);
 
-  // --- Step 3: Identify the U8G2 source commit — must match catalogue-source.json (WO1
-  //     provenance.test.ts), so the font list and the converter cannot silently diverge. ---
+  // --- Step 3: Identify the U8G2 source commit — must match catalogue-source.json
+  //     (checked by test/bdfconv/provenance.test.ts), so the font list and the converter cannot silently diverge. ---
   const u8g2Source = readU8g2Source(resolvedU8g2Path);
   if (u8g2Source.commit === null) {
     console.warn(
@@ -231,7 +243,7 @@ function main(): void {
   // The glue is Emscripten's own EXPORT_ES6 output (`export default Module;`), so writing
   // it verbatim into a `.ts` file with these two header comments is enough to make it a
   // real module `tsc` copies into `dist/` and `src/core/fonts/` imports statically — no
-  // `eval`, `new Function`, or `data:`/`blob:` URL anywhere in the chain (WO2 item 1).
+  // `eval`, `new Function`, or `data:`/`blob:` URL anywhere in the chain.
   const gluePreamble =
     '/* eslint-disable */\n' +
     '// @ts-nocheck\n' +

@@ -4,26 +4,23 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/fonts/compile-bdf.ts
- * Purpose: PR-04b WO2's public API — one asynchronous, platform-neutral function that
- *          turns a BDF file's bytes into a U8G2 font array's bytes, behaving identically
- *          in Node and in a browser. Wired into `generate` by WO3's
- *          `compileProjectAssets()` (`src/core/assets/`), which calls this for every
- *          `<bdf>` before `generate()` runs; the `<bdf>` refusal in
- *          `validate-not-yet-supported.ts` is gone (WO3 item 4).
+ * Purpose: The one platform-neutral function that turns a BDF file's bytes into a
+ *          U8G2 font array's bytes, behaving identically in Node and in a browser.
+ *          `compileProjectAssets()` (`src/core/assets/`) calls it for every `<bdf>`
+ *          before `generate()` runs.
  * Description: Translates and validates `range` (bdf-range.ts), runs bdfconv through one
- *              fresh Wasm module instance (bdfconv-instance.ts — WO1's finding: one
- *              instance serves exactly one conversion), and parses its C output
+ *              fresh Wasm module instance (bdfconv-instance.ts — one instance serves
+ *              exactly one conversion, because the runtime exits after `main`), and parses its C output
  *              (bdfconv-output.ts) into exact array bytes. Never throws for a defect in
  *              the author's input — malformed `range`, bdfconv exiting non-zero, or zero
- *              glyphs selected (a malformed BDF, WO1 Finding 2, or a `range` matching
- *              nothing) all come back as a FontCompileFailure with a human-readable reason
+ *              glyphs selected (a malformed BDF — bdfconv exits 0 with `Glyphs: 0/0` —
+ *              or a `range` matching nothing) all come back as a FontCompileFailure with a human-readable reason
  *              and bdfconv's own stderr lines.
  *
- *              **PR-04b WO3 item 1 correction:** an absent `range` means every glyph
- *              (`0-MAX_BDF_CODEPOINT`), not bdfconv's own default map `*`. WO2's WORKORDER
- *              said to use `*`, but `bdf_map.c:174` defines `*` as 32–255, so a font with
- *              glyphs above 255 — an icon font, departures-board-v3's weather and Wi-Fi
- *              fonts — would silently lose them. `<bdf range>` documents itself as an
+ *              An absent `range` means every glyph (`0-MAX_BDF_CODEPOINT`), not
+ *              bdfconv's own default map `*`: `bdf_map.c:174` defines `*` as 32–255, so
+ *              a font with glyphs above 255 (an icon font, say) would silently lose
+ *              them. `<bdf range>` documents itself as an
  *              optional *filter* (globals.ts), so its absence must mean unfiltered.
  *
  * Exports:
@@ -47,7 +44,7 @@ export interface CompileBdfInput {
   /**
    * The `<bdf range>` attribute, untranslated. Omitted means every glyph
    * (`0-MAX_BDF_CODEPOINT`) — a filter that selects nothing is not the same as no
-   * filter (WO3 item 1).
+   * filter.
    */
   readonly range?: string;
 }
@@ -92,8 +89,7 @@ export type CompileBdfResult = ({ readonly ok: true } & CompiledFont) | FontComp
 export async function compileBdf(input: CompileBdfInput): Promise<CompileBdfResult> {
   // --- Step 1: translate and validate `range` before touching bdfconv at all ---
   // Absent range means unfiltered — every glyph up to bdfconv's own maximum
-  // codepoint — never bdfconv's own default map `*` (32-255, WO3 item 1: WO2's
-  // WORKORDER was wrong here, see the file header).
+  // codepoint — never bdfconv's own default map `*` (32-255; see the file header).
   let bdfconvMap = `0-${MAX_BDF_CODEPOINT}`;
   if (input.range !== undefined) {
     const parsedRange = parseBdfRange(input.range);
@@ -107,9 +103,19 @@ export async function compileBdf(input: CompileBdfInput): Promise<CompileBdfResu
   const stderrLines: string[] = [];
   const module = await instantiateBdfconv({ onStderr: (line) => stderrLines.push(line) });
   const outputPath = '/out.c';
+  // The two fixed options, in bdfconv's own words (`extern/u8g2/tools/font/bdfconv/main.c`
+  // help text):
+  //   `-b 0` build mode, "Most compact, glyph bitmap is minimal": each glyph's bitmap is
+  //     cropped to its ink, not padded to the font's height or width as modes 1-3 do. The
+  //     compiled metrics (`u8g2_GetMaxCharHeight()` and friends) follow from that
+  //     cropping; test/test_bdf_real_u8g2.cpp derives them the same way. It is the
+  //     proportional mode, the only one that keeps a font as small as the BDF allows.
+  //   `-f 1` font format, "u8g2 font": the compressed format the U8G2 runtime draws.
+  //     The alternatives are `0` (a ucglib font) and `2` (an uncompressed 8x8 font,
+  //     which forces `-b 3`); neither is a U8G2 font this library can draw.
   const conversion = convertBdf(module, input.bdf, [
     '-b',
-    '0', // WO2 always builds with -b 0 (WORKORDER: "we always build with -b 0")
+    '0',
     '-f',
     '1',
     '-m',
@@ -143,8 +149,8 @@ export async function compileBdf(input: CompileBdfInput): Promise<CompileBdfResu
     return { ok: false, reason: parsed.reason, stderr: stderrLines };
   }
 
-  // --- Step 4: zero glyphs is a failure, not a degenerate success (WO1 Finding 2: a
-  //     malformed BDF exits 0 with "Glyphs: 0/0"; a range matching nothing does too) ---
+  // --- Step 4: zero glyphs is a failure, not a degenerate success (a malformed BDF
+  //     makes bdfconv exit 0 with "Glyphs: 0/0"; a range matching nothing does too) ---
   if (parsed.value.selectedGlyphs === 0) {
     const rangeDescription = input.range !== undefined ? `range '${input.range}'` : 'the default range';
     const reason =

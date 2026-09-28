@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/fonts/index.ts
- * Purpose: Barrel export for the font compiler (PR-04b WO2) — the public API WO3 wires
- *          into `generate`, and the `<bdf range>` grammar the validator also uses.
+ * Purpose: Barrel export for the font compiler — the public API, and the
+ *          `<bdf range>` grammar the validator also uses.
  * Description: Re-exports compileBdf() and its types, and the range parser/translator.
  *              Deliberately does not re-export bdfconv-instance.ts or bdfconv-output.ts —
  *              those are internal to compileBdf() and nothing outside this directory

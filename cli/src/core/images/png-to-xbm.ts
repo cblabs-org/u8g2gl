@@ -39,6 +39,8 @@
  * Exports:
  * - DEFAULT_THRESHOLD:  128, the cutoff when `threshold` is absent
  * - ConvertMode:        'threshold' | 'dither'
+ * - ConvertOptions:     The optional `mode` and `threshold`
+ * - ConvertFailure:     Why a PNG could not be converted (the decoder's error)
  * - rgbaToXbm():        The conversion over decoded pixels (pure, synchronous)
  * - convertPng():       Decode a PNG and convert it, at the PNG's own size
  */

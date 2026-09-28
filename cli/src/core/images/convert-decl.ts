@@ -19,6 +19,7 @@
  *
  * Exports:
  * - CONVERT_MODES:       The two valid `mode` values
+ * - ConvertDeclShape:    The attributes of a `<convert>` this module inspects
  * - ConvertDeclProblem:  One thing wrong with a declaration
  * - convertDeclProblems(): Every problem, in attribute order
  */

@@ -167,7 +167,8 @@ export const DIAGNOSTIC_CODES = {
   /**
    * The document uses a construct the schema accepts but the generator does not
    * build yet — focus rings, events and screen navigation (PR-09), collections
-   * and composites with their own C++ class (PR-08). The message names the PR that delivers it.
+   * and composites with their own C++ class (PR-08). The message names the PR
+   * that delivers it.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
    * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).
@@ -292,8 +293,7 @@ export const DIAGNOSTIC_CODES = {
    */
   DRAWING_ELEMENT_NEEDS_OBJECT: 'U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT',
   /**
-   * A `<bdf>` font's `range` attribute is not a well-formed codepoint list (PR-04b
-   * WO2 item 3): an item that is not a decimal or `0x`-prefixed hex number or an
+   * A `<bdf>` font's `range` attribute is not a well-formed codepoint list: an item that is not a decimal or `0x`-prefixed hex number or an
    * inclusive `lo-hi` pair, an empty item, `lo > hi`, or a number outside what
    * bdfconv's own map parser accepts (0–0xFFFF — bdfconv encodes a glyph's codepoint
    * into a `uint16_t`, `bdf_font.h`'s `tga_draw_glyph`). The message names the
@@ -302,7 +302,7 @@ export const DIAGNOSTIC_CODES = {
    */
   MALFORMED_BDF_RANGE: 'U8G2GL_MALFORMED_BDF_RANGE',
   /**
-   * `bdfconv` could not compile a `<bdf>` font's source (PR-04b WO3 item 3):
+   * `bdfconv` could not compile a `<bdf>` font's source:
    * a malformed BDF, a `range` that selects no glyphs from a font that has
    * some, or bdfconv itself exiting non-zero. The message carries
    * `compileBdf()`'s own human-readable reason, and bdfconv's stderr lines
@@ -313,8 +313,8 @@ export const DIAGNOSTIC_CODES = {
    */
   BDF_COMPILE_FAILED: 'U8G2GL_BDF_COMPILE_FAILED',
   /**
-   * `generate` has no compiled entry for a `<bdf>` font it is about to emit
-   * (PR-04b WO3 item 3). Emission never compiles fonts itself —
+   * `generate` has no compiled entry for a `<bdf>` font it is about to emit.
+   * Emission never compiles fonts itself —
    * `compileProjectAssets()` must run first and hand its result to
    * `generate()` as `GenerateInput.compiledAssets` — so a missing entry with
    * no accompanying `BDF_COMPILE_FAILED` or `MISSING_FILE` diagnostic for the
@@ -325,7 +325,7 @@ export const DIAGNOSTIC_CODES = {
    */
   MISSING_COMPILED_FONT: 'U8G2GL_MISSING_COMPILED_FONT',
   /**
-   * A `<convert>` image's PNG could not be turned into an XBM (PR-04b WO4): the
+   * A `<convert>` image's PNG could not be turned into an XBM: the
    * file is not a PNG, is corrupt or truncated, holds an unknown critical
    * chunk, is Adam7 interlaced, or its size is not the size the declaration
    * gives. The message says which, and names the declaration and the file.
@@ -333,7 +333,7 @@ export const DIAGNOSTIC_CODES = {
   IMAGE_CONVERT_FAILED: 'U8G2GL_IMAGE_CONVERT_FAILED',
   /**
    * `generate` has no image for an `<xbm>` or `<convert>` it is about to emit
-   * (PR-04b WO4) — the image counterpart of `MISSING_COMPILED_FONT`. Emission
+   * — the image counterpart of `MISSING_COMPILED_FONT`. Emission
    * never reads or converts an asset itself: `compileProjectAssets()` must run
    * first and hand its result to `generate()` as
    * `GenerateInput.compiledAssets`. A missing image with no accompanying
