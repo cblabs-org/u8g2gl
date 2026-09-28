@@ -82,8 +82,8 @@ Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D 
 ## Work Order Decomposition
 
 - [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
-- [ ] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
-- [ ] **WO3 — the runtime clamps a rounded box's radius** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
+- [x] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** ✅ `e26d623` · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
+- [ ] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
 - [ ] **WO4 — bound draw-call arguments clamp as objects do** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
 - [ ] **WO5 — readability review and remediation** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
@@ -146,3 +146,12 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
 - **2026-09-28 12:07** — Owner merged-on-instruction: #6 merged (`ca398ac`); radius bound set to
   `2r <= min(w,h)` (quoted above). Local `main` fast-forwarded; WO2 branched from `ca398ac` and
   dispatched. PR-04b may be released.
+- **2026-09-28** — **WO2 complete, `e26d623`.** PA verified, each suite alone: CLI **1079 / 64**,
+  `tsc`, lint clean; C++ 0 warnings, 362 / one skip; goldens unchanged; no existing assertion
+  changed. One rule (`isStyleAttribute`, `schema/globals.ts`) used by validator and emission. The
+  worker also applied it in `missingRequired()` (a refused override no longer satisfies `required`)
+  and the substituted-value check; both follow from the rule and are accepted. Carried to WO5:
+  `emit/screen.ts`'s `unknown` message is stale for a non-§10 setter prop (unreachable via the CLI);
+  `style_text` suggests `style_font` where the useful remedy is the plain attribute; a `style_*` on a
+  drawing element is refused with the setter message rather than §13.5's. WO3 dispatched on
+  `u8g2gl-4r/wo3-radius-clamp`.
