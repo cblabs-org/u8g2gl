@@ -1,0 +1,29 @@
+{
+  "u8g2": {
+    "tag": "2.36.18",
+    "commit": "d66b49af3e48cd0becf95f862353bf94a9c0c2be"
+  },
+  "emscripten": {
+    "version": "5.0.3",
+    "commit": "285c424dfa9e83b03cf8490c65ceadb7c45f28eb"
+  },
+  "flags": [
+    "-O2",
+    "-w",
+    "-sMODULARIZE",
+    "-sEXPORT_ES6",
+    "-sENVIRONMENT=web",
+    "-sEXIT_RUNTIME=1",
+    "-sINVOKE_RUN=0",
+    "-sEXPORTED_RUNTIME_METHODS=FS,callMain",
+    "-sALLOW_MEMORY_GROWTH=1",
+    "-ffile-prefix-map=<bdfconv-source-dir>=bdfconv"
+  ],
+  "wasm": {
+    "sha256": "53b988238fd2b191e2d29dcdc1714b5f9a9761d8abc4a35cbbd1d5d06cbae982"
+  },
+  "artefacts": {
+    "bdfconv-glue.json": "b5196e6d2a5ebe958db7f958b1ade150b76eb8556aba8c249deb77968467da63",
+    "bdfconv-wasm.json": "9e7cdcc3510bdccc9532f7427b86290e9754f71d3d6218a0a9d1f78c243269de"
+  }
+}
