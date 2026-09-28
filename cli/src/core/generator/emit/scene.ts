@@ -64,7 +64,7 @@ import type { PropDef } from '../../schema/widget-manifest.js';
 import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
-import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../realise/index.js';
+import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../../realise/index.js';
 import { drawArgumentSources } from './draw-args.js';
 import { boundPositionOrigin } from './placement.js';
 import { fontDeclarations } from './fonts.js';

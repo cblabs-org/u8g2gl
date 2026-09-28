@@ -53,7 +53,7 @@ import type { PropDef } from '../../schema/widget-manifest.js';
 import { FLAG_COMPARISONS, type WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
-import type { RealisedBinding, RealisedElement, RealisedScreen } from '../realise/index.js';
+import type { RealisedBinding, RealisedElement, RealisedScreen } from '../../realise/index.js';
 import { resolvedLiteralFor } from './draw-args.js';
 import { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
 

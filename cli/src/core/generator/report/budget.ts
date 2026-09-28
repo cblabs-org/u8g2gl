@@ -61,7 +61,7 @@ import {
   type Capacities,
   type RealisedElement,
   type RealisedScreen,
-} from '../realise/index.js';
+} from '../../realise/index.js';
 import {
   MEASURED_KIND,
   UNMEASURED_KIND,

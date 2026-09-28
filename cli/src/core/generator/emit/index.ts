@@ -42,7 +42,7 @@ import type { ManifestRegistry } from '../../manifest/index.js';
 import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
-import type { Capacities, RealisedScreen } from '../realise/index.js';
+import type { Capacities, RealisedScreen } from '../../realise/index.js';
 import { formatHeaderStamp } from '../header.js';
 import { emitGeneratedConfigHeader, GENERATED_CONFIG_HEADER } from './generated-config.js';
 import { emitFontsUnit, FONTS_UNIT } from './fonts.js';

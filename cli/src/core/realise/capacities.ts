@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Matt McNeill (CB Labs)
  * SPDX-License-Identifier: MIT
  *
- * File: src/core/generator/realise/capacities.ts
+ * File: src/core/realise/capacities.ts
  * Purpose: [D-21] — counts every static capacity the runtime needs from what
  *          realisation decided, so the pools are sized by arithmetic rather than
  *          by a guess in `u8g2gl_config.h`. Exceeding a capacity becomes a build
@@ -46,7 +46,7 @@
  * - computeCapacities(): Count them
  */
 
-import type { Globals, SubjectDecl } from '../../schema/globals.js';
+import type { Globals, SubjectDecl } from '../schema/globals.js';
 import { walkRealised } from './realise.js';
 import type { RealisedScreen } from './model.js';
 

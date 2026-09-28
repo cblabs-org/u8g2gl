@@ -36,7 +36,7 @@ import type { ManifestRegistry } from '../../manifest/index.js';
 import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
-import type { Capacities } from '../realise/index.js';
+import type { Capacities } from '../../realise/index.js';
 import { compareCodeUnits } from '../../order.js';
 
 /** One emitted file. */

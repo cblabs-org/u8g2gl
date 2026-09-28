@@ -40,7 +40,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import { MAX_OBJECTS_PER_SCREEN } from '../generator/realise/index.js';
+import { MAX_OBJECTS_PER_SCREEN } from '../realise/index.js';
 import type { ValidateInput } from './validate.js';
 import { realisationOf } from './shared-model.js';
 import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';

@@ -28,7 +28,7 @@ import type { Target } from '../schema/project.js';
 import type { ScreenPipeline } from '../resolver/index.js';
 import { compareDiagnostics, validate, type ValidateInput, type ValidateResult } from '../validator/validate.js';
 import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
-import type { RealisationResult } from './realise/index.js';
+import type { RealisationResult } from '../realise/index.js';
 
 /**
  * A project as loaded, before validation: the validator's input without a
