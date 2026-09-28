@@ -6,8 +6,23 @@ work_order: WO13 (proposed)
 project: pr-04-generator
 branch: u8g2gl-generator/wo13-readability
 base: u8g2gl-generator/wo12-budget-determinism
-status: draft — awaiting the owner's approval (this would be the twenty-first work order)
+status: dispatched — approved by the owner 2026-09-28
 ---
+
+## Authorization
+
+Part of PR-04 (`pr-04-generator`). Verify from committed files: `../PROJECT.md` "Human Approval"
+quotes the owner's PR-04 approval with a timestamp, and "Owner rulings and approval — 2026-09-28"
+quotes the owner's approval of **WO13** verbatim. This WORKORDER's `status` must be `dispatched`.
+Otherwise stop and report.
+
+**Branch:** `u8g2gl-generator/wo13-readability`, base `u8g2gl-generator/wo12-budget-determinism`.
+Run `git branch --show-current` as its own command immediately before every commit. Commit on a
+green build without asking. Do not push and do not tag.
+
+**Not in this work order, by the PA's decision:** the 522 U8G2 fonts whose names contain capitals.
+The owner has ruled that all fonts must be usable, but §13.4's lowercase rule is what forbids them,
+so the Chief Architect's amendment comes first. Do not touch font-name validation.
 
 ## PA triage, 2026-09-28
 

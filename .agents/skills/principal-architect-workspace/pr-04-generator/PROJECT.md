@@ -90,6 +90,9 @@ the approved decomposition.
 
 ### Standing instructions carried in every WORKORDER
 
+- **Every PR ends with a readability and documentation pass** before it is raised — owner, 2026-09-28:
+  "these should always be done so that the code is clean and properly documented on completion".
+
 - Workers **commit on a green build and never ask permission mid-flight** — they
   cannot be answered, and their work strands.
 - Load the `u8g2gl-standards` skill before writing code.
@@ -1364,6 +1367,45 @@ agreed in the same message, verbatim: *"PR-09 - yes"*. The PA carries it into PR
 entry at wrap-up.
 
 
+### Owner rulings and approval — 2026-09-28
+
+**APPROVED by the human (Matt McNeill) on 2026-09-28.** The owner's own words, verbatim:
+
+> "1) yes absolutely - these should always be done so that the code is clean and properly documented
+> on completion.
+> 2) gut feeling is no - we should not do this (i assume a text subject is bound at runtime) I see no
+> reason to add a usability limit so that we can calculate memory size. This could also mean we
+> constantly reserve the maximum lengths which could ADD size unnecessarily. If we need to estimate
+> RAM size we should either make some assumptions on average sizes to get a ball-park estimate or
+> provide a range.
+> 3) Fonts are input - we can't expect them to follow our naming conventions we should use whatever
+> is provided and ensure ALL fonts are available.
+>
+> DO WO13 and then raise the PR for review."
+
+**1. WO13 approved.** The ledger is **twenty-one**. The owner's reason is standing guidance, recorded
+in Standing instructions: a readability and documentation pass belongs in every PR's completion, not
+in a follow-up.
+
+**2. `max_len` stays optional — ruled, and the report follows the ruling.** The owner is right that
+the subject's declared length is what the runtime reserves, so requiring it would enlarge the RAM it
+was meant to reveal. WO12 f9 is closed as "no change". The budget keeps reporting that storage
+**unmeasured** with its reason, which is honest under §1.3. The owner's alternative — a stated
+assumption or a range — is recorded as a **PR-05 refinement**, not done here, because §1.3 requires
+any such figure to be labelled as the assumption it is.
+
+**3. All U8G2 fonts must be usable — ruled.** This overrides the PA's own framing of bridge item 1:
+a font name is *input*, not an identifier the author chose, so the 522 names containing capitals must
+be accepted and the generated alias mangled. **Not in WO13**, and here is why: §13.4 states the
+lowercase rule that currently forbids them, so the amendment is the Chief Architect's to make, and
+the validator cannot be loosened before the spec says so. The bridge (CA-BRIDGE-2026-09-28.md item 1)
+now carries the owner's ruling, so the Chief Architect is amending §13.4 to a decision already taken
+rather than being asked to decide it. The code change is one work order after that ruling lands, and
+it is additive — no XML that validates today stops validating.
+
+**4. The PR is authorised after WO13.** "DO WO13 and then raise the PR for review." That is the
+owner's approval for the outward-facing step, which the PA had held.
+
 ### Readability review of the stack — 2026-09-28, and a proposed WO13 (awaiting the owner)
 
 The `readability-reviewer` agent audited the whole PR-04 diff (`ff20f0c..d9e21e0`) against the
@@ -1712,6 +1754,7 @@ bind_text is active". WO10b's line items say so.
 
 ## Status Log
 
+- 2026-09-28 — **Owner approved WO13 and ruled on two open questions** (verbatim above): a readability pass belongs in every PR's completion; `max_len` stays optional, so WO12 f9 closes as no change and the range/assumption idea becomes a PR-05 refinement; and **all U8G2 fonts must be usable**, which settles bridge item 1 — the Chief Architect now amends §13.4 to a decision taken, and the code change is a work order after that. **The PR is authorised after WO13.** WO13 dispatched on `u8g2gl-generator/wo13-readability`.
 - 2026-09-28 — **Readability review complete** (P1 0, P2 3, P3 4, P4 0; nothing behavioural). PA spot-checked and found one finding wrong as stated. Remediation needs a twenty-first work order, so **WO13 is proposed and awaits the owner**; PR-04 can ship without it. Layering Observation held for the Chief Architect bridge.
 - 2026-09-28 — **WO12 complete** (`2bd6473`…`8a853a0`) — **all twenty work orders are done.** Verified independently: 0 warnings, ctest 361, CLI 1044/62, capacities match the header, 0.7.0 stamped while goldens stay pinned, determinism guards non-vacuous under two PA mutations (4 and 12 failures), and the catalogue reorder proven content-identical by parsing both versions. **The framebuffer stop-and-report is upheld against the PA's own work order**: §18 and §5.2 require the figure, so it is reported with its derivation and `ramDerivedBytes` is 1074. Findings placed: 4, 7, 10 → PR-05 obligations; 9 → owner question (`max_len`); 5, 6, 8 → accepted or recorded. **Wrap-up begins**: readability review over the stack.
 - 2026-09-27 — **WO11b complete** (twelve commits, `280cd0e`…`86a3a47`). Verified independently: 0 warnings, ctest 361 (one known skip), CLI 948/57, tsc and lint clean; emission byte-identical; rulings 1c and 6, the builtin-font check, and all three follow-up items plus finding 12 confirmed through the built CLI. Three PA premises were wrong and are recorded. Findings placed: 1, 2, 4, 10 → Chief Architect bridge; 7, 8, 11 → wrap-up; 6 → no action. **WO12 revised and dispatched** on `u8g2gl-generator/wo12-budget-determinism`. WO12 is the last work order.
