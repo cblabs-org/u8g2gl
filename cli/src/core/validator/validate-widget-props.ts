@@ -47,16 +47,13 @@
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { namedStyles, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
 import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';
 import { GEOMETRY_BINDINGS, INT32_MAX, INT32_MIN, isRectangular, walkExpanded } from '../resolver/index.js';
-import { COLOR_VALUES } from '../generator/emit/value.js';
 import type { PropDef } from '../schema/widget-manifest.js';
-import { namedStyles } from '../generator/emit/screen-model.js';
-import { styleProperties } from '../generator/emit/styles.js';
-import type { Globals, StyleDecl } from '../schema/globals.js';
+import { COLOR_VALUES, styleProperties, type Globals, type StyleDecl } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
@@ -411,7 +408,7 @@ function checkStyleOverride(node: WidgetNode, name: string, value: string, prop:
     case 'bool':
       return BOOLEAN_VALUES.includes(value) ? undefined : invalid(BOOLEAN_VALUES, 'a boolean');
     case 'color':
-      return COLOR_VALUES.includes(value) ? undefined : invalid(COLOR_VALUES, 'a draw colour');
+      return (COLOR_VALUES as readonly string[]).includes(value) ? undefined : invalid(COLOR_VALUES, 'a draw colour');
     case 'enum': {
       const allowed = (prop.values ?? '').split(',').map((member) => member.trim());
       return allowed.includes(value) ? undefined : invalid(allowed, 'an enum');

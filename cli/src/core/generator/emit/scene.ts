@@ -59,7 +59,9 @@
  * - emitSceneFile():       The description as `ui_scene.json`
  */
 
+import { styleProperties } from '../../schema/globals.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
+import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../realise/index.js';
@@ -71,7 +73,6 @@ import {
   classOf,
   flagComparison,
   INIT_STEPS,
-  namedStyles,
   placeScreen,
   rectangleOf,
   styleOverridesOf,
@@ -79,7 +80,7 @@ import {
   type FlagComparison,
   type Placement,
 } from './screen-model.js';
-import { styleIdentifiers, styleProperties } from './styles.js';
+import { styleIdentifiers } from './styles.js';
 import { GENERATED_JSON_MARKER_KEY, GENERATED_JSON_MARKER_VALUE } from '../header.js';
 import type { ProjectEmitInput } from './unit.js';
 

@@ -32,7 +32,6 @@
  * - Placement:            One element with its manifest and device-space model
  * - ScreenPlacements:     Every element of a screen, placed, and what placing found
  * - RECTANGLE:            The four axes §7.2's rectangle names, in set_coords order
- * - FLAG_COMPARISONS:     The runtime's `bind_flag_if_*` overload set (§8.4)
  * - FLAG_ENUMERATOR_PATTERN: How a flag name becomes its `U8G2GL_FLAG_*` enumerator
  * - InitStep, INIT_STEPS: The order init configures objects in (§13.7)
  * - FlagComparison:       One directive, understood
@@ -44,16 +43,14 @@
  * - rectangleSetterOf():  The setter a manifest's four rectangle axes share
  * - rectangleOf():        The one rectangle-setter call an object makes
  * - writtenProperties():  The setter props the author wrote, in manifest order
- * - namedStyles():        The styles an element names, in layering order
  * - styleOverridesOf():   An element's `style_*` overrides, resolved to props
  * - flagComparison():     A directive's method, comparison, ref and flag
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
-import type { SubjectType } from '../../schema/globals.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
-import type { WidgetNode } from '../../schema/widget-node.js';
+import { FLAG_COMPARISONS, type WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
 import type { RealisedBinding, RealisedElement, RealisedScreen } from '../realise/index.js';
@@ -89,29 +86,6 @@ export interface ScreenPlacements {
  * that marks dirty once.
  */
 export const RECTANGLE: readonly ('x' | 'y' | 'width' | 'height')[] = ['x', 'y', 'width', 'height'];
-
-/**
- * What the runtime's `bind_flag_if_*` overloads accept (`u8g2gl_obj.h`), and the
- * comparison that means "this flag is clear" when a draw call reads the subject
- * itself.
- *
- * This mirrors the runtime's overload set rather than any element: an int
- * subject compares four ways, a bool subject only for equality, and a string or
- * time subject not at all. A comparison outside this table has no C++ to call,
- * so it is a diagnostic rather than a compile error in the user's build.
- *
- * Exported (PR-04 WO11) because the editor registry generates one entry per
- * method and subject type from this same table, so the two targets accept
- * exactly the same directives and clear a guard with the same comparison.
- */
-export const FLAG_COMPARISONS: Readonly<
-  Record<string, { readonly clearWhen: string; readonly subjectTypes: readonly SubjectType[] }>
-> = {
-  bind_flag_if_eq: { clearWhen: '!=', subjectTypes: ['int', 'bool'] },
-  bind_flag_if_not_eq: { clearWhen: '==', subjectTypes: ['int', 'bool'] },
-  bind_flag_if_gt: { clearWhen: '<=', subjectTypes: ['int'] },
-  bind_flag_if_lt: { clearWhen: '>=', subjectTypes: ['int'] },
-};
 
 /** One configuring step of a screen's `init`, after construction (§13.7). */
 export type InitStep = 'properties' | 'styles' | 'bindings';
@@ -418,23 +392,6 @@ export function writtenProperties(placement: Placement): readonly WrittenPropert
     }
   }
   return written;
-}
-
-/**
- * @brief The styles an element names, in the order they layer: the `style`
- *        attribute, then each `<style>` child as written (§10).
- */
-export function namedStyles(node: WidgetNode): string[] {
-  const names: string[] = [];
-  if (typeof node.attributes.style === 'string' && node.attributes.style !== '') {
-    names.push(node.attributes.style);
-  }
-  for (const child of node.children) {
-    if ('kind' in child && child.kind === 'style' && child.name !== '') {
-      names.push(child.name);
-    }
-  }
-  return names;
 }
 
 /**

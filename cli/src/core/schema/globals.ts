@@ -16,12 +16,13 @@
  * - ConstDecl: Named compile-time constant integer or string
  * - SubjectType: Scalar subject data type ('int' | 'string' | 'bool' | 'time')
  * - SubjectDecl: Reactive observable subject declaration
- * - DrawColor: Monochrome pixel drawing mode ('0' | '1' | 'xor')
+ * - COLOR_VALUES, DrawColor: §10's draw colours, the one list, and the type derived from it
  * - TextAlign: Horizontal text alignment ('left' | 'center' | 'right')
  * - FontMode: Font rendering background mode ('solid' | 'transparent')
  * - BitmapMode: Bitmap rendering background mode ('solid' | 'transparent')
  * - StyleDecl: Named style properties definition
  * - StylePropertyKey, StyleProperty, STYLE_PROPERTIES: §10's style properties, the one list
+ * - styleProperties(): A style's declared properties by attribute, in applied order
  * - FontDecl: Discriminated union of font definitions (BDF or U8G2 built-in)
  * - BdfFontDecl: Custom BDF font definition with optional glyph range
  * - BuiltinFontDecl: Direct U8G2 C font identifier definition
@@ -91,12 +92,25 @@ export interface SubjectDecl {
 }
 
 /**
- * Monochrome pixel draw colour modes (§10).
+ * The monochrome draw colours (§10) — **the one list** of what a `draw_color`
+ * style property or a `type="color"` prop accepts, in order:
  * - '0': Clear pixels (black on standard OLED)
  * - '1': Set pixels (white on standard OLED)
  * - 'xor': Invert underlying framebuffer pixels
+ *
+ * Pass 1 checks a written colour against it, and the generator spells each one
+ * through `emit/value.ts`, whose enumerator table is keyed by {@link DrawColor}
+ * so the compiler holds it to one enumerator per value. It lives here, beside
+ * the type, because both layers read it: owned by either, the other would have
+ * to import across the validator/generator boundary (PR-4R WO1).
  */
-export type DrawColor = '0' | '1' | 'xor';
+export const COLOR_VALUES = ['0', '1', 'xor'] as const;
+
+/**
+ * Monochrome pixel draw colour mode (§10), derived from {@link COLOR_VALUES} so
+ * the type and the list cannot drift apart.
+ */
+export type DrawColor = (typeof COLOR_VALUES)[number];
 
 /**
  * Text alignment options (§10).
@@ -204,6 +218,33 @@ export const STYLE_PROPERTIES: readonly StyleProperty[] = [
   { key: 'fontMode', attribute: 'font_mode', setter: 'set_font_mode', kind: 'text', aliases: ['fontMode'] },
   { key: 'bitmapMode', attribute: 'bitmap_mode', setter: 'set_bitmap_mode', kind: 'text', aliases: ['bitmapMode'] },
 ];
+
+/**
+ * @brief A style's declared properties, by attribute, in the order the styles
+ *        unit applies them — {@link STYLE_PROPERTIES} order.
+ *
+ * The editor's scene description lists a style this way (PR-04 WO11), from the
+ * same table the firmware unit is written from, so the two cannot apply a
+ * different set or a different order; Pass 1 reads it to tell which attributes
+ * a named style sets. It lives beside the table rather than in the emitter so
+ * the validator need not import from the generator (PR-4R WO1).
+ *
+ * @param declaration The style as declared.
+ * @return Each declared property's attribute and value.
+ */
+export function styleProperties(
+  declaration: StyleDecl,
+): readonly { readonly attribute: string; readonly value: string | number | boolean }[] {
+  const properties: { attribute: string; value: string | number | boolean }[] = [];
+  for (const property of STYLE_PROPERTIES) {
+    const value = declaration[property.key];
+    if (value === undefined || typeof value === 'object') {
+      continue;
+    }
+    properties.push({ attribute: property.attribute, value });
+  }
+  return properties;
+}
 
 /**
  * Discriminated union of font declarations supported in `<fonts>`.

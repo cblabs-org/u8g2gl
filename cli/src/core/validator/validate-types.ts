@@ -34,7 +34,7 @@
  *              format on a string subject is refused outright (PR-04 WO11b). Every
  *              `<bind_flag_if_*>` must name one of §8.4's two flags (PR-04 WO5a
  *              finding 1), be a comparison the runtime provides for its subject's
- *              type — emission's `FLAG_COMPARISONS`, the one table — and carry a
+ *              type — the schema's `FLAG_COMPARISONS`, the one table — and carry a
  *              `ref_value` that fits the subject's type (PR-04 WO11b).
  *
  * Exports:
@@ -43,13 +43,12 @@
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import type { WidgetNode } from '../schema/widget-node.js';
+import { FLAG_COMPARISONS, type WidgetNode } from '../schema/widget-node.js';
 import type { SubjectDecl } from '../schema/globals.js';
 import type { BindDef } from '../schema/widget-manifest.js';
 import { BINDING_FLAGS } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { walkExpanded, withInstantiation } from '../resolver/index.js';
-import { FLAG_COMPARISONS } from '../generator/emit/screen-model.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
 
@@ -238,7 +237,7 @@ function checkElement(
     }
 
     // --- Step 3b: A comparison the runtime provides, for this subject's type ---
-    // The runtime's `bind_flag_if_*` overload set is emission's one table,
+    // The runtime's `bind_flag_if_*` overload set is the schema's one table,
     // FLAG_COMPARISONS: a directive outside it, or a subject type it has no
     // overload for, has no C++ to call, and `ref_value` is the thing compared.
     // Emission refused all three while `validate` passed them (PR-04 WO11b,

@@ -63,6 +63,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
+import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import {
   screenFunctionIdentifier,
@@ -85,7 +86,6 @@ import {
   FLAG_ENUMERATOR_PATTERN,
   flagComparison,
   INIT_STEPS,
-  namedStyles,
   placeScreen,
   rectangleOf,
   styleOverridesOf,
