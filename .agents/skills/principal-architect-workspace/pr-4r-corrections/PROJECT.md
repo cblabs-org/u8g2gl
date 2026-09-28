@@ -84,8 +84,8 @@ Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D 
 - [x] **[WO1 — shared tables and the realisation rule move to neutral modules](wo1-neutral-tables/WORKORDER.md)** ✅ `44953ac` · `u8g2gl-4r/wo1-neutral-tables` · base `main` · standard · item 4, rulings A, B · **own PR**
 - [x] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** ✅ `e26d623` · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
 - [x] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** ✅ `afe599b` · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
-- [ ] **[WO4 — bound draw-call arguments clamp as objects do](wo4-bound-arg-clamp/WORKORDER.md)** · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
-- [ ] **WO5 — readability review and remediation** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
+- [x] **[WO4 — bound draw-call arguments clamp as objects do](wo4-bound-arg-clamp/WORKORDER.md)** ✅ `7f71f7f` · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
+- [ ] **[WO5 — readability review and remediation](wo5-readability/WORKORDER.md)** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
 WORKORDERs for WO2–WO5 are written at dispatch, against the code as it then stands.
 
@@ -178,3 +178,18 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   **For the CA bridge (worker finding):** draw calls are not clipped to their container while objects
   are, so a draw-call child overhanging its container paints outside it: realisation is observable
   through clipping too. Not in PR-4R's mandate.
+- **2026-09-28** — **WO4 complete, `7f71f7f`.** PA verified from a clean configure, each suite alone:
+  CLI **1083 / 64**, `tsc`, lint clean; C++ 0 warnings, **377 / one skip**; built CLI reports
+  **0.8.0**. Golden diff reviewed: the `u8g2gl_coord.h` include and bound-argument spellings only
+  (`u8g2gl_coord_bound(40, ui_subject_knob_x.get())`). Object path, firmware draw calls and the
+  editor host all clamp through one helper; parity tests now agree on clamped values where at the
+  base they agreed on wrapped ones (+40000 drew at x=40040, −40000 at 25576, on screen). **For the
+  CA bridge:** §13.5's example no longer matches emitted text; draw calls are not clipped to their
+  container (realisation observable through clipping); a bound `time` subject reaches the helper as
+  `uint32_t`, so epochs above INT32_MAX go negative on both targets; the same-class two-realisation
+  case is inexpressible before PR-09.
+- **2026-09-28** — Readability review over WO2–WO4: no P1; P2 `u8g2gl_draw.h` docs stale after WO3;
+  P3 "BOUND" used twice in `u8g2gl_coord.h`; P4 dashes. With WO1's P4 and the carried message
+  fixes, these make WO5, dispatched. Not carried (for the CA): a `style_*` on a drawing element is
+  refused with the setter message rather than §13.5's; the box manifest's `radius` help omits the
+  bound.
