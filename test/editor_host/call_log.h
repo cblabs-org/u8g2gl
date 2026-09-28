@@ -32,7 +32,7 @@
 #include <sstream>
 #include <string>
 
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 /** @brief One call-log entry as `op(a, b, …)[pointer]"text"`. */
 inline std::string describe_call(const u8g2_stub_call& call) {

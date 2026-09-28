@@ -12,7 +12,7 @@
  *          its fonts unit compiles on the host. A `<builtin>` font is a
  *          reference to U8G2's own array (§14.1): generated code writes
  *          `ui_font_u8g2_font_6x10_mr = u8g2_font_6x10_mr`, and real U8G2
- *          declares that array in u8g2.h. The host stub (test/stubs/U8G2lib.h)
+ *          declares that array in u8g2.h. The host stub (test/stubs/U8g2lib.h)
  *          models the U8G2 class, not its font tables, so without this the
  *          generated unit would not compile against the stub.
  *

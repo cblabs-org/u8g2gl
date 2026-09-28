@@ -362,7 +362,7 @@ set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
     PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.4"
 )
 # --- Real U8G2 acceptance target (WO4c) ---
-# Every other target compiles the runtime against test/stubs/U8G2lib.h, and a
+# Every other target compiles the runtime against test/stubs/U8g2lib.h, and a
 # stub can offer an API real U8G2 lacks: getFont() did, and nothing noticed. This
 # target compiles the runtime's own sources against U8G2's real headers from the
 # pinned submodule (extern/u8g2, tag 2.36.18) instead, so an API or type mismatch
@@ -451,11 +451,12 @@ target_include_directories(test_generated_fixture PRIVATE
 )
 
 # The fonts unit is the one generated unit that includes U8G2 by name, and it
-# spells it as real U8G2 does, <U8g2lib.h>. The host stub is U8G2lib.h, so the
-# unit is built on its own, with support/u8g2_case/ first on its include path
-# to forward the real spelling to the stub — warning-free on a case-insensitive
-# filesystem and found at all on a case-sensitive one. It does not link the
-# runtime target, so the stub directory never precedes the shim.
+# spells it as real U8G2 does, <U8g2lib.h> — which is also how the host stub is
+# spelled, so the stub directory satisfies it directly. (Before PR-04 WO13 the
+# stub was mis-cased `U8G2lib.h` and this target needed a forwarding shim under
+# support/u8g2_case/ to be found at all on a case-sensitive filesystem; the
+# rename removed both the shim and the hazard.) It is still built on its own
+# because it does not link the runtime target.
 #
 # A <builtin> font also names U8G2's own table, which real U8G2 declares and
 # the stub does not, so the fixture's two are declared by a forced include.
@@ -463,7 +464,7 @@ add_library(u8g2gl_fixture_fonts OBJECT
     ${U8G2GL_FIXTURE_GENERATED}/ui_fonts.cpp
 )
 target_include_directories(u8g2gl_fixture_fonts PRIVATE
-    ${U8G2GL_FIXTURE_DIR}/support/u8g2_case
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
     ${U8G2GL_FIXTURE_GENERATED}
     ${PROJECT_SOURCE_DIR}/include
 )

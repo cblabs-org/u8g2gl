@@ -12,7 +12,7 @@
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_config.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 TEST(Smoke, TypeConstants) {
     EXPECT_EQ(U8G2GL_IDLE, UINT32_MAX);

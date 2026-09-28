@@ -30,7 +30,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include "call_log.h"
 #include "fixture_u8g2_fonts.h"
 #include "u8g2gl/u8g2gl_core.h"

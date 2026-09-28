@@ -32,7 +32,7 @@
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_subject.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include <cstring>
 #include <iostream>
 #include <string>

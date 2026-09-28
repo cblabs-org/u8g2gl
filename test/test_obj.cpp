@@ -20,7 +20,7 @@
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_helpers.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 TEST(Obj, DefaultConstruction) {
     u8g2gl_obj obj;

@@ -82,8 +82,8 @@
 #include <cstdint>
 
 // Forward declaration of the U8G2 display class. The real declaration comes
-// from U8G2lib.h on firmware/editor builds, or from the single authoritative
-// test stub (test/stubs/U8G2lib.h) on host test builds — see cpp.md §7.
+// from U8g2lib.h on firmware/editor builds, or from the single authoritative
+// test stub (test/stubs/U8g2lib.h) on host test builds — see cpp.md §7.
 class U8G2;
 
 /**

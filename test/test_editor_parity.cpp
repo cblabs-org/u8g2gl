@@ -45,7 +45,7 @@
 
 #include "ui.hpp"
 
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include "call_log.h"
 #include "editor_host.h"
 #include "fixture_u8g2_fonts.h"

@@ -21,7 +21,7 @@
  */
 #include "editor_host.h"
 
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_types.h"
 

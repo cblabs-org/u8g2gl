@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: MIT
  *
- * File: test/stubs/U8G2lib.h
+ * File: test/stubs/U8g2lib.h
  * Purpose: The single authoritative host test double for U8G2. It records the
  *          calls the runtime makes so tests can assert on them without
  *          hardware.

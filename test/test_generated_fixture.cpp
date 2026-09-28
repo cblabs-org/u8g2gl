@@ -39,7 +39,7 @@
 #include "ui.hpp"
 
 #include "capacity_probe.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_obj.h"

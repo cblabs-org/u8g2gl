@@ -11,7 +11,7 @@
  * Purpose: Verification suite for the u8g2gl_draw_* free functions ([D-18]).
  *          Every one of the eight primitives asserts the specific U8G2 call
  *          issued and its arguments, not merely "does not crash" — WO3b
- *          extended the test double (test/stubs/U8G2lib.h) precisely so this
+ *          extended the test double (test/stubs/U8g2lib.h) precisely so this
  *          suite could stop being a smoke test. Degenerate geometry
  *          (zero/negative width, height or radius) is still checked
  *          separately: it must be a silent no-op rather than undefined
@@ -22,7 +22,7 @@
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_draw.h"
-#include "U8G2lib.h"
+#include "U8g2lib.h"
 
 // --- u8g2gl_draw_box ---
 
