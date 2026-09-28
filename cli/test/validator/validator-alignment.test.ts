@@ -254,7 +254,7 @@ describe('the codebase holds exactly one object count and one reserved-prefix li
   it('declares the object ceiling once', () => {
     const declaring = coreFiles().filter(([, text]) => /export const MAX_OBJECTS_PER_SCREEN|const MAX_OBJECTS_PER_SCREEN/.test(text));
     expect(declaring.map(([path]) => path.slice(coreDir.length + 1))).toEqual([
-      'generator/realise/model.ts',
+      'realise/model.ts',
     ]);
   });
 

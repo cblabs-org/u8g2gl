@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Matt McNeill (CB Labs)
  * SPDX-License-Identifier: MIT
  *
- * File: src/core/generator/realise/realise.ts
+ * File: src/core/realise/realise.ts
  * Purpose: §13.5 and §13.3 — decides, for every element in the whole document,
  *          whether it becomes a C++ object or a sequence of draw calls, and
  *          flattens what it decided into the object array and parent table the
@@ -47,20 +47,20 @@
  * - walkRealised():    Visit realised elements depth-first in document order
  */
 
-import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
-import type { Globals, SubjectDecl } from '../../schema/globals.js';
-import type { BindDef } from '../../schema/widget-manifest.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { Globals, SubjectDecl } from '../schema/globals.js';
+import type { BindDef } from '../schema/widget-manifest.js';
 import {
   isDrawingElement,
   type EffectiveManifest,
   type ManifestRegistry,
-} from '../../manifest/manifest-registry.js';
+} from '../manifest/manifest-registry.js';
 import {
   withInstantiation,
   type ExpandedElement,
   type ExpandedScreen,
   type ExpansionResult,
-} from '../../resolver/index.js';
+} from '../resolver/index.js';
 import {
   REALISATION_REASONS,
   U8G2GL_NO_PARENT,

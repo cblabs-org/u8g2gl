@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Matt McNeill (CB Labs)
  * SPDX-License-Identifier: MIT
  *
- * File: src/core/generator/realise/model.ts
+ * File: src/core/realise/model.ts
  * Purpose: The vocabulary realisation speaks, kept apart from the analysis that
  *          fills it in. §13.5 decides per instance whether an element becomes a
  *          C++ object or a sequence of draw calls, and §13.3 flattens what is
@@ -37,13 +37,13 @@
  * - RealisationResult:     Every screen, and what realisation refused
  */
 
-import type { Diagnostic } from '../../schema/diagnostic.js';
-import type { SubjectType } from '../../schema/globals.js';
-import type { Screen } from '../../schema/screen.js';
-import type { SourceLocation } from '../../schema/source-location.js';
-import type { BindDef } from '../../schema/widget-manifest.js';
-import type { BindingChild } from '../../schema/widget-node.js';
-import type { ExpandedElement } from '../../resolver/index.js';
+import type { Diagnostic } from '../schema/diagnostic.js';
+import type { SubjectType } from '../schema/globals.js';
+import type { Screen } from '../schema/screen.js';
+import type { SourceLocation } from '../schema/source-location.js';
+import type { BindDef } from '../schema/widget-manifest.js';
+import type { BindingChild } from '../schema/widget-node.js';
+import type { ExpandedElement } from '../resolver/index.js';
 
 /**
  * The parent-table value marking an object directly under `<view>` (§13.3).

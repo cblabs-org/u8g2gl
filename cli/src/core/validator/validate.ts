@@ -38,7 +38,7 @@ import type { Diagnostic } from '../schema/diagnostic.js';
 import { compareCodeUnits } from '../order.js';
 
 import type { ScreenPipeline } from '../resolver/index.js';
-import type { RealisationResult } from '../generator/realise/index.js';
+import type { RealisationResult } from '../realise/index.js';
 import { checkedTarget, pipelineOf } from './shared-model.js';
 import { validateSchema } from './validate-schema.js';
 import { validateReferences } from './validate-references.js';

@@ -34,7 +34,6 @@
  * - STYLES_UNIT:          The unit's file name
  * - STYLES_INIT_FUNCTION: The function that applies each style's properties
  * - styleIdentifiers():   The distinct styles emitted, in order
- * - styleProperties():    A style's declared properties by attribute, in applied order
  * - emitStylesUnit():     Emit `ui_styles.cpp`
  */
 
@@ -80,31 +79,6 @@ function styleValueProp(manifests: ManifestRegistry, attribute: string): PropDef
     );
   }
   return prop;
-}
-
-/**
- * @brief A style's declared properties, by attribute, in the order
- *        {@link emitStylesUnit} applies them.
- *
- * The editor's scene description lists a style this way (PR-04 WO11), from the
- * same table the firmware unit is written from, so the two cannot apply a
- * different set or a different order.
- *
- * @param declaration The style as declared.
- * @return Each declared property's attribute and value.
- */
-export function styleProperties(
-  declaration: StyleDecl,
-): readonly { readonly attribute: string; readonly value: string | number | boolean }[] {
-  const properties: { attribute: string; value: string | number | boolean }[] = [];
-  for (const property of STYLE_PROPERTIES) {
-    const value = declaration[property.key];
-    if (value === undefined || typeof value === 'object') {
-      continue;
-    }
-    properties.push({ attribute: property.attribute, value });
-  }
-  return properties;
 }
 
 /**

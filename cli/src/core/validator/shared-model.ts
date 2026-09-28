@@ -28,7 +28,7 @@
 
 import type { Target } from '../schema/project.js';
 import { createScreenPipeline, findTargetDisplay, type ScreenPipeline } from '../resolver/index.js';
-import { realiseScreens, type RealisationResult } from '../generator/realise/index.js';
+import { realiseScreens, type RealisationResult } from '../realise/index.js';
 import type { ValidateInput } from './validate.js';
 
 /**

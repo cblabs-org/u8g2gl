@@ -46,7 +46,8 @@
  *              (validate-identifiers.ts), not collisions. Isomorphic.
  *
  * Exports:
- * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS: §13.4's reserved spellings
+ * - RESERVED_IDENTIFIER_PREFIXES: §13.4's reserved prefixes
+ * - CPP_KEYWORDS:                     §13.4's reserved keywords (re-exported from schema/cpp-keywords.ts)
  * - SCREEN_FUNCTIONS, SCREEN_TABLES:  Suffixes of each screen's generated symbols
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
@@ -60,6 +61,7 @@
  * - mangleIdentifiers():              Build and collision-check a project's table
  */
 
+import { CPP_KEYWORDS } from '../schema/cpp-keywords.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Globals } from '../schema/globals.js';
 import type { SourceLocation } from '../schema/source-location.js';
@@ -82,23 +84,11 @@ import { formatInstantiation, formatLocation, withInstantiation, type Instantiat
  */
 export const RESERVED_IDENTIFIER_PREFIXES: readonly string[] = ['u8g2gl_', 'ui_'];
 
-/**
- * C++ keywords (§13.4). The same list Pass 7 checks author-written names
- * against; here it checks identifiers that only exist after prefixing.
- */
-export const CPP_KEYWORDS: ReadonlySet<string> = new Set([
-  'alignas', 'alignof', 'and', 'and_eq', 'asm', 'auto', 'bitand', 'bitor', 'bool', 'break',
-  'case', 'catch', 'char', 'char8_t', 'char16_t', 'char32_t', 'class', 'compl', 'concept',
-  'const', 'consteval', 'constexpr', 'constinit', 'const_cast', 'continue', 'co_await',
-  'co_return', 'co_yield', 'decltype', 'default', 'delete', 'do', 'double', 'dynamic_cast',
-  'else', 'enum', 'explicit', 'export', 'extern', 'false', 'float', 'for', 'friend', 'goto',
-  'if', 'inline', 'int', 'long', 'mutable', 'namespace', 'new', 'noexcept', 'not', 'not_eq',
-  'nullptr', 'operator', 'or', 'or_eq', 'private', 'protected', 'public', 'reflexpr',
-  'register', 'reinterpret_cast', 'requires', 'return', 'short', 'signed', 'sizeof', 'static',
-  'static_assert', 'static_cast', 'struct', 'switch', 'template', 'this', 'thread_local',
-  'throw', 'true', 'try', 'typedef', 'typeid', 'typename', 'union', 'unsigned', 'using',
-  'virtual', 'void', 'volatile', 'wchar_t', 'while', 'xor', 'xor_eq',
-]);
+// C++ keywords (§13.4) are the schema's one list, which Pass 7 checks
+// author-written names against too; here they check the identifiers that only
+// exist after prefixing. Re-exported so the resolver's public surface keeps
+// `CPP_KEYWORDS` where it has always been (PR-4R WO1).
+export { CPP_KEYWORDS };
 
 /** The five functions §13.7 emits per screen: `ui_screen_<name>_<suffix>`. */
 export const SCREEN_FUNCTIONS: readonly string[] = ['init', 'activate', 'deactivate', 'tick', 'render'];

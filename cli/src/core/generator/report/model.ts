@@ -45,7 +45,7 @@
  * - GenerateReport:     The three reports together
  */
 
-import type { RealisationReason } from '../realise/index.js';
+import type { RealisationReason } from '../../realise/index.js';
 
 /** {@link Measured.kind} — a figure the generator derived. */
 export const MEASURED_KIND = 'measured';

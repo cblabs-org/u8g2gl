@@ -41,7 +41,7 @@ import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
 import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
 import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { emitProjectFiles } from './emit/index.js';
-import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from './realise/index.js';
+import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from '../realise/index.js';
 
 /**
  * The not-yet-supported policy `generate()` applies. Fixed, not a parameter: a

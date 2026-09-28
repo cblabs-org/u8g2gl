@@ -15,11 +15,14 @@
  * - WidgetNode: Instantiated visual element in a view tree
  * - WidgetNodeChild: Union of valid child elements under a widget node
  * - BindingChild: Reactive data binding or conditional flag directive
+ * - FLAG_COMPARISONS: The runtime's `bind_flag_if_*` overload set (§8.4), the one table
  * - EventTrigger: Input interaction trigger ('press' | 'long_press' | 'value_changed')
  * - EventChild: Action handler attached to an element
  * - StyleChild: Inline style reference child element
+ * - namedStyles(): The styles an element names, in layering order
  */
 
+import type { SubjectType } from './globals.js';
 import type { SourceLocation } from './source-location.js';
 
 /**
@@ -103,6 +106,31 @@ export interface BindingChild {
 }
 
 /**
+ * What the runtime's `bind_flag_if_*` overloads accept (`u8g2gl_obj.h`), keyed
+ * by a {@link BindingChild}'s `type`, and the comparison that means "this flag
+ * is clear" when a draw call reads the subject itself.
+ *
+ * This mirrors the runtime's overload set rather than any element: an int
+ * subject compares four ways, a bool subject only for equality, and a string or
+ * time subject not at all. A comparison outside this table has no C++ to call,
+ * so it is a diagnostic rather than a compile error in the user's build.
+ *
+ * **The one table.** Pass 1 checks a directive's subject type against it, the
+ * firmware screen unit and the editor registry (PR-04 WO11) generate from it,
+ * so every journey accepts exactly the same directives and clears a guard with
+ * the same comparison. It lives beside the directive's shape, not in the
+ * emitter, so the validator need not import from the generator (PR-4R WO1).
+ */
+export const FLAG_COMPARISONS: Readonly<
+  Record<string, { readonly clearWhen: string; readonly subjectTypes: readonly SubjectType[] }>
+> = {
+  bind_flag_if_eq: { clearWhen: '!=', subjectTypes: ['int', 'bool'] },
+  bind_flag_if_not_eq: { clearWhen: '==', subjectTypes: ['int', 'bool'] },
+  bind_flag_if_gt: { clearWhen: '<=', subjectTypes: ['int'] },
+  bind_flag_if_lt: { clearWhen: '>=', subjectTypes: ['int'] },
+};
+
+/**
  * Semantic user input interaction trigger (§12.3).
  */
 export type EventTrigger = 'press' | 'long_press' | 'value_changed';
@@ -135,4 +163,24 @@ export interface StyleChild {
   readonly name: string;
   /** Source location where this style child was declared. */
   readonly loc?: SourceLocation;
+}
+
+/**
+ * @brief The styles an element names, in the order they layer: the `style`
+ *        attribute, then each `<style>` child as written (§10).
+ *
+ * Read by Pass 1 and by both emission targets, so it lives with the node it
+ * reads rather than in either layer (PR-4R WO1).
+ */
+export function namedStyles(node: WidgetNode): string[] {
+  const names: string[] = [];
+  if (typeof node.attributes.style === 'string' && node.attributes.style !== '') {
+    names.push(node.attributes.style);
+  }
+  for (const child of node.children) {
+    if ('kind' in child && child.kind === 'style' && child.name !== '') {
+      names.push(child.name);
+    }
+  }
+  return names;
 }

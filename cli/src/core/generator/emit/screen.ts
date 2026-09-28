@@ -63,6 +63,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
+import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import {
   screenFunctionIdentifier,
@@ -76,7 +77,7 @@ import {
   type RealisedElement,
   type RealisedScreen,
   type VisibilityTerm,
-} from '../realise/index.js';
+} from '../../realise/index.js';
 import { drawArgumentSources, drawCallFor, SUBJECT_READ_SUFFIX } from './draw-args.js';
 import { boundPositionOrigin } from './placement.js';
 import {
@@ -85,7 +86,6 @@ import {
   FLAG_ENUMERATOR_PATTERN,
   flagComparison,
   INIT_STEPS,
-  namedStyles,
   placeScreen,
   rectangleOf,
   styleOverridesOf,

@@ -37,9 +37,9 @@
  * - cppStringLiteral():  A C++ string literal, escaped (§13.2)
  * - cppEnumerator():     An enumerator from a manifest's `emit` pattern
  * - cppValue():          Spell one prop's resolved value as C++ (§13.2)
- * - COLOR_VALUES:        The values a `color` prop accepts
  */
 
+import type { DrawColor } from '../../schema/globals.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import {
   fontIdentifier,
@@ -49,25 +49,21 @@ import {
 } from '../../resolver/index.js';
 
 /**
- * The monochrome draw colours (§10) and their enumerators (`u8g2gl_types.h`).
+ * The enumerator (`u8g2gl_types.h`) for each monochrome draw colour (§10).
  *
  * A `type="color"` prop takes one of three values, so §13.2 maps it directly
  * rather than through an `emit` pattern. `xor` uppercases to `XOR`, which is why
  * this is a table and not a string concatenation.
+ *
+ * The values themselves are `COLOR_VALUES` in `schema/globals.ts`, which the
+ * validator reads too; only their C++ spelling is emission's. Keyed by
+ * `DrawColor`, so the compiler requires exactly one enumerator per value.
  */
-const COLOR_ENUMERATORS: Readonly<Record<string, string>> = {
+const COLOR_ENUMERATORS: Readonly<Record<DrawColor, string>> = {
   '0': 'U8G2GL_COLOR_0',
   '1': 'U8G2GL_COLOR_1',
   xor: 'U8G2GL_COLOR_XOR',
 };
-
-/**
- * The values a `type="color"` prop accepts, in {@link COLOR_ENUMERATORS} order.
- *
- * Exported (PR-04 WO11) so the editor registry can generate one branch per
- * colour, each spelled by {@link cppValue}, without a second list of colours.
- */
-export const COLOR_VALUES: readonly string[] = Object.keys(COLOR_ENUMERATORS);
 
 /** Characters with a short C++ escape, rather than a numeric one. */
 const SHORT_ESCAPES: Readonly<Record<string, string>> = {
@@ -242,7 +238,9 @@ export function cppValue(prop: PropDef, value: string): string {
     case 'style':
       return styleIdentifier(value);
     case 'color': {
-      const enumerator = COLOR_ENUMERATORS[value];
+      // Looked up by the unvalidated string, as before the table was keyed by
+      // DrawColor: a value outside it is a validation gap, thrown below.
+      const enumerator = (COLOR_ENUMERATORS as Readonly<Record<string, string>>)[value];
       if (enumerator === undefined) {
         throw unspellable(prop, value, `a colour is one of ${Object.keys(COLOR_ENUMERATORS).join(', ')} (§10)`);
       }

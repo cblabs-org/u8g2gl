@@ -51,7 +51,7 @@
 import type { EffectiveManifest } from '../../manifest/manifest-registry.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import { subjectIdentifier, type ResolvedElement } from '../../resolver/index.js';
-import type { RealisedBinding } from '../realise/index.js';
+import type { RealisedBinding } from '../../realise/index.js';
 import { boundPositionOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
 import { cppValue } from './value.js';
 

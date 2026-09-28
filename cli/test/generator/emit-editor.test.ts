@@ -29,7 +29,8 @@ import {
   SCENE_FILE,
 } from '../../src/core/generator/emit/index.js';
 import { drawFunctionOf } from '../../src/core/generator/emit/draw-args.js';
-import { FLAG_COMPARISONS, INIT_STEPS } from '../../src/core/generator/emit/screen-model.js';
+import { INIT_STEPS } from '../../src/core/generator/emit/screen-model.js';
+import { FLAG_COMPARISONS } from '../../src/core/schema/widget-node.js';
 import { cppValue } from '../../src/core/generator/emit/value.js';
 import { isDrawingElement, type ManifestRegistry } from '../../src/core/manifest/index.js';
 import { parseWidgetManifestFile } from '../../src/core/parser/index.js';

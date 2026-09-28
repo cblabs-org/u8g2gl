@@ -49,13 +49,15 @@
  */
 
 import { BINDING_FLAGS, isDrawingElement, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
+import { COLOR_VALUES } from '../../schema/globals.js';
 import type { BindDef, PropDef, PropType } from '../../schema/widget-manifest.js';
+import { FLAG_COMPARISONS } from '../../schema/widget-node.js';
 import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
 import { POSITION_BINDINGS } from './placement.js';
-import { classOf, FLAG_COMPARISONS, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
+import { classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
-import { COLOR_VALUES, cppEnumerator, cppStringLiteral, cppValue } from './value.js';
+import { cppEnumerator, cppStringLiteral, cppValue } from './value.js';
 
 /** The editor registry unit (§13.7's file set does not name it; [UD-4] does). */
 export const EDITOR_REGISTRY_UNIT = 'ui_editor_registry.cpp';
@@ -121,7 +123,7 @@ export function editorTypeEnumerator(type: PropType): string {
 
 // valuesOf
 // The spellings an enum or colour prop accepts, in declaration order: an enum's
-// `values=` list, or the colours `value.ts` maps.
+// `values=` list, or the schema's `COLOR_VALUES`, each of which `value.ts` maps.
 function valuesOf(prop: PropDef): readonly string[] {
   if (prop.type === 'color') {
     return COLOR_VALUES;

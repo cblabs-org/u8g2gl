@@ -14,7 +14,8 @@
  * - GENERATED_MARKER, HeaderStamp, formatHeaderStamp, isGeneratedContent (header.ts)
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
  *   GENERATE_REFUSAL_POLICY (generate.ts)
- * - Realisation and capacities — §13.5, §13.3, [D-21] (realise/)
+ * - Realisation and capacities — §13.5, §13.3, [D-21] (re-exported from ../realise/,
+ *   which the validator also reads, so it sits outside both layers — PR-4R WO1)
  * - Emission — §13.2's value spelling, the draw-argument order and the
  *   project-level units (emit/). WO10 and WO11 emit through these helpers
  *   rather than spelling a setter call or an argument list of their own.
@@ -37,6 +38,6 @@ export {
   type GenerateResult,
   type GeneratedFile,
 } from './generate.js';
-export * from './realise/index.js';
+export * from '../realise/index.js';
 export * from './emit/index.js';
 export * from './report/index.js';

@@ -40,7 +40,7 @@
 
 import type { SubjectDecl, SubjectType } from '../../schema/globals.js';
 import { SUBJECTS_INIT_FUNCTION, subjectIdentifier, subjectSetterIdentifier } from '../../resolver/index.js';
-import type { SubjectObservers } from '../realise/index.js';
+import type { SubjectObservers } from '../../realise/index.js';
 import { cppStringLiteral } from './value.js';
 import { declarationError, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 import type { Diagnostic } from '../../schema/diagnostic.js';
