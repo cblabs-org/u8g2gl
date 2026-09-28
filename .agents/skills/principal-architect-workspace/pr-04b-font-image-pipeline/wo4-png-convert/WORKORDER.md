@@ -217,33 +217,71 @@ fix it.
 
 ## Completion Report (written by the worker at task completion)
 
-```markdown
 ---
 ## Completion Report
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path` — what changed and why
+- `cli/src/core/images/png-decode.ts` (new) - PNG decoder from the W3C spec: signature, chunk walk with CRC on every chunk, IHDR validation (colour type x depth table), PLTE/tRNS (palette alpha; grey and RGB colour keys compared at native depth), multi-IDAT, inflate through the global `DecompressionStream('deflate')` (written without awaiting the write side, no `Blob`, so the browser sandbox needs only that one global; output capped at the size the header implies), all five filters, expansion to RGBA8. Refuses, as reasons and never throws: bad signature, CRC failure, truncation/missing IEND, unknown critical chunk, Adam7 ("save it non-interlaced"), zero size, bad depth for type, short/long/corrupt data, unknown filter type, palette index out of range.
+- `cli/src/core/images/png-to-xbm.ts` (new) - `rgbaToXbm` (alpha over white, Rec. 601, `Y < threshold` sets, default 128, Floyd-Steinberg) and `convertPng` (decode then convert, at the PNG's own size).
+- `cli/src/core/images/convert-decl.ts` (new) - the one definition of a well-formed `<convert>` (`mode`, `threshold`, `width`, `height`), shared by the validator and the asset step so they cannot disagree.
+- `cli/src/core/images/xbm.ts` - moved from `generator/emit/xbm.ts` (git mv, not duplicated); `XbmImage` is now the one image model. `cli/src/core/images/index.ts` (new) barrel; exported from `core/index.ts` and `browser/index.ts`.
+- `cli/src/core/assets/compile-project-assets.ts` - produces every image (both kinds), see the image model below. `<xbm>` missing/malformed diagnostics moved here with the same codes, text and locations.
+- `cli/src/core/generator/generate.ts`, `emit/index.ts`, `emit/unit.ts`, `emit/images.ts`, `report/budget.ts` - `assets` removed from `GenerateInput`, `ProjectEmissionInput`, `ProjectEmitInput` and `ReportInput`, replaced by `images`; the guard covers images (`U8G2GL_MISSING_COMPILED_IMAGE`); the `<convert>` refusal/deferred-comment block is gone; a converted image is emitted like an `<xbm>` with a provenance comment. The budget line is renamed `image data (bitmap arrays)`.
+- `cli/src/core/validator/validate-schema.ts` - validates `<convert>` (INVALID_ENUM_VALUE for `mode`, TYPE_MISMATCH for threshold/size), no file access. `validate-not-yet-supported.ts` - `<convert>` entry removed. `parser/parse-globals.ts` and `schema/globals.ts` - `mode` is now the string as written instead of a cast to the union (`globals.ts` is one line outside the box's literal list but is the type parse-globals must satisfy; see Decisions).
+- `cli/src/core/schema/diagnostic.ts` - two new codes, `U8G2GL_IMAGE_CONVERT_FAILED` and `U8G2GL_MISSING_COMPILED_IMAGE` (no existing code fit: the BDF ones are font-specific).
+- `cli/src/node/cli.ts`, `load-project.ts` - reads `<convert>` sources; the CLI passes `compiledAssets` to the report and the editor target.
+- Item 6: `emit/generated-config.ts` ("WO4 F5" removed) and `emit/screen.ts` ("PR-09" removed); the third (`images.ts`) went with the refusal block. `cli/test/generator/no-ticket-numbers.test.ts` generates the committed fixture for both targets and fails on `/\b(WO|PR-)\d/` with file and line.
+- Tests: `test/images/{png-decode,png-to-xbm,parity,fixture-logo}.test.ts`, `test/assets/compile-project-images.test.ts`, `test/validator/validate-convert.test.ts`, `test/generator/emit-images.test.ts`, `test/integration/generate-convert.test.ts`, helpers `png-builder.ts` (independent PNG writer), `browser-bundle.ts` (WO2's harness moved out of `test/fonts/parity.test.ts`, which now uses it), `compiled-assets.ts`, `fixture-logo.ts`; existing tests updated for the new API and the removed refusal (`not-yet-supported`, `generate`, `budget-report`, `emit-*`, `refresh-goldens.mjs`).
+- Fixture: `test/generated_fixture/globals.xml` + `screens/screen_bounds.xml` (a dithered `<convert>` drawn on the bounds screen), `assets/logo_mark.png` (produced by `cli/test/fixtures/make-fixture-logo.ts`, zlib level 0 so it is byte-stable; a test pins it), goldens regenerated and reviewed, `test/test_editor_parity.cpp` (`provide_image("logo_mark", ...)`), `test/test_generated_fixture.cpp` (busiest-screen count 8 to 9, one new test that the logo reaches `drawXBMP`). `cli/test/integration/fixtures/valid-project/images/wifi.xbm` added (see Decisions).
+- Commit `aee1a57` on `u8g2gl-fonts/wo4-png-convert`.
 
 ### The image model
-<!-- The asset step's final signature; how the emitter, budget and editor read images. -->
+```ts
+compileProjectAssets(input: { globals: Globals; assets: ReadonlyMap<string, Uint8Array> }): Promise<{
+  fonts: ReadonlyMap<string, CompiledFont>;
+  images: ReadonlyMap<string, XbmImage>;   // <xbm> parsed + <convert> converted, declaration order
+  diagnostics: readonly Diagnostic[];      // fonts first, then images, each in declaration order
+  failedFonts: ReadonlySet<string>;
+  failedImages: ReadonlySet<string>;       // every image declaration that produced nothing
+}>
+```
+`generate({ ..., compiledAssets })` takes images from `compiledAssets.images` and passes them to emission as `ProjectEmitInput.images`; `buildGenerateReport({ ..., images })` and the editor target (`emitEditorFiles({ ..., images })`, scene image names) read the same map, so nothing measures or emits from the raw bytes any more. `generate()`'s guard emits `U8G2GL_MISSING_COMPILED_IMAGE` for a declared image that is neither in `images` nor in `failedImages`.
 
 ### Measurements
-- Decoder coverage (colour types x depths, filters):
-- Built-CLI budget and emitted comments:
-- Suite counts (C++, CLI), warnings:
+- Decoder coverage: every colour type at every allowed depth (0: 1/2/4/8/16, 2: 8/16, 3: 1/2/4/8, 4: 8/16, 6: 8/16), width 5 so sub-byte depths end mid-byte; all five filters at 1, 2, 3 and 4 bytes per pixel and mixed per row; palette with and without tRNS; grey and RGB colour keys; 3 IDATs; each refused input in *The rules*, plus bad depth, bad header sizes, non-zlib data, unknown filter, bad palette index. 48 decoder tests, 20 conversion tests.
+- Built-CLI end to end (scratch project in `tmp/`, one threshold and one dither `<convert>`, the fixture logo at 16x16):
+  - Budget: `image data (bitmap arrays) (2)   64 bytes` (derivable flash 64 bytes).
+  - `// mark_hard: converted from assets/logo_mark.png, 16x16, mode threshold, threshold 100, 32 bytes.`
+  - `// mark_soft: converted from assets/logo_mark.png, 16x16, mode dither, threshold 128, 32 bytes.`
+- Parity: 7 conversion cases (every colour family, both modes, several IDATs) and 3 refusals give identical bytes / reasons in Node and in a bare `vm` context holding only `DecompressionStream` and `console`.
+- Suite counts: **CLI 1265** (baseline 1161, +104), lint (`eslint` + `tsc -p tsconfig.test.json`) and `npm run build` clean. **C++ 383** (baseline 382, +1), one known skip (`SizeOfReport.ThirtyTwoBitTarget`), **zero warnings**. The suites were run one after the other.
 
 ### Decisions Made
-- Including the dither rounding rule, stated exactly.
+- **Dither rounding rule (exact).** Pixel value `v` = grey plus accumulated error, clamped to 0..255; `q = 0` if `v < threshold` else `255` (`q = 0` sets the bit); `e = v - q`. Right, below-left and below neighbours receive `Math.trunc(7e/16)`, `Math.trunc(3e/16)`, `Math.trunc(5e/16)` (toward zero); the below-right neighbour receives the remainder `e - (the three)`, so the four shares sum to `e` exactly and error is conserved. Error falling outside the image is dropped. The 2x2 mid-grey case is worked by hand in `png-to-xbm.test.ts` (result rows `0b10`, `0b01`).
+- **Size check location.** `convertPng()` converts at the PNG's own size (it has no declaration to name); `compileProjectAssets()` compares to the declared size and produces "Image 'logo' declares 32x32 but 'assets/logo.png' is 48x40; resize the PNG." with `U8G2GL_IMAGE_CONVERT_FAILED`. The decode/convert work is done before the check; negligible for icon-sized art.
+- **A `<convert>` the validator rejects** (bad mode/threshold/size) is not converted and adds no diagnostic in the asset step, but is put in `failedImages`, so each defect is reported once (by `validate`, from the same `convertDeclProblems()`), and the guard does not add an internal-error diagnostic on top.
+- **`ConvertImageDecl.mode` is now `string`**, not the union, in `schema/globals.ts` (one line beyond the box's literal list): the parser can no longer cast an unchecked value to a union it is not, and the validator reports bad values. The schema vocabulary is unchanged.
+- **Grey/colour keys.** Greyscale and RGB `tRNS` colour keys are honoured (compared at native depth); `tRNS` on types 4 and 6 is ignored. Palette `tRNS` longer than the palette is refused.
+- **Nonstandard PNG leniency.** Bytes after IEND are ignored; PLTE on types 0/4 is ignored; IDAT contiguity is not enforced. Decoder output is capped at 64 MiB.
+- **New codes rather than reuse**, as above. `U8G2GL_INVALID_ENUM_VALUE` for `mode` as the WORKORDER suggested; `U8G2GL_TYPE_MISMATCH` for threshold and size (the code the parser already uses for non-integer values).
+- **Budget line renamed** to `image data (bitmap arrays)`; this is a `--json` field value, so a consumer matching the old string must update (0.9.0 is unreleased).
+- **`assets` removed** from `GenerateInput`/emit/report inputs rather than left as dead data; the host still reads bytes and passes them to `compileProjectAssets()`.
+- **Existing `valid-project` integration fixture** referenced `images/wifi.xbm` but never shipped it: it only worked because a validation error stopped generation before emission read the file. The asset step now reads it first, as it already did for a missing `<bdf>`, so the missing file surfaced. I added the file (an 8x8 XBM) rather than change the tests' meaning; a missing asset is now reported together with other errors, which is the better behaviour.
+- **Fixture PNG stored at zlib level 0**, because a compressed stream's bytes depend on the zlib version and the file must be byte-stable; the decoder's compressed path is exercised by the unit tests (`node:zlib` default level).
+- **Attribution.** Commit ends `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`, the model actually running.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, what to avoid
+- The first `crcOf` helper in `png-decode.test.ts` sliced the IHDR wrongly (offsets: signature 8, length+type 8, data at [16,29), CRC at [29,33)), so every "patched header" test failed on the CRC check instead of the header rule; the tests now use `refreshIhdrCrc`. If a header-patching test reports "fails its CRC check", suspect the helper before the decoder.
+- `describe` bodies cannot `await`: `emit-golden.test.ts` and `budget-report.test.ts` now generate at module level with top-level `await`.
+- macOS `sed -i` takes the next argument as a backup suffix; use `sed -i ''`.
+- Do not "fix" a fixture-PNG diff by regenerating with compression: the byte-stability test pins level 0.
 
 ### Out-of-Scope Findings
-- Finding and suggested action
+- `docs/implementation_plan.md:276` still describes PR-04b as future work ("Split out of PR-04, which refuses both with a named error"); `docs/design_spec.md` section 14.2 and section 18 (the budget line name, the `<convert>` size and polarity rules recorded in PROJECT.md) should be updated to say what shipped. `docs/` was outside my box. Suggest a docs work order in this PR.
+- PROJECT.md's rule that size mismatch is an error and resampling is additive later is now implemented; the schema question for the CA (whether `<convert>` should ever resample) remains open as the WORKORDER said.
 
 ### Blockers
 (none)
-```
