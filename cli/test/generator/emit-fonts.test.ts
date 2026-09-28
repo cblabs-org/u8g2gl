@@ -201,6 +201,70 @@ describe('<bdf> through generate() (PR-04b WO3)', () => {
     const codes = result.diagnostics.map((d) => d.code);
     expect(codes).toContain('U8G2GL_MISSING_COMPILED_FONT');
   });
+
+  // The guard's three cases (PR-04b WO3b item 1), now driven by
+  // compiledAssets.failedFonts rather than by reading offendingText: a font
+  // that compiled, one whose compile failed (compileProjectAssets() already
+  // reported it — the guard must not pile on a second, misleading diagnostic),
+  // and one never submitted to compileProjectAssets() at all.
+
+  it('a font that compiled: no U8G2GL_MISSING_COMPILED_FONT diagnostic', async () => {
+    const globalsXml = `<globals><fonts><bdf name="small_9" src="fonts/4x6.bdf" range="0x20-0x7F" /></fonts></globals>\n`;
+    const screenBody = `<u8g2gl_label name="lbl" x="0" y="0" width="128" height="12" font="small_9" text="Hi" />`;
+    const assets = new Map([['fonts/4x6.bdf', FOUR_BY_SIX()]]);
+
+    const result = await generateWith(globalsXml, screenBody, assets);
+
+    expect(result.errors).toBe(0);
+    expect(result.diagnostics.map((d) => d.code)).not.toContain('U8G2GL_MISSING_COMPILED_FONT');
+  });
+
+  it('a font whose compile failed: exactly the one diagnostic compileProjectAssets() raised, never a second', async () => {
+    const globalsXml = `<globals><fonts><bdf name="small_9" src="fonts/bad.bdf" /></fonts></globals>\n`;
+    const screenBody = `<u8g2gl_label name="lbl" x="0" y="0" width="128" height="12" font="small_9" text="Hi" />`;
+    const assets = new Map([['fonts/bad.bdf', new TextEncoder().encode('this is not a BDF file\n')]]);
+
+    const result = await generateWith(globalsXml, screenBody, assets);
+
+    expect(result.errors).toBeGreaterThan(0);
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toEqual(['U8G2GL_BDF_COMPILE_FAILED']);
+    expect(codes).not.toContain('U8G2GL_MISSING_COMPILED_FONT');
+  });
+
+  it('a font never submitted to compileProjectAssets(): U8G2GL_MISSING_COMPILED_FONT', async () => {
+    // compileProjectAssets() runs over an empty Globals, so 'dropped' is
+    // compiled by nothing and diagnosed by nothing — exactly what a host that
+    // silently dropped a font before calling compileProjectAssets() would
+    // produce, distinct from the "never called it at all" test above.
+    const globalsXml = `<globals><fonts><bdf name="dropped" src="fonts/4x6.bdf" /></fonts></globals>\n`;
+    const screenBody = `<u8g2gl_label name="lbl" x="0" y="0" width="128" height="12" font="dropped" text="Hi" />`;
+    const assets = new Map([['fonts/4x6.bdf', FOUR_BY_SIX()]]);
+    const compiledAssets = await compileProjectAssets({ globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] }, assets });
+
+    const project = parseProjectFile(PROJECT_XML, 'u8g2gl.xml').value!;
+    const globals = parseGlobalsFile(globalsXml, 'globals.xml').value!;
+    const screen = parseScreenFile(
+      `<screen name="home"><view>${screenBody}</view></screen>`,
+      'screens/screen_home.xml',
+    ).value!;
+    const result = generate({
+      project,
+      globals,
+      screens: [screen],
+      manifests: frameworkRegistry(),
+      catalogue: CATALOGUE,
+      loadDiagnostics: [],
+      hasProjectManifest: true,
+      generatorVersion: '9.9.9',
+      assets,
+      compiledAssets,
+    });
+
+    expect(result.errors).toBeGreaterThan(0);
+    const codes = result.diagnostics.map((d) => d.code);
+    expect(codes).toEqual(['U8G2GL_MISSING_COMPILED_FONT']);
+  });
 });
 
 describe('emitFontsUnit() — comment sanitisation (PR-04b WO3 item 5)', () => {

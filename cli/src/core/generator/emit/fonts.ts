@@ -100,7 +100,7 @@ function sanitiseCommentField(text: string): string {
 //   font     — the <bdf> declaration; only `range` is read
 //   compiled — its compiled result, for the glyph counts
 function rangeDescription(font: BdfFontDecl, compiled: CompiledFont): string {
-  const range = font.range ?? 'unfiltered (every glyph — no range declared, WO3 item 1)';
+  const range = font.range ?? 'none — every glyph';
   return `range: ${range} — ${compiled.selectedGlyphs} of ${compiled.totalGlyphs} glyphs, ${compiled.declaredLength} bytes`;
 }
 

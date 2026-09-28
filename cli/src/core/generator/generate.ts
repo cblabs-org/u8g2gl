@@ -218,8 +218,14 @@ function missingCompiledFontDiagnostic(font: BdfFontDecl): Diagnostic {
 // asset compile step's own diagnostics (a missing source file, or bdfconv
 // failing — both located and named by compileProjectAssets()), plus a loud,
 // internal-error diagnostic for any <bdf> that is neither compiled nor already
-// accounted for by one of those — which can only mean the host never called
+// known to have failed there — which can only mean the host never called
 // compileProjectAssets() at all, or silently dropped a font it returned.
+//
+// The guard is driven by compiledAssets.failedFonts, an explicit set of font
+// names (PR-04b WO3b item 1) — not by re-reading `offendingText` off the asset
+// diagnostics, which is presentation data free to be reworded; WO3 read it for
+// exactly this decision, so rewording a diagnostic used to silently change
+// which fonts this guard fired for.
 //   input         — generate's own input; reads `globals.fonts` and `compiledAssets`
 //   compiledFonts — input.compiledAssets?.fonts ?? new Map()
 function compiledFontDiagnostics(
@@ -227,12 +233,10 @@ function compiledFontDiagnostics(
   compiledFonts: ReadonlyMap<string, CompiledFont>,
 ): readonly Diagnostic[] {
   const assetDiagnostics = input.compiledAssets?.diagnostics ?? [];
-  const diagnosedFontNames = new Set(
-    assetDiagnostics.map((d) => d.offendingText).filter((name): name is string => name !== undefined),
-  );
+  const failedFonts = input.compiledAssets?.failedFonts ?? new Set<string>();
   const missing: Diagnostic[] = [];
   for (const font of input.globals.fonts ?? []) {
-    if (font.kind === 'bdf' && !compiledFonts.has(font.name) && !diagnosedFontNames.has(font.name)) {
+    if (font.kind === 'bdf' && !compiledFonts.has(font.name) && !failedFonts.has(font.name)) {
       missing.push(missingCompiledFontDiagnostic(font));
     }
   }

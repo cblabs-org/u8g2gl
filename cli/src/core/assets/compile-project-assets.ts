@@ -28,16 +28,18 @@
  *              because `generate()` refuses a document with a validation error
  *              before this step's caller has any reason to run it.
  *
- *              Every diagnostic's `offendingText` is the font's own name. This is
- *              deliberately not the same convention `images.ts` uses for `<xbm>`
- *              (`image.src`) — `generate()` cross-checks a missing compiled
- *              entry against these diagnostics by font name (WO3 item 3's
- *              "the host forgot to call this" guard), so the name has to be
- *              recoverable from the diagnostic without re-parsing prose.
+ *              Every diagnostic's `offendingText` follows the same convention
+ *              `images.ts` uses for `<xbm>` (the declaration's own `src`) —
+ *              PR-04b WO3b item 1 moved `generate()`'s "the host forgot to call
+ *              this" guard off of parsing that field, so nothing here needs the
+ *              font's name recoverable from a presentation field any more.
+ *              {@link CompileProjectAssetsResult.failedFonts} is the explicit
+ *              set the guard drives from instead.
  *
  * Exports:
  * - CompileProjectAssetsInput:  Globals and the asset bytes read for them
- * - CompileProjectAssetsResult: Compiled fonts by name, and any diagnostics
+ * - CompileProjectAssetsResult: Compiled fonts by name, any diagnostics, and
+ *                                the set of font names that failed to compile
  * - compileProjectAssets():     Compiles every declared `<bdf>` font
  */
 
@@ -70,12 +72,22 @@ export interface CompileProjectAssetsResult {
    * order (§13.9), located at the font's own declaration.
    */
   readonly diagnostics: readonly Diagnostic[];
+  /**
+   * Declared `name` of every `<bdf>` that did not compile — explicit data for
+   * `generate()`'s "the host forgot to call this" guard (PR-04b WO3b item 1),
+   * rather than a control-flow decision inferred by reading a diagnostic's
+   * `offendingText` (a presentation field, free to be reworded).
+   */
+  readonly failedFonts: ReadonlySet<string>;
 }
 
 // missingBdfSource
 // The diagnostic for a <bdf> whose src file did not come through in `assets` —
 // missing, unreadable, or outside the project root, the same condition
 // images.ts's missingAsset() reports for an <xbm>, applied to a <bdf>'s source.
+// offendingText is font.src, images.ts's own convention (PR-04b WO3b item 1) —
+// the guard that used to read this field is now driven by
+// CompileProjectAssetsResult.failedFonts instead.
 //   font — the declaration
 function missingBdfSource(font: BdfFontDecl): Diagnostic {
   return {
@@ -88,13 +100,14 @@ function missingBdfSource(font: BdfFontDecl): Diagnostic {
       `Font '${font.name}' names '${font.src}', which could not be read relative to the project ` +
       `directory. A <bdf> font is compiled into the generated code (§14.1), so the build cannot ` +
       `proceed without it.`,
-    offendingText: font.name,
+    offendingText: font.src,
   };
 }
 
 // bdfCompileFailed
 // The diagnostic for a <bdf> whose bytes were read but that bdfconv could not
 // compile — compileBdf()'s own reason, plus its stderr lines if it ran at all.
+// offendingText is font.src, images.ts's own convention (PR-04b WO3b item 1).
 //   font   — the declaration
 //   reason — compileBdf()'s human-readable reason
 //   stderr — bdfconv's own stderr lines, [] if it never ran
@@ -107,7 +120,7 @@ function bdfCompileFailed(font: BdfFontDecl, reason: string, stderr: readonly st
     line: font.loc?.line ?? 1,
     column: font.loc?.column ?? 1,
     message: `Font '${font.name}' (${font.src}) could not be compiled: ${reason}${stderrClause}`,
-    offendingText: font.name,
+    offendingText: font.src,
   };
 }
 
@@ -153,12 +166,14 @@ export async function compileProjectAssets(input: CompileProjectAssetsInput): Pr
 
   const fonts = new Map<string, CompiledFont>();
   const diagnostics: Diagnostic[] = [];
+  const failedFonts = new Set<string>();
   for (const outcome of outcomes) {
     if (!outcome.ok) {
       diagnostics.push(outcome.diagnostic);
+      failedFonts.add(outcome.name);
       continue;
     }
     fonts.set(outcome.name, outcome.compiled);
   }
-  return { fonts, diagnostics };
+  return { fonts, diagnostics, failedFonts };
 }

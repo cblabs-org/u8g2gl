@@ -8,8 +8,10 @@
  *          async step both hosts must call before generate(). Covers every
  *          diagnostic it raises, that results and diagnostics come out in
  *          declaration order regardless of which font's compile settles first,
- *          and that a successfully compiled font's bytes are exactly compileBdf()'s
- *          own.
+ *          that a successfully compiled font's bytes are exactly compileBdf()'s
+ *          own, that `offendingText` follows images.ts's own `src` convention,
+ *          and that `failedFonts` names every font that did not compile
+ *          (PR-04b WO3b item 1).
  * Description: Builds a `Globals` value directly (no XML parsing needed — this
  *              module reads only `globals.fonts`) and an in-memory asset map, so
  *              these tests exercise the isomorphic core with no filesystem.
@@ -61,6 +63,7 @@ describe('compileProjectAssets()', () => {
     if (!direct.ok || compiled === undefined) return;
     expect(compiled.bytes).toEqual(direct.bytes);
     expect(compiled.declaredLength).toBe(direct.declaredLength);
+    expect(result.failedFonts).toEqual(new Set());
   });
 
   it('reports a missing source file as U8G2GL_MISSING_FILE, located at the declaration', async () => {
@@ -75,9 +78,13 @@ describe('compileProjectAssets()', () => {
       severity: 'error',
       file: 'globals.xml',
       line: 20,
-      offendingText: 'small_9',
+      // images.ts's own convention (PR-04b WO3b item 1): the declaration's
+      // `src`, not its `name` — generate()'s guard reads `failedFonts` instead
+      // of this field now, so nothing needs the name recoverable from here.
+      offendingText: 'fonts/missing.bdf',
     });
     expect(result.diagnostics[0]?.message).toContain('fonts/missing.bdf');
+    expect(result.failedFonts).toEqual(new Set(['small_9']));
   });
 
   it('reports a bdfconv failure as U8G2GL_BDF_COMPILE_FAILED, with the reason', async () => {
@@ -93,9 +100,10 @@ describe('compileProjectAssets()', () => {
       severity: 'error',
       file: 'globals.xml',
       line: 21,
-      offendingText: 'small_9',
+      offendingText: 'fonts/bad.bdf',
     });
     expect(result.diagnostics[0]?.message).toContain('No glyphs compiled');
+    expect(result.failedFonts).toEqual(new Set(['small_9']));
   });
 
   it('produces results and diagnostics in declaration order regardless of completion order', async () => {
@@ -114,7 +122,8 @@ describe('compileProjectAssets()', () => {
     const result = await compileProjectAssets({ globals, assets });
 
     expect([...result.fonts.keys()]).toEqual(['z_slow', 'a_fast']);
-    expect(result.diagnostics.map((d) => d.offendingText)).toEqual(['a_missing']);
+    expect(result.diagnostics.map((d) => d.offendingText)).toEqual(['fonts/missing.bdf']);
+    expect(result.failedFonts).toEqual(new Set(['a_missing']));
   });
 
   it('ignores <builtin> fonts entirely — nothing to compile, nothing to diagnose', async () => {
@@ -130,5 +139,6 @@ describe('compileProjectAssets()', () => {
 
     expect(result.fonts.size).toBe(0);
     expect(result.diagnostics).toEqual([]);
+    expect(result.failedFonts).toEqual(new Set());
   });
 });
