@@ -37,7 +37,6 @@ const PROJECT_XML = `<u8g2gl schema="0.4" name="deferred" version="1.0.0">
 
 const GLOBALS_XML = `<globals>
     <fonts>
-        <bdf name="tall_12" src="fonts/tall_12.bdf" />
         <builtin name="u8g2_font_6x10_mr" />
     </fonts>
     <images>
@@ -112,19 +111,15 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const found = deferred(validateNotYetSupported(inputWith()));
     const byText = new Map(found.map((d) => [d.offendingText, d]));
 
+    // <bdf> is no longer reported: PR-04b WO3 removed its refusal — it compiles now.
     expect(found.map((d) => d.offendingText).sort()).toEqual(
-      ['bdf', 'column', 'convert', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
+      ['column', 'convert', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
     );
     for (const pr9 of ['focus_ring', 'event_cb', 'screen_load_event', 'screen_back_event']) {
       expect(byText.get(pr9)?.message).toContain('PR-09');
     }
     expect(byText.get('column')?.message).toContain('PR-08');
     expect(byText.get('column')?.message).toContain('<wd_list>');
-    // Specific enough for PR-04b to find and replace: the declaration, the tool, the PR.
-    expect(byText.get('bdf')?.message).toBe(
-      "<bdf> font 'tall_12' is not yet supported: compiling BDF fonts with bdfconv (§14) — it is " +
-        "delivered in PR-04b, and 'u8g2gl generate' refuses it until then. Declare a <builtin> U8G2 font meanwhile.",
-    );
     expect(byText.get('convert')?.message).toContain("<convert> image 'logo'");
     expect(byText.get('convert')?.message).toContain('PR-04b');
   });
@@ -141,8 +136,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     expect(at('screen_back_event')).toBe('screens/screen_home.xml:6:13');
     expect(at('column')).toBe('screens/screen_home.xml:9:13');
     expect(at('focus_ring')).toBe('screens/screen_home.xml:11:9');
-    expect(at('bdf')).toMatch(/^globals\.xml:3:/);
-    expect(at('convert')).toMatch(/^globals\.xml:7:/);
+    expect(at('convert')).toMatch(/^globals\.xml:6:/);
   });
 
   it('reports nothing for builtin fonts, xbm images, and plain elements', () => {
@@ -158,7 +152,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const warned = deferred(validate({ ...inputWith(), refusalPolicy: 'warning' }).diagnostics);
     const refused = deferred(validate({ ...inputWith(), refusalPolicy: 'error' }).diagnostics);
 
-    expect(byDefault).toHaveLength(7);
+    expect(byDefault).toHaveLength(6);
     expect(byDefault).toEqual(warned);
     expect(warned.every((d) => d.severity === 'warning')).toBe(true);
     expect(refused.every((d) => d.severity === 'error')).toBe(true);

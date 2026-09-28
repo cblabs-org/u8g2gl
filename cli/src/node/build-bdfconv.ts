@@ -6,8 +6,8 @@
  *
  * File: src/node/build-bdfconv.ts
  * Purpose: Regenerates the committed bdfconv Wasm artefact (§14, PR-04b WO1) so `<bdf>`
- *          fonts can eventually compile identically in the CLI (Node) and the designer
- *          (browser) with no Emscripten dependency at install or test time — the same
+ *          fonts compile identically in the CLI (Node) and the designer (browser) with
+ *          no Emscripten dependency at install or test time — the same
  *          "measure once, commit the artefact, verify the recorded hashes" pattern
  *          build-catalogue.ts uses for the display catalogue (Q-11).
  * Description: Builds U8G2's bdfconv sources from the pinned submodule (or a

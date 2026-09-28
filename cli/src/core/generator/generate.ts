@@ -35,6 +35,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { BdfFontDecl } from '../schema/globals.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
@@ -42,6 +43,8 @@ import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '..
 import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { emitProjectFiles } from './emit/index.js';
 import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from '../realise/index.js';
+import type { CompiledFont } from '../fonts/index.js';
+import type { CompileProjectAssetsResult } from '../assets/index.js';
 
 /**
  * The not-yet-supported policy `generate()` applies. Fixed, not a parameter: a
@@ -59,9 +62,9 @@ export interface GenerateInput extends ProjectModel {
   /** Version of the CLI running, stamped into every file (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Asset file text by the `src` path its declaration names (§14.2) — an
-   * `<xbm>`'s bytes are compiled into the generated code, so emission needs
-   * them.
+   * Asset file **bytes** by the `src` path its declaration names (§14.1,
+   * §14.2, PR-04b WO3 item 2) — an `<xbm>`'s bytes and a `<bdf>`'s source are
+   * both compiled into the generated code, so emission needs them.
    *
    * Passed in rather than read, because this module is isomorphic and
    * `src/core/` may not touch the filesystem (typescript.md §1): the Node
@@ -69,7 +72,27 @@ export interface GenerateInput extends ProjectModel {
    * buffers. Absent is the same as empty — the images emitter reports any asset
    * it needed and did not get.
    */
-  readonly assets?: ReadonlyMap<string, string>;
+  readonly assets?: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Every `<bdf>` font already compiled, and any diagnostic compiling one
+   * raised — from `compileProjectAssets()`, run **before** `generate()`
+   * because it is asynchronous and this function is not (PR-04b WO3 item 3).
+   *
+   * Absent means the host never called it. `generate()` treats that as a
+   * programming error rather than a silently empty build: any `<bdf>` the
+   * document declares is reported as `U8G2GL_MISSING_COMPILED_FONT` rather
+   * than emitted with no data, or dropped without a trace as it would be if
+   * a build simply skipped fonts it did not recognise.
+   */
+  readonly compiledAssets?: CompileProjectAssetsResult;
+  /**
+   * Licence-like files found beside each `<bdf>`'s own source file, keyed by
+   * font `name`, sorted and project-relative (§14.1's provenance rule,
+   * PR-04b WO3 item 5) — a directory listing, which `src/core/` may not do
+   * (typescript.md §1). Absent is the same as empty: no licence line is
+   * emitted for a font with no entry.
+   */
+  readonly bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -170,6 +193,52 @@ function resolveTarget(input: GenerateInput): Target | Diagnostic {
   };
 }
 
+// missingCompiledFontDiagnostic
+// The internal-error diagnostic for a <bdf> generate() has no compiled entry
+// for (PR-04b WO3 item 3) — see GenerateInput.compiledAssets's doc comment.
+//   font — the declaration with no entry
+function missingCompiledFontDiagnostic(font: BdfFontDecl): Diagnostic {
+  const loc = font.loc;
+  return {
+    code: DIAGNOSTIC_CODES.MISSING_COMPILED_FONT,
+    severity: 'error',
+    file: loc?.file ?? '',
+    line: loc?.line ?? 1,
+    column: loc?.column ?? 1,
+    message:
+      `<bdf> font '${font.name}' has no compiled entry. 'u8g2gl generate' never compiles a <bdf> itself — ` +
+      `the host must call compileProjectAssets() first and pass its result as GenerateInput.compiledAssets ` +
+      `— so this means that step was never run, or it silently dropped this font.`,
+    offendingText: font.name,
+  };
+}
+
+// compiledFontDiagnostics
+// Every diagnostic generate() owes its caller about <bdf> compilation: the
+// asset compile step's own diagnostics (a missing source file, or bdfconv
+// failing — both located and named by compileProjectAssets()), plus a loud,
+// internal-error diagnostic for any <bdf> that is neither compiled nor already
+// accounted for by one of those — which can only mean the host never called
+// compileProjectAssets() at all, or silently dropped a font it returned.
+//   input         — generate's own input; reads `globals.fonts` and `compiledAssets`
+//   compiledFonts — input.compiledAssets?.fonts ?? new Map()
+function compiledFontDiagnostics(
+  input: GenerateInput,
+  compiledFonts: ReadonlyMap<string, CompiledFont>,
+): readonly Diagnostic[] {
+  const assetDiagnostics = input.compiledAssets?.diagnostics ?? [];
+  const diagnosedFontNames = new Set(
+    assetDiagnostics.map((d) => d.offendingText).filter((name): name is string => name !== undefined),
+  );
+  const missing: Diagnostic[] = [];
+  for (const font of input.globals.fonts ?? []) {
+    if (font.kind === 'bdf' && !compiledFonts.has(font.name) && !diagnosedFontNames.has(font.name)) {
+      missing.push(missingCompiledFontDiagnostic(font));
+    }
+  }
+  return [...assetDiagnostics, ...missing];
+}
+
 /**
  * @brief Validates a project and lays out its generated files.
  *
@@ -220,14 +289,18 @@ export function generate(input: GenerateInput): GenerateResult {
       : realiseScreens({ globals: input.globals, manifests: input.manifests, expansion: pipeline.expansion });
 
   // --- Step 4: Validate exactly as `validate` does, refusing unsupported constructs ---
-  const { diagnostics, errors, warnings } = checkProject(
+  const validated = checkProject(
     input,
     GENERATE_REFUSAL_POLICY,
     'code' in target ? undefined : target,
     pipeline,
     realisation,
   );
-  const checked = { diagnostics, errors, warnings };
+  // Never compiled here — `compileProjectAssets()` is asynchronous and this
+  // function is not (PR-04b WO3 item 3); its result, and the diagnostics it
+  // raised, arrive through `input.compiledAssets`.
+  const compiledFonts = input.compiledAssets?.fonts ?? new Map<string, CompiledFont>();
+  const checked = finaliseDiagnostics([...validated.diagnostics, ...compiledFontDiagnostics(input, compiledFonts)]);
   if (checked.errors > 0) {
     return { files: [], ...checked, ...('code' in target ? {} : { target: target.name }) };
   }
@@ -264,7 +337,9 @@ export function generate(input: GenerateInput): GenerateResult {
           resolved: pipeline.resolution.screens,
           manifests: input.manifests,
           capacities,
-          assets: input.assets ?? new Map<string, string>(),
+          assets: input.assets ?? new Map<string, Uint8Array>(),
+          compiledFonts,
+          bdfLicenceFiles: input.bdfLicenceFiles ?? new Map<string, readonly string[]>(),
           generatorVersion: input.generatorVersion,
           target: target.name,
         });

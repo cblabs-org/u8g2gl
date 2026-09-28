@@ -489,18 +489,20 @@ describe('generate() carries the realised model and the capacities', () => {
    * would put an undefined `ui_image_*` symbol into generated code and turn a
    * clear diagnostic into a link error.
    */
-  const ASSETS: ReadonlyMap<string, string> = new Map([
+  const ASSETS: ReadonlyMap<string, Uint8Array> = new Map([
     [
       'images/wifi.xbm',
-      ['#define wifi_width 8', '#define wifi_height 8', 'static unsigned char wifi_bits[] = {',
-       '   0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00 };', ''].join('\n'),
+      new TextEncoder().encode(
+        ['#define wifi_width 8', '#define wifi_height 8', 'static unsigned char wifi_bits[] = {',
+         '   0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00 };', ''].join('\n'),
+      ),
     ],
   ]);
 
   function model(
     body: string,
     composites: readonly WidgetManifest[],
-  ): ProjectModel & { readonly assets: ReadonlyMap<string, string> } {
+  ): ProjectModel & { readonly assets: ReadonlyMap<string, Uint8Array> } {
     return {
       project: parseProjectFile(PROJECT_XML, 'u8g2gl.xml').value!,
       globals: globals(),

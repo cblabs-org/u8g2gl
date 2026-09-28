@@ -16,9 +16,12 @@
         <style name="body" font="small_9" align="left" draw_color="1" />
     </styles>
 
+    <!-- fonts/4x6.bdf is U8G2's own tools/font/bdf/4x6.bdf (public domain), the
+         PR-04b WO2 correctness oracle — the same BDF two <bdf> declarations
+         compile with different ranges (PR-04b WO3). -->
     <fonts>
-        <bdf name="small_9" src="fonts/small_9.bdf" />
-        <bdf name="tall_12" src="fonts/tall_12.bdf" />
+        <bdf name="small_9" src="fonts/4x6.bdf" range="0x20-0x7F" />
+        <bdf name="tall_12" src="fonts/4x6.bdf" range="0x30-0x39" />
     </fonts>
 
     <images>

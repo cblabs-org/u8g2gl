@@ -41,7 +41,11 @@ const PROJECT_XML = `<u8g2gl schema="0.4" name="gen" version="1.0.0">
 const BUILTIN_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>
 `;
 
-const BDF_GLOBALS_XML = `<globals><fonts><bdf name="u8g2_font_6x10_mr" src="fonts/f.bdf" /></fonts></globals>
+// <convert>, not <bdf>: PR-04b WO3 removed the <bdf> refusal, so <convert> is
+// now the not-yet-supported construct this suite reaches for (WO4 still
+// refuses it). The screens below reference u8g2_font_6x10_mr, so it is still
+// declared alongside the <convert> image.
+const CONVERT_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts><images><convert name="logo" src="images/logo.png" width="16" height="16" /></images></globals>
 `;
 
 function screenXml(screen: string, label: string | undefined): string {
@@ -133,7 +137,7 @@ describe('generate() (PR-04 WO5b)', () => {
   });
 
   it('refuses a not-yet-supported construct that validate only warns about — same code and location', () => {
-    const input = model({ globals: BDF_GLOBALS_XML });
+    const input = model({ globals: CONVERT_GLOBALS_XML });
     const validated = checkProject(input, 'warning');
     const generated = generate({ ...input, generatorVersion: '1.0.0' });
 

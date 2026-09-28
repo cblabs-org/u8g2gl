@@ -169,11 +169,13 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
         .map((d) => `${d.code} ${d.file}:${d.line}:${d.column} ${d.message}`);
 
     expect(res.code).toBe(1);
-    expect(located(validated.diagnostics)).toHaveLength(3);
+    // Only <focus_ring> remains not-yet-supported since PR-04b WO3 removed the
+    // <bdf> refusal — valid-project's two <bdf> fonts now compile.
+    expect(located(validated.diagnostics)).toHaveLength(1);
     expect(located(generated.diagnostics)).toEqual(located(validated.diagnostics));
     expect(validated.diagnostics.every((d) => d.severity === 'warning')).toBe(true);
     expect(generated.diagnostics.every((d) => d.severity === 'error')).toBe(true);
-    expect(generated.errors).toBe(3);
+    expect(generated.errors).toBe(1);
     expect(generated.files).toEqual([]);
     expect(existsSync(join(validProjectDir, 'generated'))).toBe(false);
   });
@@ -184,7 +186,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(res.code).toBe(1);
     expect(res.stderr).toContain('<focus_ring wrap="true">');
     expect(res.stderr).toContain('PR-09');
-    expect(res.stderr).toContain('Generation refused: 3 error(s), 0 warning(s). Nothing was written.');
+    expect(res.stderr).toContain('Generation refused: 1 error(s), 0 warning(s). Nothing was written.');
   });
 
   it('fails on a missing name with the same diagnostic validate reports, inventing no name', async () => {
@@ -341,7 +343,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     const res = await runCli(['generate', dir]);
 
     expect(res.code).toBe(0);
-    expect(res.stdout).toContain("u8g2gl 0.8.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
+    expect(res.stdout).toContain("u8g2gl 0.9.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
     expect(res.stdout).toContain('  FLASH');
     expect(res.stdout).toContain('  RAM (static)');
     expect(res.stdout).toContain('  CAPACITY (generated — see u8g2gl_generated_config.h)');
@@ -361,11 +363,12 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     const budget = parsed.budget;
     expect(budget).toBeDefined();
 
-    // Not one flash cost is claimed for this project except the image arrays,
-    // which are the only flash bytes the generator writes itself — and it
-    // declares no <xbm>, so that line is an exact 0 rather than a guess.
+    // Not one flash cost is claimed for this project except the image and
+    // compiled-font arrays, which are the only flash bytes the generator
+    // writes itself — and it declares no <xbm> or <bdf>, so both lines are an
+    // exact 0 rather than a guess (PR-04b WO3 item 6).
     for (const line of budget!.flash) {
-      if (line.item === 'image data (xbm arrays)') {
+      if (line.item === 'image data (xbm arrays)' || line.item === 'fonts (compiled bdf)') {
         expect(line.figure).toMatchObject({ kind: 'measured', bytes: 0 });
         continue;
       }
@@ -455,16 +458,18 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(Object.keys(parsed)).toEqual(['files', 'diagnostics', 'errors', 'warnings']);
   });
 
-  it('stamps the package version into a freshly generated project — the 0.8.0 proof', async () => {
+  it('stamps the package version into a freshly generated project — the 0.9.0 proof', async () => {
     // Pinned literally, not read from package.json: a test that compares the
     // stamp against the same file it came from passes at every version and
-    // therefore proves no bump ever happened (PR-04 WO10's carry).
-    expect(packageVersion).toBe('0.8.0');
+    // therefore proves no bump ever happened (PR-04 WO10's carry; PR-04b WO3
+    // bumped 0.8.0 -> 0.9.0, a new capability with no existing valid input's
+    // output changing).
+    expect(packageVersion).toBe('0.9.0');
     const dir = createProject();
     expect((await runCli(['generate', dir])).code).toBe(0);
     const header = readFileSync(join(dir, 'generated/u8g2gl_generated_config.h'), 'utf-8');
-    expect(header).toContain('// generator: 0.8.0');
-    expect((await runCli(['--version'])).stdout.trim()).toBe('0.8.0');
+    expect(header).toContain('// generator: 0.9.0');
+    expect((await runCli(['--version'])).stdout.trim()).toBe('0.9.0');
     // And the goldens are not dragged along by the bump: they are pinned.
     expect(header).not.toContain('0.0.0-golden');
   });

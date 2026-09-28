@@ -135,12 +135,17 @@ export function emitImagesUnit(input: ProjectEmitInput): EmittedUnit {
   }
 
   for (const { image, identifier } of declarations) {
-    // --- Step 1: The asset's text, as read by src/node/ ---
-    const text = input.assets.get(image.src);
-    if (text === undefined) {
+    // --- Step 1: The asset's bytes, as read by src/node/ ---
+    const assetBytes = input.assets.get(image.src);
+    if (assetBytes === undefined) {
       diagnostics.push(missingAsset(image));
       continue;
     }
+    // An XBM file is itself C source (§14.2), so it is decoded as UTF-8 text —
+    // the one asset channel carries bytes (PR-04b WO3 item 2, unit.ts) because
+    // a <bdf> may be Latin-1 and WO4's PNGs are binary, and this is where an
+    // <xbm> asset turns back into the text parseXbm() already expects.
+    const text = new TextDecoder('utf-8').decode(assetBytes);
 
     // --- Step 2: Its dimensions and bytes ---
     const parsed = parseXbm(text);

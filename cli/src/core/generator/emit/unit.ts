@@ -37,6 +37,7 @@ import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { Capacities } from '../../realise/index.js';
+import type { CompiledFont } from '../../fonts/index.js';
 import { compareCodeUnits } from '../../order.js';
 
 /** One emitted file. */
@@ -69,11 +70,32 @@ export interface ProjectEmitInput {
    */
   readonly manifests: ManifestRegistry;
   /**
-   * Asset file text by the `src` path each declaration names, supplied by
+   * Asset file **bytes** by the `src` path each declaration names, supplied by
    * `src/node/` because `src/core/` may not read files (typescript.md §1). An
    * absent entry is a missing asset, reported as a diagnostic.
+   *
+   * Bytes, not text (PR-04b WO3 item 2): a BDF may be Latin-1 and WO4's PNGs
+   * are binary, so the one asset channel carries bytes and each unit decodes
+   * what it needs — `images.ts` decodes an `<xbm>`'s bytes as UTF-8 text,
+   * because an XBM file is itself C source.
    */
-  readonly assets: ReadonlyMap<string, string>;
+  readonly assets: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Every `<bdf>` font already compiled, keyed by its declared `name`
+   * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before
+   * `generate()` because it is asynchronous and this emitter is not. Optional
+   * because most emit inputs (the editor target's nested project model, most
+   * tests) never emit `<bdf>` bytes and so never need it; `fonts.ts` treats an
+   * absent map the same as an empty one.
+   */
+  readonly compiledFonts?: ReadonlyMap<string, CompiledFont>;
+  /**
+   * Licence-like files found beside each `<bdf>`'s own source file, keyed by
+   * font `name`, sorted and project-relative (§14.1's provenance rule). Read
+   * by `src/node/` — a directory listing, which `src/core/` may not do
+   * (typescript.md §1). Optional for the same reason as {@link compiledFonts}.
+   */
+  readonly bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>;
   /** This file's header stamp, already rendered (`header.ts`). */
   readonly stamp: string;
 }

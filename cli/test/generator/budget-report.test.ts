@@ -56,6 +56,7 @@ function reportFixture(): {
     ...(display !== undefined ? { display } : {}),
     generatorVersion: GOLDEN_GENERATOR_VERSION,
     assets: loaded.assets,
+    compiledFonts: new Map(),
   };
   const report = buildGenerateReport(input);
   const configHeader = result.files.find((f) => f.path === 'u8g2gl_generated_config.h')?.content ?? '';
@@ -115,7 +116,7 @@ describe('§18.1 capacities agree with the generated header, exactly ([D-21])', 
 describe('§1.3 — no figure the tooling cannot substantiate', () => {
   it('reports every flash cost as unmeasured except the arrays it emits itself', () => {
     for (const flashLine of report.budget.flash) {
-      if (flashLine.item === 'image data (xbm arrays)') {
+      if (flashLine.item === 'image data (xbm arrays)' || flashLine.item === 'fonts (compiled bdf)') {
         continue;
       }
       expect(flashLine.figure.kind, `${flashLine.item} claims a flash figure`).toBe(UNMEASURED_KIND);

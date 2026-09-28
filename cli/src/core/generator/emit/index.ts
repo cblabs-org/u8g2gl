@@ -43,6 +43,7 @@ import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import type { Capacities, RealisedScreen } from '../../realise/index.js';
+import type { CompiledFont } from '../../fonts/index.js';
 import { formatHeaderStamp } from '../header.js';
 import { emitGeneratedConfigHeader, GENERATED_CONFIG_HEADER } from './generated-config.js';
 import { emitFontsUnit, FONTS_UNIT } from './fonts.js';
@@ -109,8 +110,17 @@ export interface ProjectEmissionInput {
   readonly manifests: ManifestRegistry;
   /** WO8b's counted capacities ([D-21]). Emitted, never recounted. */
   readonly capacities: Capacities;
-  /** Asset text by `src` path, read by `src/node/`. */
-  readonly assets: ReadonlyMap<string, string>;
+  /** Asset bytes by `src` path, read by `src/node/` (PR-04b WO3 item 2). */
+  readonly assets: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Every `<bdf>` font already compiled, keyed by its declared `name`
+   * (PR-04b WO3 item 3) — from `compileProjectAssets()`, run before
+   * `generate()`. Optional: absent is the same as empty, and only matters to a
+   * build that declares a `<bdf>`.
+   */
+  readonly compiledFonts?: ReadonlyMap<string, CompiledFont>;
+  /** Licence-like files beside each `<bdf>`'s source, keyed by font `name` (§14.1). */
+  readonly bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>;
   /** The CLI's own version, for the stamp (§13.9). Never guessed. */
   readonly generatorVersion: string;
   /** The `<target>` being built, for the stamp. */
@@ -190,6 +200,8 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
       capacities: input.capacities,
       manifests: input.manifests,
       assets: input.assets,
+      compiledFonts: input.compiledFonts,
+      bdfLicenceFiles: input.bdfLicenceFiles,
       stamp: stampFor(plan.source === 'project' ? projectSource : globalsSource),
     });
     diagnostics.push(...unit.diagnostics);
@@ -273,6 +285,8 @@ export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
       capacities: input.capacities,
       manifests: input.manifests,
       assets: input.assets,
+      compiledFonts: input.compiledFonts,
+      bdfLicenceFiles: input.bdfLicenceFiles,
       stamp: '',
     },
     realised: input.realised,

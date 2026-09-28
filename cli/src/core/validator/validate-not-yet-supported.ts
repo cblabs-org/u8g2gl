@@ -22,7 +22,9 @@
  *                `<screen_back_event>` → PR-09 (decision 1)
  *              - collection `<element>` children (§9), and a composite that also
  *                has a C++ class (`view` + `extends`) → PR-08 (decision 1)
- *              - `<bdf>` fonts and `<convert>` images → PR-04b (decision 3)
+ *              - `<convert>` images → PR-04b (decision 3, WO4). `<bdf>` fonts
+ *                were here too until PR-04b WO3 removed the entry: they compile
+ *                through `bdfconv` now (`compileProjectAssets()`, `generate.ts`).
  *
  * Exports:
  * - RefusalPolicy:                'warning' (authoring) or 'error' (build)
@@ -176,8 +178,8 @@ function checkView(
  *              every diagnostic, defaulting to
  *              {@link DEFAULT_REFUSAL_POLICY}.
  * @return One `U8G2GL_NOT_YET_SUPPORTED` diagnostic per construct: screens, then
- *         declared composites, then globals' fonts and images, each in document
- *         order. `validate()` sorts the combined result.
+ *         declared composites, then globals' `<convert>` images, each in
+ *         document order. `validate()` sorts the combined result.
  */
 export function validateNotYetSupported(input: ValidateInput): readonly Diagnostic[] {
   const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
@@ -207,22 +209,10 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
     checkView(composite.view, input, severity, diagnostics);
   }
 
-  // --- Step 3: Asset pipeline — BDF fonts and converted images ---
-  // Messages name the declaration and the tool that is missing, so PR-04b can
-  // replace exactly these two and nothing else.
-  for (const font of input.globals?.fonts ?? []) {
-    if (font.kind === 'bdf') {
-      diagnostics.push(
-        deferredDiagnostic(
-          severity,
-          `<bdf> font '${font.name}' is not yet supported: compiling BDF fonts with bdfconv (§14) — ` +
-            `${refusalClause(FONT_AND_IMAGE_PIPELINE_PR)}. Declare a <builtin> U8G2 font meanwhile.`,
-          font.loc,
-          'bdf',
-        ),
-      );
-    }
-  }
+  // --- Step 3: Asset pipeline — converted images ---
+  // `<bdf>` fonts compile now (PR-04b WO3 item 4) and are no longer reported
+  // here; the message names the declaration and the tool that is missing, so
+  // WO4 can replace this <convert> entry alone when its turn comes.
   for (const image of input.globals?.images ?? []) {
     if (image.kind === 'convert') {
       diagnostics.push(

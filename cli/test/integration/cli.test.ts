@@ -50,16 +50,17 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
-  // PR-04 WO5b: valid-project's two <bdf> fonts (PR-04b) and its <focus_ring>
-  // (PR-09) are valid as authored but not generated yet, so `validate` passes
-  // with exactly those three warnings — and `generate` refuses the same project
+  // PR-04 WO5b, updated PR-04b WO3: valid-project's two <bdf> fonts now compile
+  // (WO3 removed the refusal), so only its <focus_ring> (PR-09) is valid as
+  // authored but not generated yet — `validate` passes with exactly that one
+  // warning, and `generate` refuses the same project
   // (test/integration/generate.test.ts).
   it('u8g2gl validate valid-project/ -> exit 0, no output on stderr', async () => {
     const res = await runCliSubprocess(['validate', validProjectDir]);
 
     expect(res.code).toBe(0);
     expect(res.stderr.trim()).toBe('');
-    expect(res.stdout).toContain('Validation passed: 0 errors, 3 warning(s).');
+    expect(res.stdout).toContain('Validation passed: 0 errors, 1 warning(s).');
   });
 
   it('u8g2gl validate valid-project/ --json -> valid JSON, errors: 0', async () => {
@@ -72,11 +73,9 @@ describe('U8G2GL CLI End-to-End Integration', () => {
       warnings: number;
     };
     expect(parsed.errors).toBe(0);
-    expect(parsed.warnings).toBe(3);
+    expect(parsed.warnings).toBe(1);
     expect(Array.isArray(parsed.diagnostics)).toBe(true);
     expect(parsed.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual([
-      'warning U8G2GL_NOT_YET_SUPPORTED',
-      'warning U8G2GL_NOT_YET_SUPPORTED',
       'warning U8G2GL_NOT_YET_SUPPORTED',
     ]);
   });

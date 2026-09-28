@@ -144,7 +144,7 @@ function generateProject(options: Options): GenerateResult {
     loadDiagnostics,
     hasProjectManifest: true,
     generatorVersion: '0.0.0-test',
-    assets: new Map([['assets/icon_wifi.xbm', XBM]]),
+    assets: new Map([['assets/icon_wifi.xbm', new TextEncoder().encode(XBM)]]),
   });
 }
 

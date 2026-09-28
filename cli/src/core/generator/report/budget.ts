@@ -51,6 +51,7 @@ import type { DisplayRecord } from '../../schema/display-record.js';
 import type { Globals } from '../../schema/globals.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { Target } from '../../schema/project.js';
+import type { CompiledFont } from '../../fonts/index.js';
 import { classOf } from '../emit/screen-model.js';
 import { GENERATED_CONFIG_HEADER } from '../emit/generated-config.js';
 import { parseXbm } from '../emit/xbm.js';
@@ -92,11 +93,17 @@ export interface ReportInput {
   /** The CLI version stamped into the build (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Asset text by the `src` path each declaration names — the same map emission
-   * compiled the `<xbm>` arrays from, so the byte count reported is the byte
-   * count emitted.
+   * Asset bytes by the `src` path each declaration names (PR-04b WO3 item 2) —
+   * the same map emission compiled the `<xbm>` arrays from, so the byte count
+   * reported is the byte count emitted.
    */
-  readonly assets: ReadonlyMap<string, string>;
+  readonly assets: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Every `<bdf>` font this build compiled, keyed by its declared `name`
+   * (PR-04b WO3 item 6) — the same map emission wrote the arrays from, so the
+   * flash figure reported is the flash figure emitted.
+   */
+  readonly compiledFonts: ReadonlyMap<string, CompiledFont>;
 }
 
 // measured
@@ -172,10 +179,13 @@ function imageDataBytes(input: ReportInput): { readonly bytes: number; readonly 
     if (image.kind !== 'xbm') {
       continue;
     }
-    const text = input.assets.get(image.src);
-    if (text === undefined) {
+    const assetBytes = input.assets.get(image.src);
+    if (assetBytes === undefined) {
       continue;
     }
+    // The same decode images.ts applies (PR-04b WO3 item 2): the one asset
+    // channel carries bytes, and an XBM file is itself C source.
+    const text = new TextDecoder('utf-8').decode(assetBytes);
     const parsed = parseXbm(text);
     if ('reason' in parsed) {
       continue; // Malformed: emission refuses the build, so no report is built for it.
@@ -187,12 +197,37 @@ function imageDataBytes(input: ReportInput): { readonly bytes: number; readonly 
 }
 
 // flashLines
-// §18's flash table. Every line is unmeasured except the `<xbm>` arrays, whose
-// bytes the generator emits itself and therefore knows exactly.
+// compiledBdfFontBytes
+// The exact bytes every compiled <bdf> font's array adds — sourced from the
+// same `compiledFonts` map emission wrote the arrays from (PR-04b WO3 item 6),
+// never recomputed: `declaredLength` is bdfconv's own array length, the same
+// figure fonts.ts emits as `ui_fontdata_<name>[declaredLength]`.
+//   input — the report input; reads `globals.fonts` and `compiledFonts`
+function compiledBdfFontBytes(input: ReportInput): { readonly bytes: number; readonly names: readonly string[] } {
+  let bytes = 0;
+  const names: string[] = [];
+  for (const font of input.globals.fonts ?? []) {
+    if (font.kind !== 'bdf') {
+      continue;
+    }
+    const compiled = input.compiledFonts.get(font.name);
+    if (compiled === undefined) {
+      continue; // A build that reaches the report never has one of these: generate() already refused it.
+    }
+    bytes += compiled.declaredLength;
+    names.push(font.name);
+  }
+  return { bytes, names };
+}
+
+// §18's flash table. Every line is unmeasured except the `<xbm>` arrays and a
+// compiled `<bdf>` font's arrays, whose bytes the generator emits itself and
+// therefore knows exactly.
 //   input — the report input
 function flashLines(input: ReportInput): readonly BudgetLine[] {
   const classes = elementClassesByOrigin(input);
-  const fonts = (input.globals.fonts ?? []).filter((font) => font.kind === 'builtin').map((font) => font.name);
+  const builtinFonts = (input.globals.fonts ?? []).filter((font) => font.kind === 'builtin').map((font) => font.name);
+  const compiledFonts = compiledBdfFontBytes(input);
   const images = imageDataBytes(input);
 
   return [
@@ -210,11 +245,20 @@ function flashLines(input: ReportInput): readonly BudgetLine[] {
       figure: unmeasured(FLASH_REASON),
     },
     {
-      item: 'fonts',
-      count: fonts.length,
-      names: fonts,
+      item: 'fonts (builtin)',
+      count: builtinFonts.length,
+      names: builtinFonts,
       figure: unmeasured(
         `a <builtin> font's array lives in U8G2, not in generated code, so its size is U8G2's: ${FLASH_REASON}`,
+      ),
+    },
+    {
+      item: 'fonts (compiled bdf)',
+      count: compiledFonts.names.length,
+      names: compiledFonts.names,
+      figure: measured(
+        compiledFonts.bytes,
+        "the sum of each compiled font's declared array length, bdfconv's own output (§14.1)",
       ),
     },
     {

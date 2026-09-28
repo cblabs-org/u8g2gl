@@ -302,6 +302,29 @@ export const DIAGNOSTIC_CODES = {
    * (one module, so they cannot disagree).
    */
   MALFORMED_BDF_RANGE: 'U8G2GL_MALFORMED_BDF_RANGE',
+  /**
+   * `bdfconv` could not compile a `<bdf>` font's source (PR-04b WO3 item 3):
+   * a malformed BDF, a `range` that selects no glyphs from a font that has
+   * some, or bdfconv itself exiting non-zero. The message carries
+   * `compileBdf()`'s own human-readable reason, and bdfconv's stderr lines
+   * when there were any. Distinct from `MALFORMED_BDF_RANGE`, which the
+   * validator reports for a `range` that is not well-formed grammar in the
+   * first place — this code is for a well-formed range (or an absent one)
+   * that still could not be compiled.
+   */
+  BDF_COMPILE_FAILED: 'U8G2GL_BDF_COMPILE_FAILED',
+  /**
+   * `generate` has no compiled entry for a `<bdf>` font it is about to emit
+   * (PR-04b WO3 item 3). Emission never compiles fonts itself —
+   * `compileProjectAssets()` must run first and hand its result to
+   * `generate()` as `GenerateInput.compiledAssets` — so a missing entry with
+   * no accompanying `BDF_COMPILE_FAILED` or `MISSING_FILE` diagnostic for the
+   * same font means the host forgot to call it (or dropped a font it
+   * returned). Either way this is a programming error, not the author's, and
+   * `generate` refuses loudly with this diagnostic rather than emit a font
+   * with no data, or crash.
+   */
+  MISSING_COMPILED_FONT: 'U8G2GL_MISSING_COMPILED_FONT',
 } as const;
 
 /**
