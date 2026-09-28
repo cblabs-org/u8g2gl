@@ -28,7 +28,7 @@
     "LICENSES/"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/clean-dist.mjs && tsc",
     "build:catalogue": "tsx src/node/build-catalogue.ts",
     "build:manifests": "tsx src/node/build-manifests.ts",
     "build:bdfconv": "tsx src/node/build-bdfconv.ts",
