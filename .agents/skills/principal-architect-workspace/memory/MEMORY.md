@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-09-05T10:59:27Z — was: 2026-09-04T11:23:03Z -->
+<!-- Last updated: 2026-09-28T14:55:00Z — was: 2026-09-05T10:59:27Z -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-04b-font-image-pipeline | **Active** — WO1/6 (bdfconv Wasm). Worktree `../U8G2GL-04b`, branches `u8g2gl-fonts/wo<N>-*`, base `main` @ `453f9f3` | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |
