@@ -12,7 +12,7 @@
  *              exactly as test/node/load-project.test.ts does.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { loadProject } from '../../src/node/load-project.js';
@@ -162,5 +162,42 @@ describe('loadProject() — <bdf> licence files (PR-04b WO3 item 5)', () => {
 
     expect(loaded.assets.has('../outside/small_9.bdf')).toBe(false);
     expect(loaded.bdfLicenceFiles.has('small_9')).toBe(false);
+  });
+});
+
+describe('loadProject() — symlinks and the project boundary', () => {
+  it('treats a symlinked <bdf> src that points outside the project as outside', () => {
+    const dir = createProject({});
+    const outsideDir = mkdtempSync(resolve(__dirname, '../../tmp/load-project-assets-target-'));
+    tempDirs.push(outsideDir);
+    writeFileSync(join(outsideDir, 'secret.bdf'), 'STARTFONT 2.1\nENDFONT\n');
+    rmSync(join(dir, 'fonts', 'small_9.bdf'));
+    symlinkSync(join(outsideDir, 'secret.bdf'), join(dir, 'fonts', 'small_9.bdf'));
+
+    const loaded = loadProject(dir);
+
+    expect(loaded.assets.has('fonts/small_9.bdf')).toBe(false);
+    expect(loaded.bdfLicenceFiles.has('small_9')).toBe(false);
+  });
+
+  it('still reads a symlink that stays inside the project', () => {
+    const dir = createProject({ extraFiles: { 'fonts/real.bdf': 'STARTFONT 2.1\nENDFONT\n' } });
+    rmSync(join(dir, 'fonts', 'small_9.bdf'));
+    symlinkSync(join(dir, 'fonts', 'real.bdf'), join(dir, 'fonts', 'small_9.bdf'));
+
+    const loaded = loadProject(dir);
+
+    expect(new TextDecoder().decode(loaded.assets.get('fonts/small_9.bdf'))).toBe('STARTFONT 2.1\nENDFONT\n');
+  });
+
+  it('still works when the project root itself is reached through a symlink', () => {
+    const dir = createProject({});
+    const link = `${dir}-link`;
+    symlinkSync(dir, link);
+    tempDirs.push(link);
+
+    const loaded = loadProject(link);
+
+    expect(loaded.assets.has('fonts/small_9.bdf')).toBe(true);
   });
 });
