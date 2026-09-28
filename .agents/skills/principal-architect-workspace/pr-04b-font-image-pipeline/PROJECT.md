@@ -103,8 +103,8 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 - [x] **[WO1 — bdfconv as a committed Wasm artefact](wo1-bdfconv-wasm/WORKORDER.md)** ✅ `c14086f`…`004fb17` · `u8g2gl-fonts/wo1-bdfconv-wasm` · base `main` @ `453f9f3` · standard · findings 1–3; [Q-2]; notices row
 - [x] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** ✅ `8d45c91`…`975ca41` · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
 - [x] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** ✅ `95b3c03`, `9ffc4bf`, `a0f0df9` · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
-- [ ] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
-- [ ] **WO4 — `<convert>`: PNG to XBM** · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · one image model shared with `<xbm>`; parity; notices row for any decoder dependency
+- [x] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** ✅ `93e54fa`, `b991378`, `3296112`, `1e46500` · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
+- [ ] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
 - [ ] **WO5 — licences, docs and a migration rehearsal** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · §22.1 wording; departures-board-v3's ten BDFs through the built CLI, compared with its `fonts.cpp`
 - [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
 
@@ -193,3 +193,38 @@ schema, manifest vocabulary or system design stops and goes to the owner.
 - The public-domain `4x6.bdf` is now copied into
   `cli/test/integration/fixtures/valid-project/fonts/` (12.9k lines). WO5's
   notices pass must cover it.
+
+### 2026-09-28 — WO3b ingested
+- **Complete**, 3 code commits. PA re-ran both suites one after the other, with
+  a clean C++ build in `tmp/pa-cbuild`: **C++ 382** (+5, one known skip,
+  **zero warnings**) and **CLI 1161** (+3); lint clean.
+- `test_bdf_real_u8g2.cpp` links the fixture's generated `ui_fonts.cpp`
+  against real U8G2. The compiled 4x6 font `memcmp`s equal to
+  `u8g2_font_4x6_tr`. Metrics match values derived from the BDF's own
+  `BBX`/`DWIDTH`. Glyphs above 0xFF and below 0x20 draw pixel for pixel as
+  their BDF `BITMAP` rows say, which proves the absent-`range` fix reaches the
+  screen. Expected values come from the BDF, never from U8G2's output (the PA
+  checked the constants).
+- Failed fonts are now an explicit `failedFonts` set. The ticket reference in
+  the fonts comment is gone.
+- The editor target needed no new plumbing: `<bdf>` fonts travel by name to
+  `editor_host::provide_font` exactly as `<builtin>` fonts do, and `scene.json`
+  needs nothing new.
+- Worker signed commits `Claude Sonnet 5`, its actual identity, not the
+  template's line. Accepted; WO4 onward asks each worker to name the model it
+  is.
+- **Carried into WO4:** three older emitters also leak ticket numbers into
+  generated code (`images.ts` `PR-04b`, `generated-config.ts` `WO4 F5`,
+  `screen.ts` `PR-09`). Fix them, and add a test that fails on any `WO<n>`
+  or `PR-<n>` in generated output.
+
+### 2026-09-28 — WO4 decisions (PA)
+- **No PNG dependency.** `DecompressionStream('deflate')` is a global in
+  Node ≥ 18 (the `engines` floor) and in browsers, and the asset step is
+  already async. This avoids a licence row and a supply-chain question.
+- The size, grey-conversion, polarity and dither rules are prescribed in
+  WO4's WORKORDER, integer-only. Size mismatch and polarity stay CA
+  questions 2–3.
+- `<convert>`'s `mode` and `threshold` are currently parsed through an
+  unchecked cast and never validated. WO4 validates them, which is existing
+  vocabulary, not new schema.
