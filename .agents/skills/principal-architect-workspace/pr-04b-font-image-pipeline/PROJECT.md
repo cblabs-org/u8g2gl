@@ -100,8 +100,8 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — bdfconv as a committed Wasm artefact](wo1-bdfconv-wasm/WORKORDER.md)** · `u8g2gl-fonts/wo1-bdfconv-wasm` · base `main` @ `453f9f3` · standard · findings 1–3; [Q-2]; notices row
-- [ ] **WO2 — the font compiler in `src/core/`** · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
+- [x] **[WO1 — bdfconv as a committed Wasm artefact](wo1-bdfconv-wasm/WORKORDER.md)** ✅ `c14086f`…`004fb17` · `u8g2gl-fonts/wo1-bdfconv-wasm` · base `main` @ `453f9f3` · standard · findings 1–3; [Q-2]; notices row
+- [ ] **[WO2 — the font compiler in `src/core/`](wo2-font-compiler/WORKORDER.md)** · `u8g2gl-fonts/wo2-font-compiler` · base WO1 · standard · findings 2, 4, 7; U8G2 oracle test; Node↔browser parity; determinism
 - [ ] **WO3 — `<bdf>` through `generate`** · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · finding 8; refusal removed; emitter, editor target, budget, fixture, real-U8G2 C++ test; CLI 0.9.0
 - [ ] **WO4 — `<convert>`: PNG to XBM** · `u8g2gl-fonts/wo4-png-convert` · base WO3 · standard · one image model shared with `<xbm>`; parity; notices row for any decoder dependency
 - [ ] **WO5 — licences, docs and a migration rehearsal** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · §22.1 wording; departures-board-v3's ten BDFs through the built CLI, compared with its `fonts.cpp`
@@ -128,3 +128,23 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   ui_spec §12. Measured findings 1–8. Created worktree `../U8G2GL-04b` on
   `u8g2gl-fonts/wo1-bdfconv-wasm` from `main` @ `453f9f3`; submodule initialised
   from the main checkout's clone (no network).
+
+### 2026-09-28 — WO1 ingested
+- **Complete**, 4 commits, CLI **1097** (+10). PA re-ran suite, lint and build
+  in the worktree: green.
+- Flags added by measurement: `-ffile-prefix-map` (an absolute path leaked into
+  the Wasm without it) and `-sALLOW_MEMORY_GROWTH=1` (`unifont_jp.bdf`, 9.4 MB,
+  OOMs without it; ~80 ms with it). Rebuild from a different absolute path is
+  byte-identical.
+- **A malformed BDF does not fail**: bdfconv exits 0 with a zero-glyph font.
+  WO2 must detect it from the output, not the exit status.
+- **PA review finding carried into WO2:** the runner loads the glue with
+  `import()` of a `data:` URL. It works in Node, but a browser
+  Content-Security-Policy without `data:` in `script-src` blocks it, and a
+  bundler cannot see through it. WO2 makes the glue a real module that is
+  statically imported.
+- **Seam for WO2/WO3:** `generate()` is synchronous and Wasm instantiation is
+  asynchronous, so font compilation is a separate async core step. Both hosts
+  call it with bytes before `generate`.
+- bdfconv's map grammar (`bdf_map.c`) writes hex as `$20`, not `0x20`, and has
+  `*`, `~` exclusion and `>` remap. Its default map is `*`.
