@@ -84,3 +84,15 @@ that visible rather than silent.
   `fonts (compiled bdf)` (measured), `fonts (builtin)` (unmeasured) and
   `image data (bitmap arrays)` (measured).
 - §21 Q-2: see item 1 for proposed closing text.
+- design_spec §22's dependency table (~line 2075): bdfconv is no longer only
+  a "build tool, not linked". It ships in the npm package as Wasm (BSD-2 notice
+  in `cli/LICENSES/`), and Emscripten's generated glue ships with it (MIT).
+  §22.1's quoted `LICENSE` summary (~2088) lacks the sentence WO5 added: a
+  `<bdf>` conversion does not change a font's licence.
+
+## 8. PR-05 readiness — measured
+
+All 12 font arrays departures-board-v3 ships are **byte-identical** to what
+`u8g2gl generate` produces from the same BDFs with no `range` (worker-measured
+for all 12; PA-reproduced for two). PR-05's only font work is renaming to
+lowercase `<bdf>` names and switching code to `ui_font_<name>`.

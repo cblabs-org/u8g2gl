@@ -105,7 +105,7 @@ scratchpad, against `extern/u8g2` at 2.36.18 (`d66b49af`).
 - [x] **[WO3 — `<bdf>` through `generate`](wo3-bdf-generate/WORKORDER.md)** ✅ `95b3c03`, `9ffc4bf`, `a0f0df9` · `u8g2gl-fonts/wo3-bdf-generate` · base WO2 · standard · absent-`range` correction; assets as bytes; async compile step; refusal removed; emission, provenance, budget; CLI 0.9.0
 - [x] **[WO3b — the fixture, real U8G2, and the editor target](wo3b-bdf-fixture/WORKORDER.md)** ✅ `93e54fa`, `b991378`, `3296112`, `1e46500` · `u8g2gl-fonts/wo3b-bdf-fixture` · base WO3 · standard · `<bdf>` in `test/generated_fixture/`; generated array linked against real U8G2 and measured; editor target resolves `<bdf>` fonts; editor parity (split from WO3, 2026-09-28)
 - [x] **[WO4 — `<convert>`: PNG to XBM](wo4-png-convert/WORKORDER.md)** ✅ `aee1a57`, `8d31354` · `u8g2gl-fonts/wo4-png-convert` · base WO3b · standard · zero-dependency PNG decoder; one image model for `<xbm>` and `<convert>`; attribute validation; parity; ticket-number leaks fixed and guarded by a test
-- [ ] **[WO5 — licences, docs and a migration rehearsal](wo5-docs-rehearsal/WORKORDER.md)** · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · licence of a converted font; notices audit; npm package carries LICENSE; departures-board-v3's **14** BDFs through the built CLI, compared byte for byte with its `fonts.cpp`
+- [x] **[WO5 — licences, docs and a migration rehearsal](wo5-docs-rehearsal/WORKORDER.md)** ✅ `9791ee0`, `b810c00` · `u8g2gl-fonts/wo5-docs-rehearsal` · base WO4 · standard · licence of a converted font; notices audit; npm package carries LICENSE; departures-board-v3's **14** BDFs through the built CLI, compared byte for byte with its `fonts.cpp`
 - [ ] **WO6 — readability remediation** · `u8g2gl-fonts/wo6-readability` · base WO5 · standard · from the `readability-reviewer` report over the stack
 
 WORKORDERs are written just in time, each after its predecessor's Completion
@@ -256,3 +256,31 @@ schema, manifest vocabulary or system design stops and goes to the owner.
   should record the `<convert>` rules and the renamed budget line. Added to
   the CA bridge.
 - Correction to this ledger: departures-board-v3 has **14** BDFs, not ten.
+
+### 2026-09-28 — WO5 ingested
+- **Complete.** CLI **1268** (+3); lint and build green. `LICENSE` and
+  `THIRD-PARTY-NOTICES.md` now say that converting a font with `<bdf>`, or an
+  image with `<convert>`, does not change its licence. The notices carry a
+  provenance table for the test material the PR adds: `4x6.bdf` (public
+  domain), and `arrow_mini.bdf` and `logo_mark.png` (MIT), none of them in
+  the npm package.
+- **The published package had no `LICENSE`.** `cli/LICENSE` is a committed
+  copy of the root file, and a test pins it byte-identical and checks
+  `npm pack`'s file list.
+- **Migration rehearsal: all 12 arrays in departures-board-v3's `fonts.cpp`
+  are byte-identical** to what the built CLI produces from the same BDFs with
+  no `range`. The PA reproduced two with its own parser: NatRailTall12 1221 B
+  and WifiIcons11 138 B, both identical. (The PA's first parser stopped at a
+  literal `;` byte opening a line, the trap WO2 recorded; anchoring the end to
+  a line end fixed it.) Two of the 14 BDFs (`RailClockHuge11`,
+  `RailClockMega13`) are stale leftovers that project never compiles.
+- **For PR-05:** font names must be renamed to `[a-z][a-z0-9_]*`. Generated
+  symbols are `ui_font_<name>` (pointer) and `ui_fontdata_<name>` (array), not
+  the old PascalCase arrays. Nothing else needed.
+- **Carried into WO6:** `tsc` never cleans `dist/`, so a local `npm pack`
+  shipped a stale `bdfconv-glue.json`. The build should start from an empty
+  `dist/`.
+- To the CA bridge: design_spec §22's dependency table (line ~2075) still
+  says bdfconv is a "build tool, not linked", and the Emscripten row likewise.
+  Both now ship in the npm package. The `LICENSE` quote at ~2088 lacks the new
+  sentence.
