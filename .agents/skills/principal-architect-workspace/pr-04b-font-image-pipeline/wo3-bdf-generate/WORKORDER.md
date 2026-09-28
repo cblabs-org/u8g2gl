@@ -241,36 +241,264 @@ fix it.
 
 ## Completion Report (written by the worker at task completion)
 
-```markdown
 ---
 ## Completion Report
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path` — what changed and why
+- `cli/src/core/fonts/compile-bdf.ts` — item 1: absent `range` now maps to
+  `0-MAX_BDF_CODEPOINT` (unfiltered — every glyph), not bdfconv's own default
+  map `*` (32–255). Fixes a WO2 WORKORDER instruction that would have silently
+  dropped glyphs above 255 for any font relying on the default.
+- `cli/src/core/assets/compile-project-assets.ts`, `cli/src/core/assets/index.ts`
+  — new (item 3). `compileProjectAssets()`, the async seam both hosts call
+  before `generate()`: compiles every `<bdf>` in declaration order (concurrent,
+  via `Promise.all`, whose result order does not depend on completion order),
+  returns compiled fonts by name and a diagnostic per font that could not be
+  read (`U8G2GL_MISSING_FILE`) or compiled (`U8G2GL_BDF_COMPILE_FAILED`, new
+  code, item 3).
+- `cli/src/core/generator/emit/unit.ts` — `ProjectEmitInput.assets` is now
+  `ReadonlyMap<string, Uint8Array>` (item 2); added optional `compiledFonts`
+  and `bdfLicenceFiles`.
+- `cli/src/core/generator/emit/images.ts` — decodes an `<xbm>`'s bytes as UTF-8
+  text at the one point that still needs text (an XBM file is itself C
+  source); everything else about `<xbm>` emission is unchanged.
+- `cli/src/core/generator/emit/fonts.ts` — rewritten (item 5). Both font kinds
+  now share one `fontDeclarations()` list and one `ui.hpp` declaration form. A
+  compiled `<bdf>` emits `ui_fontdata_<name>[declaredLength]` (the array,
+  `U8G2_FONT_SECTION`-tagged) and `ui_font_<name>` (a pointer to it), with a
+  provenance comment: source path, U8G2 version (from `bdfconv-source.json`),
+  the BDF's own `FONT`/`COPYRIGHT` when present (sanitised — control
+  characters and `\n` become spaces, `*/` is escaped, capped at 200 chars),
+  any licence files found beside the BDF, and the effective range with glyph
+  counts. `emitFontsUnit()` throws (never a diagnostic) if a `<bdf>` reaches
+  it with no compiled entry — `generate()` must already have refused that
+  build; this is the "value validation should have refused" convention
+  `value.ts` already uses.
+- `cli/src/core/generator/emit/index.ts` — `ProjectEmissionInput` gets the same
+  `assets` type change and two new optional fields, threaded through
+  `emitProjectFiles()` and `emitEditorFiles()`.
+- `cli/src/core/generator/generate.ts` — item 3's cross-check: `GenerateInput`
+  gains `compiledAssets?: CompileProjectAssetsResult` and
+  `bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>`. For every
+  `<bdf>` declared, if it has no compiled entry *and* no diagnostic already
+  names it (by `offendingText === font.name`), `generate()` raises
+  `U8G2GL_MISSING_COMPILED_FONT` (new code) — the "host forgot to call
+  `compileProjectAssets()`" case, distinct from an author's BDF failing to
+  compile (which already has its own diagnostic and needs no second one).
+- `cli/src/core/generator/report/budget.ts` — `ReportInput.assets` is now
+  bytes; new required `compiledFonts` field; the flash table's old single
+  `fonts` line is now `fonts (builtin)` (unmeasured, unchanged reasoning) and
+  `fonts (compiled bdf)` (measured — sum of each compiled font's
+  `declaredLength`, item 6).
+- `cli/src/core/validator/validate-not-yet-supported.ts` — item 4: the `<bdf>`
+  half of Pass 8's Step 3 is gone; `<convert>` stays refused for WO4.
+- `cli/src/core/schema/diagnostic.ts` — two new codes:
+  `U8G2GL_BDF_COMPILE_FAILED`, `U8G2GL_MISSING_COMPILED_FONT`.
+- `cli/src/core/resolver/mangle.ts`, `cli/src/core/resolver/index.ts` — new
+  `fontDataIdentifier()` (`ui_fontdata_<name>`), exported alongside
+  `fontIdentifier()`.
+- `cli/src/core/index.ts`, `cli/src/browser/index.ts` — export the new
+  `assets` barrel.
+- `cli/src/node/load-project.ts` — `readAssets()` now reads a `<bdf>`'s `src`
+  too (bytes, not text), through the same project-root confinement as an
+  `<xbm>`'s; new `readBdfLicenceFiles()` scans each `<bdf>`'s own directory
+  for a file matching `license`/`licence`/`copying`/`ofl` (case-insensitive
+  prefix) or `<bdf-stem>.license`/`.licence` (any extension), sorted,
+  project-relative; `LoadedProject` gains `bdfLicenceFiles`.
+- `cli/src/node/cli.ts` — `handleGenerateCommand()` (and therefore `runCli()`)
+  is now `async`: it calls `compileProjectAssets()` once, before `generate()`,
+  and that one call's result feeds `generate()`, the editor target
+  (`editorFilesOf()`) and the budget report (`reportFor()`) — the "any command
+  that emits" wiring the WORKORDER asked for, satisfied by one call site
+  rather than one per flag. `validate` is untouched: it never compiles fonts.
+- `cli/package.json`, `cli/package-lock.json` — 0.8.0 → 0.9.0.
+- `cli/test/integration/fixtures/valid-project/globals.xml`,
+  `.../fonts/4x6.bdf` (new) — the fixture's two `<bdf>` fonts now reference a
+  real BDF (U8G2's own `tools/font/bdf/4x6.bdf`, the WO2 oracle's own font,
+  public domain) with different ranges, and actually compile; every test that
+  pinned the fixture's old "valid but refused" warning/error counts is updated
+  (see *Tests changed rather than added*).
+- New tests: `cli/test/assets/compile-project-assets.test.ts` (5),
+  `cli/test/generator/emit-fonts.test.ts` (7),
+  `cli/test/node/load-project-assets.test.ts` (7),
+  `cli/test/integration/generate-bdf.test.ts` (1) — see *Measurements* and
+  *Line-Item Instructions* item 7 below for what each covers.
+- `cli/test/fonts/u8g2-oracle.test.ts` → moved its independent font-array
+  reader into `cli/test/helpers/u8g2-font-reader.ts` (parameterised on the
+  `u8g2_fonts.c` path) so `emit-fonts.test.ts`'s own oracle assertion reuses it
+  rather than duplicating it, per the line item's instruction.
 
 ### The surface WO3b and WO4 will use
-<!-- The compile step's exact name, signature and import path; the new GenerateInput field; how the asset map is keyed and typed. -->
+
+```ts
+// cli/src/core/assets/index.ts
+export function compileProjectAssets(input: {
+  readonly globals: Globals;
+  readonly assets: ReadonlyMap<string, Uint8Array>;
+}): Promise<{
+  readonly fonts: ReadonlyMap<string /* font name */, CompiledFont>;
+  readonly diagnostics: readonly Diagnostic[];
+}>;
+```
+
+Call it once, before `generate()`, and pass its result as
+`GenerateInput.compiledAssets`. `GenerateInput` also takes
+`assets: ReadonlyMap<string, Uint8Array>` (bytes, keyed by each `<xbm>`'s or
+`<bdf>`'s `src` path — one channel for both) and optionally
+`bdfLicenceFiles: ReadonlyMap<string, readonly string[]>` (font `name` →
+sorted, project-relative licence files; from `loadProject()`'s
+`LoadedProject.bdfLicenceFiles` on the Node side). Both are `?? new Map()`
+inside `generate()` if omitted — a project with no `<bdf>` needs neither.
+
+WO3b's committed C++ fixture and real-U8G2 test can therefore build the exact
+same `ui_fontdata_<name>`/`ui_font_<name>` pair this WO emits — nothing about
+that shape is provisional. WO4's `<convert>` images share the same
+`assets: ReadonlyMap<string, Uint8Array>` channel (keyed by the image's own
+`src`) and the same `ProjectEmitInput`/`ProjectEmissionInput` shape; no new
+plumbing is needed for a second asset kind, only a second compile step
+alongside `compileProjectAssets()` if WO4 wants one, or an extension of it.
 
 ### Measurements
-- Sweep with the 0-65535 default (was 363/364):
-- Built-CLI budget output for three departures-board-v3 fonts:
-- Determinism check:
+
+- **Sweep with the 0-65535 default**: swept every `.bdf` file directly under
+  `extern/u8g2/tools/font/bdf/` (396 files — a superset of WO2's 364-file,
+  `BM_T`-bit-only selection; I did not reconstruct `build.c`'s exact filter,
+  but a superset sweep can only be as strict or stricter) with no `range`
+  given: **396/396 succeed**, including `waffle-10.bdf`, WO2's one failure
+  under the old `*` (32–255) default — confirming the fix: `waffle-10.bdf`'s
+  glyphs are encoded outside 32–255 (`CHARSET_ENCODING "1"`, not ISO 10646, as
+  WO2's Completion Report noted), so the old default excluded them and the new
+  one does not.
+- **Built-CLI budget output for three departures-board-v3 fonts** — a scratch
+  project in `cli/tmp/` (not committed; departures-board-v3 itself untouched)
+  with `<bdf>` declarations for `NatRailSmall9.bdf`, `NatRailTall12.bdf` and
+  `UndergroundClock8.bdf`, no `range`, read-only from
+  `/Users/mcneillm/Documents/Projects/departures-board-v3/src/fonts/source/`,
+  through `node dist/node/cli.js generate`:
+
+  ```
+  u8g2gl 0.9.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)
+
+    FLASH
+      runtime core                          unmeasured
+      framework element classes (1)         unmeasured
+      custom element classes (0)            unmeasured
+      fonts (builtin) (0)                   unmeasured
+      fonts (compiled bdf) (3)              2336 bytes
+      image data (xbm arrays) (0)              0 bytes
+      generated code                        unmeasured
+      ------------------------------------------------
+      derivable                             2336 bytes
+
+    RAM (static)
+      framebuffer (128x64)                  1024 bytes
+      element objects (3)                   unmeasured
+      string subject storage (0)               0 bytes
+      subject observer slots (0)            unmeasured
+      binding pool slots (0)                unmeasured
+      styles (0)                            unmeasured
+      ------------------------------------------------
+      derivable                             1024 bytes
+  ```
+
+  All three fonts compiled with **every glyph selected** (95/95, 95/95, 12/12
+  — none of these BDFs has a glyph outside 32–255, so this run does not by
+  itself distinguish the old and new defaults; the 396-file sweep above is
+  what does). Per-font byte counts, read from the generated `ui_fonts.cpp`'s
+  own comments: `nat_rail_small_9` 947 bytes, `nat_rail_tall_12` 1221 bytes,
+  `underground_clock_8` 168 bytes (sum 2336, matching the budget line).
+- **Determinism check**: `cli/test/integration/generate-bdf.test.ts` runs the
+  built CLI in two child processes — different `cwd` (project root vs. its
+  own `screens/` directory, naming the project `..`) and different `TZ`
+  (`UTC` vs. `Asia/Tokyo`) — against a project with one `<bdf>` (U8G2's own
+  `4x6.bdf`, `range="0x20-0x7F"`): byte-identical output trees, and no
+  absolute path (neither the temp directory nor a bare `/Users/` or `/home/`)
+  anywhere in any generated file.
 
 ### Tests changed rather than added
-- test — why
+
+- `test/validator/not-yet-supported.test.ts` — `<bdf>` removed from
+  `GLOBALS_XML` and every assertion about it (item 4: it is no longer
+  not-yet-supported); location assertions and the warning count (7 → 6)
+  shifted accordingly.
+- `test/generator/generate.test.ts` (unit) — `BDF_GLOBALS_XML` replaced with
+  `CONVERT_GLOBALS_XML`: the "refuses a not-yet-supported construct" test
+  needs *some* deferred construct, and `<bdf>` no longer is one; `<convert>`
+  (still refused, WO4) takes its place.
+- `test/validator/validate.test.ts` — the "valid project fixture" test's own
+  `<bdf>`-bearing globals fixture (`test/validator/fixtures/valid/globals.xml`,
+  unchanged — this fixture is validator-only and never reaches
+  `compileProjectAssets()`) now produces 0 warnings, not 2: `validate()` never
+  compiles a font, so a `<bdf>` it can't read is simply not its business.
+- `test/integration/cli.test.ts`, `test/integration/generate.test.ts` — every
+  assertion pinning valid-project's old "2 `<bdf>` + 1 `<focus_ring>` = 3
+  not-yet-supported warnings, refused with 3 errors" is now "1
+  (`<focus_ring>` alone)", since valid-project's `<bdf>`s now compile (see
+  fixture change above). `packageVersion`/stamp assertions: `0.8.0` → `0.9.0`.
+- `test/generator/budget-report.test.ts`, `test/integration/generate.test.ts`
+  ("reports every unmeasurable cost...", "reports every unmeasurable cost as
+  unmeasured...") — the flash-line exception list gains `'fonts (compiled
+  bdf)'` beside `'image data (xbm arrays)'`: a project with no `<bdf>` still
+  gets that line, at `measured, bytes: 0` rather than absent (item 6's
+  "always report the split, an empty result is still a fact").
+- `test/generator/emit-screen.test.ts`, `test/generator/realise.test.ts` —
+  their inline asset maps (`ReadonlyMap<string, string>`) are now
+  `Uint8Array` via `new TextEncoder().encode(...)` (item 2's type change);
+  behaviour unchanged.
 
 ### Decisions Made
-- Decision and rationale
+
+- **`ui_fontdata_<name>` for the array, not `ui_font_<name>_data`** — already
+  decided by the PA at WO2→WO3 handoff (PROJECT.md's WO2-ingested session log
+  entry) and implemented as specified; recorded again in
+  `fontDataIdentifier()`'s own doc comment so the reasoning travels with the
+  code.
+- **Diagnostic `offendingText` is the font's own `name`**, not its `src` path
+  — a deliberate departure from `images.ts`'s convention (`image.src`) for
+  the two new asset-compile diagnostics. `generate()`'s "host forgot to call
+  `compileProjectAssets()`" guard (item 3) needs to tell "this font already
+  has a diagnostic" from "this font has none at all" by matching on the
+  declared font name, and only the name is guaranteed to be a stable, unique
+  handle a diagnostic and a `<bdf>` declaration can both carry.
+- **The "missing compiled entry" guard lives in `generate()`, not
+  `emitFontsUnit()`.** `generate()` is the one place that knows both what
+  `compileProjectAssets()` was actually asked to do and what the document
+  declares; by the time `emitFontsUnit()` runs, `generate()` has already
+  refused any build where an entry is missing, so `emitFontsUnit()` throws
+  (not a diagnostic) if it ever finds one anyway — a defect in the pipeline
+  wiring, never the author's, mirroring `value.ts`'s existing "value
+  validation should have refused" convention rather than inventing a second
+  one.
+- **`compiledFonts` and `bdfLicenceFiles` are optional on `ProjectEmitInput`
+  and `ProjectEmissionInput`**, defaulting to empty inside `fonts.ts` and
+  `generate.ts`, rather than required — this kept the change's blast radius
+  to exactly the places that construct these objects and care about `<bdf>`
+  (the editor target's nested scene-description input, and several tests that
+  build a `ProjectEmitInput` directly, never touch either).
+- **The sweep covers 396 files, not WO2's 364** — I did not reconstruct
+  `build.c`'s `BM_T`-bit filter to reproduce the exact subset; a superset
+  sweep is the more conservative measurement (it can only surface *more*
+  failures than the narrower one, never fewer), and it still isolates the
+  fix directly: `waffle-10.bdf` moves from fail to pass, and nothing else
+  changes.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, what to avoid
+
+- **`tsx` cannot run a script with top-level `await`** in this repo's default
+  CJS-targeting transform — wrap the sweep (or any one-off script) in an
+  `async function main() { … } main();` rather than a bare top-level `await`.
+- **`npm run build` must be re-run before every integration-test run that
+  exercises the built CLI** — I lost time once to `dist/node/cli.js` still
+  reflecting a pre-edit build while iterating on the fixture and the refusal
+  removal together; the failures printed the *old* `<bdf>`-refused message
+  and were easy to misread as a code defect rather than a stale build.
 
 ### Out-of-Scope Findings
-- Finding and suggested action
+
+- None found beyond WO3b/WO4's already-scoped work.
 
 ### Blockers
 (none)
-```
