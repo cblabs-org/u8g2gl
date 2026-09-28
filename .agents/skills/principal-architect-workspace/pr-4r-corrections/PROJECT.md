@@ -85,7 +85,7 @@ Ruling C's other parts stand: relax WO11b's check, no capsule warning. Ruling D 
 - [x] **[WO2 — inline `style_*` restricted to §10's nine](wo2-style-overrides/WORKORDER.md)** ✅ `e26d623` · `u8g2gl-4r/wo2-style-overrides` · base `main` @ `ca398ac` · standard · item 2
 - [x] **[WO3 — the rounded-box radius bound, in both places](wo3-radius-clamp/WORKORDER.md)** ✅ `afe599b` · `u8g2gl-4r/wo3-radius-clamp` · base WO2 · standard · item 3, rulings C, D · runtime 0.5.0 · bound `2r <= min(w,h)` (owner, 12:07)
 - [x] **[WO4 — bound draw-call arguments clamp as objects do](wo4-bound-arg-clamp/WORKORDER.md)** ✅ `7f71f7f` · `u8g2gl-4r/wo4-bound-arg-clamp` · base WO3 · standard · item 1 · CLI 0.8.0, goldens move
-- [ ] **[WO5 — readability review and remediation](wo5-readability/WORKORDER.md)** · `u8g2gl-4r/wo5-readability` · base WO4 · standard
+- [x] **[WO5 — readability review and remediation](wo5-readability/WORKORDER.md)** ✅ `dc4e198` · `u8g2gl-4r/wo5-readability` · base WO4 · standard
 
 WORKORDERs for WO2–WO5 are written at dispatch, against the code as it then stands.
 
@@ -193,3 +193,10 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   fixes, these make WO5, dispatched. Not carried (for the CA): a `style_*` on a drawing element is
   refused with the setter message rather than §13.5's; the box manifest's `radius` help omits the
   bound.
+- **2026-09-28** — **WO5 complete, `dc4e198`.** PA verified from a clean configure, each suite alone:
+  CLI **1087 / 64**, `tsc`, lint clean; C++ 0 warnings, **377 / one skip**; goldens unchanged;
+  lockfile diff the two version fields. One WO2-added assertion changed under R6's permission.
+- **2026-09-28** — **PR-4R implementation complete.** Chief Architect bridge written, carrying the
+  radius measurement as the owner instructed:
+  [CA-BRIDGE-2026-09-28-PR4R.md](CA-BRIDGE-2026-09-28-PR4R.md). Stack WO2–WO5 pushed and opened as
+  one PR against `main` @ `ca398ac`.
