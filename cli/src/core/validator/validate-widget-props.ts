@@ -30,6 +30,9 @@
  *              name a property the element sets and fit its type (WO10 finding
  *              8); and a drawing element, which has no object, may carry no
  *              style at all (§13.5) — each refused with the code emission used.
+ *              PR-4R WO2 narrowed overrides to §10's nine style properties
+ *              (`isStyleAttribute`, the rule the screen model applies too), so
+ *              `style_text` is refused although a label has a `text` setter.
  *
  *              Once, never twice (PR-04 WO7b): every check runs on the elements
  *              as written — screens and each composite's `<view>` — so a template
@@ -53,7 +56,14 @@ import { findClosest } from '../catalogue/edit-distance.js';
 import { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';
 import { GEOMETRY_BINDINGS, INT32_MAX, INT32_MIN, isRectangular, walkExpanded } from '../resolver/index.js';
 import type { PropDef } from '../schema/widget-manifest.js';
-import { COLOR_VALUES, styleProperties, type Globals, type StyleDecl } from '../schema/globals.js';
+import {
+  COLOR_VALUES,
+  isStyleAttribute,
+  STYLE_ATTRIBUTES,
+  styleProperties,
+  type Globals,
+  type StyleDecl,
+} from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
@@ -336,7 +346,9 @@ function suppliedByStyle(node: WidgetNode, name: string, styles: StyleScope): bo
 // A value can come from four places, and any one satisfies `required` (PR-04
 // WO11b, WO10b finding 1): the attribute written; a geometry binding for it
 // ([D-20] — `bind_x` supplies `x`, from the resolver's one table); a `style_*`
-// override of it; or a named style the element applies that declares it (§10).
+// override of it, if it is one of §10's nine (any other override is refused and
+// never applied, PR-4R WO2); or a named style the element applies that declares
+// it (§10).
 // Before, only the first counted, so a label had to write `font=` beside the
 // style that already set it, and the fixture wrote `x="0"` beside `bind_x`.
 //
@@ -359,7 +371,7 @@ function missingRequired(node: WidgetNode, manifest: EffectiveManifest, styles: 
     const supplied =
       (written !== undefined && written !== '') ||
       (binding !== undefined && node.attributes[binding.binding] !== undefined) ||
-      node.styleOverrides[prop.name] !== undefined ||
+      (isStyleAttribute(prop.name) && node.styleOverrides[prop.name] !== undefined) ||
       suppliedByStyle(node, prop.name, styles);
     if (!supplied) {
       diagnostics.push(
@@ -438,8 +450,11 @@ function checkStyleOverride(node: WidgetNode, name: string, value: string, prop:
 // - a drawing element compiles to a draw call with no object, so it has
 //   nothing to apply a style to (§13.5); a named style on one is refused here,
 //   with the code emission used;
-// - an override must name a property the element sets through a setter — the
-//   one it is applied through — or there is no setter to call ([D-17]);
+// - an override must name one of §10's nine style properties
+//   (isStyleAttribute, PR-4R WO2) — even a prop the element has a setter for is
+//   refused otherwise, because §10 restricts inline overrides to styling;
+// - it must name a property the element sets through a setter — the one it is
+//   applied through — or there is no setter to call ([D-17]);
 // - its value must fit that property's type (checkStyleOverride).
 //   node          — the element as written
 //   manifest      — its effective manifest
@@ -460,12 +475,35 @@ function checkStyles(node: WidgetNode, manifest: EffectiveManifest, atScreenLeve
     );
   }
 
-  // --- Step 2: Each override names a setter property, and fits its type ---
+  // --- Step 2: Each override names one of §10's nine, which the element sets, and fits its type ---
+  // The nine this element can take are the only useful suggestions: offering a
+  // setter prop outside them would suggest another refusal.
+  const settable = manifest.api.props
+    .filter((candidate) => candidate.setter !== undefined && isStyleAttribute(candidate.name))
+    .map((candidate) => candidate.name);
   for (const [name, value] of Object.entries(node.styleOverrides)) {
     const attribute = `style_${name}`;
+    if (!isStyleAttribute(name)) {
+      // Refused even when the element has a setter for it (§10, PR-4R WO2): the
+      // one rule the screen model also applies, so no target applies it. When
+      // the element declares the prop, the attribute is what the author meant.
+      const remedy = manifest.api.props.some((candidate) => candidate.name === name)
+        ? ` Write it as the attribute '${name}' instead.`
+        : '';
+      diagnostics.push(
+        createPropDiagnostic(
+          DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+          `'${attribute}' on ${describeNode(node)} is not a style override: inline overrides are limited to ` +
+            `§10's style properties, ${STYLE_ATTRIBUTES.join(', ')}.${remedy}`,
+          node.attributeLocs?.[attribute] ?? node.loc,
+          attribute,
+          findClosest(name, settable).map((candidate) => `style_${candidate}`),
+        ),
+      );
+      continue;
+    }
     const prop = manifest.api.props.find((candidate) => candidate.name === name && candidate.setter !== undefined);
     if (prop === undefined) {
-      const settable = manifest.api.props.filter((candidate) => candidate.setter !== undefined).map((p) => p.name);
       diagnostics.push(
         createPropDiagnostic(
           DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
@@ -618,8 +656,10 @@ function checkSubstitutedValues(input: ValidateInput, diagnostics: Diagnostic[])
           continue; // A `<style name="$s">` value is not an attribute: Pass 2's.
         }
         const overridden = attribute.startsWith('style_') ? attribute.slice('style_'.length) : undefined;
+        // A non-§10 override was refused as written (checkStyles); its value is
+        // not a style value, so it is not checked as one here.
         const overriddenProp =
-          overridden === undefined
+          overridden === undefined || !isStyleAttribute(overridden)
             ? undefined
             : manifest.api.props.find((prop) => prop.name === overridden && prop.setter !== undefined);
         const overrideValue = overridden === undefined ? undefined : element.node.styleOverrides[overridden];

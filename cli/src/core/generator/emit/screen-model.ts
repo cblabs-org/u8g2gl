@@ -50,6 +50,7 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
+import { isStyleAttribute } from '../../schema/globals.js';
 import { FLAG_COMPARISONS, type WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
@@ -158,9 +159,9 @@ export interface WrittenProperty {
 
 /** An element's `style_*` overrides (§10), resolved against its manifest. */
 export interface StyleOverrides {
-  /** Overrides naming a setter prop, in manifest declaration order. */
+  /** Overrides naming one of §10's nine that is a setter prop, in manifest declaration order. */
   readonly applied: readonly { readonly prop: PropDef; readonly value: string }[];
-  /** Keys naming no setter prop the element declares, sorted (§13.9). */
+  /** Every other key — not one of §10's nine, or no setter prop the element declares — sorted (§13.9). */
   readonly unknown: readonly string[];
 }
 
@@ -398,9 +399,12 @@ export function writtenProperties(placement: Placement): readonly WrittenPropert
  * @brief An element's `style_*` inline overrides, resolved to its own props.
  *
  * An override is applied through the element's own `<prop>` of the same name —
- * the setter and type come from the manifest ([D-17]). No validator pass checks
- * `style_*` keys today, so a key the element does not declare is returned for
- * the caller to report rather than dropped.
+ * the setter and type come from the manifest ([D-17]) — and only if it names
+ * one of §10's nine style properties (`isStyleAttribute`, PR-4R WO2): the same
+ * rule Pass 4 refuses by, so neither the firmware nor the editor target can
+ * apply an override the validator refused. Any other key, including a setter
+ * prop outside the nine such as `text`, is returned in `unknown` for the caller
+ * to report rather than dropped.
  *
  * @param placement The element's manifest and model.
  * @return The applied overrides in manifest order, and the unknown keys, sorted.
@@ -410,7 +414,7 @@ export function styleOverridesOf(placement: Placement): StyleOverrides {
   const applied: { prop: PropDef; value: string }[] = [];
   for (const prop of placement.manifest.api.props) {
     const value = overrides.get(prop.name);
-    if (value === undefined || prop.setter === undefined) {
+    if (value === undefined || prop.setter === undefined || !isStyleAttribute(prop.name)) {
       continue;
     }
     overrides.delete(prop.name);
