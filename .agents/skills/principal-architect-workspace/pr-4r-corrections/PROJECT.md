@@ -169,3 +169,12 @@ capsule including the switch's default `r = h/2`, and warns on nothing. Only the
   is only ever checked at draw time; the box manifest's `radius` help does not state the bound.
   **Carried to WO5:** `u8g2gl_draw.h`'s `u8g2gl_draw_box()` docs and Coordinates table omit the clamp.
   WO4 dispatched.
+- **2026-09-28** — WO4 worker stopped, correctly, with the helper committed green (`e8e21a4`,
+  object path now calls `u8g2gl_coord_bound()`, behaviour unchanged). Two gaps in the PA's box:
+  generated units need `#include "u8g2gl/u8g2gl_coord.h"` (`emit/screen.ts`, outside the box), and
+  the 0.8.0 bump needs version literals changed in `generate.test.ts`. **PA ruling:** both granted
+  (WORKORDER amendment); the same-class two-realisation test is not expressible before PR-09 and
+  the worker's label-vs-box construction is accepted. Runtime stays 0.5.0. Worker resumed.
+  **For the CA bridge (worker finding):** draw calls are not clipped to their container while objects
+  are, so a draw-call child overhanging its container paints outside it: realisation is observable
+  through clipping too. Not in PR-4R's mandate.

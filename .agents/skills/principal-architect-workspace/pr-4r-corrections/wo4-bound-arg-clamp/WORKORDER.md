@@ -5,7 +5,7 @@ title: "A bound draw-call argument clamps exactly as an object's binding does"
 branch: u8g2gl-4r/wo4-bound-arg-clamp
 base: u8g2gl-4r/wo3-radius-clamp
 complexity: standard
-status: blocked
+status: dispatched
 ---
 
 # WO4 — realisation must not be observable
@@ -113,10 +113,32 @@ if one path clamps and the other wraps, realisation becomes observable, and the 
       form change **to the new spelling only**. List every one in the report.
 - [x] Run the **built CLI** on the fixture and show a bound draw call as generated.
 
+## PA amendment, 2026-09-28: unblocked
+
+The worker's stop was correct; both blockers were gaps in the PA's box, not in the work.
+
+1. **The generated include.** `cli/src/core/generator/emit/screen.ts` is **in scope**, for Step 2
+   only: emit `#include "u8g2gl/u8g2gl_coord.h"` beside `DRAW_HEADER`, sorted with the other
+   includes (§13.9), and only if the unit emits a bound draw-call argument or unconditionally. Your
+   call; state it. **Do not** include it from `u8g2gl_draw.h`, which forward-declares U8G2 on purpose.
+   The goldens may therefore change by **that include line**, in addition to bound arguments. Any
+   other golden change is still stop-and-report.
+2. **The version bump.** Tests pinning the CLI version literally (e.g.
+   `cli/test/integration/generate.test.ts`, `0.7.0` at :344, :458, :462, :466, :467) may change
+   `0.7.0` → `0.8.0`, literals and titles only. List each.
+3. **The two-realisation test.** Accepted as built: `knob` (a box, as draw calls) against `readout`
+   (a label, realised as an object), sharing `bind_x="$position"` in `track`, plus the
+   screen-level `dot` for origin 0. The same-class construction cannot be expressed before PR-09.
+   That goes in the Completion Report as a finding, not a gap.
+4. **Runtime version stays 0.5.0.** The helper lands in the same unreleased minor as WO3.
+
+Apply `tmp/wo4-pending.patch`, add the include, regenerate the goldens, bump to 0.8.0, run every
+suite alone, update the Completion Report, set `status: complete`, commit.
+
 ## Strict Boundary Box
 
 **In scope:** `include/u8g2gl/u8g2gl_coord.h`, `src/u8g2gl_obj.cpp` (use the helper, no behaviour
-change), `cli/src/core/generator/emit/draw-args.ts`, `test/editor_host/editor_host.cpp`,
+change), `cli/src/core/generator/emit/draw-args.ts`, `cli/src/core/generator/emit/screen.ts` (Step 2's include only; PA amendment), `test/editor_host/editor_host.cpp`,
 `test/test_generated_fixture.cpp`, `test/test_editor_parity.cpp`, `test/test_obj.cpp`,
 `test/test_binding.cpp`, the committed fixture (`test/generated_fixture/**`, including new XML and
 regenerated goldens), `cli/test/` (draw-args tests and golden-spelling assertions), `cli/package.json`
