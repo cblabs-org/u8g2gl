@@ -342,3 +342,32 @@ Wasm bdfconv, committed with provenance. PR-05 is unblocked: departures-board-v3
 work-order references in comments (the CA's standards question); P4
 readability items (shared `byteLines` helper and similar), left for a later
 pass.
+
+### 2026-09-29 — Chief Architect rulings on the bridge
+The CA answered all nine items inline in [CA-BRIDGE.md](CA-BRIDGE.md) and
+**accepted every PA default**. Nothing in the PR's behaviour changes.
+- **Q-2 closed** with the proposed text, plus the Emscripten version and the
+  regeneration command. The CA lands the §21 edit.
+- `<convert>`: **refuse a size mismatch** (the attributes declare, they don't
+  resample). **Polarity confirmed:** darker than threshold sets the bit, and
+  alpha composites over white. Both go into §14.2. An `invert` attribute is
+  additive if light-on-dark art ever appears.
+- **Committed Wasm approved** on the `catalogue.json` precedent, on condition
+  that the byte-identical rebuild, the provenance and the commit-tying test all
+  stay, and that the regeneration command is documented where people will find
+  it.
+- `range`: **the subset** only. `>` remapping and `~` exclusion are font
+  authoring, which is Phase 4. **Absent means unfiltered.** Grammar and default
+  both go into §14.1.
+- Stale docs (§14.2, §18, §21, §22, §22.1, `implementation_plan.md:276`): the
+  CA lands them on `main`.
+- PR-05: recorded in `PROGRAM.md`; PR-05's font work is narrowed to lowercase
+  names and `ui_font_<name>`.
+- Comments standard: the PA's rule is adopted into `u8g2gl-standards` for new
+  and changed lines only. **Older citations are not defects; do not sweep them,
+  and reviewers should not raise them.**
+
+**PA action taken:** `cli/src/data/bdfconv/README.md`, beside the artefact,
+documents the one regeneration command, the pinned Emscripten 5.0.3, the tests
+that check a regeneration, and the licences. That was the one condition the CA
+set that falls in this PR.
