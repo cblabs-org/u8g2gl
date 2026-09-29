@@ -19,15 +19,25 @@
  *              point into — project files and the bundled framework manifests
  *              (WO1 F9) — so human output can always print the source line.
  *
+ *              For a project directory it also reads the asset bytes every
+ *              `<xbm>`, `<convert>` and `<bdf>` `src` names (`assets`) and finds the
+ *              licence files beside each `<bdf>` (`bdfLicenceFiles`). Both are done
+ *              here because `src/core/` may not touch the filesystem or list a
+ *              directory. A `src` that resolves outside the project root, by path
+ *              or through a symlink, is left absent rather than read
+ *              ([D-11], §13.10); `compileProjectAssets()` reports the absence
+ *              against the declaration.
+ *
  * Exports:
  * - LoadProjectOptions:  Display label and an injectable framework bundle
- * - LoadedProject:       Project model, project root and source texts
+ * - LoadedProject:       Project model, project root, source texts, asset bytes and licence files
  * - loadProject():       Load a directory or single file
  */
 
-import { readFileSync, statSync } from 'node:fs';
-import { resolve, sep } from 'node:path';
+import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { basename, dirname, extname, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
+import { compareCodeUnits } from '../core/order.js';
 import { FRAMEWORK_MANIFESTS } from '../data/manifests.js';
 import {
   buildManifestRegistry,
@@ -80,16 +90,26 @@ export interface LoadedProject {
    */
   readonly fileContents: ReadonlyMap<string, string>;
   /**
-   * Asset file text by the `src` path its declaration names (§14.2), for the
-   * emitters to compile into generated code.
+   * Asset file **bytes** by the `src` path its declaration names (§14.1,
+   * §14.2), for the emitters and `compileProjectAssets()`
+   * to compile into generated code. Covers an `<xbm>`'s, a `<convert>`'s and a
+   * `<bdf>`'s `src`.
    *
    * Read here because `src/core/` may not touch the filesystem
    * (typescript.md §1): emission is isomorphic and takes the bytes as a
    * parameter, which is also what lets the designer supply them from editor
    * buffers instead of from disk. An asset that could not be read is simply
-   * absent, and the images emitter reports it against its own declaration.
+   * absent, and `compileProjectAssets()` reports it
+   * against its own declaration.
    */
-  readonly assets: ReadonlyMap<string, string>;
+  readonly assets: ReadonlyMap<string, Uint8Array>;
+  /**
+   * Licence-like files found beside each `<bdf>`'s own source file, keyed by
+   * font `name`, sorted and project-relative (§14.1's provenance rule)
+   * — a directory listing, which `src/core/` may not do
+   * (typescript.md §1) and which emission therefore cannot discover itself.
+   */
+  readonly bdfLicenceFiles: ReadonlyMap<string, readonly string[]>;
 }
 
 // bundledFrameworkFilename
@@ -252,44 +272,150 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     projectRoot,
     fileContents,
     assets: readAssets(projectRoot, globals),
+    bdfLicenceFiles: readBdfLicenceFiles(projectRoot, globals),
   };
 }
 
+// isInsideProject
+// Whether a path lies inside the project directory, applying [D-11] and
+// §13.10's write-boundary in the other direction: an author who needs a file
+// from elsewhere can copy it in. Both paths are compared by their real
+// (symlink-free) location, so a symlink inside the project that points outside
+// it does not pass, and a project root reached through a symlink (macOS
+// `/tmp` -> `/private/tmp`) still works. A target that does not exist cannot be
+// resolved, so it falls back to the lexical comparison and the caller's
+// missing-file handling takes over.
+//   projectRoot — absolute project directory
+//   absolute    — absolute path to test
+function isInsideProject(projectRoot: string, absolute: string): boolean {
+  let root = projectRoot;
+  let target = absolute;
+  try {
+    target = realpathSync(absolute);
+    root = realpathSync(projectRoot);
+  } catch {
+    // Not resolvable (absent): compare lexically, as for any missing file.
+  }
+  return target === root || target.startsWith(root + sep);
+}
+
 // readAssets
-// The text of every asset the document declares, keyed by the `src` path the
-// declaration names (§14.2).
-//
-// Only `<xbm>`: a `<convert>` image is refused before emission (PR-04b), and a
-// `<bdf>` font likewise (§14.1), so reading either would be work for a build
-// that cannot finish.
+// The bytes of every asset the document declares, keyed by the `src` path the
+// declaration names (§14.1, §14.2): the `src` of every `<xbm>`, `<convert>`
+// and `<bdf>`.
 //
 // A `src` that resolves outside the project directory is skipped rather than
-// read. [D-11] and §13.10 confine what the generator *writes* to the output
-// directory; confining what it reads to the project is the same principle
-// applied to the other direction, and an author who needs an asset from
-// elsewhere can copy it in. A skipped or unreadable asset is left absent, and
-// the images emitter reports it with the declaration's own location — a missing
-// file is the author's defect, not the loader's, so nothing is thrown here.
+// read. A skipped or unreadable asset is left absent, and
+// `compileProjectAssets()` reports it with the declaration's own location —
+// a missing file is the author's defect, not the loader's, so nothing is
+// thrown here.
 //   projectRoot — absolute project directory, or undefined for a single file
 //   globals     — the parsed globals, for the declarations
-function readAssets(projectRoot: string | undefined, globals: Globals): ReadonlyMap<string, string> {
-  const assets = new Map<string, string>();
+function readAssets(projectRoot: string | undefined, globals: Globals): ReadonlyMap<string, Uint8Array> {
+  const assets = new Map<string, Uint8Array>();
   if (projectRoot === undefined) {
     return assets;
   }
+  const sources: string[] = [];
   for (const image of globals.images ?? []) {
-    if (image.kind !== 'xbm' || image.src === '' || assets.has(image.src)) {
+    if (image.src !== '') {
+      sources.push(image.src);
+    }
+  }
+  for (const font of globals.fonts ?? []) {
+    if (font.kind === 'bdf' && font.src !== '') {
+      sources.push(font.src);
+    }
+  }
+  for (const src of sources) {
+    if (assets.has(src)) {
       continue;
     }
-    const absolute = resolve(projectRoot, image.src);
-    if (absolute !== projectRoot && !absolute.startsWith(projectRoot + sep)) {
+    const absolute = resolve(projectRoot, src);
+    if (!isInsideProject(projectRoot, absolute)) {
       continue;
     }
     try {
-      assets.set(image.src, readFileSync(absolute, 'utf-8'));
+      assets.set(src, new Uint8Array(readFileSync(absolute)));
     } catch {
-      // Absent: reported by the images emitter, against the declaration.
+      // Absent: reported by compileProjectAssets(), against the declaration.
     }
   }
   return assets;
+}
+
+/**
+ * Lower-case name prefixes taken as licence provenance regardless of the BDF's
+ * own name (§14.1); a file matches when its lower-cased name starts with one.
+ */
+const GENERIC_LICENCE_PREFIXES = ['license', 'licence', 'copying'];
+
+/**
+ * The SIL Open Font Licence's usual file names (`OFL.txt`, `OFL-1.1.txt`,
+ * `ofl_license`): `ofl` followed by the end of the name, or by `.`, `-` or `_`.
+ * A bare `ofl` prefix would also take `oflow.txt`. The other prefixes stay
+ * loose on purpose: `COPYING3`, `LICENSES.txt` and `LICENSE2` are real licence
+ * file names that a boundary rule would reject.
+ */
+const OFL_LICENCE_NAME = /^ofl(?:$|[._-])/;
+
+// bdfLicenceFilesFor
+// The sorted, project-relative licence-like files found in one <bdf>'s own
+// directory (§14.1): a file whose name starts, case-insensitively, with
+// 'license', 'licence' or 'copying', or is an OFL name (see OFL_LICENCE_NAME),
+// or is named '<bdf-stem>.license'/'<bdf-stem>.licence' with any extension. Convenience
+// provenance, never a diagnostic (§14.1) — an unreadable directory or a src
+// outside the project simply yields no licence files.
+//   projectRoot — absolute project directory
+//   font        — the <bdf> declaration
+function bdfLicenceFilesFor(projectRoot: string, font: { readonly src: string }): readonly string[] {
+  if (font.src === '') {
+    return [];
+  }
+  const absoluteFont = resolve(projectRoot, font.src);
+  if (!isInsideProject(projectRoot, absoluteFont)) {
+    return [];
+  }
+  const dir = dirname(absoluteFont);
+  let entries: readonly string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+
+  const stem = basename(font.src, extname(font.src)).toLowerCase();
+  const matches = entries.filter((name) => {
+    const lower = name.toLowerCase();
+    if (GENERIC_LICENCE_PREFIXES.some((prefix) => lower.startsWith(prefix)) || OFL_LICENCE_NAME.test(lower)) {
+      return true;
+    }
+    return lower === `${stem}.license` || lower === `${stem}.licence` ||
+      lower.startsWith(`${stem}.license.`) || lower.startsWith(`${stem}.licence.`);
+  });
+
+  const dirRelative = dir === projectRoot ? '' : `${dir.slice(projectRoot.length + 1).split(sep).join('/')}/`;
+  return matches.map((name) => `${dirRelative}${name}`).sort(compareCodeUnits);
+}
+
+// readBdfLicenceFiles
+// Every <bdf> declaration's licence files, keyed by font name. A font with no
+// match is simply absent (no line for it in the generated comment).
+//   projectRoot — absolute project directory, or undefined for a single file
+//   globals     — the parsed globals, for the declarations
+function readBdfLicenceFiles(projectRoot: string | undefined, globals: Globals): ReadonlyMap<string, readonly string[]> {
+  const result = new Map<string, readonly string[]>();
+  if (projectRoot === undefined) {
+    return result;
+  }
+  for (const font of globals.fonts ?? []) {
+    if (font.kind !== 'bdf') {
+      continue;
+    }
+    const files = bdfLicenceFilesFor(projectRoot, font);
+    if (files.length > 0) {
+      result.set(font.name, files);
+    }
+  }
+  return result;
 }

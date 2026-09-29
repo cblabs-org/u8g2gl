@@ -63,7 +63,7 @@ void ui_screen_gauges_init() {
 }
 
 // --- activate / deactivate (§12.4) ---
-// Nothing to do: events and focus are not generated until PR-09, and
+// Nothing to do: this build generates no event or focus handling, and
 // u8g2gl_set_active_screen() already marks the new screen dirty.
 void ui_screen_gauges_activate() {}
 

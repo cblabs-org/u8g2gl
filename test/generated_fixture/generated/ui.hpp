@@ -74,9 +74,12 @@ extern u8g2gl_style ui_style_loud;
 extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
 extern const uint8_t* const ui_font_u8g2_font_5x7_mr;
 extern const uint8_t* const ui_font_u8g2_font_helvR08_tr;
+extern const uint8_t* const ui_font_font_4x6;
+extern const uint8_t* const ui_font_font_arrow_mini;
 
 // --- Images (§14.2) ---
 extern const uint8_t ui_image_icon_wifi[];
+extern const uint8_t ui_image_logo_mark[];
 
 // --- Screens (§13.7) ---
 

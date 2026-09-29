@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-09-05T10:59:27Z — was: 2026-09-04T11:23:03Z -->
+<!-- Last updated: 2026-09-28T14:55:00Z — was: 2026-09-05T10:59:27Z -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-04b-font-image-pipeline | **Submitted** — 7/7 WOs, PR from `u8g2gl-fonts/wo6-readability`. C++ 383 / CLI 1281, CLI 0.9.0. CA bridge: 9 items | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
 
 ## Recently Completed (last 5)
 | Project | Completed | Modules | Key Outcome |

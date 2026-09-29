@@ -21,7 +21,9 @@
  *              structurally unknowable to the generator and are always
  *              unmeasured:
  *
- *              - **Any flash figure.** §13.7 forbids the generator assuming
+ *              - **Any flash figure for code or a `<builtin>` font.** (The
+ *                arrays the generator emits itself, images and compiled `<bdf>`
+ *                fonts, are measured exactly.) §13.7 forbids the generator assuming
  *                anything about a runtime class's size or layout, so the runtime
  *                core, the element classes and a `<builtin>` font's compiled
  *                array are all the runtime's and U8G2's business. Measuring them
@@ -30,8 +32,8 @@
  *                is default-constructible and nothing about its fields.
  *
  *              What *is* derivable is derived exactly: a string subject's storage
- *              from its declared `max_len + 1` (§8.2), an `<xbm>`'s bytes from
- *              the asset the build compiled in, the framebuffer from the
+ *              from its declared `max_len + 1` (§8.2), an image's bytes (`<xbm>`
+ *              or `<convert>`) from the image the build emitted, the framebuffer from the
  *              catalogue's tile dimensions for the target's setup ([D-14], §18),
  *              and every count and capacity [D-21] emitted.
  *
@@ -51,9 +53,10 @@ import type { DisplayRecord } from '../../schema/display-record.js';
 import type { Globals } from '../../schema/globals.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { Target } from '../../schema/project.js';
+import type { CompiledFont } from '../../fonts/index.js';
 import { classOf } from '../emit/screen-model.js';
 import { GENERATED_CONFIG_HEADER } from '../emit/generated-config.js';
-import { parseXbm } from '../emit/xbm.js';
+import type { XbmImage } from '../../images/index.js';
 import { compareCodeUnits } from '../../order.js';
 import {
   MAX_OBJECTS_PER_SCREEN,
@@ -92,11 +95,17 @@ export interface ReportInput {
   /** The CLI version stamped into the build (§13.9). */
   readonly generatorVersion: string;
   /**
-   * Asset text by the `src` path each declaration names — the same map emission
-   * compiled the `<xbm>` arrays from, so the byte count reported is the byte
-   * count emitted.
+   * Every image this build produced, keyed by its declared `name` —
+   * the same map emission wrote the arrays from, so the byte count
+   * reported is the byte count emitted, for `<xbm>` and `<convert>` alike.
    */
-  readonly assets: ReadonlyMap<string, string>;
+  readonly images: ReadonlyMap<string, XbmImage>;
+  /**
+   * Every `<bdf>` font this build compiled, keyed by its declared `name`
+   * — the same map emission wrote the arrays from, so the
+   * flash figure reported is the flash figure emitted.
+   */
+  readonly compiledFonts: ReadonlyMap<string, CompiledFont>;
 }
 
 // measured
@@ -158,41 +167,58 @@ function elementClassesByOrigin(input: ReportInput): {
 }
 
 // imageDataBytes
-// The exact bytes the `<xbm>` arrays add, read from the very assets emission
-// compiled in. Derivable, so it is derived: §18's own purpose includes catching
-// an asset that is far larger than the project needs, and an author cannot see
-// that in XML. An asset that is absent or malformed refuses the build before the
-// report is built, so a missing entry here can only be a `<convert>`, which is
-// refused too — either way it contributes nothing rather than a guess.
-//   input — the report input; reads `globals.images` and `assets`
+// The exact bytes the image arrays add, read from the very image map emission
+// wrote them from: `<xbm>` and `<convert>` alike, so a converted
+// image is measured, not guessed. Derivable, so it is derived: §18's own
+// purpose includes catching an asset that is far larger than the project needs,
+// and an author cannot see that in XML. A declaration with no entry failed in
+// the asset step and refuses the build, so no report is built for it.
+//   input — the report input; reads `globals.images` and `images`
 function imageDataBytes(input: ReportInput): { readonly bytes: number; readonly names: readonly string[] } {
   let bytes = 0;
   const names: string[] = [];
   for (const image of input.globals.images ?? []) {
-    if (image.kind !== 'xbm') {
+    const produced = input.images.get(image.name);
+    if (produced === undefined) {
       continue;
     }
-    const text = input.assets.get(image.src);
-    if (text === undefined) {
-      continue;
-    }
-    const parsed = parseXbm(text);
-    if ('reason' in parsed) {
-      continue; // Malformed: emission refuses the build, so no report is built for it.
-    }
-    bytes += parsed.bytes.length;
+    bytes += produced.bytes.length;
     names.push(image.name);
   }
   return { bytes, names };
 }
 
+// compiledBdfFontBytes
+// The exact bytes every compiled <bdf> font's array adds — sourced from the
+// same `compiledFonts` map emission wrote the arrays from, never recomputed: `declaredLength` is bdfconv's own array length, the same
+// figure fonts.ts emits as `ui_fontdata_<name>[declaredLength]`.
+//   input — the report input; reads `globals.fonts` and `compiledFonts`
+function compiledBdfFontBytes(input: ReportInput): { readonly bytes: number; readonly names: readonly string[] } {
+  let bytes = 0;
+  const names: string[] = [];
+  for (const font of input.globals.fonts ?? []) {
+    if (font.kind !== 'bdf') {
+      continue;
+    }
+    const compiled = input.compiledFonts.get(font.name);
+    if (compiled === undefined) {
+      continue; // A build that reaches the report never has one of these: generate() already refused it.
+    }
+    bytes += compiled.declaredLength;
+    names.push(font.name);
+  }
+  return { bytes, names };
+}
+
 // flashLines
-// §18's flash table. Every line is unmeasured except the `<xbm>` arrays, whose
-// bytes the generator emits itself and therefore knows exactly.
+// §18's flash table. Every line is unmeasured except the image arrays and a
+// compiled `<bdf>` font's arrays, whose bytes the generator emits itself and
+// therefore knows exactly.
 //   input — the report input
 function flashLines(input: ReportInput): readonly BudgetLine[] {
   const classes = elementClassesByOrigin(input);
-  const fonts = (input.globals.fonts ?? []).filter((font) => font.kind === 'builtin').map((font) => font.name);
+  const builtinFonts = (input.globals.fonts ?? []).filter((font) => font.kind === 'builtin').map((font) => font.name);
+  const compiledFonts = compiledBdfFontBytes(input);
   const images = imageDataBytes(input);
 
   return [
@@ -210,15 +236,24 @@ function flashLines(input: ReportInput): readonly BudgetLine[] {
       figure: unmeasured(FLASH_REASON),
     },
     {
-      item: 'fonts',
-      count: fonts.length,
-      names: fonts,
+      item: 'fonts (builtin)',
+      count: builtinFonts.length,
+      names: builtinFonts,
       figure: unmeasured(
         `a <builtin> font's array lives in U8G2, not in generated code, so its size is U8G2's: ${FLASH_REASON}`,
       ),
     },
     {
-      item: 'image data (xbm arrays)',
+      item: 'fonts (compiled bdf)',
+      count: compiledFonts.names.length,
+      names: compiledFonts.names,
+      figure: measured(
+        compiledFonts.bytes,
+        "the sum of each compiled font's declared array length, bdfconv's own output (§14.1)",
+      ),
+    },
+    {
+      item: 'image data (bitmap arrays)',
       count: images.names.length,
       names: images.names,
       figure: measured(images.bytes, 'the byte count of the arrays this build emits (§14.2)'),
@@ -484,7 +519,7 @@ function realisationReport(realised: readonly RealisedScreen[]): RealisationRepo
  * two renderings of one arithmetic ([D-21], PR-04 WO8c).
  *
  * @param input The build's globals, manifests, realisation, capacities, target
- *              and assets, and the generator version stamped into it.
+ *              and images, and the generator version stamped into it.
  * @return The three reports `generate --json` carries. Deterministic for a given
  *         document (§13.9): every list is in document order or sorted by code
  *         unit, and nothing is read from a `Set`'s iteration order.

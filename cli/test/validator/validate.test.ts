@@ -70,14 +70,11 @@ describe('validate orchestrator integration', () => {
     const input = loadValidProject();
     const result = validate(input);
 
-    // PR-04 WO5b: the fixture's <bdf> fonts are valid as authored but refused by
-    // `generate` until PR-04b, so validation reports them as warnings (decision 3).
+    // The fixture's <bdf> fonts raise nothing here (validate() never compiles a
+    // font; only generate() does, through compileProjectAssets()).
     expect(result.errors).toBe(0);
-    expect(result.warnings).toBe(2);
-    expect(result.diagnostics.map((d) => d.code)).toEqual([
-      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
-      DIAGNOSTIC_CODES.NOT_YET_SUPPORTED,
-    ]);
+    expect(result.warnings).toBe(0);
+    expect(result.diagnostics.map((d) => d.code)).toEqual([]);
   });
 
   // §6.6 recommends `wd_` for user elements and §13.4 reserved it, so a

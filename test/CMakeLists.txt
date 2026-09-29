@@ -532,6 +532,71 @@ target_compile_options(test_generated_fixture PRIVATE
 
 gtest_discover_tests(test_generated_fixture)
 
+# --- <bdf> against real U8G2 ---
+# Every other build of ui_fonts.cpp compiles against test/stubs/U8g2lib.h. This
+# one compiles it a third time against real U8G2's own headers (extern/u8g2,
+# tag 2.36.18) and real U8G2's own C sources (u8g2gl_u8g2_csrc, the same static
+# library test_rbox_bound links) — the same pattern u8g2gl_real_u8g2 uses for
+# the runtime itself, applied to the generated fonts unit, so a compiled <bdf>
+# is proved against the library that will actually decode it on hardware, not
+# only against the stub's recording of setFont()'s argument.
+#
+#   - <U8g2lib.h> is the C++ wrapper (cppsrc), which needs Arduino's Print
+#     class; test/real_u8g2/ supplies that, exactly as u8g2gl_real_u8g2 does.
+#   - No forced include of u8g2gl_generated_config.h or fixture_u8g2_fonts.h:
+#     ui_fonts.cpp needs neither against real U8G2 — real U8G2's own u8g2.h
+#     already declares every <builtin> font by name, and a compiled <bdf>'s
+#     array carries no capacity dependency.
+#   - Real U8G2's own u8g2.h defines U8G2_FONT_SECTION (forwarding to
+#     u8x8.h's U8X8_FONT_SECTION), so nothing here defines it — unlike the stub, which must (test/stubs/U8g2lib.h).
+add_library(u8g2gl_fixture_fonts_real_u8g2 OBJECT
+    ${U8G2GL_FIXTURE_GENERATED}/ui_fonts.cpp
+)
+target_include_directories(u8g2gl_fixture_fonts_real_u8g2 PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    ${U8G2GL_FIXTURE_GENERATED}
+)
+target_include_directories(u8g2gl_fixture_fonts_real_u8g2 SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_fixture_fonts_real_u8g2 PRIVATE ARDUINO=10819)
+target_compile_options(u8g2gl_fixture_fonts_real_u8g2 PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+# ui_fonts.cpp's <builtin> aliases (u8g2_font_6x10_mr and friends) are only
+# *declared* by u8g2.h; their bytes live in u8g2_fonts.c, U8G2's own font data
+# file — and the oracle check needs u8g2_font_4x6_tr's bytes too. Its own
+# static library, not folded into u8g2gl_u8g2_csrc above: nothing else here
+# needs several hundred font arrays, and keeping them apart keeps the other
+# real-U8G2 targets' link (and rebuild) fast.
+add_library(u8g2gl_u8g2_fonts_csrc STATIC ${U8G2GL_U8G2_DIR}/csrc/u8g2_fonts.c)
+target_include_directories(u8g2gl_u8g2_fonts_csrc SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_options(u8g2gl_u8g2_fonts_csrc PRIVATE -w)
+
+add_executable(test_bdf_real_u8g2
+    test_bdf_real_u8g2.cpp
+)
+target_include_directories(test_bdf_real_u8g2 PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${U8G2GL_FIXTURE_GENERATED}
+)
+target_include_directories(test_bdf_real_u8g2 SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_link_libraries(test_bdf_real_u8g2 PRIVATE
+    u8g2gl_fixture_fonts_real_u8g2
+    u8g2gl_u8g2_csrc
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_bdf_real_u8g2 PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_bdf_real_u8g2)
+
 # --- The editor target ([UD-4], PR-04 WO11) ---
 # The runtime compiled a third time, with U8G2GL_EDITOR defined: the build the
 # designer's Wasm canvas uses. Default capacities, not the fixture's counted

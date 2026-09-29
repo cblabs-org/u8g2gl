@@ -8,7 +8,7 @@
  *          does not build yet, and the PR that will build it. Without it a
  *          document using a focus ring would validate cleanly and then either be
  *          refused obscurely by `generate` or, worse, generate without its focus
- *          ring. The Chief Architect's PR-04 decisions 1 and 3 fix the set; this
+ *          ring. The Chief Architect's PR-04 decision 1 fixes the set; this
  *          module is the one place that lists it, so each later PR deletes its own
  *          entry here when it lands.
  * Description: The severity is a parameter, not a branch — the same shape as the
@@ -22,7 +22,6 @@
  *                `<screen_back_event>` → PR-09 (decision 1)
  *              - collection `<element>` children (§9), and a composite that also
  *                has a C++ class (`view` + `extends`) → PR-08 (decision 1)
- *              - `<bdf>` fonts and `<convert>` images → PR-04b (decision 3)
  *
  * Exports:
  * - RefusalPolicy:                'warning' (authoring) or 'error' (build)
@@ -70,7 +69,6 @@ export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 // cannot disagree with each other, and so each PR finds its own entries here.
 const FOCUS_AND_EVENTS_PR = 'PR-09';
 const COLLECTIONS_AND_CLASSED_COMPOSITES_PR = 'PR-08';
-const FONT_AND_IMAGE_PIPELINE_PR = 'PR-04b';
 
 // deferredDiagnostic
 // Builds one NOT_YET_SUPPORTED diagnostic at the caller's policy severity.
@@ -176,8 +174,7 @@ function checkView(
  *              every diagnostic, defaulting to
  *              {@link DEFAULT_REFUSAL_POLICY}.
  * @return One `U8G2GL_NOT_YET_SUPPORTED` diagnostic per construct: screens, then
- *         declared composites, then globals' fonts and images, each in document
- *         order. `validate()` sorts the combined result.
+ *         declared composites, each in document order. `validate()` sorts the combined result.
  */
 export function validateNotYetSupported(input: ValidateInput): readonly Diagnostic[] {
   const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
@@ -205,36 +202,6 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
       );
     }
     checkView(composite.view, input, severity, diagnostics);
-  }
-
-  // --- Step 3: Asset pipeline — BDF fonts and converted images ---
-  // Messages name the declaration and the tool that is missing, so PR-04b can
-  // replace exactly these two and nothing else.
-  for (const font of input.globals?.fonts ?? []) {
-    if (font.kind === 'bdf') {
-      diagnostics.push(
-        deferredDiagnostic(
-          severity,
-          `<bdf> font '${font.name}' is not yet supported: compiling BDF fonts with bdfconv (§14) — ` +
-            `${refusalClause(FONT_AND_IMAGE_PIPELINE_PR)}. Declare a <builtin> U8G2 font meanwhile.`,
-          font.loc,
-          'bdf',
-        ),
-      );
-    }
-  }
-  for (const image of input.globals?.images ?? []) {
-    if (image.kind === 'convert') {
-      diagnostics.push(
-        deferredDiagnostic(
-          severity,
-          `<convert> image '${image.name}' is not yet supported: build-time PNG-to-XBM conversion (§14) — ` +
-            `${refusalClause(FONT_AND_IMAGE_PIPELINE_PR)}. Declare an <xbm> image meanwhile.`,
-          image.loc,
-          'convert',
-        ),
-      );
-    }
   }
 
   return diagnostics;

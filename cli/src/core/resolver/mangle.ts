@@ -276,6 +276,30 @@ export function fontIdentifier(font: string): string {
   return `ui_font_${font}`;
 }
 
+/**
+ * @brief A compiled `<bdf>` font's own array: `ui_fontdata_` + its name —
+ *        `ui_fontdata_small_9`.
+ *
+ * `ui_font_<name>` is declared once, in `ui.hpp`, as `extern const uint8_t*
+ * const` for **both** font kinds (`fontIdentifier()`), so no consumer can tell
+ * a `<builtin>` from a compiled `<bdf>` apart. A `<bdf>` therefore needs a
+ * second, distinct symbol to hold the array itself, which `ui_font_<name>`
+ * then points at.
+ *
+ * `ui_fontdata_<name>`, not `ui_font_<name>_data`: `ui_font_<name>_data` is
+ * rejected because it collides with a `<bdf>` legitimately named
+ * `<name>_data` — `ui_font_small_data` would be ambiguous between font `small`
+ * (suffixed `_data`) and font `small_data` (unsuffixed). `ui_fontdata_` is a
+ * distinct family inside the reserved `ui_` prefix (§13.4 forbids an author
+ * name starting `ui_`), so no author-chosen name can ever reach it, and no
+ * separate collision registration is needed: font names are already unique
+ * ({@link fontIdentifier}'s own collision check), so distinct `<bdf>`s can
+ * never produce the same `ui_fontdata_<name>`.
+ */
+export function fontDataIdentifier(font: string): string {
+  return `ui_fontdata_${font}`;
+}
+
 /** `ui_image_icon_wifi`. */
 export function imageIdentifier(image: string): string {
   return `ui_image_${image}`;

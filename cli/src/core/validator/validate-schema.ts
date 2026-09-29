@@ -31,17 +31,27 @@
  *              through the one bool and enum rule an element's attribute uses
  *              (value-rules.ts; PR-04 WO11b finding 12).
  *
+ *              Two `<globals>` checks reuse a definition owned elsewhere, so
+ *              `validate` and the build cannot disagree: a `<bdf range>` is checked
+ *              by `parseBdfRange()` (`MALFORMED_BDF_RANGE`), the module
+ *              `compileBdf()` also translates the range with; a `<convert>`'s
+ *              `mode`, `threshold` and size are checked by `convertDeclProblems()`,
+ *              the same function that keeps the asset step from converting one the
+ *              validator rejects.
+ *
  * Exports:
  * - validateSchema(input): Runs Pass 1 schema structure validation
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import { parseBdfRange } from '../fonts/bdf-range.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
 import type { PropDef, PropType } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import { COLOR_VALUES, STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
+import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
 
@@ -645,6 +655,21 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           ),
         );
       }
+      if (font.kind === 'bdf' && font.range !== undefined) {
+        // Same grammar module compileBdf() uses to translate `range` for bdfconv, so
+        // `validate` and codegen cannot disagree about what a range means.
+        const parsedRange = parseBdfRange(font.range);
+        if (!parsedRange.ok) {
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.MALFORMED_BDF_RANGE,
+              `Malformed 'range' on BDF font '${font.name}': ${parsedRange.reason}`,
+              font.loc,
+              'range',
+            ),
+          );
+        }
+      }
     }
 
     for (const img of globals.images ?? []) {
@@ -667,6 +692,21 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
             'src',
           ),
         );
+      }
+      if (img.kind === 'convert') {
+        // §14.2: the attributes `<convert>` already has, judged from the one
+        // definition the asset step also consults.
+        for (const problem of convertDeclProblems(img.name, img)) {
+          diagnostics.push(
+            createDiagnostic(
+              problem.attribute === 'mode' ? DIAGNOSTIC_CODES.INVALID_ENUM_VALUE : DIAGNOSTIC_CODES.TYPE_MISMATCH,
+              problem.message,
+              img.loc,
+              problem.offendingText,
+              problem.suggestions,
+            ),
+          );
+        }
       }
     }
   }

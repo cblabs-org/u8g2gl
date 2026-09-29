@@ -3,12 +3,14 @@
  * Copyright (c) 2026 Matt McNeill (CB Labs)
  * SPDX-License-Identifier: MIT
  *
- * File: src/core/generator/emit/xbm.ts
+ * File: src/core/images/xbm.ts
  * Purpose: Reads an `.xbm` asset's dimensions and bytes out of the file's text
- *          (§14.2). An XBM file is already C — a pair of `#define`s and a byte
- *          array — so this is a parse rather than a conversion, and it is the
- *          reason `<xbm>` needs no tooling while `<convert>` needs a PNG decoder
- *          and is refused until PR-04b.
+ *          (§14.2), and defines `XbmImage`, the one image model every image
+ *          reaches the emitter, the budget and the editor target as — whether
+ *          it started as an `<xbm>` (parsed here) or a `<convert>` (produced by
+ *          `png-to-xbm.ts`). An XBM file is already C — a pair of `#define`s
+ *          and a byte array — so reading one is a parse rather than a
+ *          conversion.
  * Description: Kept apart from the images emitter, and kept **pure**, for two
  *              reasons: `src/core/` may not read files (typescript.md §1), so
  *              the text arrives from `src/node/`; and a malformed asset must
@@ -49,6 +51,7 @@ export interface XbmParseError {
 
 /** A `#define <anything>_width 16` line. */
 const WIDTH_DEFINE = /#define\s+\w*_width\s+(\d+)/;
+/** A `#define <anything>_height 16` line. */
 const HEIGHT_DEFINE = /#define\s+\w*_height\s+(\d+)/;
 
 /** The byte array's braces. XBM declares exactly one array. */

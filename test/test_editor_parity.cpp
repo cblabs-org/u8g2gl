@@ -104,7 +104,14 @@ std::unique_ptr<editor_host> editor_for(const fixture_values& v) {
     // all, so the editor journey resolves it by the same string the firmware
     // alias is spelled from.
     host->provide_font("u8g2_font_helvR08_tr", u8g2_font_helvR08_tr);
+    // A <bdf> font follows the same path as a <builtin> —
+    // the host hands over the same ui_font_* pointer ui_fonts.cpp compiled,
+    // by the name the scene uses, exactly as it does for a U8G2 built-in above.
+    host->provide_font("font_4x6", ui_font_font_4x6);
+    host->provide_font("font_arrow_mini", ui_font_font_arrow_mini);
     host->provide_image("icon_wifi", ui_image_icon_wifi);
+    // A <convert> image is an image like any other to the host.
+    host->provide_image("logo_mark", ui_image_logo_mark);
     EXPECT_TRUE(host->set_string("station_name", v.station));
     EXPECT_TRUE(host->set_string("service_message", v.message));
     EXPECT_TRUE(host->set_bool("wifi_connected", v.wifi));

@@ -6,6 +6,9 @@
         <!-- Ruling 1: bound positions are container-relative. -->
         <slider name="track" x="40" y="10" width="60" height="20" />
 
+        <!-- PR-04b WO4: a <convert> image, drawn like any bitmap. -->
+        <u8g2gl_xbm name="logo" x="8" y="4" width="16" height="16" src="logo_mark" />
+
         <!-- ...and on the screen, a bound position is its value (no literal x). -->
         <u8g2gl_box name="dot" bind_x="knob_x" y="40" width="2" height="2" />
 
@@ -29,5 +32,14 @@
              the three spellings must agree or this unit will not build. -->
         <u8g2gl_label name="caps" x="0" y="26" width="60" height="10"
                       font="u8g2_font_helvR08_tr" text="Caps" />
+
+        <!-- PR-04b WO3b item 3/5: <bdf> fonts, drawn exactly as a <builtin>
+             is — set_font takes the same ui_font_* pointer either way, so
+             this is what proves emission goes through the emitter for a
+             compiled font too, on firmware and in the editor host alike. -->
+        <u8g2gl_label name="bdf_4x6" x="64" y="14" width="60" height="8"
+                      font="font_4x6" text="4x6!" />
+        <u8g2gl_label name="bdf_arrow" x="90" y="26" width="30" height="8"
+                      font="font_arrow_mini" text="A" />
     </view>
 </screen>

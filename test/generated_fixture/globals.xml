@@ -29,8 +29,6 @@
     </styles>
 
     <fonts>
-        <!-- §13.12 names BDF fonts, which PR-04 refuses (PR-04b); U8G2
-             built-ins stand in for them. -->
         <builtin name="u8g2_font_6x10_mr" />
         <builtin name="u8g2_font_5x7_mr" />
 
@@ -41,9 +39,29 @@
              the bounds screen, so the exemption is proved end to end rather than
              only in the validator. -->
         <builtin name="u8g2_font_helvR08_tr" />
+
+        <!-- PR-04b WO3b item 3: <bdf> in the committed fixture, compiled,
+             linked against real U8G2 and measured
+             (test/test_bdf_real_u8g2.cpp). U8G2's own public-domain 4x6.bdf,
+             filtered to ASCII — assets/fonts/LICENSE quotes its BDF COPYRIGHT
+             line. -->
+        <bdf name="font_4x6" src="assets/fonts/4x6.bdf" range="0x20-0x7F" />
+
+        <!-- A hand-written MIT fixture (header comment in the BDF itself) with
+             no `range`, proving the absent-range fix (WO3 item 1): a glyph
+             below 0x20, one in ASCII, and one above 0xFF (U+2190) all compile
+             and reach the screen. No licence file beside it — none needed. -->
+        <bdf name="font_arrow_mini" src="assets/fonts/custom/arrow_mini.bdf" />
     </fonts>
 
     <images>
         <xbm name="icon_wifi" src="assets/icon_wifi.xbm" />
+
+        <!-- PR-04b WO4: <convert>, PNG to XBM at generate time. Drawn on the
+             bounds screen, compiled, and given to the editor host, so a converted
+             image is proved end to end exactly as an <xbm> is. The PNG is
+             produced by cli/test/fixtures/make-fixture-logo.ts (byte-stable);
+             dithered, so the error-diffusion path is what the C++ suite builds. -->
+        <convert name="logo_mark" src="assets/logo_mark.png" width="16" height="16" mode="dither" />
     </images>
 </globals>

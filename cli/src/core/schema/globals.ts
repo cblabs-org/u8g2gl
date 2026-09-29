@@ -346,8 +346,12 @@ export interface ConvertImageDecl {
   readonly width: number;
   /** Target height in pixels. */
   readonly height: number;
-  /** Conversion algorithm: fixed threshold or error diffusion dither. */
-  readonly mode?: 'threshold' | 'dither';
+  /**
+   * Conversion algorithm as written: `'threshold'` or `'dither'` when valid.
+   * A string rather than the union, so a wrong value reaches the validator
+   * (`U8G2GL_INVALID_ENUM_VALUE`) instead of being cast to a type it is not.
+   */
+  readonly mode?: string;
   /** Luminance cutoff value (0..255) when mode is 'threshold'. */
   readonly threshold?: number;
   /** Source location where this image was declared. */

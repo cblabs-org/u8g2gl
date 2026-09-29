@@ -13,6 +13,11 @@
  *          catching anything.
  * Description: Generates through the built `dist/`, with the same fixed version
  *              the tests use, and writes each fixture's expectations in place.
+ *              Every `<bdf>` is compiled and every image produced first through
+ *              `compileProjectAssets()`, exactly as the CLI's own `generate` command
+ *              does — `generate()` itself never compiles a font, and a fixture
+ *              declaring one would otherwise refuse with
+ *              `U8G2GL_MISSING_COMPILED_FONT`.
  *              Run `npx tsc` first, then review every line of the diff — and,
  *              for the compile fixture, rebuild and run the C++ suite, because
  *              its output is compiled and executed there.
@@ -27,6 +32,7 @@ import { loadProject } from '../../dist/node/load-project.js';
 import { generate } from '../../dist/core/generator/index.js';
 import { emitEditorFiles } from '../../dist/core/generator/emit/index.js';
 import { writeGenerated } from '../../dist/node/write-generated.js';
+import { compileProjectAssets } from '../../dist/core/assets/index.js';
 
 /** Must match GOLDEN_GENERATOR_VERSION in emit-golden.test.ts and compile-fixture.test.ts. */
 const GOLDEN_GENERATOR_VERSION = '0.0.0-golden';
@@ -48,10 +54,14 @@ const FIXTURES = [
 
 for (const { project, expected, editor } of FIXTURES) {
   const loaded = loadProject(project);
+  // Asynchronous, and run before generate() — the same
+  // step the CLI's own `generate` command runs (src/node/cli.ts).
+  const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
   const result = generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
+    compiledAssets,
+    bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
 
   if (result.errors > 0) {
@@ -75,7 +85,9 @@ for (const { project, expected, editor } of FIXTURES) {
       resolved: result.resolved,
       manifests: loaded.model.manifests,
       capacities: result.capacities,
-      assets: loaded.assets,
+      images: compiledAssets.images,
+      compiledFonts: compiledAssets.fonts,
+      bdfLicenceFiles: loaded.bdfLicenceFiles,
       generatorVersion: GOLDEN_GENERATOR_VERSION,
       target: result.target,
     }).files;

@@ -132,6 +132,7 @@ export {
   subjectIdentifier,
   subjectSetterIdentifier,
   fontIdentifier,
+  fontDataIdentifier,
   imageIdentifier,
   styleIdentifier,
   childIdentifier,

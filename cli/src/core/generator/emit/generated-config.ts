@@ -147,7 +147,7 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     `#ifndef ${guard}`,
     `#define ${guard}`,
     '',
-    '// Reaching the runtime library as well as the generated units (WO4 F5, §16).',
+    '// Reaching the runtime library as well as the generated units (§16).',
     '//',
     '// The binding pool is sized inside src/u8g2gl_obj.cpp, which is compiled as',
     '// part of the library and never includes this header. A project that included',

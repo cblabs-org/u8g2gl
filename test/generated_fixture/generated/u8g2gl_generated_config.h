@@ -7,7 +7,7 @@
 #ifndef U8G2GL_GENERATED_CONFIG_H
 #define U8G2GL_GENERATED_CONFIG_H
 
-// Reaching the runtime library as well as the generated units (WO4 F5, §16).
+// Reaching the runtime library as well as the generated units (§16).
 //
 // The binding pool is sized inside src/u8g2gl_obj.cpp, which is compiled as
 // part of the library and never includes this header. A project that included
@@ -42,7 +42,7 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // which is why this header must be included first (§13.7).
 
 // The busiest screen is 'bounds'.
-#define U8G2GL_MAX_OBJECTS_PER_SCREEN 6
+#define U8G2GL_MAX_OBJECTS_PER_SCREEN 9
 
 // The busiest object is 'track_readout'.
 #define U8G2GL_MAX_BINDINGS_PER_OBJ 1

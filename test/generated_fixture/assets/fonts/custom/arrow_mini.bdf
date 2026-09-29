@@ -1,0 +1,71 @@
+COMMENT arrow_mini.bdf
+COMMENT
+COMMENT U8G2GL — declarative UI for U8G2 monochrome displays
+COMMENT Copyright (c) 2026 Matt McNeill (CB Labs)
+COMMENT SPDX-License-Identifier: MIT
+COMMENT
+COMMENT A hand-written three-glyph BDF fixture (PR-04b WO3b item 3): one glyph
+COMMENT below 0x20, one in ASCII, and one above 0xFF, so <bdf> with no `range`
+COMMENT reaches every one of them — the absent-range fix's own proof.
+STARTFONT 2.1
+FONT -cblabs-arrowmini-medium-r-normal--7-70-75-75-c-50-iso10646-1
+SIZE 7 75 75
+FONTBOUNDINGBOX 5 7 0 -1
+
+STARTPROPERTIES 6
+FOUNDRY "CBLabs"
+FAMILY_NAME "ArrowMini"
+WEIGHT_NAME "Medium"
+SLANT "R"
+PIXEL_SIZE 7
+DEFAULT_CHAR 65
+ENDPROPERTIES
+
+CHARS 3
+
+STARTCHAR ctrl_bell
+ENCODING 7
+SWIDTH 714 0
+DWIDTH 5 0
+BBX 5 7 0 -1
+BITMAP
+00
+70
+70
+70
+00
+00
+00
+ENDCHAR
+
+STARTCHAR A
+ENCODING 65
+SWIDTH 714 0
+DWIDTH 5 0
+BBX 5 7 0 -1
+BITMAP
+20
+50
+50
+70
+50
+50
+00
+ENDCHAR
+
+STARTCHAR arrowleft
+ENCODING 8592
+SWIDTH 714 0
+DWIDTH 5 0
+BBX 5 7 0 -1
+BITMAP
+00
+20
+40
+F8
+40
+20
+00
+ENDCHAR
+
+ENDFONT

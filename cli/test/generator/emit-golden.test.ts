@@ -23,6 +23,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { compileProjectAssets } from '../../src/core/assets/index.js';
 import { generate } from '../../src/core/generator/index.js';
 import { loadProject } from '../../src/node/load-project.js';
 
@@ -39,17 +40,22 @@ const fixtureDir = resolve(__dirname, 'fixtures/emit-project');
 const expectedDir = join(fixtureDir, 'expected');
 
 /** Generates the fixture through the core API, exactly as the goldens were made. */
-function generateFixture(): ReturnType<typeof generate> {
+async function generateFixture(): Promise<ReturnType<typeof generate>> {
   const loaded = loadProject(fixtureDir);
+  const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
   return generate({
     ...loaded.model,
     generatorVersion: GOLDEN_GENERATOR_VERSION,
-    assets: loaded.assets,
+    compiledAssets,
   });
 }
 
+// One generation, at module level: it is asynchronous (the asset step), and
+// `describe` bodies cannot await.
+const generated = await generateFixture();
+
 describe('golden files — the emitted project (§17.1, §13.9)', () => {
-  const result = generateFixture();
+  const result = generated;
 
   it('generates the fixture without a diagnostic', () => {
     expect(result.diagnostics).toEqual([]);
@@ -94,8 +100,8 @@ describe('golden files — the emitted project (§17.1, §13.9)', () => {
     });
   }
 
-  it('regenerates byte-identically — the §13.9 claim', () => {
-    const again = generateFixture();
+  it('regenerates byte-identically — the §13.9 claim', async () => {
+    const again = await generateFixture();
     expect(again.files).toEqual(result.files);
   });
 
@@ -108,7 +114,7 @@ describe('golden files — the emitted project (§17.1, §13.9)', () => {
 });
 
 describe('what the golden fixture is there to pin', () => {
-  const result = generateFixture();
+  const result = generated;
   const content = (path: string): string => result.files.find((file) => file.path === path)?.content ?? '';
 
   it('sizes a subject bound by three objects and one draw-call element as _n<4>', () => {

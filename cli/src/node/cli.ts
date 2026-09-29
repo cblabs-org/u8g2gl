@@ -15,20 +15,24 @@
  *              only in the not-yet-supported severity: `validate` warns, `generate`
  *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
  *              element names back; `generate` never invents identity (ui_spec §16.1).
+ *              `generate` first runs the asynchronous asset step
+ *              (`compileProjectAssets()`: every `<bdf>` compiled, every image
+ *              produced) and hands its result to the synchronous `generate()`.
+ *              `generate --target-kind editor` ([UD-4]) writes the editor target —
+ *              the registry unit and the scene description — from the same
+ *              validated build the firmware units come from, into
+ *              `<output dir>_editor` by default.
  *              Output is compiler-style diagnostics (§15.1) or JSON (§15.3, [D-16]).
  *
  * Exports:
  * - runCli(args): Main entry point for command-line execution
- *
- * `generate --target-kind editor` (PR-04 WO11, [UD-4]) writes the editor target —
- * the registry unit and the scene description — from the same validated build
- * the firmware units come from, into `<output dir>_editor` by default.
  */
 
 import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
 import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
+import { compileProjectAssets, type CompileProjectAssetsResult } from '../core/assets/index.js';
 import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
 import { buildGenerateReport, type GenerateReport } from '../core/generator/report/index.js';
 import { findTargetDisplay } from '../core/resolver/index.js';
@@ -660,7 +664,12 @@ function formatChanges(changes: readonly FileChange[], check: boolean): string {
 //   loaded           — the loaded project
 //   result           — its successful firmware generation
 //   generatorVersion — the version the firmware files were stamped with
-function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateResult['files'] {
+function editorFilesOf(
+  loaded: LoadedProject,
+  result: GenerateResult,
+  generatorVersion: string,
+  compiledAssets: CompileProjectAssetsResult,
+): GenerateResult['files'] {
   const { realised, resolved, capacities, target } = result;
   if (realised === undefined || resolved === undefined || capacities === undefined || target === undefined) {
     throw new Error('A build that generated carries its realisation, resolution, capacities and target.');
@@ -673,7 +682,9 @@ function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorV
     resolved,
     manifests: loaded.model.manifests,
     capacities,
-    assets: loaded.assets,
+    images: compiledAssets.images,
+    compiledFonts: compiledAssets.fonts,
+    bdfLicenceFiles: loaded.bdfLicenceFiles,
     generatorVersion,
     target,
   }).files;
@@ -687,7 +698,12 @@ function editorFilesOf(loaded: LoadedProject, result: GenerateResult, generatorV
 //   loaded           — the loaded project
 //   result           — its successful generation
 //   generatorVersion — the version stamped into those files
-function reportFor(loaded: LoadedProject, result: GenerateResult, generatorVersion: string): GenerateReport {
+function reportFor(
+  loaded: LoadedProject,
+  result: GenerateResult,
+  generatorVersion: string,
+  compiledAssets: CompileProjectAssetsResult,
+): GenerateReport {
   const { realised, capacities, target: targetName } = result;
   const target = loaded.model.project.targets.find((t) => t.name === targetName);
   if (realised === undefined || capacities === undefined || target === undefined) {
@@ -702,7 +718,8 @@ function reportFor(loaded: LoadedProject, result: GenerateResult, generatorVersi
     target,
     ...(display !== undefined ? { display } : {}),
     generatorVersion,
-    assets: loaded.assets,
+    images: compiledAssets.images,
+    compiledFonts: compiledAssets.fonts,
   });
 }
 
@@ -758,24 +775,34 @@ function reportFor(loaded: LoadedProject, result: GenerateResult, generatorVersi
  * @param json Whether to output JSON.
  * @param useColor Whether ANSI colouring is enabled.
  */
-function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): void {
+async function handleGenerateCommand(args: readonly string[], json: boolean, useColor: boolean): Promise<void> {
   const options = parseGenerateArgs(args, json);
 
-  // --- Step 1: Load, validate and lay out — all or nothing ---
+  // --- Step 1: Load, compile every <bdf> font and produce every image, validate and lay out — all or nothing ---
   const loaded = loadOrExit(options.path, json, { files: [] });
   const generatorVersion = generatorVersionOrExit(json);
+  // Asynchronous, so it runs before the synchronous generate(). The same
+  // result is passed to generate(), the editor target and the budget report, so
+  // all three read one set of compiled fonts and images.
+  const compiledAssets: CompileProjectAssetsResult = await compileProjectAssets({
+    globals: loaded.model.globals,
+    assets: loaded.assets,
+  });
   const result = generate({
     ...loaded.model,
     ...(options.target !== undefined ? { target: options.target } : {}),
     generatorVersion,
-    assets: loaded.assets,
+    compiledAssets,
+    bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
   const { diagnostics, errors, warnings } = result;
   // The editor target is emitted from this very build — its realisation,
   // resolution and capacities — and only when the firmware emission it shares a
   // model with succeeded, so it can never describe a document `generate` refuses.
   const written: GenerateResult =
-    options.targetKind === 'editor' && errors === 0 ? { ...result, files: editorFilesOf(loaded, result, generatorVersion) } : result;
+    options.targetKind === 'editor' && errors === 0
+      ? { ...result, files: editorFilesOf(loaded, result, generatorVersion, compiledAssets) }
+      : result;
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
 
   if (errors > 0 || loaded.projectRoot === undefined) {
@@ -813,7 +840,7 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
   // §13.11's last pipeline step, and §1.3's obligation: every `generate` run
   // states what the project costs, including under `--check`, where nothing was
   // written but the figures are still the ones the checked output carries.
-  const report = reportFor(loaded, result, generatorVersion);
+  const report = reportFor(loaded, result, generatorVersion, compiledAssets);
 
   // --- Step 5: Report ---
   if (json) {
@@ -864,7 +891,7 @@ function handleGenerateCommand(args: readonly string[], json: boolean, useColor:
  *
  * @param rawArgs Command-line arguments (excluding node binary and script path).
  */
-export function runCli(rawArgs: readonly string[]): void {
+export async function runCli(rawArgs: readonly string[]): Promise<void> {
   // --- Step 1: Scan for global flags and isolate subcommand ---
   let json = false;
   let noColor = false;
@@ -940,7 +967,7 @@ export function runCli(rawArgs: readonly string[]): void {
   }
 
   if (subcommand === 'generate') {
-    handleGenerateCommand(subcommandArgs, json, useColor);
+    await handleGenerateCommand(subcommandArgs, json, useColor);
     return;
   }
 
@@ -963,5 +990,12 @@ export function runCli(rawArgs: readonly string[]): void {
   process.exit(1);
 }
 
-// Execute immediately when invoked from CLI
-runCli(process.argv.slice(2));
+// Execute immediately when invoked from CLI. Every path inside runCli() exits
+// the process itself (process.exit()) on both success and a user-facing
+// refusal, so this catch only ever fires for a genuine bug — an exception
+// that escaped every handler — and exists so that case is reported rather
+// than becoming a silent, unhandled rejection.
+runCli(process.argv.slice(2)).catch((error: unknown) => {
+  console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+  process.exit(1);
+});
