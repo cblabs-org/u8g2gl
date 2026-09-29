@@ -1221,3 +1221,60 @@ belong in PR-04b, which is the font and image pipeline. They go to **PR-4R2**,
 after PR-04b. **The clipping condition must not slip past PR-05**: that is when
 generated code first goes into a real application, and a draw-call child
 painting outside its container would be found on hardware.
+
+---
+
+## Session — 2026-09-29 · PR-04b merged (#8); nine rulings; state captured before compaction
+
+**PR-04b is merged as [#8](https://github.com/cblabs-org/u8g2gl/pull/8).** The
+font and image pipeline: `<bdf>` through bdfconv compiled to Wasm from the
+pinned submodule, and PNG→XBM `<convert>`. The PA committed the Chief
+Architect's answers itself (`4c99284`), so nothing was stranded in its worktree.
+
+### The nine rulings, recorded here because the bridge lives in a PR folder
+
+1. **Q-2 closes.** It asked whether Wasm packaging was *work* or *unknown risk*.
+   A byte-identical rebuild, output equal to native bdfconv, and a pinned
+   reproduction of `u8g2_font_4x6_tr` answer it. The §21 row must name
+   Emscripten 5.0.3 — "regenerate the artefact" means nothing without a version.
+2. **`<convert>` refuses a size mismatch.** `width`/`height` *declare*; they do
+   not resample. A filter is a permanent design commitment and a determinism
+   surface, refusing can become resizing later without invalidating a document,
+   and resample-then-threshold is where monochrome art turns to mush.
+3. **Polarity confirmed and it goes in the spec** — darker than `threshold` sets
+   the bit, alpha composites over white. The spec sentence is the substantive
+   half: the editor's preview and the CLI must agree, and a written rule is what
+   keeps two implementations agreeing.
+4. **The committed Wasm artefact is approved**, on `catalogue.json`'s precedent.
+   Its real cost is that no reviewer can read a binary diff; what makes that
+   acceptable is the byte-identical rebuild, the provenance, and the test tying
+   it to the same pinned U8G2 commit as the catalogue. Keep all three.
+5. **`range` takes the subset.** `>` remapping and `~` exclusion are font
+   *authoring*, not range selection, and belong to the Phase 4 glyph editor.
+6. **An absent `range` means no filter.** An optional filter attribute that
+   filters when omitted is a trap; bdfconv's own `*` default (32–255) would
+   silently drop everything above ASCII. §18's budget line is the right
+   mitigation — make the cost visible rather than guess a surprising default.
+7. **The stale documents are the Chief Architect's** — see CONTEXT_BRIDGE §7,
+   which now lists them as outstanding.
+8. **PR-05's font risk is effectively nil.** All twelve of departures-board-v3's
+   font arrays are byte-identical to generator output.
+9. **Comment citations:** keep `§`/`[D-n]` references and measured facts, drop
+   work-order tags and narrated debate — *and* state that pre-existing citations
+   are not defects, so reviewers do not re-litigate hundreds of old comments
+   every PR. Do not sweep older code: a mass comment rewrite is a large diff
+   with no behaviour change that churns `git blame` for a diffuse benefit.
+
+### Worth recording about the PA's work
+
+Its first work order had the `range` default wrong (it used bdfconv's `*`), and
+review caught it before anything consumed it. It also measured Q-2's evidence
+*before* writing a work order, which is why the question could be closed on
+delivery rather than argued about.
+
+### State captured for compaction
+
+CONTEXT_BRIDGE §7 was six PRs out of date (still describing a PR-03 worker) and
+has been rewritten as the reload document: PR status, the Chief Architect's own
+outstanding spec work, the two open owner decisions, PR-4R2's carried items, the
+three-checkout hazard, and the process lessons that live nowhere else.

@@ -213,45 +213,128 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Date of this revision: 2026-09-10.**
+**Revised 2026-09-29.** `main` @ `0607c1b`.
 
-**The main working tree is on `u8g2gl-widgets/wo2-scroll-xbm-glyph` with a PR-03
-worker actively mid-WO** — uncommitted `scrolling_label`, `xbm` and `glyph`
-sources plus modified `CMakeLists.txt`. **Do not commit, stash, or switch branches
-in that tree.** For your own documentation work use a worktree:
+### Where the programme is
 
-```bash
-git worktree add /tmp/wt main    # then commit and push from there
-git worktree remove /tmp/wt
-```
+Merged: **#1** PR-01 runtime core · **#2** PR-02 CLI/schema/validator · **#3**
+PR-03 widgets + `[U-1]` · **#4** PR-3R remediation to `[D-18]`–`[D-21]` · **#5**
+PR-04 the generator · **#6**+**#7** PR-4R corrections · **#8** PR-04b the font
+and image pipeline.
 
-**Nothing is blocked on the owner right now.** PR-03 is running. The next thing
-that needs you is ingesting PR-03 when it completes.
+Baselines at `main`: C++ ~377 tests (one known skip,
+`SizeOfReport.ThirtyTwoBitTarget`), CLI ~1087, zero warnings. Schema **0.4**,
+CLI **0.8.0**, runtime **0.5.0**. U8G2 pinned at **2.36.18** (`d66b49af`) in
+`extern/u8g2`.
 
-**When PR-03 returns, review these three specifically:**
+**Next:** PR-4R2 (carried corrections), then **PR-05** (foundation integration,
+first real board). PR-05's font risk is effectively nil — all twelve of
+departures-board-v3's font arrays are byte-identical to generator output; its
+font work is renaming to lowercase `<bdf>` names and using `ui_font_<name>`.
 
-1. **WO6's element-identity decision.** The PA chose Option A (require `name`),
-   the one breaking choice. Check the reasoning holds against round-trip fidelity
-   ([UD-3]), the sidecar editor-state file, and §13.4's mangling and collision
-   rules. If it does not, this is far cheaper to change before the generator
-   exists than after.
-2. **WO5's manifest→validator cross-test.** This is the seam between PR-02 and
-   PR-03: manifests must satisfy the `PropDef` schema in
-   `cli/src/core/schema/widget-manifest.ts`. If that test is missing or weak, a
-   PR-04 integration failure has been deferred rather than prevented.
-3. **Measured `sizeof` for every widget**, with the host width stated. Widget
-   instances multiply across a screen. Do not accept asserted figures — build both
-   sides and measure, which is how the PR-01 padding claim was found to be wrong
-   on the host and right on the target.
+### Your role, and the correction that shaped it
 
-**Still open, no owner decision needed yet:** `[Q-1]` multi-target layout
-overrides (needs two real targets to test against), `[Q-2]` `bdfconv` packaging
-(work, not risk — Wasm route recommended), `[Q-4]` measured budget at the PR-07
-gate, `[U-3]` multi-target canvas, `[U-6]` where sample data lives, `[U-7]` palette
-taxonomy.
+You are the **Chief Architect (Tier 1)**. You do not write production code and
+you do not run work orders. You hand each PR to a Principal Architect by bridge
+prompt, rule on what they bring back, and maintain the records.
 
-**The governing principle when in doubt** (design_spec §1.5): omission is the
-default; a feature earns inclusion by *demonstrated* rather than anticipated need;
-**schema surface is the expensive kind of complexity** because it is permanent
-once authors write XML against it, whereas generator complexity is cheap. A
-typical screen should be 15 lines of XML.
+**Two owner corrections are load-bearing:**
+- *"you don't do anything — always hand off to a PA"* — implementation and
+  in-PR record-keeping go to the PA, always.
+- *"You own the specification, so you can update those files directly"* — the
+  spec, `concept.md`, `ui_spec.md`, the decision records, `PROGRAM.md`,
+  `PROGRAM-PLAN.md` and the standards skill are **yours to edit directly**.
+
+Earlier in the programme the Chief Architect ran PR-3R as its own PA. It worked,
+and it spent Tier-1 context on `nm` output and boundary-box diffs. Don't repeat
+it.
+
+### Outstanding — Chief Architect's own, promised and not yet done
+
+These were promised to PR-04b's PA in its `CA-BRIDGE.md` (now on `main`) and are
+**not** done. Nobody else will do them:
+
+1. **§21: close Q-2.** `bdfconv` packaging is settled — Wasm built from the
+   pinned submodule, committed with provenance, byte-identical rebuild, output
+   equal to native. The closing row must name **Emscripten 5.0.3** and point at
+   the regeneration command.
+2. **§18: use the budget's real lines** — `fonts (compiled bdf)` (measured),
+   `fonts (builtin)` (unmeasured), `image data (bitmap arrays)` (measured).
+3. **`implementation_plan.md:276`** still describes PR-04b as future work. Mark
+   it merged (#8).
+4. **The standards skill needs the comment-citation rule** (agreed with
+   PR-04b's PA): keep `§`/`[D-n]` references and measured facts; drop bare work
+   order tags, pointers to workspace files and narrated debate. **And state
+   explicitly that pre-existing citations are not defects and reviewers must not
+   raise them** — the rule binds new and changed lines only, or every future
+   review re-litigates hundreds of old comments.
+5. **Verify, don't assume:** §14.2's `<convert>` behaviour and §22's `bdfconv`
+   rows look partly updated already. Check before editing.
+
+### Open — owner decisions
+
+- **CA-1 — the editor track's shape.** E-1 (shell, filesystem, round-trip), E-2
+  (canvas, property panel), E-3 (sample data, navigation) are **placeholders**
+  in both ledgers. How many PRs, and does the track sit behind the PR-07 gate or
+  run alongside it? E-1 is otherwise unblocked now: PR-04 delivered the editor
+  target, and PR-04b the fonts it needs.
+- **CA-2 — the gate does not measure the editor.** All four PR-07 criteria are
+  firmware-side. A GO would say only that we match what UiUiUi already does; a
+  NO-GO could end the editor without it ever being tried. Recommendation on
+  record: run E-1 before the gate and add an editor criterion.
+
+These two are now the main thing between the programme and its stated purpose.
+
+### Carried code — PR-4R2
+
+The clipping condition (§13.5 — a bound-geometry child of a container must be an
+object), refusing a `time` subject bound to a coordinate (§13.2 already requires
+matching types; it is unenforced), a build-time style-radius check where the
+size is literal, and the box manifest's `radius` help text. **The clipping
+condition must not slip past PR-05**, which is when generated code first reaches
+a real application.
+
+### Working trees — check every time
+
+Three checkouts exist:
+
+| Path | Branch | Note |
+|---|---|---|
+| `U8G2GL` | `u8g2gl-generator/wo13-readability` | the main checkout, sitting on a **merged, stale** branch |
+| `U8G2GL-04b` | `u8g2gl-fonts/wo6-readability` | PR-04b's PA |
+| `U8G2GL-4r` | `u8g2gl-4r/wo5-readability` | PR-4R's PA |
+
+**Always work in a fresh worktree on `main`**, never in a PA's checkout:
+`git worktree add --detach <scratch>/x origin/main && git -C <scratch>/x checkout -B main origin/main`.
+Verify `git branch --show-current` as **its own command** immediately before every
+commit, and confirm with `git log --oneline origin/main -1` after pushing — a
+successful `git push origin main` proves nothing about where your commits landed.
+
+### Things learned that are not in the plan or the work orders
+
+- **Measure U8G2; do not reason about it.** Three times a plausible derivation
+  was refuted by a short measurement, twice against the Chief Architect. The
+  radius bound is the sharp case: `r ≤ min(w,h) − 1` was derived from one
+  arithmetic line while another wrapped first, and it accepted 30 of 68 radii
+  that draw outside the box. Reasoning about a C function means reading *every*
+  operation in it.
+- **Unifying duplicated logic is where defects hide.** Three of PR-3R's four
+  real defects surfaced that way, and PR-4R found another.
+- **Verify a PA's claim when it becomes permanent.** Reports have been accurate,
+  but a claim that turns into spec wording (the 2039 font names, the 522 with
+  capitals, zero case-folding collisions) is worth ten minutes against the
+  source.
+- **Edit with asserted anchors.** Every spec edit in this programme has been an
+  exact-match replace that aborts if the anchor moved. It has caught real drift.
+- **Shell gotchas that have bitten:** zsh eats `:t` and `:c` in `$REF:path`
+  (brace it, `${REF}:path`), and `git grep` wants `-A` *before* the ref.
+- **Decision records are history.** Amend them with a dated note; never rewrite
+  the original text.
+
+### The governing principle when in doubt
+
+design_spec §1.5: omission is the default; a feature earns inclusion by
+*demonstrated* rather than anticipated need; **schema surface is the expensive
+kind of complexity**, because it is permanent once authors write XML against it,
+whereas generator complexity is cheap. A typical screen should be 15 lines of
+XML.
