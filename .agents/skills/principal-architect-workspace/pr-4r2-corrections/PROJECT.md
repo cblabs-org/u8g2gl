@@ -1,0 +1,129 @@
+# PROJECT — PR-4R2: carried corrections from PR-4R
+
+**Tier 2 · Principal Architect**
+**Programme**: U8G2GL
+**Parent**: [PROGRAM.md](../PROGRAM.md) — next after PR-04b, before PR-05
+**Source**: Chief Architect bridge "PR-4R2: carried corrections from PR-4R" (pasted by the owner,
+2026-10-05), carrying PR-4R's findings: [CA-BRIDGE-2026-09-28-PR4R.md](../pr-4r-corrections/CA-BRIDGE-2026-09-28-PR4R.md) items 3, 5, 6 and the radius help text
+<!-- Last updated: 2026-10-05 -->
+
+## Mandate
+
+1. **A bound-geometry child of a container must not be observable as draw calls** (§13.5, [D-18]).
+   **Priority: must not slip past PR-05.** Owner ruling 1 below decides *how*.
+2. **A `time` subject bound to a coordinate** (§13.2): verify before building. Settled by probe; see
+   Scoping findings.
+3. **Check a radius at build time where the size is literal**, including a radius arriving by style
+   (§10, bound `2·radius <= min(width, height)`, measured in PR-4R). Owner ruling 2 below sets *when*.
+4. **State the radius bound in the manifest help** ([UD-5]).
+
+**Out of scope:** new schema vocabulary; the schema version; [Q-14]; [Q-16] children following a
+container; PR-09's events and focus rings; the spec text itself (the Chief Architect writes it; the
+wording this PR needs is proposed below).
+
+**Baselines to hold:** C++ **383** (one known skip, `SizeOfReport.ThirtyTwoBitTarget`), CLI
+**1281**, **zero** warnings under `-Wall -Wextra -Wpedantic`. Schema **0.4** (owner decision, do
+not bump). CLI **0.9.0**, runtime **0.5.0**, U8G2 **2.36.18** (`d66b49af`).
+
+**Versions expected** (rules/03): CLI → **0.10.0** in WO1 (emitted output changes without an input
+change). Runtime → **0.6.0** only if WO1 adds a public runtime helper. Each bumped once, by the
+first WO that needs it.
+
+## Branch Strategy
+
+Base: `origin/main` @ `86d3f89`. Worktree `../U8G2GL-4r2` (the main checkout is parked on a stale
+merged branch; PR-04b and PR-4R have their own worktrees). Branches `u8g2gl-4r2/wo<N>-<topic>`,
+stacked serially, each based on the previous WO's branch by name. WO1's branch has **no upstream**
+(it was created from `origin/main` and the tracking was removed so a bare `git push` cannot target
+`main`). The stack tip opens as one PR against `main`.
+
+## Scoping findings — PA probes, 2026-10-05
+
+Measured against a build of `86d3f89`; projects and results in [evidence/probes/](evidence/probes/).
+
+- **Item 1 reproduces.** A box with bound `x` inside a composite, and one with bound `width` inside
+  a `u8g2gl_obj`, both emit unclipped draw calls; an object child is clipped to its ancestors by
+  `u8g2gl_render_object()` → `u8g2gl_effective_clip()`. **But §13.5's text ("gets an object") can
+  only refuse:** every class-backed element is already an object under [D-18]'s interim
+  amendment, so the condition affects only drawing elements, which have no class, and the outcome
+  would be `DRAWING_ELEMENT_NEEDS_OBJECT`. A bound box inside a composite (a level bar in a card)
+  would become unwritable. Hence ruling 1.
+- **Item 2: the attribute path is enforced; the gap is elsewhere.** `bind_x`/`bind_y` on a box or
+  label to a `time` subject, written directly or forwarded through a composite's `type="subject"`
+  prop, is refused with `TYPE_MISMATCH`. The finding as carried is stale. **The real gap:** a custom
+  element's `<api>` may declare `<bind name="bind_when" type="time" setter="bind_x"/>`. It validates
+  with zero errors and generates `ui_obj_w.bind_x(&ui_subject_t);`. Even with `type="int"` that call
+  does not compile (missing origin argument), because geometry handling (origin, clamp, the
+  bound-container anchor rule) is keyed by the binding's **name** in
+  `cli/src/core/resolver/geometry-bindings.ts`, not by its `setter=`. Fails at C++ compile time,
+  not silently, but PR-05 brings custom elements to real firmware.
+- **Item 3 as written is vacuous.** The box refuses every style form, and button/switch (the only
+  classes that read `radius`) declare it with `setter=`, so "radius, width and height all `draw=`"
+  never admits a styled radius. A **literal** `radius="10"` on a 20×6 button also passes today.
+  Hence ruling 2.
+
+## Human Approval
+
+**Owner, 2026-10-05 23:2x BST, verbatim**, in reply to the PA's scoping report and proposed
+decomposition (rulings 1 and 2 as framed there, quoted in full below):
+
+> 1) b is fine
+> 2) agreed
+> 3) approved ruling 2
+> 4) approved decomp.
+>
+> Please proceed autonomously
+
+### Ruling 1 — option (b), as put to the owner
+
+> Emit the draw call inside the parent object's effective clip — the same
+> `u8g2gl_effective_clip`/`u8g2gl_apply_clip` the object path uses, so the pixels match, which is
+> what [D-18] actually requires. Needs a §13.5 wording change, CLI 0.10.0, possibly runtime 0.6.0
+> if I add a helper. The editor host draws from the scene JSON too, so it needs the same clip.
+
+### Item 2 plan — "agreed"
+
+> Pin the attribute and composite paths with tests, and have the validator refuse a custom
+> `<bind>` that points at a geometry setter under another name, or whose type the inherited
+> `<bind>` with that `setter=` doesn't accept. Adds checks, not schema.
+
+### Ruling 2 — approved, as put to the owner
+
+> Check any element that declares `radius` (as `draw=` or `setter=`) where the radius (attribute
+> or style) and width and height are all literal, against the measured bound as it stands. The
+> worker measures button and switch first (the switch has a separate handle rect). The catch:
+> labels inherit `radius` but ignore it, so a meaningless oversized radius on a label would also be
+> refused.
+
+Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xml` states the bound.
+
+## Work Order Decomposition
+
+- [ ] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0
+- [ ] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
+- [ ] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
+- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
+
+WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
+
+**Ordering.** WO1 first: the priority item, and it carries the CLI bump so goldens move once for
+one stated reason. WO2 and WO3 both touch the validator, so they stack rather than run in parallel.
+
+## For the Chief Architect
+
+- **§13.5 wording (ruling 1).** The last bullet of the realisation list cannot say "gets an object"
+  — for a drawing element that is a refusal. Proposed: *"A drawing element inside a container whose
+  geometry is bound is drawn inside its container's effective clip, exactly as an object child is,
+  so an overhang is clipped either way and realisation is not observable ([D-18]). A child whose
+  geometry is literal needs no clip: §7.2 already refuses one that overhangs."* Final wording
+  after WO1 lands, citing what it emits.
+- **PR-05:** a custom element may `extends="u8g2gl_box"` (a drawing element) and is accepted; it
+  then emits a method call on a class with no such member (probe `d/`). PR-4R's "time above
+  INT32_MAX goes negative" is reachable only through the custom-`<bind>` path WO2 closes.
+
+## Session Log
+
+- **2026-10-05** — Bridge received. PA probed all four items against `86d3f89` (findings above),
+  put rulings 1 and 2 to the owner with the decomposition, and received approval (quoted). Worktree
+  `../U8G2GL-4r2` created on `u8g2gl-4r2/wo1-bound-child-clip` from `origin/main`, upstream
+  removed. Rule `00-operating-model.md` identical to the skill's asset.
