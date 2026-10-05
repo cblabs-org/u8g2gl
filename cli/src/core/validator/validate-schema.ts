@@ -379,8 +379,11 @@ function checkBindDeclarations(
   // Step 1: Gather what the targets are. A class manifest's `setter=` is a method
   //         its `extends` chain may already bind; a drawing manifest's is one of
   //         its own props ([Q-9]).
+  //         A composite declares no `extends`; the registry supplies `u8g2gl_obj`
+  //         as its base (§13.12), so the base is read from the effective chain.
+  const baseTag = manifest.extends ?? registry.get(manifest.name)?.chain[1];
   const inherited: readonly BindDef[] =
-    manifest.extends !== undefined ? (registry.get(manifest.extends)?.api.bindings ?? []) : [];
+    baseTag !== undefined ? (registry.get(baseTag)?.api.bindings ?? []) : [];
   const drawingProps: readonly PropDef[] = isDrawingElement(manifest) ? (manifest.api?.props ?? []) : [];
 
   for (const bind of bindings) {
@@ -1048,6 +1051,11 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
       }
     }
     diagnostics.push(...checkBindDeclarations(manifest, manifests));
+  }
+
+  // --- 6. Composite `<bind>` declarations: the same rule as a class's ---
+  for (const composite of manifests.declaredComposites) {
+    diagnostics.push(...checkBindDeclarations(composite, manifests));
   }
 
   return diagnostics;

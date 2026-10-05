@@ -167,3 +167,35 @@ describe("a custom manifest's <bind> is checked against the setter it targets (ย
     expect(errorsIn(run(instance('wd_draw'), [wd]), 'widgets/wd_draw/wd_draw.xml')).toEqual([]);
   });
 });
+
+describe("a composite's <bind> is checked by the same rule", () => {
+  // `<bind>` is on line 3; a composite's base is u8g2gl_obj (ยง13.12).
+  const composite = (bind: string): WidgetManifest =>
+    parseWidgetManifestFile(
+      `<widget name="wd_t">\n    <api>\n        ${bind}\n    </api>\n    <view />\n</widget>`,
+      'widgets/wd_t/wd_t.xml',
+    ).value!;
+  const instance = (attrs = ''): string => `        <wd_t name="w" x="0" y="0" width="10" height="6"${attrs} />`;
+
+  it('refuses a time bind that re-targets bind_x under another name, with both diagnostics at the <bind>', () => {
+    const found = errors(run(instance(' bind_when="t"'), [composite('<bind name="bind_when" type="time" setter="bind_x" />')]));
+    expect(found.map((d) => [d.code, d.file, d.line]).sort()).toEqual(
+      [
+        [DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
+        [DIAGNOSTIC_CODES.TYPE_MISMATCH, 'widgets/wd_t/wd_t.xml', 3],
+      ].sort(),
+    );
+  });
+
+  it('refuses the int variant by the alias rule alone', () => {
+    const found = errors(run(instance(' bind_when="n"'), [composite('<bind name="bind_when" type="int" setter="bind_x" />')]));
+    expect(found.map((d) => [d.code, d.file, d.line])).toEqual([
+      [DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
+    ]);
+  });
+
+  it('accepts a bind whose setter is a new method', () => {
+    const found = errors(run(instance(' bind_when="t"'), [composite('<bind name="bind_when" type="time" setter="bind_when" />')]));
+    expect(found).toEqual([]);
+  });
+});

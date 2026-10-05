@@ -5,7 +5,7 @@ title: "A custom manifest's <bind> is checked against the setter it targets"
 branch: u8g2gl-4r2/wo2-bind-type-paths
 base: u8g2gl-4r2/wo1-bound-child-clip
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO2 — §13.2's matching types, on the path that skips them
@@ -216,7 +216,7 @@ None. The first draft of the new test file's drawing cases failed because an ins
 ### Out-of-Scope Findings
 - **Spec debt:** design_spec §15 / [D-16] code list: `U8G2GL_GEOMETRY_BINDING_ALIAS` is new and unlisted. `docs/` not edited, per the WORKORDER.
 - A custom class whose own prop-less `<bind>` re-uses an *inherited non-geometry* setter under a new name (e.g. `name="bind_foo" setter="bind_text"`) is accepted if its type matches. That is intended (rule 1 is geometry only) but means such an alias gets no `fmt` pairing; not checked.
-- Composites (`declaredComposites`) are outside §5's loop and so their `<api>` `<bind>`s, if any, are not checked by this rule.
+- Composites (`declaredComposites`) were outside §5's loop; closed by the amendment below.
 
 ### Blockers
 (none)
@@ -237,3 +237,15 @@ Validation failed: 2 error(s), 0 warning(s).
 The `type="int"` variant (int subject `n`, exit 1, 1 error): the first diagnostic above only (`<bind name="bind_when" ... type="int" setter="bind_x" />`), no type error.
 
 Shipped manifests: the whole CLI suite (framework manifests and fixtures) passes with no new diagnostic; the built CLI also reports none on `test/generated_fixture`, `cli/test/generator/fixtures/emit-project`, `cli/test/validator/fixtures/valid` and `cli/test/integration/fixtures/valid-project`.
+
+### Amendment (composites too)
+- **Change:** `validate-schema.ts` gains a second loop (§6) over `manifests.declaredComposites` calling the same `checkBindDeclarations()`; no second copy of the rule. The base is `manifest.extends ?? registry.get(manifest.name)?.chain[1]`, which is `u8g2gl_obj` for a composite (the registry supplies it, §13.12).
+- **Tests (failing first):** 3 added to `bind-type-paths.test.ts`. The composite `time`/`bind_when` alias (both diagnostics, at the `<bind>`, line 3) and its `int` variant (alias only) failed before the fix; the accepted new-setter composite passed before and after.
+- **Counts:** CLI 1301 (88 files; 1298 + 3), `tsc` and lint clean, goldens untouched; C++ untouched.
+- **Built CLI** (`validate tmp/c`, composite `wd_t` with `<bind name="bind_when" type="time" setter="bind_x" />`, instanced with `bind_when="t"`; exit 1, 2 errors at `widgets/wd_t/wd_t.xml:3:3`):
+```
+Widget 'wd_t' declares <bind name="bind_when" setter="bind_x">, which reaches a geometry setter under another name. Write name="bind_x": geometry bindings keep their names so origin and clamping apply (§8.4, [D-20]).
+Widget 'wd_t' declares <bind name="bind_when" type="time" setter="bind_x">, but the setter 'bind_x' it inherits accepts only 'int' (§13.2). Declare type="int", or point setter= at a new method on your own class.
+Validation failed: 2 error(s), 0 warning(s).
+```
+  With `type="int"` and an int subject (exit 1, 1 error): the alias diagnostic only.
