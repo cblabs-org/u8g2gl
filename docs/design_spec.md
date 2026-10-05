@@ -1744,15 +1744,15 @@ measure against.
 
 `<bdf>` declarations are compiled by **`bdfconv`**, U8G2's own tool.
 
-**[Q-2] `bdfconv` distribution is an unsolved packaging problem and a genuine adoption risk.** It is a C program in the U8G2 source tree with no published binaries. Options:
+**`bdfconv` ships as WebAssembly — [Q-2], closed by PR-04b.** It is a C program in the U8G2 source tree with no published binaries, so U8G2GL compiles it from the pinned submodule with **Emscripten 5.0.3** and commits the resulting Wasm as a data artefact. Its provenance — the U8G2 commit and the Emscripten version — is recorded in `cli/src/data/bdfconv/bdfconv-source.json`, and the single command that regenerates it is documented beside it in `cli/src/data/bdfconv/README.md`. Emscripten is needed only to regenerate the artefact, never to build or test the CLI.
 
-| Option | Pros | Cons |
-|---|---|---|
-| Ship prebuilt binaries per platform in the npm package | Zero user setup | Three build targets to maintain; macOS notarisation |
-| Compile `bdfconv` to Wasm, run under Node | One artefact, all platforms, no signing | Some build work up front |
-| Require a user-installed `bdfconv` on `PATH` | No packaging work | Will defeat a large share of Windows users |
+The CLI and the designer load the same artefact, so font compilation has one implementation rather than two, and it runs client-side in the browser ([UD-2]).
 
-**Recommendation: Wasm.** It reuses the Emscripten toolchain already required by **[D-9]**, works identically everywhere, needs no code signing, and makes font compilation available in the browser preview for free.
+*Why a committed binary is acceptable here.* A reviewer cannot read its diff, so it has to be re-derivable instead: the rebuild is byte-identical, the output equals native `bdfconv` byte for byte, and converting U8G2's own public-domain `4x6.bdf` reproduces `u8g2_font_4x6_tr` byte for byte in a pinned test. Those three properties are the whole justification — without them this is an opaque blob. The precedent is the display catalogue ([D-14]): generated data, committed, with provenance.
+
+**`range` selects codepoints, and an absent `range` means no filter.** The grammar is a comma-separated list of single codepoints and `a-b` ranges, each hexadecimal (`0x20`) or decimal — `range="0x20-0x7F,0xE000-0xE01F"`. Anything else is a named error. A `<bdf>` without `range` compiles **every codepoint the BDF contains**: an optional filter attribute that silently filters when omitted is a trap, and `bdfconv`'s own `*` default of 32–255 would quietly drop every glyph a project needs above ASCII. The cost of omitting it is reported rather than hidden — §18's budget shows the compiled size, which is where a font pulling in a full CJK or symbol block becomes visible.
+
+`bdfconv`'s mapping language also offers `>` remapping and `~` exclusion. Those are not range selection — they rewrite which glyph sits at which codepoint, which is font *authoring* and belongs to the Phase 4 BDF editor (§20) where the author can see the result, not to a build attribute whose effect is invisible until it renders. Schema surface is permanent once authors write XML against it (§1.5).
 
 `<builtin name="u8g2_font_6x10_mr" />` references U8G2's bundled fonts with no compilation step — it emits a reference to a symbol U8G2 already provides, so it needs no `bdfconv`, no packaging, and no licensing consideration beyond what the user accepted by linking U8G2 (§22.1). **This is the default path** and covers several hundred fonts; `<bdf>` exists for when a project genuinely needs its own typeface.
 
@@ -1767,6 +1767,17 @@ measure against.
 ```
 
 `mode` is `threshold` (default) or `dither`. v0.1 made Floyd–Steinberg dithering the headline example; that is the wrong default for UI iconography at 16×16, where dithering produces visual noise and a hand-tuned threshold is almost always better. Dithering remains available for photographic content.
+
+**`width` and `height` declare what the asset is; they do not resample it.** A PNG whose dimensions differ from the declared size is refused, naming both sizes. A resampling filter would be a permanent design commitment and a determinism surface — the filter choice and its rounding both become things `generated/` depends on (§13.9) — and resample-then-threshold is exactly where monochrome art turns to mush. Refusing is diagnosable today and can become resizing later without invalidating a single existing document; silent resampling could never be withdrawn.
+
+**The conversion is specified exactly, because two implementations must agree on it.** The designer's side-by-side preview (ui_spec §12) and the CLI run the same pipeline, and a written rule is what keeps them in step:
+
+- Alpha is composited over **white**, so a transparent pixel stays clear.
+- Luminance is **Rec. 601**, in integer arithmetic.
+- **`Y < threshold` sets the bit** — a pixel darker than the threshold is drawn in the foreground colour. This matches ImageMagick's convention and suits dark-on-light icon art. Should light-on-dark art ever be needed, an explicit `invert` attribute is additive (§1.5).
+- `threshold` defaults to **128**.
+- `dither` is Floyd–Steinberg, left to right, with the remainder carried to the below-right neighbour.
+- **Adam7-interlaced PNGs are refused**, rather than silently de-interlaced.
 
 All bitmap data is emitted `PROGMEM` and drawn with `drawXBMP`.
 
@@ -1891,8 +1902,9 @@ u8g2gl 0.2.0 — target 'default' (SSD1322 256x64)
     runtime core                      3.2 KB
     built-in widgets (4 used)         2.8 KB
     custom widgets (1)                1.9 KB
-    fonts (4)                        11.4 KB
-    images (2)                        0.3 KB
+    fonts (compiled bdf, 2)          11.4 KB
+    fonts (builtin, 2)                    -     <- not attributable; see below
+    image data (bitmap arrays, 2)     0.3 KB
                                     --------
                                      19.6 KB
 
@@ -1909,6 +1921,8 @@ u8g2gl 0.2.0 — target 'default' (SSD1322 256x64)
 ```
 
 Figures come from the linker map for a reference build, the statically declared capacities, and — for the framebuffer — the exact tile dimensions in U8G2's buffer allocator ([D-14]). **They are indicative until measured**, and establishing real numbers is a Phase 1 deliverable.
+
+**`fonts (builtin)` carries no figure, and that is deliberate.** A `<builtin>` declaration emits a reference to a symbol U8G2 already provides (§22.1); whether it adds a single byte depends on whether the firmware links that font anyway, and the linker decides. Attributing a number to it would be exactly the kind of claim §1.3 forbids, so the line is reported as present-but-unmeasured rather than guessed at or silently omitted. `fonts (compiled bdf)` and `image data (bitmap arrays)` are measured, because U8G2GL emits those arrays itself and knows their size.
 
 **What this report is actually for.** Against the `esp32dev` baseline ([D-1]) — 520 KB SRAM, 4 MB flash — a ~20 KB flash and ~5 KB RAM framework is noise. departures-board already carries this exact workload there while also running WiFi, TLS, an async web server, and a streaming JSON parser. The budget report does not exist because the framework is near a limit.
 
@@ -2037,7 +2051,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | ID | Question | Blocks |
 |---|---|---|
 | **Q-1** | *Narrowed by [D-14].* Target **declaration** is settled — displays come from U8G2's catalogue. What remains open is only the **layout** half: is `<target_override>` enough to retarget a screen across very different geometries (256×64 vs 128×32), or are alternative `<view>` blocks needed? Defer until two real targets exist to test against. | Phase 2 |
-| **Q-2** | `bdfconv` distribution — Wasm recommended; Emscripten is already proven in departures-board's `layoutsim`, so this is packaging work rather than unknown risk | Phase 1 |
+| **Q-2** | **`bdfconv` distribution.** **CLOSED by PR-04b (2026-09-29):** compiled to Wasm from the pinned submodule with **Emscripten 5.0.3**, committed as a data artefact with provenance in `cli/src/data/bdfconv/bdfconv-source.json`, regenerated by the single command documented in `cli/src/data/bdfconv/README.md`, and loaded identically by the CLI and the designer. The rebuild is byte-identical, output equals native `bdfconv` byte for byte, and a pinned test reproduces `u8g2_font_4x6_tr` from U8G2's own `4x6.bdf`. Emscripten is needed only to regenerate the artefact. See §14.1 | **Closed** |
 | ~~Q-3~~ | ~~Project and XML-vocabulary naming~~ | **Resolved** — name kept; `u8g2gl_` prefix adopted throughout, see [D-12]/[D-13] |
 | **Q-4** | Confirm the measured runtime budget against the `esp32dev` baseline — the floor, not the target ([D-1]). Expected comfortable, since departures-board already runs this workload there, so this is verification rather than open risk. | Phase 1 exit |
 | ~~Q-5~~ | ~~Frame-timing ownership~~ | **Resolved** — app owns the loop, framework owns scheduling and returns a sleep hint, per LVGL 9's model. See [D-15] |
@@ -2072,8 +2086,9 @@ This resolves [Q-6]. The concern was that departures-board is CC BY-NC-SA and U8
 | Dependency | Licence | Compatible with MIT distribution |
 |---|---|---|
 | U8G2 (linked by user firmware) | BSD 2-clause | Yes |
-| `bdfconv` (build-time tool only) | BSD 2-clause | Yes — build tool, not linked |
-| Emscripten toolchain (build-time) | MIT / NCSA | Yes |
+| `bdfconv` (Wasm, **ships in the npm package**) | BSD 2-clause | Yes — notice in `cli/LICENSES/`; runs on the host, never linked into firmware |
+| Emscripten-generated glue (ships with the Wasm) | MIT | Yes — notice in `cli/LICENSES/` |
+| Emscripten toolchain (build-time, to regenerate the Wasm only) | MIT / NCSA | Yes |
 
 ### 22.1 Fonts — Follow U8G2's Model
 
@@ -2087,7 +2102,7 @@ This is a reason to make `<builtin>` the documented default path. Several hundre
 
 Summarised in the shipped `LICENSE`:
 
-> U8G2GL is MIT licensed. Fonts are not part of U8G2GL. Fonts bundled with U8G2 remain under U8G2's terms — see https://github.com/olikraus/u8g2/wiki/fntgrp. Fonts you supply remain yours, under whatever terms they carry.
+> U8G2GL is MIT licensed. Fonts are not part of U8G2GL. Fonts bundled with U8G2 remain under U8G2's terms — see https://github.com/olikraus/u8g2/wiki/fntgrp. Fonts you supply remain yours, under whatever terms they carry. Compiling a font with `<bdf>` changes its format, not its licence.
 
 ---
 

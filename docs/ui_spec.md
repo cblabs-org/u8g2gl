@@ -77,6 +77,8 @@ The editor programs against a single `ProjectFileSystem` interface; the implemen
 
 Same frontend either way. Resolves the Chromium-only concern without imposing it on Firefox and Safari users.
 
+*Amendment, 2026-10-05 (owner, CA-1).* The decision stands as written; what changes is sequencing. The designer is to be **browser-hosted with no server component**, so **static mode is built and served mode is deferred** — not withdrawn. `ProjectFileSystem` keeps both implementations possible behind one interface, which is what makes deferral safe, and §1.5's rule applies: build the served mode when a Firefox or Safari user actually asks, not before. Until then the designer is Chromium-only, and that is a stated limitation rather than an oversight.
+
 ### [UD-3] Text is the single source of truth; the canvas produces text edits
 
 The `.xml` file is the model. The canvas is a *view* that emits text edits against it.

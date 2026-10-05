@@ -127,13 +127,14 @@ failure — which is why `[D-21]` exists.
 
 **⚠ The editor had no PR until 2026-09-13.** design_spec §20 Phase 3 makes the
 editor the programme's destination, but the PR ledger's Phase 3 was consolidation
-work only. An editor track (E-1 to E-3) is now in both ledgers **as placeholders**;
-its shape is owner decision **CA-1**. Separately, **CA-2**: none of PR-07's gate
-criteria measures the editor. Both are in `PROGRAM-PLAN.md`. Don't let a refresh
-of either ledger quietly drop the track again.
+work only. An editor track is now in both ledgers — **E-D, then E-1 to E-3** —
+and `CA-1` and `CA-2` settled its shape and the gate's scope on 2026-10-05
+(see §7). **Don't let a refresh of either ledger quietly drop the track again**:
+that is how it vanished the first time, and it is still the programme's purpose.
 
-**Next:** PR-04 generator, PR-05 foundation integration, PR-06 Wasm preview, then
-**PR-07 — the GO/NO-GO gate**. Ledger in plan §5.
+**Next:** see §7, which is the current one. In outline: PR-4R2, PR-05 foundation
+integration, PR-06 Wasm preview, then **PR-07 — the GO/NO-GO gate**, and the
+editor track only on a GO. Ledger in plan §5.
 
 ### 4.1 What PR-03's review actually caught, and why it took two passes
 
@@ -213,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-09-29.** `main` @ `0607c1b`.
+**Revised 2026-10-05.**
 
 ### Where the programme is
 
@@ -222,15 +223,19 @@ PR-03 widgets + `[U-1]` · **#4** PR-3R remediation to `[D-18]`–`[D-21]` · **
 PR-04 the generator · **#6**+**#7** PR-4R corrections · **#8** PR-04b the font
 and image pipeline.
 
-Baselines at `main`: C++ ~377 tests (one known skip,
-`SizeOfReport.ThirtyTwoBitTarget`), CLI ~1087, zero warnings. Schema **0.4**,
-CLI **0.8.0**, runtime **0.5.0**. U8G2 pinned at **2.36.18** (`d66b49af`) in
-`extern/u8g2`.
+Baselines at `main`: **C++ 383** tests (one known skip,
+`SizeOfReport.ThirtyTwoBitTarget`), **CLI 1281**, zero warnings. Schema **0.4**,
+CLI **0.9.0**, runtime **0.5.0**. U8G2 pinned at **2.36.18** (`d66b49af`) in
+`extern/u8g2`. *(Corrected 2026-10-05: the previous revision gave pre-merge
+figures — ~377 / ~1087 / 0.8.0 — which were wrong by one PR.)*
 
 **Next:** PR-4R2 (carried corrections), then **PR-05** (foundation integration,
-first real board). PR-05's font risk is effectively nil — all twelve of
-departures-board-v3's font arrays are byte-identical to generator output; its
-font work is renaming to lowercase `<bdf>` names and using `ui_font_<name>`.
+first real board), then PR-06, then the **PR-07 gate**. The editor track (E-D,
+then E-1..E-3) begins only on a GO — owner decision CA-1, 2026-10-05.
+
+PR-05's font risk is effectively nil: all twelve of departures-board-v3's font
+arrays are byte-identical to generator output, so its font work is renaming to
+lowercase `<bdf>` names and using `ui_font_<name>`.
 
 ### Your role, and the correction that shaped it
 
@@ -249,41 +254,34 @@ Earlier in the programme the Chief Architect ran PR-3R as its own PA. It worked,
 and it spent Tier-1 context on `nm` output and boundary-box diffs. Don't repeat
 it.
 
-### Outstanding — Chief Architect's own, promised and not yet done
+### Outstanding — Chief Architect's own
 
-These were promised to PR-04b's PA in its `CA-BRIDGE.md` (now on `main`) and are
-**not** done. Nobody else will do them:
+**All of PR-04b's spec debt is landed (2026-10-05).** §14.1 (Q-2's answer, the
+`range` grammar, absent-means-unfiltered), §14.2 (`<convert>` fully specified),
+§18's real budget lines, §21's Q-2 closure, §22 / §22.1, `implementation_plan.md`,
+and §4.1 of the standards' `documentation.md` — the comment-citation rule with
+its "pre-existing citations are not defects" half.
 
-1. **§21: close Q-2.** `bdfconv` packaging is settled — Wasm built from the
-   pinned submodule, committed with provenance, byte-identical rebuild, output
-   equal to native. The closing row must name **Emscripten 5.0.3** and point at
-   the regeneration command.
-2. **§18: use the budget's real lines** — `fonts (compiled bdf)` (measured),
-   `fonts (builtin)` (unmeasured), `image data (bitmap arrays)` (measured).
-3. **`implementation_plan.md:276`** still describes PR-04b as future work. Mark
-   it merged (#8).
-4. **The standards skill needs the comment-citation rule** (agreed with
-   PR-04b's PA): keep `§`/`[D-n]` references and measured facts; drop bare work
-   order tags, pointers to workspace files and narrated debate. **And state
-   explicitly that pre-existing citations are not defects and reviewers must not
-   raise them** — the rule binds new and changed lines only, or every future
-   review re-litigates hundreds of old comments.
-5. **Verify, don't assume:** §14.2's `<convert>` behaviour and §22's `bdfconv`
-   rows look partly updated already. Check before editing.
+**One item remains, and it is desk work rather than a PR:** confirm that every
+piece of state the designer needs has a home in the XML or an agreed sidecar.
+That is the only schema-shaped risk left in the editor, and schema is the
+expensive thing to reverse (§1.5). Everything else about round-trip is a parser
+contract under `[UD-3]`, so it waits for E-1.
 
-### Open — owner decisions
+### Owner decisions — both closed 2026-10-05
 
-- **CA-1 — the editor track's shape.** E-1 (shell, filesystem, round-trip), E-2
-  (canvas, property panel), E-3 (sample data, navigation) are **placeholders**
-  in both ledgers. How many PRs, and does the track sit behind the PR-07 gate or
-  run alongside it? E-1 is otherwise unblocked now: PR-04 delivered the editor
-  target, and PR-04b the fonts it needs.
-- **CA-2 — the gate does not measure the editor.** All four PR-07 criteria are
-  firmware-side. A GO would say only that we match what UiUiUi already does; a
-  NO-GO could end the editor without it ever being tried. Recommendation on
-  record: run E-1 before the gate and add an editor criterion.
+- **CA-1 — the editor track.** Runs **after the PR-07 gate**. Browser-hosted
+  with no server, which is `[UD-2]`'s static mode already specified; served mode
+  deferred, so the designer is Chromium-only for now. **E-D** added ahead of E-1
+  (interaction design and decomposition, no code), because E-1 bundles a
+  filesystem layer, a CST serializer and an application shell. Generating C++
+  runs in the browser; building firmware stays in PlatformIO.
+- **CA-2 — the gate.** Four criteria stand, firmware-side. A fifth editor
+  criterion was recommended and declined. The unmeasured differentiator is
+  written up at `implementation_plan.md` §6 — **do not reopen it**; whoever runs
+  the gate judges criteria 2 and 4 as written.
 
-These two are now the main thing between the programme and its stated purpose.
+Full reasoning for both: `PROGRAM.md`, 2026-10-05.
 
 ### Carried code — PR-4R2
 

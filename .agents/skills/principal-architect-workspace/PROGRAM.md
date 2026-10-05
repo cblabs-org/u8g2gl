@@ -1278,3 +1278,74 @@ CONTEXT_BRIDGE §7 was six PRs out of date (still describing a PR-03 worker) and
 has been rewritten as the reload document: PR status, the Chief Architect's own
 outstanding spec work, the two open owner decisions, PR-4R2's carried items, the
 three-checkout hazard, and the process lessons that live nowhere else.
+
+---
+
+## 2026-10-05 — CA-1 and CA-2 closed; the PR-04b spec debt landed
+
+### CA-1 — the editor track's shape (owner)
+
+**The track runs after PR-07's gate.** The XML-to-firmware path is verified
+first; designer effort is not spent on a foundation that has not passed.
+
+**The designer is browser-hosted with no server component.** This turned out to
+be `[UD-2]`'s static mode, already specified — so the ruling confirms the
+existing design rather than changing it. Served mode (`npx u8g2gl design`, the
+Firefox/Safari path) is **deferred, not dropped**; `ProjectFileSystem` keeps both
+implementations possible behind one interface, which is what makes deferring it
+safe. The designer is Chromium-only until someone asks otherwise.
+
+**E-1 is not one PR.** It bundles a filesystem layer, a CST parser and
+serializer, and an application shell. **E-D** is added ahead of it: interaction
+design on the settled architecture, then a real decomposition. No code.
+
+Two things worth having straight, because both are easy to assume wrong:
+
+- **Generating C++ runs in the browser; building firmware never will.** `[D-10]`
+  made the CLI isomorphic and PR-04b made `bdfconv` Wasm, so schema, validator,
+  generator and font compilation are all client-side. PlatformIO stays on the
+  user's machine. The canvas does not need a compiler either — `[UD-4]`'s
+  pre-built editor target renders arbitrary XML.
+- **No serializer or CST module exists on `main`** (verified). That is E-1's
+  first job, and post-gate is the right place for it.
+
+### CA-2 — the gate (owner)
+
+**The four criteria stand and the gate stays firmware-side.** A fifth,
+editor-facing criterion was recommended by the Chief Architect and **declined**:
+equivalency is proven before designer effort is spent.
+
+The cost is recorded at `implementation_plan.md` §6 rather than dropped, because
+it names what a GO will not tell us — a pass certifies the half shared with prior
+art (UiUiUi already does build-time monochrome layout), and criteria 2 and 4 are
+judged against *hand-written* XML, the architecture's weakest case. Against that,
+pre-gate editor work is exactly what makes stopping expensive, and cheap stopping
+is the gate's whole value. The trade was made knowingly.
+
+**Instruction to whoever runs the gate: judge criteria 2 and 4 as written. Do not
+discount them for the absence of a designer.**
+
+### The round-trip test — offered, then withdrawn
+
+The Chief Architect offered a pre-gate round-trip test and, on inspection,
+**withdrew it**. The worry was that lossless round-trip might force a schema
+change, and schema is the expensive thing to reverse. `[UD-3]` already answers
+it: the document is a CST, not an AST, so round-trip fidelity is a *parser*
+contract (ui_spec §15 says so explicitly), not a schema property. A pre-gate test
+would have tested an implementation that does not exist, not a decision that
+cannot be undone.
+
+What remains, and is the Chief Architect's own desk work rather than a PR: confirm
+every piece of state the designer needs has a home in the file or an agreed
+sidecar. That is the only genuinely schema-shaped risk left in the editor.
+
+### The PR-04b spec debt — landed
+
+All of it, on `main`: §14.1 (Q-2's answer, the `range` grammar, absent-means-
+unfiltered), §14.2 (declared size not resampled, alpha over white, Rec. 601,
+`Y < threshold`, default 128, Floyd–Steinberg left-to-right, Adam7 refused),
+§18's real budget lines with `fonts (builtin)` reported as unmeasurable, §21's
+Q-2 closure, §22's dependency table and §22.1's licence sentence, and §4.1 of the
+standards' `documentation.md` — the comment-citation rule, including the half
+that stops it becoming noise: **pre-existing citations are not defects and a
+reviewer must not raise them.**

@@ -20,8 +20,8 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 
 | ID | Question | Blocks |
 |---|---|---|
-| **CA-1** | **Shape of the editor track** — how many PRs, and does it sit behind the PR-07 gate or run alongside it? See "Editor track" below | E-1 |
-| **CA-2** | **The gate does not measure the editor.** All four PR-07 criteria are firmware-side. The programme could pass or fail GO/NO-GO without testing the thing it exists to build | PR-07 |
+| ~~CA-1~~ | ~~Shape of the editor track~~ | **CLOSED 2026-10-05** — track runs **after the gate**; browser-hosted, no server (`[UD-2]` static, served deferred); **E-D** design item added, E-1 not decomposed until it lands |
+| ~~CA-2~~ | ~~The gate does not measure the editor~~ | **CLOSED 2026-10-05** — the four criteria stand, gate stays firmware-side; equivalency proven before designer effort. The unmeasured differentiator is recorded at `implementation_plan.md` §6 |
 | U-6 | Where sample data lives | E-3 |
 | Q-1 | Multi-target layout overrides — needs two real targets | — |
 
@@ -40,18 +40,32 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 | PR-04b | U8G2GL | **Font and image pipeline:** `<bdf>` through `bdfconv` in Wasm [Q-2], PNG→XBM `<convert>`. Split out of PR-04, which refuses both with a named error | PR-04 | Pending — **on the critical path** |
 | PR-05 | foundation | Integration module, build hooks, first board migrated. **Owed by PR-04:** a compile check against real U8G2 headers for the ESP-IDF build — PR-04 WO4c covers Arduino only. **Also owed by PR-04 (WO12, 2026-09-28):** `generate()` returns its report (§13.11 ends "emit → report", and the isomorphic designer needs it); `--check` reports a directory that would be removed; and the budget report's `§` and em dashes tested on a legacy Windows console | PR-04 + **PR-04b** | Pending |
 | PR-06 | U8G2GL | Wasm renderer + snapshot harness. **Owed by PR-04:** a container-edge pixel test against real U8G2 — (a) an element whose clip is exactly its bounds, drawing to its last column and row; (b) a frame partly off the left edge, confirming wrapped origins draw their visible part; (c) a clipped line, allowing ~1px endpoint rounding (WO4c T1) and a corner pixel at the clipping bound (T2). Plus a compile check against real U8G2 headers for the Wasm build. **Also owed by PR-04 (WO11, WO10b, WO11b, 2026-09-27):** a subject observer cannot be removed, so an editor host that rebuilds a scene leaks observer slots and a reused binding slot can be driven by a stale observer, and rebinding text adds a second observer; the editor runtime uses default capacities, which the Wasm build must size; and an out-of-range `int` wraps silently when it reaches a narrower setter, so the host validates values first | PR-3R | Pending — may run ∥ PR-04 |
-| PR-07 | foundation | ★ **GO/NO-GO GATE** | PR-05 + PR-06 | Pending — see CA-2 |
+| PR-07 | foundation | ★ **GO/NO-GO GATE** — four criteria, firmware-side, settled by CA-2 | PR-05 + PR-06 | Pending |
 
 ## Editor track — the programme's destination (design_spec §20 Phase 3)
 
-**Not yet decomposed. Placeholders only, so the editor cannot fall out of the
-graph again.** The shape below is a starting proposal for CA-1, not a decision.
+**Sequenced by CA-1 (owner, 2026-10-05): the track runs after PR-07's gate.**
+The XML-to-firmware path is proven first. E-1 is explicitly *not* one PR; E-D
+breaks it up before any of it is built.
 
 | PR | Repo | Scope | Depends | Status |
 |---|---|---|---|---|
-| E-1 | U8G2GL | Designer shell: Monaco + custom shell `[UD-1]`, project filesystem API, lossless XML round-trip `[UD-3]` | PR-04, PR-06 | Placeholder |
-| E-2 | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests `[D-17]` | E-1 | Placeholder |
+| **E-D** | U8G2GL | **Editor design.** Interaction and UX design on the settled `[UD-1]`–`[UD-7]` architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Document, no code | **PR-07 GO** | Next after the gate |
+| E-1 | U8G2GL | Designer shell: Monaco + custom shell `[UD-1]`, `ProjectFileSystem` on the File System Access API (`[UD-2]` static mode), CST parse/serialize with lossless round-trip `[UD-3]`. **Split by E-D** | E-D | Placeholder |
+| E-2 | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests `[D-17]`; `[UD-4]` Wasm renderer | E-1, PR-06 | Placeholder |
 | E-3 | U8G2GL | Sample data for binding preview; screen navigation design | E-2 | Placeholder — blocked U-6 |
+
+**Browser-hosted, no server.** Generation runs client-side — `[D-10]`'s
+isomorphic CLI plus PR-04b's Wasm `bdfconv` means schema, validator, generator
+and font compilation all work in the browser. Firmware building stays in
+PlatformIO on the user's machine, and the canvas does not need it (`[UD-4]`
+renders arbitrary XML from a pre-built Wasm target). Served mode (`npx u8g2gl
+design`, the Firefox/Safari path) is deferred, not dropped.
+
+**No serializer or CST module exists on `main`** (verified 2026-10-05). It is
+E-1's first job. Post-gate is the right place for it: `[UD-3]` makes round-trip
+fidelity a parser contract, not a schema property, so nothing here constrains a
+decision that would be costly to reverse.
 
 ## Phase 2 — Composition
 
@@ -101,7 +115,7 @@ Licence: code BSD-2-Clause, fonts per-group. A notices row in both repos.
 - **PR-04b** extends `generate`'s asset handling, so it follows PR-04 rather than
   running alongside it — two PAs editing the generator at once is the conflict to
   avoid.
-- **Editor track** after PR-04 and PR-06. Its relation to PR-07 is CA-1.
+- **Editor track** after the PR-07 gate (CA-1, 2026-10-05). E-D first.
 - **PR-08 ∥ PR-09** — both touch the runtime; serialise or split by directory.
 - **PR-10** strictly last in consolidation — it deletes the legacy module.
 
@@ -112,11 +126,13 @@ Licence: code BSD-2-Clause, fonts per-group. A notices row in both repos.
 3. Measured budget comfortable on `esp32dev` alongside WiFi/TLS (§18, Q-4)
 4. Edit → regenerate → rebuild faster in practice than editing C++
 
-**Chief Architect note (CA-2):** every criterion is firmware-side. None asks
-whether the editor is viable, so a GO says nothing about the programme's stated
-purpose and a NO-GO could kill the editor without it ever being tested. Owner
-decision whether to add an editor criterion, or to state explicitly that the gate
-tests the framework only.
+**CA-2 settled (owner, 2026-10-05): the gate tests the framework only, and the
+four criteria stand.** A fifth, editor-facing criterion was recommended and
+declined; equivalency is proven before designer effort is spent. The cost was
+taken knowingly and is written up at `implementation_plan.md` §6 — a GO certifies
+the half shared with prior art, and criteria 2 and 4 are judged against
+hand-written XML, which is the architecture's weakest case. **Judge them as
+written; do not discount them for the absence of a designer.**
 
 NO-GO is legitimate. PR-01..PR-06 are additive; the legacy display module keeps
 running under PD-4.

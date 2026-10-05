@@ -295,14 +295,38 @@ specifies it in full. PR-02's validator and PR-04's resolver were listed as inpu
 to the editor, but nothing delivered the editor itself — so it would have been
 deferred by omission, which the owner explicitly rejected.
 
-**These are placeholders.** Their number, their boundaries and their order
-relative to PR-07's gate are owner decision CA-1 (`PROGRAM-PLAN.md`).
+**CA-1 resolved by the owner, 2026-10-05.** The track runs **after PR-07's
+gate**: the XML-to-firmware path is verified first, and designer effort is not
+spent on a foundation that has not passed. The designer is **browser-hosted with
+no server component** — which is `[UD-2]`'s static mode, already specified — and
+the served `npx u8g2gl design` fallback is **deferred** rather than dropped, on
+§1.5's rule that omission is the default until someone asks for Safari.
+
+**E-1 is not one PR and will not be decomposed until E-D lands.** It bundles a
+project filesystem layer, a CST parser and serializer, and an application shell:
+three different kinds of work, of which only the serializer is on anyone's
+critical path. `[UD-1]`–`[UD-7]` settle the architecture; what is missing is the
+interaction design and the breakdown.
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **E-1** | U8G2GL | Designer shell — Monaco plus a custom shell ([UD-1]), project filesystem API, lossless XML round-trip ([UD-3]) | PR-04, PR-06 |
-| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]) | E-1 |
+| **E-D** | U8G2GL | **Editor design.** Interaction and UX design against the settled architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Produces a design document, no code | **PR-07 (GO)** |
+| **E-1** | U8G2GL | Designer shell — Monaco plus a custom shell ([UD-1]), `ProjectFileSystem` over the File System Access API ([UD-2] static mode), CST parse and serialize with lossless round-trip ([UD-3]). **To be split by E-D** | E-D |
+| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) | E-1, PR-06 |
 | **E-3** | U8G2GL | Sample data for binding preview; screen navigation design | E-2 · blocked by [U-6] |
+
+**What "browser-hosted" does and does not include.** Generating C++ into the
+project tree runs in the browser: [D-10] made the CLI isomorphic, and PR-04b's
+`bdfconv` is Wasm, so schema, validator, generator and font compilation are all
+client-side. *Building firmware* from that C++ is not and will not be in the
+browser — it stays PlatformIO in the user's own toolchain. The canvas does not
+need it either: `[UD-4]`'s pre-built editor target renders arbitrary XML without
+a compiler. The loop is **edit → preview in-browser → generate → build locally**.
+
+**No serializer or CST module exists today** (verified on `main`, 2026-10-05).
+That is E-1's first job and it is correctly post-gate: `[UD-3]` makes round-trip
+fidelity a parser contract rather than a schema property (ui_spec §15), so
+nothing about it constrains a decision that would be expensive to reverse later.
 
 *Naming: §20's "Phase 3" is this editor track. The Phase 3 heading below is this
 ledger's consolidation phase. The labels are left as they are rather than
@@ -329,6 +353,13 @@ renumbered across three documents.*
 4. Edit → regenerate → rebuild faster in practice than editing C++ was.
 
 **On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
+
+**CA-2 resolved by the owner, 2026-10-05 — the four criteria stand and the gate stays firmware-side.** Equivalency is verified before any designer effort is spent. The Chief Architect's recommendation had been to add a fifth, editor-facing criterion; it is **declined**, and the reasoning is recorded here rather than dropped, because it names the one thing a GO will not tell us:
+
+- A pass certifies the half U8G2GL shares with prior art — UiUiUi already does build-time monochrome layout ([concept.md §4.2](concept.md)). The differentiator, a visual designer over the same XML, goes unmeasured until after the stop-or-go.
+- Criteria 2 and 4 are judged against **hand-written** XML, which is the weakest case the architecture has. With a designer, criterion 4 is not close; without one it is a genuine contest.
+
+Against that: adding editor work before the gate is precisely what makes stopping expensive, and cheap stopping is the gate's entire value. The owner has weighed the two and chosen to prove the foundation first. **Reviewers at the gate should judge criteria 2 and 4 on their merits as written, and not discount them for the absence of a designer** — that trade was made deliberately and with the cost known.
 
 ---
 

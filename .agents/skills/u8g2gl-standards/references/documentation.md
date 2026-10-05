@@ -334,6 +334,38 @@ i++;  // increment i
 **The test:** would a competent reader be surprised, or ask "why like that?" If
 so, answer them.
 
+### 4.1 What a comment may cite — durable references, not provenance
+
+A comment is read by someone who was never here. That is this document's
+governing test, and it settles cleanly what a comment is allowed to point at.
+
+**Keep:**
+
+- **Published references the reader can follow** — `§13.5`, `[D-18]`, `[A-3]`, a
+  U8G2 function name, an upstream issue number.
+- **Measured facts.** `// u8g2_DrawRBox's band is w - r - r, which wraps before
+  the corner centre underflows` is evidence. It stays true and stays useful.
+
+**Drop:**
+
+- **Bare work-order tags** — `PR-04 WO9`, `WO3 item 5`. They name a workspace
+  that never ships, so the reader cannot follow them anywhere.
+- **Pointers to workspace files.** Same reason: the reader does not have them.
+- **Narrated debate** — "the PA rejected the first approach here". The argument
+  is settled; write the conclusion and its reason instead.
+
+The rewrite is nearly always one line. `// WO3 item 5: clamp before the cast`
+becomes `// Clamp before the cast: a bound width of 300 wraps int16_t (§13.2)`.
+The provenance goes and the knowledge stays — which is the trade, because
+provenance is what `git log` is for.
+
+**This rule binds new and changed lines only.** Several hundred such citations
+exist in older code. **They are not defects, and a reviewer must not raise
+them.** Sweeping them would be a large diff with no behaviour change, churning
+`git blame` across files people are actively reading, and a stale work-order
+reference costs a reader a shrug. Fix one when you are already editing that
+line, and not otherwise.
+
 ---
 
 ## 5. What to check when reviewing
@@ -355,3 +387,6 @@ In rough order of value:
    for a removed parameter, a comment describing behaviour that has changed.
    **Treat stale docs as more serious than missing docs.** Absent documentation
    slows a reader down; wrong documentation actively misleads them.
+7. **A comment citing a work order, a workspace file, or a past debate** — §4.1.
+   **Only on lines the change under review touches.** Pre-existing citations are
+   explicitly not defects and raising them is itself a review error.
