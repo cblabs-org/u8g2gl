@@ -47,8 +47,9 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import { parseBdfRange } from '../fonts/bdf-range.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { PropDef, PropType } from '../schema/widget-manifest.js';
+import type { BindDef, PropDef, PropType, WidgetManifest } from '../schema/widget-manifest.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
+import { geometryBindingFor, geometryBindingNamed } from '../resolver/geometry-bindings.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import { COLOR_VALUES, STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
 import { convertDeclProblems } from '../images/convert-decl.js';
@@ -341,6 +342,120 @@ function checkSubjectValue(subject: SubjectDecl): Diagnostic | undefined {
     default:
       return undefined;
   }
+}
+
+/**
+ * The subject type a prop of each type can be bound to (§13.2, §8.4). Only three
+ * prop types have a subject type of their own; a `time` subject has no prop to
+ * match, because it is consumed by a method (`bind_time`), never written to a
+ * prop. Props of any other type (enum, font, image, style, color) are not bound
+ * to a subject by a drawing manifest, so a `<bind>` naming one is left to the
+ * author rather than guessed at.
+ */
+const SUBJECT_TYPE_OF_PROP: Readonly<Partial<Record<PropType, SubjectType>>> = {
+  int: 'int',
+  bool: 'bool',
+  string: 'string',
+};
+
+// checkBindDeclarations
+// Checks each `<bind>` a widget manifest declares against the setter it targets
+// (§13.2: a subject must match the type its target accepts, and [D-20]: the four
+// geometry bindings keep their names so origin and clamping apply). Pass 5
+// checks a subject against the *declared* `<bind>`; this checks the declaration
+// itself, which is the only path a mistyped subject could otherwise take.
+//   manifest  — a widget manifest as declared
+//   registry  — supplies the effective manifest of `extends`, never an element name ([D-17])
+function checkBindDeclarations(
+  manifest: WidgetManifest,
+  registry: ValidateInput['manifests'],
+): readonly Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const bindings = manifest.api?.bindings ?? [];
+  if (bindings.length === 0) {
+    return diagnostics;
+  }
+
+  // Step 1: Gather what the targets are. A class manifest's `setter=` is a method
+  //         its `extends` chain may already bind; a drawing manifest's is one of
+  //         its own props ([Q-9]).
+  const inherited: readonly BindDef[] =
+    manifest.extends !== undefined ? (registry.get(manifest.extends)?.api.bindings ?? []) : [];
+  const drawingProps: readonly PropDef[] = isDrawingElement(manifest) ? (manifest.api?.props ?? []) : [];
+
+  for (const bind of bindings) {
+    // Step 2: A binding the inherited chain already has under this setter fixes
+    //         the name and the types the setter accepts.
+    const sharing = inherited.filter((candidate) => candidate.setter === bind.setter);
+    const geometryAlias = sharing.find(
+      (candidate) => geometryBindingNamed(candidate.name) !== undefined && candidate.name !== bind.name,
+    );
+    if (geometryAlias !== undefined) {
+      diagnostics.push(geometryAliasDiagnostic(manifest, bind, geometryAlias.name));
+    }
+    if (sharing.length > 0) {
+      const accepted = Array.from(new Set(sharing.map((candidate) => candidate.type)));
+      if (!accepted.includes(bind.type)) {
+        diagnostics.push(
+          createDiagnostic(
+            DIAGNOSTIC_CODES.TYPE_MISMATCH,
+            `Widget '${manifest.name}' declares <bind name="${bind.name}" type="${bind.type}" ` +
+              `setter="${bind.setter}">, but the setter '${bind.setter}' it inherits accepts only ` +
+              `${accepted.map((type) => `'${type}'`).join(', ')} (§13.2). Declare type="${accepted[0]}", ` +
+              `or point setter= at a new method on your own class.`,
+            bind.loc,
+            bind.type,
+            accepted,
+          ),
+        );
+      }
+      continue;
+    }
+
+    // Step 3: Otherwise a drawing manifest's `setter=` names one of its props.
+    const prop = drawingProps.find((candidate) => candidate.name === bind.setter);
+    if (prop === undefined) {
+      continue; // A new method on the author's own class: the C++ compiler checks it.
+    }
+    if (prop.name === 'x' || prop.name === 'y' || prop.name === 'width' || prop.name === 'height') {
+      const geometry = geometryBindingFor(prop.name);
+      if (geometry.binding !== bind.name) {
+        diagnostics.push(geometryAliasDiagnostic(manifest, bind, geometry.binding));
+      }
+    }
+    const subjectType = SUBJECT_TYPE_OF_PROP[prop.type];
+    if (subjectType !== undefined && subjectType !== bind.type) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.TYPE_MISMATCH,
+          `Widget '${manifest.name}' declares <bind name="${bind.name}" type="${bind.type}" ` +
+            `setter="${bind.setter}">, but prop '${prop.name}' is of type '${prop.type}' and takes a ` +
+            `'${subjectType}' subject (§13.2). Declare type="${subjectType}".`,
+          bind.loc,
+          bind.type,
+          [subjectType],
+        ),
+      );
+    }
+  }
+  return diagnostics;
+}
+
+// geometryAliasDiagnostic
+// The diagnostic for a `<bind>` that reaches a geometry setter under another name.
+//   manifest — the declaring manifest
+//   bind     — the offending `<bind>`
+//   expected — the geometry binding name to write instead
+function geometryAliasDiagnostic(manifest: WidgetManifest, bind: BindDef, expected: string): Diagnostic {
+  return createDiagnostic(
+    DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS,
+    `Widget '${manifest.name}' declares <bind name="${bind.name}" setter="${bind.setter}">, which ` +
+      `reaches a geometry setter under another name. Write name="${expected}": geometry bindings ` +
+      `keep their names so origin and clamping apply (§8.4, [D-20]).`,
+    bind.loc,
+    bind.name,
+    [expected],
+  );
 }
 
 /**
@@ -932,6 +1047,7 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
         );
       }
     }
+    diagnostics.push(...checkBindDeclarations(manifest, manifests));
   }
 
   return diagnostics;

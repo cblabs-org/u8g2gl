@@ -135,6 +135,15 @@ export const DIAGNOSTIC_CODES = {
    */
   MIXED_EMISSION_TARGETS: 'U8G2GL_MIXED_EMISSION_TARGETS',
   /**
+   * A manifest's `<bind>` targets the setter of one of [D-20]'s four geometry
+   * bindings (`bind_x`, `bind_y`, `bind_width`, `bind_height`) under a different
+   * name. Origin, clamping and the bound-container rule are keyed by the
+   * binding's **name** (§8.4), so an alias would reach the setter without them
+   * and generate a call that does not compile. The message names the binding to
+   * write instead.
+   */
+  GEOMETRY_BINDING_ALIAS: 'U8G2GL_GEOMETRY_BINDING_ALIAS',
+  /**
    * A `<bind_flag_if_*>` directive names a flag the element cannot carry — today
    * `flag="disabled"` on a drawing element (§8.4, [D-18]). The flag set is fixed
    * at `hidden` and `disabled`; `hidden` applies to every element, but a drawing

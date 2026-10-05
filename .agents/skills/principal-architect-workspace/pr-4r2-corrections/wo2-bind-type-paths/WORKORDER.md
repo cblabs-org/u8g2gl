@@ -5,7 +5,7 @@ title: "A custom manifest's <bind> is checked against the setter it targets"
 branch: u8g2gl-4r2/wo2-bind-type-paths
 base: u8g2gl-4r2/wo1-bound-child-clip
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO2 — §13.2's matching types, on the path that skips them
@@ -160,20 +160,58 @@ carried, do not re-report: a class extending a drawing element (`extends="u8g2gl
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Baseline and final counts
+| Suite | Baseline (WO1 tip) | Final |
+|---|---|---|
+| C++ ctest | 391 / 391 passed, 1 skipped (`SizeOfReport.ThirtyTwoBitTarget`), 0 build warnings | unchanged (no C++ touched; not rebuilt after the CLI change) |
+| CLI vitest | 1288 (87 files) | 1298 (88 files): +10 new tests, all in `cli/test/validator/bind-type-paths.test.ts` |
+| `tsc`, lint | clean | clean |
+
+Authority verified: `../PROJECT.md` "Human Approval" quotes the owner, "Item 2 plan" states the rule, WO `status` was `dispatched`.
 
 ### Changes Made
+- `cli/src/core/validator/validate-schema.ts`: new `checkBindDeclarations()` called at the end of §5's per-manifest loop, plus `geometryAliasDiagnostic()` and `SUBJECT_TYPE_OF_PROP`. Reads inherited bindings from `registry.get(manifest.extends)`, never by element name.
+- `cli/src/core/schema/diagnostic.ts`: one new code, `GEOMETRY_BINDING_ALIAS` (`U8G2GL_GEOMETRY_BINDING_ALIAS`), beside `MIXED_EMISSION_TARGETS`.
+- `cli/test/validator/bind-type-paths.test.ts`: 3 pin tests for the already-enforced attribute and composite paths (pass at the base) and 7 for the declaration check.
+- No change to `validate-types.ts`, manifests, generator, goldens or versions. Goldens: no diff.
 
 ### Decisions Made
+- **Pins pass at the base; gap tests fail at the base.** Run before the fix: 3 pins and 3 "accepts" tests passed, 4 gap tests failed (the alias, `type="int"` alias, same-name-wrong-type and drawing cases).
+- **Rules 1 and 2 are both reported on the time/`bind_when` case, as two diagnostics at the `<bind>`.** This is not noise: they are independent faults with independent fixes (rename so origin and clamping apply; change the type). Fixing only the name would leave a `bind_x` with a `time` type, which rule 2 would then refuse. The `type="int"` variant gets rule 1 alone.
+- **Rule 1 code**: no existing code was apt, so added `GEOMETRY_BINDING_ALIAS`. Rule 2 reuses `TYPE_MISMATCH`.
+- **Prop/subject pairs treated as matching (drawing manifests):** `int` prop to `int` subject, `bool` to `bool`, `string` to `string`. These are the only prop types with a subject type of their own. A `time` subject matches no prop type, because it is consumed by a method (`bind_time`) and never written to a prop. Props of type enum, font, image, subject, style or color are left alone: no subject type corresponds to them, so there is nothing to compare against without guessing.
+- **Prop comparison applies only to drawing manifests** (`isDrawingElement(declared)`), where `setter=` names a prop ([Q-9]). On a class manifest `setter=` is a method, so prop names are not consulted.
+- **Rule 1 also applied to drawing manifests** (small extension, same defect as the class case): if a drawing manifest's `<bind setter="x|y|width|height">` is not named `geometryBindingFor(that attribute).binding`, it is refused with the same code. All shipped drawing manifests already comply. If the PA considers this beyond the WORKORDER, it is one block (the `geometryBindingFor` branch) and its removal would not affect any other test.
+- Diagnostics are located at the `<bind>` (`bind.loc`); the alias one has `offendingText` = the bind name, the type one has the type, each with a suggestion.
 
 ### Dead Ends & Warnings
+None. The first draft of the new test file's drawing cases failed because an instance of the drawing widget on a screen draws its own `UNKNOWN_ATTRIBUTE` errors (it declares only one prop); those tests filter to errors in the manifest file.
 
 ### Out-of-Scope Findings
+- **Spec debt:** design_spec §15 / [D-16] code list: `U8G2GL_GEOMETRY_BINDING_ALIAS` is new and unlisted. `docs/` not edited, per the WORKORDER.
+- A custom class whose own prop-less `<bind>` re-uses an *inherited non-geometry* setter under a new name (e.g. `name="bind_foo" setter="bind_text"`) is accepted if its type matches. That is intended (rule 1 is geometry only) but means such an alias gets no `fmt` pairing; not checked.
+- Composites (`declaredComposites`) are outside §5's loop and so their `<api>` `<bind>`s, if any, are not checked by this rule.
 
 ### Blockers
 (none)
+
+### End to end: built CLI on a copy of probe `d/` (in `tmp/`)
+`npm run build`, then `node cli/dist/node/cli.js validate tmp/d` (exit 1, 2 errors):
+```
+error: widgets/wd_d/wd_d.xml:3:3
+   Widget 'wd_d' declares <bind name="bind_when" setter="bind_x">, which reaches a geometry setter under another name. Write name="bind_x": geometry bindings keep their names so origin and clamping apply (§8.4, [D-20]).
+ 3 |   <bind name="bind_when" type="time" setter="bind_x" />
+   = did you mean 'bind_x'?
+error: widgets/wd_d/wd_d.xml:3:3
+   Widget 'wd_d' declares <bind name="bind_when" type="time" setter="bind_x">, but the setter 'bind_x' it inherits accepts only 'int' (§13.2). Declare type="int", or point setter= at a new method on your own class.
+ 3 |   <bind name="bind_when" type="time" setter="bind_x" />
+   = did you mean 'int'?
+Validation failed: 2 error(s), 0 warning(s).
+```
+The `type="int"` variant (int subject `n`, exit 1, 1 error): the first diagnostic above only (`<bind name="bind_when" ... type="int" setter="bind_x" />`), no type error.
+
+Shipped manifests: the whole CLI suite (framework manifests and fixtures) passes with no new diagnostic; the built CLI also reports none on `test/generated_fixture`, `cli/test/generator/fixtures/emit-project`, `cli/test/validator/fixtures/valid` and `cli/test/integration/fixtures/valid-project`.
