@@ -5,7 +5,7 @@ title: "A bound draw-call child is clipped to its container, as an object child 
 branch: u8g2gl-4r2/wo1-bound-child-clip
 base: main @ 86d3f89
 complexity: architect
-status: dispatched
+status: complete
 ---
 
 # WO1 — realisation must not be observable through clipping
@@ -182,17 +182,156 @@ Out-of-scope findings go in the Completion Report. Do not fix, do not file.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete — implementation commit `68f89b6` on `u8g2gl-4r2/wo1-bound-child-clip` (not pushed).
 
 ### Baseline and final counts
 
+Each suite run alone; C++ from a clean configure (`rm -rf build`).
+
+| Suite | Base `bd21c76` | Tip `68f89b6` |
+|---|---|---|
+| C++ ctest | 383 pass, 1 skip (`SizeOfReport.ThirtyTwoBitTarget`) | **391** pass, same 1 skip (+3 pixel, +4 Core, +1 parity) |
+| C++ warnings (`-Wall -Wextra -Wpedantic`) | 0 | 0 |
+| CLI vitest | 1281 | **1288** (+6 emit-screen, +1 emit-editor) |
+| `tsc --noEmit` | clean | clean |
+| `npm run lint` | clean | clean |
+
+**Real-U8G2 pixel test** (`test/test_bound_child_clip.cpp`), run against real U8G2 2.36.18:
+
+| Case | Base (generator's base emission) | Tip |
+|---|---|---|
+| bound `x` box overhanging the right edge | **FAIL: 30 pixels outside** (5 cols x 6 rows), 30 inside | pass: 0 outside, 30 inside |
+| bound `height` box overhanging the bottom edge | **FAIL: 56 pixels outside** (8 cols x 7 rows), 40 inside | pass: 0 outside, 40 inside |
+| object control (class-backed child, same rects) | pass | pass |
+
+Driven by **the exact statements the generator emits** (stated choice), not by
+generated code: at the base, `render_object(container)` then the guarded
+unwrapped `u8g2gl_draw_box(... u8g2gl_coord_bound(...) ...)`; at the tip, the
+same inside `u8g2gl_clip_scope`. The CLI emission tests pin that spelling.
+
+### The emitted spelling (for the §13.5 wording)
+
+Built CLI (`node cli/dist/node/cli.js generate`) on a copy of `evidence/probes/one/` in `tmp/`:
+
+```cpp
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_w
+    if (!ui_obj_w.is_hidden()) {
+        u8g2gl_clip_scope clip(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_w's effective clip (§13.5)
+        if (clip.drawable()) {
+            u8g2gl_draw_box(display, u8g2gl_coord_bound(10, ui_subject_n.get()), 10, 10, 6, true, 0);  // w_b: no object (§13.5)
+        }
+    }
+    u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_c
+    if (!ui_obj_c.is_hidden()) {
+        u8g2gl_clip_scope clip(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_c's effective clip (§13.5)
+        if (clip.drawable()) {
+            u8g2gl_draw_box(display, 40, 10, u8g2gl_coord_bound(0, ui_subject_n.get()), 6, true, 0);  // b2: no object (§13.5)
+        }
+    }
+```
+
 ### Changes Made
+
+- **Runtime** (`include/u8g2gl/u8g2gl_core.h`, `src/u8g2gl_core.cpp`): new
+  `u8g2gl_clip_scope` — ctor `applied_ = u8g2gl_apply_clip(display,
+  u8g2gl_effective_clip(objs, parents, index))`, dtor `setMaxClipWindow()` only
+  if applied, `drawable()` query, non-copyable/non-movable. No rect arithmetic
+  of its own (`u8g2gl_apply_clip()` already rejects an empty rect).
+  `u8g2gl_render_object()` now uses it.
+- **Emission**: `drawClipObject(element, sources)` in `draw-args.ts` is the one
+  statement of the rule (enclosing object **and** any `bound` argument source →
+  `element.parentIndex`). `screen.ts` spells it (above); a clipped step takes a
+  block of its own and is never hoisted into a neighbour's guard block (two
+  scopes must never share a block). `scene.ts` records it.
+- **Scene format 2 → 3**: a clipped draw call carries `clip: <object index>`;
+  absent means unclipped (same convention as `origin`). Format comment block
+  updated. Editor host checks version 3 and draws a `clip` call inside
+  `u8g2gl_clip_scope` with that index (index range-checked).
+- **Versions**: CLI `0.9.0 → 0.10.0` (`package.json`, two lockfile fields);
+  runtime `0.5.0 → 0.6.0` (`CMakeLists.txt` and `u8g2gl_version.h`
+  `U8G2GL_VERSION_MINOR`, which CMake cross-checks). Schema stays 0.4.
+- **Goldens**: only `generated/ui_screen_bounds.cpp` (clip scope around
+  `track_knob`) and `generated_editor/ui_scene.json` (`version` 3, `"clip": 0`
+  on `track_knob`) changed. `emit-project/expected/**` unchanged (no bound
+  container child). `dot`, `level_bar`, `panel_edge` unchanged. Goldens carry
+  the pinned `0.0.0-golden` version, so the bumps do not touch them.
+- **Tests**: `test/test_bound_child_clip.cpp` + CMake target (see Dead Ends);
+  `test_core.cpp` +4 (`ClipScopeSetsTheEffectiveClipAndResetsItOnExit`,
+  `...WithAnEmptyClipTouchesNothing`, `...WhollyOffTheDisplayTouchesNothing`,
+  `...OverANullArrayTouchesNothing`); `test_editor_parity.cpp` +1
+  (`BoundsScreenClipsTheOverhangingKnobToItsTrackOnBothTargets`: knob_x = 58,
+  asserts `setClipWindow(40,10,100,30)` / `drawBox` / `setMaxClipWindow` on both
+  logs, and no clip before `dot`); `emit-screen.test.ts` +6 (composite child
+  wrapped, `u8g2gl_obj` child wrapped, own block, literal child not wrapped,
+  screen-level bound not wrapped); `emit-editor.test.ts` +1 (`clip` present for
+  `track_knob`, absent for `dot`, `panel_edge`, `level_bar`).
+- **Changed existing assertions**: `emit-screen.test.ts` "adds a draw call's
+  container origin into its bound argument" (re-indented: now inside the
+  scope's `if`) — the only one that spelled the old unwrapped text. Version
+  literals: `generate.test.ts` (`0.9.0` → `0.10.0` ×4 and the test title),
+  `emit-editor.test.ts` (`scene.version` 2 → 3).
 
 ### Decisions Made
 
+- **Helper shape: RAII scope** (`u8g2gl_clip_scope` + `drawable()`), because
+  the reset then runs on every exit from the block and cannot be forgotten; a
+  function pair would leave it to each caller.
+- **Spelling: block form inside the existing visibility guard**, not the C++17
+  `if (init; cond)` form, so generated code needs nothing newer than the
+  runtime already does and reads top to bottom.
+- **Scene: new field, version bump**. The existing fields could not suffice
+  without the host re-deriving the rule (the nearest object is the last
+  `ancestor` term, but "is an argument bound" would be a second copy of the
+  test), so `clip` carries the answer from `drawClipObject()`.
+- **`render_object` line-by-line diff (done).** Old: visible? → effective
+  clip; empty → return (no saver) → saver → `apply_clip` fails → return →
+  render → `setMaxClipWindow` → saver restore. New: visible? → saver → scope
+  (`apply_clip(effective_clip)`) → not drawable → return → render → scope
+  `setMaxClipWindow` → saver restore. Normal path and off-display path are
+  call-for-call identical. **One difference**: an *empty* effective clip now
+  constructs the saver before returning, so it logs a restore of the
+  unchanged colour and font (`setDrawColor`, `setFont`) where the old code
+  logged nothing. No pixel, clip or state difference; all `Core.*`
+  render-object tests unchanged and green. Avoiding it would need the empty
+  check outside the scope (a second copy of the clip rule) or a reversed
+  restore order on the common path, both worse.
+
 ### Dead Ends & Warnings
 
+- **Linking the runtime against real U8G2 crashed (SIGSEGV) at first**:
+  `u8x8.h` defines `U8X8_USE_PINS` under `ARDUINO`, adding `pins[]` to
+  `u8x8_t`. `u8g2gl_u8g2_csrc` is built without `ARDUINO`; the C++ wrapper
+  needs it, so one struct had two layouts. The new target therefore builds its
+  own `u8g2gl_u8g2_csrc_arduino` (the same C list plus `u8g2_bitmap.c`,
+  `u8g2_line.c`, `u8g2_polygon.c` for the rest of the runtime) with
+  `ARDUINO=10819`, and links `$<TARGET_OBJECTS:u8g2gl_real_u8g2>`. This is the
+  first test that *links and runs* the runtime against real U8G2; it is
+  reusable for future pixel tests.
+- `u8g2gl_clip_scope` instances must not nest (documented): the reset is to
+  the full display, not to an outer clip.
+
 ### Out-of-Scope Findings
+
+1. **No runtime-version guard in generated code.** Generated code checks only
+   the schema version (`U8G2GL_REQUIRE_SCHEMA_VERSION` in
+   `u8g2gl_generated_config.h`); nothing records or checks a minimum runtime
+   version. A 0.10.0 project with a bound container child fails against a
+   0.5.0 runtime only as an unknown `u8g2gl_clip_scope` compile error (loud,
+   but not a §16-style diagnostic); one without such a child compiles
+   silently, which is correct here but would not be for a behavioural change.
+   Worth a minimum-runtime check alongside the schema guard.
+2. **Stale wording in `include/u8g2gl/u8g2gl_state_saver.h`** (outside the
+   box): its header says "Clip lifetime belongs to u8g2gl_render_object(),
+   which sets the clip, renders, and resets it". Still true in effect, but the
+   owner is now `u8g2gl_clip_scope`, used by `render_object` and by bound draw
+   calls.
+3. **Emitted render-function preamble** (every screen unit) still says "A draw
+   call has no object, so its visibility is the build-time guard (§13.5)" and
+   does not mention the clip. Changing it would move every golden, so it was
+   left; a candidate for the next deliberate golden move.
+4. `cli/test/node/write-generated.test.ts:225` writes a `version: 2` scene as
+   writer-marker test data; harmless (the writer reads only the marker), noted
+   for consistency.
 
 ### Blockers
 (none)
