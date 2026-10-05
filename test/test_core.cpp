@@ -528,6 +528,77 @@ TEST_F(Core, RenderObjectNullArrayRendersNothing) {
     EXPECT_EQ(display.max_clip_window_count, 0);
 }
 
+// --- u8g2gl_clip_scope: the one set-and-reset of an effective clip (§13.5) ---
+// The guard u8g2gl_render_object() uses around render(), and a generated draw
+// call inside a bound container uses around the call.
+
+TEST_F(Core, ClipScopeSetsTheEffectiveClipAndResetsItOnExit) {
+    u8g2gl_obj container;
+    u8g2gl_obj child;
+    container.set_coords(0, 0, 20, 10);
+    child.set_coords(15, 5, 20, 20);   // overhangs the container right and below
+
+    u8g2gl_obj* const objs[] = { &container, &child };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    U8G2 display;
+    {
+        const u8g2gl_clip_scope clip(display, objs, parents, 1);
+        EXPECT_TRUE(clip.drawable());
+        // The intersection, x 15..19 and y 5..9, far corner exclusive.
+        EXPECT_EQ(display.set_clip_window_count, 1);
+        EXPECT_EQ(display.last_clip_x0, 15);
+        EXPECT_EQ(display.last_clip_y0, 5);
+        EXPECT_EQ(display.last_clip_x1, 20);
+        EXPECT_EQ(display.last_clip_y1, 10);
+        EXPECT_EQ(display.max_clip_window_count, 0);   // not reset while in scope
+    }
+    EXPECT_EQ(display.max_clip_window_count, 1);       // reset exactly once on exit
+}
+
+TEST_F(Core, ClipScopeWithAnEmptyClipTouchesNothing) {
+    u8g2gl_obj container;
+    u8g2gl_obj child;
+    container.set_coords(0, 0, 10, 10);
+    child.set_coords(20, 20, 5, 5);   // wholly outside its container
+
+    u8g2gl_obj* const objs[] = { &container, &child };
+    const uint8_t parents[] = { U8G2GL_NO_PARENT, 0 };
+
+    U8G2 display;
+    {
+        const u8g2gl_clip_scope clip(display, objs, parents, 1);
+        EXPECT_FALSE(clip.drawable());
+    }
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);   // nothing set, so nothing reset
+}
+
+TEST_F(Core, ClipScopeWhollyOffTheDisplayTouchesNothing) {
+    u8g2gl_obj widget;
+    widget.set_coords(-20, -20, 10, 10);   // a non-empty rect with no pixel on the display
+
+    u8g2gl_obj* const objs[] = { &widget };
+
+    U8G2 display;
+    {
+        const u8g2gl_clip_scope clip(display, objs, nullptr, 0);
+        EXPECT_FALSE(clip.drawable());
+    }
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
+TEST_F(Core, ClipScopeOverANullArrayTouchesNothing) {
+    U8G2 display;
+    {
+        const u8g2gl_clip_scope clip(display, nullptr, nullptr, 0);
+        EXPECT_FALSE(clip.drawable());
+    }
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
 // --- Clip-corner convention: u8g2gl_apply_clip() ---
 
 // PINS THE CLIP-CORNER CONVENTION. The exclusive far corner is read from U8G2

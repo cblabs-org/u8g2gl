@@ -30,6 +30,12 @@
  *            interleave exactly as the author wrote them; adjacent draw calls
  *            that share a guard may share one `if`, but nothing is ever moved
  *            to create that opportunity (§13.5).
+ *          - **A bound draw call inside a container is clipped like an object
+ *            child**: drawn inside a `u8g2gl_clip_scope` on its nearest
+ *            enclosing object, the guard `u8g2gl_render_object()` itself uses,
+ *            so an overhanging bound value is clipped either way ([D-18]).
+ *            Which calls is `draw-args.ts`'s drawClipObject(), read by the
+ *            scene too.
  *
  * Description: The unit holds, in order: the widget headers it uses; the static
  *              objects in array order (a composite's container is a plain
@@ -79,7 +85,7 @@ import {
   type RealisedScreen,
   type VisibilityTerm,
 } from '../../realise/index.js';
-import { drawArgumentSources, drawCallFor, SUBJECT_READ_SUFFIX } from './draw-args.js';
+import { drawArgumentSources, drawCallFor, drawClipObject, SUBJECT_READ_SUFFIX } from './draw-args.js';
 import { boundPositionOrigin } from './placement.js';
 import {
   classOf,
@@ -134,6 +140,8 @@ export function screenUnitPath(screen: string): string {
 /** What emitting one screen accumulates. */
 interface ScreenContext {
   readonly placements: ReadonlyMap<RealisedElement, Placement>;
+  /** The screen's objects in array order, so an index can be named in a comment. */
+  readonly objects: readonly RealisedElement[];
   readonly diagnostics: Diagnostic[];
 }
 
@@ -317,14 +325,35 @@ function guardOf(element: RealisedElement, tag: string, context: ScreenContext):
 interface RenderStep {
   /** '' when unconditional. */
   readonly guard: string;
-  readonly line: string;
+  /** The statement, one entry per line, each indented for the function body. */
+  readonly lines: readonly string[];
+  /**
+   * The step declares a local (a clip scope), so it takes a block of its own
+   * and never shares its guard's block with a neighbour.
+   */
+  readonly ownBlock: boolean;
 }
+
+/** The runtime guard a clipped draw call is drawn inside (`u8g2gl_core.h`). */
+const CLIP_SCOPE = 'u8g2gl_clip_scope';
 
 // drawCallStep
 // A draw-call element's statement and its guard. (A literal `hidden` never
 // reaches here: a drawing manifest declares no `hidden` prop, so Pass 4 refuses
 // it; a drawing element is hidden only through a bound flag, which is a guard.)
-function drawCallStep(element: RealisedElement, placement: Placement, context: ScreenContext): RenderStep {
+// A call drawArgs' drawClipObject() clips is drawn inside a u8g2gl_clip_scope
+// on its enclosing object, so a bound overhang is clipped where an object
+// child's would be (§13.5, [D-18]).
+//   element   — the realised draw-call element
+//   placement — its manifest and device-space model
+//   context   — the screen's placements, and where diagnostics are collected
+//   tables    — the screen's object and parent array identifiers
+function drawCallStep(
+  element: RealisedElement,
+  placement: Placement,
+  context: ScreenContext,
+  tables: { readonly objs: string; readonly parents: string },
+): RenderStep {
   const node = placement.absolute.node;
   // A draw-call element has nothing to apply a style to (§13.5): no object, and
   // the `u8g2gl_draw_*` functions take no style. Dropping it would silently
@@ -346,14 +375,13 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
   // *something* then does — WO7b's positioning rule covers an under-determined
   // start, not a size that is simply absent. So a box with no width and no
   // bind_width reaches here, and is refused rather than thrown on.
-  const missing = drawArgumentSources({
+  const sources = drawArgumentSources({
     manifest: placement.manifest,
     resolved: placement.absolute,
     bindings: element.bindings,
     origin: placement.origin,
-  })
-    .filter((source) => source.kind === 'none')
-    .map((source) => source.prop);
+  });
+  const missing = sources.filter((source) => source.kind === 'none').map((source) => source.prop);
   if (missing.length > 0) {
     for (const prop of missing) {
       context.diagnostics.push(
@@ -367,7 +395,7 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
         ),
       );
     }
-    return { guard: '', line: '' };
+    return { guard: '', lines: [], ownBlock: false };
   }
   const call = drawCallFor({
     manifest: placement.manifest,
@@ -375,32 +403,56 @@ function drawCallStep(element: RealisedElement, placement: Placement, context: S
     bindings: element.bindings,
     origin: placement.origin,
   });
+  const statement = `${call.fn}(display, ${call.args.join(', ')});  // ${element.identifier}: no object (§13.5)`;
+  const guard = guardOf(element, node.tag, context);
+  const clipObject = drawClipObject(element, sources);
+  if (clipObject === undefined) {
+    return { guard, lines: [`    ${statement}`], ownBlock: false };
+  }
+  const container = context.objects[clipObject];
+  const containerName = container === undefined ? String(clipObject) : cpp(container);
   return {
-    guard: guardOf(element, node.tag, context),
-    line: `    ${call.fn}(display, ${call.args.join(', ')});  // ${element.identifier}: no object (§13.5)`,
+    guard,
+    lines: [
+      `    ${CLIP_SCOPE} clip(display, ${tables.objs}, ${tables.parents}, ${clipObject});  // ${containerName}'s effective clip (§13.5)`,
+      '    if (clip.drawable()) {',
+      `        ${statement}`,
+      '    }',
+    ],
+    ownBlock: true,
   };
 }
 
 // renderBody
 // The render function's statements in document order ([D-4]), with adjacent
 // draw calls sharing an identical guard hoisted into one block — never reordered
-// to create one (§13.5).
+// to create one (§13.5). A step that declares a local takes a block of its own,
+// so two clip scopes never share one: each must reset before the next is set.
 function renderBody(steps: readonly RenderStep[]): string[] {
   const lines: string[] = [];
+  const indented = (step: RenderStep): string[] => step.lines.map((line) => `    ${line}`);
   let index = 0;
   while (index < steps.length) {
     const step = steps[index];
     if (step === undefined) {
       break;
     }
+    if (step.ownBlock) {
+      lines.push(step.guard === '' ? '    {' : `    if (${step.guard}) {`, ...indented(step), '    }');
+      index += 1;
+      continue;
+    }
     if (step.guard === '') {
-      lines.push(step.line);
+      lines.push(...step.lines);
       index += 1;
       continue;
     }
     lines.push(`    if (${step.guard}) {`);
-    while (index < steps.length && steps[index]?.guard === step.guard) {
-      lines.push(`    ${steps[index]?.line ?? ''}`);
+    while (index < steps.length && steps[index]?.guard === step.guard && steps[index]?.ownBlock === false) {
+      const shared = steps[index];
+      if (shared !== undefined) {
+        lines.push(...indented(shared));
+      }
       index += 1;
     }
     lines.push('    }');
@@ -437,7 +489,11 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   if (screenPlacements.diagnostics.length > 0) {
     return { content: '', diagnostics: [...screenPlacements.diagnostics] };
   }
-  const context: ScreenContext = { placements: screenPlacements.placements, diagnostics: [] };
+  const context: ScreenContext = {
+    placements: screenPlacements.placements,
+    objects: realised.objects,
+    diagnostics: [],
+  };
   const placed = (element: RealisedElement): Placement => {
     const placement = context.placements.get(element);
     if (placement === undefined) {
@@ -483,9 +539,10 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     step.kind === 'object'
       ? {
           guard: '',
-          line: `    u8g2gl_render_object(display, ${objs}, ${parents}, ${step.objectIndex});  // ${cpp(step.element)}`,
+          lines: [`    u8g2gl_render_object(display, ${objs}, ${parents}, ${step.objectIndex});  // ${cpp(step.element)}`],
+          ownBlock: false,
         }
-      : drawCallStep(step.element, placed(step.element), context),
+      : drawCallStep(step.element, placed(step.element), context, { objs, parents }),
   );
   if (context.diagnostics.length > 0) {
     return { content: '', diagnostics: context.diagnostics };

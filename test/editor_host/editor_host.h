@@ -23,7 +23,7 @@
  *              `init` gives — the firmware init's own order: rectangle and
  *              properties, styles and overrides, bindings and flag directives. `render()` walks the draw order: objects
  *              through u8g2gl_render_object(), draw calls through draw-by-name
- *              after their guard. Every refusal is recorded in `error()` rather
+ *              after their guard, inside u8g2gl_clip_scope where the scene says. Every refusal is recorded in `error()` rather
  *              than skipped, so an element the registry cannot build fails the
  *              test instead of silently vanishing from both sides.
  *
@@ -123,6 +123,8 @@ private:
     bool apply_styles(size_t index, const scene_json& element);
     bool bind_object(size_t index, const scene_json& element);
     bool draw_call(U8G2& display, const scene_json& element);
+    bool draw(U8G2& display, const u8g2gl_editor_drawing& drawing, std::vector<u8g2gl_editor_value>& args,
+              const std::string& name);
     bool visible(const scene_json& element, bool* shown);
     void* allocate(size_t size, size_t align);
 

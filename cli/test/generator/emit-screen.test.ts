@@ -469,7 +469,7 @@ describe('bound positions are container-relative (§7.2, [D-20] amendment, rulin
 
   it("adds a draw call's container origin into its bound argument", () => {
     // The composite's knob is bound inside a container at (40, 20).
-    expect(render).toContain('        u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_level.get()), 20, 4, 4, true, 0);');
+    expect(render).toContain('            u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_level.get()), 20, 4, 4, true, 0);');
   });
 
   it("passes an object's container origin to bind_x and bind_y as a literal", () => {
@@ -481,6 +481,77 @@ describe('bound positions are container-relative (§7.2, [D-20] amendment, rulin
     expect(render).toContain('    u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_level.get()), 50, 2, 2, true, 0);');
     expect(init).toContain('    ui_obj_free.bind_x(&ui_subject_level, 0);');
     expect(init).toContain('    ui_obj_free.bind_y(&ui_subject_count, 0);');
+  });
+});
+
+describe('a bound draw call inside a container is drawn inside its clip (§13.5, [D-18])', () => {
+  // Realisation must not be observable: an object child is clipped to its
+  // container by u8g2gl_render_object(), so a draw-call child whose bound value
+  // can overhang is drawn inside the same clip, through the same runtime guard.
+  const result = generateProject({
+    screens: {
+      home: `
+        <slider name="box" x="40" y="20" width="40" height="16" />
+        <u8g2gl_obj name="c" x="10" y="40" width="20" height="10">
+            <u8g2gl_box name="grow" x="0" y="0" height="6" bind_width="level" />
+            <u8g2gl_box name="still" x="2" y="2" width="4" height="4" />
+        </u8g2gl_obj>
+        <u8g2gl_box name="dot" x="0" bind_x="level" y="56" width="2" height="2" />`,
+    },
+    widgets: [SLIDER],
+  });
+  const unit = file(result, 'ui_screen_home.cpp');
+  const render = body(unit, 'void ui_screen_home_render(U8G2& display)');
+
+  it('generates without a diagnostic', () => {
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('wraps a bound child of a composite in its container\'s clip scope, inside the visibility guard', () => {
+    // box (object 0) is the composite's container; knob has a bound x.
+    const knob = render.indexOf('    if (!ui_obj_box.is_hidden()) {');
+    expect(render.slice(knob, knob + 6)).toEqual([
+      '    if (!ui_obj_box.is_hidden()) {',
+      "        u8g2gl_clip_scope clip(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_box's effective clip (§13.5)",
+      '        if (clip.drawable()) {',
+      '            u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_level.get()), 20, 4, 4, true, 0);  // box_knob: no object (§13.5)',
+      '        }',
+      '    }',
+    ]);
+  });
+
+  it('wraps a bound child of a u8g2gl_obj, scoped to that object', () => {
+    // c is object 2 (box, box_knob_label, c); grow has a bound width.
+    const grow = render.indexOf("        u8g2gl_clip_scope clip(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // ui_obj_c's effective clip (§13.5)");
+    expect(grow).toBeGreaterThan(0);
+    expect(render.slice(grow - 1, grow + 5)).toEqual([
+      '    if (!ui_obj_c.is_hidden()) {',
+      "        u8g2gl_clip_scope clip(display, ui_screen_home_objs, ui_screen_home_parents, 2);  // ui_obj_c's effective clip (§13.5)",
+      '        if (clip.drawable()) {',
+      '            u8g2gl_draw_box(display, 10, 40, u8g2gl_coord_bound(0, ui_subject_level.get()), 6, true, 0);  // grow: no object (§13.5)',
+      '        }',
+      '    }',
+    ]);
+  });
+
+  it('gives a clipped call a block of its own, so a literal sibling with the same guard is not hoisted into it', () => {
+    const still = render.indexOf('        u8g2gl_draw_box(display, 12, 42, 4, 4, true, 0);  // still: no object (§13.5)');
+    expect(still).toBeGreaterThan(0);
+    expect(render.slice(still - 1, still + 2)).toEqual([
+      '    if (!ui_obj_c.is_hidden()) {',
+      '        u8g2gl_draw_box(display, 12, 42, 4, 4, true, 0);  // still: no object (§13.5)',
+      '    }',
+    ]);
+  });
+
+  it('does not wrap a literal child of a container — §7.2 already refuses its overhang', () => {
+    expect(render.filter((line) => line.includes('u8g2gl_clip_scope'))).toHaveLength(2);
+  });
+
+  it('does not wrap a bound element on the screen, which has no container', () => {
+    expect(render).toContain(
+      '    u8g2gl_draw_box(display, u8g2gl_coord_bound(0, ui_subject_level.get()), 56, 2, 2, true, 0);  // dot: no object (§13.5)',
+    );
   });
 });
 
