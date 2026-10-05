@@ -101,8 +101,8 @@ Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xm
 
 - [x] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** ✅ `68f89b6` · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0, runtime 0.6.0, scene format 3
 - [x] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** ✅ `5ea99c6` · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
-- [ ] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
-- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
+- [x] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** ✅ `85685dd` · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
+- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** in review · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
 
@@ -159,3 +159,15 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   fixture validates clean. One rule, `checkBindDeclarations()` in `validate-schema.ts`, reached
   from the widget and composite loops. Pin tests for the attribute and composite-prop paths pass
   at base and tip: **the carried finding as worded was stale**. WO3 dispatched.
+- **2026-10-06** — **WO3 complete, `84dcbd5` + `85685dd`.** Measured first: over 18 sizes × radius
+  0..min/2+2, the button (border layer 0, focused fill) and the switch track pass the requested
+  radius to U8G2 unchanged **exactly when `2r <= min(w,h)`**, else `min/2`; pinned as
+  `RadiusHonoured.*`. Inner border layers and the switch handle derive their radius from the outer
+  one and are not checked. PA verified from a clean configure, each suite alone: C++ **395 / one
+  skip**, 0 warnings; CLI **1319**, `tsc`, lint clean; goldens unchanged; `manifests.json` diff
+  the two help strings. Built CLI: 20×6 switch with `style="round"` (radius 10) refused, "radius=10
+  (from style 'round') … Use radius <= 3"; precedence attribute > `style_radius` > named style
+  confirmed end to end; default switch accepted; both fixtures validate clean. One precedence
+  function (`validator/configured-radius.ts`) mirrors `styleLines()`. A `setter=` radius's message
+  says the runtime clamps it, not that U8G2 draws outside — correct for objects. Carried to WO4:
+  `u8g2gl_draw.h` says an over-bound radius is "clamped, not refused", now incomplete.
