@@ -99,8 +99,8 @@ Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xm
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0
-- [ ] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
+- [x] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** ✅ `68f89b6` · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0, runtime 0.6.0, scene format 3
+- [ ] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
 - [ ] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
 - [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
 
@@ -117,6 +117,14 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   so an overhang is clipped either way and realisation is not observable ([D-18]). A child whose
   geometry is literal needs no clip: §7.2 already refuses one that overhangs."* Final wording
   after WO1 lands, citing what it emits.
+- **Generated code checks the schema version only, never the runtime's** (WO1 finding). A CLI
+  0.10.0 project with a bound container child fails against runtime 0.5.0 as a plain compile error
+  on `u8g2gl_clip_scope`; one without compiles silently. Rules/03's guardrail covers schema, not
+  runtime minimums. Worth a ruling before PR-05 ships generated code to firmware.
+- **First test linking the runtime against real U8G2** (WO1 finding): under `ARDUINO`, `u8x8.h`
+  adds `pins[]` to `u8x8_t`, so the existing `u8g2gl_u8g2_csrc` target (built without `ARDUINO`)
+  had a different struct layout from the runtime's view of it and crashed. WO1 added
+  `u8g2gl_u8g2_csrc_arduino`. Relevant to PR-06's pixel tests.
 - **PR-05:** a custom element may `extends="u8g2gl_box"` (a drawing element) and is accepted; it
   then emits a method call on a class with no such member (probe `d/`). PR-4R's "time above
   INT32_MAX goes negative" is reachable only through the custom-`<bind>` path WO2 closes.
@@ -127,3 +135,15 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   put rulings 1 and 2 to the owner with the decomposition, and received approval (quoted). Worktree
   `../U8G2GL-4r2` created on `u8g2gl-4r2/wo1-bound-child-clip` from `origin/main`, upstream
   removed. Rule `00-operating-model.md` identical to the skill's asset.
+- **2026-10-05** — **WO1 complete, `68f89b6`.** PA verified from a clean configure, each suite
+  alone: C++ **391 / one skip**, 0 warnings; CLI **1288**, `tsc`, lint clean; built CLI reports
+  **0.10.0**. Built CLI on probe `one/` plus a literal child: both bound container children emitted
+  inside `u8g2gl_clip_scope clip(display, <objs>, <parents>, <parent index>); if (clip.drawable())
+  { … }`, the literal child unwrapped, output compiles under `-Wall -Wextra -Wpedantic`. Real-U8G2
+  pixel test (`test/test_bound_child_clip.cpp`): base sets 30 pixels outside the right edge and 56
+  outside the bottom; tip sets 0; object control 0 at both. `u8g2gl_render_object()` now uses the
+  same RAII scope; PA read the diff: same calls, same order, except the state saver now exists on
+  the empty-clip return (a no-op restore). Goldens: `track_knob`'s clip block and the scene's
+  version 3 and `"clip": 0` only. Carried to WO4: `u8g2gl_state_saver.h` still says clip lifetime
+  belongs to `render_object`. Other findings are under "For the Chief Architect". WO2 dispatched on
+  `u8g2gl-4r2/wo2-bind-type-paths`.
