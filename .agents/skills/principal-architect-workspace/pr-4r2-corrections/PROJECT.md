@@ -100,8 +100,8 @@ Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xm
 ## Work Order Decomposition
 
 - [x] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** ✅ `68f89b6` · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0, runtime 0.6.0, scene format 3
-- [ ] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
-- [ ] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
+- [x] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** ✅ `5ea99c6` · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
+- [ ] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
 - [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
@@ -125,6 +125,9 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   adds `pins[]` to `u8x8_t`, so the existing `u8g2gl_u8g2_csrc` target (built without `ARDUINO`)
   had a different struct layout from the runtime's view of it and crashed. WO1 added
   `u8g2gl_u8g2_csrc_arduino`. Relevant to PR-06's pixel tests.
+- **Spec debt (WO2):** new diagnostic `U8G2GL_GEOMETRY_BINDING_ALIAS`, not yet in §15. A custom
+  `<bind>` may still alias an inherited **non-geometry** setter (`name="bind_foo"
+  setter="bind_text"`) when the type matches — intended, and harmless.
 - **PR-05:** a custom element may `extends="u8g2gl_box"` (a drawing element) and is accepted; it
   then emits a method call on a class with no such member (probe `d/`). PR-4R's "time above
   INT32_MAX goes negative" is reachable only through the custom-`<bind>` path WO2 closes.
@@ -147,3 +150,12 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   version 3 and `"clip": 0` only. Carried to WO4: `u8g2gl_state_saver.h` still says clip lifetime
   belongs to `render_object`. Other findings are under "For the Chief Architect". WO2 dispatched on
   `u8g2gl-4r2/wo2-bind-type-paths`.
+- **2026-10-05** — **WO2 complete, `c90228a` + `5ea99c6`.** First pass verified (CLI 1298); the
+  worker surfaced that composite `<api>` `<bind>`s skip the §5 manifest loop; PA reproduced it
+  through the built CLI (validates clean, emits `ui_obj_w.bind_x(&ui_subject_t)`) and amended the
+  WO (`2138f7a`); same agent resumed. PA verified the tip: CLI **1301**, `tsc`, lint clean; C++
+  untouched; goldens unchanged. Built CLI: probe `d/` and the composite case each refused with the
+  alias and type errors at the `<bind>`; `int` variants the alias error alone; the committed
+  fixture validates clean. One rule, `checkBindDeclarations()` in `validate-schema.ts`, reached
+  from the widget and composite loops. Pin tests for the attribute and composite-prop paths pass
+  at base and tip: **the carried finding as worded was stale**. WO3 dispatched.
