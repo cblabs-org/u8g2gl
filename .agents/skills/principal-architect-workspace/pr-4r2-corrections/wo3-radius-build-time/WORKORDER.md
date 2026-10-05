@@ -5,7 +5,7 @@ title: "A radius known at build time is checked at build time, however it arrive
 branch: u8g2gl-4r2/wo3-radius-build-time
 base: u8g2gl-4r2/wo2-bind-type-paths
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO3 — the radius bound, reported instead of silently clamped
@@ -169,20 +169,47 @@ Out-of-scope findings go in the Completion Report. Do not fix, do not file.
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Baseline and final counts
+- Baseline at base `0ebec18`, each suite alone: C++ 391 tests, 1 skip (`SizeOfReport.ThirtyTwoBitTarget`), zero warnings; CLI 1301.
+- Final: C++ 395 (391 + the 4 new `RadiusHonoured.*`), 1 skip, zero warnings from a clean configure; CLI 1319 (1301 + 18 new), `npm run lint` (eslint + `tsc -p tsconfig.test.json`) clean, `tsc` clean.
 
 ### Changes Made
+- `test/test_radius_honoured.cpp` + `test/CMakeLists.txt` line (commit `84dcbd5`): the measurement. 18 sizes (the 14 of `test_rbox_bound.cpp` plus 20x6, 6x20, 4x4, 5x5) x radius 0..min/2+2.
+- `cli/src/core/validator/configured-radius.ts` (new): `configuredRadius()`, the one precedence function (attribute > inline `style_radius` > last named style in scope declaring `radius` > none). Header names `styleLines()` / INIT_STEPS as the order it mirrors and `styleScope()` / `styleProperties()` as what it reads.
+- `validate-widget-props.ts`: `styleScope()` and `StyleScope` exported, nothing else.
+- `validate-geometry.ts`: `checkCornerRadius()` now runs for any element whose effective manifest declares `radius` (draw= or setter=), using `configuredRadius()`; `WalkRules` gained `styles` (templates: globals only; screen elements: globals + the screen's own). Message shape and code unchanged; a style source is named as `(from style_radius)` / `(from style 'round')`; the diagnostic is located at the radius attribute, the `style_radius` attribute, or the `style` attribute / `<style>` child.
+- `cli/test/validator/radius-build-time.test.ts` (18 tests). The box's existing tests are untouched and pass.
+- Help text on `radius` in `u8g2gl_box.xml` and `u8g2gl_obj.xml`; `cli/src/data/manifests.json` regenerated (diff: those two strings only); `globals.ts` `StyleDecl.radius` doc comment gives the bound. `u8g2gl_draw.h` already stated the bound; unchanged. No golden, scene or editor registry carries the help string; none moved.
+
+### Measurement (prediction confirmed for both classes)
+The outer radius reaches U8G2 unchanged exactly when `2r <= min(w, h)`, and is `min(w,h)/2` beyond it: button border layer 0, button focused fill, switch track. Pinned in `test_radius_honoured.cpp`. Observed but not asserted: a button's border layer i requests `r - i`, clamped to its own smaller box (10x10 r=5, 2 layers: layer 1 draws 4); the switch handle requests `outer - 1`, clamped to the handle's box (10x10 r=1..7: handle 0,1,2,2,2,2,2; 20x6 r=1..5: 0,1,2,2,2). A scratch sweep found no case where the handle differed from "outer - 1 clamped to the handle box". Switch with no radius draws `h/2` (30x14 -> 7).
+
+### End to end (built CLI, `validate`, probes in `tmp/probe/`, all 20x6 radius 10)
+- switch `style="round"`: error 3:66 "has radius=10 (from style 'round'), too large for its height=6 ... Use radius <= 3."
+- button `style_radius="10"`: error 3:98 "has radius=10 (from style_radius) ... height=6 ... Use radius <= 3."
+- button `radius="10"`: error 3:92 "has radius=10 ... Use radius <= 3."
+- label `radius="10"`: error 3:91, same shape (ruling 2's accepted consequence).
+- box `radius="10"`: error 3:64, existing message ("or U8G2 draws outside the box").
+- box `style="round"`: refused by the existing "a style, but it compiles to a draw call with no object" rule (not this check).
+Each: 1 error, exit non-zero.
 
 ### Decisions Made
+- Style sources (inline and named) take part only when the manifest's `radius` prop has a `setter`; a `draw=` radius takes the attribute alone, mirroring `styleOverridesOf` and the fact that styles apply through `apply_style` on objects. This leaves the box's behaviour exactly as before.
+- Message tail differs by prop kind: `draw=` keeps "U8G2 draws outside the box (u8g2_box.c)"; a `setter=` radius says "the runtime silently clamps it (u8g2gl_coord_corner_radius())", since the first claim is false for objects. Head, code, bound arithmetic and the "Use radius <=" suffix are unchanged.
+- A `$`-reference style name in a template is treated as an unknown winner (no value, so skipped), because it may name any style.
+- Instance-naming test uses `width="$w" height="$h"` in the template: a template whose sizes are literal is the template's defect and is reported once, unnamed, by the existing Step 2 dedupe (same as the box).
 
 ### Dead Ends & Warnings
+- `rm -rf` on a glob in `tmp/probe` was blocked by the safety check; it was unnecessary and not retried.
+- zsh needs `--gtest_filter='Tmp*'` quoted; the scratch inner-layer sweep was removed from the committed test file.
 
 ### Out-of-Scope Findings
+- A label (or any object inheriting `radius` from `u8g2gl_obj`) with a too-large radius is now an error although it draws no rounded shape: ruling 2's accepted consequence, noted only so it is not a surprise.
+- `include/u8g2gl/u8g2gl_draw.h`'s `u8g2gl_draw_box` text says an over-bound radius is "clamped down to that bound, not refused"; true of the runtime, now only half the story for the validator. Not changed (comment owned by the runtime).
 
 ### Blockers
 (none)

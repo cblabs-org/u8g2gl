@@ -37,8 +37,10 @@
  *                 inside the container — a pixel as 1×1, a line or triangle by
  *                 its points, a circle or ellipse by the segments it draws. The
  *                 box is the resolver's `drawnExtent()`, the one derivation.
- *              3c. A rounded box's radius fits its own size: `2*r` within its
- *                 literal width and height. Measured against the pinned U8G2
+ *              3c. A radius fits its element's own size: `2*r` within its
+ *                 literal width and height, whether it is written as an attribute,
+ *                 an inline `style_radius` or a named style (§10), and whether the
+ *                 element is a drawing element or an object. Measured against the pinned U8G2
  *                 (PR-4R WO3): past it `u8g2_box.c`'s band `w - r - r` wraps and
  *                 U8G2 draws outside the box; up to it, including the capsule
  *                 `2*r == min`, nothing is drawn outside. The runtime clamps to
@@ -103,6 +105,8 @@ import {
 } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
+import { configuredRadius } from './configured-radius.js';
+import { styleScope, type StyleScope } from './validate-widget-props.js';
 
 function createGeomDiagnostic(
   code: string,
@@ -681,22 +685,41 @@ function checkDrawnAxis(
 // here. This check exists so a literal the author can fix is reported to them
 // rather than silently clamped.
 //
-// Only where the radius reaches a draw call with the size — a manifest whose
-// `radius`, `width` and `height` are all `draw=` props (the box, read from the
-// manifest, never by name) — because that is where the three meet in one U8G2
-// call. A radius of 0 selects the plain box, so it constrains nothing.
+// Any element whose effective manifest declares `radius` — as a `draw=` prop (the
+// box) or a `setter=` prop (every object) — read from the manifest, never by
+// name ([D-17]). The radius is the one the element is configured with at init,
+// from whichever source wins (configuredRadius(): attribute, inline
+// `style_radius`, named style), so a radius a style supplies is judged exactly
+// as one written on the element. A radius of 0 or none constrains nothing; a
+// width or height that is bound or unresolved is skipped, which is what the
+// runtime clamp is for. An object does not draw a rounded shape with the
+// author's radius alone — a label inherits `radius` and draws none — so a
+// literal past the bound is refused there too, one rule for every element.
 //   element — the resolved element
 //   context — resolution context, for the manifest
+//   styles  — the named styles in scope for this element
 //   emit    — receives each diagnostic
-function checkCornerRadius(element: ResolvedElement, context: ResolverContext, emit: ElementDiagnosticSink): void {
+function checkCornerRadius(
+  element: ResolvedElement,
+  context: ResolverContext,
+  styles: StyleScope,
+  emit: ElementDiagnosticSink,
+): void {
   const { node, geometry } = element;
   const props = context.manifests.get(node.tag)?.api.props ?? [];
-  const drawn = (name: string): boolean => props.some((prop) => prop.name === name && prop.draw !== undefined);
-  const radius = element.extras.find((extra) => extra.attribute === 'radius')?.coordinate;
-  if (!drawn('radius') || !drawn('width') || !drawn('height') || radius === undefined || radius.value <= 0) {
+  const configured = configuredRadius(element, props, styles);
+  const value = configured?.value;
+  if (configured === undefined || value === undefined || value <= 0) {
     return;
   }
-  const needed = 2 * radius.value;
+  const drawn = props.some((prop) => prop.name === 'radius' && prop.draw !== undefined);
+  const needed = 2 * value;
+  const from =
+    configured.source.kind === 'inline'
+      ? ' (from style_radius)'
+      : configured.source.kind === 'style'
+        ? ` (from style '${configured.source.name}')`
+        : '';
   for (const size of [geometry.width, geometry.height]) {
     if (size === undefined || size.value >= needed) {
       continue; // Bound, unresolved, or large enough.
@@ -705,11 +728,14 @@ function checkCornerRadius(element: ResolvedElement, context: ResolverContext, e
       node,
       createGeomDiagnostic(
         DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
-        `${describeNode(node)} has radius=${radius.value}, too large for its ${size.provenance.attribute}=` +
-          `${size.value}: a rounded box needs 2*radius = ${needed} <= ${size.provenance.attribute}, or U8G2 ` +
-          `draws outside the box (u8g2_box.c). Use radius <= ${Math.max(0, Math.floor(size.value / 2))}.`,
-        radius.provenance.loc ?? node.loc,
-        sourceText(radius),
+        `${describeNode(node)} has radius=${value}${from}, too large for its ${size.provenance.attribute}=` +
+          `${size.value}: a rounded box needs 2*radius = ${needed} <= ${size.provenance.attribute}, or ` +
+          (drawn
+            ? 'U8G2 draws outside the box (u8g2_box.c)'
+            : 'the runtime silently clamps it (u8g2gl_coord_corner_radius())') +
+          `. Use radius <= ${Math.max(0, Math.floor(size.value / 2))}.`,
+        configured.loc ?? node.loc,
+        configured.text,
       ),
     );
   }
@@ -798,6 +824,8 @@ interface WalkRules {
   readonly judges: (element: ResolvedElement, axis: GeometryAxis) => boolean;
   /** Whether the element was copied from a composite's `<view>`. */
   readonly templateSourced: (element: ResolvedElement) => boolean;
+  /** The named styles in scope for an element (§10): a template sees the globals only. */
+  readonly styles: (element: ResolvedElement) => StyleScope;
 }
 
 // checkElements
@@ -836,7 +864,7 @@ function checkElements(
       }
     }
     checkExtras(element, context, rules.templateSourced(element), emit);
-    checkCornerRadius(element, context, emit);
+    checkCornerRadius(element, context, rules.styles(element), emit);
     checkProperties(element, context, rules.templateSourced(element), emit);
     checkElements(element.children, rules, context, emit);
   }
@@ -1012,6 +1040,7 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
   // inside it — is reported here, once, whether the composite is used never or
   // many times. So is every axis that no instance can change (settledInTemplate);
   // the rest wait for Step 3.
+  const globalStyles = styleScope(input.globals, undefined);
   const templateReported = new Set<string>();
   const reportTemplate = (diagnostic: Diagnostic): void => {
     templateReported.add(diagnosticKey(diagnostic));
@@ -1032,6 +1061,7 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
       {
         judges: (element, axis) => settled.get(element.node)?.has(axis.name) ?? false,
         templateSourced: () => true,
+        styles: () => globalStyles,
       },
       context,
       (_node, diagnostic) => reportTemplate(diagnostic),
@@ -1067,6 +1097,7 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
     report(node, diagnostic);
   }
   for (const resolved of pipeline.resolution.screens) {
+    const screenStyles = styleScope(input.globals, resolved.screen);
     checkElements(
       resolved.elements,
       {
@@ -1077,6 +1108,10 @@ export function validateGeometry(input: ValidateInput): readonly Diagnostic[] {
         templateSourced: (element) => {
           const source = sourceOf(element);
           return source !== undefined && settled.has(source);
+        },
+        styles: (element) => {
+          const source = sourceOf(element);
+          return source !== undefined && settled.has(source) ? globalStyles : screenStyles;
         },
       },
       context,
