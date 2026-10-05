@@ -5,7 +5,7 @@ title: "A custom manifest's <bind> is checked against the setter it targets"
 branch: u8g2gl-4r2/wo2-bind-type-paths
 base: u8g2gl-4r2/wo1-bound-child-clip
 complexity: standard
-status: complete
+status: dispatched
 ---
 
 # WO2 — §13.2's matching types, on the path that skips them
@@ -157,6 +157,28 @@ this WORKORDER.
 
 Out-of-scope findings go in the Completion Report. Do not fix, do not file. Known and already
 carried, do not re-report: a class extending a drawing element (`extends="u8g2gl_box"`) is accepted.
+
+## PA amendment, 2026-10-05: composites too
+
+Verified at `c90228a` by the PA: CLI 1298, `tsc`, lint clean; probe `d/` refused with both
+diagnostics at the `<bind>`. **Accepted:** reporting both rules on the `time` alias; the
+prop/subject pairs (`int`, `bool`, `string`; `time` matches no prop); and the extension of rule 1
+to a drawing manifest's `<bind>` targeting `x`, `y`, `width` or `height` under another name.
+
+**Gap you surfaced, reproduced by the PA through the built CLI:** a composite
+`<widget name="wd_t"><api><bind name="bind_when" type="time" setter="bind_x"/></api><view>…`
+instanced as `<wd_t … bind_when="t"/>` validates with 0 errors and generates
+`ui_obj_w.bind_x(&ui_subject_t);`. Same defect, same item. **In scope now:**
+
+- [ ] Apply `checkBindDeclarations()` to `manifests.declaredComposites` as well, against the
+      registry's effective base (`u8g2gl_obj` for every composite), so the rule is stated once and
+      reached from both loops. No second copy of the rule.
+- [ ] Failing-first tests: the composite `time`/`bind_when` alias (both diagnostics), its `int`
+      variant (alias only), and an accepted composite `<bind>` with a new setter name.
+- [ ] Built CLI on the composite case; paste the diagnostics into the Completion Report.
+- [ ] Update the Completion Report (add an "Amendment" subsection; keep the original), commit.
+
+Boundary Box unchanged. Status stays `complete` when done.
 
 ---
 ## Completion Report
