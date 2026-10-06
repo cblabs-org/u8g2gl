@@ -29,7 +29,7 @@ const PROJECT_XML = `<u8g2gl schema="0.4" name="bind_paths" version="1.0.0">
 `;
 
 const GLOBALS_XML =
-  `<globals>\n    <subjects><time name="t" value="0" /><int name="n" value="0" /></subjects>\n` +
+  `<globals>\n    <subjects><time name="t" value="0" /><int name="n" value="0" /><string name="s" max_len="8" /></subjects>\n` +
   `    <fonts><builtin name="${FONT}" /></fonts>\n</globals>\n`;
 
 /** Every diagnostic `validate` gives for a screen holding `body` and the manifests given. */
@@ -110,7 +110,7 @@ describe("a custom manifest's <bind> is checked against the setter it targets (ย
   it('refuses a time bind that re-targets bind_x under another name: both faults are reported at the <bind>', () => {
     const wd = custom('wd_d', 'u8g2gl_obj', '<bind name="bind_when" type="time" setter="bind_x" />');
     const found = errors(run(instance('wd_d', ' bind_when="t"'), [wd]));
-    const alias = withCode(found, DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS);
+    const alias = withCode(found, DIAGNOSTIC_CODES.BINDING_ALIAS);
     const mismatch = withCode(found, DIAGNOSTIC_CODES.TYPE_MISMATCH);
     // Two faults, two fixes: the name (so origin and clamping apply) and the type.
     expect(alias.map((d) => [d.file, d.line])).toEqual([['widgets/wd_d/wd_d.xml', 3]]);
@@ -123,7 +123,7 @@ describe("a custom manifest's <bind> is checked against the setter it targets (ย
     const wd = custom('wd_d', 'u8g2gl_obj', '<bind name="bind_when" type="int" setter="bind_x" />');
     const found = errors(run(instance('wd_d', ' bind_when="n"'), [wd]));
     expect(found.map((d) => [d.code, d.file, d.line])).toEqual([
-      [DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS, 'widgets/wd_d/wd_d.xml', 3],
+      [DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_d/wd_d.xml', 3],
     ]);
     expect(found[0]?.message).toContain('bind_x');
   });
@@ -181,7 +181,7 @@ describe("a composite's <bind> is checked by the same rule", () => {
     const found = errors(run(instance(' bind_when="t"'), [composite('<bind name="bind_when" type="time" setter="bind_x" />')]));
     expect(found.map((d) => [d.code, d.file, d.line]).sort()).toEqual(
       [
-        [DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
+        [DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
         [DIAGNOSTIC_CODES.TYPE_MISMATCH, 'widgets/wd_t/wd_t.xml', 3],
       ].sort(),
     );
@@ -190,12 +190,74 @@ describe("a composite's <bind> is checked by the same rule", () => {
   it('refuses the int variant by the alias rule alone', () => {
     const found = errors(run(instance(' bind_when="n"'), [composite('<bind name="bind_when" type="int" setter="bind_x" />')]));
     expect(found.map((d) => [d.code, d.file, d.line])).toEqual([
-      [DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
+      [DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_t/wd_t.xml', 3],
     ]);
   });
 
   it('accepts a bind whose setter is a new method', () => {
     const found = errors(run(instance(' bind_when="t"'), [composite('<bind name="bind_when" type="time" setter="bind_when" />')]));
     expect(found).toEqual([]);
+  });
+});
+
+describe('a <bind> that re-declares an inherited setter keeps the inherited name (ยง13.1)', () => {
+  // `<bind>` is on line 3 of every manifest here (widget, api, bind).
+  const custom = (name: string, extendsTag: string, bind: string): WidgetManifest =>
+    parseWidgetManifestFile(
+      `<widget name="${name}" extends="${extendsTag}">\n    <api>\n        ${bind}\n    </api>\n</widget>`,
+      `widgets/${name}/${name}.xml`,
+    ).value!;
+  const composite = (bind: string): WidgetManifest =>
+    parseWidgetManifestFile(
+      `<widget name="wd_c">\n    <api>\n        ${bind}\n    </api>\n    <view />\n</widget>`,
+      'widgets/wd_c/wd_c.xml',
+    ).value!;
+  const drawing = (bind: string, prop: string): WidgetManifest =>
+    parseWidgetManifestFile(
+      `<widget name="wd_draw">\n    <api>\n        ${bind}\n        ${prop}\n    </api>\n</widget>`,
+      'widgets/wd_draw/wd_draw.xml',
+    ).value!;
+  const instance = (name: string, attrs = ''): string => `        <${name} name="w" x="0" y="0" width="10" height="6"${attrs} />`;
+  const summary = (found: readonly Diagnostic[]): unknown[] => found.map((d) => [d.code, d.file, d.line]);
+
+  it('refuses a drawing element whose bind reaches its own geometry prop under another name', () => {
+    const wd = drawing('<bind name="bind_when" type="int" setter="x" />', '<prop name="x" type="int" draw="u8g2gl_draw_box" />');
+    const found = errorsIn(run(instance('wd_draw'), [wd]), 'widgets/wd_draw/wd_draw.xml');
+    expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_draw/wd_draw.xml', 3]]);
+    expect(found[0]?.message).toContain('bind_x');
+  });
+
+  it('refuses a label subclass that binds the inherited bind_text under another name', () => {
+    const wd = custom('wd_l', 'u8g2gl_label', '<bind name="bind_foo" type="string" setter="bind_text" />');
+    const found = errors(run(instance('wd_l', ` font="${FONT}" bind_foo="s"`), [wd]));
+    expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_l/wd_l.xml', 3]]);
+    expect(found[0]?.message).toContain('bind_text');
+  });
+
+  it('refuses the same bind on a composite', () => {
+    // A composite's base is u8g2gl_obj, which binds bind_text.
+    const found = errors(run(instance('wd_c', ' bind_foo="s"'), [composite('<bind name="bind_foo" type="string" setter="bind_text" />')]));
+    expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_c/wd_c.xml', 3]]);
+  });
+
+  it('refuses an int bind on bind_text by the alias rule alone', () => {
+    const wd = custom('wd_l', 'u8g2gl_label', '<bind name="bind_foo" type="int" setter="bind_text" />');
+    const found = errors(run(instance('wd_l', ` font="${FONT}" bind_foo="n"`), [wd]));
+    expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_l/wd_l.xml', 3]]);
+  });
+
+  it('accepts a label subclass that re-declares bind_text under its own name', () => {
+    const wd = custom('wd_l', 'u8g2gl_label', '<bind name="bind_text" type="string" setter="bind_text" />');
+    expect(errors(run(instance('wd_l', ` font="${FONT}" text="hi"`), [wd]))).toEqual([]);
+  });
+
+  it('accepts a new method on a label subclass', () => {
+    const wd = custom('wd_l', 'u8g2gl_label', '<bind name="bind_foo" type="string" setter="bind_foo" />');
+    expect(errors(run(instance('wd_l', ` font="${FONT}" bind_foo="s"`), [wd]))).toEqual([]);
+  });
+
+  it('accepts a drawing element binding a non-geometry prop of its own under a new name', () => {
+    const wd = drawing('<bind name="bind_foo" type="bool" setter="filled" />', '<prop name="filled" type="bool" draw="u8g2gl_draw_box" />');
+    expect(errorsIn(run(instance('wd_draw'), [wd]), 'widgets/wd_draw/wd_draw.xml')).toEqual([]);
   });
 });

@@ -360,8 +360,9 @@ const SUBJECT_TYPE_OF_PROP: Readonly<Partial<Record<PropType, SubjectType>>> = {
 
 // checkBindDeclarations
 // Checks each `<bind>` a widget manifest declares against the setter it targets
-// (§13.2: a subject must match the type its target accepts, and [D-20]: the four
-// geometry bindings keep their names so origin and clamping apply). Pass 5
+// (§13.1, §13.2: a subject must match the type its target accepts; a setter the
+// `extends` chain already binds keeps its inherited name, and a drawing manifest's
+// own geometry prop keeps its [D-20] name). Pass 5
 // checks a subject against the *declared* `<bind>`; this checks the declaration
 // itself, which is the only path a mistyped subject could otherwise take.
 //   manifest  — a widget manifest as declared
@@ -390,11 +391,10 @@ function checkBindDeclarations(
     // --- Step 2: A binding the inherited chain already has fixes the name and types ---
     // The binding is one already declared under this setter.
     const sharing = inherited.filter((candidate) => candidate.setter === bind.setter);
-    const geometryAlias = sharing.find(
-      (candidate) => geometryBindingNamed(candidate.name) !== undefined && candidate.name !== bind.name,
-    );
-    if (geometryAlias !== undefined) {
-      diagnostics.push(geometryAliasDiagnostic(manifest, bind, geometryAlias.name));
+    if (sharing.length > 0 && !sharing.some((candidate) => candidate.name === bind.name)) {
+      diagnostics.push(
+        bindingAliasDiagnostic(manifest, bind, Array.from(new Set(sharing.map((candidate) => candidate.name)))),
+      );
     }
     if (sharing.length > 0) {
       const accepted = Array.from(new Set(sharing.map((candidate) => candidate.type)));
@@ -423,7 +423,7 @@ function checkBindDeclarations(
     if (prop.name === 'x' || prop.name === 'y' || prop.name === 'width' || prop.name === 'height') {
       const geometry = geometryBindingFor(prop.name);
       if (geometry.binding !== bind.name) {
-        diagnostics.push(geometryAliasDiagnostic(manifest, bind, geometry.binding));
+        diagnostics.push(bindingAliasDiagnostic(manifest, bind, [geometry.binding]));
       }
     }
     const subjectType = SUBJECT_TYPE_OF_PROP[prop.type];
@@ -444,20 +444,33 @@ function checkBindDeclarations(
   return diagnostics;
 }
 
-// geometryAliasDiagnostic
-// The diagnostic for a `<bind>` that reaches a geometry setter under another name.
+// bindingAliasDiagnostic
+// The one diagnostic for a `<bind>` that reaches a setter under another name (§13.1).
+// A geometry setter gets [D-20]'s consequence, since origin, clamp and anchor are
+// keyed by name; any other gets [UD-5]'s, since the editor would show a name the
+// runtime does not use.
 //   manifest — the declaring manifest
 //   bind     — the offending `<bind>`
-//   expected — the geometry binding name to write instead
-function geometryAliasDiagnostic(manifest: WidgetManifest, bind: BindDef, expected: string): Diagnostic {
+//   expected — the inherited binding name(s) to write instead
+function bindingAliasDiagnostic(
+  manifest: WidgetManifest,
+  bind: BindDef,
+  expected: readonly string[],
+): Diagnostic {
+  const geometry = expected.some((name) => geometryBindingNamed(name) !== undefined);
+  const names = expected.map((name) => `name="${name}"`).join(' or ');
+  const consequence = geometry
+    ? `geometry bindings keep their names so origin and clamping apply, and under another name the ` +
+      `generated call does not compile (§8.4, [D-20])`
+    : `the editor's property panel and diagnostics would show '${bind.name}', a name the runtime ` +
+      `does not use ([UD-5])`;
   return createDiagnostic(
-    DIAGNOSTIC_CODES.GEOMETRY_BINDING_ALIAS,
+    DIAGNOSTIC_CODES.BINDING_ALIAS,
     `Widget '${manifest.name}' declares <bind name="${bind.name}" setter="${bind.setter}">, which ` +
-      `reaches a geometry setter under another name. Write name="${expected}": geometry bindings ` +
-      `keep their names so origin and clamping apply (§8.4, [D-20]).`,
+      `reaches a setter that is bound under another name. Write ${names}: ${consequence} (§13.1).`,
     bind.loc,
     bind.name,
-    [expected],
+    expected,
   );
 }
 

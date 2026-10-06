@@ -1382,9 +1382,20 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 **This resolves a real ambiguity.** The shipped manifests currently spell both as `setter=` — `u8g2gl_box.xml` uses `setter="drawBox"`, naming a U8G2 method, while `u8g2gl_label.xml` uses `setter="set_text"`, naming a runtime method. The same attribute meant two different things.
 
-**A `<bind>` may not reach a setter under another name.** `<bind name="bind_when" setter="bind_x" />` is refused, and so is a `type` the inherited setter — or, on a drawing manifest, the target prop — does not accept. Both are checked on the widget and composite manifests alike, because a manifest is data ([D-17]) and unvalidated data is a crash with extra steps.
+**A `<bind>` that re-declares a setter already bound in its `extends` chain must
+use the inherited binding's name.** `<bind name="bind_when" setter="bind_x" />`
+is refused, and so is a `type` the inherited setter — or, on a drawing manifest,
+the target prop — does not accept. A manifest declaring a binding for its own
+prop or its own method names it freely; the rule bites only on an inherited
+setter rebound under a different name. Both are checked on widget and composite
+manifests alike, because a manifest is data ([D-17]) and unvalidated data is a
+crash with extra steps.
 
-The geometry case is why this is a rule rather than a style preference. [D-20]'s bindable geometry resolves its origin, its clamp and its anchor by the binding's **name**, so a geometry setter reached under a different name silently receives none of them and the generated call does not compile. The alias diagnostic is `U8G2GL_GEOMETRY_BINDING_ALIAS` (PR-4R2); the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
+The geometry case is why this is a rule rather than a style preference. [D-20]'s
+bindable geometry resolves its origin, its clamp and its anchor by the binding's
+**name**, so a geometry setter reached under a different name silently receives
+none of them and the generated call does not compile. The diagnostic is
+`U8G2GL_BINDING_ALIAS`; the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
 
 *Why the code names appear here and not in a list.* §15.3 makes diagnostic codes a stable contract, and the CLI's `DIAGNOSTIC_CODES` is where they are defined. A catalogue of them in this document would be a second copy that drifts, which is the argument this programme applies everywhere else. A code is named beside the rule that raises it, as `U8G2GL_UNKNOWN_FONT` is in §15.3.
 

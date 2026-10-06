@@ -5,7 +5,7 @@ title: "A <bind> that re-declares an inherited setter keeps the inherited name"
 branch: u8g2gl-4r3/wo3-binding-alias
 base: u8g2gl-4r3/wo2-extends-class
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO3 — §13.1: one name per inherited setter, one code for the rule
@@ -167,30 +167,46 @@ the attribute.
 
 ## Completion Report (append below on completion)
 
-```markdown
 ---
 ## Completion Report
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Baseline and final counts
 | Suite | Baseline | Final |
 |---|---|---|
+| C++ ctest | 401, one skip, 0 warnings | unchanged (no C++ touched) |
+| CLI vitest | 1331 | 1338 (+7 new) |
+| tsc / lint | clean | clean (`npm run lint`, `npm run build`) |
 
 ### Changes Made
-- `path` — what and why
+- `cli/src/core/schema/diagnostic.ts` — `GEOMETRY_BINDING_ALIAS` renamed `BINDING_ALIAS` (`U8G2GL_BINDING_ALIAS`); doc comment covers the inherited-setter and drawing-geometry-prop cases.
+- `cli/src/core/validator/validate-schema.ts` — Step 2 refuses any `<bind>` whose setter is bound in the inherited chain when none of those bindings has its name; Step 3 keeps the geometry refusal. `geometryAliasDiagnostic` replaced by one `bindingAliasDiagnostic`; comment block updated.
+- `cli/test/validator/bind-type-paths.test.ts` — references renamed; a `<string name="s">` subject added to the shared globals; 7 new tests.
+- `docs/design_spec.md` §13.1 — the two paragraphs replaced with R2's text verbatim (diff in the commit).
 
 ### Decisions Made
-- message wording for the geometry and non-geometry cases; how one check replaced two
+- One check, one function: Step 2's geometry-only `find` became "no inherited binding shares the name"; the message branches on whether an expected name is a geometry binding (`geometryBindingNamed`): [D-20] consequence, else [UD-5] consequence. Step 3 calls the same function with `geometryBindingFor(...)`.
+- Wording: `reaches a setter that is bound under another name. Write name="X": <consequence> (§13.1).` Neutral so it also fits Step 3's own-prop case.
+- The composite refused test uses `bind_text` (u8g2gl_obj binds it); a `bind_x` composite already failed at base.
 
 ### Evidence
-- pin test; failing-first runs; built-CLI output for the three projects; §13.1 diff
+- Pin test (drawing element, `bind_when` -> `x`) passed at base under the old code and at the tip under the new code.
+- Failing at base: label subclass `bind_foo`->`bind_text`, composite `bind_foo`->`bind_text`, int variant (3 failed, 17 passed). The four accepted cases pass at base and tip.
+- Built CLI (`tmp/wo3/{a,b,c}`):
+  - a (`wd_l` extends label, `bind_foo`->`bind_text`): exit 1, `widgets/wd_l/wd_l.xml:3:1 ... Write name="bind_text": the editor's property panel and diagnostics would show 'bind_foo', a name the runtime does not use ([UD-5]) (§13.1).`, 1 error.
+  - b (`extends="u8g2gl_obj"`, `bind_when`->`bind_x`): exit 1, `... Write name="bind_x": geometry bindings keep their names so origin and clamping apply, and under another name the generated call does not compile (§8.4, [D-20]) (§13.1).`, 1 error.
+  - c (drawing element, `bind_foo` -> own bool prop `filled`): exit 0, 0 errors.
+- `git grep GEOMETRY_BINDING_ALIAS -- . ':!.agents'` is empty. The whole CLI suite (framework manifests and fixtures) passes, so nothing relied on the alias.
+- Goldens untouched; no version bump.
 
 ### Dead Ends & Warnings
+- First draft of the label tests failed on fixture noise (missing subject, `font`/`text`), not on the rule; fixed in the fixtures.
 
 ### Out-of-Scope Findings
+- The geometry message ends "(§8.4, [D-20]) (§13.1)", two adjacent parentheticals; cosmetic.
+- Step 3's message says "bound under another name" for an own-prop case with no inherited binding; accurate enough, wording is yours to rule on.
 
 ### Blockers
 (none)
-```
