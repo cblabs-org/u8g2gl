@@ -147,3 +147,41 @@ pushed commit, so it is serial after both.
     Older dated workspace records showing `--init` without `--checkout` are left as history.
   - **For the owner:** `library.json` names the author "Matthew McNeill" with an email address.
     The source headers say "Matt McNeill (CB Labs)". Which should the published manifest carry?
+- **2026-10-06 — foundation WO-B1 Part 1 and WO-B2 Part 1 verified.**
+  - **Pixels:** the migrated `DiagnosticsBoard` renders **byte-identical to legacy** in all four
+    scenarios, defects included. The PA reproduced this from a clean archive. The gate's
+    criterion 1 is met in the host harness; the device check is WO-B5.
+  - **Criterion 2 is not obviously met:** 138 authored code lines against 99. The detail is in the
+    twin PROJECT and its EVIDENCE §2.
+  - **Legacy defects the baseline records**, bug for bug:
+    - an off-by-one clip, so descenders are cut;
+    - a "·" separator that never draws;
+    - a long SSID cut mid-glyph.
+
+## Findings for the Chief Architect — U8G2GL runtime and CLI (reported, not fixed here)
+
+Measured by foundation WO-B2 in the host harness (real U8G2 2.36.18) and confirmed in source by the
+PA where cited.
+
+1. **The runtime never establishes `setFontPosTop()`, but every text widget assumes it.**
+   - `u8g2gl_label.cpp:334` and `u8g2gl_clock.cpp:221` assume it; design_spec §Appendix A
+     (`:2216`) calls it "the framework default"; nothing in `src/` sets it.
+   - Measured: the `connected` frame drawn by a plain `begin()` + `ui_handler()` user lights
+     **15 pixels instead of 1392**.
+   - Foundation is unaffected only because its legacy module sets it. **Severity: high** for any
+     other consumer, and the first thing a new user would hit.
+2. **The state saver restores a null font**, and U8G2 dereferences it. That is a segfault on the
+   first frame when no font was current before a widget drew (`u8g2gl_state_saver.h:80-83`).
+3. **The state saver does not restore the font mode.** Its header says U8G2 has no getter, but
+   `u8g2->font_decode.is_transparent` is readable. A label left the legacy module's
+   transparent mode as solid for every later board. Foundation's host board restores it.
+4. **A screen file not named `screen_*.xml` is silently ignored.** `validate` and `generate` both
+   exit 0 and report "0 screens". design_spec §19 states the naming but nothing enforces or
+   reports it.
+5. **The generated config's PlatformIO guidance, `build_flags = -include
+   generated/u8g2gl_generated_config.h`, is likely unworkable in a multi-library project.** It is
+   a relative path. It reaches C units, where `static_assert` is not a keyword before C23. And it
+   reaches libraries that cannot resolve `u8g2gl/`. Without it the runtime's binding pool keeps
+   its default size.
+   - *To be measured* in foundation WO-B2 Part 2, which scopes the include to the runtime's
+     sources with a build middleware.
