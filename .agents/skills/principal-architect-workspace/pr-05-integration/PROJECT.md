@@ -97,7 +97,7 @@ Stacked `u8g2gl-integration/wo<N>-<topic>`, serial.
 
 - **[x] [wo1-packaging](wo1-packaging/WORKORDER.md):** `library.json`, version agreement at
   configure time, submodules `update = none`, the incidental version literal. **Complete and
-  verified by the PA.** Pushed. **Pin: `69c37e01f75198a4aa3fa84b8926fcf139e30f02`** (code). The tip
+  verified by the PA.** Pushed. **Pin: `0fe144f5da57b4e81283668b7453f6d635c44b85`**. Re-pinned from `69c37e0` after the owner asked that their email not be published. Only `library.json` differs, and the runtime is identical. The tip
   `47618b5` adds only the report.
 
 ### Foundation (ledger of record: the twin `PROJECT.md`)
@@ -145,7 +145,10 @@ pushed commit, so it is serial after both.
     `CONFIG_AUTOSTART_ARDUINO=y`, which are dual-framework settings. Confirm foundation sets them.
   - **Fixed by the PA:** the stale `CONTEXT_BRIDGE.md` note on the version pin (worker finding).
     Older dated workspace records showing `--init` without `--checkout` are left as history.
-  - **For the owner:** `library.json` names the author "Matthew McNeill" with an email address.
+  - **For the owner:** `library.json` names the author "Matthew McNeill". The email was removed
+    in `0fe144f` at the owner's request (2026-10-06). It survives in this branch's history
+    (`1dee2db`, `69c37e0`, private repository); removing it needs a force-push, which is the
+    owner's call.
     The source headers say "Matt McNeill (CB Labs)". Which should the published manifest carry?
 - **2026-10-06 — foundation WO-B1 Part 1 and WO-B2 Part 1 verified.**
   - **Pixels:** the migrated `DiagnosticsBoard` renders **byte-identical to legacy** in all four
