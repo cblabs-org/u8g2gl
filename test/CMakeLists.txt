@@ -347,6 +347,19 @@ gtest_discover_tests(test_version)
 #   schema_0_4     — literal (0, 4), today's schema; must compile
 #   mismatch       — schema major + 1; must be refused
 #   stale_minor    — literal (0, 3) against 0.4: the pre-1.0 minor rule (§16)
+#
+# The runtime requirement is a floor, not an equality (§16), so it has its own
+# cases, written as expressions from the runtime's own macros so a version bump
+# needs no edit here:
+#
+#   runtime_floor_match   — floor equal to this runtime; must compile
+#   runtime_newer_minor   — floor one minor below; must compile (a floor, not equality)
+#   runtime_older         — floor one minor above; must be refused, naming both
+#   runtime_major         — floor major + 1; must be refused
+#
+# And one case for the runtime the check most exists to catch, one that predates
+# U8G2GL_REQUIRE_RUNTIME_VERSION. It compiles the committed generated config
+# against a frozen copy of the 0.6.0 header, so what is tested is emitted text.
 
 foreach(_guard_case match schema_0_4 mismatch stale_minor)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
@@ -380,6 +393,71 @@ add_test(NAME VersionGuard.StaleSchemaMinorFailsToCompile
 set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
     PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.4"
 )
+foreach(_guard_case runtime_floor_match runtime_newer_minor runtime_older runtime_major)
+    add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
+        version_guard/${_guard_case}.cpp
+    )
+    target_include_directories(version_guard_${_guard_case} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+    )
+    target_compile_options(version_guard_${_guard_case} PRIVATE
+        -Wall -Wextra -Wpedantic
+    )
+endforeach()
+
+# Two builds of one translation unit that includes the committed generated
+# config; only the directory supplying u8g2gl/u8g2gl_version.h differs.
+set(_guard_generated_dir ${PROJECT_SOURCE_DIR}/test/generated_fixture/generated)
+add_executable(version_guard_pre_macro EXCLUDE_FROM_ALL
+    version_guard/pre_macro/include_generated_config.cpp
+)
+target_include_directories(version_guard_pre_macro PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/version_guard/pre_macro
+    ${_guard_generated_dir}
+)
+add_executable(version_guard_generated_config EXCLUDE_FROM_ALL
+    version_guard/pre_macro/include_generated_config.cpp
+)
+target_include_directories(version_guard_generated_config PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${_guard_generated_dir}
+)
+foreach(_guard_case pre_macro generated_config)
+    target_compile_options(version_guard_${_guard_case} PRIVATE -Wall -Wextra -Wpedantic)
+endforeach()
+
+add_test(NAME VersionGuard.RuntimeFloorMatchCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_floor_match
+)
+add_test(NAME VersionGuard.NewerRuntimeMinorCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_newer_minor
+)
+add_test(NAME VersionGuard.OlderRuntimeFailsToCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_older
+)
+set_tests_properties(VersionGuard.OlderRuntimeFailsToCompile PROPERTIES
+    # The floor is an expression (minor + 1), which the message spells as
+    # written; the runtime's own version is exact, from this project's version.
+    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime major [^,]+, minor [^,]+ or later, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
+)
+add_test(NAME VersionGuard.MismatchedRuntimeMajorFailsToCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_major
+)
+set_tests_properties(VersionGuard.MismatchedRuntimeMajorFailsToCompile PROPERTIES
+    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime major [^,]+, minor [^,]+ or later, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
+)
+add_test(NAME VersionGuard.GeneratedConfigCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_generated_config
+)
+add_test(NAME VersionGuard.PreMacroRuntimeFailsByName
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_pre_macro
+)
+set_tests_properties(VersionGuard.PreMacroRuntimeFailsByName PROPERTIES
+    # The #error text the emitted guard carries; it must name the floor the
+    # generated code needs, which is this runtime's major.minor.
+    PASS_REGULAR_EXPRESSION "requires u8g2gl runtime ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR} or newer"
+)
+
 # --- Real U8G2 acceptance target (WO4c) ---
 # Every other target compiles the runtime against test/stubs/U8g2lib.h, and a
 # stub can offer an API real U8G2 lacks: getFont() did, and nothing noticed. This
@@ -748,6 +826,12 @@ set_tests_properties(
     VersionGuard.SchemaZeroFourCompiles
     VersionGuard.MismatchedSchemaMajorFailsToCompile
     VersionGuard.StaleSchemaMinorFailsToCompile
+    VersionGuard.RuntimeFloorMatchCompiles
+    VersionGuard.NewerRuntimeMinorCompiles
+    VersionGuard.OlderRuntimeFailsToCompile
+    VersionGuard.MismatchedRuntimeMajorFailsToCompile
+    VersionGuard.GeneratedConfigCompiles
+    VersionGuard.PreMacroRuntimeFailsByName
     RealU8g2.RuntimeCompilesAgainstRealHeaders
     PROPERTIES RESOURCE_LOCK u8g2gl_build_tree
 )

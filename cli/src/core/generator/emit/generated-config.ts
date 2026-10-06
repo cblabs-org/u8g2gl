@@ -11,12 +11,15 @@
  *          over the document being compiled, so exceeding a capacity stops being
  *          a screen that boots and silently fails to update one widget.
  *
- *          It also carries §16's version guard, so a stale `generated/`
+ *          It also carries §16's two version guards, so a stale `generated/`
  *          directory fails as one named compile error rather than as a missing
- *          symbol or, worse, not at all.
- * Description: Emits the four [D-21] capacities and
- *              `U8G2GL_REQUIRE_SCHEMA_VERSION`. The figures come from WO8b's
- *              `Capacities` — this module does not count anything, because a
+ *          symbol or, worse, not at all: the schema, which must match, and the
+ *          runtime, which must be at least the one this CLI was built beside.
+ * Description: Emits the four [D-21] capacities,
+ *              `U8G2GL_REQUIRE_SCHEMA_VERSION`, and
+ *              `U8G2GL_REQUIRE_RUNTIME_VERSION` behind an `#ifndef` that names
+ *              the floor for a runtime too old to define it. The figures come from the
+ *              `Capacities` counted in `src/core/realise/capacities.ts` — this module does not count anything, because a
  *              second count is the defect WO8c spent a whole work order
  *              removing.
  *
@@ -43,6 +46,7 @@
  * - emitGeneratedConfigHeader(): Emit `u8g2gl_generated_config.h`
  */
 
+import { RUNTIME_VERSION } from '../../../data/runtime-version.js';
 import { declarationError, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 
 /** §13.7's generated capacity header ([D-21]). */
@@ -96,6 +100,11 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     };
   }
   const [, major, minor] = version;
+
+  // The runtime floor: the version of the runtime this CLI was built beside,
+  // stamped from the header (src/data/runtime-version.ts). Not an option, and
+  // not the CLI's own version, which is independent of the runtime's (§16).
+  const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}`;
 
   // --- Step 2: The four [D-21] capacities, as counted by WO8b ---
   // `busiestScreen` and `busiestObject` are mangled names (§13.4) — what the
@@ -174,6 +183,17 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     '// minor is compared too while the major is 0, because before 1.0 breaking',
     '// changes land in minor bumps (§15.4).',
     `U8G2GL_REQUIRE_SCHEMA_VERSION(${major}, ${minor});`,
+    '',
+    '// Refuses to compile against a runtime older than the one this generator was',
+    '// built beside (§16). A floor, not an equality: a newer runtime minor is fine.',
+    '// A runtime that predates the check does not define the macro, and would',
+    '// report a syntax error instead of a refusal, so say what is needed here.',
+    '// The call sits in the #else, so a runtime without the macro reports only this #error.',
+    '#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION',
+    `#error "This code requires u8g2gl runtime ${floor} or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."`,
+    '#else',
+    `U8G2GL_REQUIRE_RUNTIME_VERSION(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor});`,
+    '#endif',
     '',
     section('Static capacities, counted from this document ([D-21])'),
     '// Every value is exact, so add_binding() cannot fail in generated code: the',

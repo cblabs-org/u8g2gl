@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compileProjectAssets } from '../../src/core/assets/index.js';
 import { generate } from '../../src/core/generator/index.js';
+import { RUNTIME_VERSION } from '../../src/data/runtime-version.js';
 import { loadProject } from '../../src/node/load-project.js';
 
 /**
@@ -142,6 +143,37 @@ describe('what the golden fixture is there to pin', () => {
     expect(config).toContain('#define U8G2GL_MAX_BINDINGS_PER_OBJ 1');
     expect(config).toContain('#define U8G2GL_MAX_TOTAL_BINDINGS 6');
     expect(config).toContain('#define U8G2GL_MAX_STYLES 2');
+  });
+
+  describe('the §16 runtime floor', () => {
+    const config = content('u8g2gl_generated_config.h');
+    const call = `U8G2GL_REQUIRE_RUNTIME_VERSION(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor});`;
+    const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}`;
+
+    it('emits the stamped floor, which is the runtime version and not the CLI version', () => {
+      expect(config).toContain(call);
+      expect(config).toContain(`This code requires u8g2gl runtime ${floor} or newer`);
+    });
+
+    it('puts the macro call in the #else of an #ifndef whose #error names the floor and the remedy', () => {
+      const guard = config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION');
+      const error = config.indexOf('#error', guard);
+      const otherwise = config.indexOf('#else', error);
+      const endif = config.indexOf('#endif', otherwise);
+      expect(guard).toBeGreaterThan(-1);
+      expect(error).toBeGreaterThan(guard);
+      expect(otherwise).toBeGreaterThan(error);
+      expect(endif).toBeGreaterThan(otherwise);
+      expect(config.indexOf(call)).toBeGreaterThan(otherwise);
+      expect(config.indexOf(call)).toBeLessThan(endif);
+      expect(config.slice(error, otherwise)).toContain('Update the u8g2gl runtime library');
+    });
+
+    it('leaves the schema guard unchanged and ahead of the runtime guard', () => {
+      const schema = config.indexOf('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);');
+      expect(schema).toBeGreaterThan(-1);
+      expect(schema).toBeLessThan(config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION'));
+    });
   });
 
   it('includes the generated capacities before any runtime header ([D-21], §13.7)', () => {

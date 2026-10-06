@@ -1,5 +1,5 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-10-05T22:30:00Z — was: 2026-09-28T14:55:00Z -->
+<!-- Last updated: 2026-10-06T12:30:00Z — was: 2026-10-05T22:30:00Z -->
 
 ## Active Programs
 | Program | Plan | Status |
@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-4r3-corrections | **Submitted** — 4/4 WOs, PR from `u8g2gl-4r3/wo4-readability`. C++ 401 / CLI 1338, CLI 0.11.0, runtime 0.7.0 (every regenerated project needs runtime ≥ 0.7). CA bridge written. Owner approved 2026-10-06. Worktree `../U8G2GL-4r3` | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-4r3-corrections/PROJECT.md) |
 | pr-4r2-corrections | **Submitted** — 4/4 WOs, PR from `u8g2gl-4r2/wo4-readability`. C++ 395 / CLI 1319, CLI 0.10.0, runtime 0.6.0. CA bridge written. Owner approved decomposition + rulings 2026-10-05. Worktree `../U8G2GL-4r2` | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-4r2-corrections/PROJECT.md) |
 | pr-04b-font-image-pipeline | **Submitted** — 7/7 WOs, PR from `u8g2gl-fonts/wo6-readability`. C++ 383 / CLI 1281, CLI 0.9.0. CA bridge: 9 items | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
 

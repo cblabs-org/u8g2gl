@@ -128,6 +128,14 @@ export const DIAGNOSTIC_CODES = {
    */
   DRAWING_ELEMENT_EXTENDS: 'U8G2GL_DRAWING_ELEMENT_EXTENDS',
   /**
+   * A manifest's `extends` names a drawing element ([D-18], §6.2, §6.5). The
+   * converse of `DRAWING_ELEMENT_EXTENDS`: that code is a drawing element
+   * declaring `extends`; this one is a class (or composite) extending one.
+   * A drawing element is served by free functions and has no class, so the
+   * generated code would call methods on a type with no such members.
+   */
+  EXTENDS_DRAWING_ELEMENT: 'U8G2GL_EXTENDS_DRAWING_ELEMENT',
+  /**
    * A manifest declares both `setter=` props and `draw=` props ([D-18],
    * §13.1). An element has one emission target: methods on its class, or a
    * free draw function with no class. The message names one prop of each kind.
@@ -135,14 +143,17 @@ export const DIAGNOSTIC_CODES = {
    */
   MIXED_EMISSION_TARGETS: 'U8G2GL_MIXED_EMISSION_TARGETS',
   /**
-   * A manifest's `<bind>` targets the setter of one of [D-20]'s four geometry
-   * bindings (`bind_x`, `bind_y`, `bind_width`, `bind_height`) under a different
-   * name. Origin, clamping and the bound-container rule are keyed by the
-   * binding's **name** (§8.4), so an alias would reach the setter without them
-   * and generate a call that does not compile. The message names the binding to
-   * write instead.
+   * A manifest's `<bind>` re-declares a setter already bound in its `extends`
+   * chain under a different name (§13.1). For one of [D-20]'s four geometry
+   * bindings (`bind_x`, `bind_y`, `bind_width`, `bind_height`) the alias is
+   * fatal: origin, clamping and the bound-container rule are keyed by the
+   * binding's **name** (§8.4), so the call would not compile. For any other
+   * setter the editor's property panel ([UD-5]) and diagnostics would show a name
+   * the runtime does not use. A drawing manifest's `<bind>` on one of its own
+   * geometry props is refused for the same [D-20] reason. The message names the
+   * binding to write instead.
    */
-  GEOMETRY_BINDING_ALIAS: 'U8G2GL_GEOMETRY_BINDING_ALIAS',
+  BINDING_ALIAS: 'U8G2GL_BINDING_ALIAS',
   /**
    * A `<bind_flag_if_*>` directive names a flag the element cannot carry — today
    * `flag="disabled"` on a drawing element (§8.4, [D-18]). The flag set is fixed

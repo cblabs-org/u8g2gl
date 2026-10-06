@@ -16,14 +16,14 @@ consumed together.
 Generated code records the schema version and generator version that produced it
 (design_spec §13.2), and asserts **two** floors at compile time (§16):
 
-| Requirement | Floor |
-|---|---|
-| `U8G2GL_REQUIRE_SCHEMA_VERSION` | The schema the generator wrote for |
-| `U8G2GL_REQUIRE_RUNTIME_VERSION` | The runtime version the generator was **built beside** |
+| Requirement | Floor | Comparison |
+|---|---|---|
+| `U8G2GL_REQUIRE_SCHEMA_VERSION` | The schema the generator wrote for | Equality: major, and minor while the major is 0 |
+| `U8G2GL_REQUIRE_RUNTIME_VERSION` | The runtime version the generator was **built beside** | Floor: major equal, runtime minor ≥ the floor's |
 
-Both compare the major version, and **also the minor while the major is 0**,
-because before 1.0 breaking changes land in minor bumps. Checking only the major
-would let a 0.3 project compile against a 0.4 runtime without any error.
+The schema requirement is an **equality** — the major, and the minor while the
+major is 0. The runtime requirement is a **floor**, compared on the minor at
+every version, because API accretes and a newer runtime is fine.
 
 **The runtime floor is not the generator's own version.** These two numbers are
 independent by design and have already diverged (CLI 0.10.0, runtime 0.6.0), so

@@ -805,6 +805,13 @@ generator could not emit its setters and the editor could not display them.
 Naming such a class in `extends` is a validation error. To extend one, give it a
 manifest — an `<api>` with no new props is enough.
 
+**`extends` must name an element that has a manifest *and a class*.** A drawing
+element (§6.2) has no class — it is served by free functions ([D-18]) — so
+extending one is refused: the generated code would call methods on a type with
+no such members. An element that wants box-like drawing has two routes, and
+neither of them extends the box. Declare a drawing element of its own (`draw=`
+props, no `extends`), or extend `u8g2gl_obj` and draw from your own class.
+
 ### 6.6 Naming
 
 Framework element tags carry the `u8g2gl_` prefix ([D-12]). User element tags
@@ -1375,9 +1382,20 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 **This resolves a real ambiguity.** The shipped manifests currently spell both as `setter=` — `u8g2gl_box.xml` uses `setter="drawBox"`, naming a U8G2 method, while `u8g2gl_label.xml` uses `setter="set_text"`, naming a runtime method. The same attribute meant two different things.
 
-**A `<bind>` may not reach a setter under another name.** `<bind name="bind_when" setter="bind_x" />` is refused, and so is a `type` the inherited setter — or, on a drawing manifest, the target prop — does not accept. Both are checked on the widget and composite manifests alike, because a manifest is data ([D-17]) and unvalidated data is a crash with extra steps.
+**A `<bind>` that re-declares a setter already bound in its `extends` chain must
+use the inherited binding's name.** `<bind name="bind_when" setter="bind_x" />`
+is refused, and so is a `type` the inherited setter — or, on a drawing manifest,
+the target prop — does not accept. A manifest declaring a binding for its own
+prop or its own method names it freely; the rule bites only on an inherited
+setter rebound under a different name. Both are checked on widget and composite
+manifests alike, because a manifest is data ([D-17]) and unvalidated data is a
+crash with extra steps.
 
-The geometry case is why this is a rule rather than a style preference. [D-20]'s bindable geometry resolves its origin, its clamp and its anchor by the binding's **name**, so a geometry setter reached under a different name silently receives none of them and the generated call does not compile. The alias diagnostic is `U8G2GL_GEOMETRY_BINDING_ALIAS` (PR-4R2); the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
+The geometry case is why this is a rule rather than a style preference. [D-20]'s
+bindable geometry resolves its origin, its clamp and its anchor by the binding's
+**name**, so a geometry setter reached under a different name silently receives
+none of them and the generated call does not compile. The diagnostic is
+`U8G2GL_BINDING_ALIAS`; the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
 
 *Why the code names appear here and not in a list.* §15.3 makes diagnostic codes a stable contract, and the CLI's `DIAGNOSTIC_CODES` is where they are defined. A catalogue of them in this document would be a second copy that drifts, which is the argument this programme applies everywhere else. A code is named beside the rule that raises it, as `U8G2GL_UNKNOWN_FONT` is in §15.3.
 
@@ -1897,12 +1915,37 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 | **Arduino IDE** | Run the CLI manually; commit `generated/`. Documented as the supported flow. |
 | **CI** | `u8g2gl validate` plus a check that `generated/` is current (regenerate, fail on diff) |
 
-The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements, and both are compared on the major version **and on the minor while the major is 0**. Before 1.0 breaking changes land in minor bumps (§15.4), so checking only the major would let a project generated for 0.3 compile against a 0.4 runtime without any error.
+The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements.
 
 | Requirement | Emitted as | Guards against |
 |---|---|---|
 | **Schema** | `U8G2GL_REQUIRE_SCHEMA_VERSION(major, minor)` | A runtime that implements a different XML vocabulary |
 | **Runtime** | `U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)` | Generated code that calls runtime API the linked runtime does not have |
+
+The two requirements compare differently, because they ask different questions.
+
+The **schema** question is "does this runtime implement the vocabulary this code
+was written for?", which only equality answers: the major, and the minor while
+the major is 0, because before 1.0 breaking vocabulary changes land in minor
+bumps (§15.4). A 0.3 project must not compile against a 0.4 runtime.
+
+The **runtime** question is "does this runtime have the API this code calls?".
+API accretes, so this is a **floor**: the major must be equal and the runtime's
+minor must be at least the floor's, at every version. Applying the schema's
+shape here would ignore the minor from 1.0 onward, and a post-1.0 minor is
+exactly where new API arrives — code generated against 1.2 would compile
+against a 1.0 runtime lacking everything 1.1 and 1.2 added.
+
+*Accepted residual.* Before 1.0 a runtime minor may break rather than add, so a
+newer runtime can satisfy the floor and still fail to compile. That degrades to
+an ordinary compile error, which is visible, and it is much the rarer
+direction: the case this guard exists for is the user who upgrades the CLI and
+forgets the library.
+
+**A runtime older than the macro cannot answer the question at all.** The
+generated guard is therefore preceded by an `#ifndef` that names the required
+floor, so that runtime — the one the check most exists to catch — reports a
+refusal rather than a syntax error.
 
 **The runtime floor is the runtime version the generator was built beside, not the generator's own version.** The CLI and the runtime are numbered independently and have already diverged — CLI 0.10.0 against runtime 0.6.0 — so a floor taken from the generator's own number would demand a runtime that does not exist. They do, however, ship from one repository at one commit, so the CLI stamps the runtime version it was built alongside (read from `u8g2gl_version.h`, the way `CMakeLists.txt` already reads it) and emits that as the floor. A newer runtime is fine; an older one is not.
 

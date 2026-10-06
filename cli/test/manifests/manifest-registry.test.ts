@@ -230,6 +230,64 @@ describe('buildManifestRegistry', () => {
     });
   });
 
+  // §6.5: a drawing element has no class, so a class cannot extend one ([D-18]).
+  describe('extending a drawing element', () => {
+    const drawProp = (name: string): PropDef => ({ name, type: 'int', draw: 'u8g2gl_draw_box' });
+    const drawing = (name: string, extra: { extends?: string } = {}): WidgetManifest =>
+      widget(name, { ...extra, props: [drawProp('x'), drawProp('y')] });
+    const codeOf = (registry: ReturnType<typeof registryOf>) =>
+      registry.diagnostics.map((d) => d.code);
+
+    it('refuses a class extending a framework drawing element, naming both routes', () => {
+      const registry = frameworkRegistry([widget('wd_b', { extends: 'u8g2gl_box' })]);
+
+      const diag = registry.diagnostics.find(
+        (d) => d.code === DIAGNOSTIC_CODES.EXTENDS_DRAWING_ELEMENT,
+      );
+      expect(registry.diagnostics).toHaveLength(1);
+      expect(diag?.severity).toBe('error');
+      expect(diag?.file).toBe('widgets/wd_b/wd_b.xml');
+      expect(diag?.offendingText).toBe('u8g2gl_box');
+      expect(diag?.message).toContain("<wd_b> extends drawing element 'u8g2gl_box'");
+      expect(diag?.message).toContain('no class');
+      expect(diag?.message).toContain('§6.5');
+      expect(diag?.message).toContain('draw=');
+      expect(diag?.message).toContain('extends="u8g2gl_obj"');
+      // The child still inherits the parent's props, so an instance's own
+      // attributes are not also reported unknown.
+      expect(registry.get('wd_b')?.api.props.map((p) => p.name)).toContain('width');
+    });
+
+    it('refuses a class extending a project drawing element', () => {
+      const registry = registryOf([drawing('wd_frame'), widget('wd_b', { extends: 'wd_frame' })]);
+      expect(codeOf(registry)).toEqual([DIAGNOSTIC_CODES.EXTENDS_DRAWING_ELEMENT]);
+    });
+
+    it('refuses a composite extending a drawing element', () => {
+      const composite: WidgetManifest = {
+        name: 'wd_panel',
+        extends: 'u8g2gl_box',
+        api: { props: [], bindings: [], elements: [] },
+        view: { children: [] },
+        loc: { file: 'widgets/wd_panel/wd_panel.xml', line: 2, column: 1 },
+      };
+      expect(codeOf(frameworkRegistry([composite]))).toEqual([
+        DIAGNOSTIC_CODES.EXTENDS_DRAWING_ELEMENT,
+      ]);
+    });
+
+    it('accepts extending u8g2gl_obj, a framework class, or declaring a drawing element', () => {
+      expect(codeOf(frameworkRegistry([widget('wd_a', { extends: 'u8g2gl_obj' })]))).toEqual([]);
+      expect(codeOf(frameworkRegistry([widget('wd_l', { extends: 'u8g2gl_label' })]))).toEqual([]);
+      expect(codeOf(frameworkRegistry([drawing('wd_own')]))).toEqual([]);
+    });
+
+    it('leaves a drawing element that declares extends to the schema pass', () => {
+      const registry = frameworkRegistry([drawing('wd_bad', { extends: 'u8g2gl_box' })]);
+      expect(codeOf(registry)).toEqual([]);
+    });
+  });
+
   describe('framework manifests', () => {
     it('resolves the bundled framework manifests with no diagnostics', () => {
       // u8g2gl_obj.xml declares no `extends` — it is the root class manifest —
