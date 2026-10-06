@@ -21,11 +21,13 @@
  *              constructs one screen's objects into a fixed arena, heap-free on
  *              the runtime's side, then configures them in the order the scene's
  *              `init` gives — the firmware init's own order: rectangle and
- *              properties, styles and overrides, bindings and flag directives. `render()` walks the draw order: objects
- *              through u8g2gl_render_object(), draw calls through draw-by-name
- *              after their guard, inside u8g2gl_clip_scope where the scene says. Every refusal is recorded in `error()` rather
- *              than skipped, so an element the registry cannot build fails the
- *              test instead of silently vanishing from both sides.
+ *              properties, styles and overrides, bindings and flag directives.
+ *              `render()` walks the draw order: objects through
+ *              u8g2gl_render_object(), draw calls through draw-by-name after
+ *              their guard, inside u8g2gl_clip_scope where the scene says.
+ *              Every refusal is recorded in `error()` rather than skipped, so
+ *              an element the registry cannot build fails the test instead of
+ *              silently vanishing from both sides.
  *
  *              Test-only: standard containers hold the host's own bookkeeping.
  *              Objects themselves live in the host's own aligned arena and are

@@ -132,6 +132,7 @@ void ui_screen_bounds_render(U8G2& display) {
     // and saves and restores draw state, so nothing paints outside its
     // container and a hidden container hides its children (§11.3). A draw
     // call has no object, so its visibility is the build-time guard (§13.5).
+    // A bound draw call inside a container is drawn inside that container's clip, as an object would be (§13.5).
     u8g2gl_render_object(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 0);  // ui_obj_track
     if (!ui_obj_track.is_hidden()) {
         u8g2gl_clip_scope clip(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 0);  // ui_obj_track's effective clip (§13.5)

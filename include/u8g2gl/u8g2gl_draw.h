@@ -61,7 +61,9 @@
  *              | (u8g2gl_draw_box)                       | radius(): clamped to    |
  *              |                                         | 2r <= min(w, h); one    |
  *              |                                         | that clamps to 0 draws  |
- *              |                                         | square                  |
+ *              |                                         | square; a literal over- |
+ *              |                                         | bound radius is refused |
+ *              |                                         | at build time (§10)     |
  *
  *              A bound value comes one step earlier: generated code clamps each
  *              bound integer argument through u8g2gl_coord_bound() — origin plus
@@ -115,7 +117,8 @@ enum u8g2gl_draw_segment_t : uint8_t {
 
 /**
  * @brief Draw a box (filled or outline rectangle), optionally with rounded
- * corners, its radius clamped to the box.
+ * corners, its radius clamped to the box (a literal over-bound radius is
+ * refused at build time, §10).
  *
  * Matches `include/u8g2gl/manifests/u8g2gl_box.xml`: `filled` selects between
  * U8G2's `drawBox`/`drawFrame`, and a radius still `> 0` after clamping selects
@@ -128,9 +131,11 @@ enum u8g2gl_draw_segment_t : uint8_t {
  * @param height  Height in pixels. `<= 0` draws nothing.
  * @param filled  Whether the box is filled or an outline frame.
  * @param radius  Corner radius in pixels. `<= 0` draws square corners. A radius
- *                past `2r <= min(width, height)` is clamped down to that bound,
- *                not refused, and one that clamps to 0 (a 1-pixel side) draws
- *                square corners; see u8g2gl_coord_corner_radius().
+ *                past `2r <= min(width, height)` is refused at build time when
+ *                it and the size are literal (U8G2GL_OUT_OF_BOUNDS, §10); one
+ *                that reaches here by another route is clamped down to that
+ *                bound, not refused, and one that clamps to 0 (a 1-pixel side)
+ *                draws square corners; see u8g2gl_coord_corner_radius().
  */
 void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
                       int16_t height, bool filled = true, int16_t radius = 0);

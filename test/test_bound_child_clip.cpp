@@ -20,9 +20,10 @@
  *          for such a child (cli/src/core/generator/emit/screen.ts; the CLI's
  *          emission tests pin that spelling), so they fail if the clip scope is
  *          removed from either side: without it, the bound-position box sets 30
- *          pixels outside the container and the bound-size box 56, measured. The object cases are the control:
- *          a class-backed element with the same rectangle, rendered through
- *          u8g2gl_render_object(), must set no pixel outside either.
+ *          pixels outside the container and the bound-size box 56, measured.
+ *          The object cases are the control: a class-backed element with the
+ *          same rectangle, rendered through u8g2gl_render_object(), must set no
+ *          pixel outside either.
  *
  * Description: Compiles the runtime against real U8G2's headers and links real
  *              U8G2's C sources (extern/u8g2, tag 2.36.18) — never the host

@@ -5,7 +5,7 @@ title: "Readability remediation over PR-4R2"
 branch: u8g2gl-4r2/wo4-readability
 base: u8g2gl-4r2/wo3-radius-build-time
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO4 — readability remediation
@@ -102,16 +102,27 @@ Out-of-scope findings go in the Completion Report. Do not fix, do not file.
 
 ---
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
+- P2-1 `u8g2gl_state_saver.h`: clip bullet now names `u8g2gl_clip_scope`; checked against `u8g2gl_render_object()` (saver line 139, clip scope line 140, so the clip resets first).
+- P2-2 `u8g2gl_draw.h`: table row, `@brief` and `@param radius` now agree (literal over-bound radius refused at build time, §10; otherwise clamped).
+- P3-1 `screen.ts` "Three rules". P3-2 `validate-schema.ts` three `// --- Step N: ... ---` comments, detail beneath.
+- P3-3 `screen.ts`: one emitted render comment line; goldens regenerated (4 files: `cli/test/generator/fixtures/emit-project/expected/ui_screen_home.cpp`, `test/generated_fixture/generated/ui_screen_{bounds,gauges,home}.cpp`). Diff is that line only, once per file (4 insertions, 0 deletions). Moved for this comment only; ships in the unreleased CLI 0.10.0, no further generator bump (§13.9).
+- Radius message: `checkCornerRadius()` uses the `setter=` wording for every element; the `drawn` branch and variable removed; the measured U8G2 behaviour stays in the function comment. No test assertion pinned the old box wording, so none changed (grep for `u8g2_box`, `outside the box`, `draws outside` in `cli/test` found nothing).
+- P4-1 two no-op `.replace()` deleted. P4-2 re-wrapped `editor_host.h`, `test_bound_child_clip.cpp`, `validate-geometry.ts` header paragraph. P4-3 skipped as instructed.
 
 ### Decisions Made
+- Re-wrapped the validate-geometry.ts paragraph through its end so the block stays at one width.
+- Added three comment lines to checkCornerRadius's header giving the reason the bound exists.
 
 ### Out-of-Scope Findings
+(none)
 
 ### Blockers
 (none)
+
+### Verification
+Baseline and final: CLI vitest 1319 passed; `tsc` and eslint clean. C++ clean configure in `tmp/cleanbuild`: zero warnings, ctest 395 passed, 1 skipped (SizeOfReport.ThirtyTwoBitTarget). Suites run alone.

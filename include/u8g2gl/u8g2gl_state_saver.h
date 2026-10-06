@@ -18,9 +18,11 @@
  *          construct one themselves.
  *
  *          It can only restore what U8G2 lets it read. What it does NOT save:
- *          - The clip window. U8G2 has no clip getter. Clip lifetime belongs to
- *            u8g2gl_render_object(), which sets the clip, renders, and resets
- *            it to the full display.
+ *          - The clip window. U8G2 has no clip getter, so nothing can save and
+ *            restore it. Clip lifetime belongs to u8g2gl_clip_scope
+ *            (u8g2gl_core.h), which u8g2gl_render_object() declares after this
+ *            saver so the clip resets to the full display before colour and
+ *            font are restored.
  *          - Font mode and bitmap mode. U8G2's C++ API exposes setFontMode() and
  *            setBitmapMode() but no getter for either, and neither does the test
  *            stub, so a value cannot be captured to restore. A widget that draws

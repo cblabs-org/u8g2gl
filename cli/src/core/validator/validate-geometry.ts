@@ -40,11 +40,12 @@
  *              3c. A radius fits its element's own size: `2*r` within its
  *                 literal width and height, whether it is written as an attribute,
  *                 an inline `style_radius` or a named style (§10), and whether the
- *                 element is a drawing element or an object. Measured against the pinned U8G2
- *                 (PR-4R WO3): past it `u8g2_box.c`'s band `w - r - r` wraps and
- *                 U8G2 draws outside the box; up to it, including the capsule
- *                 `2*r == min`, nothing is drawn outside. The runtime clamps to
- *                 the same bound at draw time (`u8g2gl_coord_corner_radius()`).
+ *                 element is a drawing element or an object. Measured against
+ *                 the pinned U8G2 (PR-4R WO3): past it `u8g2_box.c`'s band
+ *                 `w - r - r` wraps and U8G2 draws outside the box; up to it,
+ *                 including the capsule `2*r == min`, nothing is drawn outside.
+ *                 The runtime clamps to the same bound at draw time
+ *                 (`u8g2gl_coord_corner_radius()`).
  *              4. Every **non-coordinate `int` property** resolved too (§13.2,
  *                 PR-04 WO9): `scroll_px_per_sec="#speed"` used never to be
  *                 evaluated at all and reached emission as text (WO8a finding
@@ -695,6 +696,9 @@ function checkDrawnAxis(
 // runtime clamp is for. An object does not draw a rounded shape with the
 // author's radius alone — a label inherits `radius` and draws none — so a
 // literal past the bound is refused there too, one rule for every element.
+// The message names the runtime clamp for every element: u8g2gl_draw_box clamps
+// through u8g2gl_coord_corner_radius() like every other path. U8G2 itself draws
+// outside the box past the bound, which is why the bound exists.
 //   element — the resolved element
 //   context — resolution context, for the manifest
 //   styles  — the named styles in scope for this element
@@ -712,7 +716,6 @@ function checkCornerRadius(
   if (configured === undefined || value === undefined || value <= 0) {
     return;
   }
-  const drawn = props.some((prop) => prop.name === 'radius' && prop.draw !== undefined);
   const needed = 2 * value;
   const from =
     configured.source.kind === 'inline'
@@ -730,9 +733,7 @@ function checkCornerRadius(
         DIAGNOSTIC_CODES.OUT_OF_BOUNDS,
         `${describeNode(node)} has radius=${value}${from}, too large for its ${size.provenance.attribute}=` +
           `${size.value}: a rounded box needs 2*radius = ${needed} <= ${size.provenance.attribute}, or ` +
-          (drawn
-            ? 'U8G2 draws outside the box (u8g2_box.c)'
-            : 'the runtime silently clamps it (u8g2gl_coord_corner_radius())') +
+          'the runtime silently clamps it (u8g2gl_coord_corner_radius())' +
           `. Use radius <= ${Math.max(0, Math.floor(size.value / 2))}.`,
         configured.loc ?? node.loc,
         configured.text,

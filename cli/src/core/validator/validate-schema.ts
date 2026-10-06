@@ -376,19 +376,19 @@ function checkBindDeclarations(
     return diagnostics;
   }
 
-  // Step 1: Gather what the targets are. A class manifest's `setter=` is a method
-  //         its `extends` chain may already bind; a drawing manifest's is one of
-  //         its own props ([Q-9]).
-  //         A composite declares no `extends`; the registry supplies `u8g2gl_obj`
-  //         as its base (§13.12), so the base is read from the effective chain.
+  // --- Step 1: Gather what the targets are ---
+  // A class manifest's `setter=` is a method its `extends` chain may already
+  // bind; a drawing manifest's is one of its own props ([Q-9]).
+  // A composite declares no `extends`; the registry supplies `u8g2gl_obj`
+  // as its base (§13.12), so the base is read from the effective chain.
   const baseTag = manifest.extends ?? registry.get(manifest.name)?.chain[1];
   const inherited: readonly BindDef[] =
     baseTag !== undefined ? (registry.get(baseTag)?.api.bindings ?? []) : [];
   const drawingProps: readonly PropDef[] = isDrawingElement(manifest) ? (manifest.api?.props ?? []) : [];
 
   for (const bind of bindings) {
-    // Step 2: A binding the inherited chain already has under this setter fixes
-    //         the name and the types the setter accepts.
+    // --- Step 2: A binding the inherited chain already has fixes the name and types ---
+    // The binding is one already declared under this setter.
     const sharing = inherited.filter((candidate) => candidate.setter === bind.setter);
     const geometryAlias = sharing.find(
       (candidate) => geometryBindingNamed(candidate.name) !== undefined && candidate.name !== bind.name,
@@ -415,7 +415,7 @@ function checkBindDeclarations(
       continue;
     }
 
-    // Step 3: Otherwise a drawing manifest's `setter=` names one of its props.
+    // --- Step 3: Otherwise a drawing manifest's setter= names one of its props ---
     const prop = drawingProps.find((candidate) => candidate.name === bind.setter);
     if (prop === undefined) {
       continue; // A new method on the author's own class: the C++ compiler checks it.

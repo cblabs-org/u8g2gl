@@ -46,7 +46,7 @@ function run(body: string, manifests: readonly WidgetManifest[] = []): readonly 
 /** A manifest at widgets/<name>/<name>.xml whose `<api>` holds `api`; the first `<bind>` or `<prop>` is on line 2. */
 function manifest(name: string, attrs: string, api: string): WidgetManifest {
   const parsed = parseWidgetManifestFile(
-    [`<widget name="${name}"${attrs}>`, `    ${api}`, '</widget>'].join('\n').replace('<widget', '<widget').replace('<api>', '<api>'),
+    [`<widget name="${name}"${attrs}>`, `    ${api}`, '</widget>'].join('\n'),
     `widgets/${name}/${name}.xml`,
   );
   expect(parsed.diagnostics).toEqual([]);

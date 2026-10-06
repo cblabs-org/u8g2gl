@@ -20,7 +20,7 @@
  *          answers as data, so a change to a decision belongs in
  *          `screen-model.ts`, where both targets see it — never here alone.
  *
- *          Two rules are load-bearing and easy to break by "simplifying":
+ *          Three rules are load-bearing and easy to break by "simplifying":
  *          - **Every object renders through `u8g2gl_render_object()`**, never
  *            `obj.render(d)`. The wrapper is what checks effective visibility
  *            (a hidden container hides its children), sets the ancestor-
@@ -647,6 +647,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     '    // and saves and restores draw state, so nothing paints outside its',
     '    // container and a hidden container hides its children (§11.3). A draw',
     '    // call has no object, so its visibility is the build-time guard (§13.5).',
+    "    // A bound draw call inside a container is drawn inside that container's clip, as an object would be (§13.5).",
     ...(renderSteps.length === 0 ? ['    (void)display;'] : renderBody(renderSteps)),
     '}',
     '',
