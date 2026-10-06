@@ -385,7 +385,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
               parentTag,
             ),
           );
-          // M keeps the parent's props deliberately: dropping them would add an
+          // The result keeps the parent's props deliberately: dropping them would add an
           // "unknown attribute" error for every instance attribute on top of
           // this one, burying the cause under its consequences.
         }

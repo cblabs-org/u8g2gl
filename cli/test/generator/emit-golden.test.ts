@@ -155,15 +155,18 @@ describe('what the golden fixture is there to pin', () => {
       expect(config).toContain(`This code requires u8g2gl runtime ${floor} or newer`);
     });
 
-    it('precedes the macro call with an #ifndef whose #error names the floor and the remedy', () => {
+    it('puts the macro call in the #else of an #ifndef whose #error names the floor and the remedy', () => {
       const guard = config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION');
       const error = config.indexOf('#error', guard);
-      const endif = config.indexOf('#endif', error);
+      const otherwise = config.indexOf('#else', error);
+      const endif = config.indexOf('#endif', otherwise);
       expect(guard).toBeGreaterThan(-1);
       expect(error).toBeGreaterThan(guard);
-      expect(endif).toBeGreaterThan(error);
-      expect(config.indexOf(call)).toBeGreaterThan(endif);
-      expect(config.slice(error, endif)).toContain('Update the u8g2gl runtime library');
+      expect(otherwise).toBeGreaterThan(error);
+      expect(endif).toBeGreaterThan(otherwise);
+      expect(config.indexOf(call)).toBeGreaterThan(otherwise);
+      expect(config.indexOf(call)).toBeLessThan(endif);
+      expect(config.slice(error, otherwise)).toContain('Update the u8g2gl runtime library');
     });
 
     it('leaves the schema guard unchanged and ahead of the runtime guard', () => {

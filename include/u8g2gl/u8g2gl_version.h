@@ -100,7 +100,7 @@
         "runtime.")
 
 /**
- * @brief Refuse to compile if the runtime is older than the one the code needs.
+ * @brief Refuse to compile unless the runtime has the major, and at least the minor, the code was generated for.
  *
  * A generated header invokes this once, at namespace scope, with the runtime
  * version the generator was built beside (§16):
@@ -120,8 +120,8 @@
  * and the version of this runtime.
  *
  * A runtime that predates this macro cannot refuse by itself, so generated code
- * precedes the call with `#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION` and an
- * `#error` naming the floor (§16).
+ * guards the call with `#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION`, an `#error`
+ * naming the floor, and an `#else` holding the call (§16).
  *
  * @param major Runtime major version the generated code requires; must equal this runtime's.
  * @param minor Lowest runtime minor version the generated code requires.
@@ -130,8 +130,9 @@
     static_assert((major) == U8G2GL_VERSION_MAJOR &&                              \
                   (minor) <= U8G2GL_VERSION_MINOR,                                \
         "U8G2GL runtime too old or mismatched: this code was generated for "      \
-        "runtime " U8G2GL_VERSION_STR(major) "." U8G2GL_VERSION_STR(minor)        \
-        " or newer, but this runtime is "                                         \
+        "runtime major " U8G2GL_VERSION_STR(major) ", minor "                     \
+        U8G2GL_VERSION_STR(minor)                                                 \
+        " or later, but this runtime is "                                         \
         U8G2GL_VERSION_STR(U8G2GL_VERSION_MAJOR) "."                              \
         U8G2GL_VERSION_STR(U8G2GL_VERSION_MINOR) "."                              \
         U8G2GL_VERSION_STR(U8G2GL_VERSION_PATCH)                                  \

@@ -18,8 +18,8 @@
  * Description: Emits the four [D-21] capacities,
  *              `U8G2GL_REQUIRE_SCHEMA_VERSION`, and
  *              `U8G2GL_REQUIRE_RUNTIME_VERSION` behind an `#ifndef` that names
- *              the floor for a runtime too old to define it. The figures come from WO8b's
- *              `Capacities` — this module does not count anything, because a
+ *              the floor for a runtime too old to define it. The figures come from the
+ *              `Capacities` counted in `src/core/realise/capacities.ts` — this module does not count anything, because a
  *              second count is the defect WO8c spent a whole work order
  *              removing.
  *
@@ -188,10 +188,12 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     '// built beside (§16). A floor, not an equality: a newer runtime minor is fine.',
     '// A runtime that predates the check does not define the macro, and would',
     '// report a syntax error instead of a refusal, so say what is needed here.',
+    '// The call sits in the #else, so a runtime without the macro reports only this #error.',
     '#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION',
     `#error "This code requires u8g2gl runtime ${floor} or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."`,
-    '#endif',
+    '#else',
     `U8G2GL_REQUIRE_RUNTIME_VERSION(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor});`,
+    '#endif',
     '',
     section('Static capacities, counted from this document ([D-21])'),
     '// Every value is exact, so add_binding() cannot fail in generated code: the',

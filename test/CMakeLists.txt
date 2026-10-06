@@ -438,13 +438,13 @@ add_test(NAME VersionGuard.OlderRuntimeFailsToCompile
 set_tests_properties(VersionGuard.OlderRuntimeFailsToCompile PROPERTIES
     # The floor is an expression (minor + 1), which the message spells as
     # written; the runtime's own version is exact, from this project's version.
-    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime [^,]+ or newer, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
+    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime major [^,]+, minor [^,]+ or later, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
 )
 add_test(NAME VersionGuard.MismatchedRuntimeMajorFailsToCompile
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_major
 )
 set_tests_properties(VersionGuard.MismatchedRuntimeMajorFailsToCompile PROPERTIES
-    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime [^,]+ or newer, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
+    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime major [^,]+, minor [^,]+ or later, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
 )
 add_test(NAME VersionGuard.GeneratedConfigCompiles
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_generated_config

@@ -5,7 +5,7 @@ title: "Readability remediation"
 branch: u8g2gl-4r3/wo4-readability
 base: u8g2gl-4r3/wo3-binding-alias
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO4 — readability review remediation
@@ -141,3 +141,45 @@ complete | partial | blocked
 ### Blockers
 (none)
 ```
+
+---
+## Completion Report
+
+### Status
+complete
+
+### Baseline and final counts
+| Suite | Baseline | Final |
+|---|---|---|
+| C++ (clean configure, ctest) | 401 / one skip (SizeOfReport.ThirtyTwoBitTarget), 0 warnings | 401 / one skip, 0 warnings |
+| CLI (vitest) | 1338 | 1338 (two existing tests gained wording assertions) |
+| `tsc --noEmit` | clean | clean |
+| lint (`eslint` and `tsc -p tsconfig.test.json`) | clean | clean |
+
+Each suite was run alone.
+
+### Changes Made
+- **`#else` guard** (`generated-config.ts`): the call now sits in `#else`, before the closing `#endif`. A comment line records why. `emit-golden.test.ts` asserts the call lies between `#else` and `#endif`. `u8g2gl_version.h` Doxygen now says "guards the call". Both goldens refreshed from a rebuilt CLI. No version bump.
+- **Floor message** (`u8g2gl_version.h`): the `static_assert` reads "generated for runtime major M, minor m or later", and the `@brief` says the runtime must have the major and at least the minor the code was generated for. Both `PASS_REGULAR_EXPRESSION`s in `test/CMakeLists.txt` updated.
+- **Citation tail** (`validate-schema.ts`): one parenthetical, "(§13.1, §8.4, [D-20])" for geometry and "(§13.1, [UD-5])" otherwise.
+- **Step 3 wording**: `bindingAliasDiagnostic` takes `origin: 'inherited' | 'own'`. Step 3 says "binds its own prop 'x' under another name"; Step 2 keeps "reaches a setter that is bound under another name". The existing tests in `bind-type-paths.test.ts` gained assertions on both.
+- **§4.1 tag**: "WO8b's `Capacities`" became "the `Capacities` counted in `src/core/realise/capacities.ts`" (`Capacities` is defined there).
+- **TSDoc** on `RUNTIME_VERSION`. The file is hand-written (only the `.json` is generated), so the doc lives there. `npm run build:runtime-version` was re-run and left the stamp unchanged (0.7.0).
+- **`M`** in `manifest-registry.ts` became "The result keeps the parent's props deliberately".
+
+### Evidence
+- clang before, on the committed fixture config against `test/version_guard/pre_macro/`: two errors, the `#error` at line 43 and "a type specifier is required for all declarations" at line 45 on `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);`.
+- clang after: `1 error generated.`, only the `#error` (now line 44), same text.
+- CTest, matched lines:
+  - OlderRuntimeFailsToCompile: `static assertion failed due to requirement '(7 + 1) <= 7': U8G2GL runtime too old or mismatched: this code was generated for runtime major 0, minor 7 + 1 or later, but this runtime is 0.7.0.`
+  - MismatchedRuntimeMajorFailsToCompile: `static assertion failed due to requirement '(0 + 1) == 0': U8G2GL runtime too old or mismatched: this code was generated for runtime major 0 + 1, minor 7 or later, but this runtime is 0.7.0.`
+  - All 10 VersionGuard.* tests pass, including PreMacroRuntimeFailsByName and GeneratedConfigCompiles.
+- Golden diff, both files: the comment line, `#endif` becoming `#else`, and `#endif` moving after the call. Nothing else.
+- Built CLI (`generate` on the emit-project fixture into `tmp/`): the config compiles against this runtime with exit 0 and no output under `-Wall -Wextra -Wpedantic`. Against the frozen header it gives exactly one error, the `#error`.
+- Source files changed are all inside the Boundary Box. The added lines in source files contain no work-order tag; the only matches in `git diff u8g2gl-4r3/wo3-binding-alias` are in workspace files the PA committed.
+
+### Out-of-Scope Findings
+- §16 of the design spec says the guard is "preceded by an `#ifndef`". The `#else` form is not literally that. This was noted in REVIEW.md for the architect and `docs/` was not touched.
+
+### Blockers
+(none)

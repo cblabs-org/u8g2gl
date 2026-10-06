@@ -393,7 +393,12 @@ function checkBindDeclarations(
     const sharing = inherited.filter((candidate) => candidate.setter === bind.setter);
     if (sharing.length > 0 && !sharing.some((candidate) => candidate.name === bind.name)) {
       diagnostics.push(
-        bindingAliasDiagnostic(manifest, bind, Array.from(new Set(sharing.map((candidate) => candidate.name)))),
+        bindingAliasDiagnostic(
+          manifest,
+          bind,
+          Array.from(new Set(sharing.map((candidate) => candidate.name))),
+          'inherited',
+        ),
       );
     }
     if (sharing.length > 0) {
@@ -423,7 +428,7 @@ function checkBindDeclarations(
     if (prop.name === 'x' || prop.name === 'y' || prop.name === 'width' || prop.name === 'height') {
       const geometry = geometryBindingFor(prop.name);
       if (geometry.binding !== bind.name) {
-        diagnostics.push(bindingAliasDiagnostic(manifest, bind, [geometry.binding]));
+        diagnostics.push(bindingAliasDiagnostic(manifest, bind, [geometry.binding], 'own'));
       }
     }
     const subjectType = SUBJECT_TYPE_OF_PROP[prop.type];
@@ -452,22 +457,30 @@ function checkBindDeclarations(
 //   manifest — the declaring manifest
 //   bind     — the offending `<bind>`
 //   expected — the inherited binding name(s) to write instead
+//   origin   — whose setter it is: 'inherited' from an ancestor, or the drawing
+//              element's 'own' prop, which words the cause accordingly
 function bindingAliasDiagnostic(
   manifest: WidgetManifest,
   bind: BindDef,
   expected: readonly string[],
+  origin: 'inherited' | 'own',
 ): Diagnostic {
   const geometry = expected.some((name) => geometryBindingNamed(name) !== undefined);
   const names = expected.map((name) => `name="${name}"`).join(' or ');
   const consequence = geometry
     ? `geometry bindings keep their names so origin and clamping apply, and under another name the ` +
-      `generated call does not compile (§8.4, [D-20])`
+      `generated call does not compile`
     : `the editor's property panel and diagnostics would show '${bind.name}', a name the runtime ` +
-      `does not use ([UD-5])`;
+      `does not use`;
+  const citation = geometry ? '§13.1, §8.4, [D-20]' : '§13.1, [UD-5]';
+  const cause =
+    origin === 'own'
+      ? `binds its own prop '${bind.setter}' under another name`
+      : `reaches a setter that is bound under another name`;
   return createDiagnostic(
     DIAGNOSTIC_CODES.BINDING_ALIAS,
     `Widget '${manifest.name}' declares <bind name="${bind.name}" setter="${bind.setter}">, which ` +
-      `reaches a setter that is bound under another name. Write ${names}: ${consequence} (§13.1).`,
+      `${cause}. Write ${names}: ${consequence} (${citation}).`,
     bind.loc,
     bind.name,
     expected,

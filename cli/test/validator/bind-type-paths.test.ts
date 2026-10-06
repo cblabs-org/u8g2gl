@@ -225,6 +225,8 @@ describe('a <bind> that re-declares an inherited setter keeps the inherited name
     const found = errorsIn(run(instance('wd_draw'), [wd]), 'widgets/wd_draw/wd_draw.xml');
     expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_draw/wd_draw.xml', 3]]);
     expect(found[0]?.message).toContain('bind_x');
+    expect(found[0]?.message).toContain("binds its own prop 'x' under another name");
+    expect(found[0]?.message).toContain('(§13.1, §8.4, [D-20])');
   });
 
   it('refuses a label subclass that binds the inherited bind_text under another name', () => {
@@ -232,6 +234,8 @@ describe('a <bind> that re-declares an inherited setter keeps the inherited name
     const found = errors(run(instance('wd_l', ` font="${FONT}" bind_foo="s"`), [wd]));
     expect(summary(found)).toEqual([[DIAGNOSTIC_CODES.BINDING_ALIAS, 'widgets/wd_l/wd_l.xml', 3]]);
     expect(found[0]?.message).toContain('bind_text');
+    expect(found[0]?.message).toContain('reaches a setter that is bound under another name');
+    expect(found[0]?.message).toContain('(§13.1, [UD-5])');
   });
 
   it('refuses the same bind on a composite', () => {

@@ -18,5 +18,11 @@
 
 import runtimeVersionData from './runtime-version.json' with { type: 'json' };
 
+/**
+ * @brief The runtime's version, stamped from include/u8g2gl/u8g2gl_version.h.
+ *
+ * This is the floor the generator emits into generated code (§16). It is the
+ * runtime's version, not the CLI's: the CLI's own version is in package.json.
+ */
 export const RUNTIME_VERSION: Readonly<{ major: number; minor: number; patch: number }> =
   runtimeVersionData;
