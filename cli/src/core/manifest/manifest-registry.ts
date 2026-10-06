@@ -16,7 +16,8 @@
  *              element's `extends` chain — merging props by name and bindings by
  *              (name, type), parent order first, a child's override keeping its
  *              parent's position — and diagnoses unknown `extends` targets (with
- *              §6.5's remedy) and cycles.
+ *              §6.5's remedy), cycles, and an `extends` that names a drawing
+ *              element, which has no class to inherit (§6.5, [D-18]).
  *
  * Exports:
  * - ManifestOrigin:          Where a manifest came from ('framework' | 'project')
@@ -364,6 +365,30 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
         );
       } else {
         parent = resolveTag(parentTag, path);
+        // §6.5: a drawing element has no class to inherit from. The test reads
+        // the parent's declared manifest, and skips a manifest that is itself a
+        // drawing element, which the schema pass already reports as declaring
+        // `extends` — there the child, not the parent, is at fault.
+        if (
+          isDrawingElement(registrations.get(parentTag)?.manifest) &&
+          !isDrawingElement(manifest)
+        ) {
+          diagnostics.push(
+            manifestDiagnostic(
+              DIAGNOSTIC_CODES.EXTENDS_DRAWING_ELEMENT,
+              `Manifest <${tag}> extends drawing element '${parentTag}'. A drawing element has ` +
+                `no class — it is drawn by free functions ([D-18]) — so there is nothing to ` +
+                `inherit, and the generated code would call methods on a type with no such ` +
+                `members (§6.5). Declare a drawing element of your own (props with draw=, no ` +
+                `'extends'), or use extends="u8g2gl_obj" and draw from your own class.`,
+              manifest,
+              parentTag,
+            ),
+          );
+          // M keeps the parent's props deliberately: dropping them would add an
+          // "unknown attribute" error for every instance attribute on top of
+          // this one, burying the cause under its consequences.
+        }
       }
     }
 

@@ -5,7 +5,7 @@ title: "extends must name an element that has a class"
 branch: u8g2gl-4r3/wo2-extends-class
 base: u8g2gl-4r3/wo1-runtime-floor
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO2 — §6.5: a class cannot extend a drawing element
@@ -184,3 +184,56 @@ complete | partial | blocked
 ### Blockers
 (none)
 ```
+
+---
+## Completion Report
+
+### Status
+complete
+
+### Baseline and final counts
+| Suite | Baseline | Final |
+|---|---|---|
+| C++ ctest | 401 passed, one skip (SizeOfReport.ThirtyTwoBitTarget), 0 warnings (clean rebuild) | unchanged: 401 / one skip, 0 warnings |
+| CLI vitest | 1326 | 1331 (+5) |
+| `eslint .` / `tsc -p tsconfig.test.json` / `tsc --noEmit` | clean | clean |
+
+### Changes Made
+- `cli/src/core/schema/diagnostic.ts` — `EXTENDS_DRAWING_ELEMENT: 'U8G2GL_EXTENDS_DRAWING_ELEMENT'`, doc comment distinguishing it from `DRAWING_ELEMENT_EXTENDS`.
+- `cli/src/core/manifest/manifest-registry.ts` — Step 3 (`resolveTag`): after resolving a registered parent, refuse when `isDrawingElement(registrations.get(parentTag)?.manifest) && !isDrawingElement(manifest)`. No tag lists. File header Description updated.
+- `cli/test/manifests/manifest-registry.test.ts` — new `extending a drawing element` block (5 tests; the registry test file, since the rule lives in the registry).
+- `docs/design_spec.md` §6.5 — Chief Architect's clause verbatim, new paragraph after the "`extends` must name an element that has a manifest" paragraph (which is untouched).
+
+### Decisions Made
+- Code name kept as suggested: `EXTENDS_DRAWING_ELEMENT`. It reads as the converse of `DRAWING_ELEMENT_EXTENDS` and the doc comments disambiguate.
+- After the refusal M **keeps the parent's props** (the check does not clear `parent`). Probe: `wd_b extends="u8g2gl_box"`, instanced `<wd_b name="w" x="0" y="0" width="10" height="6"/>`.
+  - Option A (inherit parent's props): **1 error**, the new diagnostic only.
+  - Option B (inherit nothing): **5 errors**: `Unknown attribute 'x'`, `'y'`, `'width'`, `'height'` on `<wd_b>` (the last with a spurious `did you mean 'right'?`), plus the new diagnostic.
+  - A chosen; a test asserts `wd_b` still has `width`.
+
+### Evidence
+- Failing first: with only the diagnostic code added and no check, 3 refused-case tests failed (framework, project, composite); the accepted and not-double-reported cases pass at base too, as required.
+- Built CLI, refused project (`tmp/wo2/refused`), `validate`:
+```
+error: widgets/wd_b/wd_b.xml:2:1
+   Manifest <wd_b> extends drawing element 'u8g2gl_box'. A drawing element has no class — it is drawn by free functions ([D-18]) — so there is nothing to inherit, and the generated code would call methods on a type with no such members (§6.5). Declare a drawing element of your own (props with draw=, no 'extends'), or use extends="u8g2gl_obj" and draw from your own class.
+   |
+ 2 | <widget name="wd_b" extends="u8g2gl_box">
+   | ^^^^^^^^^^
+
+Validation failed: 1 error(s), 0 warning(s).
+```
+  `generate` on it: same error, `Generation refused: 1 error(s), 0 warning(s). Nothing was written.`, exit 1.
+- Working routes validate clean ("Validation passed: 0 errors, 0 warnings."): own drawing element at `tmp/wo2/own`; `extends="u8g2gl_obj"` at `tmp/wo2/obj`; `extends="u8g2gl_label"` at `tmp/wo2/label`.
+- Shipped manifests: the `frameworkRegistry()` test (no diagnostics) passes; every fixture-driven suite passes, so no shipped manifest or fixture gained a diagnostic. Nothing was edited to achieve this.
+- §6.5 diff: 7 lines added (clause verbatim) after the existing paragraph.
+- Composite (`<view>`) extending `u8g2gl_box`: refused with the same code.
+
+### Dead Ends & Warnings
+- None.
+
+### Out-of-Scope Findings
+- Location: the manifest model records only the `<widget>` element's `loc`, not the `extends` attribute's, so the diagnostic is located at the element (2:1), with a 10-character underline (the length of the parent tag) that covers `<widget na` rather than the `extends` value. The unknown-target and cycle diagnostics share this. Pointing at the attribute needs the parser to record an attribute location (outside this Boundary Box).
+
+### Blockers
+(none)

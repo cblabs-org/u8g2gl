@@ -805,6 +805,13 @@ generator could not emit its setters and the editor could not display them.
 Naming such a class in `extends` is a validation error. To extend one, give it a
 manifest — an `<api>` with no new props is enough.
 
+**`extends` must name an element that has a manifest *and a class*.** A drawing
+element (§6.2) has no class — it is served by free functions ([D-18]) — so
+extending one is refused: the generated code would call methods on a type with
+no such members. An element that wants box-like drawing has two routes, and
+neither of them extends the box. Declare a drawing element of its own (`draw=`
+props, no `extends`), or extend `u8g2gl_obj` and draw from your own class.
+
 ### 6.6 Naming
 
 Framework element tags carry the `u8g2gl_` prefix ([D-12]). User element tags

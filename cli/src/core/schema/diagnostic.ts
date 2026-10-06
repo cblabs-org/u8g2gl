@@ -128,6 +128,14 @@ export const DIAGNOSTIC_CODES = {
    */
   DRAWING_ELEMENT_EXTENDS: 'U8G2GL_DRAWING_ELEMENT_EXTENDS',
   /**
+   * A manifest's `extends` names a drawing element ([D-18], §6.2, §6.5). The
+   * converse of `DRAWING_ELEMENT_EXTENDS`: that code is a drawing element
+   * declaring `extends`; this one is a class (or composite) extending one.
+   * A drawing element is served by free functions and has no class, so the
+   * generated code would call methods on a type with no such members.
+   */
+  EXTENDS_DRAWING_ELEMENT: 'U8G2GL_EXTENDS_DRAWING_ELEMENT',
+  /**
    * A manifest declares both `setter=` props and `draw=` props ([D-18],
    * §13.1). An element has one emission target: methods on its class, or a
    * free draw function with no class. The message names one prop of each kind.
