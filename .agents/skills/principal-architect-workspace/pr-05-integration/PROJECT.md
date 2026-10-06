@@ -97,8 +97,7 @@ Stacked `u8g2gl-integration/wo<N>-<topic>`, serial.
 
 - **[x] [wo1-packaging](wo1-packaging/WORKORDER.md):** `library.json`, version agreement at
   configure time, submodules `update = none`, the incidental version literal. **Complete and
-  verified by the PA.** Pushed. **Pin: `0fe144f5da57b4e81283668b7453f6d635c44b85`**. Re-pinned from `69c37e0` after the owner asked that their email not be published. Only `library.json` differs, and the runtime is identical. The tip
-  `47618b5` adds only the report.
+  verified by the PA.** Pushed. **Pin: `82ec83f2bbce02080c3dd1ab6618bcf6559bfde5`** (the code; later commits add only workspace records).
 
 ### Foundation (ledger of record: the twin `PROJECT.md`)
 
@@ -139,16 +138,15 @@ pushed commit, so it is serial after both.
     mismatch: library.json says 0.7.1 …").
   - **Fresh recursive clone:** 13 MB, with no submodule populated.
   - **PlatformIO consumer:** `esp32dev`, `framework = arduino, espidf`,
-    `lib_compat_mode = strict`, pinned to `69c37e0`. Builds with `u8g2gl @ 0.7.0+sha.69c37e0` and
+    `lib_compat_mode = strict`, pinned to the pre-rewrite form of `82ec83f`. Builds with `u8g2gl @ 0.7.0` and
     `U8g2 @ 2.36.18`. `libdeps/u8g2gl` is 10 MB and `extern/u8g2` is empty (PA re-checked).
   - **Carried to WO-B2:** the consumer needed `CONFIG_FREERTOS_HZ=1000` and
     `CONFIG_AUTOSTART_ARDUINO=y`, which are dual-framework settings. Confirm foundation sets them.
   - **Fixed by the PA:** the stale `CONTEXT_BRIDGE.md` note on the version pin (worker finding).
     Older dated workspace records showing `--init` without `--checkout` are left as history.
   - **For the owner:** `library.json` names the author "Matthew McNeill". The email was removed
-    in `0fe144f` at the owner's request (2026-10-06). It survives in this branch's history
-    (`1dee2db`, `69c37e0`, private repository); removing it needs a force-push, which is the
-    owner's call.
+    at the owner's request (2026-10-06), and the branch history was then rewritten so it never
+    appears. See the session log.
     The source headers say "Matt McNeill (CB Labs)". Which should the published manifest carry?
 - **2026-10-06 — foundation WO-B1 Part 1 and WO-B2 Part 1 verified.**
   - **Pixels:** the migrated `DiagnosticsBoard` renders **byte-identical to legacy** in all four
@@ -188,3 +186,20 @@ PA where cited.
    its default size.
    - *To be measured* in foundation WO-B2 Part 2, which scopes the include to the runtime's
      sources with a build middleware.
+- **2026-10-06 — history rewritten at the owner's instruction.** The owner asked for the contact
+  address to be cleaned out of the history.
+  - `git filter-branch --prune-empty --tree-filter` over `1254eb3..u8g2gl-05/wo1-packaging`
+    removed the field from every commit's `library.json`. The removal commit, now empty, was
+    dropped.
+  - **Verified:**
+    - `git log -p` over the range contains no occurrence;
+    - the final tree is identical to the pre-rewrite tip `a324695`;
+    - the code commit `82ec83f` differs from the old `69c37e0` only in `library.json`.
+  - **Pushed:** with `--force-with-lease` against `0fe144f`.
+  - **Old refs removed:** the `refs/original` backup was deleted and this branch's reflogs
+    expired. No ref reaches `1dee2db`, `69c37e0`, `47618b5` or `0fe144f`.
+  - **Foundation re-pinned** to `82ec83f`, and a fresh `FetchContent` reproduces every render.
+  - **Residual:** GitHub keeps unreachable commits viewable by sha until its own garbage
+    collection. A guaranteed purge of the old commits is a GitHub Support request. The objects
+    also remain in the local object store until `git gc` prunes them.
+  - Older log entries citing the old shas describe what was verified at the time.
