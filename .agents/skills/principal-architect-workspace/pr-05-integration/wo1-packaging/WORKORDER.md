@@ -5,7 +5,7 @@ title: "The runtime becomes a PlatformIO library"
 branch: u8g2gl-05/wo1-packaging
 base: main @ 1254eb3
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO-A: the runtime becomes a PlatformIO library
@@ -178,7 +178,124 @@ Report defects outside the Boundary Box in the Completion Report. Do not file th
 
 ## Completion Report
 
-<!-- Written by the worker at task completion, using the template from the principal-architect
-skill: Status, Changes Made, Decisions Made, Dead Ends & Warnings, Out-of-Scope Findings,
-Blockers. Add: pushed sha, suite counts, the configure refusal output, the clone measurement,
-and the PlatformIO consumer measurements. -->
+### Status
+
+**Complete.** All eight instructions done. Both suites at baseline, configure refusal shown, a
+recursive clone carries no submodule content, and the PlatformIO consumer built green against the
+**pushed** sha.
+
+- **Pushed sha (code):** `69c37e01f75198a4aa3fa84b8926fcf139e30f02` on `origin/u8g2gl-05/wo1-packaging`.
+  The Completion Report commit that follows it adds only this file.
+- **Suites:** C++ **401** (400 passed, 1 skipped: `SizeOfReport.ThirtyTwoBitTarget`), CLI **1338**
+  passed (90 files), lint and `tsc -p tsconfig.test.json` clean, zero warnings. Run sequentially.
+
+### Changes Made
+
+| Commit | Content |
+|---|---|
+| `1dee2db` `build(runtime): ship as a PlatformIO library; version agreement checked at configure` | `library.json` (new); `CMakeLists.txt` version-agreement block; `generate.test.ts:345` |
+| `69c37e0` `build(submodules): update = none, so a consumer clone fetches none of them` | `.gitmodules` (`update = none` x4); `CMakeLists.txt:84` message; `CONTEXT_BRIDGE.md:319` |
+
+- `library.json`: name, version 0.7.0, description, keywords, MIT, author, homepage, git
+  repository, `frameworks: "arduino"`, `platforms: "*"`, `dependencies: olikraus/U8g2 ^2.36.18`,
+  `export.exclude` for `cli docs test extern .agents`. The defaults (`src/` compiled, `include/` on
+  the path) worked unchanged.
+- CMake reads `library.json`'s `"version"` with a regex (CMake 3.16-safe), adds the file to
+  `CMAKE_CONFIGURE_DEPENDS`, and `FATAL_ERROR`s naming both values and both files.
+- `generate.test.ts:345` now builds its expectation from `packageVersion` (a template literal,
+  because the original was a double-quoted string). `:460-473` untouched.
+- No version number moved. Nothing under `src/` or `include/` was touched.
+
+### Configure refusal (Instruction 2)
+
+With `library.json` set to `0.7.1`:
+
+```
+CMake Error at CMakeLists.txt:40 (message):
+  Runtime version mismatch: library.json says 0.7.1,
+  include/u8g2gl/u8g2gl_version.h says 0.7.0.  Bump both together.
+
+-- Configuring incomplete, errors occurred!
+```
+
+Restored to `0.7.0`:
+
+```
+-- Configuring done (3.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: .../tmp/refuse
+```
+
+### Clone measurement (Instruction 3)
+
+`git -c protocol.file.allow=always clone --recursive --branch u8g2gl-05/wo1-packaging <local path> tmp/clonetest`:
+
+```
+Skipping submodule '.agents/skills/embedded-systems'
+Skipping submodule '.agents/skills/lvgl-pro-expert'
+Skipping submodule '.agents/skills/oo-expert'
+Skipping submodule 'extern/u8g2'
+```
+
+All four paths held **0** entries; `git submodule status` showed all four with a leading `-`; the
+whole clone was 13 MB. Then `git submodule update --init --checkout --reference
+<main checkout>/extern/u8g2 extern/u8g2` checked out `d66b49af...` (12 top-level entries), and the
+three skill submodules stayed empty.
+
+### PlatformIO consumer (Instruction 5)
+
+`tmp/pio-consumer/`: `platform = espressif32`, `board = esp32dev`, **`framework = arduino, espidf`**
+(the full dual framework, not the fallback), `lib_compat_mode = strict`,
+`lib_deps = https://github.com/cblabs-org/u8g2gl.git#69c37e01f75198a4aa3fa84b8926fcf139e30f02`.
+`main.cpp` includes `u8g2gl/u8g2gl_version.h` and `u8g2gl/u8g2gl_core.h`, uses
+`U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);` and calls `ui_handler(display)` on a
+`U8G2_SSD1306_128X64_NONAME_F_HW_I2C`.
+
+- **Built: yes.** `[SUCCESS] Took 54.90 seconds`; RAM 17456 B (5.3%), Flash 279505 B (6.7%).
+- **Dependency graph:** `u8g2gl @ 0.7.0+sha.69c37e0` and `U8g2 @ 2.36.18`, so U8g2 was resolved
+  as a dependency and strict mode accepted the library.
+- All 15 `src/*.cpp` files compiled; no warning came from u8g2gl (the one warning in the log is
+  the Arduino core's `ssl_client.cpp` PSK notice).
+- **`.pio/libdeps/esp32dev/u8g2gl/`: 10 MB.** `extern/u8g2` has **0** entries. The `.agents/skills`
+  directory holds five entries (`embedded-systems`, `lvgl-pro-expert`, `oo-expert`,
+  `principal-architect-workspace`, `u8g2gl-standards`); the three submodule ones are empty and the
+  other two are ordinary tracked directories. This is the working tree, not a packed archive, so
+  `export.exclude` does not apply and `cli/`, `docs/`, `test/` are present (~10 MB total).
+
+### Decisions Made
+
+- Commit split: the `CMakeLists.txt` message edit went in the submodule commit, the version block
+  in the packaging commit (done by staging the file twice).
+- `library.json` author is the owner, from `git config` and the user email.
+
+### Dead Ends & Warnings
+
+1. **The dual-framework build needs two consumer settings that are not the library's business.**
+   Without them the first attempts failed: (a) the sdkconfig must set `CONFIG_FREERTOS_HZ=1000` (`esp32-arduino requires
+   CONFIG_FREERTOS_HZ=1000 (currently 100)`); (b) Arduino as an IDF component needs
+   `CONFIG_AUTOSTART_ARDUINO=y`, otherwise the link fails with `undefined reference to app_main`.
+   I put both in `tmp/pio-consumer/sdkconfig.defaults`. Foundation's `env:esp32dev` presumably has
+   its own sdkconfig; WO-B2 should confirm it sets both.
+2. **Arduino 1.5 claim (Instruction 6), confirmed.** The Arduino library specification says
+   the `src` folder is added to the include search path and only the headers in the root of `src/`
+   (not its subfolders) form the library's interface
+   (https://arduino.github.io/arduino-cli/latest/library-specification/, source
+   `docs/library-specification.md` in `arduino/arduino-cli`). The runtime's headers are in
+   `include/u8g2gl/`, so `library.properties` was not written.
+3. BSD `sed -i` needs `-i ''` on this machine; `tmp/` is git-ignored and nothing in it was committed.
+
+### Out-of-Scope Findings
+
+- `CONTEXT_BRIDGE.md:320-322` still says the CLI pins its version literally "so every version bump
+  breaks it". After this WO that is only true of the deliberate pin at `:467`; the note is now
+  misleading.
+- Historical records still show the old `git submodule update --init` form (`pr-4r3-corrections`
+  PROJECT/CA-BRIDGE/WORKORDER, `pr-04-generator` WORKORDER/BRIDGE). I left them: they are dated
+  records, and `update = none` makes those commands silently do nothing. A reader following one
+  needs `--checkout`.
+- `test/CMakeLists.txt` and `cli` docs were checked: no other contributor-facing initialisation
+  instruction exists in live files.
+
+### Blockers
+
+None. Not done: no tag, npm publish or PR, as instructed.
