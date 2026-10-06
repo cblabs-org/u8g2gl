@@ -172,6 +172,33 @@ int count_op(const U8G2& display, const char* op) {
     return n;
 }
 
+// op_index
+// The log position of the `nth` (0-based) call to `op`, or -1 if there is none.
+int op_index(const U8G2& display, const char* op, int nth) {
+    for (int i = 0; i < display.call_log_count && i < U8G2::kCallLogCapacity; ++i) {
+        if (std::strcmp(display.call_log[i].op, op) == 0 && nth-- == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// expect_clipped_draw_box
+// Asserts the `nth` drawBox is drawn inside exactly the given clip window — set
+// immediately before it, reset immediately after — as u8g2gl_clip_scope draws.
+void expect_clipped_draw_box(const U8G2& display, int nth, int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
+    const int box = op_index(display, "drawBox", nth);
+    ASSERT_GT(box, 0);
+    ASSERT_LT(box + 1, display.call_log_count);
+    const u8g2_stub_call& before = display.call_log[box - 1];
+    EXPECT_STREQ(before.op, "setClipWindow");
+    EXPECT_EQ(before.args[0], x0);
+    EXPECT_EQ(before.args[1], y0);
+    EXPECT_EQ(before.args[2], x1);
+    EXPECT_EQ(before.args[3], y1);
+    EXPECT_STREQ(display.call_log[box + 1].op, "setMaxClipWindow");
+}
+
 }  // namespace
 
 // --- §13.12's worked example ---
@@ -273,6 +300,31 @@ TEST(EditorParity, BoundsScreenWithAMovedKnobAndANewTemperature) {
     EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware, &editor));
     EXPECT_TRUE(drew_text(firmware, "30°C"));
     EXPECT_TRUE(drew_text(editor, "30°C"));
+}
+
+// --- A bound draw call inside a container is clipped to it (§13.5, [D-18]) ---
+// track_knob is a draw call with a bound x inside the track (40, 10, 60 x 20);
+// knob_x = 58 puts it at 98..101, overhanging the track's last column, 99. An
+// object child is clipped to its container, so the draw call is too, on both
+// targets, by the same u8g2gl_clip_scope. dot, bound but on the screen, has no
+// container and is not clipped.
+
+TEST(EditorParity, BoundsScreenClipsTheOverhangingKnobToItsTrackOnBothTargets) {
+    fixture_values v;
+    v.knob_x = 58;
+    U8G2 firmware;
+    U8G2 editor;
+    EXPECT_TRUE(same_screen(ui_screen_bounds_render, "bounds", v, &firmware, &editor));
+    ASSERT_EQ(count_op(firmware, "drawBox"), 2);
+    EXPECT_EQ(firmware.call_log[op_index(firmware, "drawBox", 0)].args[0], 98);   // track_knob: 40 + 58
+
+    // The track's effective clip, far corner exclusive (u8g2gl_apply_clip()).
+    expect_clipped_draw_box(firmware, 0, 40, 10, 100, 30);
+    expect_clipped_draw_box(editor, 0, 40, 10, 100, 30);
+
+    // dot: no clip window is set for it.
+    EXPECT_STRNE(firmware.call_log[op_index(firmware, "drawBox", 1) - 1].op, "setClipWindow");
+    EXPECT_STRNE(editor.call_log[op_index(editor, "drawBox", 1) - 1].op, "setClipWindow");
 }
 
 // --- Bound draw-call arguments clamp, on both targets (PR-4R WO4, §13.5) ---

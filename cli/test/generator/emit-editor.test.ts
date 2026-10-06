@@ -381,7 +381,20 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     expect(element(byName('bounds'), 'temp').bindings).toEqual([
       { name: 'bind_text', subject: 'temperature', subject_type: 'int', fmt: '%d°C' },
     ]);
-    expect(scene.version).toBe(2);
+    expect(scene.version).toBe(3);
+  });
+
+  it('marks a bound draw call inside a container with the object whose clip it is drawn in (§13.5)', () => {
+    // track_knob: bound x, inside track (object 0) — clipped to it, as firmware
+    // draws it inside u8g2gl_clip_scope on object 0.
+    expect(element(byName('bounds'), 'track_knob').clip).toBe(0);
+    // dot: bound, but on the screen — no container, no clip.
+    expect(element(byName('bounds'), 'dot')).not.toHaveProperty('clip');
+    // panel_edge: inside panel, but every argument literal — no clip (§7.2
+    // already refuses a literal overhang).
+    expect(element(byName('gauges'), 'panel_edge')).not.toHaveProperty('clip');
+    // level_bar: bound width, on the screen — no clip.
+    expect(element(byName('gauges'), 'level_bar')).not.toHaveProperty('clip');
   });
 
   it('is emitted as ui_scene.json beside the registry, deterministically', async () => {

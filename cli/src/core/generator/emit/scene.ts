@@ -28,7 +28,8 @@
  *              everything else the text the author wrote, which the host maps
  *              through the registry entry's declared type.
  *
- *              Format, version 2 (PR-04 WO10b added `origin`; version 1 had none):
+ *              Format, version 3 (version 3 added a draw call's `clip`; version
+ *              2 added `origin`; version 1 had neither):
  *              - `u8g2gl_generated`: the marker the **writer** recognises the file
  *                by. A host reads nothing from it, and it is not part of the
  *                format a host checks, so adding it did not bump the version —
@@ -45,7 +46,10 @@
  *                an **object** — `class`, `object`, `parent`, `rect`,
  *                `properties`, `styles`, `style_overrides`, `bindings`, `flags` —
  *                or a **draw call** — `arguments` (bound ones name a subject;
- *                absent ones take the manifest default) and `visibility`.
+ *                absent ones take the manifest default), `visibility`, and,
+ *                only when the call is clipped, `clip`: the object index whose
+ *                effective clip it is drawn inside, as firmware draws it inside
+ *                a `u8g2gl_clip_scope` (§13.5). Absent means unclipped.
  *              - A binding or bound argument that sets a position (`bind_x`,
  *                `bind_y`) carries `origin`: its container's absolute corner on
  *                that axis, which the host adds to the subject's value as
@@ -65,7 +69,7 @@ import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../../realise/index.js';
-import { drawArgumentSources } from './draw-args.js';
+import { drawArgumentSources, drawClipObject } from './draw-args.js';
 import { boundPositionOrigin } from './placement.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations } from './images.js';
@@ -91,7 +95,7 @@ export const SCENE_FILE = 'ui_scene.json';
  * The format version. A host checks it before reading anything else; bump it
  * for any change a host would read differently.
  */
-export const SCENE_FORMAT_VERSION = 2;
+export const SCENE_FORMAT_VERSION = 3;
 
 /** Everything describing the scenes needs. */
 export interface SceneInput {
@@ -226,17 +230,19 @@ function objectJson(element: RealisedElement, placement: Placement): { [key: str
 // A draw-call element as the firmware's render function draws it: each argument
 // from the one precedence rule (draw-args.ts) — a bound one names its subject,
 // read at draw time; a default is left to the registry thunk, which spells it as
-// the firmware does — and its build-time visibility as terms.
+// the firmware does — its build-time visibility as terms, and the object whose
+// clip it is drawn inside, by the rule firmware emission reads.
 //   element   — the realised draw-call element
 //   placement — its manifest and device-space model
 function drawCallJson(element: RealisedElement, placement: Placement): { [key: string]: Json } {
   const args: Json[] = [];
-  for (const argument of drawArgumentSources({
+  const sources = drawArgumentSources({
     manifest: placement.manifest,
     resolved: placement.absolute,
     bindings: element.bindings,
     origin: placement.origin,
-  })) {
+  });
+  for (const argument of sources) {
     if (argument.kind === 'bound') {
       args.push({
         name: argument.prop.name,
@@ -264,6 +270,7 @@ function drawCallJson(element: RealisedElement, placement: Placement): { [key: s
       ref: jsonValue(comparison.refType, comparison.ref),
     };
   });
+  const clip = drawClipObject(element, sources);
   return {
     name: element.identifier,
     tag: element.element.node.tag,
@@ -271,6 +278,7 @@ function drawCallJson(element: RealisedElement, placement: Placement): { [key: s
     source: source(element),
     arguments: args,
     visibility,
+    ...(clip === undefined ? {} : { clip }),
   };
 }
 

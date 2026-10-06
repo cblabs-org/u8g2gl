@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="home"><view>
+<u8g2gl_switch name="b" x="0" y="0" width="20" height="6" style="round" />
+</view></screen>

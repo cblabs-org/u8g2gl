@@ -308,7 +308,7 @@ function checkInstanceProps(
 }
 
 /** The named styles in scope for an element, by name (§10). */
-type StyleScope = ReadonlyMap<string, StyleDecl>;
+export type StyleScope = ReadonlyMap<string, StyleDecl>;
 
 // styleScope
 // What a named style on an element can resolve to: the global styles, and on a
@@ -317,7 +317,7 @@ type StyleScope = ReadonlyMap<string, StyleDecl>;
 // only the globals: its template is shared by every screen.
 //   globals — the project's globals
 //   screen  — the screen the element is written in, if it is written in one
-function styleScope(globals: Globals | undefined, screen: Screen | undefined): StyleScope {
+export function styleScope(globals: Globals | undefined, screen: Screen | undefined): StyleScope {
   const scope = new Map<string, StyleDecl>();
   for (const style of [...(globals?.styles ?? []), ...(screen?.styles ?? [])]) {
     scope.set(style.name, style);

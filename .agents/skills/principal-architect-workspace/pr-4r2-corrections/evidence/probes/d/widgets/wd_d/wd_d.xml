@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="wd_d" extends="u8g2gl_obj"><api>
+  <bind name="bind_when" type="time" setter="bind_x" />
+</api></widget>

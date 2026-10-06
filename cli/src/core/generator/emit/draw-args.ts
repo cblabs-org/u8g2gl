@@ -52,6 +52,7 @@
  * - drawFunctionOf():    The function and argument order (shared with the editor registry)
  * - drawArgumentSources(): Each argument's source, by the one precedence rule
  * - drawCallFor():       Assemble a drawing element's call
+ * - drawClipObject():    The object whose effective clip a draw call is drawn inside, if any
  * - bindingFor():        The binding driving a prop, if any
  * - resolvedLiteralFor(): The settled literal for one prop (shared with object setters)
  */
@@ -59,7 +60,7 @@
 import type { EffectiveManifest } from '../../manifest/manifest-registry.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
 import { subjectIdentifier, type ResolvedElement } from '../../resolver/index.js';
-import type { RealisedBinding } from '../../realise/index.js';
+import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement } from '../../realise/index.js';
 import { boundPositionOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
 import { cppValue } from './value.js';
 
@@ -344,4 +345,35 @@ export function drawCallFor(input: DrawCallInput): DrawCall {
   });
 
   return { fn, args };
+}
+
+/**
+ * @brief The object whose effective clip a drawing element's call is drawn
+ *        inside, or undefined when the call is drawn unclipped.
+ *
+ * A draw call is clipped exactly when it has an enclosing object **and** at
+ * least one of its arguments is bound. A bound value can overhang the
+ * container where a literal cannot — §7.2 refuses a literal overhang at build
+ * time — and an object child is clipped to its container by
+ * `u8g2gl_render_object()` (§11.3), so the draw call is drawn inside the same
+ * clip or realisation would be observable (§13.5, [D-18]). An element directly
+ * on the screen has no container to be clipped to.
+ *
+ * The one statement of the rule: the firmware emitter spells the clip from it
+ * and the scene description records it for the editor host from it, so the
+ * two targets cannot disagree about which calls are clipped.
+ *
+ * @param element The realised draw-call element; its `parentIndex` is its
+ *                nearest enclosing object.
+ * @param sources Its arguments' sources, from {@link drawArgumentSources}.
+ * @return The enclosing object's index, or undefined.
+ */
+export function drawClipObject(
+  element: RealisedElement,
+  sources: readonly DrawArgumentSource[],
+): number | undefined {
+  if (element.parentIndex === U8G2GL_NO_PARENT) {
+    return undefined;
+  }
+  return sources.some((source) => source.kind === 'bound') ? element.parentIndex : undefined;
 }

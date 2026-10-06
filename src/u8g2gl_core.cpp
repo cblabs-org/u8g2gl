@@ -18,8 +18,10 @@
  *              dirty gating, the ui_handler entry points, the two calls
  *              generated code makes into the frame — the per-object render
  *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
- *              and u8g2gl_apply_clip(), the single owner of the clip-corner
- *              convention
+ *              u8g2gl_apply_clip(), the single owner of the clip-corner
+ *              convention, and u8g2gl_clip_scope, the one set-and-reset of an
+ *              object's effective clip, shared by the render wrapper and a
+ *              bound draw call inside a container
  */
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_coord.h"
@@ -130,30 +132,52 @@ void u8g2gl_render_object(
         return;
     }
 
-    // --- Step 2: Skip an object with nothing left to draw into ---
-    // An empty clip is the normal outcome for an element wholly outside its
-    // container; there is no pixel it could legitimately set.
-    const u8g2gl_rect clip = u8g2gl_effective_clip(objs, parents, index);
-    if (clip.w <= 0 || clip.h <= 0) {
-        return;
-    }
-
-    // --- Step 3: Draw inside saved state and the effective clip ---
-    // The saver is constructed before the clip is applied so its lifetime spans
-    // the whole render; it does not touch the clip either way.
+    // --- Step 2: Save draw state, then set the effective clip ---
+    // Declared in this order so they unwind in the reverse: the clip is reset
+    // to the full display first, then colour and font are restored. Neither
+    // touches the other's state.
     u8g2gl_state_saver saver(display);
-    if (!u8g2gl_apply_clip(display, clip)) {
-        // Wholly above or left of the display: no pixel to draw into.
+    const u8g2gl_clip_scope clip(display, objs, parents, index);
+
+    // --- Step 3: Draw, unless there is nothing left to draw into ---
+    // An empty clip is the normal outcome for an element wholly outside its
+    // container; one wholly above or left of the display has no pixel either.
+    // There is no pixel it could legitimately set.
+    if (!clip.drawable()) {
         return;
     }
     objs[index]->render(display);
+}
 
-    // --- Step 4: Reset the clip this function set ---
-    // The state saver cannot restore the clip: U8G2 has no clip getter. The full
-    // display is the right state to leave, because no object's clip is ever
-    // nested inside another's active clip — each is computed from its ancestors
-    // in Step 2.
-    display.setMaxClipWindow();
+// u8g2gl_clip_scope
+// Sets the clip window to one object's effective clip, through the two
+// functions that own that rule — u8g2gl_effective_clip() for the rect and
+// u8g2gl_apply_clip() for the window — and nothing else.
+//   display — receives the clip window
+//   objs    — flat array, document order
+//   parents — parallel index array, or nullptr for each object's own
+//   index   — the object whose clip is wanted
+u8g2gl_clip_scope::u8g2gl_clip_scope(
+    U8G2& display,
+    u8g2gl_obj* const* objs,
+    const uint8_t* parents,
+    uint8_t index
+)
+    : display_(display),
+      // u8g2gl_apply_clip() rejects an empty rect itself, leaving the display
+      // untouched, so an empty effective clip needs no check of its own here.
+      applied_(u8g2gl_apply_clip(display, u8g2gl_effective_clip(objs, parents, index))) {
+}
+
+// ~u8g2gl_clip_scope
+// Resets the window this guard set. The state saver cannot do it, because U8G2
+// has no clip getter; the full display is the right state to leave, because no
+// clip is ever nested inside another's active clip — each is computed from its
+// ancestors. Nothing is reset when nothing was set.
+u8g2gl_clip_scope::~u8g2gl_clip_scope() {
+    if (applied_) {
+        display_.setMaxClipWindow();
+    }
 }
 
 // u8g2gl_apply_clip

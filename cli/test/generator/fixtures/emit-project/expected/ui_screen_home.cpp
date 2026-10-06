@@ -138,6 +138,7 @@ void ui_screen_home_render(U8G2& display) {
     // and saves and restores draw state, so nothing paints outside its
     // container and a hidden container hides its children (§11.3). A draw
     // call has no object, so its visibility is the build-time guard (§13.5).
+    // A bound draw call inside a container is drawn inside that container's clip, as an object would be (§13.5).
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 0);  // ui_obj_badge
     u8g2gl_render_object(display, ui_screen_home_objs, ui_screen_home_parents, 1);  // ui_obj_badge_caption
     u8g2gl_draw_hline(display, 0, 13, 128);  // rule: no object (§13.5)

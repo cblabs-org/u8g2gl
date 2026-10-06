@@ -18,7 +18,9 @@
  *              order, evaluating a draw call's guard with the registry's own
  *              comparison and reading bound arguments from subjects at draw
  *              time, as firmware's `ui_subject_x.get()` does (§13.5), clamped
- *              with the origin by the runtime's own u8g2gl_coord_bound().
+ *              with the origin by the runtime's own u8g2gl_coord_bound(), and
+ *              drawing a call the scene marks `clip` inside the runtime's own
+ *              u8g2gl_clip_scope.
  */
 #include "editor_host.h"
 
@@ -50,8 +52,8 @@ bool editor_host::load(const std::string& scene_path) {
     if (!parse_error.empty()) {
         return fail(parse_error);
     }
-    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 2) {
-        return fail("not a version 2 u8g2gl scene description");
+    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 3) {
+        return fail("not a version 3 u8g2gl scene description");
     }
     for (const scene_json& described : scene_.get("subjects").items()) {
         if (described.has("value")) {
@@ -439,7 +441,8 @@ bool editor_host::visible(const scene_json& element, bool* shown) {
 // Draw-by-name: each argument placed by its param's name; a bound one read from
 // its subject now and clamped with its origin, as firmware's
 // `u8g2gl_coord_bound(origin, ui_subject_x.get())` is at draw time; an absent
-// one left NONE for the thunk's default.
+// one left NONE for the thunk's default. A call the scene marks `clip` is drawn
+// inside that object's u8g2gl_clip_scope, the guard firmware draws it inside.
 bool editor_host::draw_call(U8G2& display, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_drawing* drawing =
@@ -483,7 +486,28 @@ bool editor_host::draw_call(U8G2& display, const scene_json& element) {
             return false;
         }
     }
-    if (!u8g2gl_editor_draw(*drawing, display, args.data(), drawing->param_count)) {
+    // Arguments are read before the clip is set rather than after, as firmware
+    // reads them: subject reads touch no display state, so the call log and the
+    // pixels are the same either way.
+    if (!element.has("clip")) {
+        return draw(display, *drawing, args, name);
+    }
+    const int32_t clip_object = element.get("clip").as_int();
+    if (clip_object < 0 || static_cast<size_t>(clip_object) >= objects_.size()) {
+        return fail(name + ": clip names a missing object");
+    }
+    const u8g2gl_clip_scope clip(display, objects_.data(), parents_.data(), static_cast<uint8_t>(clip_object));
+    if (!clip.drawable()) {
+        return true;
+    }
+    return draw(display, *drawing, args, name);
+}
+
+// draw
+// One draw-by-name call, its refusal recorded.
+bool editor_host::draw(U8G2& display, const u8g2gl_editor_drawing& drawing,
+                       std::vector<u8g2gl_editor_value>& args, const std::string& name) {
+    if (!u8g2gl_editor_draw(drawing, display, args.data(), drawing.param_count)) {
         return fail(name + ": draw-by-name refused");
     }
     return true;

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="home"><view>
+  <wd_p name="w" x="10" y="10" width="20" height="10" s="n" />
+  <u8g2gl_obj name="c" x="40" y="10" width="20" height="10">
+    <u8g2gl_box name="b2" x="0" y="0" width="10" height="6" bind_width="n" />
+  </u8g2gl_obj>
+</view></screen>

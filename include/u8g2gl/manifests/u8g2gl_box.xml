@@ -6,7 +6,7 @@
     <prop name="width" type="int" draw="u8g2gl_draw_box" help="Length in pixels" />
     <prop name="height" type="int" draw="u8g2gl_draw_box" help="Height in pixels" />
     <prop name="filled" type="bool" draw="u8g2gl_draw_box" default="true" help="Whether box is filled or outline frame" />
-    <prop name="radius" type="int" draw="u8g2gl_draw_box" default="0" help="Corner radius in pixels" />
+    <prop name="radius" type="int" draw="u8g2gl_draw_box" default="0" help="Corner radius in pixels; 2 × radius may not exceed the smaller of width and height" />
     <bind name="bind_x" type="int" setter="x" />
     <bind name="bind_y" type="int" setter="y" />
     <bind name="bind_width" type="int" setter="width" />

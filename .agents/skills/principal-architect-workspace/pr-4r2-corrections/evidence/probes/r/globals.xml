@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals><subjects><int name="n" value="0" /></subjects>
+<styles><style name="round" radius="10" /></styles>
+<fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>

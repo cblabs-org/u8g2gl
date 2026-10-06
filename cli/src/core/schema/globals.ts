@@ -147,7 +147,7 @@ export interface StyleDecl {
   readonly padding?: number;
   /** 1px outline border flag. */
   readonly border?: boolean;
-  /** Corner radius in pixels for rounded boxes. */
+  /** Corner radius in pixels; 2 × radius may not exceed the smaller of the element's width and height (§10). */
   readonly radius?: number;
   /** Text alignment within element width. */
   readonly align?: TextAlign;

@@ -228,6 +228,25 @@ target_compile_options(test_button PRIVATE
 
 gtest_discover_tests(test_button)
 
+add_executable(test_radius_honoured
+    test_radius_honoured.cpp
+)
+
+target_include_directories(test_radius_honoured PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_radius_honoured PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_radius_honoured PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_radius_honoured)
+
 add_executable(test_sizeof_report
     test_sizeof_report.cpp
 )
@@ -440,6 +459,52 @@ target_compile_options(test_rbox_bound PRIVATE
     -Wall -Wextra -Wpedantic
 )
 gtest_discover_tests(test_rbox_bound)
+
+# --- Real U8G2: a bound draw-call child is clipped to its container (§13.5) ---
+# A drawing element inside a container is drawn inside the container's
+# effective clip, as an object child is, so realisation cannot be seen
+# ([D-18]). The stub only records setClipWindow(); whether a pixel is really
+# kept inside is U8G2's to decide, so this executable runs the runtime against
+# real U8G2: its objects come from u8g2gl_real_u8g2 (the runtime compiled
+# against the real headers, above) and U8G2's C sources from
+# u8g2gl_u8g2_csrc_arduino, below. Like test_rbox_bound it never links `u8g2gl` or test/stubs.
+#
+# U8G2's C sources are compiled a second time for it, with ARDUINO defined as
+# the C++ wrapper requires: u8x8.h adds a pins[] array to u8x8_t under ARDUINO,
+# so linking u8g2gl_u8g2_csrc (built without it) against the wrapper splits one
+# struct into two layouts and crashes on the first call. The list is
+# u8g2gl_u8g2_csrc's plus what the runtime's other draw functions call, since
+# the whole runtime is linked.
+set(U8G2GL_U8G2_RUNTIME_SOURCES u8g2_bitmap.c u8g2_line.c u8g2_polygon.c)
+list(TRANSFORM U8G2GL_U8G2_RUNTIME_SOURCES PREPEND ${U8G2GL_U8G2_DIR}/csrc/)
+add_library(u8g2gl_u8g2_csrc_arduino STATIC
+    ${U8G2GL_U8G2_BOUND_SOURCES}
+    ${U8G2GL_U8G2_RUNTIME_SOURCES}
+)
+target_include_directories(u8g2gl_u8g2_csrc_arduino PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2)
+target_include_directories(u8g2gl_u8g2_csrc_arduino SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_definitions(u8g2gl_u8g2_csrc_arduino PUBLIC ARDUINO=10819)
+target_compile_options(u8g2gl_u8g2_csrc_arduino PRIVATE -w)
+
+add_executable(test_bound_child_clip
+    test_bound_child_clip.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_bound_child_clip PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_bound_child_clip SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_bound_child_clip PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    GTest::gtest_main
+)
+target_compile_options(test_bound_child_clip PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_bound_child_clip)
 
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is

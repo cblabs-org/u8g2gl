@@ -37,6 +37,7 @@
  *
  *     Clipping:
  *     - u8g2gl_apply_clip():           The one place a rect becomes a setClipWindow() call
+ *     - u8g2gl_clip_scope:             RAII: draw inside one object's effective clip, reset on exit
  */
 #ifndef U8G2GL_CORE_H
 #define U8G2GL_CORE_H
@@ -162,22 +163,103 @@ void u8g2gl_frame_dirty_observer(void* user_data);
  */
 bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip);
 
+/**
+ * @brief Draw inside one object's effective clip for exactly as long as this
+ *        guard is in scope.
+ *
+ * The one sequence that turns an object's place in the flat tree into a clip
+ * window and back: construction computes u8g2gl_effective_clip() (the object's
+ * bounds intersected with every ancestor's) and passes it to
+ * u8g2gl_apply_clip(); destruction resets the window to the full display. It
+ * does no rectangle arithmetic of its own.
+ *
+ * Two callers, so the clip cannot differ between them:
+ * - u8g2gl_render_object(), around an object's render();
+ * - a generated draw call inside a container whose geometry is bound (§13.5),
+ *   scoped to its nearest enclosing object. A bound value can overhang the
+ *   container where a literal cannot (§7.2 refuses that at build time), and
+ *   the draw call must be clipped exactly where the same element realised as
+ *   an object would be, or realisation would be observable ([D-18]). The
+ *   generator emits it inside the call's visibility guard, which is its block:
+ *
+ * @code
+ * if (!ui_obj_track.is_hidden()) {
+ *     u8g2gl_clip_scope clip(display, ui_screen_bounds_objs, ui_screen_bounds_parents, 0);
+ *     if (clip.drawable()) {
+ *         u8g2gl_draw_box(display, u8g2gl_coord_bound(40, ui_subject_knob_x.get()), 10, 4, 4, true, 0);
+ *     }
+ * }
+ * @endcode
+ *
+ * A scope rather than a set/reset function pair because the reset cannot then
+ * be forgotten: it runs on every exit from the enclosing block.
+ *
+ * Visibility is not this guard's concern. u8g2gl_render_object() checks it
+ * first, and a generated draw call keeps its build-time guard (§13.5).
+ *
+ * @note On destruction the clip window is the full display, not whatever it
+ *       was before construction — U8G2 has no clip getter, so it cannot be
+ *       saved. That is the correct state between elements, because every clip
+ *       is computed from ancestors rather than nested inside an active one.
+ *       Scopes must therefore not be nested.
+ */
+class u8g2gl_clip_scope {
+public:
+    /**
+     * @brief Set the clip window to object @p index's effective clip.
+     *
+     * @param display U8G2 instance to clip. Must outlive this guard.
+     * @param objs    The screen's object array, in document order. A null array
+     *                or a null entry on the ancestry chain gives an empty clip.
+     * @param parents The parallel parent-index array, or nullptr to use each
+     *                object's own parent index (as for u8g2gl_effective_clip()).
+     * @param index   The object whose clip is wanted. Not bounds-checked: it
+     *                must be less than the screen's object count.
+     */
+    u8g2gl_clip_scope(U8G2& display, u8g2gl_obj* const* objs, const uint8_t* parents, uint8_t index);
+
+    /** @brief Reset the clip window to the full display, if this guard set one. */
+    ~u8g2gl_clip_scope();
+
+    /**
+     * @brief Whether anything may be drawn inside this scope.
+     *
+     * @return false when the effective clip is empty or lies wholly off the
+     *         display. The window was then left untouched, so the caller must
+     *         draw nothing: whatever is in force is not this object's clip.
+     */
+    bool drawable() const { return applied_; }
+
+    // Non-copyable, non-movable: a copy would reset the window twice.
+    u8g2gl_clip_scope(const u8g2gl_clip_scope&) = delete;
+    u8g2gl_clip_scope& operator=(const u8g2gl_clip_scope&) = delete;
+    u8g2gl_clip_scope(u8g2gl_clip_scope&&) = delete;
+    u8g2gl_clip_scope& operator=(u8g2gl_clip_scope&&) = delete;
+
+private:
+    U8G2& display_;
+    bool applied_;
+};
+
 // --- Per-object rendering ---
 
 /**
  * @brief Render one object of a screen's flat tree inside the framework's
  *        containment (§11.3).
  *
- * In order: skips the object if it or any ancestor is hidden; skips it if its
- * effective clip (own bounds intersected with every ancestor's) is empty;
- * otherwise saves draw colour and font with u8g2gl_state_saver, sets the clip
- * window to the effective clip through u8g2gl_apply_clip(), calls the object's
- * render(), and resets the clip window to the full display.
+ * In order: skips the object if it or any ancestor is hidden; otherwise saves
+ * draw colour and font with u8g2gl_state_saver, sets the clip window to the
+ * effective clip (own bounds intersected with every ancestor's) with a
+ * u8g2gl_clip_scope, calls the object's render() unless that clip is empty or
+ * off the display, and lets the scope reset the clip window to the full
+ * display before the saver restores colour and font.
  *
- * Clip lifetime is this function's responsibility, not the state saver's: it
- * sets the clip, renders, and resets it. U8G2 cannot report its clip window, so
- * nothing can save and restore it, and a widget must not set one of its own —
- * it would replace the ancestor-intersected clip rather than narrow it.
+ * Clip lifetime is this function's responsibility, not the state saver's: its
+ * u8g2gl_clip_scope sets the clip and resets it, the same guard a generated
+ * draw call inside a bound container uses (§13.5). U8G2 cannot report its clip
+ * window, so nothing can save and restore it, and a widget must not set one of
+ * its own — it would replace the ancestor-intersected clip rather than narrow
+ * it.
  *
  * Generated screen render functions call this once per object in document
  * order, and the editor build calls the same function, so the firmware and the
