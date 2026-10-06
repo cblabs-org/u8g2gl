@@ -4,7 +4,7 @@
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #9 (PR-4R2). Next PR-4R3 (small, must precede PR-05), then PR-05. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #10 (PR-4R3). **Next PR-05** — first board, first PR in esp32-app-foundation; ship runtime 0.7.0 with it. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
 
 ## Active Projects
 | Project | Status | Modules | Context |

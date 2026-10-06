@@ -14,9 +14,9 @@ consumed together.
 ## The compatibility rule
 
 Generated code records the schema version and generator version that produced it
-(design_spec §13.2), and asserts **two** floors at compile time (§16):
+(design_spec §13.2), and asserts **two** version requirements at compile time (§16):
 
-| Requirement | Floor | Comparison |
+| Requirement | Pinned to | Comparison |
 |---|---|---|
 | `U8G2GL_REQUIRE_SCHEMA_VERSION` | The schema the generator wrote for | Equality: major, and minor while the major is 0 |
 | `U8G2GL_REQUIRE_RUNTIME_VERSION` | The runtime version the generator was **built beside** | Floor: major equal, runtime minor ≥ the floor's |

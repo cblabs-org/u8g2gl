@@ -1382,19 +1382,22 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 **This resolves a real ambiguity.** The shipped manifests currently spell both as `setter=` — `u8g2gl_box.xml` uses `setter="drawBox"`, naming a U8G2 method, while `u8g2gl_label.xml` uses `setter="set_text"`, naming a runtime method. The same attribute meant two different things.
 
-**A `<bind>` that re-declares a setter already bound in its `extends` chain must
-use the inherited binding's name.** `<bind name="bind_when" setter="bind_x" />`
-is refused, and so is a `type` the inherited setter — or, on a drawing manifest,
-the target prop — does not accept. A manifest declaring a binding for its own
-prop or its own method names it freely; the rule bites only on an inherited
-setter rebound under a different name. Both are checked on widget and composite
-manifests alike, because a manifest is data ([D-17]) and unvalidated data is a
-crash with extra steps.
+Two constraints apply to a `<bind>` declaration.
 
-The geometry case is why this is a rule rather than a style preference. [D-20]'s
-bindable geometry resolves its origin, its clamp and its anchor by the binding's
-**name**, so a geometry setter reached under a different name silently receives
-none of them and the generated call does not compile. The diagnostic is
+**A binding onto geometry must use [D-20]'s name for that axis** — `bind_x`,
+`bind_y`, `bind_width`, `bind_height` — whether the prop is inherited or the
+element's own. [D-20] resolves a bound coordinate's origin, its clamp and its
+anchor by the binding's *name*, so a geometry prop reached under any other name
+silently receives none of them.
+
+**A binding that re-declares a setter already bound in its `extends` chain must
+use the inherited binding's name**, and must declare a `type` that setter — or,
+on a drawing manifest, the target prop — accepts. `<bind name="bind_when"
+setter="bind_x" />` is refused on both counts.
+
+Otherwise a manifest names its own bindings freely. Both constraints are checked
+on widget and composite manifests alike, because a manifest is data ([D-17]) and
+unvalidated data is a crash with extra steps. The diagnostic is
 `U8G2GL_BINDING_ALIAS`; the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
 
 *Why the code names appear here and not in a list.* §15.3 makes diagnostic codes a stable contract, and the CLI's `DIAGNOSTIC_CODES` is where they are defined. A catalogue of them in this document would be a second copy that drifts, which is the argument this programme applies everywhere else. A code is named beside the rule that raises it, as `U8G2GL_UNKNOWN_FONT` is in §15.3.
@@ -1943,8 +1946,8 @@ direction: the case this guard exists for is the user who upgrades the CLI and
 forgets the library.
 
 **A runtime older than the macro cannot answer the question at all.** The
-generated guard is therefore preceded by an `#ifndef` that names the required
-floor, so that runtime — the one the check most exists to catch — reports a
+generated guard is therefore wrapped in an `#ifndef` that guards the call and
+names the required floor, so that runtime — the one the check most exists to catch — reports a
 refusal rather than a syntax error.
 
 **The runtime floor is the runtime version the generator was built beside, not the generator's own version.** The CLI and the runtime are numbered independently and have already diverged — CLI 0.10.0 against runtime 0.6.0 — so a floor taken from the generator's own number would demand a runtime that does not exist. They do, however, ship from one repository at one commit, so the CLI stamps the runtime version it was built alongside (read from `u8g2gl_version.h`, the way `CMakeLists.txt` already reads it) and emits that as the floor. A newer runtime is fine; an older one is not.
@@ -2150,6 +2153,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-13** | **`$prop` interpolation inside text.** A whole-value `$name` substitutes; `text="Hi $who"` does not, and is a hard error as of PR-04 (WO7b) rather than passing `$who` through to generated output. Interpolation is additive, so §1.5 applies: defer until a real composite needs a composed string, then decide at the next schema bump | Next schema bump |
 | **Q-14** | **Send only dirty tiles.** [D-4]'s redraw stays full-frame. The question is whether to *send* only the tiles covered by the union of dirty object bounds, including each moved or hidden object's previous bounds, using U8G2's `updateDisplayArea()`. Measure bus time per frame, whole buffer against dirty tiles only, on I²C and on SPI, for one real departures-board screen. Adopt it only if the saving matters. U8G2 can also cap how many tiles go out per call, which fits `ui_handler()`'s cooperative scheduling ([D-15]). Prior art: UiUiUi ([concept.md §4.2](concept.md)) | Q-4 / Phase 1 exit |
 | **Q-15** | **A "cards" element** — one container showing exactly one of its children, chosen by an integer subject, equivalent to UiUiUi's `UICards`. Today this takes `bind_flag_if` on every child, which is clumsy. It would switch between modes or pages within one region of a screen — the mechanism a carousel would drive. It is *not* a modal: modals need overlays and z-order beyond document order, which ui_spec §7.3 excludes, and a cards element needs neither. It would be a *mechanism*. Carousel *policy* stays in `modules/U8G2GLDisplay`, as ui_spec §7.3 already rules. It adds schema surface, so §1.5 applies: defer until E-3's navigation design or a departures-board carousel actually needs it | E-3 |
+| **Q-17** | **Manifest diagnostics locate at the element, not the attribute.** An `extends` that names an unknown element, a drawing element or a cycle, and a `<bind>` refused by §13.1, all report at the `<widget>` tag rather than the attribute at fault. §15.1 requires **file, line and column** and the offending text, and §1.2 makes diagnostics the product rather than polish, so this is the spec unmet rather than a nicety. It needs the manifest parser to record attribute locations, which it does not today. Found by PR-4R3's PA (2026-10-06); it does not block PR-05, and the editor will feel it hardest — a property panel that can only say "something in this manifest" is not much of a panel. **Trigger:** the next PR that touches the manifest parser, or E-1, whichever comes first | E-1 |
 | **Q-16** | **Children that follow their container.** Schema 0.4 forbids children inside a container whose position is bound (§7.2), because children's positions are fixed at build time. That rules out sliding panels and carousels — the very cases where you'd bind a container's position. Lifting it needs no layout pass: the runtime already walks each object's ancestors every frame for clipping and visibility ([A-3]), and adding up the ancestors' origins in that same walk would move children with their parent. That's translation, not layout, so [D-7] and [D-20] still hold. It touches every render path, so it waits until a real screen needs it — probably alongside Q-15 in E-3 | E-3 |
 
 ---

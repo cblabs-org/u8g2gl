@@ -1435,3 +1435,84 @@ what the handshake catches.
   on `u8g2gl-generator/wo13-readability`, a branch merged at PR-04, so it lacks
   everything since. The hazard is the checkout, not the skill — it has now
   produced two near-misses.
+
+---
+
+## 2026-10-06 — PR-4R3 ingested (merged as #10, `15296b4`)
+
+C++ 395 → **401**, CLI 1319 → **1338**, zero warnings. Schema 0.4 unchanged;
+**CLI 0.11.0, runtime 0.7.0**.
+
+The three holes that would have surfaced inside PR-05 — in the wrong repository
+— are closed. **PR-05 must now ship runtime 0.7.0**, because every project
+regenerated with CLI 0.11.0 requires it.
+
+### Two Chief Architect errors, both caught before dispatch
+
+This PR is worth recording mainly for how it went rather than what it built.
+
+1. **The runtime floor was defined as "the generator's own major.minor".** The
+   CLI and the runtime are numbered independently *by design* and had already
+   diverged — 0.10.0 against 0.6.0 — so that rule would have made every project
+   demand a runtime that does not exist. Caught by the Chief Architect while
+   writing the bridge; corrected in `783e189` to "the runtime the CLI was built
+   beside", stamped from `u8g2gl_version.h`.
+
+2. **The comparison was specified as the schema check's.** §16 said "compare the
+   major, and the minor while the major is 0" for both requirements. That is an
+   *equality*'s shape — `U8G2GL_REQUIRE_SCHEMA_VERSION` is a `static_assert`
+   with `==` — and on a floor it means the minor is ignored from 1.0 onward,
+   which is exactly where additive API arrives. Caught by the PA during scoping.
+   Ruled: major equal, runtime minor ≥ the floor's, at every version.
+
+   The PA's framing is the useful part: *"the same flaw as §13.5's 'gets an
+   object': the text as written cannot meet its own intent."* That is now twice
+   in three PRs. **A normative rule needs its success path stated, not only its
+   failure.**
+
+3. The bridge also proposed a remedy for the `extends` hole — "`u8g2gl_obj` plus
+   a `draw=` prop" — that the validator refuses (`DRAWING_ELEMENT_EXTENDS`).
+   The PA measured it through the built CLI rather than assuming the bridge was
+   right. The diagnostic now names the two routes that do work.
+
+**All three were found by a PA scoping against the real code before writing a
+work order.** Keep that step even when a bridge looks settled.
+
+### Rulings
+
+- **R1 — the floor comparison.** Major equal, runtime minor ≥ the floor's, at
+  every version, with the pre-1.0 residual accepted and recorded: a breaking
+  runtime minor can satisfy the floor and still fail, degrading to a plain
+  compile error. The common direction — upgrade the CLI, forget the library —
+  is the one the guard catches.
+- **R2 — one code.** `U8G2GL_GEOMETRY_BINDING_ALIAS` → `U8G2GL_BINDING_ALIAS`.
+  One check raises one code; the message carries the specifics. Two codes would
+  force every `--json` consumer to branch on both, which is the opposite of what
+  §15.3 promises. Nothing published, so the rename costs nobody anything.
+- **R3 — versions.** CLI 0.11.0 and runtime 0.7.0 both within `rules/03` agent
+  autonomy, and both required.
+- **Spec authorship.** The Chief Architect wrote the §16, §13.1 and §6.5
+  wording; the PA landed it verbatim in the PR, so spec and code arrived
+  together. That is the pattern to repeat — the spec stays Tier 1's, the
+  atomicity stays the PR's.
+
+### Post-merge corrections, from the PA's own review of the landed text
+
+- **§13.1 now states two constraints, not one with a carve-out.** The paragraph
+  said a manifest "names its own bindings freely", which read as permitting a
+  custom drawing element to alias its *own* geometry prop — a case the code
+  refuses, correctly, because [D-20] keys origin and clamp by name. Restated as:
+  a binding onto geometry uses [D-20]'s name, own or inherited; a binding
+  re-declaring an inherited setter uses the inherited name; otherwise free.
+- **`rules/03` called both requirements "floors"** beside a column saying the
+  schema one is an equality. Fixed.
+- **§16's "preceded by an `#ifndef`"** → "wrapped in an `#ifndef` that guards
+  the call", which is what shipped.
+
+### Q-17 opened
+
+Manifest diagnostics locate at the `<widget>` element rather than the attribute
+at fault — for a bad `extends`, a cycle, and a refused `<bind>` alike. §15.1
+requires file, line and column with the offending text, so this is the spec
+unmet rather than a nicety. It needs the parser to record attribute locations.
+Trigger: the next PR touching the manifest parser, or E-1.
