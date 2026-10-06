@@ -41,7 +41,7 @@
  *                 literal width and height, whether it is written as an attribute,
  *                 an inline `style_radius` or a named style (§10), and whether the
  *                 element is a drawing element or an object. Measured against
- *                 the pinned U8G2 (PR-4R WO3): past it `u8g2_box.c`'s band
+ *                 the pinned U8G2 (test/test_rbox_bound.cpp): past it `u8g2_box.c`'s band
  *                 `w - r - r` wraps and U8G2 draws outside the box; up to it,
  *                 including the capsule `2*r == min`, nothing is drawn outside.
  *                 The runtime clamps to the same bound at draw time

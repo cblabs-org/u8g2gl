@@ -5,7 +5,7 @@
 **Parent**: [PROGRAM.md](../PROGRAM.md) — next after PR-04b, before PR-05
 **Source**: Chief Architect bridge "PR-4R2: carried corrections from PR-4R" (pasted by the owner,
 2026-10-05), carrying PR-4R's findings: [CA-BRIDGE-2026-09-28-PR4R.md](../pr-4r-corrections/CA-BRIDGE-2026-09-28-PR4R.md) items 3, 5, 6 and the radius help text
-<!-- Last updated: 2026-10-05 -->
+<!-- Last updated: 2026-10-06 -->
 
 ## Mandate
 
@@ -102,7 +102,7 @@ Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xm
 - [x] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** ✅ `68f89b6` · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0, runtime 0.6.0, scene format 3
 - [x] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** ✅ `5ea99c6` · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
 - [x] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** ✅ `85685dd` · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
-- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
+- [x] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** ✅ `5d5c248` · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
 
@@ -180,3 +180,12 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   runtime-clamp wording, because `u8g2gl_draw_box` clamps too and "U8G2 draws outside" is no longer
   what happens; P4 banner split skipped. Reviewer noted the main checkout's copy of
   `u8g2gl-standards` lacks §4.1 (this worktree's has it): for the owner. WO4 dispatched.
+- **2026-10-06** — **WO4 complete, `5d5c248`.** PA verified at the tip from a clean configure,
+  each suite alone: C++ **395 / one skip**, 0 warnings; CLI **1319**, `tsc`, lint clean; built CLI
+  0.10.0. Golden diff: the one emitted render-comment line, in four `ui_screen_*.cpp` goldens. No
+  radius assertion pinned the old box wording. PA's own fix: the re-wrap had moved a pre-existing
+  "(PR-4R WO3)" onto a changed line in `validate-geometry.ts`'s header; replaced with the pinned
+  test's path (§4.1). No added line in `86d3f89..HEAD` carries a work-order tag.
+- **2026-10-06** — **PR-4R2 implementation complete.** Chief Architect bridge:
+  [CA-BRIDGE-2026-10-06-PR4R2.md](CA-BRIDGE-2026-10-06-PR4R2.md). From 383 / 1281 to **395 / 1319**,
+  zero warnings. Schema 0.4, CLI 0.10.0, runtime 0.6.0, scene format 3.
