@@ -161,8 +161,8 @@ three rulings, the two PA readings above, and the four-WO decomposition below, w
 
 ## Work Order Decomposition
 
-- [ ] **[WO1 — generated code asserts a runtime floor](wo1-runtime-floor/WORKORDER.md)** · `u8g2gl-4r3/wo1-runtime-floor` · base `main` @ `783e189` · standard · item 1, R1, R3 · CLI 0.11.0, runtime 0.7.0
-- [ ] **WO2 — `extends` must name an element with a class** · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
+- [x] **[WO1 — generated code asserts a runtime floor](wo1-runtime-floor/WORKORDER.md)** ✅ `69f8b7d` · `u8g2gl-4r3/wo1-runtime-floor` · base `main` @ `783e189` · standard · item 1, R1, R3 · CLI 0.11.0, runtime 0.7.0
+- [ ] **[WO2 — `extends` must name an element with a class](wo2-extends-class/WORKORDER.md)** · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
 - [ ] **WO3 — a `<bind>` may not alias an inherited setter** · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
 - [ ] **WO4 — readability review and remediation** · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
 
@@ -181,6 +181,16 @@ reason. WO2 and WO3 both touch `schema/diagnostic.ts`, so they stack.
   immediately after the table, keeps the stamp paragraphs, and removes only the comparison
   sentences before the table. Every word of R1 lands; nothing contradicting it remains. Check the
   diff in the PR.
+- **rules/03 lead-in now disagrees with its own table** (WO1). The pre-existing sentence says
+  generated code "asserts **two** floors" and the middle column is headed `Floor`, while the new
+  `Comparison` column says the schema requirement is an equality. Your words, so not touched.
+  Suggest "two requirements" and a column header such as `Compared against`.
+- **Version literals pinned in tests** (WO1). `cli/test/integration/generate.test.ts` pins the CLI
+  version in three places, so every CLI bump fails it until edited. Worth a line on whatever bump
+  checklist exists, or reading the version from `package.json` in the test.
+- **Fresh worktrees need `extern/u8g2`** (WO1). Configure fails until
+  `git submodule update --init --reference ../U8G2GL/extern/u8g2 extern/u8g2`. Relevant to every
+  PA and to PR-05's setup notes.
 
 ## Session Log
 
@@ -190,3 +200,18 @@ reason. WO2 and WO3 both touch `schema/diagnostic.ts`, so they stack.
   owner; rulings R1–R3 recorded above. Owner approved (quoted). Worktree `../U8G2GL-4r3` created
   on `u8g2gl-4r3/wo1-runtime-floor` from `origin/main`, upstream removed. Rule
   `00-operating-model.md` identical to the skill's asset. WO1 dispatched.
+- **2026-10-06** — **WO1 complete, `69f8b7d`.** PA verified from a clean configure, each suite
+  alone: C++ **401 / one skip** (395 + six `VersionGuard` tests), **0** warnings; CLI **1326**,
+  `tsc`, lint clean. Golden diff: the 9 guard lines in each of the two config goldens, nothing else.
+  `OlderRuntimeFailsToCompile` matched on "this code was generated for runtime 0.7 + 1 or newer, but
+  this runtime is 0.7.0"; `PreMacroRuntimeFailsByName` compiles the **committed** fixture config
+  against a frozen 0.6.0 header and matches the `#error`. Drift test reads the real header and has
+  a doctored-header case (worker showed it failing against the stale 0.6.0 stamp). Built CLI
+  reports 0.11.0; a fresh project's config compiles against this runtime and against the frozen
+  header fails first on `#error "This code requires u8g2gl runtime 0.7 or newer…"`. §16 and rules/03
+  carry R1's text, placed as recorded above. **Carried to WO4:** (1) clang continues past `#error`
+  and adds "a type specifier is required" on the macro line — put the call in an `#else`; emitted
+  text changes within unreleased 0.11.0, no further bump. (2) The `static_assert` message says
+  "generated for runtime M.m or newer", which misdescribes refusing a *newer major*; state the
+  requirement (major M, minor ≥ m). Worker added `VersionGuard.GeneratedConfigCompiles` as the
+  control for the pre-macro test — kept. WO2 dispatched on `u8g2gl-4r3/wo2-extends-class`.
