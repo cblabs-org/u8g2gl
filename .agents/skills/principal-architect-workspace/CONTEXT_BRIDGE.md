@@ -315,11 +315,14 @@ parser, or E-1.
 
 ### Setting up a fresh PA worktree — three things that have cost time
 
-- **The U8G2 submodule is not initialised automatically.** Before configuring:
+- **The U8G2 submodule is not initialised automatically**, and since PR-05 every
+  submodule is `update = none` (so a PlatformIO consumer's recursive clone fetches
+  none of them). Plain `--init` now skips it silently; `--checkout` is required:
   `git submodule update --init --checkout --reference ../U8G2GL/extern/u8g2 extern/u8g2`
-- **`cli/test/.../generate.test.ts` pins the CLI version literally**, so every
-  version bump breaks it. It should read `package.json`; until it does, expect
-  it and fix it in the same commit as the bump.
+- **A CLI version bump breaks one test, deliberately.** `cli/test/integration/generate.test.ts`
+  "the 0.11.0 proof" pins the version literally, because a stamp compared against the
+  file it came from proves no bump happened. Update it in the same commit as the
+  bump. Every other assertion reads `package.json` (PR-05 ruling R2).
 - **`refresh-goldens.mjs` reads `dist/`**, so a rebuild must come first or it
   regenerates goldens from stale output — which looks like success.
 

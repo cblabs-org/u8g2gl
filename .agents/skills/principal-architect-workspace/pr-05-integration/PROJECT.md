@@ -95,8 +95,10 @@ Stacked `u8g2gl-integration/wo<N>-<topic>`, serial.
 
 ### U8G2GL
 
-- **[ ] [wo1-packaging](wo1-packaging/WORKORDER.md):** `library.json`, version agreement at
-  configure time, submodules `update = none`, the incidental version literal. *Dispatched.*
+- **[x] [wo1-packaging](wo1-packaging/WORKORDER.md):** `library.json`, version agreement at
+  configure time, submodules `update = none`, the incidental version literal. **Complete and
+  verified by the PA.** Pushed. **Pin: `69c37e01f75198a4aa3fa84b8926fcf139e30f02`** (code). The tip
+  `47618b5` adds only the report.
 
 ### Foundation (ledger of record: the twin `PROJECT.md`)
 
@@ -130,3 +132,18 @@ pushed commit, so it is serial after both.
 
 - **2026-10-06 — scoping and dispatch.** Scoped both repos read-only; the findings are above.
   Owner approved. Worktrees created. WO-A and WO-B1 Part 1 dispatched in parallel.
+- **2026-10-06 — WO-A verified.**
+  - **Suites:** re-run by the PA, sequentially, from a clean build directory: C++ 401 (1 skip,
+    `SizeOfReport.ThirtyTwoBitTarget`), CLI 1338, lint clean, zero warnings. Baselines held.
+  - **Configure refusal:** demonstrated by the worker (`library.json` 0.7.1 → "Runtime version
+    mismatch: library.json says 0.7.1 …").
+  - **Fresh recursive clone:** 13 MB, with no submodule populated.
+  - **PlatformIO consumer:** `esp32dev`, `framework = arduino, espidf`,
+    `lib_compat_mode = strict`, pinned to `69c37e0`. Builds with `u8g2gl @ 0.7.0+sha.69c37e0` and
+    `U8g2 @ 2.36.18`. `libdeps/u8g2gl` is 10 MB and `extern/u8g2` is empty (PA re-checked).
+  - **Carried to WO-B2:** the consumer needed `CONFIG_FREERTOS_HZ=1000` and
+    `CONFIG_AUTOSTART_ARDUINO=y`, which are dual-framework settings. Confirm foundation sets them.
+  - **Fixed by the PA:** the stale `CONTEXT_BRIDGE.md` note on the version pin (worker finding).
+    Older dated workspace records showing `--init` without `--checkout` are left as history.
+  - **For the owner:** `library.json` names the author "Matthew McNeill" with an email address.
+    The source headers say "Matt McNeill (CB Labs)". Which should the published manifest carry?
