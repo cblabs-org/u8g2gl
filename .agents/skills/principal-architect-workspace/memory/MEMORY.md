@@ -1,14 +1,15 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-10-06T12:30:00Z — was: 2026-10-05T22:30:00Z -->
+<!-- Last updated: 2026-10-06T18:00:00Z — was: 2026-10-06T12:30:00Z -->
 
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #10 (PR-4R3). **Next PR-05** — first board, first PR in esp32-app-foundation; ship runtime 0.7.0 with it. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #10 (PR-4R3). **PR-05 in progress** — two repos; packaging here, integration in esp32-app-foundation. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
 
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-05-integration | **Executing** — WO-A (packaging) and foundation WO-B1 Part 1 dispatched. Builds in foundation wait on the PlatformIO MCP (R4). Worktrees `../U8G2GL-05`, `../esp32-app-foundation-u8g2gl`. Twin PROJECT.md in foundation `pr-u8g2gl-05` | Packaging / Integration | [PROJECT.md](../pr-05-integration/PROJECT.md) |
 | pr-4r3-corrections | **Submitted** — 4/4 WOs, PR from `u8g2gl-4r3/wo4-readability`. C++ 401 / CLI 1338, CLI 0.11.0, runtime 0.7.0 (every regenerated project needs runtime ≥ 0.7). CA bridge written. Owner approved 2026-10-06. Worktree `../U8G2GL-4r3` | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-4r3-corrections/PROJECT.md) |
 | pr-4r2-corrections | **Submitted** — 4/4 WOs, PR from `u8g2gl-4r2/wo4-readability`. C++ 395 / CLI 1319, CLI 0.10.0, runtime 0.6.0. CA bridge written. Owner approved decomposition + rulings 2026-10-05. Worktree `../U8G2GL-4r2` | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-4r2-corrections/PROJECT.md) |
 | pr-04b-font-image-pipeline | **Submitted** — 7/7 WOs, PR from `u8g2gl-fonts/wo6-readability`. C++ 383 / CLI 1281, CLI 0.9.0. CA bridge: 9 items | Host Tooling | [PROJECT.md](../pr-04b-font-image-pipeline/PROJECT.md) |
