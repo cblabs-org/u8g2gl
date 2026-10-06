@@ -162,8 +162,8 @@ three rulings, the two PA readings above, and the four-WO decomposition below, w
 ## Work Order Decomposition
 
 - [x] **[WO1 — generated code asserts a runtime floor](wo1-runtime-floor/WORKORDER.md)** ✅ `69f8b7d` · `u8g2gl-4r3/wo1-runtime-floor` · base `main` @ `783e189` · standard · item 1, R1, R3 · CLI 0.11.0, runtime 0.7.0
-- [ ] **[WO2 — `extends` must name an element with a class](wo2-extends-class/WORKORDER.md)** · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
-- [ ] **WO3 — a `<bind>` may not alias an inherited setter** · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
+- [x] **[WO2 — `extends` must name an element with a class](wo2-extends-class/WORKORDER.md)** ✅ `9351366` · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
+- [ ] **[WO3 — a `<bind>` may not alias an inherited setter](wo3-binding-alias/WORKORDER.md)** · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
 - [ ] **WO4 — readability review and remediation** · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
@@ -215,3 +215,12 @@ reason. WO2 and WO3 both touch `schema/diagnostic.ts`, so they stack.
   "generated for runtime M.m or newer", which misdescribes refusing a *newer major*; state the
   requirement (major M, minor ≥ m). Worker added `VersionGuard.GeneratedConfigCompiles` as the
   control for the pre-macro test — kept. WO2 dispatched on `u8g2gl-4r3/wo2-extends-class`.
+- **2026-10-06** — **WO2 complete, `9351366`.** PA verified, each suite alone: CLI **1331**, `tsc`,
+  lint clean; C++ unchanged (401 / one skip); goldens unchanged. Built CLI on the scoping probes:
+  `extends="u8g2gl_box"` → exactly one error, `U8G2GL_EXTENDS_DRAWING_ELEMENT`, message names both
+  working routes; `generate` refuses, nothing written. Own drawing element and
+  `extends="u8g2gl_obj"` validate clean; `extends="u8g2gl_obj"` + `draw=` prop still gets
+  `DRAWING_ELEMENT_EXTENDS` only (no double report). **Accepted:** after the refusal the child keeps
+  the parent's props — measured 1 error versus 5 (four "unknown attribute" cascades) when it
+  inherits nothing; pinned by a test. Location limit recorded under "For the Chief Architect".
+  WO3 dispatched on `u8g2gl-4r3/wo3-binding-alias`.
