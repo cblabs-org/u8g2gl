@@ -35,6 +35,15 @@
 // changes land in minor bumps (§15.4).
 U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 
+// Refuses to compile against a runtime older than the one this generator was
+// built beside (§16). A floor, not an equality: a newer runtime minor is fine.
+// A runtime that predates the check does not define the macro, and would
+// report a syntax error instead of a refusal, so say what is needed here.
+#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION
+#error "This code requires u8g2gl runtime 0.7 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
+#endif
+U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);
+
 // --- Static capacities, counted from this document ([D-21]) ---
 // Every value is exact, so add_binding() cannot fail in generated code: the
 // pool was sized from the very bindings being added ([D-21] decision 4).

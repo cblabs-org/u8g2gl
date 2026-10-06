@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "CLI and schema toolkit for U8G2GL",
   "license": "MIT",
   "type": "module",
@@ -23,6 +23,7 @@
     "dist/",
     "src/data/catalogue.json",
     "src/data/manifests.json",
+    "src/data/runtime-version.json",
     "src/data/page-mode-map.json",
     "src/data/bdfconv/bdfconv-wasm.json",
     "LICENSES/"
@@ -31,6 +32,7 @@
     "build": "node scripts/clean-dist.mjs && tsc",
     "build:catalogue": "tsx src/node/build-catalogue.ts",
     "build:manifests": "tsx src/node/build-manifests.ts",
+    "build:runtime-version": "tsx src/node/build-runtime-version.ts",
     "build:bdfconv": "tsx src/node/build-bdfconv.ts",
     "test": "vitest run",
     "lint": "eslint . && tsc -p tsconfig.test.json"

@@ -342,7 +342,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     const res = await runCli(['generate', dir]);
 
     expect(res.code).toBe(0);
-    expect(res.stdout).toContain("u8g2gl 0.10.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
+    expect(res.stdout).toContain("u8g2gl 0.11.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
     expect(res.stdout).toContain('  FLASH');
     expect(res.stdout).toContain('  RAM (static)');
     expect(res.stdout).toContain('  CAPACITY (generated — see u8g2gl_generated_config.h)');
@@ -457,17 +457,19 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(Object.keys(parsed)).toEqual(['files', 'diagnostics', 'errors', 'warnings']);
   });
 
-  it('stamps the package version into a freshly generated project — the 0.10.0 proof', async () => {
+  it('stamps the package version into a freshly generated project — the 0.11.0 proof', async () => {
     // Pinned literally, not read from package.json: a test that compares the
     // stamp against the same file it came from passes at every version and
     // therefore proves no bump ever happened (the 0.9.0 bump was a new
-    // capability, with no existing valid input's output changing).
-    expect(packageVersion).toBe('0.10.0');
+    // capability, with no existing valid input's output changing; 0.11.0 is an
+    // output change with no input change, the runtime floor in every generated
+    // config, so §13.9 requires the bump).
+    expect(packageVersion).toBe('0.11.0');
     const dir = createProject();
     expect((await runCli(['generate', dir])).code).toBe(0);
     const header = readFileSync(join(dir, 'generated/u8g2gl_generated_config.h'), 'utf-8');
-    expect(header).toContain('// generator: 0.10.0');
-    expect((await runCli(['--version'])).stdout.trim()).toBe('0.10.0');
+    expect(header).toContain('// generator: 0.11.0');
+    expect((await runCli(['--version'])).stdout.trim()).toBe('0.11.0');
     // And the goldens are not dragged along by the bump: they are pinned.
     expect(header).not.toContain('0.0.0-golden');
   });

@@ -21,7 +21,8 @@
  *          (.agents/rules/03-versioning.md).
  *
  * Description: Runtime version, the schema version this runtime implements, and
- *              the static_assert hook a generated header invokes.
+ *              the two static_assert hooks a generated header invokes: one for
+ *              the schema (an equality) and one for the runtime (a floor).
  *
  * Exported Constants:
  *
@@ -34,6 +35,8 @@
  *
  * Exported Macros:
  * - U8G2GL_REQUIRE_SCHEMA_VERSION(): compile-time refusal of a mismatched schema version
+ * - U8G2GL_REQUIRE_RUNTIME_VERSION(): compile-time refusal of a runtime older than the
+ *                                     floor the code was generated for
  */
 #ifndef U8G2GL_VERSION_H
 #define U8G2GL_VERSION_H
@@ -42,7 +45,7 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 6  ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 7  ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements
@@ -72,9 +75,11 @@
  * checking only the major would let a project generated for 0.3 compile against
  * a 0.4 runtime without any error. From 1.0 on, only the major is compared.
  *
- * Schema version rather than generator or runtime version: the schema and §13
- * are the contract generated code is written against, and the CLI and runtime
- * are versioned independently (.agents/rules/03-versioning.md).
+ * This guard answers "does this runtime implement the vocabulary the code was
+ * written for?", which only equality can. The separate question "does this
+ * runtime have the API the code calls?" is U8G2GL_REQUIRE_RUNTIME_VERSION().
+ * The CLI and runtime are versioned independently
+ * (.agents/rules/03-versioning.md).
  *
  * The refusal message names both versions — the one the code was generated for
  * and the one this runtime implements.
@@ -93,5 +98,44 @@
         U8G2GL_VERSION_STR(U8G2GL_SCHEMA_VERSION_MINOR)                           \
         ". Regenerate with a u8g2gl CLI matching the runtime, or use a matching " \
         "runtime.")
+
+/**
+ * @brief Refuse to compile if the runtime is older than the one the code needs.
+ *
+ * A generated header invokes this once, at namespace scope, with the runtime
+ * version the generator was built beside (§16):
+ *
+ * @code
+ * #include "u8g2gl/u8g2gl_version.h"
+ * U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);
+ * @endcode
+ *
+ * Unlike the schema guard this is a **floor**, not an equality: the major must
+ * be equal and this runtime's minor must be at least @p minor, at every version
+ * (§16). API accretes, so a newer runtime minor still has everything the code
+ * calls, and comparing the minor only while the major is 0 would ignore it from
+ * 1.0 on, where new API arrives in minor releases. The patch is not compared.
+ *
+ * The refusal message names both versions: the floor the code was generated for
+ * and the version of this runtime.
+ *
+ * A runtime that predates this macro cannot refuse by itself, so generated code
+ * precedes the call with `#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION` and an
+ * `#error` naming the floor (§16).
+ *
+ * @param major Runtime major version the generated code requires; must equal this runtime's.
+ * @param minor Lowest runtime minor version the generated code requires.
+ */
+#define U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)                              \
+    static_assert((major) == U8G2GL_VERSION_MAJOR &&                              \
+                  (minor) <= U8G2GL_VERSION_MINOR,                                \
+        "U8G2GL runtime too old or mismatched: this code was generated for "      \
+        "runtime " U8G2GL_VERSION_STR(major) "." U8G2GL_VERSION_STR(minor)        \
+        " or newer, but this runtime is "                                         \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_MAJOR) "."                              \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_MINOR) "."                              \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_PATCH)                                  \
+        ". Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI "   \
+        "matching the runtime.")
 
 #endif // U8G2GL_VERSION_H

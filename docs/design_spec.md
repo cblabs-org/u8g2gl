@@ -1897,12 +1897,37 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 | **Arduino IDE** | Run the CLI manually; commit `generated/`. Documented as the supported flow. |
 | **CI** | `u8g2gl validate` plus a check that `generated/` is current (regenerate, fail on diff) |
 
-The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements, and both are compared on the major version **and on the minor while the major is 0**. Before 1.0 breaking changes land in minor bumps (§15.4), so checking only the major would let a project generated for 0.3 compile against a 0.4 runtime without any error.
+The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements.
 
 | Requirement | Emitted as | Guards against |
 |---|---|---|
 | **Schema** | `U8G2GL_REQUIRE_SCHEMA_VERSION(major, minor)` | A runtime that implements a different XML vocabulary |
 | **Runtime** | `U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)` | Generated code that calls runtime API the linked runtime does not have |
+
+The two requirements compare differently, because they ask different questions.
+
+The **schema** question is "does this runtime implement the vocabulary this code
+was written for?", which only equality answers: the major, and the minor while
+the major is 0, because before 1.0 breaking vocabulary changes land in minor
+bumps (§15.4). A 0.3 project must not compile against a 0.4 runtime.
+
+The **runtime** question is "does this runtime have the API this code calls?".
+API accretes, so this is a **floor**: the major must be equal and the runtime's
+minor must be at least the floor's, at every version. Applying the schema's
+shape here would ignore the minor from 1.0 onward, and a post-1.0 minor is
+exactly where new API arrives — code generated against 1.2 would compile
+against a 1.0 runtime lacking everything 1.1 and 1.2 added.
+
+*Accepted residual.* Before 1.0 a runtime minor may break rather than add, so a
+newer runtime can satisfy the floor and still fail to compile. That degrades to
+an ordinary compile error, which is visible, and it is much the rarer
+direction: the case this guard exists for is the user who upgrades the CLI and
+forgets the library.
+
+**A runtime older than the macro cannot answer the question at all.** The
+generated guard is therefore preceded by an `#ifndef` that names the required
+floor, so that runtime — the one the check most exists to catch — reports a
+refusal rather than a syntax error.
 
 **The runtime floor is the runtime version the generator was built beside, not the generator's own version.** The CLI and the runtime are numbered independently and have already diverged — CLI 0.10.0 against runtime 0.6.0 — so a floor taken from the generator's own number would demand a runtime that does not exist. They do, however, ship from one repository at one commit, so the CLI stamps the runtime version it was built alongside (read from `u8g2gl_version.h`, the way `CMakeLists.txt` already reads it) and emits that as the floor. A newer runtime is fine; an older one is not.
 
