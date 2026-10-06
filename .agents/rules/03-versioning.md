@@ -19,11 +19,19 @@ Generated code records the schema version and generator version that produced it
 | Requirement | Floor |
 |---|---|
 | `U8G2GL_REQUIRE_SCHEMA_VERSION` | The schema the generator wrote for |
-| `U8G2GL_REQUIRE_RUNTIME_VERSION` | The **generator's own** major.minor |
+| `U8G2GL_REQUIRE_RUNTIME_VERSION` | The runtime version the generator was **built beside** |
 
 Both compare the major version, and **also the minor while the major is 0**,
 because before 1.0 breaking changes land in minor bumps. Checking only the major
 would let a 0.3 project compile against a 0.4 runtime without any error.
+
+**The runtime floor is not the generator's own version.** These two numbers are
+independent by design and have already diverged (CLI 0.10.0, runtime 0.6.0), so
+a floor taken from the generator's number would demand a runtime that does not
+exist. They ship from one repository at one commit, so the CLI stamps the
+runtime version in the tree it was built from and emits that — which is
+automatic, and means a CLI can never require API newer than the runtime it
+shipped beside.
 
 The runtime floor exists because the generator and the runtime are shipped
 separately and consumed together, so a project can sit on a current CLI and a
