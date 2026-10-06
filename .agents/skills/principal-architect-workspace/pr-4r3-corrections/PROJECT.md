@@ -164,7 +164,7 @@ three rulings, the two PA readings above, and the four-WO decomposition below, w
 - [x] **[WO1 — generated code asserts a runtime floor](wo1-runtime-floor/WORKORDER.md)** ✅ `69f8b7d` · `u8g2gl-4r3/wo1-runtime-floor` · base `main` @ `783e189` · standard · item 1, R1, R3 · CLI 0.11.0, runtime 0.7.0
 - [x] **[WO2 — `extends` must name an element with a class](wo2-extends-class/WORKORDER.md)** ✅ `9351366` · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
 - [x] **[WO3 — a `<bind>` may not alias an inherited setter](wo3-binding-alias/WORKORDER.md)** ✅ `626ff59` · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
-- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
+- [x] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** ✅ `5650a77` · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
 
@@ -243,3 +243,24 @@ reason. WO2 and WO3 both touch `schema/diagnostic.ts`, so they stack.
   all P4 skipped (the `@code` example mirrors the schema macro's; `RuntimeVersion` lives under
   `node/`, which core data must not import; banner and long test lines pass lint). The `#else`
   change moves goldens inside unreleased 0.11.0 — no further bump. WO4 dispatched.
+- **2026-10-06** — **WO4 complete, `5650a77`.** All seven P3s fixed. PA verified **the stack tip**
+  from a clean configure, each suite alone: C++ **401 / one skip**, **0** warnings; CLI **1338**,
+  `tsc`, lint clean; built CLI 0.11.0. A fresh project's config compiles clean under
+  `-Wall -Wextra -Wpedantic` against this runtime and fails against the frozen 0.6.0 header with
+  **exactly one** error, the `#error`. Golden diff vs `main`: 22 added lines across the two config
+  goldens, nothing else. No added line in `783e189..HEAD` carries a work-order tag.
+- **2026-10-06** — **PR-4R3 implementation complete.** Chief Architect bridge:
+  [CA-BRIDGE-2026-10-06-PR4R3.md](CA-BRIDGE-2026-10-06-PR4R3.md). From 395 / 1319 to **401 / 1338**,
+  zero warnings. Schema 0.4, CLI **0.11.0**, runtime **0.7.0**, scene format 3.
+
+### Project Wrap-Up
+
+- **Outcome.** Generated code now refuses, by name, a runtime below the floor it was built beside,
+  including a runtime that predates the check; the stamp cannot go stale without failing a test. A
+  class can no longer extend a drawing element, and an inherited setter can no longer be rebound
+  under another name — one code, `U8G2GL_BINDING_ALIAS`, for the whole rule.
+- **Lesson, again: scope against the real code before writing a work order.** Two of three bridge
+  items as written had no success path (the item-2 remedy; a floor compared on the minor only while
+  the major is 0). Both were found by running the built CLI and reading the code, not by reasoning
+  from the bridge.
+- **Unresolved, with the Chief Architect:** the five notes above.
