@@ -5,7 +5,7 @@ title: "Generated code asserts the runtime it needs"
 branch: u8g2gl-4r3/wo1-runtime-floor
 base: main @ 783e189
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO1 — §16's runtime floor, stamped, emitted, and refused by name
@@ -239,3 +239,58 @@ complete | partial | blocked
 ### Blockers
 (none)
 ```
+
+---
+## Completion Report
+
+### Status
+complete
+
+### Baseline and final counts
+| Suite | Baseline | Final |
+|---|---|---|
+| C++ ctest (clean configure, build 0 warnings under `-Wall -Wextra -Wpedantic`) | 395, one skip (`SizeOfReport.ThirtyTwoBitTarget`) | **401**, same one skip (+6 VersionGuard), 0 warnings |
+| CLI vitest | 1319 (89 files) | **1326** (90 files; +4 stamp tests, +3 emitter tests) |
+| `tsc`, lint | clean | clean |
+
+### Changes Made
+- `include/u8g2gl/u8g2gl_version.h` — `U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)` beside the schema macro, Doxygen in the same depth; header Description and Exported Macros updated; the schema macro's "Schema version rather than generator or runtime version" paragraph replaced so the header no longer implies the runtime is unchecked. Runtime 0.6.0 -> 0.7.0.
+- `CMakeLists.txt` — `project(... VERSION 0.7.0)`.
+- `test/CMakeLists.txt`, `test/version_guard/{runtime_floor_match,runtime_newer_minor,runtime_older,runtime_major}.cpp`, `test/version_guard/pre_macro/` (frozen 0.6.0 header + `include_generated_config.cpp`) — six new CTests, all in the `u8g2gl_build_tree` RESOURCE_LOCK. `test_version.cpp` needed no change.
+- `cli/src/node/runtime-version-header.ts` (shared parser), `cli/src/node/build-runtime-version.ts`, `cli/src/data/runtime-version.{json,ts}`, `package.json` script `build:runtime-version` and `files` entry.
+- `cli/src/core/generator/emit/generated-config.ts` — `#ifndef`/`#error` block and the macro call after the schema guard; module header updated.
+- `cli/test/data/runtime-version.test.ts` (drift), `cli/test/generator/emit-golden.test.ts` (emitter), `cli/test/integration/generate.test.ts` (three literals `0.10.0` -> `0.11.0` and the comment saying why; this pinned test necessarily moves with the CLI bump).
+- CLI 0.11.0 in `cli/package.json` and `package-lock.json`.
+- Goldens refreshed (two files); `docs/design_spec.md` §16; `.agents/rules/03-versioning.md` compatibility section.
+
+### Decisions Made
+- **Message wording.** Emitted `#error`: "This code requires u8g2gl runtime 0.7 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime." Runtime `static_assert`: "U8G2GL runtime too old or mismatched: this code was generated for runtime X.Y or newer, but this runtime is A.B.C. Update ... or regenerate ...". It names the runtime's full version (patch included) and the floor as major.minor.
+- **Stamp format.** `{"major","minor","patch"}` JSON plus a typed `RUNTIME_VERSION` accessor. The header parser is its own module (`runtime-version-header.ts`) so the build script and the drift test share one reading of the header; the script cannot be imported by a test because it runs `main()` on load. The drift test's doctored-header case compares against a stamp derived from the real header, so it stays valid at any stamp state.
+- **Pre-macro test compiles emitted text.** `include_generated_config.cpp` includes the committed `test/generated_fixture/generated/u8g2gl_generated_config.h` with the frozen header's directory first on the include path; no hand-written copy of the guard. I added a control, `VersionGuard.GeneratedConfigCompiles` (same TU against the real runtime), so the refusal cannot be a broken fixture. That is the sixth new test.
+- **CTest regexes.** Older/major cases match the message shape with the floor expression as written (`[^,]+`) and this runtime's exact version from `PROJECT_VERSION_*`, so they follow bumps. The pre-macro regex builds `requires u8g2gl runtime <major>.<minor> or newer` from the same variables.
+- Emitted comment says "so say what is needed here" (plain, no work-order tags).
+
+### Evidence
+- **Drift test fails against the stale stamp.** With `runtime-version.json` at 0.6.0 and the header at 0.7.0: `× runtime version stamp > matches include/u8g2gl/u8g2gl_version.h` -> `"minor: stamp says 6, header says 7; run \`npm run build:runtime-version\`"`. After `npm run build:runtime-version` (`Stamped runtime 0.7.0`), 4/4 pass. The doctored-header test (minor+1) is the non-vacuity proof.
+- **Failing-first C++.** Before the emitter change, `VersionGuard.PreMacroRuntimeFailsByName` failed with `Required regular expression not found. Regex=[requires u8g2gl runtime 0\.7 or newer]`; it passes once the goldens carry the `#error`.
+- **Matched lines (message, not mere failure).**
+  - Older: `runtime_older.cpp:22:1: error: static assertion failed due to requirement '(7 + 1) <= 7': U8G2GL runtime too old or mismatched: this code was generated for runtime 0.7 + 1 or newer, but this runtime is 0.7.0. Update the u8g2gl runtime library, ...`
+  - Major: `... requirement '(0 + 1) == 0': U8G2GL runtime too old or mismatched: this code was generated for runtime 0 + 1.7 or newer, but this runtime is 0.7.0. ...`
+  - Pre-macro: `u8g2gl_generated_config.h:43:2: error: "This code requires u8g2gl runtime 0.7 or newer, but the runtime in use predates the runtime version check. ..."` (the follow-on `a type specifier is required for all declarations` at line 45 is the syntax error the `#error` exists to pre-empt).
+- **Golden diff.** `git diff --stat`: two files, 9 insertions each, 0 deletions (`cli/test/generator/fixtures/emit-project/expected/u8g2gl_generated_config.h`, `test/generated_fixture/generated/u8g2gl_generated_config.h`); the hunk is exactly the 9 guard lines (comment, `#ifndef`, `#error`, `#endif`, `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);`, blank). Nothing else in any golden moved.
+- **Built CLI end to end.** `node cli/dist/node/cli.js --version` -> `0.11.0`. Generated `emit-project` copy in `tmp/e2e`; emitted guard block is the one above. (a) `c++ -std=c++17 -Wall -Wextra -Wpedantic -Iinclude` on the config header: compiles, 0 diagnostics. (b) Against the frozen 0.6.0 header: `error: "This code requires u8g2gl runtime 0.7 or newer, ..."`.
+- **Boundary.** `git diff --name-only 783e189..HEAD` is within the box plus the WORKORDER/PROJECT/MEMORY files from the PA's own commit `029c9aa` (not mine).
+- **§16 and rules/03 diffs**: see `git show 69f8b7d -- docs/design_spec.md .agents/rules/03-versioning.md`. §16: the "both are compared on the major..." sentences removed leaving "Generated code carries **two** version requirements."; R1 text inserted verbatim after the table; the stamp paragraphs and "*Why the runtime check is needed...*" kept. rules/03: `Comparison` column added (schema: "Equality: major, and minor while the major is 0"; runtime: "Floor: major equal, runtime minor ≥ the floor's"), old "Both compare the major version..." paragraph replaced by R1's two sentences.
+- **Commit.** `69f8b7d` (code, tests, docs). Report commit follows it.
+
+### Dead Ends & Warnings
+- The submodule `extern/u8g2` was uninitialised in the new worktree, so configure failed. I ran `git submodule update --init --reference ../U8G2GL/extern/u8g2 extern/u8g2` (no tracked-file change). Worth noting for the other worktrees.
+- `vitest`'s globalSetup runs `tsc`, so a missing `runtime-version.json` breaks the whole suite, not just the new test; I wrote the stale 0.6.0 stamp by hand to demonstrate the drift failure.
+- The stringified expression in the major case reads `0 + 1.7` (the minor and major macros are stringified separately); cosmetic, only for the test inputs.
+
+### Out-of-Scope Findings
+- `test/integration/generate.test.ts` pins the CLI version literally in three places, so every CLI bump needs a hand edit there. Intentional per its own comment, but it is a recurring cost; the PA may want to say so in the bump checklist.
+- The golden fixture's `test/generated_fixture` is regenerated by `refresh-goldens.mjs` from `dist/`, so `npx tsc` must be run first; a stale `dist/` would silently refresh the old output.
+
+### Blockers
+(none)
