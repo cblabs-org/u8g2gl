@@ -99,7 +99,7 @@ if(U8G2GL_BUILD_TESTS)
         message(FATAL_ERROR
             "The U8G2 submodule is not initialised (${U8G2GL_U8G2_DIR} has no "
             "cppsrc/U8g2lib.h). The host tests compile the runtime against it. "
-            "Run:\n  git submodule update --init extern/u8g2\n"
+            "Run:\n  git submodule update --init --checkout extern/u8g2\n"
             "or configure with -DU8G2GL_BUILD_TESTS=OFF to build the library only.")
     endif()
 

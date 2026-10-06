@@ -316,7 +316,7 @@ parser, or E-1.
 ### Setting up a fresh PA worktree — three things that have cost time
 
 - **The U8G2 submodule is not initialised automatically.** Before configuring:
-  `git submodule update --init --reference ../U8G2GL/extern/u8g2 extern/u8g2`
+  `git submodule update --init --checkout --reference ../U8G2GL/extern/u8g2 extern/u8g2`
 - **`cli/test/.../generate.test.ts` pins the CLI version literally**, so every
   version bump breaks it. It should read `package.json`; until it does, expect
   it and fix it in the same commit as the bump.
