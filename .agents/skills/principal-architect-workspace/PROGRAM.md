@@ -1349,3 +1349,89 @@ Q-2 closure, §22's dependency table and §22.1's licence sentence, and §4.1 of
 standards' `documentation.md` — the comment-citation rule, including the half
 that stops it becoming noise: **pre-existing citations are not defects and a
 reviewer must not raise them.**
+
+---
+
+## 2026-10-06 — PR-4R2 ingested (merged as #9, `1ac1be6`)
+
+C++ 383 → **395**, CLI 1281 → **1319**, zero warnings, one known skip. Schema
+0.4 unchanged; **CLI 0.10.0, runtime 0.6.0, scene format 3**.
+
+Two of the four items could not be built as the bridge specified them, and the
+PA was right both times. The owner's rulings were taken **before** work started
+and are quoted verbatim in `pr-4r2-corrections/PROJECT.md` — rule 00's trust
+anchor used properly.
+
+### Rulings
+
+1. **Item 1: clip, don't force an object. The Chief Architect's §13.5 was
+   wrong.** A drawing element has no class, so "gets an object" had no object to
+   get; the condition's only reachable outcome was a refusal, and that refusal
+   would have made a bound box inside a composite — a level bar in a card —
+   unwritable. Banning a legitimate design to preserve a rule whose purpose is
+   that authors never notice realisation had the cost and the benefit the wrong
+   way round. The bullet is **removed from the "an object is emitted when"
+   list** and §13.5 now states the clipping rule directly, with the measurement
+   (30 and 56 stray pixels before, 0 after).
+
+2. **Item 2's finding was stale, and what replaced it was worse.** The carried
+   `time`-on-a-coordinate case was already refused. The real gap was a
+   manifest's own `<bind>` reaching a setter under another name — accepted,
+   then generating a call that did not compile, because [D-20] keys origin,
+   clamp and anchor by the binding's *name*. §13.1 now carries the rule.
+
+   **Declined: a diagnostic-code list in §15.** The PA asked for
+   `U8G2GL_GEOMETRY_BINDING_ALIAS` to be listed there. The spec has no such
+   list, and starting one duplicates the CLI's `DIAGNOSTIC_CODES` and will
+   drift — the same argument this programme applies to everything else. Codes
+   are named beside the rule that raises them, as §15.3 already does.
+
+3. **Item 3 accepted, including its awkward consequence:** a label inherits
+   `radius`, draws nothing round, and is refused an oversized one too. The
+   alternative is a rule conditioned on what an element *happens* to draw,
+   which the manifest does not say. Measured before enforced — the second time
+   measurement has set this bound, and the first time it agreed with the
+   prediction.
+
+4. **Item 4** — the bound is now in the help text, which under `[UD-5]` is the
+   only place it reaches an author.
+
+### The runtime version handshake — the finding that mattered
+
+Generated code asserts the **schema** version and has never asserted the
+**runtime** version. §16 and rules/03 both described a guardrail that was only
+half built.
+
+**Ruled:** generated code emits `U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)`,
+floor = the generator's own major.minor, compared on major *and* minor while
+major is 0. `u8g2gl_version.h` already has the version macros, so the work is
+the require-macro and its emission.
+
+The loud failure is survivable; the silent one is not. A stale pair in a project
+that happens to use no new API compiles clean, and the author learns nothing
+until a later edit reaches the gap.
+
+### Scoping correction — two items could not have gone where they were filed
+
+The PA filed the version handshake and the `extends="u8g2gl_box"` defect under
+"For PR-05". **PR-05 lands in `esp32-app-foundation`**; both are generator and
+runtime work in this repository, so PR-05 had nowhere to put them and would have
+discovered them mid-work, in the wrong repo, with a PA who does not own the
+generator.
+
+They become **PR-4R3**, with the non-geometry bind alias: small, and ahead of
+PR-05. Third remediation PR in a row, which is worth noticing — but 4R and 4R2
+cleaned up after large PRs, while 4R3 exists because PR-05 is the first time
+generated code meets a runtime the user builds separately, which is precisely
+what the handshake catches.
+
+### Also recorded
+
+- **PR-06 must link `u8g2gl_u8g2_csrc_arduino`.** Under `ARDUINO`, `u8x8.h`
+  adds `pins[]` to `u8x8_t`; the non-`ARDUINO` target gives two struct layouts
+  and a crash. PR-4R2's WO1 added the variant. In the ledger.
+- **The "standards skill is out of sync" report was not a defect.** §4.1 is on
+  `main`, and `u8g2gl-standards` is not a submodule. The main checkout is parked
+  on `u8g2gl-generator/wo13-readability`, a branch merged at PR-04, so it lacks
+  everything since. The hazard is the checkout, not the skill — it has now
+  produced two near-misses.

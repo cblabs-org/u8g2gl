@@ -1089,7 +1089,9 @@ Monochrome collapses the styling domain to a small set:
 | `font_mode` | `solid` / `transparent` | Text background |
 | `bitmap_mode` | `solid` / `transparent` | XBM background |
 
-**A rounded box's corner radius satisfies `2 · radius ≤ min(width, height)`.** The validator refuses a literal radius beyond it, and the runtime clamps a radius known only at run time — a bound size, or a radius arriving through a style — to the same bound, so both paths agree. At equality the corner discs meet and the shape is a capsule. That is intended, and it is what `u8g2gl_switch` draws by default.
+**A rounded box's corner radius satisfies `2 · radius ≤ min(width, height)`.** The validator refuses a radius beyond it **however it is configured** — as an attribute, as `style_radius`, or through a named style — whenever the element's width and height are literal, and the diagnostic names which of the three the value came from. Precedence is the one `init` applies: attribute, then `style_radius`, then the last named style in scope. The runtime clamps to the same bound whatever survives to run time — a bound size, or a style resolved late — so both paths agree.
+
+The check runs for any element whose manifest declares `radius`, not only those that draw a rounded shape. **A label inherits `radius` and draws nothing round, and is refused an oversized one too.** That is deliberate: the alternative is a rule conditioned on what an element *happens* to draw, which the manifest does not say and the validator cannot know. Measured (`test/test_radius_honoured.cpp`, 18 sizes × every radius): the button and the switch pass the requested radius to U8G2 unchanged exactly when `2 · radius ≤ min(width, height)`, and substitute `min/2` beyond it — the same boundary, so one rule covers every element that reads the property. At equality the corner discs meet and the shape is a capsule. That is intended, and it is what `u8g2gl_switch` draws by default.
 
 Past the bound, the band U8G2 draws between the corner discs — `w - r - r`, `u8g2_box.c:121-123` — wraps in `u8g2_uint_t`, the `>= 3` guard that follows still passes, and the box paints across the display.
 
@@ -1373,6 +1375,12 @@ A manifest declaring `draw=` and no class is a drawing element (§6.2); it can s
 
 **This resolves a real ambiguity.** The shipped manifests currently spell both as `setter=` — `u8g2gl_box.xml` uses `setter="drawBox"`, naming a U8G2 method, while `u8g2gl_label.xml` uses `setter="set_text"`, naming a runtime method. The same attribute meant two different things.
 
+**A `<bind>` may not reach a setter under another name.** `<bind name="bind_when" setter="bind_x" />` is refused, and so is a `type` the inherited setter — or, on a drawing manifest, the target prop — does not accept. Both are checked on the widget and composite manifests alike, because a manifest is data ([D-17]) and unvalidated data is a crash with extra steps.
+
+The geometry case is why this is a rule rather than a style preference. [D-20]'s bindable geometry resolves its origin, its clamp and its anchor by the binding's **name**, so a geometry setter reached under a different name silently receives none of them and the generated call does not compile. The alias diagnostic is `U8G2GL_GEOMETRY_BINDING_ALIAS` (PR-4R2); the type mismatch reuses `U8G2GL_TYPE_MISMATCH`.
+
+*Why the code names appear here and not in a list.* §15.3 makes diagnostic codes a stable contract, and the CLI's `DIAGNOSTIC_CODES` is where they are defined. A catalogue of them in this document would be a second copy that drifts, which is the argument this programme applies everywhere else. A code is named beside the rule that raises it, as `U8G2GL_UNKNOWN_FONT` is in §15.3.
+
 ### 13.2 Type mapping
 
 | `<prop>` type | XML value | Emitted C++ | Validation |
@@ -1469,10 +1477,33 @@ Concretely, an object is emitted when *any* of the following holds:
 - it is a member of a `<focus_ring>`;
 - it is a composite, or has children;
 - a parent composite's generated code holds a typed pointer to it;
-- it sits inside a container and its geometry is **bound**. Draw calls are not clipped to their container, so an overhanging draw-call child would paint where the same element as an object would be clipped, and realisation must not be observable ([D-18]). A child whose geometry is *literal* needs no such rule: §7.2 already refuses one that overhangs its container, so draw calls and an object agree.
-
 Otherwise the generator emits draw calls. **Nothing about the element's tag
 decides this** — a `<u8g2gl_label>` may be either, and so may a `<u8g2gl_box>`.
+
+#### A bound drawing element inside a container is clipped
+
+**A drawing element whose geometry is bound and which sits inside a container is
+drawn inside that container's effective clip, exactly as an object child is.**
+Draw calls are not otherwise clipped, so without this an overhanging draw-call
+child would paint where the same element realised as an object would be clipped
+— and realisation must not be observable ([D-18]). A child whose geometry is
+*literal* needs no clip: §7.2 already refuses one that overhangs.
+
+The guard costs nothing where it is not needed. It is emitted only where all
+three conditions hold — a drawing element, an enclosing object, and a bound
+argument — and the same decision serves the firmware and the editor scene, so
+the two cannot disagree.
+
+*Corrected 2026-10-06, by measurement.* This was originally written as a fourth
+realisation condition: such an element "gets an object". That was unbuildable. A
+drawing element has no class, so there is no object for it to get, and the only
+reachable outcome was a refusal that would have made a bound box inside a
+composite — a level bar in a card — unwritable. Banning a legitimate design to
+preserve a rule whose purpose is that authors never notice realisation had the
+cost and the benefit the wrong way round. Clipping reaches non-observability
+directly. Measured against real U8G2 (`test/test_bound_child_clip.cpp`): a
+bound-`x` box painted 30 pixels outside its container before the fix and a
+bound-`height` box 56; both are 0 after, and an object control is 0 either way.
 
 #### Bindings without an object
 
@@ -1866,7 +1897,16 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 | **Arduino IDE** | Run the CLI manually; commit `generated/`. Documented as the supported flow. |
 | **CI** | `u8g2gl validate` plus a check that `generated/` is current (regenerate, fail on diff) |
 
-The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. The runtime refuses to compile against a mismatched **schema** version: the major version, and **also the minor version while the major is 0**. Before 1.0, breaking changes land in minor bumps (§15.4), so checking only the major would let a project generated for 0.3 compile against a 0.4 runtime without any error.
+The runtime library ships as a PlatformIO library and an Arduino library. **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements, and both are compared on the major version **and on the minor while the major is 0**. Before 1.0 breaking changes land in minor bumps (§15.4), so checking only the major would let a project generated for 0.3 compile against a 0.4 runtime without any error.
+
+| Requirement | Emitted as | Guards against |
+|---|---|---|
+| **Schema** | `U8G2GL_REQUIRE_SCHEMA_VERSION(major, minor)` | A runtime that implements a different XML vocabulary |
+| **Runtime** | `U8G2GL_REQUIRE_RUNTIME_VERSION(major, minor)` | Generated code that calls runtime API the linked runtime does not have |
+
+The runtime floor is the **generator's own** major and minor: code generated by CLI 0.10.0 requires runtime ≥ 0.10.0. A newer runtime is fine; an older one is not.
+
+*Why the runtime check is needed and not merely tidy.* The two artefacts are built and shipped separately and consumed together, so a project can sit on a current CLI and a stale runtime indefinitely. The loud failure is survivable — generated code calling an absent helper fails to compile, confusingly but visibly. **The silent one is not:** the same stale pair, in a project that happens to use no new API, compiles clean and the author never learns the two are mismatched, until a later edit reaches the gap. This was found in PR-4R2, when a 0.10.0 project emitting `u8g2gl_clip_scope` met a 0.5.0 runtime.
 
 ---
 
@@ -2058,7 +2098,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | ~~Q-6~~ | ~~Framework licence~~ | **Resolved** — MIT, see §22 |
 | **Q-7** | The property panel needs conditional visibility (`visible_when`) — `scroll_px_per_sec` and friends are meaningless unless `long_mode` is a scrolling value ([D-19]). Additive schema; LVGL Pro has the identical problem and does not solve it | Phase 3 |
 | **Q-8** | **Repeaters.** A `<view>` is a static structure, so it can express "three carriages" but not "N carriages" (§6.5). A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be *designed* rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not. Schema surface, so §1.5 applies: defer until a real screen demonstrates the need | Phase 2 |
-| **Q-9** | **`setter=` has a third meaning.** On a `<bind>`, `setter=` names a *prop*, not a method: `<bind name="bind_width" setter="width">`. §13.1 says [D-18] removed `setter=`'s double meaning by introducing `draw=`, and this is a third one. Kept as-is for PR-04, because new manifest vocabulary needs a demonstrated need (§1.5). Resolve at the next schema bump — `prop=` is the obvious candidate | Next schema bump |
+| **Q-9** | **`setter=` has a third meaning.** On a `<bind>`, `setter=` names a *prop*, not a method: `<bind name="bind_width" setter="width">`. §13.1 says [D-18] removed `setter=`'s double meaning by introducing `draw=`, and this is a third one. **Sharpened by PR-4R2 (2026-10-06):** this is no longer only untidy. The overloaded attribute is what allowed a manifest to reach a geometry setter under another name, generating a call that did not compile, because [D-20] keys origin, clamp and anchor by the binding's *name*. §13.1 now refuses the alias, so the defect is closed — but it closed with a validation rule rather than by removing the ambiguity that produced it. The demonstrated need §1.5 was waiting for has arrived. Resolve at the next schema bump; `prop=` is the obvious candidate | Next schema bump |
 | **Q-10** | **Text properties live on the base object.** `font`, `align` and text binding are on `u8g2gl_obj`, so every element inherits them — including a box or a line that can't use them. The editor's property panel will show them. That conflicts with the standards' "do not grow `u8g2gl_obj` to serve one widget". Options: an intermediate text base class, or leave the C++ as it is and hide the properties per manifest. Decide before E-2 builds the property panel on top of it | E-2 |
 | **Q-11** | **The catalogue doesn't record its source.** [D-14] builds the display catalogue from U8G2's own tables, but `catalogue.json` doesn't record which U8G2 version or commit it came from, and the builder takes `--u8g2-path` without recording it. So the catalogue can't be reproduced, or diffed across a U8G2 upgrade. Record the source commit in the catalogue. **CLOSED by PR-04 WO4c (2026-09-15):** U8G2 is a git submodule at `extern/u8g2` pinned to 2.36.18, the builder defaults to it, and the tag and commit are recorded in `cli/src/data/catalogue-source.json` — a sibling file, so the `CATALOGUE` export's shape is unchanged | **Closed** |
 | **Q-12** | **`bind_src` / `bind_glyph`.** §6.3 used to list them, but no manifest declared them and nothing in the runtime implemented them, so they've been removed. Binding an image or icon glyph to a subject — a Wi-Fi strength icon, say — is the likely first real need. This is additive, a minor bump. Defer until a screen needs it | Phase 2 |

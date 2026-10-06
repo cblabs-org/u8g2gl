@@ -214,24 +214,28 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-05.**
+**Revised 2026-10-06.**
 
 ### Where the programme is
 
 Merged: **#1** PR-01 runtime core · **#2** PR-02 CLI/schema/validator · **#3**
 PR-03 widgets + `[U-1]` · **#4** PR-3R remediation to `[D-18]`–`[D-21]` · **#5**
 PR-04 the generator · **#6**+**#7** PR-4R corrections · **#8** PR-04b the font
-and image pipeline.
+and image pipeline · **#9** PR-4R2 (bound children clipped, `<bind>` aliasing
+refused, the radius bound checked however configured).
 
-Baselines at `main`: **C++ 383** tests (one known skip,
-`SizeOfReport.ThirtyTwoBitTarget`), **CLI 1281**, zero warnings. Schema **0.4**,
-CLI **0.9.0**, runtime **0.5.0**. U8G2 pinned at **2.36.18** (`d66b49af`) in
-`extern/u8g2`. *(Corrected 2026-10-05: the previous revision gave pre-merge
-figures — ~377 / ~1087 / 0.8.0 — which were wrong by one PR.)*
+Baselines at `main` @ `1ac1be6`: **C++ 395** tests (one known skip,
+`SizeOfReport.ThirtyTwoBitTarget`), **CLI 1319**, zero warnings. Schema **0.4**,
+CLI **0.10.0**, runtime **0.6.0**, scene format **3**. U8G2 pinned at
+**2.36.18** (`d66b49af`) in `extern/u8g2`. **Take these from a merged `main`,
+never from a report** — a PA's figures are correct when written and stale by the
+time they are read.
 
-**Next:** PR-4R2 (carried corrections), then **PR-05** (foundation integration,
-first real board), then PR-06, then the **PR-07 gate**. The editor track (E-D,
-then E-1..E-3) begins only on a GO — owner decision CA-1, 2026-10-05.
+**Next:** **PR-4R3** — small, and it must land before PR-05: the runtime
+version handshake, `extends` restricted to manifests that have a class, and the
+non-geometry `<bind>` alias. Then **PR-05** (foundation integration, first real
+board), PR-06, and the **PR-07 gate**. The editor track (E-D, then E-1..E-3)
+begins only on a GO — owner decision CA-1, 2026-10-05.
 
 PR-05's font risk is effectively nil: all twelve of departures-board-v3's font
 arrays are byte-identical to generator output, so its font work is renaming to
@@ -283,14 +287,26 @@ contract under `[UD-3]`, so it waits for E-1.
 
 Full reasoning for both: `PROGRAM.md`, 2026-10-05.
 
-### Carried code — PR-4R2
+### Carried code — now PR-4R3
 
-The clipping condition (§13.5 — a bound-geometry child of a container must be an
-object), refusing a `time` subject bound to a coordinate (§13.2 already requires
-matching types; it is unenforced), a build-time style-radius check where the
-size is literal, and the box manifest's `radius` help text. **The clipping
-condition must not slip past PR-05**, which is when generated code first reaches
-a real application.
+PR-4R2 cleared PR-4R's four carried items (#9). Three replace them, and the
+first is the reason PR-4R3 exists at all rather than waiting:
+
+1. **Generated code never asserts the runtime version** — only the schema's.
+   §16 and `rules/03` now specify `U8G2GL_REQUIRE_RUNTIME_VERSION`, floor = the
+   generator's own major.minor. **PR-05 is the first time generated code meets a
+   runtime the user builds separately**, and the dangerous case is the quiet
+   one: a stale pair using no new API compiles clean.
+2. **`extends` may name a drawing element**, which is accepted and then emits
+   method calls on a class with no such members. §6.5 requires `extends` to name
+   a manifest; it must also require one with a class.
+3. **A `<bind>` may alias an inherited non-geometry setter.** Harmless today —
+   which is exactly how the geometry alias began. Refuse it, after checking
+   nothing relies on it.
+
+**PR-06 owes one thing from PR-4R2:** link `u8g2gl_u8g2_csrc_arduino`, not
+`u8g2gl_u8g2_csrc`. Under `ARDUINO`, `u8x8.h` adds `pins[]` to `u8x8_t`; the
+mismatch is two struct layouts and a crash.
 
 ### Working trees — check every time
 
@@ -317,7 +333,19 @@ successful `git push origin main` proves nothing about where your commits landed
   that draw outside the box. Reasoning about a C function means reading *every*
   operation in it.
 - **Unifying duplicated logic is where defects hide.** Three of PR-3R's four
-  real defects surfaced that way, and PR-4R found another.
+  real defects surfaced that way, and PR-4R found another. PR-4R2 found both of
+  its real problems in the same place — object vs draw call, attribute vs
+  style, widget vs composite manifest.
+- **A rule whose only outcome is an error is probably unbuildable.** §13.5's
+  "a bound container child gets an object" could never succeed: a drawing
+  element has no class to instantiate, so every path through the condition
+  ended in a refusal. When writing a normative rule, say what its *success*
+  looks like; if there isn't one, the rule is a ban wearing a requirement's
+  clothes.
+- **A PA that pushes back on the spec is usually worth listening to**, and
+  PR-4R2 did it twice. Both times the owner ruled before work started, quoted
+  verbatim in `PROJECT.md`. That is the shape to insist on — not "the PA
+  disagreed and proceeded", but a recorded decision ahead of the work.
 - **Verify a PA's claim when it becomes permanent.** Reports have been accurate,
   but a claim that turns into spec wording (the 2039 font names, the 522 with
   capitals, zero case-folding collisions) is worth ten minutes against the
