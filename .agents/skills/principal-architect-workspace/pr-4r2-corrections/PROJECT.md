@@ -102,7 +102,7 @@ Item 4 as proposed: the `radius` help in `u8g2gl_box.xml` **and** `u8g2gl_obj.xm
 - [x] **[WO1 — a bound draw-call child is clipped to its container](wo1-bound-child-clip/WORKORDER.md)** ✅ `68f89b6` · `u8g2gl-4r2/wo1-bound-child-clip` · base `main` @ `86d3f89` · architect · item 1, ruling 1 · CLI 0.10.0, runtime 0.6.0, scene format 3
 - [x] **[WO2 — custom `<bind>` declarations are checked](wo2-bind-type-paths/WORKORDER.md)** ✅ `5ea99c6` · `u8g2gl-4r2/wo2-bind-type-paths` · base WO1 · standard · item 2
 - [x] **[WO3 — radius checked at build time wherever it is literal](wo3-radius-build-time/WORKORDER.md)** ✅ `85685dd` · `u8g2gl-4r2/wo3-radius-build-time` · base WO2 · standard · items 3, 4, ruling 2
-- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** in review · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
+- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** dispatched · `u8g2gl-4r2/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
 
@@ -171,3 +171,12 @@ one stated reason. WO2 and WO3 both touch the validator, so they stack rather th
   function (`validator/configured-radius.ts`) mirrors `styleLines()`. A `setter=` radius's message
   says the runtime clamps it, not that U8G2 draws outside — correct for objects. Carried to WO4:
   `u8g2gl_draw.h` says an over-bound radius is "clamped, not refused", now incomplete.
+- **2026-10-06** — Readability review over `86d3f89..HEAD` ([REVIEW.md](wo4-readability/REVIEW.md)):
+  **no P1**; §4.1 clean on every added line, no pre-existing citation raised. P2: the stale clip
+  ownership comment in `u8g2gl_state_saver.h`; `u8g2gl_draw.h`'s "clamped, not refused". P3:
+  "Two rules" → three; step-comment format in `checkBindDeclarations`; the emitted render comment
+  does not mention the clip. **PA decisions:** fix the emitted comment now (goldens move once,
+  inside unreleased 0.10.0, no further generator bump); unify the radius message's tail on the
+  runtime-clamp wording, because `u8g2gl_draw_box` clamps too and "U8G2 draws outside" is no longer
+  what happens; P4 banner split skipped. Reviewer noted the main checkout's copy of
+  `u8g2gl-standards` lacks §4.1 (this worktree's has it): for the owner. WO4 dispatched.
