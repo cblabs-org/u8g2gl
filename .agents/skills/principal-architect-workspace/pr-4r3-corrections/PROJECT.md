@@ -163,8 +163,8 @@ three rulings, the two PA readings above, and the four-WO decomposition below, w
 
 - [x] **[WO1 — generated code asserts a runtime floor](wo1-runtime-floor/WORKORDER.md)** ✅ `69f8b7d` · `u8g2gl-4r3/wo1-runtime-floor` · base `main` @ `783e189` · standard · item 1, R1, R3 · CLI 0.11.0, runtime 0.7.0
 - [x] **[WO2 — `extends` must name an element with a class](wo2-extends-class/WORKORDER.md)** ✅ `9351366` · `u8g2gl-4r3/wo2-extends-class` · base WO1 · standard · item 2, §6.5 clause
-- [ ] **[WO3 — a `<bind>` may not alias an inherited setter](wo3-binding-alias/WORKORDER.md)** · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
-- [ ] **WO4 — readability review and remediation** · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
+- [x] **[WO3 — a `<bind>` may not alias an inherited setter](wo3-binding-alias/WORKORDER.md)** ✅ `626ff59` · `u8g2gl-4r3/wo3-binding-alias` · base WO2 · standard · item 3, R2, §13.1 text
+- [ ] **[WO4 — readability review and remediation](wo4-readability/WORKORDER.md)** · `u8g2gl-4r3/wo4-readability` · base WO3 · standard
 
 WORKORDERs for WO2–WO4 are written at dispatch, against the code as it then stands.
 
@@ -224,3 +224,22 @@ reason. WO2 and WO3 both touch `schema/diagnostic.ts`, so they stack.
   the parent's props — measured 1 error versus 5 (four "unknown attribute" cascades) when it
   inherits nothing; pinned by a test. Location limit recorded under "For the Chief Architect".
   WO3 dispatched on `u8g2gl-4r3/wo3-binding-alias`.
+- **2026-10-06** — **WO3 complete, `626ff59`.** PA verified, each suite alone: CLI **1338**, `tsc`,
+  lint clean; C++ 401 / one skip; goldens unchanged; `git grep GEOMETRY_BINDING_ALIAS` outside
+  `.agents/` empty. Built CLI: label subclass `bind_foo` → `bind_text` refused, one
+  `U8G2GL_BINDING_ALIAS`, "Write name=\"bind_text\" … ([UD-5])"; PR-4R2's probe `d/` →
+  `BINDING_ALIAS` + `TYPE_MISMATCH`; custom drawing element `bind_foo` → own prop `filled` validates
+  clean. Step 2 is now "no inherited binding sharing this setter has this name"; Step 3's geometry
+  refusal kept and pinned by a new test (none existed). One `bindingAliasDiagnostic` words the
+  consequence by case. No shipped manifest or fixture relied on the alias. **Carried to WO4:**
+  the geometry message ends "(§8.4, [D-20]) (§13.1)"; Step 3's message says "bound under another
+  name" where nothing is inherited. Readability review started on `u8g2gl-4r3/wo4-readability`.
+- **2026-10-06** — Readability review over `783e189..HEAD` ([REVIEW.md](wo4-readability/REVIEW.md)):
+  **no P1, no P2**; 7 P3, 4 P4. Spec §6.5, §13.1, §16 and rules/03 landed intact and in place;
+  every new file has its header and SPDX. P3: the four carried items (`#else` guard; the floor's
+  "or newer" text and its two CTest regexes; one citation tail; Step 3's "own prop" wording), a
+  "WO8b" tag a re-wrap moved onto a changed line in `generated-config.ts`, missing TSDoc on
+  `RUNTIME_VERSION`, and an undefined "M" in a registry comment. **PA decisions:** all P3 fixed;
+  all P4 skipped (the `@code` example mirrors the schema macro's; `RuntimeVersion` lives under
+  `node/`, which core data must not import; banner and long test lines pass lint). The `#else`
+  change moves goldens inside unreleased 0.11.0 — no further bump. WO4 dispatched.
