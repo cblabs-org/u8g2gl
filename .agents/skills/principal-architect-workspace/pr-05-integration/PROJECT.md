@@ -184,8 +184,22 @@ PA where cited.
    a relative path. It reaches C units, where `static_assert` is not a keyword before C23. And it
    reaches libraries that cannot resolve `u8g2gl/`. Without it the runtime's binding pool keeps
    its default size.
-   - *To be measured* in foundation WO-B2 Part 2, which scopes the include to the runtime's
-     sources with a build middleware.
+   - **Measured (foundation WO-B2 Part 2): confirmed, and worse than predicted.** The project-wide
+     `-include` fails on the first unrelated library, before any C unit:
+     `u8g2gl_generated_config.h:30:10: fatal error: u8g2gl/u8g2gl_version.h: No such file or
+     directory`, first in the Arduino `FS` library and then in `PsychicHttp`.
+   - **What works:** a PlatformIO build middleware that adds the include to the runtime's own 15
+     sources only. It shrank `s_binding_pool` from 6144 B to 96 B, and `esp32dev` RAM from
+     63388 B to 57340 B. The generated header's comment should recommend that form, or the
+     runtime should take the header path by a macro.
+6. **`library.json` `frameworks: "arduino"` excludes the runtime from native and other
+   non-Arduino PlatformIO builds.** This was WO-A's own choice, because the runtime includes
+   `U8g2lib.h`.
+   - Foundation's native tests work around it by compiling the runtime through a test-local
+     unity file.
+   - `"*"` would match `platforms` and let PlatformIO's library finder build it on native. It
+     needs a decision, since a native build then also needs U8G2's C symbols, which foundation
+     stubs out.
 - **2026-10-06 — history rewritten at the owner's instruction.** The owner asked for the contact
   address to be cleaned out of the history.
   - `git filter-branch --prune-empty --tree-filter` over `1254eb3..u8g2gl-05/wo1-packaging`
