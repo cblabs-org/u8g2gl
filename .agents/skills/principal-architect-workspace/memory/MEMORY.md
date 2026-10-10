@@ -4,7 +4,7 @@
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #10 (PR-4R3). **PR-05 verified** — packaging merged (#11); foundation integration held off its `main` until a cut-over (R10). Next: runtime-fixes PR (findings 1–3), PR-06, PR-07 gate on branch evidence. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — merged through #10 (PR-4R3). **PR-05 verified** — packaging merged (#11); foundation integration held off its `main` until a cut-over (R10). Next: **PR-05R** — all six findings, ruled 2026-10-10, before PR-06. Criterion 1's 0-pixel result must be re-measured after it: the legacy module was setting the font position. Then PR-06, PR-07 gate on branch evidence. CA-1 and CA-2 closed 2026-10-05: the editor track (E-D, then E-1..3) runs after the PR-07 gate |
 
 ## Active Projects
 | Project | Status | Modules | Context |

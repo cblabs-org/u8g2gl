@@ -1516,3 +1516,107 @@ at fault — for a bad `extends`, a cycle, and a refused `<bind>` alike. §15.1
 requires file, line and column with the offending text, so this is the spec
 unmet rather than a nicety. It needs the parser to record attribute locations.
 Trigger: the next PR touching the manifest parser, or E-1.
+
+---
+
+## 2026-10-10 — PR-05 ingested (U8G2GL #11 merged; foundation held)
+
+The first PR to leave this repository, and the first time generated code reached
+firmware on real hardware. **U8G2GL half merged as #11** (`3bc2a08`); packaging
+only, so counts are unchanged at C++ 401 / CLI 1338. **Foundation half held as a
+draft** — [esp32-app-foundation#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292)
+— per the owner's [R10]. Foundation native tests 989 → 1018.
+
+### [R10] and what it changes
+
+> *"We will continue to develop and merge in the u8g2gl repo as normal. I just
+> don't want to destabilise the esp32-app-foundation until we are at a more
+> mature stage."*
+
+PD-4's freeze trigger moves from "PR-05 lands" to **the cut-over**;
+`modules/U8G2Display` stays active on foundation `main`. Every plan dependency
+reading "PR-05 lands" now reads **"PR-05 verified on its branch"**, PR-07's
+included. Restated in `implementation_plan.md` §2 and §5.
+
+### The most important thing in the report, which the bridge understated
+
+**Criterion 1's evidence is conditional on an unfixed defect.** Pixel identity
+passed on host *and* device — 0 differing pixels, owner-confirmed three times,
+which is the strongest result the hardest criterion has produced. But the bridge
+also notes that foundation "is unaffected only because its legacy module sets
+[`setFontPosTop`]". The font position that made those pixels correct was set by
+the module the cut-over deletes.
+
+So the evidence is not wrong, and it is not yet evidence about U8G2GL. **It must
+be re-measured after PR-05R, with the legacy module out of the picture.**
+Recorded against the gate row in `PROGRAM-PLAN.md` so a later reader does not
+take the 0-pixel result as settled.
+
+### Gate evidence — the verdict is PR-07's, but two measurements are missing
+
+- **Criterion 1 — passed**, subject to the re-measurement above.
+- **Criterion 3 — met, tightly.** 85.5% of an app partition that legacy already
+  had at 84.9%, 228 KB free. The headroom is the application's, not the
+  framework's, and the report should say so.
+- **Criterion 2 — compares the wrong pair.** The criterion reads "the XML is
+  materially shorter and clearer than *the C++ it replaces*". The PA measured
+  whole board against whole board (138 authored lines against 99), which answers
+  a different question. What is needed: **how many of legacy's 99 lines did the
+  33 lines of XML replace?** That is a reading of `DiagnosticsBoard.cpp`, not a
+  new experiment. **The total rising 39% stands as a finding regardless** — both
+  numbers belong in the report, and part of the growth was the PA's own
+  testability refactor rather than a framework cost. "Clearer" is a judgement no
+  line count delivers, and the gate asks for one: requested as a written
+  paragraph with the two files side by side.
+- **Criterion 4 — fails on the letter, and the decomposition is the finding.**
+  +4.99 s per round, of which the generator is 0.05 s and compilation is
+  *0.75 s faster*. The entire gap is PlatformIO's library dependency scan over
+  three more libraries. The architecture made the loop faster; the packaging made
+  it slower. **Try `lib_ldf_mode` and explicit `lib_deps` before PR-07 argues
+  about it** — an hour that either removes the regression or proves it
+  structural. Reporting a build-system default as an architecture result would be
+  the wrong conclusion from the right data.
+
+### PR-05R — all six findings, not three
+
+The PA asked for a fixes PR covering findings 1–3 "at least". Ruled: **all six**,
+as **PR-05R** rather than PR-4R4, because the name should say where the findings
+came from. Before PR-06, whose snapshots finding 1 would poison exactly as it
+conditioned PR-05's.
+
+Findings 4, 5 and 6 are not makeweights. A project whose screens are silently
+ignored (exit 0, "0 screens") is the failure §1.2 and §15.1 exist to forbid; the
+generated header's PlatformIO advice does not work and the form that does cuts
+the binding pool from 6144 B to 96 B, which is a §18 number; and a workaround in
+the first consumer is our packaging being wrong, not theirs.
+
+### Arduino packaging — deferred, and §16 corrected
+
+§16 claimed the runtime "ships as a PlatformIO library and an Arduino library",
+which was not true. Arduino 1.5 compiles only `src/` while the public headers are
+in `include/u8g2gl/`, so serving it means relocating headers (breaking the CMake
+and PlatformIO layout) or carrying a second include path.
+
+**Ruled: defer, build it after the gate as a flattened release artefact**, and
+say so in the spec with the reason. A spec claiming an absent capability is worse
+than one admitting the gap — and [D-11] commits `generated/` *for* Arduino IDE
+users, so this must not become permanent by default. Opened as **Q-18**.
+
+### The downstream pin makes merge strategy load-bearing
+
+Foundation pins the runtime at `82ec83f`, an intermediate work-order commit
+reachable from `main` only through #11's merge commit. A squash would orphan it.
+The bridge asked for a no-squash policy; **a policy is a weak guarantee for
+something a build depends on.** Recorded in `rules/04`, with the robust fix: the
+owner tags the commit, foundation pins the tag, and the constraint stops
+mattering.
+
+### Worth recording about this PR
+
+**[R1] is what made a held branch possible.** Making `U8G2GLDisplay` a board host
+inside the legacy carousel, rather than an owner of the display, is why the
+foundation half can sit as a draft without destabilising anything.
+
+**[R8] is how evidence becomes trustworthy.** Fixing the legacy board's defects
+in *both* boards, and re-running pixel identity after the fixes, meant the
+comparison was fair rather than flattering. The order was right.

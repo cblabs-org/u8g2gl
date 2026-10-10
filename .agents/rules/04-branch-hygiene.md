@@ -65,3 +65,19 @@ problem.
 
 Say plainly what happened. A quietly repaired mistake is one nobody can learn
 from, and this rule exists only because the first incident was written down.
+
+## A downstream pin makes merge strategy load-bearing
+
+`esp32-app-foundation`'s held integration branch pins the U8G2GL runtime by
+**git commit** — an intermediate work-order commit, reachable from `main` only
+through its PR's merge commit. A squash merge would make it unreachable and
+eventually collectable, breaking a branch nobody is currently looking at.
+
+**So: merge U8G2GL PRs with merge commits, not squash, while any downstream
+branch pins a bare commit.**
+
+That is a policy, and a policy is a weak guarantee for something a build depends
+on. **The robust fix is a tag**, which is a ref and is never collected. Tagging
+is an owner action (`.agents/rules/03-versioning.md`), so the sequence is: the
+owner tags the pinned commit, the downstream branch pins the tag, and this
+constraint stops mattering. Until then, treat it as real.

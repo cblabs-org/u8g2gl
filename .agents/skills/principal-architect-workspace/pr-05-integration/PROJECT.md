@@ -247,3 +247,54 @@ PA where cited.
       gates it.
   - **Unresolved:** the Arduino packaging decision; runtime findings 1–6; the plan wording for R10.
   - **Foundation layout questions** are filed as esp32-app-foundation#293.
+
+---
+
+## Chief Architect ingest — 2026-10-10
+
+Rulings in `PROGRAM.md` (2026-10-10). In short:
+
+- **The runtime fixes are `PR-05R`, and all six findings are in scope**, not
+  findings 1–3. Findings 4, 5 and 6 are not makeweights: silently ignoring a
+  project's screens is the failure §1.2 and §15.1 forbid; the generated header's
+  PlatformIO advice does not work, and the form that does cuts the binding pool
+  from 6144 B to 96 B; and a workaround in the first consumer is our packaging
+  being wrong. PR-05R runs **before PR-06**.
+- **Arduino packaging deferred**, built after the gate as a flattened release
+  artefact. §16 corrected — it had claimed the Arduino library already ships —
+  and opened as **Q-18**, because [D-11] commits `generated/` for that audience.
+- **The plan is restated for [R10]**: PD-4's freeze trigger moves to the
+  cut-over, and "PR-05 lands" reads "PR-05 verified on its branch" throughout.
+- **The pinned commit should become a tag.** A no-squash policy is a weak
+  guarantee for something a build depends on; recorded in `rules/04` with the
+  tag as the robust fix (owner action under `rules/03`).
+
+### ⚠ Criterion 1's evidence is conditional — re-measure after PR-05R
+
+Pixel identity passed with **0 differing pixels** on host and device, which is
+the strongest result the hardest criterion has produced. But it was obtained
+with foundation's **legacy** module setting `setFontPosTop()` — finding 1 — and
+the cut-over deletes that module.
+
+The result is not wrong. It is not yet evidence about U8G2GL. **It must be
+re-measured once PR-05R makes the framework set the font position itself**, and
+`evidence/EVIDENCE.md` in the foundation workspace should carry this caveat
+beside the figure so a later reader does not take it as settled.
+
+### Gate evidence — still to produce
+
+- **Criterion 2** was measured whole-board against whole-board (138 authored
+  lines against 99). The criterion asks about "the C++ it replaces": **how many
+  of legacy's 99 lines did the 33 lines of XML replace?** A reading of
+  `DiagnosticsBoard.cpp`, not a new experiment. The 39% total rise stands as a
+  finding either way, and the share attributable to the testability refactor
+  should be separated from framework cost. "Clearer" needs a written judgement
+  with the two files side by side — the gate asks for one and a line count
+  cannot give it.
+- **Criterion 4**: try `lib_ldf_mode` and explicit `lib_deps` before PR-07
+  argues about it. The whole +4.99 s is PlatformIO's library scan; the generator
+  is 0.05 s and compilation is *faster*. An hour either removes the regression or
+  proves it structural.
+
+**The gate verdict is PR-07's, not the Chief Architect's.** These are
+measurements it will need, not a pre-emption of it.

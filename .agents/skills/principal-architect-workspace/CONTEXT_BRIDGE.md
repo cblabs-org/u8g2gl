@@ -214,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-06 (second revision, after #10).**
+**Revised 2026-10-10, after PR-05.**
 
 ### Where the programme is
 
@@ -223,21 +223,28 @@ PR-03 widgets + `[U-1]` · **#4** PR-3R remediation to `[D-18]`–`[D-21]` · **
 PR-04 the generator · **#6**+**#7** PR-4R corrections · **#8** PR-04b the font
 and image pipeline · **#9** PR-4R2 (bound children clipped, `<bind>` aliasing
 refused, the radius bound checked however configured) · **#10** PR-4R3 (the
-runtime version floor, `extends` restricted to elements with a class).
+runtime version floor, `extends` restricted to elements with a class) · **#11**
+PR-05's U8G2GL half (the runtime packaged as a PlatformIO library).
 
-Baselines at `main` @ `15296b4`: **C++ 401** tests (one known skip,
+**PR-05's foundation half is deliberately unmerged** —
+[esp32-app-foundation#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292),
+held as a draft by the owner's **[R10]** until a cut-over at "a more complete
+renderer". It is *verified* on its branch, with all four gate evidence sets. The
+U8G2GL repository continues to merge normally. Wherever a plan says "PR-05
+lands", read "PR-05 verified on its branch".
+
+Baselines at `main` @ `c32f2ca`: **C++ 401** tests (one known skip,
 `SizeOfReport.ThirtyTwoBitTarget`), **CLI 1338**, zero warnings. Schema **0.4**,
-CLI **0.11.0**, runtime **0.7.0**, scene format **3**. U8G2 pinned at
+CLI **0.11.0**, runtime **0.7.0**, scene format **3**. Foundation's held branch:
+native tests **1018**. U8G2 pinned at
 **2.36.18** (`d66b49af`) in `extern/u8g2`. **Take these from a merged `main`,
 never from a report** — a PA's figures are correct when written and stale by the
 time they are read.
 
-**Next: PR-05** — foundation integration and the first real board. It is the
-first PR in `esp32-app-foundation` rather than this repository, which is a
-different shape of work: a different repo, a different licence (Apache-2.0), and
-PlatformIO rather than npm. Then PR-06, then the **PR-07 gate**. The editor
-track (E-D, then E-1..E-3) begins only on a GO — owner decision CA-1,
-2026-10-05.
+**Next: PR-05R** — six runtime and CLI defects the first real integration
+surfaced, one of them the first thing any new user would hit. Then PR-06, then
+the **PR-07 gate**. The editor track (E-D, then E-1..E-3) begins only on a GO —
+owner decision CA-1, 2026-10-05.
 
 PR-05's font risk is effectively nil: all twelve of departures-board-v3's font
 arrays are byte-identical to generator output, so its font work is renaming to
@@ -289,29 +296,42 @@ contract under `[UD-3]`, so it waits for E-1.
 
 Full reasoning for both: `PROGRAM.md`, 2026-10-05.
 
-### Carried into PR-05 and PR-06
+### Carried — PR-05R, then PR-06
 
-PR-4R3 (#10) cleared the three holes that would otherwise have surfaced inside
-PR-05. What remains:
+**PR-05R is next**, and it exists because the first real integration found six
+things no amount of host testing would have. Full detail in the ledger and in
+`PROGRAM.md` (2026-10-10). The one to understand before anything else:
 
-**PR-05 must ship runtime 0.7.0 alongside the CLI.** Every project regenerated
-with CLI 0.11.0 emits `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7)`, so an older
-runtime is now refused by name — including for departures-board-v3. This is
-intended; 0.7 is the first runtime that can answer the question at all.
+> **Nothing in the runtime calls `setFontPosTop()`**, although `u8g2gl_label.cpp`
+> and `u8g2gl_clock.cpp` both document it as the framework standard — in
+> comments only. A plain `begin()` + `ui_handler()` user gets **15 lit pixels
+> instead of 1392**.
 
-**Two validator refusals are new to anyone migrating existing widgets:** a
-custom element may no longer `extends` a drawing element, nor rebind an
-inherited setter under another name. Both now fail at `validate` with a remedy
-rather than at compile time, which is a better failure but an unfamiliar one.
+**That defect also conditions the gate's best result.** PR-05's pixel identity
+passed with 0 differing pixels on host and device, but only because foundation's
+*legacy* module sets the font position — and the cut-over deletes it. **Criterion
+1 must be re-measured after PR-05R.** Do not let the 0-pixel figure be read as
+settled before then.
 
-**PR-06 owes one thing from PR-4R2:** link `u8g2gl_u8g2_csrc_arduino`, not
-`u8g2gl_u8g2_csrc`. Under `ARDUINO`, `u8x8.h` adds `pins[]` to `u8x8_t`; the
-mismatch is two struct layouts and a crash.
+**PR-06 still owes** `u8g2gl_u8g2_csrc_arduino` from PR-4R2: under `ARDUINO`,
+`u8x8.h` adds `pins[]` to `u8x8_t`, and the mismatch is two struct layouts and a
+crash.
 
-**Q-17 is open** (§21): manifest diagnostics locate at the `<widget>` element
-rather than the attribute at fault, which §15.1 does not allow. It needs the
-parser to record attribute locations. Trigger: the next PR touching the manifest
-parser, or E-1.
+**Two open questions** sit in §21: **Q-17** (manifest diagnostics locate at the
+`<widget>`, not the attribute — §15.1 unmet) and **Q-18** (Arduino IDE
+packaging, deferred until after the gate, with [D-11] the reason it must not be
+dropped quietly).
+
+### The gate's state, so nobody rediscovers it
+
+Criterion 1 passed (conditionally, above). Criterion 3 is met tightly — 85.5% of
+a partition legacy already had at 84.9%. **Criteria 2 and 4 are not met as
+written**, and both have identified causes rather than mysteries: criterion 2 was
+measured whole-board against whole-board when it asks about "the C++ it
+replaces", and criterion 4's whole +4.99 s is PlatformIO's library scan, with the
+generator at 0.05 s and compilation actually *faster*. `PROGRAM.md` 2026-10-10
+says what is still to measure. **The verdict is PR-07's, not the Chief
+Architect's** — do not pre-empt it in either direction.
 
 ### Setting up a fresh PA worktree — three things that have cost time
 

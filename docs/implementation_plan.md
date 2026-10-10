@@ -162,12 +162,18 @@ Strangler-fig fails if both implementations stay live and drift. The transition 
 
 | Trigger | `modules/U8G2Display` status |
 |---|---|
-| Today, until PR-05 lands | **Active.** Normal maintenance |
-| **PR-05 lands** (first board migrated) | **Frozen.** Correctness and security fixes only. No new features, no new boards, no new widgets. New work targets `modules/U8G2GLDisplay/` |
+| Today, until the cut-over | **Active.** Normal maintenance |
+| **The cut-over** (the held integration branch merges to foundation `main`) | **Frozen.** Correctness and security fixes only. No new features, no new boards, no new widgets. New work targets `modules/U8G2GLDisplay/` |
 | PR-10 lands (remaining boards migrated) | **Deprecated.** Compiles, warns, scheduled for removal |
 | departures-board-v3 advances `framework.lock` past PR-10 | **Removed** |
 
-The freeze is announced in the PR-05 description and enforced at review: a PR adding a feature to the legacy module is rejected and redirected. A bug fixed in both modules during the frozen window must reference the same issue in both commits, so divergence is visible in history rather than discovered later.
+**Amended 2026-10-10 by the owner — [R10].** The trigger was "PR-05 lands". PR-05's foundation half is deliberately **held as a draft** rather than merged:
+
+> *"We will continue to develop and merge in the u8g2gl repo as normal. I just don't want to destabilise the esp32-app-foundation until we are at a more mature stage."*
+
+So the freeze now fires at the **cut-over**, not at PR-05, and `modules/U8G2Display` stays active on foundation `main` until then. Everywhere this plan says "PR-05 lands" as a dependency, read **"PR-05 verified on its branch"** — all four gate evidence sets exist there. The U8G2GL repository continues to merge normally.
+
+The freeze is announced in the cut-over PR's description and enforced at review: a PR adding a feature to the legacy module is rejected and redirected. A bug fixed in both modules during the frozen window must reference the same issue in both commits, so divergence is visible in history rather than discovered later.
 
 ---
 
@@ -276,7 +282,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 | **PR-04b** ✅ | **U8G2GL** | **MERGED (#8).** Font and image pipeline: `<bdf>` through `bdfconv` in Wasm ([Q-2]), PNG→XBM `<convert>`. Split out of PR-04, which refuses both with a named error. On the critical path: departures-board-v3's screens use custom BDF fonts, so PR-05 can't migrate a real board without it | PR-04 | — |
 | **PR-05** | foundation | `modules/U8G2GLDisplay/` integration module + `uidesign/<board>/u8g2gl/` per the `lvglpro` precedent; PlatformIO dependency on `u8g2gl`; pre-build hook; `THIRD-PARTY-NOTICES.md` row; first system board migrated | PR-04, PR-04b, **PR-4R3** | — |
 | **PR-06** | **U8G2GL** | Wasm preview + snapshot harness, ported from `departures-board/tools/layoutsim` | PR-03 | — |
-| **PR-07** | foundation | **★ GATE** — §6 | PR-05, PR-06 | — |
+| **PR-07** | foundation | **★ GATE** — §6 | PR-05 **verified on its branch** ([R10]), PR-06 | — |
 
 ### Phase 2 — Composition
 
