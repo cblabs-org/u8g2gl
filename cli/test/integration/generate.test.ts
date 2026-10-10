@@ -342,7 +342,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     const res = await runCli(['generate', dir]);
 
     expect(res.code).toBe(0);
-    expect(res.stdout).toContain("u8g2gl 0.11.0 — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)");
+    expect(res.stdout).toContain(`u8g2gl ${packageVersion} — target 'primary' (U8G2_SSD1306_128X64_NONAME_F_HW_I2C 128x64)`);
     expect(res.stdout).toContain('  FLASH');
     expect(res.stdout).toContain('  RAM (static)');
     expect(res.stdout).toContain('  CAPACITY (generated — see u8g2gl_generated_config.h)');

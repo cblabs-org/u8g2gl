@@ -2,10 +2,13 @@ cmake_minimum_required(VERSION 3.16)
 project(u8g2gl VERSION 0.7.0 LANGUAGES CXX)
 
 # --- Runtime version agreement (§16, .agents/rules/03-versioning.md) ---
-# The runtime version is stated twice: here, for packaging, and in
-# u8g2gl_version.h, for the compile-time guard generated code relies on. Read
-# the header and refuse to configure if they differ, so a bump to one cannot
-# ship without the other. Re-configure whenever the header changes.
+# The runtime version is stated three times: here, for CMake packaging; in
+# library.json, for PlatformIO; and in u8g2gl_version.h, for the compile-time
+# guard generated code relies on. Read the header and refuse to configure if
+# either other statement differs, so a bump to one cannot ship without the
+# rest. Re-configure whenever the header or library.json changes. library.json
+# is read with a regex, not string(JSON), which needs CMake 3.19 where the
+# floor here is 3.16.
 set(_u8g2gl_version_header "${CMAKE_CURRENT_SOURCE_DIR}/include/u8g2gl/u8g2gl_version.h")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_u8g2gl_version_header}")
 file(STRINGS "${_u8g2gl_version_header}" _u8g2gl_version_lines
@@ -21,6 +24,21 @@ set(_u8g2gl_header_version
 if(NOT _u8g2gl_header_version VERSION_EQUAL PROJECT_VERSION)
     message(FATAL_ERROR
         "Runtime version mismatch: CMakeLists.txt says ${PROJECT_VERSION}, "
+        "include/u8g2gl/u8g2gl_version.h says ${_u8g2gl_header_version}. "
+        "Bump both together.")
+endif()
+
+set(_u8g2gl_library_json "${CMAKE_CURRENT_SOURCE_DIR}/library.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_u8g2gl_library_json}")
+file(STRINGS "${_u8g2gl_library_json}" _u8g2gl_library_json_lines
+    REGEX "^ *\"version\" *: *\"[^\"]*\"")
+if(NOT _u8g2gl_library_json_lines MATCHES "\"version\" *: *\"([^\"]*)\"")
+    message(FATAL_ERROR "library.json has no top-level \"version\" field")
+endif()
+set(_u8g2gl_library_version "${CMAKE_MATCH_1}")
+if(NOT _u8g2gl_library_version VERSION_EQUAL _u8g2gl_header_version)
+    message(FATAL_ERROR
+        "Runtime version mismatch: library.json says ${_u8g2gl_library_version}, "
         "include/u8g2gl/u8g2gl_version.h says ${_u8g2gl_header_version}. "
         "Bump both together.")
 endif()
@@ -81,7 +99,7 @@ if(U8G2GL_BUILD_TESTS)
         message(FATAL_ERROR
             "The U8G2 submodule is not initialised (${U8G2GL_U8G2_DIR} has no "
             "cppsrc/U8g2lib.h). The host tests compile the runtime against it. "
-            "Run:\n  git submodule update --init extern/u8g2\n"
+            "Run:\n  git submodule update --init --checkout extern/u8g2\n"
             "or configure with -DU8G2GL_BUILD_TESTS=OFF to build the library only.")
     endif()
 

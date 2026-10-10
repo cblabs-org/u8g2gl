@@ -1,12 +1,16 @@
 [submodule ".agents/skills/lvgl-pro-expert"]
 	path = .agents/skills/lvgl-pro-expert
 	url = https://github.com/mm-skills/lvgl-pro-expert.git
+	update = none
 [submodule ".agents/skills/embedded-systems"]
 	path = .agents/skills/embedded-systems
 	url = https://github.com/mm-skills/embedded-systems.git
+	update = none
 [submodule ".agents/skills/oo-expert"]
 	path = .agents/skills/oo-expert
 	url = https://github.com/mm-skills/oo-expert.git
+	update = none
 [submodule "extern/u8g2"]
 	path = extern/u8g2
 	url = https://github.com/olikraus/u8g2.git
+	update = none
