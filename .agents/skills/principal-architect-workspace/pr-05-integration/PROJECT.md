@@ -217,3 +217,18 @@ PA where cited.
     collection. A guaranteed purge of the old commits is a GitHub Support request. The objects
     also remain in the local object store until `git gc` prunes them.
   - Older log entries citing the old shas describe what was verified at the time.
+
+- **2026-10-10 — R10, owner ruling: foundation is held off `main`; U8G2GL merges as normal.**
+  - **The ruling:** "We will continue to develop and merge in the u8g2gl repo as normal. I just
+    don't want to destabilise the esp32-app-foundation until we are at a more mature stage."
+  - **U8G2GL [#11](https://github.com/cblabs-org/u8g2gl/pull/11) merges normally.** Merge with a
+    merge commit, not a squash: foundation's held stack pins `82ec83f`, which then stays
+    reachable from `main`.
+  - **Foundation [#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292) stays a
+    draft stack off `main`** until a planned cut-over at a more complete renderer.
+  - **PD-4's freeze trigger ("PR-05 lands") is deferred to that cut-over.** `modules/U8G2Display`
+    stays active on foundation `main`.
+  - **Before cut-over:** merge foundation `main` into the stack, re-pin to the then-current
+    U8G2GL `main`, rebuild, and re-verify (harness, native, both firmware builds, device).
+  - **The PR-07 gate** can be judged from the branch evidence. **For the Chief Architect:** the
+    programme plan's "PR-05 lands" milestones need restating as "PR-05 verified on its branch".
