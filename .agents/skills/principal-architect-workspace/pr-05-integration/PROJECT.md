@@ -232,3 +232,18 @@ PA where cited.
     U8G2GL `main`, rebuild, and re-verify (harness, native, both firmware builds, device).
   - **The PR-07 gate** can be judged from the branch evidence. **For the Chief Architect:** the
     programme plan's "PR-05 lands" milestones need restating as "PR-05 verified on its branch".
+
+- **2026-10-10 — Project wrap-up (U8G2GL side).**
+  - **Outcome:** #11 merged as `3bc2a08`. Foundation #292 is verified end to end (host, native,
+    both builds, device) and held for cut-over (R10).
+  - **CA bridge:** [CA-BRIDGE-2026-10-10-PR05.md](CA-BRIDGE-2026-10-10-PR05.md).
+  - **Lessons:**
+    - **Verify from `git archive`.** A git-ignored file had hidden a broken checkout.
+    - **Look at rendered output, not only at hashes.** The clipped descenders were found that way.
+    - **Never commit into a worktree during a timing run.** `inject_version` stamps HEAD into
+      the build.
+    - **Interleave timing comparisons.** Unpaired runs were 4× off under load.
+    - **Read the policy engine's code before assuming a profile applies.** Project enrollment
+      gates it.
+  - **Unresolved:** the Arduino packaging decision; runtime findings 1–6; the plan wording for R10.
+  - **Foundation layout questions** are filed as esp32-app-foundation#293.
