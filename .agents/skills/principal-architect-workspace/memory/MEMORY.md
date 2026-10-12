@@ -9,6 +9,7 @@
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| device-measurements | **Executing** — measurement session, evidence only, branch `u8g2gl-device/measurements` off #13 (`81e533f`), worktree `../U8G2GL-device`. WO1 (firmware A/B1/B2) + WO2 (M4 xtensa sweep, M5) dispatched; flashes F1–F3 with the owner. Owner approved 2026-10-12 | Device / Build | [PROJECT.md](../device-measurements/PROJECT.md) |
 | pr-05r-runtime-fixes | **Submitted — [#13](https://github.com/cblabs-org/u8g2gl/pull/13)**, merge commit not squash (tip `u8g2gl-05r/wo6-readability`). C++ 415 / CLI 1353, runtime 0.8.0, CLI 0.12.0. Criterion 1 holds for U8G2GL alone, host and device (device sha = host sha) | Firmware Runtime / Host Tooling / Packaging | [PROJECT.md](../pr-05r-runtime-fixes/PROJECT.md) |
 | pr-05-integration | **Verified; U8G2GL half merged (#11), foundation half HELD off main (R10)**: foundation PR matthewmcneill/esp32-app-foundation#292 is a draft until cut-over. Native 1018, device-verified on ESP32-S3 (`dev.91`–`dev.93`). 6 runtime/CLI findings; CA bridge written | Packaging / Integration | [PROJECT.md](../pr-05-integration/PROJECT.md) |
 | pr-4r3-corrections | **Submitted** — 4/4 WOs, PR from `u8g2gl-4r3/wo4-readability`. C++ 401 / CLI 1338, CLI 0.11.0, runtime 0.7.0 (every regenerated project needs runtime ≥ 0.7). CA bridge written. Owner approved 2026-10-06. Worktree `../U8G2GL-4r3` | Host Tooling / Firmware Runtime | [PROJECT.md](../pr-4r3-corrections/PROJECT.md) |
