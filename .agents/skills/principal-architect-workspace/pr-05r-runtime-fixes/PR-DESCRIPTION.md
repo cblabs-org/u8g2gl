@@ -72,12 +72,14 @@ them. The headline: a plain `begin()` + `ui_handler()` user used to get a near-b
 - §13.9 ("output changes need a bump") stays a review rule. Every output change shows in the golden
   diff.
 
-**Gate criterion 1, re-measured.** PR-05's 0-pixel result was obtained with foundation's legacy
-module setting the font state. Measured again with foundation's render harness against this branch:
-- five scenarios: 0 differing pixels;
-- a plain `begin()` user: 0, down from 1407.
-- The method and tables are in the workspace's `CRITERION-1.md`.
-- Host only; the on-device check is still to do.
+**Gate criterion 1, re-measured on host and device.** PR-05's 0-pixel result was obtained with
+foundation's legacy module setting the font state. Measured again for a plain U8G2GL user:
+- **Host:** foundation's render harness against this branch. Five scenarios give 0 differing
+  pixels. A plain `begin()` user gives 0, down from 1407.
+- **Device** (foundation's ESP32-S3 Nano and SSD1322): `main`'s runtime crashes on the first frame,
+  in the null-font restore. This branch's frame hashes to
+  `b9042618…0f62d`, lit 1405 — **byte-identical to the host**.
+- Method and tables are in the workspace's `CRITERION-1.md`.
 
 **Versions:**
 - Runtime 0.7.0 → **0.8.0**: behaviour change and a removed overload.
