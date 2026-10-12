@@ -14,7 +14,7 @@
     "type": "git",
     "url": "https://github.com/cblabs-org/u8g2gl.git"
   },
-  "frameworks": "arduino",
+  "frameworks": "*",
   "platforms": "*",
   "dependencies": {
     "olikraus/U8g2": "^2.36.18"

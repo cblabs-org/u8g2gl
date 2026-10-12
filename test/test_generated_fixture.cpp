@@ -63,7 +63,7 @@ constexpr uint32_t kFixtureObjectsOnBusiestScreen = 9;  // bounds: a slider, the
 
 // What u8g2gl_config.h would have given a library built without the generated
 // header: 32 objects x 8 bindings. The capacity tests assert the library is not
-// on it, so a dropped forced include cannot pass them by coincidence.
+// on it, so a dropped U8G2GL_GENERATED_CONFIG cannot pass them by coincidence.
 constexpr uint32_t kDefaultTotalBindings = 32u * 8u;
 
 // A clock the tests control, so tick deadlines are reproducible.

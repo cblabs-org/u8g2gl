@@ -189,14 +189,25 @@ describe('what the golden fixture is there to pin', () => {
     expect(header.indexOf('u8g2gl/u8g2gl_style.h')).toBeLessThan(header.indexOf('u8g2gl/u8g2gl_subject.h'));
   });
 
-  it('documents how the capacities reach the library build itself (WO4 F5)', () => {
-    // The binding pool is sized inside the library, which never includes this
-    // header, so without the forced include [D-21] silently does not happen.
-    // One header, one spelling of the numbers — not a second define list.
+  it('documents how the capacities reach the library build itself (§16)', () => {
+    // The binding pool is sized inside the library, so without the header
+    // reaching it [D-21] silently does not happen. The advice is the
+    // U8G2GL_GENERATED_CONFIG definition, in the forms the C++ suite and an
+    // esp32dev build compiled; never a project-wide forced -include, which
+    // breaks unrelated libraries. One header, one spelling of the numbers.
     const config = content('u8g2gl_generated_config.h');
-    expect(config).toContain('-include');
-    expect(config).toContain('target_compile_options(u8g2gl PUBLIC');
-    expect(config).toContain('build_flags = -include generated/u8g2gl_generated_config.h');
+    expect(config).toContain('//     target_compile_definitions(u8g2gl PUBLIC');
+    expect(config).toContain(
+      '//         U8G2GL_GENERATED_CONFIG="${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h")',
+    );
+    expect(config).toContain(
+      [
+        '//     build_flags =',
+        '//         -I generated',
+        '//         -D U8G2GL_GENERATED_CONFIG=\\"u8g2gl_generated_config.h\\"',
+      ].join('\n'),
+    );
+    expect(config).not.toMatch(/^\/\/\s+(build_flags = )?-include /m);
     expect(config).toContain('src/u8g2gl_obj.cpp');
   });
 

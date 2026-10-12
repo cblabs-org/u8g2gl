@@ -1921,6 +1921,19 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 
 The runtime library ships as a **PlatformIO library** (`library.json`, pinned by git reference — PR-05). **The Arduino library is deferred, and that is a decision rather than an omission:** Arduino's 1.5 format compiles only `src/`, while the runtime's public headers live in `include/u8g2gl/`, so serving it would mean either relocating the headers — breaking the CMake and PlatformIO layout — or carrying a second include path to keep in step. Neither is worth doing for an audience that does not exist yet (§1.5), and it will be built after the PR-07 gate as a **release artefact with a flattened layout** rather than as the repository's working shape. This matters because [D-11] commits `generated/` specifically for Arduino IDE users, so the gap must not become permanent by default — see [Q-18].
 
+**The generated capacities must reach the runtime's own compilation.** `u8g2gl_generated_config.h` sets the [D-21] capacities, but the binding pool is sized inside `src/u8g2gl_obj.cpp`, which is compiled as part of the library and never includes the generated header itself. A project that included the header only from generated code would link a library built on `u8g2gl_config.h`'s defaults, and §18's report would be false. The project therefore names the header in **`U8G2GL_GENERATED_CONFIG`**, defined project-wide, and `u8g2gl_config.h` includes it ahead of its defaults:
+
+| Environment | Definition |
+|---|---|
+| **CMake / ESP-IDF** | `target_compile_definitions(u8g2gl PUBLIC U8G2GL_GENERATED_CONFIG="${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h")` |
+| **PlatformIO** | `build_flags =` `-I generated` and `-D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"` |
+
+The generated header carries the same text, and the forms are the ones built: the CMake form by the C++ suite's compile fixture (an ESP-IDF build, which is CMake underneath, has not been built separately), the PlatformIO form on an `esp32dev` Arduino build with unrelated C and C++ libraries. In PlatformIO the quotes must be escaped — unescaped, PlatformIO strips them and `#include` reports `expects "FILENAME" or <FILENAME>` — and the macro names the file, not a project-relative path: `#include` searches the including file's directory and the `-I` list, never the working directory, so `\"generated/u8g2gl_generated_config.h\"` is not found. `-I generated` is resolved against the project directory, where PlatformIO runs the compiler. `${PROJECT_DIR}/generated/u8g2gl_generated_config.h` also builds.
+
+Only runtime sources and generated code include `u8g2gl_config.h`, so the definition is inert in every other unit; on the measured build each unrelated compile line gained the `-D` and nothing else. **A project-wide forced `-include` of the header is not a substitute**, and was advised before this: it reaches every unit in the build, and on that `esp32dev` build stopped in the first unrelated library — Arduino `SPI` and `Wire` — with `u8g2gl/u8g2gl_version.h: No such file or directory`. It would also reach C units, where `static_assert` is not a keyword before C23. Build middleware that adds the `-include` to the runtime's sources alone works, but it matches the library by its installed directory name, which a `symlink://` or renamed dependency changes, and it misses silently: a pattern that matches nothing leaves the defaults in place and the build green.
+
+**A native PlatformIO environment builds the runtime** (`library.json` declares `"frameworks": "*"`): a `platform = native` environment with no framework finds and compiles it. The consumer still supplies what U8G2 needs off Arduino. U8G2 is an Arduino-format library, which the finder treats as framework-incompatible there and ignores as the runtime's dependency, so the consumer adds its `src/` and `src/clib/` to the include path and compiles `src/clib/` itself (for example `build_src_filter = +<../.pio/libdeps/native/U8g2/src/clib/>`). `U8g2lib.h` includes `Arduino.h` and `Print.h`, so the consumer supplies those too: a minimal `Arduino.h` with `<stdint.h>` and `<stddef.h>`, and a `Print` class with the two `write()` virtuals, as the C++ suite's `test/real_u8g2/` does. Nothing else was needed on a macOS host build that linked and ran the generated UI. An Arduino build is unaffected.
+
 **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements.
 
 | Requirement | Emitted as | Guards against |
@@ -2048,6 +2061,19 @@ value is the root sentinel ([A-3]) — so the validator rejects a screen that
 exceeds it, naming the screen and its count. The other figures have no fixed
 ceiling: they are what the generator emitted, and they exist in the report so a
 project can see itself approaching a limit rather than meeting one.
+
+**A counted capacity holds only where the header reaches the runtime.** The
+budget's `binding pool slots` line states the slot count
+`u8g2gl_generated_config.h` sets, the default it replaces
+(`U8G2GL_MAX_OBJECTS_PER_SCREEN` x `U8G2GL_MAX_BINDINGS_PER_OBJ`, 32 x 8 = 256
+slots), and that the count holds only when the header reaches the runtime's own
+sources through `U8G2GL_GENERATED_CONFIG` (§16); a firmware built without it
+keeps the default. The difference is not small. On a real multi-library
+`esp32dev` firmware the generated header cut `s_binding_pool` from **6144 B to
+96 B**, and static RAM from 63388 B to 57340 B; on a smaller `esp32dev`
+measurement build, from 6144 B to 144 B, six 24-byte slots. The generator
+cannot see the firmware's build, so the line says what its figure depends on
+rather than implying it, and the size of a slot stays unmeasured (§13.7).
 
 ## 19. Naming Conventions
 

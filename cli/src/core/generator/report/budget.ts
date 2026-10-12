@@ -55,7 +55,11 @@ import type { ManifestRegistry } from '../../manifest/index.js';
 import type { Target } from '../../schema/project.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import { classOf } from '../emit/screen-model.js';
-import { GENERATED_CONFIG_HEADER } from '../emit/generated-config.js';
+import {
+  emittedBindingPoolSlots,
+  GENERATED_CONFIG_HEADER,
+  GENERATED_CONFIG_MACRO,
+} from '../emit/generated-config.js';
 import type { XbmImage } from '../../images/index.js';
 import { compareCodeUnits } from '../../order.js';
 import {
@@ -132,6 +136,15 @@ function unmeasured(reason: string): Figure {
 const FLASH_REASON =
   'flash cost needs a linker map for a reference build (§18); §13.7 forbids the generator assuming ' +
   'any runtime class size or layout';
+
+/**
+ * `u8g2gl_config.h`'s default binding pool: `U8G2GL_MAX_OBJECTS_PER_SCREEN` x
+ * `U8G2GL_MAX_BINDINGS_PER_OBJ`, 32 x 8. A firmware the generated header never
+ * reaches is built with this, so the budget names it beside the counted figure.
+ * test/generator/budget-report.test.ts reads the runtime header and fails if the
+ * two drift.
+ */
+const RUNTIME_DEFAULT_BINDING_POOL_SLOTS = 32 * 8;
 
 /** The reason a widget instance's RAM cost is unmeasured — the same §13.7 rule. */
 const SIZEOF_REASON =
@@ -383,11 +396,7 @@ function ramLines(input: ReportInput): readonly BudgetLine[] {
       count: observerSlots,
       figure: unmeasured(SIZEOF_REASON),
     },
-    {
-      item: 'binding pool slots',
-      count: capacities.totalBindings,
-      figure: unmeasured(SIZEOF_REASON),
-    },
+    bindingPoolLine(capacities),
     {
       item: 'styles',
       count: capacities.styles,
@@ -397,6 +406,27 @@ function ramLines(input: ReportInput): readonly BudgetLine[] {
   );
 
   return lines;
+}
+
+// bindingPoolLine
+// The pool's slot count holds only in a firmware whose runtime sources saw the
+// generated header. Without it the library keeps u8g2gl_config.h's default,
+// 6144 B against 96 B on a measured esp32dev build (§18.1), and nothing in the
+// generator can tell which happened — so the line says what the figure depends
+// on instead of implying it. The size of a slot stays unmeasured (§13.7).
+//   capacities — [D-21]'s figures, as emitted
+function bindingPoolLine(capacities: Capacities): BudgetLine {
+  const slots = emittedBindingPoolSlots(capacities.totalBindings);
+  return {
+    item: 'binding pool slots',
+    count: capacities.totalBindings,
+    figure: unmeasured(SIZEOF_REASON),
+    note:
+      `${GENERATED_CONFIG_HEADER} sets U8G2GL_MAX_TOTAL_BINDINGS to ${slots}, replacing the runtime default of ` +
+      `${RUNTIME_DEFAULT_BINDING_POOL_SLOTS} slots (U8G2GL_MAX_OBJECTS_PER_SCREEN x U8G2GL_MAX_BINDINGS_PER_OBJ). ` +
+      `That holds only when the header reaches the runtime's own sources through ${GENERATED_CONFIG_MACRO} ` +
+      `(§16); a firmware built without it keeps the default.`,
+  };
 }
 
 // capacityEntries
