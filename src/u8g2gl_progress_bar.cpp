@@ -23,6 +23,7 @@
  */
 #include "u8g2gl/u8g2gl_progress_bar.h"
 #include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
@@ -277,12 +278,9 @@ void u8g2gl_progress_bar::render_animation_update(U8G2& display, uint32_t now_ms
     tick(now_ms);
 
     if (current_percent_ != old_percent) {
-        // Clear own bounding box first ([D-5])
-        display.setDrawColor(0);
-        u8g2gl_draw_box(display, x_, y_, w_, h_);
-
-        // Re-render
-        render(display);
+        // Clear and redraw inside own bounds under the render wrapper's state
+        // guard ([D-5], §11.3)
+        u8g2gl_repaint_object(display, *this);
 
         // Hardware partial update
         u8g2gl_partial_refresh(display, x_, y_, w_, h_);

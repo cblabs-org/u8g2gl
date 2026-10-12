@@ -676,17 +676,58 @@ TEST(StateSaver, SavesAndRestores) {
     const uint8_t font2 = 2;
     display.setDrawColor(1);
     display.setFont(&font1);
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+    display.setFontPosBaseline();
+    display.setFontDirection(2);
 
     {
         u8g2gl_state_saver saver(display);
+
+        // Established on construction: top positioning, direction 0.
+        EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_top);
+        EXPECT_EQ(display.getU8g2()->font_decode.dir, 0);
+        // Captured but not established: the widget's style sets these.
+        EXPECT_EQ(display.getDrawColor(), 1);
+        EXPECT_EQ(display.getU8g2()->font, &font1);
+
         display.setDrawColor(2);
         display.setFont(&font2);
+        display.setFontMode(0);
+        display.setBitmapMode(0);
+        display.setFontPosCenter();
+        display.setFontDirection(1);
         EXPECT_EQ(display.getDrawColor(), 2);
         EXPECT_EQ(display.getU8g2()->font, &font2);
     }
 
     EXPECT_EQ(display.getDrawColor(), 1);
     EXPECT_EQ(display.getU8g2()->font, &font1);
+    EXPECT_EQ(display.getU8g2()->font_decode.is_transparent, 1);
+    EXPECT_EQ(display.getU8g2()->bitmap_transparency, 1);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_EQ(display.getU8g2()->font_decode.dir, 2);
+}
+
+// A null font must come back without setFont(nullptr): real u8g2_SetFont()
+// reads the font header of any pointer it has not seen, and 0 is no header.
+// The stub cannot crash, so the check is that the call is never made.
+TEST(StateSaver, NullFontIsWrittenBackWithoutSetFont) {
+    U8G2 display;
+    const uint8_t font = 1;
+    ASSERT_EQ(display.getU8g2()->font, nullptr);
+
+    {
+        u8g2gl_state_saver saver(display);
+        display.setFont(&font);
+    }
+
+    EXPECT_EQ(display.getU8g2()->font, nullptr);
+    for (int i = 0; i < display.call_log_count; ++i) {
+        const u8g2_stub_call& call = display.call_log[i];
+        EXPECT_FALSE(std::string(call.op) == "setFont" && call.pointer == nullptr)
+            << "setFont(nullptr) at call " << i;
+    }
 }
 
 TEST(PartialRefresh, TileAligned) {

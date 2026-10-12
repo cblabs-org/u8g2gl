@@ -584,6 +584,32 @@ target_compile_options(test_bound_child_clip PRIVATE
 )
 gtest_discover_tests(test_bound_child_clip)
 
+# --- Real U8G2: ambient state established inside a render, restored after (§11.3) ---
+# The state saver's faults are U8G2's to show, not the stub's: restoring a null
+# font crashes only inside u8g2_SetFont(), and font position moves only real
+# glyphs. Built exactly as test_bound_child_clip is, plus U8G2's font data
+# (u8g2gl_u8g2_fonts_csrc, below) so a label has a real font to draw with.
+add_executable(test_ambient_state
+    test_ambient_state.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_ambient_state PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_ambient_state SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_ambient_state PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_ambient_state PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_ambient_state)
+
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is
 # committed output of `u8g2gl generate` (cli/test/generator/compile-fixture.test.ts

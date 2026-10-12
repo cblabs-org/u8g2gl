@@ -22,7 +22,7 @@
  */
 #include "u8g2gl/u8g2gl_clock.h"
 #include "u8g2gl/u8g2gl_coord.h"
-#include "u8g2gl/u8g2gl_draw.h"
+#include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
 
@@ -218,7 +218,9 @@ void u8g2gl_clock::render(U8G2& display) {
     }
 
     // --- Step 5: Compute vertical centering and baseline alignment ---
-    // In U8G2GL, setFontPosTop is the standard: (ascent - descent) gives total glyph box height.
+    // The y coordinate is the top of the glyph box: the framework's state guard,
+    // u8g2gl_state_saver, establishes setFontPosTop() around every render
+    // (§11.3). (ascent - descent) gives total glyph box height.
     int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int16_t draw_y = static_cast<int16_t>(y_ + ((h_ > font_height) ? (h_ - font_height) / 2 : 0));
 
@@ -283,12 +285,9 @@ void u8g2gl_clock::render_animation_update(U8G2& display, uint32_t now_ms) {
     tick(now_ms);
 
     if (show_colon_ != old_colon) {
-        // Clear own bounding box first ([D-5])
-        display.setDrawColor(0);
-        u8g2gl_draw_box(display, x_, y_, w_, h_);
-
-        // Re-render
-        render(display);
+        // Clear and redraw inside own bounds under the render wrapper's state
+        // guard ([D-5], §11.3)
+        u8g2gl_repaint_object(display, *this);
 
         // Hardware partial update
         u8g2gl_partial_refresh(display, x_, y_, w_, h_);

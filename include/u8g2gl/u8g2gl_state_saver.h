@@ -7,33 +7,41 @@
  * SPDX-License-Identifier: MIT
  *
  * File: include/u8g2gl/u8g2gl_state_saver.h
- * Purpose: An RAII guard that saves and restores the U8G2 drawing state that
- *          can be read back, around a widget's render(). It exists so a widget
- *          can set draw colour and font freely without restoring them, and so
- *          one widget forgetting to tidy up cannot corrupt everything drawn
- *          after it.
+ * Purpose: The boundary between the application's U8G2 state and the
+ *          framework's. The rule it enforces: U8G2GL's state inside each
+ *          object's render; the caller's at every other moment (§11.3).
  *
- *          The framework wraps every render() call in one of these, inside
- *          u8g2gl_render_object() (§11.3), so widget authors normally never
- *          construct one themselves.
+ *          On construction it captures every piece of ambient U8G2 state that
+ *          can be read back, then establishes the framework's text baseline:
+ *          top font positioning (setFontPosTop()) and, where U8G2 is built with
+ *          font rotation, direction 0. Every text widget computes its glyph
+ *          box from the top edge, so it must not depend on what the caller
+ *          left — a caller in U8G2's default baseline position would otherwise
+ *          draw every label one font height too high. On destruction it puts
+ *          back exactly what it captured, so a widget may change any of it
+ *          without tidying up, and nothing a widget does leaks into the
+ *          application's own drawing.
  *
- *          It can only restore what U8G2 lets it read. What it does NOT save:
- *          - The clip window. U8G2 has no clip getter, so nothing can save and
- *            restore it. Clip lifetime belongs to u8g2gl_clip_scope
- *            (u8g2gl_core.h), which u8g2gl_render_object() declares after this
- *            saver so the clip resets to the full display before colour and
- *            font are restored.
- *          - Font mode and bitmap mode. U8G2's C++ API exposes setFontMode() and
- *            setBitmapMode() but no getter for either, and neither does the test
- *            stub, so a value cannot be captured to restore. A widget that draws
- *            text or bitmaps must set the mode it needs itself rather than rely
- *            on whatever the previous widget left.
+ *          Font, draw colour, font mode and bitmap mode are captured but not
+ *          established: each widget sets those from its own style, and that
+ *          stays its job.
  *
- * Description: Scope guard capturing draw colour and font on construction and
- *              restoring them on destruction
+ *          The framework constructs one inside u8g2gl_render_object() and
+ *          u8g2gl_repaint_object() (u8g2gl_core.h), so widget authors normally
+ *          never construct one themselves.
+ *
+ *          What it cannot save is the clip window. U8G2 has no clip getter, so
+ *          nothing can save and restore it. Clip lifetime belongs to
+ *          u8g2gl_clip_scope (u8g2gl_core.h), which u8g2gl_render_object()
+ *          declares after this saver so the clip resets to the full display
+ *          before the rest of the state is restored.
+ *
+ * Description: Scope guard that captures U8G2's ambient drawing state,
+ *              establishes the framework's font position and direction, and
+ *              restores the captured state on destruction
  *
  * Exported Classes:
- * - u8g2gl_state_saver: RAII guard restoring draw colour and font
+ * - u8g2gl_state_saver: RAII guard — save, establish, restore
  */
 #ifndef U8G2GL_STATE_SAVER_H
 #define U8G2GL_STATE_SAVER_H
@@ -54,32 +62,83 @@ class U8G2;
 #endif
 
 /**
- * @brief Restores draw colour and font when it goes out of scope.
+ * @brief Saves the caller's U8G2 state, establishes the framework's, and
+ *        restores the caller's when it goes out of scope.
  *
- * Saves exactly two pieces of state: draw colour and font. It does not save the
- * clip window, font mode or bitmap mode — see the file header for why each
- * cannot be read back, and who is responsible instead.
+ * Captures every ambient item U8G2 lets it read, all from U8G2's state struct
+ * (u8g2.h, through getU8g2()):
+ *
+ * | Item           | Field                          | Established here |
+ * |----------------|--------------------------------|------------------|
+ * | Draw colour    | `draw_color`                   | no — style       |
+ * | Font           | `font`                         | no — style       |
+ * | Font mode      | `font_decode.is_transparent`   | no — style       |
+ * | Bitmap mode    | `bitmap_transparency`          | no — style       |
+ * | Font position  | `font_calc_vref`               | yes — top        |
+ * | Font direction | `font_decode.dir`              | yes — 0          |
+ *
+ * Font direction exists only when U8G2 is built with U8G2_WITH_FONT_ROTATION,
+ * which u8g2.h defines by default; the guard follows that macro.
+ *
+ * It does not save the clip window — see the file header for why, and who is
+ * responsible instead.
+ *
+ * Cost: byte and pointer copies plus one call per setter, each of which is a
+ * single field assignment in U8G2; nothing allocates. setFont() reads a font
+ * header only when the font actually changes.
  */
 class u8g2gl_state_saver {
 public:
     /**
-     * @brief Capture the current draw colour and font.
+     * @brief Capture the caller's state, then establish the framework's
+     *        font position and direction.
      * @param display U8G2 instance to guard. Must outlive this guard.
      */
     explicit u8g2gl_state_saver(U8G2& display)
         : display_(display),
+          // U8G2 has no getFont(), font-mode, bitmap-mode or font-position
+          // getter: each is readable only from the state struct (U8g2lib.h
+          // getU8g2(), u8g2.h struct u8g2_struct).
+          saved_font_(display.getU8g2()->font),
+          saved_font_position_(display.getU8g2()->font_calc_vref),
           saved_draw_color_(display.getDrawColor()),
-          // U8G2 has no getFont(): the current font is only readable from its
-          // state struct (U8g2lib.h getU8g2(), u8g2.h `const uint8_t *font`).
-          // A getFont() once existed in the test stub alone, so this compiled
-          // on the host and not against real U8G2 (WO4b G1, fixed in WO4c).
-          saved_font_(display.getU8g2()->font) {
+          saved_font_mode_(display.getU8g2()->font_decode.is_transparent),
+          saved_bitmap_mode_(display.getU8g2()->bitmap_transparency)
+#ifdef U8G2_WITH_FONT_ROTATION
+          ,
+          saved_direction_(display.getU8g2()->font_decode.dir)
+#endif
+    {
+        // Every text widget positions glyphs by their top edge (§11.3).
+        display_.setFontPosTop();
+#ifdef U8G2_WITH_FONT_ROTATION
+        display_.setFontDirection(0);
+#endif
     }
 
-    /** @brief Restore the draw colour and font captured at construction. */
+    /** @brief Restore every item captured at construction. */
     ~u8g2gl_state_saver() {
         display_.setDrawColor(saved_draw_color_);
-        display_.setFont(saved_font_);
+        display_.setFontMode(saved_font_mode_);
+        display_.setBitmapMode(saved_bitmap_mode_);
+#ifdef U8G2_WITH_FONT_ROTATION
+        display_.setFontDirection(saved_direction_);
+#endif
+        // No setter takes an arbitrary position function, so the captured
+        // pointer is written back as it was read.
+        display_.getU8g2()->font_calc_vref = saved_font_position_;
+
+        // A null font is written back directly. setFont(nullptr) would make
+        // u8g2_SetFont() read the font header at address 0 (u8g2_font.c), and
+        // a display that has had begin() but never setFont() holds exactly
+        // that. The widget's font metrics stay behind in the struct, which is
+        // harmless: the next setFont() sees a different pointer and reads them
+        // afresh.
+        if (saved_font_ == nullptr) {
+            display_.getU8g2()->font = nullptr;
+        } else {
+            display_.setFont(saved_font_);
+        }
     }
 
     // Non-copyable, non-movable: a copy would restore the same state twice.
@@ -89,9 +148,16 @@ public:
     u8g2gl_state_saver& operator=(u8g2gl_state_saver&&) = delete;
 
 private:
+    // Pointers first, then bytes, so the bytes share one trailing word.
     U8G2& display_;
-    uint8_t saved_draw_color_;
     const uint8_t* saved_font_;
+    u8g2_font_calc_vref_fnptr saved_font_position_;
+    uint8_t saved_draw_color_;
+    uint8_t saved_font_mode_;
+    uint8_t saved_bitmap_mode_;
+#ifdef U8G2_WITH_FONT_ROTATION
+    uint8_t saved_direction_;
+#endif
 };
 
 #endif // U8G2GL_STATE_SAVER_H

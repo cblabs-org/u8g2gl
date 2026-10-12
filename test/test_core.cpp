@@ -371,8 +371,8 @@ TEST_F(Core, ObjSetHiddenGatesFrame) {
 // --- Per-object render wrapper: u8g2gl_render_object() (§11.3) ---
 
 // Captures, while render() runs, the display state the framework set up. Then
-// it deliberately changes font and draw colour, so the tests can prove the
-// wrapper restores them.
+// it deliberately changes font, draw colour, font position and direction, so
+// the tests can prove the wrapper restores them.
 class state_probe_widget : public u8g2gl_obj {
 public:
     int render_count = 0;
@@ -382,6 +382,9 @@ public:
     int clip_y1 = -1;
     int set_clip_count_during_render = 0;
     int max_clip_count_during_render = 0;
+    int draw_box_count_during_render = 0;
+    u8g2_font_calc_vref_fnptr position_during_render = nullptr;
+    uint8_t direction_during_render = 0xFF;
     const uint8_t* font_to_leave = nullptr;
 
     void render(U8G2& display) override {
@@ -392,8 +395,13 @@ public:
         clip_y1 = display.last_clip_y1;
         set_clip_count_during_render = display.set_clip_window_count;
         max_clip_count_during_render = display.max_clip_window_count;
+        draw_box_count_during_render = display.draw_box_count;
+        position_during_render = display.getU8g2()->font_calc_vref;
+        direction_during_render = display.getU8g2()->font_decode.dir;
         display.setFont(font_to_leave);
         display.setDrawColor(0);
+        display.setFontPosBottom();
+        display.setFontDirection(3);
     }
 };
 
@@ -503,6 +511,26 @@ TEST_F(Core, RenderObjectRestoresDisplayStateAfterRender) {
     EXPECT_EQ(display.max_clip_window_count, 1);
 }
 
+TEST_F(Core, RenderObjectEstablishesTopPositionAndDirectionZero) {
+    state_probe_widget widget;
+    widget.set_coords(2, 3, 10, 8);
+    u8g2gl_obj* const objs[] = { &widget };
+
+    U8G2 display;
+    display.setFontPosBaseline();   // U8G2's own default after begin()
+    display.setFontDirection(1);
+
+    u8g2gl_render_object(display, objs, nullptr, 0);
+
+    // The framework's baseline was in force inside render()...
+    EXPECT_EQ(widget.render_count, 1);
+    EXPECT_TRUE(widget.position_during_render == u8g2_stub_vref_top);
+    EXPECT_EQ(widget.direction_during_render, 0);
+    // ...and the caller's is back afterwards, though the widget changed both.
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_EQ(display.getU8g2()->font_decode.dir, 1);
+}
+
 TEST_F(Core, RenderObjectClampsNegativeClipOrigin) {
     state_probe_widget widget;
     widget.set_coords(-4, -2, 10, 8);   // partly off the top-left of the display
@@ -526,6 +554,75 @@ TEST_F(Core, RenderObjectNullArrayRendersNothing) {
     u8g2gl_render_object(display, nullptr, nullptr, 0);
     EXPECT_EQ(display.set_clip_window_count, 0);
     EXPECT_EQ(display.max_clip_window_count, 0);
+}
+
+// --- u8g2gl_repaint_object(): the blocked-loop repaint ([D-5]) ---
+// Three widgets repaint outside the frame; this is the one implementation, and
+// it must give render() exactly what u8g2gl_render_object() does.
+
+TEST_F(Core, RepaintObjectClearsAndRendersInsideOwnBoundsUnderTheGuard) {
+    state_probe_widget widget;
+    widget.set_coords(2, 3, 10, 8);
+    widget.font_to_leave = s_font_widget;
+
+    U8G2 display;
+    display.setFont(s_font_before);
+    display.setDrawColor(1);
+    display.setFontPosBaseline();
+
+    EXPECT_TRUE(u8g2gl_repaint_object(display, widget));
+
+    // Inside render(): own bounds clipped (far corner exclusive), the box
+    // already cleared, the framework's baseline established.
+    EXPECT_EQ(widget.render_count, 1);
+    EXPECT_EQ(widget.set_clip_count_during_render, 1);
+    EXPECT_EQ(widget.clip_x0, 2);
+    EXPECT_EQ(widget.clip_y0, 3);
+    EXPECT_EQ(widget.clip_x1, 12);
+    EXPECT_EQ(widget.clip_y1, 11);
+    EXPECT_EQ(widget.max_clip_count_during_render, 0);
+    EXPECT_EQ(widget.draw_box_count_during_render, 1);
+    EXPECT_EQ(display.last_draw_box_x, 2);
+    EXPECT_EQ(display.last_draw_box_y, 3);
+    EXPECT_EQ(display.last_draw_box_w, 10);
+    EXPECT_EQ(display.last_draw_box_h, 8);
+    EXPECT_TRUE(widget.position_during_render == u8g2_stub_vref_top);
+    EXPECT_EQ(widget.direction_during_render, 0);
+
+    // The clear's draw colour 0 is set before the box is drawn.
+    int clear_colour = -1;
+    for (int i = 0; i < display.call_log_count; ++i) {
+        const u8g2_stub_call& call = display.call_log[i];
+        if (std::string(call.op) == "drawBox") {
+            break;
+        }
+        if (std::string(call.op) == "setDrawColor") {
+            clear_colour = call.args[0];
+        }
+    }
+    EXPECT_EQ(clear_colour, 0);
+
+    // Afterwards: the clip reset once, the caller's state back.
+    EXPECT_EQ(display.max_clip_window_count, 1);
+    EXPECT_EQ(display.getU8g2()->font, s_font_before);
+    EXPECT_EQ(display.getDrawColor(), 1);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_EQ(display.getU8g2()->font_decode.dir, 0);
+}
+
+TEST_F(Core, RepaintObjectWhollyOffTheDisplayTouchesNothing) {
+    state_probe_widget widget;
+    widget.set_coords(200, 0, 5, 5);
+
+    U8G2 display;
+    display.setDrawColor(1);
+
+    EXPECT_FALSE(u8g2gl_repaint_object(display, widget));
+    EXPECT_EQ(widget.render_count, 0);
+    EXPECT_EQ(display.draw_box_count, 0);
+    EXPECT_EQ(display.set_clip_window_count, 0);
+    EXPECT_EQ(display.max_clip_window_count, 0);
+    EXPECT_EQ(display.getDrawColor(), 1);
 }
 
 // --- u8g2gl_clip_scope: the one set-and-reset of an effective clip (§13.5) ---
