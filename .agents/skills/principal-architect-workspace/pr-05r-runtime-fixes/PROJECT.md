@@ -139,9 +139,9 @@ per R3).
 
 ## Work Orders
 
-- **[ ] [wo1-ambient-state](wo1-ambient-state/WORKORDER.md):** items 1–3 and the repaint paths
+- **[x] [wo1-ambient-state](wo1-ambient-state/WORKORDER.md):** items 1–3 and the repaint paths
   (R1, R2). Real-U8G2 reproductions first. `architect`.
-- **[ ] [wo2-screen-discovery](wo2-screen-discovery/WORKORDER.md):** item 4 (R5). Parallel with
+- **[x] [wo2-screen-discovery](wo2-screen-discovery/WORKORDER.md):** item 4 (R5). Parallel with
   WO1. `standard`.
 - **[ ] wo3-platformio:** items 5 and 6 (R4), one PlatformIO measurement rig. `architect`.
   WORKORDER written after WO1/WO2 land.
@@ -166,3 +166,26 @@ per R3).
   decomposition with rulings R1, R2, R4–R6; R3 left open for a PA proposal. Worktree
   `../U8G2GL-05r` created on `u8g2gl-05r/wo1-ambient-state` from `origin/main`. WO1 and WO2
   dispatched in parallel.
+- **2026-10-12 — WO2 verified** (`5022984`, report `f404e96`, on `u8g2gl-05r/wo2-screen-discovery`).
+  - **Suites, re-run by the PA:** CLI vitest **1349** (1338 + 11), `tsc` and lint clean. No golden moved.
+  - **Built CLI:** a scratch project with `screens/home.xml`, `screens/old/` and a root `stray.xml`
+    warns three times, each naming the file and the rename (`U8G2GL_SCREEN_FILE_SKIPPED`).
+  - **Bridge claim corrected:** the CLI never printed "0 screens"; the silence was "0 errors,
+    0 warnings". The warning count now carries it.
+- **2026-10-12 — WO1 verified** (`d6282d0`, report `a60d2ff`).
+  - **Suites, re-run by the PA from a clean configure:** C++ **410** (401 + 9), one skip, **0**
+    warnings. No CLI file or golden touched.
+  - **Reproductions (worker, real U8G2, all five failed before the fix):** the null font segfaults
+    in `u8g2_font_get_byte` at address 0; a label at baseline position lit 50 pixels against 93 at
+    top, and is now buffer-identical; font and bitmap mode were not restored; the marquee and clock
+    repaints leaked font and mode and drew different pixels from the normal path.
+  - **R1's cost condition is refuted by measurement — the PA's reasoning was wrong.** Each U8G2
+    setter is a cheap assignment, but it is an out-of-line call into the C library, while a
+    compare-first restore only reads a field. Measured on the arm64 host, against real U8G2:
+    saver 24 → 32 B (12 → 16 B on 32-bit); construct + destruct 2.3–2.6 → 5.1–5.6 ns.
+    Restoring after a label's own changes costs about 6.7 ns with full setting against 3.5 ns
+    with compare-first; with a real font change, 50 against 48 ns. Nothing allocates. **Put to the
+    owner.**
+  - **Out of scope, noted:** `u8g2gl_obj.h`'s `render_animation_update()` doc should point at
+    `u8g2gl_repaint_object()` (WO5); the repaint helper, like the code it replaced, checks
+    neither visibility nor ancestor clips.
