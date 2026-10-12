@@ -189,3 +189,13 @@ per R3).
   - **Out of scope, noted:** `u8g2gl_obj.h`'s `render_animation_update()` doc should point at
     `u8g2gl_repaint_object()` (WO5); the repaint helper, like the code it replaced, checks
     neither visibility nor ancestor clips.
+- **2026-10-12 — owner rulings on the R1 cost finding and R3.**
+  > 1) yes, ok
+  > 2) feels like we are over-engineering this.
+  - **R1a — approved:** the saver sets only what differs — compare first, both when establishing
+    the framework baseline and when restoring the caller's state. Behaviour unchanged. Sent back to
+    the WO1 worker, with a re-measurement.
+  - **R3 — the lock-file guard is rejected as over-engineering.** PA's simpler proposal, to
+    confirm at WO4 dispatch: delete the literal version assertion, keep the stamp test reading
+    `package.json`, and leave §13.9 as a review rule (the golden diff makes an output change
+    visible in every PR) rather than a test.
