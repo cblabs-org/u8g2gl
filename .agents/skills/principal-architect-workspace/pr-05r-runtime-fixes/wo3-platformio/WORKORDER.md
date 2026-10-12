@@ -5,7 +5,7 @@ title: "The capacity header reaches the runtime, and the manifest reaches native
 branch: u8g2gl-05r/wo3-platformio
 base: u8g2gl-05r/wo2-screen-discovery
 complexity: architect
-status: dispatched
+status: complete
 ---
 
 # WO3 — a capacity header every build system can deliver, and a manifest that builds natively
@@ -186,3 +186,206 @@ handled elsewhere: version bumps and the version-pin test (WO4); `u8g2gl_obj.h`'
 
 Use: Status · Baseline and final counts · Changes Made · Decisions Made · Evidence (A/B/C, default,
 native) · Dead Ends & Warnings · Out-of-Scope Findings · Blockers.
+
+### Status
+
+**complete** — implementation commit `373d72f`. Design R4 adopted (the `U8G2GL_GENERATED_CONFIG`
+macro); PlatformIO's quoting did not defeat it. Item 6: `"frameworks": "*"` adopted.
+
+### Baseline and final counts
+
+| | Baseline (clean configure, each suite alone) | Final |
+|---|---|---|
+| C++ build warnings | 0 | **0** |
+| ctest | **410** passed, 1 skip (`SizeOfReport.ThirtyTwoBitTarget`) — matches WO1's final figure | **410** passed, same 1 skip |
+| vitest | **1349** | **1352** (+3, `budget-report.test.ts`) |
+| `tsc`, lint | clean | clean |
+
+No new C++ tests: the existing compile-fixture tests (`capacity_probe.cpp`'s `static_assert`, the
+fixture capacity tests) and `VersionGuard.GeneratedConfigCompiles` now prove the advised form
+instead of a forced include. Checked by hand that the probe fails without the definition
+(`static assertion failed due to requirement '(32 * 8) == 7'`) and passes with it.
+
+### Changes Made
+
+- `include/u8g2gl/u8g2gl_config.h` — `#ifdef U8G2GL_GENERATED_CONFIG` / `#include
+  U8G2GL_GENERATED_CONFIG` immediately after the include guard, before every default. File doc
+  updated (delivery, inertness, no cycle; `Consumed Macros:` entry). **Cycle check:** the generated
+  header includes only `u8g2gl/u8g2gl_version.h`, whose only `#include` lines are inside its doc
+  comment, and does not include `u8g2gl_config.h`; a generated unit that includes the generated
+  header first and `u8g2gl_config.h` later hits its include guard. No cycle.
+- `cli/src/core/generator/emit/generated-config.ts` — emitted advice replaced (CMake/ESP-IDF
+  `target_compile_definitions`, PlatformIO `-I generated` + escaped `-D`), with one line each on why
+  not a forced `-include` and why not a `-D` capacity list. File header (`:26-42`) rewritten. New
+  exports `GENERATED_CONFIG_MACRO` and `emittedBindingPoolSlots()` (the 0 → 1 floor, now shared by
+  the header and the budget instead of being spelled twice).
+- `cli/src/core/generator/report/budget.ts` — `binding pool slots` gains a `note`: the slot count
+  the header sets (via `emittedBindingPoolSlots`), the default it replaces (256 =
+  `U8G2GL_MAX_OBJECTS_PER_SCREEN` x `U8G2GL_MAX_BINDINGS_PER_OBJ`), and that it holds only through
+  `U8G2GL_GENERATED_CONFIG`. Figure stays `unmeasured(SIZEOF_REASON)`. Printed as:
+  `note — binding pool slots: u8g2gl_generated_config.h sets U8G2GL_MAX_TOTAL_BINDINGS to 6,
+  replacing the runtime default of 256 slots (...). That holds only when the header reaches the
+  runtime's own sources through U8G2GL_GENERATED_CONFIG (§16); a firmware built without it keeps
+  the default.`
+- Tests: `budget-report.test.ts` +3 (note content; floor agreement with the emitted `#define`;
+  drift guard reading `u8g2gl_config.h`'s two defaults and the `MAX_TOTAL_BINDINGS` formula).
+  `emit-golden.test.ts`'s advice test rewritten to the new lines and to refuse a `-include` line.
+- Goldens: `npm run build` then `refresh-goldens.mjs`. Two files changed (the emit-project expected
+  header and `test/generated_fixture/generated/u8g2gl_generated_config.h`); every changed line is in
+  the advice comment. `generated_editor/` unchanged.
+- `test/CMakeLists.txt` — `u8g2gl_fixture_runtime` (PUBLIC), `u8g2gl_fixture_fonts` and
+  `version_guard_generated_config` now get `U8G2GL_GENERATED_CONFIG="<abs path>"` via
+  `target_compile_definitions`, the advised CMake spelling; the forced `-include` of the generated
+  config is gone (the fonts unit keeps its unrelated `fixture_u8g2_fonts.h` forced include).
+- `library.json` — `"frameworks": "*"` (only that field).
+- `docs/design_spec.md` — §16: the delivery, the table of forms, the quoting/path findings, why not
+  a forced include or middleware, and the native consumer's obligations. §18.1: what the pool line
+  says and the measured 6144 B → 96 B (foundation) / 6144 B → 144 B (rig).
+
+### Decisions Made
+
+- **PlatformIO spelling: bare file name + `-I generated`,** not `${PROJECT_DIR}/...`. Both built;
+  the bare name needs no absolute path in the macro (an absolute path with a space would have to
+  survive PlatformIO's flag splitting, which I did not test), and `-I generated` is already needed
+  for the sketch's own `#include "ui.hpp"`.
+- **CMake spelling: absolute path via `${CMAKE_CURRENT_LIST_DIR}`,** as before. CMake escapes the
+  quotes itself (`flags.make`: `-DU8G2GL_GENERATED_CONFIG=\"/…/u8g2gl_generated_config.h\"`).
+- **Shared floor helper** (`emittedBindingPoolSlots`) so the budget's "sets … to N" cannot disagree
+  with the `#define` for a document with no bindings.
+- **Default 256 spelled once in budget.ts, drift-guarded** by a test that reads the runtime header,
+  rather than left unstated.
+- **`version_guard/pre_macro/include_generated_config.cpp` switched by `#ifdef`:** the real-runtime
+  control includes `u8g2gl/u8g2gl_config.h` under the macro; the frozen-0.6.0 build (no hook) still
+  includes the header directly, as a generated unit would against that runtime.
+
+### Evidence
+
+All PlatformIO operations through the MCP: `project_envs`, `build_project` (background, polled with
+`check_task_status`), `size_report` (filter `binding_pool`), `pkg_install` (once, see Dead Ends).
+Pool sizes cross-checked with `xtensa-esp32-elf-nm -S` on the ELFs. Rig: `tmp/pio/` (esp32dev,
+Arduino, `lib_deps = symlink://<worktree>`, U8g2 2.36.18, `lib/mixed_c_cpp` with a `.c` and a
+`.cpp` unit, plus Arduino `FS`/`SPIFFS`; generated project = `emit-project` fixture regenerated with
+the built CLI). Logs copied to `tmp/wo3/`. Common section:
+
+```ini
+[common]
+platform = espressif32
+board = esp32dev
+framework = arduino
+build_src_filter = +<*> +<../generated/>
+build_flags = -I generated
+lib_deps =
+    symlink:///Users/mcneillm/Documents/Projects/U8G2GL-05r
+    olikraus/U8g2@^2.36.18
+    mixed_c_cpp
+lib_ldf_mode = deep+
+```
+
+**Default (no delivery)** — `[env:default] extends = common`. SUCCESS. `size_report`:
+`s_binding_pool` **6144 B** (`u8g2gl_obj.cpp:367`); RAM 31588 B, flash 354464 B.
+
+**A — project-wide `-include`** — `build_flags = ${common.build_flags}` +
+`-include generated/u8g2gl_generated_config.h`. FAILED, first in Arduino `SPI` and `Wire`:
+```
+Compiling .pio/build/a_include/lib1fa/SPI/SPI.cpp.o
+Compiling .pio/build/a_include/libb40/Wire/Wire.cpp.o
+In file included from <command-line>:
+./generated/u8g2gl_generated_config.h:30:10: fatal error: u8g2gl/u8g2gl_version.h: No such file or directory
+```
+Re-run after the change, with `"frameworks": "*"`: same failure (`:34:10`, the header grew).
+
+**B — PR-05 middleware** (`extra_scripts = pre:middleware.py`, `AddBuildMiddleware` adding
+`-include $PROJECT_DIR/generated/u8g2gl_generated_config.h` to the runtime's sources). SUCCESS.
+`s_binding_pool` **144 B** (6 slots x 24 B); RAM 25588 B (−6000), flash 354476 B. The runtime's
+compile lines carry the `-include`; `mixed_c.c.o` carries none. (First attempt matched nothing —
+see Dead Ends.)
+
+**C — the macro, exactly as emitted** (checked programmatically: the three emitted lines appear
+verbatim in the env):
+```ini
+[env:c_macro]
+extends = common
+build_flags =
+    -I generated
+    -D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"
+```
+SUCCESS. `size_report`: `s_binding_pool` **144 B**, same as B; RAM 25588 B, flash 354476 B,
+identical to B. Compile-line diff against `default` for unrelated units (`mixed_c.c.o`,
+`mixed_cpp.cpp.o`, `FS.cpp.o`, `SPI.cpp.o`, U8g2's `u8g2_box.c.o` and `U8g2lib.cpp.o`): added
+`-DU8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"`, removed nothing — nothing else.
+- **Quoting:** the backslash-escaped quotes are required. Unescaped
+  (`-D U8G2GL_GENERATED_CONFIG="u8g2gl_generated_config.h"`), PlatformIO strips them: FAILED,
+  `u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>` — loud, not silent.
+- **Path:** the macro must name the file as found on the include path. A project-relative path
+  (`\"generated/u8g2gl_generated_config.h\"`) FAILED: `fatal error:
+  generated/u8g2gl_generated_config.h: No such file or directory` — a quoted `#include` searches the
+  including file's directory (`include/u8g2gl/`) and the `-I` list, never the compiler's working
+  directory. `-I generated` itself is relative to the project directory (PlatformIO passes
+  `-Igenerated` through and compiles from there). `${PROJECT_DIR}/generated/u8g2gl_generated_config.h`
+  (escaped) also SUCCEEDED, 144 B.
+
+**Item 6 — native** (`platform = platformio/native@1.2.1`, no framework, `lib_deps` = worktree +
+U8g2, `build_src_filter = -<*> +<../native/main.cpp> +<../generated/>`, the macro as above).
+- `"frameworks": "arduino"`: `Framework incompatible library /Users/.../U8G2GL-05r` (and U8g2);
+  the runtime is not built; compile fails on `'u8g2gl/u8g2gl_version.h' file not found`.
+- `"frameworks": "*"`: `Dependency Graph |-- u8g2gl @ 0.7.0` — the finder builds the runtime
+  natively, 0 compiler warnings. U8g2 is still `Framework incompatible` (an Arduino-format library,
+  `library.properties`), with `Warning: Ignored 'U8g2' dependency for 'u8g2gl' library`; with only
+  its `-I` paths the link fails on `_u8g2_ClearBuffer`, `_u8g2_DrawBox`, … (U8G2's C functions).
+- Consumer obligations found, then built: `-I .pio/libdeps/native/U8g2/src`,
+  `-I .pio/libdeps/native/U8g2/src/clib`, compile `src/clib/` via
+  `+<../.pio/libdeps/native/U8g2/src/clib/>` in `build_src_filter`, and `Arduino.h`/`Print.h` shims
+  (copies of `test/real_u8g2/`). SUCCESS; the program (generated UI init, activate, tick) runs and
+  exits 0. `-DU8G2_WITHOUT_FONT_ROTATION` was not needed on this macOS clang host.
+- **esp32dev unaffected** by `"*"`: `default`, `b_middleware` and `c_macro` rebuilt after the change
+  succeed with the same pool sizes and RAM; the dependency graph is unchanged
+  (`u8g2gl → U8g2 → SPI, Wire`).
+- **Decision: adopt `"*"`**, obligations documented in §16.
+
+### Dead Ends & Warnings
+
+- **Middleware pattern missed silently.** PR-05's `"*/u8g2gl/src/*.cpp"` matched nothing here
+  because a `symlink://` dependency keeps its directory name (`U8G2GL-05r`): the build was green and
+  `s_binding_pool` stayed 6144 B. Fixed in the rig to `"*/U8G2GL-05r/src/*.cpp"`. Recorded in §16
+  as a reason the middleware is the weaker form.
+- **`platform = native` reported `UnknownPlatform: Unknown development platform 'native':`** through
+  the MCP even though `~/.platformio/platforms/native` (1.2.1) is installed; `pkg_install` reported
+  `native@1.2.1 is already installed`. `platform = platformio/native@1.2.1` works. Not investigated
+  further (PlatformIO 6.1.19 / Python 3.14 package lookup); out of scope.
+- PlatformIO wipes every env's build directory when `platformio.ini` changes, so size reports were
+  re-taken from final rebuilds after the ini settled.
+- Pre-existing LDF note on the esp32dev builds: `Warning! Circular dependencies detected between
+  .../U8g2 and /Users/.../U8G2GL-05r` (deep+ mode). Not a compiler warning; not introduced here.
+- `default`'s flash moved 354480 → 354464 B between my first and final builds with no runtime-code
+  change between them (RAM identical); not chased.
+- ESP-IDF form not built separately; the CMake form is (C++ suite). §16 says so.
+
+### Out-of-Scope Findings
+
+1. **Generated code does not compile on ESP32 for `ref_value="0"` on a bool subject.** The
+   `emit-project` fixture's `<bind_flag_if_eq subject="wifi_connected" ref_value="0" …>` emits
+   `bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN)`, which on xtensa is
+   `error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<1>*, int, const uint8_t&)' is
+   ambiguous` between the `int32_t` and `bool` overloads (`u8g2gl_obj.h:369-370`): `int32_t` is
+   `long` there, so `int → long` and `int → bool` rank equally. Compiles on the host, where `int32_t`
+   is `int`. The committed `test/generated_fixture` has the same line
+   (`ui_screen_home.cpp:75`). I changed the rig's XML to `ref_value="false"`. Needs a generator or
+   runtime fix and an on-target compile test; not mine to make.
+2. `u8g2gl_config.h`'s header lists `U8G2GL_NO_PARENT` as an exported constant, but it is not
+   defined in that file (pre-existing).
+3. `cli/src/core/generator/report/model.ts`'s `BudgetLine.note` doc says the field "exists for the
+   framebuffer"; it now also carries the binding pool's caveat. Outside my box; a one-line doc
+   update.
+4. Cheap detection idea (not built): no preprocessor check can see the library's compilation from a
+   generated unit, but the linker can. `u8g2gl_obj.cpp` could define a symbol whose name encodes
+   `U8G2GL_MAX_TOTAL_BINDINGS` (e.g. `u8g2gl_pool_slots_6`), and generated code reference the one
+   for its own count; a runtime built without the header then fails to link with a named
+   undefined symbol instead of silently keeping the default. Worth an architect look.
+5. Touched two files the Boundary Box does not list by name, both comment/test-harness only and in
+   the delivery path: `test/version_guard/pre_macro/include_generated_config.cpp` (the
+   `version_guard_generated_config` source, which the WO asked to switch) and
+   `test/test_generated_fixture.cpp` (one stale comment, "forced include").
+
+### Blockers
+
+None.
