@@ -57,9 +57,13 @@ registry no longer emitting an integer comparison for a bool subject.
       `u8g2gl_repaint_object()` and say what it does for them.
 - [ ] `cli/src/core/generator/emit/editor-registry.ts` (about `:392`): the generator now always
       gives a bool subject a `bool` ref (`screen-model.ts`), so the branch that passes
-      `ref.integer` to a bool subject is dead for generated scenes. Remove it so the emitted
-      registry has one bool comparison path. If removing it would change what a valid scene can
-      express, stop and report instead. Regenerate (`npm run build` first, then
+      `ref.integer` to a bool subject is dead for generated scenes — but the editor protocol
+      (`include/u8g2gl/u8g2gl_editor.h`, the designer side under `cli/src/browser/` or wherever
+      scenes are built at runtime) may still send an integer ref for a bool subject. **Find out
+      first and say which.** If integer refs for bool subjects cannot reach the registry, remove
+      the branch. If they can, keep the branch but pass `ref.integer != 0` (and compare
+      `get()` against `ref.integer != 0` in the clear path), so it resolves to the `bool`
+      overload explicitly rather than by implicit conversion. Regenerate (`npm run build` first, then
       `node test/generator/refresh-goldens.mjs` from `cli/`); describe the diff of
       `ui_editor_registry.cpp`, then rebuild and run the C++ suite (the editor parity tests compile it).
 - [ ] Append a "Remediation" note under each item in `AUDIT.md`: fixed, with file:line.
