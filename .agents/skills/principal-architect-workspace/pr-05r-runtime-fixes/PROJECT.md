@@ -145,9 +145,9 @@ per R3).
   WO1. `standard`.
 - **[x] [wo3-platformio](wo3-platformio/WORKORDER.md):** items 5 and 6 (R4), one PlatformIO
   measurement rig. `architect`.
-- **[ ] [wo4-height-and-bool-refs](wo4-height-and-bool-refs/WORKORDER.md):** the reference-height
+- **[x] [wo4-height-and-bool-refs](wo4-height-and-bool-refs/WORKORDER.md):** the reference-height
   mode (R7) and bool-subject comparisons on xtensa (R8). `architect`.
-- **[ ] wo5-release-criterion1:** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
+- **[ ] [wo5-release-criterion1](wo5-release-criterion1/WORKORDER.md):** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
   **Blocked on R3.** `standard`.
 - **[ ] wo6-readability:** `readability-reviewer` pass and remediation. `standard`.
@@ -271,3 +271,19 @@ per R3).
     bool subject's ref as `false`/`true`. Runtime API change, inside the 0.8.0 bump.
   - **Renumbered:** WO4 = these fixes; WO5 = versions, simplified R3, criterion 1 evidence; WO6 =
     readability.
+- **2026-10-12 — WO4 verified** (`48ce8b2` R7, `c228a33` R8, report `06f32f4`).
+  - **Suites, PA re-run, clean configure:** C++ **414** (410 + 5 − 2 removed with the overloads
+    + 1), one skip, **0** warnings; CLI **1353**, `tsc` and lint clean.
+  - **Foundation harness, PA re-run:** five scenarios **0**; `no_font_pos_top`,
+    `no_font_ref_height_all` and **`plain_user_ui_handler` all 0** (were 1407 / 274 / 274).
+  - **ESP32, PA re-run through the MCP:** `clean_project` then `build_project` on env
+    `fixture_after` — 218 units compiled, including the regenerated `ui_screen_home.cpp` and a
+    hand-written `bind_flag_if_eq(&b, 0, …)`; `[SUCCESS]`, RAM 26100 B. (A first forced build
+    reused the worker's objects: `forceExecution` bypasses the MCP's cache, not SCons's.) Worker's
+    `fixture_before` on the WO3 tip: ambiguous at both lines.
+  - **Cost:** a caller left in U8G2's default text height mode pays ~3.5 ns more per object
+    (≈4.0 → 7.7 ns); a caller already in "all" pays nothing.
+  - **For WO6:** `cli/src/core/generator/emit/editor-registry.ts:392` still has a dead branch
+    passing an integer ref to a bool subject — drop it or spell it `!= 0` (regenerates
+    `ui_editor_registry.cpp`).
+- **WO5 dispatched** on `u8g2gl-05r/wo5-release-criterion1`.
