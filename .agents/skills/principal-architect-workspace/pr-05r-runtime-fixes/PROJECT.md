@@ -208,3 +208,13 @@ per R3).
   - **WO2 rebased onto WO1's tip** (`6131ac6`) without conflict: `847b943`, report `e29f7bc`
     (pre-rebase tip `f404e96`). CLI re-run on the rebased branch: **1349**.
   - **WO3** branched from WO2 in `../U8G2GL-05r`, dispatched.
+- **2026-10-12 — WO3 stopped and re-dispatched: PlatformIO through the MCP only.**
+  - The first WO3 worker was dispatched allowing "`pio` or the MCP, whichever works". The owner
+    asked "why are you not using the mcp server?", denied direct `pio`, and stopped the worker
+    before it built anything or changed a tracked file (branch still at `842eb7b`).
+  - **The PA tried the MCP:** policy `flash_requires_approval` allows `build_project`;
+    `project_envs` resolves the scratch rig. **Measurement A reproduced through it** (env
+    `a_include`): `u8g2gl_generated_config.h:30:10: fatal error: u8g2gl/u8g2gl_version.h: No such
+    file or directory`, first in Arduino `SPI` and `Wire`, `[FAILED]` in 4.8 s.
+  - WORKORDER amended: a "Tooling Constraints — PlatformIO MCP only" section; no CLI fallback —
+    an MCP refusal is a stop-and-report.

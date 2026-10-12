@@ -73,8 +73,12 @@ out of a native PlatformIO build.
   (`../esp32-app-foundation-u8g2gl/platformio.ini`, native env). Its native env also compiles
   U8G2 with `-DU8G2_WITHOUT_FONT_ROTATION` and supplies Arduino shims; the runtime includes
   `U8g2lib.h`, which needs `Arduino.h`/`Print.h`.
-- `pio` is installed (`/opt/homebrew/bin/pio`). The PlatformIO MCP tools may also be available;
-  use whichever works, and say which.
+- A scratch rig already exists in `tmp/pio/` (envs `default`, `a_include`, `b_middleware`, a
+  `lib/mixed_c_cpp` library, a generated fixture project). It is unbuilt except for one PA
+  build: **measurement A was reproduced by the PA through the MCP** (`build_project`, env
+  `a_include`): `./generated/u8g2gl_generated_config.h:30:10: fatal error:
+  u8g2gl/u8g2gl_version.h: No such file or directory`, first in Arduino `SPI` and `Wire`. Reuse or
+  rebuild the rig as you see fit; re-run A yourself for your own evidence.
 
 ## The design (owner ruling R4, PROJECT.md)
 
@@ -86,6 +90,25 @@ an unrelated library or a C unit — it is inert there. One form for CMake, ESP-
 macro in a form a user can reasonably write in `platformio.ini`, fall back to the middleware: put
 its working form in the generated header's comment and document it. Either way the header's advice
 must be a form you have built.
+
+## Tooling Constraints — PlatformIO MCP only
+
+**The owner has denied direct use of the `pio` CLI.** Every PlatformIO operation — build, clean,
+environment listing, size/map measurement, tests — goes through the PlatformIO MCP server:
+
+- Load the `platformio-mcp:pio-manager` skill first and follow it.
+- Load the tools with ToolSearch, e.g. `select:mcp__plugin_platformio-mcp_platformio__build_project,
+  mcp__plugin_platformio-mcp_platformio__check_task_status,mcp__plugin_platformio-mcp_platformio__size_report,
+  mcp__plugin_platformio-mcp_platformio__project_envs,mcp__plugin_platformio-mcp_platformio__clean_project,
+  mcp__plugin_platformio-mcp_platformio__agent_build_diagnose`.
+- Always pass `projectDir` and `environment`. Use `background: true` for builds and poll
+  `check_task_status`. The policy profile (`flash_requires_approval`) allows building without
+  approval; nothing in this WO flashes.
+- Reading the MCP's own build logs and the `.pio/build/<env>/` artefacts (map file, ELF via `nm` /
+  `xtensa-*-nm` from the toolchain package) with ordinary read-only shell commands is fine.
+- **No `pio`/`platformio` shell commands, and no wrapper scripts that call them.** If the MCP
+  refuses or cannot do something you need, paste the refusal or error word for word, commit what
+  is green, set `status: blocked`, and stop — do not fall back to the CLI.
 
 ## Line-Item Instructions
 
