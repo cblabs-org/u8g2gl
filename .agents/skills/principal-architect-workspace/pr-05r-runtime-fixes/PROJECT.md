@@ -150,7 +150,7 @@ per R3).
 - **[x] [wo5-release-criterion1](wo5-release-criterion1/WORKORDER.md):** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
   **Blocked on R3.** `standard`.
-- **[ ] [wo6-readability](wo6-readability/WORKORDER.md):** `readability-reviewer` pass and remediation. `standard`.
+- **[x] [wo6-readability](wo6-readability/WORKORDER.md):** `readability-reviewer` pass and remediation. `standard`.
 - **Later, interactive:** an on-device criterion 1 check when the owner attaches hardware.
 
 ## Modules & Components
@@ -300,3 +300,25 @@ per R3).
     U8G2GL sha against `-DU8G2GL_SOURCE_DIR`.
 - **WO6 dispatched:** readability-reviewer audit of `origin/main..u8g2gl-05r/wo6-readability`,
   then remediation.
+- **2026-10-12 — WO6 verified** (`2d838af`, `1f0bb27`, `c5a7feb`; follow-up `73b2be3`, `0024477`).
+  All five audit findings fixed; the editor registry keeps the integer-ref branch for bool subjects
+  (hand-written scenes can still send one) as `ref.integer != 0`, now tested with 0, 1, 2 and −1
+  (0/1 alone cannot tell the paths apart — the worker's catch).
+- **2026-10-12 — Final verification, from `git archive` of the tip (`0024477`).** C++ **415**, one
+  skip, **0** warnings. CLI **1352 + 1**: `bdfconv/provenance.test.ts` reads the submodule gitlink
+  with `git ls-tree HEAD`, which a `git archive` cannot answer; it passes in the worktree and this
+  branch does not touch it. `tsc`, lint clean.
+- **2026-10-12 — Project wrap-up.**
+  - **Outcome:** six items plus three of the same kind, verified; runtime 0.8.0, CLI 0.12.0.
+    [PR-DESCRIPTION.md](PR-DESCRIPTION.md), [CA bridge](CA-BRIDGE-2026-10-12-PR05R.md).
+  - **Lessons:**
+    - **Measure; do not reason — again.** The PA's "full setting cannot be slower" was refuted in
+      one benchmark; the PA's scoping missed the reference-height mode, found by running the
+      harness rather than reading code.
+    - **Unifying ambient state found two more** (repaint paths, reference height), as the bridge
+      predicted.
+    - **Host suites cannot see target type widths.** Build generated code for the target.
+    - **`forceExecution` bypasses the MCP's cache, not SCons's** — clean first to prove a rebuild.
+    - **The bridge's submodule command was stale** (`update = none` needs `--checkout`).
+  - **Pending:** owner approval to push and open the PR (merge commit, not squash); the on-device
+    criterion 1 check when hardware is attached; worktree `../U8G2GL-05r-wo2` to remove.
