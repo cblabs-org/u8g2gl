@@ -115,3 +115,7 @@ They can reach it. Nothing in the registry or protocol forbids it: `u8g2gl_edito
 
 ### Blockers
 None.
+
+### Follow-up: integer-ref coverage
+Commit `73b2be3`. Added `EditorRegistry.IntegerRefOnABoolSubjectMatchesTheBoolRef` in `test/test_editor.cpp` (after the flag-directive test). For `bind_flag_if_eq` and `bind_flag_if_not_eq`, subject true and false, it passes `u8g2gl_editor_int(v)` for v in {0, 1, 2, -1} through `u8g2gl_editor_bind_flag` (checks `is_hidden()`) and `u8g2gl_editor_flag_clear`, and asserts each equals the result for `u8g2gl_editor_bool(v != 0)`. Totals: C++ 415 (414 + 1), one skip, 0 warnings, clean configure.
+Revert check (scratch edit of the generated registry, restored afterwards): removing `!= 0` makes the new test fail. Note that 0 and 1 alone would NOT catch it, since an int of 0/1 converts to bool or compares equal to a bool identically; the value 2 (and -1) is what distinguishes it, and only the `flag_clear` comparison (`get() == ref.integer`) is sensitive. The bind path converts implicitly to `bool` either way, so it is covered but not discriminating.
