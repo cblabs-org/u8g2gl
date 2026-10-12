@@ -5,7 +5,7 @@ title: "An XML file the project skips is named, never silent"
 branch: u8g2gl-05r/wo2-screen-discovery
 base: u8g2gl-05r/wo1-ambient-state (its first commit, the PR-05R workspace record)
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO2 — a misnamed screen file produces a diagnostic, not "0 screens"
@@ -134,3 +134,51 @@ advice and `library.json` frameworks (WO3), version bumps and the version-pin te
 
 Use: Status · Baseline and final counts · Changes Made · Decisions Made · Evidence (before/after
 CLI output) · Dead Ends & Warnings · Out-of-Scope Findings · Blockers.
+
+## Completion Report
+
+**Status:** complete. Code commit `5022984`.
+
+**Baseline and final counts:** baseline vitest 1338 passed (90 files), `tsc` and lint clean. Final
+1349 passed (1338 + 6 reader unit tests + 5 built-CLI integration tests), `tsc` and lint clean.
+
+**Changes Made**
+- `cli/src/core/schema/diagnostic.ts`: new code `SCREEN_FILE_SKIPPED` (`U8G2GL_SCREEN_FILE_SKIPPED`).
+- `cli/src/node/read-project.ts`: `ProjectFiles.skippedFiles` (readonly `Diagnostic[]`, warning
+  severity, line 1 column 1, `suggestions` = the rename, sorted by code unit). Reports the three forms.
+- `cli/src/node/load-project.ts`: merges `skippedFiles` into `loadDiagnostics`, so `validate` and
+  `generate` both report them through `checkProject`, in text and `--json`, counted in `warnings`.
+- Tests: `cli/test/node/read-project.test.ts`, `cli/test/integration/generate.test.ts` (new describe only).
+- `docs/design_spec.md` §19 only (§15 does not enumerate warnings, so untouched).
+
+**Decisions Made**
+- New diagnostic code rather than reusing an existing one; same `Diagnostic` type and formatter.
+- Suggestion for a root stray file is `screens/screen_<stem>.xml`; a root file that case-varies
+  `u8g2gl.xml`/`globals.xml` is told the lower-cased name.
+- Zero-screens summary: the summary now reads "N warning(s)" instead of "0 warnings"; no separate
+  "0 screens" line was added (the CLI never printed one).
+- `fix-names` calls `readProjectFiles` but only uses screens/widgets; it ignores `skippedFiles`
+  (the following validation reports them).
+
+**Evidence** (project `valid-project` with `screens/screen_home.xml` renamed to `home.xml`)
+- Before: `validate` printed only the target line and `Validation passed: 0 errors, 0 warnings.`;
+  `generate` wrote 7 files; both exit 0; `--json` `"diagnostics": []`.
+- After (rebuilt `dist/`), with also `Screen_Menu.XML`, `screens/old/`, root `stray.xml`: exit 0,
+  `Validation passed: 0 errors, 4 warning(s).`, e.g.
+  `warning: screens/home.xml:1:1` / `'screens/home.xml' was not read: screen files are named 'screen_*.xml' exactly (design_spec §19). To use it as a screen, rename to screens/screen_home.xml.` / `= did you mean 'screens/screen_home.xml'?`
+  `--json`: `{"code":"U8G2GL_SCREEN_FILE_SKIPPED","severity":"warning","file":"screens/home.xml","line":1,"column":1,...,"suggestions":["screens/screen_home.xml"]}`.
+  `generate` shows the same warnings before the file list.
+- Every `u8g2gl.xml` project in the repo (fixtures, `test/generated_fixture`) yields 0 skipped warnings.
+- No golden or generated output moved (full suite green).
+
+**Dead Ends & Warnings**: a case-insensitive filesystem (macOS) makes `B.xml` and `b.xml` collide; the
+ordering test uses distinct names.
+
+**Out-of-Scope Findings**
+- `cli/src/browser/` is a barrel of isomorphic compilers only; it does not discover files, so no change.
+- Symlinked screen files are not `isFile()` under `withFileTypes` and are neither read nor reported
+  (pre-existing; not among the WORKORDER's forms).
+- Skipped files are not in the diagnostics source-line map, so the formatter prints no source excerpt
+  for them (appropriate for a whole-file subject).
+
+**Blockers:** none.
