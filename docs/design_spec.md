@@ -2063,6 +2063,20 @@ project can see itself approaching a limit rather than meeting one.
 | Element dirs | `widgets/name/name.xml` | `components/`, `widgets/` |
 | Generated files | `ui_screen_*.cpp` | similar |
 
+Discovery reads `screens/screen_*.xml` and nothing else: the prefix is `screen_` and the extension
+is a lower-case `.xml`, directly inside `screens/`. An `.xml` file the project does not read is
+**reported, never dropped silently** (§1.2, §15.1): `validate` and `generate` each emit a
+`U8G2GL_SCREEN_FILE_SKIPPED` **warning** — it does not change the exit code, so a notes file kept
+beside the screens does not block a build — located at line 1, column 1 of the file, naming why it
+was skipped and the rename that would make it count. Three forms are reported:
+
+- a file in `screens/` ending `.xml` (in any case) whose name is not `screen_*.xml` exactly —
+  `home.xml`, `Screen_home.xml`, `screen_home.XML`; a case variant is told its lower-cased name;
+- an `.xml` file at the project root other than `u8g2gl.xml` and `globals.xml`;
+- a subdirectory of `screens/`, since discovery is not recursive — once per directory.
+
+Warnings are ordered by path, by code unit (§13.9).
+
 ### 19.1 The `u8g2gl_` Prefix — [D-12]
 
 **Every XML tag supplied by the framework carries the `u8g2gl_` prefix, not `u8g2_`.**
