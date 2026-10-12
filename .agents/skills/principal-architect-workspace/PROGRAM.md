@@ -1620,3 +1620,79 @@ foundation half can sit as a draft without destabilising anything.
 **[R8] is how evidence becomes trustworthy.** Fixing the legacy board's defects
 in *both* boards, and re-running pixel identity after the fixes, meant the
 comparison was fair rather than flattering. The order was right.
+
+---
+
+## 2026-10-12 — the programme gets CI (owner, re-reviewing R3)
+
+PR-05R's R3 had settled §13.9's determinism guard as **a review rule rather than
+a test**, after the owner rejected a literal version pin as fragile and a
+lock-file guard as over-engineering. The owner then asked the Chief Architect to
+re-review it, on the grounds that it was decided inside a work order and may not
+have had full system context. **Agreed, and the outcome is larger than §13.9.**
+
+### Both rejections were right; the menu was wrong
+
+Neither option offered could prove the thing §13.9 cares about, and the PA's own
+comment at `generate.test.ts:460` concedes it: *"a test that compares the stamp
+against `package.json` passes at every version and so cannot prove a bump
+happened."* So the choice was between a fragile test that proves nothing and a
+lock file that over-engineers it. "Therefore a review rule" followed from an
+exhausted menu, not from the problem.
+
+**§13.9 asserts a conditional about two states** — output changed with no input
+change ⇒ version bump. A unit test sees one commit. That is why every
+test-shaped guard collapsed: it is a **diff** property, and everyone kept
+reaching for a test.
+
+### The goldens already did the expensive half
+
+Committed goldens carry `// generator: 0.0.0-golden`, so they never churn on a
+version bump and move **only** on a genuine output change — confirmed against
+the last eight commits touching `expected/`, every one a real change. Detection
+was already built. What was missing is one condition:
+
+> a golden under `cli/test/generator/fixtures/*/expected/**` changed, its
+> fixture **inputs** did not ⇒ the CLI version must differ from the merge base.
+
+The input clause matters: editing a fixture's XML *is* an input change. The
+condition is silent on a routine bump and speaks only when the rule is broken,
+so it adds no friction — which was the owner's original objection.
+
+### The real finding: there is no CI at all
+
+No `.github/workflows`, no hooks, no husky. **Every green figure in every review
+has been a human running suites and telling another human.** §17.1's Compilation
+row has claimed "in CI" since the first revision and has been describing
+something that does not exist.
+
+**PR-05R paid for that in the same PR.** The xtensa overload ambiguity passed 401
+C++ tests, 1338 CLI tests, a PA verification and a readability review, and
+reached a **committed fixture**. Nothing human caught it; a target compile did,
+at once. No care at any §17.1 layer can reach that class, because all of them run
+on the developer's architecture.
+
+### Ruled — PR-06 introduces CI, carrying three checks
+
+| Check | Catches |
+|---|---|
+| Both suites, machine-run | A relayed green number that was never green |
+| **Target cross-compile of the generated fixtures** | Type widths, promotion, overload resolution. A compile suffices; no device needed |
+| **§13.9's determinism condition** | Output changing without a generator version bump |
+
+The cross-compile is the one with no human substitute. Recorded in §17.3, §13.9,
+`rules/03` and PR-06's ledger entry.
+
+**The review rule still goes into the standards skill — explicitly as a stopgap
+naming its successor.** An interim measure with no named replacement is how a
+weakened guard becomes the permanent answer, which is exactly what this
+re-review caught.
+
+### Worth recording about the decision itself
+
+The owner was right to reopen it. The ruling was sound *on the options in front
+of it* and wrong on the problem, and that is the characteristic failure of a
+decision taken at work-order depth: the alternatives are bounded by what the
+work order happened to consider. Two of the three inputs that changed the
+answer — the goldens' fixed stamp, and the absence of CI — were visible only
+from outside the work order.

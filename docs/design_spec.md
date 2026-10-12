@@ -1670,6 +1670,14 @@ Generated output is a committed artefact ([D-11]) and appears in review diffs. I
 
 A generator change that alters output without an input change is a breaking change and requires a generator version bump.
 
+**How that is checked.** The committed goldens carry a fixed stamp — `// generator: 0.0.0-golden` — so they never churn on a version bump and change **only** when generated output genuinely changes. That makes the rule a one-line condition on a diff rather than something a test can express, because a test sees one commit and this rule is about the difference between two:
+
+> If a golden under `cli/test/generator/fixtures/*/expected/**` changed and that fixture's **inputs** did not, the CLI version must differ from the merge base.
+
+The input clause matters: editing a fixture's XML *is* an input change, and its golden should then move freely. The check is silent when a version is bumped without an output change, silent when both move together, and speaks only when the rule is broken — so it adds no friction to a routine bump.
+
+*Why not a test.* Two test-shaped guards were tried and both were rejected, correctly. A literal version pinned in a test must be edited at every bump and still proves nothing; a test comparing the stamp to `package.json` passes at every version, so it cannot show that a bump *happened*. A lock file over the generated corpus was rejected as over-engineering. See §17.3 for where the condition runs.
+
 ### 13.10 What is never generated
 
 The boundary matters as much as the contract:
@@ -1975,9 +1983,31 @@ Absent from v0.1 entirely. It is what makes the project maintainable.
 | **Rendering** | Snapshot tests — render to the Wasm framebuffer, compare PNG against a golden image |
 | **Runtime logic** | Native unit tests on animation state machines and the subject system |
 
+**Every layer above except Compilation runs on the host**, and that is a real limit rather than a detail — see §17.3.
+
 ### 17.2 The Wasm Build Pays For Itself Twice
 
 Per **[D-9]** the same Emscripten build of the runtime plus U8G2 serves as the browser preview *and* the snapshot-test harness — and departures-board's `tools/layoutsim` is a working precedent to port rather than a green-field build. A rendering regression in `u8g2gl_clock`'s dual-font alignment fails CI as a pixel diff. This is the single highest-leverage piece of infrastructure in the project and should be built early — during Phase 1, not Phase 3.
+
+### 17.3 Continuous integration — required, and absent until PR-06
+
+**There is no CI.** No workflow, no hooks, nothing automated. Every figure in every review has been a human running the suites and reporting the result to another human. §17.1's Compilation row has said "in CI" since the first revision, and has been describing something that does not exist.
+
+That was a defensible trade while nothing shipped. Two findings ended it.
+
+**A host-only suite cannot see target type widths.** PR-05R found an overload ambiguity that is an error on xtensa and fine on the host. It passed 401 C++ tests, 1338 CLI tests, a Principal Architect's verification and a readability review, and reached a **committed fixture**. Nothing human caught it; a target compile did, immediately. No amount of care at the layers in §17.1 can reach this class of defect, because every one of them runs on the developer's architecture.
+
+**And §13.9's rule has nowhere to live.** It is a condition on a diff (§13.9), so it is not expressible as a test and needs a place that sees two commits.
+
+**CI is therefore required, and carries three things from PR-06:**
+
+| Check | Catches |
+|---|---|
+| Both suites, run by the machine | A relayed green number that was never green |
+| **A target cross-compile of the generated fixtures** | Type widths, integer promotion and overload resolution that differ from the host. A compile is enough; a device run is not required |
+| **The §13.9 determinism condition** | Generated output changing without a generator version bump |
+
+The cross-compile is the one with no substitute. The other two replace a human's diligence with a machine's; this one reaches a place no human reading host output can go.
 
 ---
 

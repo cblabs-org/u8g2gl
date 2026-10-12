@@ -146,6 +146,13 @@ These come from the design spec and are enforced in review:
   `u8g2gl_observer`.
 - **Determinism in generated output** — no timestamps, document order preserved,
   sorted includes (§13.9). An unchanged project must regenerate to an empty diff.
+  **Reviewer's question, until CI carries it (§17.3):** *did a golden under
+  `cli/test/generator/fixtures/*/expected/` change without its fixture inputs
+  changing? Then the CLI version must be bumped in the same change.* The goldens
+  are stamped `0.0.0-golden`, so they never move on a version bump — a golden
+  diff is always a real output change. **This is a stopgap with a named
+  successor**: PR-06 makes it a condition checked on the diff, and this bullet
+  then describes what the machine already enforces.
 - **Honest cost reporting** — §1.3 forbids claims the budget cannot substantiate.
   If a change makes the §18 report inaccurate, the change is wrong.
 - **Zero warnings** under `-Wall -Wextra -Wpedantic`. Not "few". Zero.

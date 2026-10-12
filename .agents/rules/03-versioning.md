@@ -62,6 +62,14 @@ A generator change that alters output **without an input change** is a breaking
 change and requires a generator version bump (§13.9). Generated code is committed
 and appears in review; an unexplained diff destroys trust in the tool.
 
+**This is checked as a condition on the diff, not as a test** — a test sees one
+commit and the rule is about two. The committed goldens are stamped
+`0.0.0-golden`, so they never move on a version bump and move only on a real
+output change; the check is therefore "a golden changed, its fixture inputs did
+not, so the CLI version must differ from the merge base" (§13.9). It runs in CI,
+which PR-06 introduces (§17.3). **Until then it is a review question, and that is
+a stopgap with a named successor, not the answer.**
+
 ## Agent autonomy
 
 | Action | Agent may do it |
