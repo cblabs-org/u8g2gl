@@ -322,3 +322,12 @@ per R3).
     - **The bridge's submodule command was stale** (`update = none` needs `--checkout`).
   - **Pending:** owner approval to push and open the PR (merge commit, not squash); the on-device
     criterion 1 check when hardware is attached; worktree `../U8G2GL-05r-wo2` to remove.
+- **2026-10-12 — owner: "Hardware is ready and attached - do the flash tests. Thn e come back to
+  the PR after."**
+  - `list_devices`: one ESP32-S3 at `/dev/cu.usbmodem101` (303A:1001), claimed by a live monitor
+    of another session's PlatformIO MCP (owner PID 4782, monitor PID 41946, env
+    `ex3-waveshare-nano`, 7 h). The owner chose "Release it, it's finished" and confirmed the
+    board is foundation's ESP32-S3 Nano with its SSD1322 (`hardware/esp32s3nano/board.h`).
+  - **Method:** device frame SHA-256 over serial against the host harness's `connected.bin`, plain
+    `begin()` user, before (`origin/main`) and after (this branch). WO7 builds the firmware only;
+    **the PA flashes and captures**, so flash approval stays at the owner↔PA boundary.
