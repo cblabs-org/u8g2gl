@@ -143,8 +143,8 @@ per R3).
   (R1, R2). Real-U8G2 reproductions first. `architect`.
 - **[x] [wo2-screen-discovery](wo2-screen-discovery/WORKORDER.md):** item 4 (R5). Parallel with
   WO1. `standard`.
-- **[ ] wo3-platformio:** items 5 and 6 (R4), one PlatformIO measurement rig. `architect`.
-  WORKORDER written after WO1/WO2 land.
+- **[ ] [wo3-platformio](wo3-platformio/WORKORDER.md):** items 5 and 6 (R4), one PlatformIO
+  measurement rig. `architect`.
 - **[ ] wo4-release-criterion1:** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
   **Blocked on R3.** `standard`.
@@ -199,3 +199,12 @@ per R3).
     confirm at WO4 dispatch: delete the literal version assertion, keep the stamp test reading
     `package.json`, and leave §13.9 as a review rule (the golden diff makes an output change
     visible in every PR) rather than a test.
+- **2026-10-12 — R1a verified; WO2 restacked; WO3 dispatched.**
+  - **R1a** (`519e8bc`, report `6131ac6`): compare-first. PA re-run from a clean configure:
+    C++ **410**, one skip, **0** warnings. Worker's figures, ns per guard: one colour change
+    5.0–5.7 → 3.7–4.1; a label's own changes 6.5–6.9 → 3.8–4.0; with a font change 50 → 47–48.
+    Size unchanged (16 B on 32-bit). `u8g2_font_calc_vref_top` is defined but not declared by
+    `u8g2.h`; the saver declares it `extern "C"`, and the real-U8G2 lane links it.
+  - **WO2 rebased onto WO1's tip** (`6131ac6`) without conflict: `847b943`, report `e29f7bc`
+    (pre-rebase tip `f404e96`). CLI re-run on the rebased branch: **1349**.
+  - **WO3** branched from WO2 in `../U8G2GL-05r`, dispatched.
