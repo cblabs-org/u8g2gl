@@ -147,10 +147,10 @@ per R3).
   measurement rig. `architect`.
 - **[x] [wo4-height-and-bool-refs](wo4-height-and-bool-refs/WORKORDER.md):** the reference-height
   mode (R7) and bool-subject comparisons on xtensa (R8). `architect`.
-- **[ ] [wo5-release-criterion1](wo5-release-criterion1/WORKORDER.md):** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
+- **[x] [wo5-release-criterion1](wo5-release-criterion1/WORKORDER.md):** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
   **Blocked on R3.** `standard`.
-- **[ ] wo6-readability:** `readability-reviewer` pass and remediation. `standard`.
+- **[ ] [wo6-readability](wo6-readability/WORKORDER.md):** `readability-reviewer` pass and remediation. `standard`.
 - **Later, interactive:** an on-device criterion 1 check when the owner attaches hardware.
 
 ## Modules & Components
@@ -287,3 +287,16 @@ per R3).
     passing an integer ref to a bool subject — drop it or spell it `!= 0` (regenerates
     `ui_editor_registry.cpp`).
 - **WO5 dispatched** on `u8g2gl-05r/wo5-release-criterion1`.
+- **2026-10-12 — WO5 verified** (`c425adc`, `900388e` [CRITERION-1.md](CRITERION-1.md), report
+  `06f3709`).
+  - **PA re-run:** C++ **414**, one skip, **0** warnings (clean configure); CLI **1353**. Runtime
+    0.8.0 in `u8g2gl_version.h`, `CMakeLists.txt`, `library.json` (the configure check accepts
+    them); `runtime-version.json` 0.8.0; `--version` 0.12.0; a fresh `generate` of the
+    emit-project fixture stamps `// generator: 0.12.0` and `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 8)`.
+    Golden diff: the floor only. The literal-version test is gone (R3 simplified).
+  - **Criterion 1 holds for U8G2GL alone, on the host** — see CRITERION-1.md. Device pending.
+  - **For the Chief Architect, foundation side:** the harness's `state_probe.json` text still says
+    the saver does not restore font mode (stale after WO1); the harness does not enforce its pinned
+    U8G2GL sha against `-DU8G2GL_SOURCE_DIR`.
+- **WO6 dispatched:** readability-reviewer audit of `origin/main..u8g2gl-05r/wo6-readability`,
+  then remediation.
