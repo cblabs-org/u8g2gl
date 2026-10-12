@@ -28,8 +28,8 @@
  *              u8g2gl_state_saver reads, under real U8G2's names, kept in step
  *              by the stub's setters — then the U8G2 class: draw calls with
  *              per-call counters and last-argument fields, draw colour / font /
- *              mode / position / direction state, clip-window recording, and
- *              configurable text metrics.
+ *              mode / position / direction / height-mode state, clip-window
+ *              recording, and configurable text metrics.
  *
  *              Every call that draws or changes draw state is also appended, in
  *              order, to a fixed-capacity call log (PR-04 WO11). Counters and
@@ -50,7 +50,8 @@
  *                 drawCircle/Disc, drawEllipse/FilledEllipse, drawTriangle,
  *                 drawXBMP, drawGlyph, drawStr, drawUTF8, drawButtonUTF8
  *     State:      set/getDrawColor, setFont, getU8g2, setFontMode, setBitmapMode,
- *                 setFontPosTop/Baseline/Bottom/Center, setFontDirection
+ *                 setFontPosTop/Baseline/Bottom/Center, setFontDirection,
+ *                 setFontRefHeightText/ExtendedText/All
  *     Clipping:   setClipWindow, setMaxClipWindow
  *     Metrics:    getUTF8Width, getStrWidth, getAscent, getDescent,
  *                 getMaxCharWidth/Height, getDisplayWidth/Height
@@ -85,6 +86,14 @@
 #define U8G2_WITH_FONT_ROTATION
 #endif
 
+/**
+ * @brief U8G2's reference-height modes (u8g2.h), the values
+ *        setFontRefHeightText/ExtendedText/All() store in font_height_mode.
+ */
+#define U8G2_FONT_HEIGHT_MODE_TEXT 0
+#define U8G2_FONT_HEIGHT_MODE_XTEXT 1
+#define U8G2_FONT_HEIGHT_MODE_ALL 2
+
 /** @brief U8G2's pixel coordinate type; uint16_t because U8G2_16BIT is on. */
 typedef uint16_t u8g2_uint_t;
 
@@ -111,7 +120,9 @@ struct u8g2_font_decode_t {
  * that state is readable only here, through getU8g2(). Keeping the stub to the
  * same field names stops the runtime compiling against an accessor or a field
  * that does not exist. Defaults are u8g2_SetupBuffer()'s (u8g2_setup.c): no
- * font, draw colour 1, solid modes, baseline position.
+ * font, draw colour 1, solid modes, baseline position, text reference height.
+ * The stub has no font metrics, so it records the height mode but not the
+ * reference ascent and descent real U8G2 derives from it.
  */
 struct u8g2_t {
     const uint8_t* font = nullptr;               ///< Current font, as set by setFont()
@@ -119,6 +130,7 @@ struct u8g2_t {
     u8g2_font_decode_t font_decode;              ///< Font mode and direction
     uint8_t bitmap_transparency = 0;             ///< Bitmap mode, as set by setBitmapMode()
     uint8_t draw_color = 1;                      ///< Draw colour, as set by setDrawColor()
+    uint8_t font_height_mode = U8G2_FONT_HEIGHT_MODE_TEXT;  ///< As set by setFontRefHeight*()
 
     u8g2_t();
 };
@@ -521,6 +533,18 @@ public:
     void setFontPosCenter() {
         log_call("setFontPosCenter", {});
         u8g2.font_calc_vref = u8g2_font_calc_vref_center;
+    }
+    void setFontRefHeightText() {
+        log_call("setFontRefHeightText", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_TEXT;
+    }
+    void setFontRefHeightExtendedText() {
+        log_call("setFontRefHeightExtendedText", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_XTEXT;
+    }
+    void setFontRefHeightAll() {
+        log_call("setFontRefHeightAll", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_ALL;
     }
     void setFontDirection(uint8_t dir) {
         log_call("setFontDirection", {dir});

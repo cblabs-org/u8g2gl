@@ -1195,7 +1195,7 @@ uint32_t tick(now_ms)          → ms until this widget next needs a tick
 
 render(display)
 ├── Framework constructs u8g2gl_state_saver (RAII: saves the caller's state,
-│   establishes setFontPosTop() and direction 0)
+│   establishes setFontPosTop(), setFontRefHeightAll() and direction 0)
 ├── Framework calls setClipWindow(x, y, x+w, y+h) — far corner excluded
 ├── Widget draws
 └── StateSaver destructor restores the caller's state
@@ -1205,7 +1205,7 @@ Two phases, not three. Widgets do not clear their own background — `clearBuffe
 
 `tick()` returns its own next deadline, and `ui_handler()` returns the minimum across all widgets ([D-15]). A widget knows this cheaply: a clock blinking at 500 ms returns the remainder to the next toggle, a scrolling label returns its step interval, a static label returns `UINT32_MAX`. Widget authors who do not care may return `UINT32_MAX` and lose nothing but the sleep hint.
 
-**The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver is the boundary between the application's U8G2 state and the framework's: U8G2GL's state inside each object's render, the caller's at every other moment.** On entry it captures draw colour, font, font mode, bitmap mode, font position and (where U8G2 is built with font rotation) font direction — each readable from U8G2's state struct (`u8g2.h`) though U8G2 offers getters for few of them — and establishes the framework's text baseline, `setFontPosTop()` and direction 0, which every text widget assumes. Font, colour and the modes are not established: widgets set them from their style. On exit it restores everything it captured; a null font (a display that has had `begin()` but no `setFont()`) is written back directly, because `u8g2_SetFont()` would read a font header at address 0. Every setter involved is a single field assignment and nothing allocates. The one thing it cannot save is the clip window — U8G2 has no clip getter — so clip lifetime is the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards. A widget's blocked-loop repaint ([D-5]) runs inside the same guard, through `u8g2gl_repaint_object()`, clipped to the widget's own bounds.
+**The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver is the boundary between the application's U8G2 state and the framework's: U8G2GL's state inside each object's render, the caller's at every other moment.** On entry it captures draw colour, font, font mode, bitmap mode, font position, reference-height mode and (where U8G2 is built with font rotation) font direction — each readable from U8G2's state struct (`u8g2.h`) though U8G2 offers getters for few of them — and establishes the framework's text baseline, which every text widget assumes: `setFontPosTop()`, `setFontRefHeightAll()` and direction 0. The reference height is all, not U8G2's default text mode, because every text widget centres on `getAscent() - getDescent()` and clips to its own box, so the height it centres on must cover every glyph the font can draw rather than `A` and `g`. Font, colour and the font and bitmap modes are not established: widgets set them from their style. Each item is compared before it is set, on entry and on exit, so a caller already in the framework's state pays a load per item. On exit it restores everything it captured, the font before the reference-height mode: each height-mode setter recomputes the reference ascent and descent from the current font (`u8g2_UpdateRefHeight()`), so the last computation is the caller's font in the caller's mode. A null font (a display that has had `begin()` but no `setFont()`) is written back directly, because `u8g2_SetFont()` would read a font header at address 0; the height-mode setters read nothing on a null font. Nothing allocates. The one thing it cannot save is the clip window — U8G2 has no clip getter — so clip lifetime is the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards. A widget's blocked-loop repaint ([D-5]) runs inside the same guard, through `u8g2gl_repaint_object()`, clipped to the widget's own bounds.
 
 The clip window is set by the framework, not the widget. It is containment insurance: a widget that miscalculates a text width cannot corrupt its neighbours. It costs two comparisons per drawn pixel and is worth it.
 
@@ -2249,7 +2249,7 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 
 **Bitmaps** — `drawXBMP` (PROGMEM, preferred), `drawXBM` (RAM)
 
-**State** — `setDrawColor`, `setFont`, `setFontMode`, `setBitmapMode`, `setClipWindow`, `setMaxClipWindow`, `setFontPosTop`
+**State** — `setDrawColor`, `setFont`, `setFontMode`, `setBitmapMode`, `setClipWindow`, `setMaxClipWindow`, `setFontPosTop`, `setFontRefHeightAll`
 
 **Metrics** — `getStrWidth`, `getUTF8Width`, `getMaxCharWidth`, `getMaxCharHeight`, `getAscent`, `getDescent`
 
@@ -2258,6 +2258,7 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 ### Key Implementation Notes
 
 - **`setFontPosTop()`** is the framework's text baseline — widget `y` is top-left, not baseline. The render guard, `u8g2gl_state_saver`, establishes it around every object's render and restores the caller's position afterwards (§11.3); nothing else needs to set it.
+- **`setFontRefHeightAll()`** completes that baseline: `getAscent()`, `getDescent()` and top positioning measure the font's whole bounding box, not `A` and `g`, so a text widget's centring covers every glyph its box can hold. The same guard establishes it and restores the caller's mode (§11.3).
 - **`setDrawColor(2)` (XOR)** enables selection highlighting and blink without a second render path. Exposed as `draw_color="xor"` / `invert="true"`.
 - **`drawXBMP`** always; the generator emits `PROGMEM` arrays.
 - **`drawButtonUTF8`** handles border, padding, centring, and inversion in one call — the intended implementation of `u8g2gl_button`.

@@ -13,11 +13,15 @@
  *
  *          On construction it captures every piece of ambient U8G2 state that
  *          can be read back, then establishes the framework's text baseline:
- *          top font positioning (setFontPosTop()) and, where U8G2 is built with
- *          font rotation, direction 0. Every text widget computes its glyph
- *          box from the top edge, so it must not depend on what the caller
- *          left — a caller in U8G2's default baseline position would otherwise
- *          draw every label one font height too high. On destruction it puts
+ *          top font positioning (setFontPosTop()), reference height over every
+ *          glyph (setFontRefHeightAll()) and, where U8G2 is built with font
+ *          rotation, direction 0. Every text widget computes its glyph box
+ *          from the top edge and centres on the font's reference height, so it
+ *          must not depend on what the caller left — a caller in U8G2's default
+ *          baseline position would otherwise draw every label one font height
+ *          too high, and one in U8G2's default text height mode would centre on
+ *          'A' and 'g' rather than on the tallest glyph the label's box must
+ *          hold. On destruction it puts
  *          back exactly what it captured, so a widget may change any of it
  *          without tidying up, and nothing a widget does leaks into the
  *          application's own drawing.
@@ -37,8 +41,8 @@
  *          before the rest of the state is restored.
  *
  * Description: Scope guard that captures U8G2's ambient drawing state,
- *              establishes the framework's font position and direction, and
- *              restores the captured state on destruction
+ *              establishes the framework's font position, reference height and
+ *              direction, and restores the captured state on destruction
  *
  * Exported Classes:
  * - u8g2gl_state_saver: RAII guard — save, establish, restore
@@ -81,10 +85,18 @@ extern "C" u8g2_uint_t u8g2_font_calc_vref_top(u8g2_t* u8g2);
  * | Font mode      | `font_decode.is_transparent`   | no — style       |
  * | Bitmap mode    | `bitmap_transparency`          | no — style       |
  * | Font position  | `font_calc_vref`               | yes — top        |
+ * | Height mode    | `font_height_mode`             | yes — all        |
  * | Font direction | `font_decode.dir`              | yes — 0          |
  *
  * Font direction exists only when U8G2 is built with U8G2_WITH_FONT_ROTATION,
  * which u8g2.h defines by default; the guard follows that macro.
+ *
+ * The height mode decides which glyphs U8G2's reference ascent and descent
+ * cover (u8g2_UpdateRefHeight(), u8g2_font.c): `A` and `g` under text, the
+ * font's whole bounding box under all. getAscent(), getDescent() and the top,
+ * centre and bottom font positions all read those reference heights. A label
+ * clips to its own box, so the framework establishes all: the height it centres
+ * on covers every glyph the font can draw.
  *
  * It does not save the clip window — see the file header for why, and who is
  * responsible instead.
@@ -95,14 +107,18 @@ extern "C" u8g2_uint_t u8g2_font_calc_vref_top(u8g2_t* u8g2);
  * library, where a comparison is one load. Measured against real U8G2 2.36.18
  * on a 64-bit arm host (-O2, 10^7 iterations, caller in baseline position),
  * construct + destruct around a label's own style changes took 6.5-6.9 ns
- * setting every item and 3.8-4.0 ns comparing first. Nothing allocates, and
- * setFont() reads a font header only when the font actually changes.
+ * setting every item and 3.8-4.0 ns comparing first. A caller in U8G2's
+ * default text height mode adds the two height-mode setters, each of which
+ * recomputes the reference heights: 7.4-8.1 ns against 4.0-4.3 ns before the
+ * mode was established; a caller already in all pays nothing for it
+ * (3.9-4.0 ns). Nothing allocates, and setFont() reads a font header only when
+ * the font actually changes.
  */
 class u8g2gl_state_saver {
 public:
     /**
      * @brief Capture the caller's state, then establish the framework's
-     *        font position and direction.
+     *        font position, reference height and direction.
      * @param display U8G2 instance to guard. Must outlive this guard.
      */
     explicit u8g2gl_state_saver(U8G2& display)
@@ -114,7 +130,8 @@ public:
           saved_font_position_(display.getU8g2()->font_calc_vref),
           saved_draw_color_(display.getDrawColor()),
           saved_font_mode_(display.getU8g2()->font_decode.is_transparent),
-          saved_bitmap_mode_(display.getU8g2()->bitmap_transparency)
+          saved_bitmap_mode_(display.getU8g2()->bitmap_transparency),
+          saved_height_mode_(display.getU8g2()->font_height_mode)
 #ifdef U8G2_WITH_FONT_ROTATION
           ,
           saved_direction_(display.getU8g2()->font_decode.dir)
@@ -124,6 +141,13 @@ public:
         // Compare first: see the class doc for the measured cost.
         if (saved_font_position_ != u8g2_font_calc_vref_top) {
             display_.setFontPosTop();
+        }
+        // Every text widget centres on the reference height, which must cover
+        // every glyph its box holds. The setter recomputes the reference
+        // heights from the current font, which is still the caller's; the
+        // widget's own setFont() recomputes them again under this mode.
+        if (saved_height_mode_ != U8G2_FONT_HEIGHT_MODE_ALL) {
+            display_.setFontRefHeightAll();
         }
 #ifdef U8G2_WITH_FONT_ROTATION
         if (saved_direction_ != 0) {
@@ -159,7 +183,7 @@ public:
         // pointer is written back as it was read.
         state->font_calc_vref = saved_font_position_;
 
-        // --- Step 3: Restore the font ---
+        // --- Step 3: Restore the font, then the height mode ---
         // A null font is written back directly. setFont(nullptr) would make
         // u8g2_SetFont() read the font header at address 0 (u8g2_font.c), and
         // a display that has had begin() but never setFont() holds exactly
@@ -174,6 +198,16 @@ public:
                 display_.setFont(saved_font_);
             }
         }
+        // The height mode comes after the font: each height-mode setter
+        // recomputes the reference heights from the font current at the call
+        // (u8g2_UpdateRefHeight(), u8g2_font.c), so restoring it last makes
+        // that final computation the caller's own font in the caller's own
+        // mode, whether or not setFont() ran above. On a null font the setter
+        // returns before reading anything, and only the mode is put back;
+        // the next setFont() computes the heights afresh.
+        if (state->font_height_mode != saved_height_mode_) {
+            restore_height_mode();
+        }
     }
 
     // Non-copyable, non-movable: a copy would restore the same state twice.
@@ -183,6 +217,26 @@ public:
     u8g2gl_state_saver& operator=(u8g2gl_state_saver&&) = delete;
 
 private:
+    // U8G2 has no setter that takes a mode value: one setter per mode (u8g2.h
+    // U8G2_FONT_HEIGHT_MODE_*). u8g2_UpdateRefHeight() treats any value other
+    // than text or extended text as all, so a value outside the three gets
+    // all's reference heights and then its own value written back, which
+    // returns the struct exactly as captured.
+    void restore_height_mode() {
+        switch (saved_height_mode_) {
+            case U8G2_FONT_HEIGHT_MODE_TEXT:
+                display_.setFontRefHeightText();
+                break;
+            case U8G2_FONT_HEIGHT_MODE_XTEXT:
+                display_.setFontRefHeightExtendedText();
+                break;
+            default:
+                display_.setFontRefHeightAll();
+                display_.getU8g2()->font_height_mode = saved_height_mode_;
+                break;
+        }
+    }
+
     // Pointers first, then bytes, so the bytes share one trailing word.
     U8G2& display_;
     const uint8_t* saved_font_;
@@ -190,6 +244,7 @@ private:
     uint8_t saved_draw_color_;
     uint8_t saved_font_mode_;
     uint8_t saved_bitmap_mode_;
+    uint8_t saved_height_mode_;
 #ifdef U8G2_WITH_FONT_ROTATION
     uint8_t saved_direction_;
 #endif

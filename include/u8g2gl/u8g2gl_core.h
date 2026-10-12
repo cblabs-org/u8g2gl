@@ -250,8 +250,8 @@ private:
  *
  * In order: skips the object if it or any ancestor is hidden; otherwise
  * constructs a u8g2gl_state_saver, which saves the caller's U8G2 state and
- * establishes the framework's text baseline (top font positioning, direction
- * 0); sets the clip window to the effective clip (own bounds intersected with
+ * establishes the framework's text baseline (top font positioning, reference
+ * height over every glyph, direction 0); sets the clip window to the effective clip (own bounds intersected with
  * every ancestor's) with a u8g2gl_clip_scope; calls the object's render()
  * unless that clip is empty or off the display; and lets the scope reset the
  * clip window to the full display before the saver restores the caller's

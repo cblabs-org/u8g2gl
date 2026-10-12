@@ -17,8 +17,12 @@
  *          - a caller in baseline position: every text widget assumes top
  *            positioning, and nothing established it, so text drew one font
  *            height higher (a downstream frame lit 15 pixels instead of 1392);
- *          - font mode, bitmap mode, font position and direction the caller set
- *            came back changed;
+ *          - a caller in U8G2's default text reference-height mode: every text
+ *            widget centres on getAscent() - getDescent(), which that mode
+ *            measures from 'A' and 'g', so text sat a row away from where it
+ *            sits under "all" (a downstream frame differed by 274 pixels);
+ *          - font mode, bitmap mode, font position, direction and height mode
+ *            the caller set must come back unchanged;
  *          - the blocked-loop repaints (render_animation_update(), [D-5]) drew
  *            outside any guard, so they did all of the above as well.
  *
@@ -121,6 +125,12 @@ struct ambient_state {
 #ifdef U8G2_WITH_FONT_ROTATION
     uint8_t direction;
 #endif
+    uint8_t height_mode;
+    // The reference heights U8G2 derives from the font and the height mode
+    // (u8g2_UpdateRefHeight(), u8g2_font.c): what getAscent()/getDescent()
+    // and every font position but baseline read.
+    int8_t ref_ascent;
+    int8_t ref_descent;
 
     static ambient_state read(U8G2& display) {
         const u8g2_t* u8g2 = display.getU8g2();
@@ -133,6 +143,9 @@ struct ambient_state {
 #ifdef U8G2_WITH_FONT_ROTATION
         s.direction = u8g2->font_decode.dir;
 #endif
+        s.height_mode = u8g2->font_height_mode;
+        s.ref_ascent = u8g2->font_ref_ascent;
+        s.ref_descent = u8g2->font_ref_descent;
         return s;
     }
 };
@@ -146,6 +159,9 @@ void expect_state_equal(const ambient_state& expected, const ambient_state& actu
 #ifdef U8G2_WITH_FONT_ROTATION
     EXPECT_EQ(actual.direction, expected.direction) << "font direction";
 #endif
+    EXPECT_EQ(actual.height_mode, expected.height_mode) << "reference-height mode";
+    EXPECT_EQ(actual.ref_ascent, expected.ref_ascent) << "reference ascent";
+    EXPECT_EQ(actual.ref_descent, expected.ref_descent) << "reference descent";
 }
 
 // A caller that has set every ambient item away from the framework's choice:
@@ -218,6 +234,91 @@ TEST(AmbientState, BaselineCallerDrawsTheSamePixelsAsTopCaller) {
     EXPECT_EQ(baseline_lit, top_lit);
     EXPECT_EQ(std::memcmp(top, baseline, kBufferBytes), 0)
         << "lit pixels: top " << top_lit << ", baseline " << baseline_lit;
+}
+
+// --- The caller's reference-height mode does not move text ---
+// A caller in U8G2's default mode (text: the ascent of 'A', the descent of 'g')
+// and one in "all" (every glyph) draw the same label. 6x10's reference ascent is
+// 7 under text and 8 under all, and every text widget centres on
+// getAscent() - getDescent(), so a guard that leaves the mode alone moves text.
+TEST(AmbientState, CallerReferenceHeightDrawsTheSamePixels) {
+    u8g2gl_label label;
+    configure_label(label);
+
+    uint8_t text_mode[kBufferBytes];
+    {
+        real_display real;
+        real.display().setFont(u8g2_font_5x7_tf);
+        real.display().setFontPosTop();
+        real.display().setFontRefHeightText();
+        render_alone(real.display(), label);
+        real.snapshot(text_mode);
+    }
+    uint8_t all_mode[kBufferBytes];
+    {
+        real_display real;
+        real.display().setFont(u8g2_font_5x7_tf);
+        real.display().setFontPosTop();
+        real.display().setFontRefHeightAll();
+        render_alone(real.display(), label);
+        real.snapshot(all_mode);
+    }
+
+    const int text_lit = lit_pixels(text_mode);
+    const int all_lit = lit_pixels(all_mode);
+    EXPECT_GT(all_lit, 0) << "nothing drawn: the check would be vacuous";
+    EXPECT_EQ(std::memcmp(text_mode, all_mode, kBufferBytes), 0)
+        << "lit pixels: text " << text_lit << ", all " << all_lit;
+}
+
+// --- Each reference-height mode comes back, with its reference heights ---
+// The caller's font is helvR08, whose reference ascent is 8 under text and 11
+// under all, so a mode or height left over from the render shows in the
+// struct; the label's 6x10 differs from it, so the font is restored as well.
+TEST(AmbientState, CallerReferenceHeightComesBackAfterRender) {
+    struct mode_case {
+        const char* name;
+        void (U8G2::*set)();
+        uint8_t mode;
+    };
+    const mode_case cases[] = {
+        {"text", &U8G2::setFontRefHeightText, U8G2_FONT_HEIGHT_MODE_TEXT},
+        {"extended text", &U8G2::setFontRefHeightExtendedText, U8G2_FONT_HEIGHT_MODE_XTEXT},
+        {"all", &U8G2::setFontRefHeightAll, U8G2_FONT_HEIGHT_MODE_ALL},
+    };
+    u8g2gl_label label;
+    configure_label(label);
+
+    for (const mode_case& c : cases) {
+        SCOPED_TRACE(c.name);
+        real_display real;
+        U8G2& display = real.display();
+        display.setFont(u8g2_font_helvR08_tf);
+        (display.*c.set)();
+        const ambient_state before = ambient_state::read(display);
+        ASSERT_EQ(before.height_mode, c.mode) << "precondition: the setter took";
+
+        render_alone(display, label);
+        expect_state_equal(before, ambient_state::read(display));
+    }
+}
+
+// --- With no font, establishing and restoring the mode reads nothing ---
+// u8g2_UpdateRefHeight() returns early on a null font (u8g2_font.c), so the
+// height-mode setters are safe here; the mode itself must still come back.
+TEST(AmbientState, NullFontKeepsTheCallerReferenceHeightMode) {
+    real_display real;
+    U8G2& display = real.display();
+    ASSERT_EQ(display.getU8g2()->font, nullptr) << "precondition: begin() sets no font";
+    ASSERT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_TEXT)
+        << "precondition: u8g2_SetupBuffer() leaves the text mode";
+    u8g2gl_label label;
+    configure_label(label);
+
+    render_alone(display, label);
+    EXPECT_EQ(display.getU8g2()->font, nullptr);
+    EXPECT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_TEXT);
+    EXPECT_GT(real.lit_pixels(), 0) << "nothing drawn: the check would be vacuous";
 }
 
 // --- Every ambient item the caller set comes back after a normal render ---
