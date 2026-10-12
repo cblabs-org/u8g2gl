@@ -524,10 +524,10 @@ TEST_F(Core, RenderObjectEstablishesTopPositionAndDirectionZero) {
 
     // The framework's baseline was in force inside render()...
     EXPECT_EQ(widget.render_count, 1);
-    EXPECT_TRUE(widget.position_during_render == u8g2_stub_vref_top);
+    EXPECT_TRUE(widget.position_during_render == u8g2_font_calc_vref_top);
     EXPECT_EQ(widget.direction_during_render, 0);
     // ...and the caller's is back afterwards, though the widget changed both.
-    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_font);
     EXPECT_EQ(display.getU8g2()->font_decode.dir, 1);
 }
 
@@ -586,7 +586,7 @@ TEST_F(Core, RepaintObjectClearsAndRendersInsideOwnBoundsUnderTheGuard) {
     EXPECT_EQ(display.last_draw_box_y, 3);
     EXPECT_EQ(display.last_draw_box_w, 10);
     EXPECT_EQ(display.last_draw_box_h, 8);
-    EXPECT_TRUE(widget.position_during_render == u8g2_stub_vref_top);
+    EXPECT_TRUE(widget.position_during_render == u8g2_font_calc_vref_top);
     EXPECT_EQ(widget.direction_during_render, 0);
 
     // The clear's draw colour 0 is set before the box is drawn.
@@ -606,7 +606,7 @@ TEST_F(Core, RepaintObjectClearsAndRendersInsideOwnBoundsUnderTheGuard) {
     EXPECT_EQ(display.max_clip_window_count, 1);
     EXPECT_EQ(display.getU8g2()->font, s_font_before);
     EXPECT_EQ(display.getDrawColor(), 1);
-    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_font);
     EXPECT_EQ(display.getU8g2()->font_decode.dir, 0);
 }
 

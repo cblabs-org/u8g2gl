@@ -685,7 +685,7 @@ TEST(StateSaver, SavesAndRestores) {
         u8g2gl_state_saver saver(display);
 
         // Established on construction: top positioning, direction 0.
-        EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_top);
+        EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_top);
         EXPECT_EQ(display.getU8g2()->font_decode.dir, 0);
         // Captured but not established: the widget's style sets these.
         EXPECT_EQ(display.getDrawColor(), 1);
@@ -705,7 +705,7 @@ TEST(StateSaver, SavesAndRestores) {
     EXPECT_EQ(display.getU8g2()->font, &font1);
     EXPECT_EQ(display.getU8g2()->font_decode.is_transparent, 1);
     EXPECT_EQ(display.getU8g2()->bitmap_transparency, 1);
-    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_stub_vref_baseline);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_font);
     EXPECT_EQ(display.getU8g2()->font_decode.dir, 2);
 }
 

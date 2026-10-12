@@ -92,8 +92,7 @@ struct u8g2_t;
 
 /**
  * @brief U8G2's font-position function type (u8g2.h). setFontPos*() stores one
- *        of four such functions; the stub's are distinct so a test can tell
- *        which position is in force.
+ *        of four such functions, declared below.
  */
 typedef u8g2_uint_t (*u8g2_font_calc_vref_fnptr)(u8g2_t* u8g2);
 
@@ -124,13 +123,20 @@ struct u8g2_t {
     u8g2_t();
 };
 
-/** @brief The stub's four font positions; each returns 0, only identity matters. */
-inline u8g2_uint_t u8g2_stub_vref_baseline(u8g2_t*) { return 0; }
-inline u8g2_uint_t u8g2_stub_vref_top(u8g2_t*) { return 0; }
-inline u8g2_uint_t u8g2_stub_vref_bottom(u8g2_t*) { return 0; }
-inline u8g2_uint_t u8g2_stub_vref_center(u8g2_t*) { return 0; }
+/**
+ * @brief The four font-position functions, under U8G2's own names and C
+ *        linkage (u8g2_font.c), so code that compares font_calc_vref against
+ *        one of them compiles identically here. Each returns 0; only their
+ *        identity matters to a test.
+ */
+extern "C" {
+inline u8g2_uint_t u8g2_font_calc_vref_font(u8g2_t*) { return 0; }    ///< Baseline
+inline u8g2_uint_t u8g2_font_calc_vref_top(u8g2_t*) { return 0; }     ///< Top
+inline u8g2_uint_t u8g2_font_calc_vref_bottom(u8g2_t*) { return 0; }  ///< Bottom
+inline u8g2_uint_t u8g2_font_calc_vref_center(u8g2_t*) { return 0; }  ///< Center
+}
 
-inline u8g2_t::u8g2_t() : font_calc_vref(u8g2_stub_vref_baseline) {}
+inline u8g2_t::u8g2_t() : font_calc_vref(u8g2_font_calc_vref_font) {}
 
 /**
  * @brief One call in the stub's ordered call log.
@@ -502,19 +508,19 @@ public:
     }
     void setFontPosTop() {
         log_call("setFontPosTop", {});
-        u8g2.font_calc_vref = u8g2_stub_vref_top;
+        u8g2.font_calc_vref = u8g2_font_calc_vref_top;
     }
     void setFontPosBaseline() {
         log_call("setFontPosBaseline", {});
-        u8g2.font_calc_vref = u8g2_stub_vref_baseline;
+        u8g2.font_calc_vref = u8g2_font_calc_vref_font;
     }
     void setFontPosBottom() {
         log_call("setFontPosBottom", {});
-        u8g2.font_calc_vref = u8g2_stub_vref_bottom;
+        u8g2.font_calc_vref = u8g2_font_calc_vref_bottom;
     }
     void setFontPosCenter() {
         log_call("setFontPosCenter", {});
-        u8g2.font_calc_vref = u8g2_stub_vref_center;
+        u8g2.font_calc_vref = u8g2_font_calc_vref_center;
     }
     void setFontDirection(uint8_t dir) {
         log_call("setFontDirection", {dir});
