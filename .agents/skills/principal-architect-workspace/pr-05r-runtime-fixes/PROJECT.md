@@ -145,10 +145,12 @@ per R3).
   WO1. `standard`.
 - **[x] [wo3-platformio](wo3-platformio/WORKORDER.md):** items 5 and 6 (R4), one PlatformIO
   measurement rig. `architect`.
-- **[ ] wo4-release-criterion1:** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
+- **[ ] [wo4-height-and-bool-refs](wo4-height-and-bool-refs/WORKORDER.md):** the reference-height
+  mode (R7) and bool-subject comparisons on xtensa (R8). `architect`.
+- **[ ] wo5-release-criterion1:** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
   **Blocked on R3.** `standard`.
-- **[ ] wo5-readability:** `readability-reviewer` pass and remediation. `standard`.
+- **[ ] wo6-readability:** `readability-reviewer` pass and remediation. `standard`.
 - **Later, interactive:** an on-device criterion 1 check when the owner attaches hardware.
 
 ## Modules & Components
@@ -249,3 +251,23 @@ per R3).
     - For WO5: `model.ts` `BudgetLine.note` doc is stale; `u8g2gl_config.h`'s header lists
       `U8G2GL_NO_PARENT`, which it does not define (pre-existing).
     - Link-time detection idea (a symbol encoding the slot count) — not built; for the owner.
+- **2026-10-12 — owner: "continue and go until fixed."** In reply to the PA's three questions
+  (fix the seventh defect here; WO4 versions with the simplified version test; the link-time
+  check). Read as: fix it in this PR, proceed with the simplified R3, no link-time check.
+  - **Criterion 1 re-measured by the PA** (foundation's harness, `git archive 499142f8` into
+    `tmp/fdn/`, `-DU8G2GL_SOURCE_DIR` = this worktree at WO3's tip; nothing written to
+    foundation). All five scenarios **0 differing pixels** against foundation's current baseline
+    (lit counts differ from PR-05's table because later foundation fixes moved the baseline).
+    `no_font_pos_top` **1407 → 0**. **But `plain_user_ui_handler` still differs by 274 pixels**,
+    identically to `no_font_ref_height_all`: U8G2GL never sets `font_height_mode`, and every text
+    widget's centring and `u8g2_font_calc_vref_top` read the reference ascent. An eighth ambient
+    item, missed by PA scoping.
+  - **R7 (PA, under "go until fixed"):** the guard establishes `setFontRefHeightAll()` and
+    restores the caller's mode. Reason: a label clips to its own box, so its reference height
+    must cover every glyph, not `A` and `g`; also the mode foundation's XML was tuned under.
+    Flagged to the owner; reversible.
+  - **R8 (PA):** one comparison overload per subject type — remove the bool subject's `int32_t`
+    overloads (hand-written `bind_flag_if_eq(&b, 0, f)` is ambiguous on xtensa too), and emit a
+    bool subject's ref as `false`/`true`. Runtime API change, inside the 0.8.0 bump.
+  - **Renumbered:** WO4 = these fixes; WO5 = versions, simplified R3, criterion 1 evidence; WO6 =
+    readability.
