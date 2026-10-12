@@ -5,7 +5,7 @@ title: "The framework establishes ambient U8G2 state, and restores the caller's"
 branch: u8g2gl-05r/wo1-ambient-state
 base: main @ 9808423
 complexity: architect
-status: dispatched
+status: complete
 ---
 
 # WO1 — ambient U8G2 state: established, saved, restored, everywhere a widget draws
@@ -178,3 +178,154 @@ PlatformIO advice and `library.json` frameworks (WO3), version bumps (WO4).
 
 Use: Status · Baseline and final counts · Changes Made · Decisions Made · Evidence (reproductions
 before/after, cost figures) · Dead Ends & Warnings · Out-of-Scope Findings · Blockers.
+
+### Status
+
+**complete** — implementation committed at `d6282d0` on `u8g2gl-05r/wo1-ambient-state`
+(no push). **One item needs the owner (see Blockers): the measurement does not confirm R1's
+cost condition** — full setting is measurably *slower* than a compare-first delta, though
+both are a few nanoseconds per object.
+
+### Baseline and final counts
+
+| | Baseline (`540c799`, clean configure) | Final (`d6282d0`, clean configure) |
+|---|---|---|
+| Build warnings | 0 | 0 |
+| ctest | 401 passed, 1 skip (`SizeOfReport.ThirtyTwoBitTarget`) | **410** passed, same 1 skip |
+
+New tests (+9): `AmbientState.*` ×5 (new `test/test_ambient_state.cpp`, real-U8G2 lane),
+`StateSaver.NullFontIsWrittenBackWithoutSetFont`, `Core.RenderObjectEstablishesTopPositionAndDirectionZero`,
+`Core.RepaintObjectClearsAndRendersInsideOwnBoundsUnderTheGuard`,
+`Core.RepaintObjectWhollyOffTheDisplayTouchesNothing`. `StateSaver.SavesAndRestores` extended to
+every captured field. CLI not built or touched (out of the box).
+
+### Changes Made
+
+- `include/u8g2gl/u8g2gl_state_saver.h` — save → establish → restore. Captures draw colour,
+  font, font mode (`font_decode.is_transparent`), bitmap mode (`bitmap_transparency`), font
+  position (`font_calc_vref`) and, under `#ifdef U8G2_WITH_FONT_ROTATION`, direction
+  (`font_decode.dir`). Establishes `setFontPosTop()` and `setFontDirection(0)` only. Restores
+  all; null font written to `getU8g2()->font` directly; position written back as the captured
+  pointer. Name and non-copyable/non-movable shape kept. File header and class doc rewritten
+  (captured/established table, clip-window reasoning kept, the "U8G2GL's state inside each
+  object's render; the caller's at every other moment" rule).
+- `include/u8g2gl/u8g2gl_core.h`, `src/u8g2gl_core.cpp` — new
+  `bool u8g2gl_repaint_object(U8G2&, u8g2gl_obj&)`: saver → own-bounds `u8g2gl_apply_clip` →
+  `setDrawColor(0)` + `u8g2gl_draw_box(bounds)` → `render()` → `setMaxClipWindow()`; returns
+  false (display untouched) for empty/off-display bounds. `u8g2gl_render_object()` doc and step
+  comments now say the guard establishes the baseline.
+- `src/u8g2gl_label.cpp`, `src/u8g2gl_clock.cpp`, `src/u8g2gl_progress_bar.cpp` — repaints call
+  the helper, then `u8g2gl_partial_refresh` as before. Label's local clip workaround removed.
+  Label's layout measurement inside `render_animation_update()` (it called `setFont` outside
+  any guard) now runs under a local `u8g2gl_state_saver`. Comments at label Step 4 and clock
+  Step 5 now say the guard establishes top positioning. Includes adjusted (`u8g2gl_tree.h` →
+  `u8g2gl_state_saver.h` in label; `u8g2gl_draw.h` dropped from clock, `u8g2gl_core.h` added to
+  clock and progress bar).
+- `test/stubs/U8g2lib.h` — `u8g2_t` gains `draw_color`, `font_calc_vref`
+  (`u8g2_font_calc_vref_fnptr`), `font_decode` (`is_transparent`, `dir`), `bitmap_transparency`,
+  with `u8g2_SetupBuffer()`'s defaults; `U8G2_WITH_FONT_ROTATION` defined as `u8g2.h` does;
+  setters keep the fields in step (`getDrawColor()` reads the struct); adds the real
+  `setFontPosBaseline/Bottom/Center` and `setFontDirection`, with four distinct stub position
+  functions so tests can tell positions apart. Header description updated.
+- `test/test_ambient_state.cpp` + `test/CMakeLists.txt` entry (built as `test_bound_child_clip`
+  is, plus `u8g2gl_u8g2_fonts_csrc`).
+- `test/test_core.cpp`, `test/test_obj.cpp` — the stub-lane tests above.
+- `docs/design_spec.md` — §11.3 lifecycle tree line and the state-saver paragraph; Appendix A
+  Key Implementation Notes `setFontPosTop()` and `u8g2gl_state_saver` bullets. Nothing else.
+
+### Decisions Made
+
+- **The clear lives inside the helper**, not at each call site: all three widgets cleared
+  identically (`setDrawColor(0)` + `u8g2gl_draw_box(x_, y_, w_, h_)`), so one implementation
+  holds clear + render. It runs inside the guard (so colour 0 never leaks) and inside the clip
+  (identical pixels: the box is the clip).
+- **Name `u8g2gl_repaint_object`**, beside `u8g2gl_render_object` (§2 flat prefix).
+- **Restore via the public setters** where they exist (colour, font mode, bitmap mode,
+  direction, non-null font); direct struct writes only where the WO requires (null font,
+  position). Full setting, as R1 specifies — see Blockers for the cost result.
+- **Bitmap mode coverage**: the caller-state reproduction also renders a `u8g2gl_xbm`, the one
+  widget that sets bitmap mode, so that field is exercised on real U8G2.
+- **Reproduction references hold a font**: the position and repaint cases give their displays a
+  caller font so they isolate their own fault from the null-font crash (without it, every case
+  crashed first and showed nothing else).
+
+### Evidence
+
+**Reproductions before** (unmodified `src/`, each run alone under `--gtest_filter`):
+
+```
+NullFontIsRestoredAndASecondRenderWorks       exit=139 (SIGSEGV)
+  stop reason = EXC_BAD_ACCESS (code=1, address=0x0)
+  frame #0: u8g2_font_get_byte + 32
+BaselineCallerDrawsTheSamePixelsAsTopCaller   FAILED
+  baseline_lit Which is: 50   top_lit Which is: 93
+  memcmp(top, baseline) Which is: -112          "lit pixels: top 93, baseline 50"
+CallerStateComesBackAfterRender               FAILED
+  after a label: font mode 0, expected 1
+  after an XBM:  font mode 0, expected 1; bitmap mode 0, expected 1
+MarqueeRepaintKeepsCallerStateAndMatchesRender FAILED
+  font 0x…f56, expected 0x…2c1 (the widget's font leaked); font mode 0, expected 1
+  memcmp(repainted, rendered) 112               "lit pixels: repaint 29, render 51"
+ClockRepaintKeepsCallerStateAndMatchesRender  FAILED
+  font leaked; font mode 0, expected 1
+  memcmp(repainted, rendered) 64                "lit pixels: repaint 57, render 57" (same count, shifted)
+```
+
+**After** (`d6282d0`): all five `[ OK ]`, exit 0. Font-position case lit pixels: top **93**,
+baseline **93**, buffers byte-identical.
+
+**Cost** (Apple arm64 host, `-O2`, real U8G2 2.36.18 C sources, 1e7 iterations × 3 runs, ns per
+construct+destruct pair, body = one `setDrawColor`; scratch in `tmp/bench/`, not committed):
+
+| | Before (`9808423` saver) | After |
+|---|---|---|
+| `sizeof(u8g2gl_state_saver)`, 64-bit host | 24 B | 32 B |
+| same, 32-bit target (ESP32), computed | 12 B | 16 B |
+| ns per pair | 2.64 / 2.33 / 2.55 | 5.29 / 5.58 / 5.05 |
+
+Stack only, once per object render, no allocation (no setter allocates; checked in source).
+
+**Full vs delta** (same harness; delta = compare each field, call the setter only on a change;
+caller in baseline position):
+
+| Body inside the guard | Full (committed) | Delta |
+|---|---|---|
+| one `setDrawColor` | 5.66 / 5.89 / 5.78 ns | 2.74 / 2.88 / 3.12 ns |
+| what a label sets (font = caller's, colour, font mode) | 6.57 / 7.01 / 6.44 ns | 3.41 / 3.72 / 3.52 ns |
+| same, caller font differs (header read on both paths) | 49.4 / 50.6 / 50.8 ns | 46.9 / 48.5 / 48.1 ns |
+
+`grep -rn "setFontPosTop" src include`: the call at `u8g2gl_state_saver.h:113`; comments at
+`u8g2gl_state_saver.h:16`, `u8g2gl_label.cpp:335`, `u8g2gl_clock.cpp:222`, all now true.
+`git diff --name-only 9808423..HEAD`: the files listed under Changes Made plus the PA's own
+`540c799` workspace files — within the box. No generated golden or CLI file changed.
+
+### Dead Ends & Warnings
+
+- `u8g2_m_16_8_f()` returns one static buffer shared by every U8G2 instance in a process, so
+  the real-U8G2 tests snapshot a frame before constructing the next display.
+- The bench must link `u8g2gl_u8g2_csrc_arduino` (ARDUINO-built), not `u8g2gl_u8g2_csrc`, for the
+  reason `test/CMakeLists.txt` gives (`u8x8_t` layout differs).
+
+### Out-of-Scope Findings
+
+- `include/u8g2gl/u8g2gl_obj.h` `render_animation_update()` doc still tells implementers to
+  clear their own box and push; it is not wrong, but it should now point at
+  `u8g2gl_repaint_object()`. Not in this WO's file list, so left.
+- `docs/design_spec.md` "Font state on inline text" says an inline text draw call has no
+  `u8g2gl_state_saver` around it. No text draw-call primitive exists today, but if the generator
+  ever emits one it will also run in the caller's font position, not top. Untouched (outside
+  the permitted passages).
+- The repaint helper, like the code it replaces, checks neither effective visibility nor
+  ancestor clips (a widget cannot reach its screen's arrays). Unchanged behaviour; noting it.
+
+### Blockers
+
+None for the code. **For the owner, R1's condition:** "full state setting must be cheaper than
+applying deltas" — **measurement says it is not.** The PA's argument (a delta needs the same
+comparison) missed that full setting pays a non-inlined call into U8G2's C library per item,
+where a delta pays a load and compare. Full setting costs ~2.5–3 ns more per object on this
+host (~5 % when a font change dominates). Absolute cost is small either way (a handful of ns
+per object, no allocation). Switching the destructor to compare-first is a few lines inside
+`u8g2gl_state_saver` with no behavioural change — establishing must still be unconditional for
+position, since U8G2 does not export `u8g2_font_calc_vref_top` to compare against. Not done
+here: R1 specifies full setting, and choosing otherwise is the owner's call.
