@@ -331,3 +331,17 @@ per R3).
   - **Method:** device frame SHA-256 over serial against the host harness's `connected.bin`, plain
     `begin()` user, before (`origin/main`) and after (this branch). WO7 builds the firmware only;
     **the PA flashes and captures**, so flash approval stays at the owner↔PA boundary.
+- **2026-10-12 — On-device criterion 1: device = host.** Full record in
+  [CRITERION-1.md](CRITERION-1.md#on-the-device--2026-10-12).
+  - `main`'s runtime (0.7.0): a plain user crashes on the first frame (`LoadProhibited` at
+    address 0, decoded to the saver's null-font `setFont`). This branch (0.8.0): `lit=1405
+    sha256=b9042618…0f62d`, identical to the host harness.
+  - **Flash path:** the MCP refused `upload_firmware` pending dashboard approval (the owner could
+    not approve it in the dashboard). The owner then wrote `tmp/device/.pio-mcp-policy.json`
+    (`lab_admin`) and enrolled it (`node …/platformio-mcp/build/cli.js policy-enroll
+    --project-dir …`). The MCP then allowed it, but Claude Code's auto-mode check refused the
+    call ("Security Weaken"). Owner: "I give you permission to uise pio directly. do it." Flashed
+    with `pio run -t upload`. The first `device_after` upload failed while the board was in the
+    crash loop; a retry succeeded.
+  - The other session's monitor on the port was stopped with the MCP's `stop_monitor`, at the
+    owner's instruction ("Release it, it's finished").

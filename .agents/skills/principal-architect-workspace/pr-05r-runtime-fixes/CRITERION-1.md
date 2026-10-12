@@ -82,3 +82,34 @@ alone cost 1407 pixels (position) and, once that was fixed, a further 274 (refer
 - **Other screens.** One screen (the diagnostics board) in five input states.
 - The harness's pinned U8G2GL SHA (`82ec83f2`) is overridden by `-DU8G2GL_SOURCE_DIR`; the
   measurement is of this tip, not of that SHA.
+
+## On the device — 2026-10-12
+
+**Hardware:** foundation's ESP32-S3 Nano (`arduino_nano_esp32`, USB 303A:1001) with its SSD1322
+256x64 (`hardware/esp32s3nano/board.h`: CS 10, DC 9, SCK 48, MOSI 38, no reset pin).
+
+**Firmware:** a scratch sketch (`tmp/device/`, not committed), one `main.cpp`, two runtimes. It
+draws foundation's committed generated `diagnostics` screen with the `connected` scenario's exact
+row strings, as **a plain user**: `SPI.begin(48, 47, 38, -1)` and `begin()`, and no other U8G2
+call before the first frame. It hashes the 2048-byte buffer (mbedTLS SHA-256) after
+`clearBuffer()` + render and before `sendBuffer()`, as the harness does, and prints the result over
+USB CDC.
+
+| Image | Runtime | Result |
+|---|---|---|
+| `device_before` | `origin/main` (`9808423`), 0.7.0 | **Crash on the first frame**, boot loop: `Guru Meditation Error: Core 1 panic'ed (LoadProhibited)`, `EXCVADDR: 0x00000000`. Decoded: `u8g2_read_font_info` (`u8g2_font.c:132`) ← `u8g2_SetFont` ← `~u8g2gl_state_saver()` (`u8g2gl_state_saver.h:82`) ← `u8g2gl_render_object()` ← `ui_screen_diagnostics_render()` — the null-font restore |
+| `device_after` | this branch, 0.8.0 | `U8G2GL-DEVICE runtime=0.8.0 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d`, stable across repeats |
+
+**Expected** (host harness against this branch, `connected.bin`): 2048 B, lit **1405**, sha256
+**`b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d`**.
+
+**Result: device = host, byte for byte, for a plain U8G2GL user.** Criterion 1's evidence is now
+about U8G2GL alone, on the host and on the device. On `main`'s runtime the same user cannot draw a
+first frame.
+
+**Tooling:** builds through the PlatformIO MCP (WO7). The flashes ran through the `pio` CLI, with
+the owner's explicit permission, after the MCP's dashboard could not approve its own request and
+Claude Code's permission check refused the MCP flash. Serial was captured by a pyserial script from
+PlatformIO's own environment. Logs: `tmp/device/logs/{before,after}.log`.
+
+**Not shown:** foundation's own firmware re-pinned to this runtime — that is foundation's cut-over.
