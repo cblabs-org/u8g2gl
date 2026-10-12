@@ -5,7 +5,7 @@ title: "Readability remediation, and one dead branch in the editor registry"
 branch: u8g2gl-05r/wo6-readability
 base: u8g2gl-05r/wo5-release-criterion1
 complexity: standard
-status: dispatched
+status: complete
 ---
 
 # WO6 — fix the readability audit's findings; drop the bool subject's integer-ref branch
@@ -91,3 +91,27 @@ Out-of-scope findings go in the Completion Report; do not fix them or file issue
 
 Use: Status · Baseline and final counts · Changes Made · Evidence · Out-of-Scope Findings ·
 Blockers.
+
+### Status
+Complete. Code commit `2d838af` (green build); AUDIT remediation notes in `1f0bb27`; this report committed after.
+
+### Baseline and final counts
+- Baseline: C++ 414 (one skip, 0 warnings, clean configure), CLI 1353.
+- Final: C++ 414 (one skip: `SizeOfReport.ThirtyTwoBitTarget`), 0 warnings, clean configure into a fresh build dir; no C++ test changed. CLI vitest 1353 passed (90 files); `tsc --noEmit` clean; `npm run lint` (eslint + `tsc -p tsconfig.test.json`) clean. Suites run sequentially.
+
+### Changes Made
+- AUDIT P2 x2, P3 x2, P4: all fixed; file:line in each "Remediation" note in AUDIT.md. Comments and doc text only (`u8g2gl_obj.h`, `model.ts`, `u8g2gl_config.h`, `generated-config.ts`, `design_spec.md`, `u8g2gl_core.h`). `u8g2gl_config.h` also now lists the five capacity macros it defines.
+- Editor registry, `cli/src/core/generator/emit/editor-registry.ts` (`directiveEntries`): kept the integer-ref branch for bool subjects and made the conversion explicit.
+
+### Integer refs reaching the editor registry: finding and action
+They can reach it. Nothing in the registry or protocol forbids it: `u8g2gl_editor_value` carries both `integer` and `boolean`, `u8g2gl_editor_int()` is public API (`u8g2gl_editor.h:125`), and `u8g2gl_editor_bind_flag` / `u8g2gl_editor_flag_clear` accept whatever the host builds. The only in-repo host, `test/editor_host/editor_host.cpp:341-345, 427-429`, picks the ref type from the JSON type of the scene's `ref`, so a hand-written or older scene with `0`/`1` on a bool subject yields an INT ref. The generator's own scene JSON emits bool refs for bool subjects, so for generated scenes the branch is dead; it is live for any other host. The designer is not in this repository, so I cannot say what it sends. I kept the branch and changed it to `ref.integer != 0` in both bind and clear (explicit `bool` overload; matches design_spec.md:1662 "0 is false, any other value true"), and updated the function's header comment.
+
+### Evidence
+- Golden diff is the editor registry branch only: `test/generated_fixture/generated_editor/ui_editor_registry.cpp`, 4 lines (bind and clear for `bind_flag_if_eq` and `bind_flag_if_not_eq`, bool subject): `ref.integer` becomes `ref.integer != 0` (bind) / `(ref.integer != 0)` (clear). `ui_scene.json` unchanged. Regenerated with `npm run build` then `node test/generator/refresh-goldens.mjs`; the C++ editor parity tests compile it and pass.
+- `git diff --name-only 4d60b11..2d838af` is 8 files, all inside the Boundary Box.
+
+### Out-of-Scope Findings
+- No test exercises an INT ref against a bool subject through `u8g2gl_editor_bind_flag` / `_flag_clear` (test_editor.cpp:369-383 use bool refs only), so the kept branch is uncovered. Architect may want one.
+
+### Blockers
+None.
