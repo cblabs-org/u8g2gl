@@ -1009,6 +1009,8 @@ Note the asymmetry this creates with the drawing set — a bound `<u8g2gl_box>` 
 
 Variants: `bind_flag_if_eq`, `_if_not_eq`, `_if_gt`, `_if_lt`. Flags: `hidden`, `disabled`.
 
+An int subject takes all four variants and an integer `ref_value`. A bool subject takes `_if_eq` and `_if_not_eq`, and its `ref_value` is `true`, `false`, `0` or `1`; the generator always emits it as a C++ `bool`, `0` as `false` and `1` as `true` (§13.8).
+
 **C++ callback escape hatch:**
 ```xml
 <u8g2gl_label name="status">
@@ -1654,8 +1656,10 @@ ui_obj_temp.bind_text(&ui_subject_temperature, "%d°C");
 The generator type-checks the format string against the subject's declared type and rejects a mismatch at build time (§8.4). Conditional flags emit similarly:
 
 ```cpp
-ui_obj_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+ui_obj_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
 ```
+
+The runtime has **one comparison overload per subject type**: an int subject's takes an `int32_t`, a bool subject's a `bool`. A bool subject's `ref_value` is therefore emitted as `false`/`true` even where the XML writes `0`/`1`. An integer literal beside both an `int32_t` and a `bool` overload would be ambiguous wherever `int32_t` is not `int` — on xtensa (ESP32) it is `long`, and a literal `0` converts to `long` and to `bool` at the same rank — so the host compiled what the ESP32 could not. With one overload, a hand-written integer reference on a bool subject converts to `bool` on every target: `0` is `false`, any other value `true`.
 
 Event callbacks emit an `extern` declaration only; the definition is the user's, and its absence is a link error whose expected signature is stated in the generated header (§8.4).
 
@@ -1751,7 +1755,7 @@ void ui_screen_home_init() {
 
     // bindings registered last — §13.7
     ui_obj_bar_location.bind_text(&ui_subject_station_name);
-    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
     ui_obj_bar_clock.bind_time(&ui_subject_system_time);
     ui_obj_msg.bind_text(&ui_subject_service_message);
 }

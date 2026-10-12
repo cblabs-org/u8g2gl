@@ -172,23 +172,9 @@ TEST(BindingInvariant, BindFlagIfLt) {
         [](u8g2gl_obj& o, int_subject& s) { return o.bind_flag_if_lt(&s, 0, U8G2GL_FLAG_HIDDEN); });
 }
 
-TEST(BindingInvariant, BindFlagIfEqBoolIntRef) {
-    expect_one_slot_one_observer<u8g2gl_obj, bool_subject>(
-        [](u8g2gl_obj& o, bool_subject& s) {
-            return o.bind_flag_if_eq(&s, static_cast<int32_t>(0), U8G2GL_FLAG_HIDDEN);
-        });
-}
-
 TEST(BindingInvariant, BindFlagIfEqBoolBoolRef) {
     expect_one_slot_one_observer<u8g2gl_obj, bool_subject>(
         [](u8g2gl_obj& o, bool_subject& s) { return o.bind_flag_if_eq(&s, false, U8G2GL_FLAG_HIDDEN); });
-}
-
-TEST(BindingInvariant, BindFlagIfNotEqBoolIntRef) {
-    expect_one_slot_one_observer<u8g2gl_obj, bool_subject>(
-        [](u8g2gl_obj& o, bool_subject& s) {
-            return o.bind_flag_if_not_eq(&s, static_cast<int32_t>(0), U8G2GL_FLAG_HIDDEN);
-        });
 }
 
 TEST(BindingInvariant, BindFlagIfNotEqBoolBoolRef) {

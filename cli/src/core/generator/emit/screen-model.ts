@@ -118,12 +118,16 @@ export interface FlagComparison {
   /** The C++ comparison meaning "the flag is clear" (`!=`, `==`, `<=`, `>=`). */
   readonly clearWhen: string;
   /**
-   * The §13.2 type `ref` is spelled as. A bool subject accepts `true`/`false` as
-   * well as `0`/`1` (Pass 5), and the runtime has an overload for each, so each
-   * is kept as its own type rather than folded into one.
+   * The §13.2 type `ref` is spelled as: the subject's own. The runtime has one
+   * comparison overload per subject type, and a bool subject's takes a bool;
+   * an integer literal there converts to `bool` and to the platform's `int32_t`
+   * at the same rank wherever `int32_t` is not `int` (it is `long` on xtensa).
    */
   readonly refType: 'bool' | 'int';
-  /** `ref_value` exactly as written. */
+  /**
+   * `ref_value` as written, except that a bool subject's `0`/`1` — which Pass 5
+   * accepts beside `true`/`false` — is normalised to `false`/`true`.
+   */
   readonly ref: string;
   /** The flag name, e.g. `hidden`. */
   readonly flag: string;
@@ -465,14 +469,30 @@ export function flagComparison(binding: RealisedBinding, owner: string, tag: str
       'ref_value',
     );
   }
-  // A bool subject accepts `true`/`false` as well as `0`/`1` (Pass 5); the
-  // runtime has an overload for each, so each is spelled as its own type.
-  const refType = binding.subjectType === 'bool' && (ref === 'true' || ref === 'false') ? 'bool' : 'int';
+  // A bool subject's ref is always a bool: Pass 5 accepts `0`/`1` beside
+  // `true`/`false`, and the runtime's one bool overload takes a bool, so an
+  // integer literal must never reach it (see FlagComparison.refType).
+  const isBool = binding.subjectType === 'bool';
   return {
     method: binding.attribute,
     clearWhen: comparison.clearWhen,
-    refType,
-    ref,
+    refType: isBool ? 'bool' : 'int',
+    ref: isBool ? boolRef(ref) : ref,
     flag: binding.flag ?? '',
   };
+}
+
+// boolRef
+// A bool subject's `ref_value` as `true`/`false`. Pass 5 admits only those and
+// `0`/`1` (validate-types.ts), so anything else passes through unchanged for
+// cppValue() to refuse rather than being guessed at here.
+//   ref — the attribute as written
+function boolRef(ref: string): string {
+  if (ref === '0') {
+    return 'false';
+  }
+  if (ref === '1') {
+    return 'true';
+  }
+  return ref;
 }

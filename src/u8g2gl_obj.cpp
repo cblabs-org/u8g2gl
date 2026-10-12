@@ -586,20 +586,14 @@ bool u8g2gl_obj::bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_v
     return add_flag_binding(subject, U8G2GL_SUBJECT_INT, U8G2GL_BIND_OP_LT, ref_value, flag);
 }
 
-bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
-    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value, flag);
-}
-
+// A bool subject's binding stores its reference as 0 or 1, the value its
+// get() compares equal to (u8g2gl_evaluate_binding()).
 bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
-    return bind_flag_if_eq(subject, static_cast<int32_t>(ref_value ? 1 : 0), flag);
-}
-
-bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag) {
-    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value, flag);
+    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_EQ, ref_value ? 1 : 0, flag);
 }
 
 bool u8g2gl_obj::bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag) {
-    return bind_flag_if_not_eq(subject, static_cast<int32_t>(ref_value ? 1 : 0), flag);
+    return add_flag_binding(subject, U8G2GL_SUBJECT_BOOL, U8G2GL_BIND_OP_NOT_EQ, ref_value ? 1 : 0, flag);
 }
 
 // u8g2gl_obj::bind_text (int subject)

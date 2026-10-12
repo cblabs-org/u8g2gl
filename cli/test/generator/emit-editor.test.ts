@@ -326,12 +326,12 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     ]);
   });
 
-  it('types a directive’s ref as firmware does: a bool subject’s true/false as a bool, 0 as an int', () => {
+  it('types a directive’s ref as firmware does: a bool subject’s ref as a bool, written 0 or false', () => {
     expect(element(byName('gauges'), 'panel').flags).toEqual([
       { directive: 'bind_flag_if_eq', subject: 'show_panel', subject_type: 'bool', ref: false, flag: 'hidden' },
     ]);
     expect(element(byName('home'), 'bar_wifi_icon').flags).toEqual([
-      { directive: 'bind_flag_if_eq', subject: 'wifi_connected', subject_type: 'bool', ref: 0, flag: 'hidden' },
+      { directive: 'bind_flag_if_eq', subject: 'wifi_connected', subject_type: 'bool', ref: false, flag: 'hidden' },
     ]);
   });
 

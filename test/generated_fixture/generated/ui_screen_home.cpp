@@ -72,7 +72,7 @@ void ui_screen_home_init() {
     // Each bind_*() returns false only when a pool is full. The pools are
     // sized from exactly these bindings ([D-21]), so the result is not checked.
     ui_obj_bar_location.bind_text(&ui_subject_station_name);
-    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
     ui_obj_bar_clock.bind_time(&ui_subject_system_time);
     ui_obj_msg.bind_text(&ui_subject_service_message);
 }

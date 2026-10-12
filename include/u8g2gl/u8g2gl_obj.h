@@ -366,9 +366,16 @@ public:
     bool bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
     bool bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
 
-    bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    /**
+     * @brief The same comparisons on a bool subject, against a bool.
+     *
+     * One overload per subject type, so a call resolves on every target. A
+     * second, int32_t overload made `bind_flag_if_eq(&b, 0, flag)` ambiguous
+     * wherever int32_t is not int — on xtensa (ESP32) it is long, and a
+     * literal 0 converts to long and to bool at the same rank. An integer
+     * argument now converts to bool: 0 is false, any other value true.
+     */
     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
-    bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
     bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
 
     void* get_bound_text_subject() const;

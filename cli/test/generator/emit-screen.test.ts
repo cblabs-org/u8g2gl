@@ -231,7 +231,7 @@ describe('§13.12 — the worked example generates as the spec prints it', () =>
     const init = body(unit, 'void ui_screen_home_init()');
     const bindings = [
       '    ui_obj_bar_location.bind_text(&ui_subject_station_name);',
-      '    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);',
+      '    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);',
       '    ui_obj_bar_clock.bind_time(&ui_subject_system_time);',
       '    ui_obj_msg.bind_text(&ui_subject_service_message);',
     ];
@@ -405,6 +405,40 @@ describe('bindings are emitted from the overload realisation chose (WO5a finding
     const init = body(file(result, 'ui_screen_home.cpp'), 'void ui_screen_home_init()');
     expect(init).toContain('    ui_obj_a.bind_flag_if_eq(&ui_subject_flag, true, U8G2GL_FLAG_HIDDEN);');
     expect(init).toContain('    ui_obj_b.bind_flag_if_not_eq(&ui_subject_count, -2, U8G2GL_FLAG_DISABLED);');
+  });
+
+  it('never spells a bool subject’s comparison as an integer literal, on an object or a draw call’s guard', () => {
+    // Pass 5 accepts 0/1 on a bool subject. The runtime's bool overload takes a
+    // bool, and an int literal there is ambiguous wherever int32_t is not int
+    // (long on xtensa), so 0/1 must reach C++ as false/true.
+    const result = generateProject({
+      screens: {
+        home: `
+          <u8g2gl_label name="a" x="0" y="0" width="40" height="10" font="${FONT}" text="A">
+              <bind_flag_if_eq subject="flag" ref_value="0" flag="hidden" />
+          </u8g2gl_label>
+          <u8g2gl_label name="b" x="0" y="12" width="40" height="10" font="${FONT}" text="B">
+              <bind_flag_if_not_eq subject="flag" ref_value="1" flag="disabled" />
+          </u8g2gl_label>
+          <u8g2gl_pixel name="p" x="60" y="2">
+              <bind_flag_if_eq subject="flag" ref_value="1" flag="hidden" />
+          </u8g2gl_pixel>
+          <u8g2gl_pixel name="q" x="62" y="2">
+              <bind_flag_if_not_eq subject="flag" ref_value="0" flag="hidden" />
+          </u8g2gl_pixel>`,
+      },
+    });
+    expect(result.diagnostics).toEqual([]);
+    const unit = file(result, 'ui_screen_home.cpp');
+    const init = body(unit, 'void ui_screen_home_init()');
+    expect(init).toContain('    ui_obj_a.bind_flag_if_eq(&ui_subject_flag, false, U8G2GL_FLAG_HIDDEN);');
+    expect(init).toContain('    ui_obj_b.bind_flag_if_not_eq(&ui_subject_flag, true, U8G2GL_FLAG_DISABLED);');
+    const render = renderCode(unit, 'home');
+    expect(render).toContain('    if (ui_subject_flag.get() != true) {');
+    expect(render).toContain('    if (ui_subject_flag.get() == false) {');
+    // And nowhere in the unit is the bool subject compared against a digit.
+    expect(unit).not.toMatch(/&ui_subject_flag, -?\d/);
+    expect(unit).not.toMatch(/ui_subject_flag\.get\(\) [!=<>]=? -?\d/);
   });
 });
 
