@@ -345,3 +345,7 @@ per R3).
     crash loop; a retry succeeded.
   - The other session's monitor on the port was stopped with the MCP's `stop_monitor`, at the
     owner's instruction ("Release it, it's finished").
+- **2026-10-12 — Submitted.** Owner: "yes proceed." Pushed `u8g2gl-05r/wo6-readability`
+  (`2cf7e46`) and opened [cblabs-org/u8g2gl#13](https://github.com/cblabs-org/u8g2gl/pull/13)
+  against `main` from PR-DESCRIPTION.md. **Merge with a merge commit, not a squash** (`rules/04`).
+  No CI checks are configured on the repository.
