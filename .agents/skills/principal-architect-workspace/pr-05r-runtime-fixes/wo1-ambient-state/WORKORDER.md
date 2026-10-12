@@ -329,3 +329,22 @@ per object, no allocation). Switching the destructor to compare-first is a few l
 `u8g2gl_state_saver` with no behavioural change — establishing must still be unconditional for
 position, since U8G2 does not export `u8g2_font_calc_vref_top` to compare against. Not done
 here: R1 specifies full setting, and choosing otherwise is the owner's call.
+
+### Follow-up: compare-first (R1a)
+
+Committed `519e8bc`. Provenance: R1a and the owner's "1) yes, ok" are recorded in `PROJECT.md` at `aae3e07`.
+
+- **Change:** `u8g2gl_state_saver` now calls a setter only when the field differs from its target value. That covers both establishing (`font_calc_vref` compared against `u8g2_font_calc_vref_top`, direction against 0) and restoring (draw colour, font mode, bitmap mode, direction, and the font too, so the no-op `setFont` call is skipped as well). Null-font handling is unchanged. The position is still written back as a plain store.
+- **Behaviour unchanged:** the setters are plain field assignments (checked in `u8g2_hvline.c`, `u8g2_font.c` and `u8g2_bitmap.c`).
+- **The top-position symbol:** `u8g2_font_calc_vref_top` has external linkage in `u8g2_font.c`, but `u8g2.h` does not declare it, so the saver header declares it `extern "C"`. The stub now defines all four position functions under U8G2's real names with C linkage. Its old stub-only names are gone, and `test_core.cpp`/`test_obj.cpp` use the real names.
+- **Doc:** the class doc now explains compare-first and states the measured figures (§4.1).
+- **Suite (clean configure):** 0 warnings, **410** passed, one skip (`SizeOfReport.ThirtyTwoBitTarget`). All five `AmbientState` reproductions pass.
+- **Cost** (same harness as above; arm64 host, `-O2`, real U8G2, 1e7 iterations × 3; caller in baseline position). `sizeof` is unchanged at 32 B (16 B on 32-bit):
+
+  | | Full setting (`d6282d0`) | Compare-first (`519e8bc`) |
+  |---|---|---|
+  | ns per construct+destruct (body: one `setDrawColor`) | 5.15 / 5.69 / 4.99 | 3.71 / 4.11 / 4.11 |
+  | What a label sets (same font) | 6.94 / 6.51 / 6.80 | 3.97 / 3.77 / 4.01 |
+  | Label, caller font differs (font header read) | 50.4 / 50.0 / 50.2 | 47.8 / 47.0 / 47.5 |
+
+  The label case now matches the scratch compare-everything guard (3.6–3.7 ns) to within noise.
