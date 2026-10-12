@@ -378,8 +378,9 @@ function drawingEntry(manifest: EffectiveManifest): { lines: string[]; initialis
 // table firmware emission checks directives against. `bind` is the call the
 // firmware's init makes; `clear` is the firmware guard's comparison, so a draw
 // call's visibility is decided the same way on both targets. A bool subject
-// takes a `bool` or an `int32_t` ref, each its own overload, chosen by the ref's
-// type exactly as firmware chooses by the ref's spelling (screen-model.ts).
+// takes a `bool` ref, or an `int32_t` ref a host may still hand it (the public
+// u8g2gl_editor_int() can build one); the integer is reduced to `!= 0` so it
+// resolves to the `bool` overload explicitly, as `0`/`1` convert in firmware.
 function directiveEntries(): string[] {
   const entries: string[] = [];
   for (const [method, comparison] of Object.entries(FLAG_COMPARISONS)) {
@@ -389,11 +390,11 @@ function directiveEntries(): string[] {
       const constCast = `static_cast<const ${base}*>(subject)`;
       const bind =
         type === 'bool'
-          ? `return ref.type == U8G2GL_EDITOR_BOOL ? obj->${method}(${cast}, ref.boolean, flag) : obj->${method}(${cast}, ref.integer, flag);`
+          ? `return ref.type == U8G2GL_EDITOR_BOOL ? obj->${method}(${cast}, ref.boolean, flag) : obj->${method}(${cast}, ref.integer != 0, flag);`
           : `return obj->${method}(${cast}, ref.integer, flag);`;
       const clear =
         type === 'bool'
-          ? `return ref.type == U8G2GL_EDITOR_BOOL ? ${constCast}->get() ${comparison.clearWhen} ref.boolean : ${constCast}->get() ${comparison.clearWhen} ref.integer;`
+          ? `return ref.type == U8G2GL_EDITOR_BOOL ? ${constCast}->get() ${comparison.clearWhen} ref.boolean : ${constCast}->get() ${comparison.clearWhen} (ref.integer != 0);`
           : `return ${constCast}->get() ${comparison.clearWhen} ref.integer;`;
       entries.push(
         `// ${method} (${type} subject): the flag is clear when get() ${comparison.clearWhen} ref`,

@@ -463,10 +463,15 @@ public:
      * display must still move. It is not the normal animation path ([D-5]);
      * tick() plus the next full frame is.
      *
-     * An implementation must clear its own bounding box first, because the
-     * buffer was not cleared on this path, and should push via
+     * An implementation repaints through `u8g2gl_repaint_object(display, *this)`
+     * (u8g2gl_core.h). That call clips to the object's own bounds, clears them
+     * (the buffer was not cleared on this path), calls render(), and runs inside
+     * the same state guard as u8g2gl_render_object() (§11.3, [D-5]), so the
+     * caller's U8G2 state survives. Do not hand-roll the clear: it would skip the
+     * clip and the guard. The implementation then pushes the same bounds with
      * u8g2gl_partial_refresh() rather than computing tile coordinates itself.
      *
+     * @see u8g2gl_repaint_object
      * @param display The U8G2 instance owned by the application.
      * @param now_ms  Current time in milliseconds.
      */

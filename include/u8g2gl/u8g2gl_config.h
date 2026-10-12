@@ -53,8 +53,11 @@
  *              names them
  *
  * Exported Constants:
+ * - U8G2GL_MAX_OBJECTS_PER_SCREEN: Maximum objects in one screen's flat tree
+ * - U8G2GL_MAX_STYLES: Maximum styles in the static pool
+ * - U8G2GL_MAX_STRING_LEN: Maximum length of a bound string
+ * - U8G2GL_MAX_BINDINGS_PER_OBJ: Maximum bindings on one object
  * - U8G2GL_MAX_TOTAL_BINDINGS: Maximum number of active bindings in the static pool
- * - U8G2GL_NO_PARENT: Sentinel for root objects
  *
  * Consumed Macros:
  * - U8G2GL_GENERATED_CONFIG: Quoted name of the project's generated capacity header

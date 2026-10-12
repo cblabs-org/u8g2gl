@@ -37,9 +37,9 @@
  *              built by the C++ suite's compile fixture and on an esp32dev
  *              Arduino build.
  *
- *              Not a forced `-include` of the header, which an earlier version
- *              advised: on a real multi-library esp32dev build it reached every
- *              unrelated library, and stopped the build in the first one with
+ *              Not a forced `-include` of the header: on a real multi-library
+ *              esp32dev build it reached every unrelated library, and stopped
+ *              the build in the first one with
  *              `u8g2gl/u8g2gl_version.h: No such file or directory`; it would
  *              also reach C units, where `static_assert` is not a keyword before
  *              C23. And not a second file of `-D` capacities: a define list
