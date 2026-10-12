@@ -39,20 +39,30 @@ Zero warnings under `-Wall -Wextra -Wpedantic`; the C++ suite and the CLI suite 
 
 - [ ] **Candidate 1 CONFIRMED** - `include/u8g2gl/u8g2gl_obj.h:466-468` (doc of `render_animation_update()`, declared line 473). The text reads: "An implementation must clear its own bounding box first, because the buffer was not cleared on this path, and should push via u8g2gl_partial_refresh()". The branch moved clear + clip + state guard + render into `u8g2gl_repaint_object()` (`src/u8g2gl_core.cpp:516`), and `label`, `clock` and `progress_bar` now all call it. The paragraph tells a new widget author to hand-roll the clear, which skips the clip and the `u8g2gl_state_saver` guard the branch exists to enforce (the failure mode `test_ambient_state.cpp` documents). The doc comment does not mention `u8g2gl_repaint_object()` anywhere. **Fix:** replace the paragraph with: an implementation repaints through `u8g2gl_repaint_object(display, *this)` (u8g2gl_core.h), which clips to the object's own bounds, clears them, calls `render()` and runs inside the same state guard as `u8g2gl_render_object()` (§11.3, [D-5]); it then pushes with `u8g2gl_partial_refresh()` over the same bounds. Add `@see u8g2gl_repaint_object`. Check `include/u8g2gl/u8g2gl_obj.h` includes or forward-declares nothing new (comment only).
 
+  **Remediation:** Fixed. `include/u8g2gl/u8g2gl_obj.h:466-474` now points implementers at `u8g2gl_repaint_object(display, *this)`, says what it does (clip, clear, render, state guard) and adds `@see u8g2gl_repaint_object`. Comment only.
+
 - [ ] **Candidate 2 CONFIRMED** - `cli/src/core/generator/report/model.ts:109` (file is not in the diff, but the branch made it false). `BudgetLine.note` doc says "It exists for the framebuffer." `budget.ts` (`bindingPoolLine()`, about line 411-428 on this branch) now sets `note` on the `binding pool slots` line, whose figure is `unmeasured`. The doc also frames `note` as "a caveat on a figure that **is** reported", which no longer holds either. **Fix:** reword the first paragraph to cover both users: the framebuffer's figure, exact for the `<target>` constructor but not for an application-built `U8G2`; and the binding pool line, whose slot count holds only when the generated header reaches the runtime (§16, §18.1). Drop "that is reported" or say "a figure or count". Keep the existing framebuffer rationale paragraph.
+
+  **Remediation:** Fixed. `cli/src/core/generator/report/model.ts:105-119` now covers both users of `note` (framebuffer; binding pool slots, §16/§18.1) and no longer says "that is reported".
 
 ### P3 - Consistency and documentation gaps
 
 - [ ] **Candidate 3 CONFIRMED (pre-existing line)** - `include/u8g2gl/u8g2gl_config.h:57` lists `U8G2GL_NO_PARENT: Sentinel for root objects` under `Exported Constants`. The file does not define it: `grep` finds the definition only at `include/u8g2gl/u8g2gl_types.h:39` (`static constexpr uint8_t U8G2GL_NO_PARENT = UINT8_MAX;`). The line dates from 0.4.0 and the branch did not write it, but the branch edited this very header block (added `Consumed Macros:` directly beneath at line 59), so it is in reach and it is a false export. **Fix:** delete line 57. Optionally list the actual capacity macros the file defines, which the header omits (`U8G2GL_MAX_OBJECTS_PER_SCREEN`, `U8G2GL_MAX_BINDINGS_PER_OBJ`, etc.; take the names from the file itself).
+
+  **Remediation:** Fixed. `include/u8g2gl/u8g2gl_config.h:55-60` drops the false `U8G2GL_NO_PARENT` export (defined at `u8g2gl_types.h:39`) and lists the five capacity macros the file does define.
 
 - [ ] **Narrated history on new lines (§4.1)** - three places describe what an earlier version advised rather than stating the conclusion and its reason:
   - `cli/src/core/generator/emit/generated-config.ts` header, "Not a forced `-include` of the header, which an earlier version advised: on a real multi-library esp32dev build ...". **Fix:** drop "which an earlier version advised:"; the measured failure that follows stands alone.
   - `docs/design_spec.md`, §16 paragraph beginning "Only runtime sources and generated code include `u8g2gl_config.h`": "**A project-wide forced `-include` of the header is not a substitute**, and was advised before this:". **Fix:** delete "and was advised before this".
   - (Check only) the spec phrase "the `x+w-1` form of earlier drafts" in §11.3 is pre-existing text and is left alone.
 
+  **Remediation:** Fixed. `cli/src/core/generator/emit/generated-config.ts:40` drops "which an earlier version advised" (paragraph rewrapped); `docs/design_spec.md:1937` drops "and was advised before this". The §11.3 phrase was left alone.
+
 ### P4 - Optional, only if the architect approves
 
 - [ ] `include/u8g2gl/u8g2gl_core.h:253-254` - the reflowed `u8g2gl_render_object()` doc has two over-long lines ("height over every glyph, direction 0); sets the clip window to the effective clip (own bounds intersected with") against a wrapped ~80-column style everywhere else. **Fix:** rewrap. No rule mandates it.
+
+  **Remediation:** Fixed. Rewrapped at `include/u8g2gl/u8g2gl_core.h:253-259`; no wording change.
 
 ## Verification Requirement
 
