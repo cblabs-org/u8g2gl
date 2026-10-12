@@ -143,7 +143,7 @@ per R3).
   (R1, R2). Real-U8G2 reproductions first. `architect`.
 - **[x] [wo2-screen-discovery](wo2-screen-discovery/WORKORDER.md):** item 4 (R5). Parallel with
   WO1. `standard`.
-- **[ ] [wo3-platformio](wo3-platformio/WORKORDER.md):** items 5 and 6 (R4), one PlatformIO
+- **[x] [wo3-platformio](wo3-platformio/WORKORDER.md):** items 5 and 6 (R4), one PlatformIO
   measurement rig. `architect`.
 - **[ ] wo4-release-criterion1:** versions (R6), goldens, the §13.9 guard per R3's outcome, and the
   criterion 1 re-measurement in a scratch foundation worktree (nothing committed to foundation).
@@ -218,3 +218,34 @@ per R3).
     file or directory`, first in Arduino `SPI` and `Wire`, `[FAILED]` in 4.8 s.
   - WORKORDER amended: a "Tooling Constraints — PlatformIO MCP only" section; no CLI fallback —
     an MCP refusal is a stop-and-report.
+- **2026-10-12 — WO3 verified** (`373d72f`, report `e17fd66`).
+  - **Suites, re-run by the PA:** C++ **410**, one skip, **0** warnings (clean configure); CLI
+    **1352** (1349 + 3), `tsc` and lint clean. Golden diff is the advice comment only.
+  - **R4 adopted, no fallback needed:** `-I generated` + `-D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"`.
+    The PA rebuilt env `c_macro` through the MCP (`build_project`, forced): `[SUCCESS]`, RAM
+    25588 B; `size_report` filtered to `binding_pool`: `s_binding_pool` **144 B** (6 slots × 24 B)
+    in `src/u8g2gl_obj.cpp:367`. Worker's default (header not delivered): 6144 B, RAM 31588 B.
+    Measurement A fails in Arduino `SPI`/`Wire`; B (middleware) = C.
+  - **Item 6: `"frameworks": "*"`.** With `"arduino"` the finder reports "Framework incompatible
+    library"; with `"*"` the runtime builds natively, 0 warnings. A native consumer still supplies
+    U8G2's `src`/`src/clib` (U8g2 itself is Arduino-format, so the finder ignores it) and
+    `Arduino.h`/`Print.h` shims — in §16. Arduino envs unchanged in size and graph.
+  - **Worker findings:**
+    - **A seventh defect — reported, not absorbed. Put to the owner.** `ref_value="0"` on a bool
+      subject validates and emits `bind_flag_if_eq(&subj, 0, …)`. `u8g2gl_obj.h:369-370` overloads
+      bool subjects on `int32_t` and `bool`; on xtensa `int32_t` is `long`, so `int`→`long` and
+      `int`→`bool` tie: ambiguous. Host compiles (`int32_t` is `int`). The committed
+      `test/generated_fixture/generated/ui_screen_home.cpp:75` carries it, from
+      `cli/test/generator/fixtures/emit-project/screens/screen_home.xml:36`. No host test can see
+      it.
+    - PR-05's middleware glob `*/u8g2gl/src/*.cpp` matches nothing for a `symlink://` dependency
+      and stays green with the 6144 B pool — a silent miss. For foundation's cut-over: switch to
+      the macro.
+    - `platform = native` reports `UnknownPlatform` through the MCP; `platformio/native@1.2.1`
+      works.
+    - Two test-harness files outside the listed box were touched as the WO's own instruction
+      required (`test/version_guard/pre_macro/include_generated_config.cpp`, a comment in
+      `test/test_generated_fixture.cpp`). Accepted.
+    - For WO5: `model.ts` `BudgetLine.note` doc is stale; `u8g2gl_config.h`'s header lists
+      `U8G2GL_NO_PARENT`, which it does not define (pre-existing).
+    - Link-time detection idea (a symbol encoding the slot count) — not built; for the owner.
