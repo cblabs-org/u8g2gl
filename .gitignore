@@ -54,9 +54,11 @@ Thumbs.db
 # .claude is a local symlink to .agents; the real content is tracked there.
 .claude
 
-# Written by the PlatformIO MCP tooling when it attaches to this directory.
-# Machine-local: it records that host's approval policy, not the project's.
+# Written by the PlatformIO MCP tooling when it attaches to this directory:
+# that host's approval policy, and its own audit log and command history.
+# Machine-local, and nothing in them describes the project.
 .pio-mcp-policy.json
+.pio-mcp-workspace/
 
 # ─── Scratch ───────────────────────────────────────────────────────────────
 tmp/
