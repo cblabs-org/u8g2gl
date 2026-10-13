@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "CLI and schema toolkit for U8G2GL",
   "license": "MIT",
   "type": "module",

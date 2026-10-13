@@ -15,13 +15,18 @@
  *              pipeline, and checks: every capacity against the macro the
  *              generated header actually defines; the author's names rather than
  *              the emitted `ui_obj_` ones; the exact derived RAM figure against
- *              `max_len + 1`; that [D-18]'s demotion statement is present
- *              whatever the project contains; and the `Figure` union's shape.
+ *              `max_len + 1`; that the binding pool's slot count says it holds
+ *              only when the header reaches the runtime, against the default
+ *              read from u8g2gl_config.h; that [D-18]'s demotion statement is
+ *              present whatever the project contains; and the `Figure` union's
+ *              shape.
  */
 
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compileProjectAssets } from '../../src/core/assets/index.js';
+import { emittedBindingPoolSlots } from '../../src/core/generator/emit/generated-config.js';
 import { generate } from '../../src/core/generator/index.js';
 import { buildGenerateReport, MEASURED_KIND, UNMEASURED_KIND } from '../../src/core/generator/report/index.js';
 import type { BudgetLine, GenerateReport, ReportInput } from '../../src/core/generator/report/index.js';
@@ -224,6 +229,45 @@ describe('the derivable RAM figures are exact', () => {
       report.capacity.entries.find((e) => e.macro === 'U8G2GL_MAX_TOTAL_BINDINGS')!.value + 1,
     );
     expect(line(report.budget.ram, 'binding pool slots').count).toBe(6);
+  });
+
+  it('says the pool slot count holds only when the header reaches the runtime (§16)', () => {
+    // The generator cannot see the firmware's build, so the line must not imply
+    // the counted pool is the one linked: it names the default it replaces and
+    // the macro that makes it happen.
+    const pool = line(report.budget.ram, 'binding pool slots');
+    expect(pool.figure.kind).toBe(UNMEASURED_KIND);
+    expect(pool.note).toContain('sets U8G2GL_MAX_TOTAL_BINDINGS to 6,');
+    expect(pool.note).toContain('U8G2GL_GENERATED_CONFIG');
+    expect(pool.note).toContain('keeps the default');
+    expect(formatBudgetReport(report)).toContain('note — binding pool slots:');
+  });
+
+  it('states the pool the header defines, which a document with no bindings floors at 1', () => {
+    // The note quotes the #define, not the count: for 0 bindings the header
+    // emits 1 (a zero-length array is ill-formed), and the note must agree.
+    expect(emittedBindingPoolSlots(0)).toBe(1);
+    expect(emittedBindingPoolSlots(6)).toBe(6);
+    const match = /^#define U8G2GL_MAX_TOTAL_BINDINGS (\d+)$/m.exec(configHeader);
+    expect(line(report.budget.ram, 'binding pool slots').note).toContain(
+      `sets U8G2GL_MAX_TOTAL_BINDINGS to ${match?.[1]},`,
+    );
+  });
+
+  it("names the runtime's own default pool size, read from u8g2gl_config.h", () => {
+    // Drift guard: the budget spells the default once; this reads the runtime's
+    // two defaults and fails if that spelling goes stale.
+    const config = readFileSync(resolve(__dirname, '../../../include/u8g2gl/u8g2gl_config.h'), 'utf8');
+    const define = (macro: string): number => {
+      const match = new RegExp(`^#define ${macro} (\\d+)$`, 'm').exec(config);
+      expect(match, `${macro} has no numeric default in u8g2gl_config.h`).not.toBeNull();
+      return Number(match?.[1]);
+    };
+    const slots = define('U8G2GL_MAX_OBJECTS_PER_SCREEN') * define('U8G2GL_MAX_BINDINGS_PER_OBJ');
+    expect(config).toMatch(
+      /#define U8G2GL_MAX_TOTAL_BINDINGS \(U8G2GL_MAX_OBJECTS_PER_SCREEN \* U8G2GL_MAX_BINDINGS_PER_OBJ\)/,
+    );
+    expect(line(report.budget.ram, 'binding pool slots').note).toContain(`runtime default of ${slots} slots`);
   });
 
   it("reports an <xbm>'s bytes exactly, from the asset the build compiled in", () => {

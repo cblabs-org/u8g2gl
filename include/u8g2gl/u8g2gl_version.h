@@ -45,7 +45,7 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 7  ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 8  ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements
@@ -107,7 +107,7 @@
  *
  * @code
  * #include "u8g2gl/u8g2gl_version.h"
- * U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);
+ * U8G2GL_REQUIRE_RUNTIME_VERSION(0, 8);
  * @endcode
  *
  * Unlike the schema guard this is a **floor**, not an equality: the major must

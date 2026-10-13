@@ -23,26 +23,36 @@
  *              second count is the defect WO8c spent a whole work order
  *              removing.
  *
- *              **Reaching the library's own compilation (WO4 F5).** The pools
- *              are sized inside `src/u8g2gl_obj.cpp`, which is compiled as part
- *              of the library and never includes this header — so a project that
- *              only included it from generated units would link against the
- *              *defaults*, [D-21] would silently not happen, and §18's report
- *              would be false. The integration that fixes it is a **forced
- *              include** of this same header into every translation unit that
- *              reads a capacity, documented in the emitted file itself for
- *              CMake, ESP-IDF and PlatformIO. WO10's compile layer proves it.
+ *              **Reaching the library's own compilation (§16).** The pools are
+ *              sized inside `src/u8g2gl_obj.cpp`, which is compiled as part of
+ *              the library and never includes this header directly — so a
+ *              project that only included it from generated units would link
+ *              against the *defaults*, [D-21] would silently not happen, and
+ *              §18's report would be false. The project names this header in
+ *              `U8G2GL_GENERATED_CONFIG`, defined project-wide, and the runtime's
+ *              `u8g2gl_config.h` includes it ahead of its defaults. Only runtime
+ *              sources and generated code include `u8g2gl_config.h`, so the
+ *              definition is inert everywhere else. The emitted file documents
+ *              the definition for CMake, ESP-IDF and PlatformIO, in the forms
+ *              built by the C++ suite's compile fixture and on an esp32dev
+ *              Arduino build.
  *
- *              A forced include rather than a second file of `-D` definitions:
- *              a define list would spell the four capacities a second time, and
- *              two spellings of one number is exactly the drift this programme
- *              keeps paying for — WO8c spent a work order removing a second
- *              object count. It also keeps every generated file recognisable by
- *              the GENERATED marker the writer uses to clean up stale output,
- *              which a CMake fragment (whose comments are `#`) could not carry.
+ *              Not a forced `-include` of the header: on a real multi-library
+ *              esp32dev build it reached every unrelated library, and stopped
+ *              the build in the first one with
+ *              `u8g2gl/u8g2gl_version.h: No such file or directory`; it would
+ *              also reach C units, where `static_assert` is not a keyword before
+ *              C23. And not a second file of `-D` capacities: a define list
+ *              would spell the four numbers a second time, and two spellings of
+ *              one number is how they come to disagree. One header also keeps
+ *              every generated file recognisable by the GENERATED marker the
+ *              writer uses to clean up stale output, which a CMake fragment
+ *              (whose comments are `#`) could not carry.
  *
  * Exports:
  * - GENERATED_CONFIG_HEADER: The header's file name
+ * - GENERATED_CONFIG_MACRO: The macro a project names the header in (§16)
+ * - emittedBindingPoolSlots(): The `U8G2GL_MAX_TOTAL_BINDINGS` the header defines
  * - emitGeneratedConfigHeader(): Emit `u8g2gl_generated_config.h`
  */
 
@@ -51,6 +61,26 @@ import { declarationError, section, type EmittedUnit, type ProjectEmitInput } fr
 
 /** §13.7's generated capacity header ([D-21]). */
 export const GENERATED_CONFIG_HEADER = 'u8g2gl_generated_config.h';
+
+/**
+ * The macro a project defines to the header's quoted name, which the runtime's
+ * `u8g2gl_config.h` includes ahead of its defaults (§16).
+ */
+export const GENERATED_CONFIG_MACRO = 'U8G2GL_GENERATED_CONFIG';
+
+/**
+ * @brief The binding pool size the header defines, which is not always the count.
+ *
+ * A document with no bindings counts 0, but the header floors the pool at 1: a
+ * zero-length array is ill-formed in standard C++. Shared with §18's budget so
+ * the slot count it states is the one the firmware is built with.
+ *
+ * @param totalBindings The counted total, `Capacities.totalBindings`.
+ * @return The value emitted for `U8G2GL_MAX_TOTAL_BINDINGS`.
+ */
+export function emittedBindingPoolSlots(totalBindings: number): number {
+  return totalBindings === 0 ? 1 : totalBindings;
+}
 
 /**
  * The capacity macros, in the order [D-21] lists them, each with the figure it
@@ -162,19 +192,23 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     '// part of the library and never includes this header. A project that included',
     '// it only from generated code would leave the library built with the defaults',
     '// in u8g2gl_config.h, so the capacities below would silently not take effect',
-    '// and the budget in section 18 would be false. Force this header into every',
-    '// translation unit that reads a capacity:',
+    '// and the budget in section 18 would be false. Name this header in',
+    '// U8G2GL_GENERATED_CONFIG, project-wide, and u8g2gl_config.h includes it',
+    '// wherever a capacity is read. Units that never include the runtime ignore it.',
     '//',
     '//   CMake / ESP-IDF',
-    '//     target_compile_options(u8g2gl PUBLIC',
-    '//         -include ${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h)',
+    '//     target_compile_definitions(u8g2gl PUBLIC',
+    '//         U8G2GL_GENERATED_CONFIG="${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h")',
     '//',
-    '//   PlatformIO (platformio.ini)',
-    '//     build_flags = -include generated/u8g2gl_generated_config.h',
+    '//   PlatformIO (platformio.ini; -I is relative to the project directory)',
+    '//     build_flags =',
+    '//         -I generated',
+    '//         -D U8G2GL_GENERATED_CONFIG=\\"u8g2gl_generated_config.h\\"',
     '//',
-    '// A forced include rather than a second file of -D definitions: a define list',
-    '// would spell these four numbers a second time, and two spellings of one',
-    '// number is how they come to disagree.',
+    '// Not a forced -include of this header: that reaches every unit in the build,',
+    '// and fails in the first library that cannot find u8g2gl/u8g2gl_version.h.',
+    '// Not a second file of -D capacities: that would spell these four numbers a',
+    '// second time, and two spellings of one number is how they come to disagree.',
     '',
     '#include "u8g2gl/u8g2gl_version.h"',
     '',
@@ -215,7 +249,7 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
         '// The document declares no bindings. The pool is floored at 1 rather than 0',
         '// because a zero-length array is ill-formed in standard C++ and would warn',
         '// under -Wpedantic; the budget still reports the true figure, 0.',
-        `#define ${macro} 1`,
+        `#define ${macro} ${emittedBindingPoolSlots(value)}`,
       );
       continue;
     }

@@ -366,9 +366,16 @@ public:
     bool bind_flag_if_gt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
     bool bind_flag_if_lt(u8g2gl_subject_int_base* subject, int32_t ref_value, uint8_t flag);
 
-    bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+    /**
+     * @brief The same comparisons on a bool subject, against a bool.
+     *
+     * One overload per subject type, so a call resolves on every target. A
+     * second, int32_t overload made `bind_flag_if_eq(&b, 0, flag)` ambiguous
+     * wherever int32_t is not int — on xtensa (ESP32) it is long, and a
+     * literal 0 converts to long and to bool at the same rank. An integer
+     * argument now converts to bool: 0 is false, any other value true.
+     */
     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
-    bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
     bool bind_flag_if_not_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
 
     void* get_bound_text_subject() const;
@@ -456,10 +463,15 @@ public:
      * display must still move. It is not the normal animation path ([D-5]);
      * tick() plus the next full frame is.
      *
-     * An implementation must clear its own bounding box first, because the
-     * buffer was not cleared on this path, and should push via
+     * An implementation repaints through `u8g2gl_repaint_object(display, *this)`
+     * (u8g2gl_core.h). That call clips to the object's own bounds, clears them
+     * (the buffer was not cleared on this path), calls render(), and runs inside
+     * the same state guard as u8g2gl_render_object() (§11.3, [D-5]), so the
+     * caller's U8G2 state survives. Do not hand-roll the clear: it would skip the
+     * clip and the guard. The implementation then pushes the same bounds with
      * u8g2gl_partial_refresh() rather than computing tile coordinates itself.
      *
+     * @see u8g2gl_repaint_object
      * @param display The U8G2 instance owned by the application.
      * @param now_ms  Current time in milliseconds.
      */

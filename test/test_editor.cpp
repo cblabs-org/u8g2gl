@@ -385,3 +385,51 @@ TEST(EditorRegistry, FlagDirectivesByNameMatchTheRuntimeOverloads) {
     EXPECT_FALSE(clear);
     u8g2gl_editor_destroy(obj);
 }
+
+// An INT ref handed to a bool subject (a hand-written scene, or any host that
+// builds the ref with u8g2gl_editor_int()) must behave as the bool it reduces to:
+// zero is false, any other value true (design_spec.md §8.4). Generated scenes send
+// BOOL refs, so this branch is only reached by other hosts.
+namespace {
+// Runs `method` on a bool subject holding `state` with `ref`; reports whether the
+// hidden flag ended up set after binding, and the guard form's `clear` result.
+struct bool_ref_outcome {
+    bool hidden;
+    bool clear;
+};
+
+bool_ref_outcome run_bool_directive(const char* method, bool state, const u8g2gl_editor_value& ref) {
+    const u8g2gl_editor_registry& registry = ui_editor_registry();
+    u8g2gl_subject_bool_n<2> subject(state);
+    host_storage storage;
+    u8g2gl_obj* obj = u8g2gl_editor_construct(*u8g2gl_editor_find_class(registry, "u8g2gl_obj"), storage.bytes,
+                                              sizeof(storage.bytes));
+    bool_ref_outcome outcome{false, false};
+    EXPECT_NE(obj, nullptr);
+    if (obj == nullptr) {
+        return outcome;
+    }
+    EXPECT_TRUE(u8g2gl_editor_bind_flag(registry, obj, method, &subject, U8G2GL_SUBJECT_BOOL, ref, "hidden"));
+    outcome.hidden = obj->is_hidden();
+    EXPECT_TRUE(u8g2gl_editor_flag_clear(registry, method, &subject, U8G2GL_SUBJECT_BOOL, ref, &outcome.clear));
+    u8g2gl_editor_destroy(obj);
+    return outcome;
+}
+}  // namespace
+
+TEST(EditorRegistry, IntegerRefOnABoolSubjectMatchesTheBoolRef) {
+    const char* methods[] = {"bind_flag_if_eq", "bind_flag_if_not_eq"};
+    // 2 is not a bool's 0/1: only the `!= 0` reduction makes it mean `true`.
+    const int32_t integers[] = {0, 1, 2, -1};
+    for (const char* method : methods) {
+        for (bool state : {false, true}) {
+            for (int32_t integer : integers) {
+                const bool_ref_outcome expected =
+                    run_bool_directive(method, state, u8g2gl_editor_bool(integer != 0));
+                const bool_ref_outcome actual = run_bool_directive(method, state, u8g2gl_editor_int(integer));
+                EXPECT_EQ(actual.hidden, expected.hidden) << method << " state=" << state << " ref=" << integer;
+                EXPECT_EQ(actual.clear, expected.clear) << method << " state=" << state << " ref=" << integer;
+            }
+        }
+    }
+}

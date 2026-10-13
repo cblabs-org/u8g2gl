@@ -360,6 +360,9 @@ gtest_discover_tests(test_version)
 # And one case for the runtime the check most exists to catch, one that predates
 # U8G2GL_REQUIRE_RUNTIME_VERSION. It compiles the committed generated config
 # against a frozen copy of the 0.6.0 header, so what is tested is emitted text.
+# Its control, version_guard_generated_config, reaches the same header the way
+# the header's own advice says (§16): U8G2GL_GENERATED_CONFIG names it and
+# u8g2gl_config.h includes it.
 
 foreach(_guard_case match schema_0_4 mismatch stale_minor)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
@@ -406,7 +409,9 @@ foreach(_guard_case runtime_floor_match runtime_newer_minor runtime_older runtim
 endforeach()
 
 # Two builds of one translation unit that includes the committed generated
-# config; only the directory supplying u8g2gl/u8g2gl_version.h differs.
+# config. The frozen 0.6.0 runtime has no u8g2gl_config.h hook, so that build
+# includes the header directly, as a generated unit does; the control defines
+# U8G2GL_GENERATED_CONFIG and reaches it through the real u8g2gl_config.h.
 set(_guard_generated_dir ${PROJECT_SOURCE_DIR}/test/generated_fixture/generated)
 add_executable(version_guard_pre_macro EXCLUDE_FROM_ALL
     version_guard/pre_macro/include_generated_config.cpp
@@ -420,7 +425,9 @@ add_executable(version_guard_generated_config EXCLUDE_FROM_ALL
 )
 target_include_directories(version_guard_generated_config PRIVATE
     ${PROJECT_SOURCE_DIR}/include
-    ${_guard_generated_dir}
+)
+target_compile_definitions(version_guard_generated_config PRIVATE
+    U8G2GL_GENERATED_CONFIG="${_guard_generated_dir}/u8g2gl_generated_config.h"
 )
 foreach(_guard_case pre_macro generated_config)
     target_compile_options(version_guard_${_guard_case} PRIVATE -Wall -Wextra -Wpedantic)
@@ -584,6 +591,32 @@ target_compile_options(test_bound_child_clip PRIVATE
 )
 gtest_discover_tests(test_bound_child_clip)
 
+# --- Real U8G2: ambient state established inside a render, restored after (§11.3) ---
+# The state saver's faults are U8G2's to show, not the stub's: restoring a null
+# font crashes only inside u8g2_SetFont(), and font position moves only real
+# glyphs. Built exactly as test_bound_child_clip is, plus U8G2's font data
+# (u8g2gl_u8g2_fonts_csrc, below) so a label has a real font to draw with.
+add_executable(test_ambient_state
+    test_ambient_state.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_ambient_state PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_ambient_state SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_ambient_state PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_ambient_state PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_ambient_state)
+
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is
 # committed output of `u8g2gl generate` (cli/test/generator/compile-fixture.test.ts
@@ -592,11 +625,12 @@ gtest_discover_tests(test_bound_child_clip)
 # firmware build.
 #
 # The runtime is compiled a second time for it, as u8g2gl_fixture_runtime, with
-# the generated capacities forced into every translation unit — the integration
-# the generated header documents for CMake ([D-21], PR-04 WO4 F5). The pools are
-# sized inside src/u8g2gl_obj.cpp, so including the header only from generated
-# code would leave the library on u8g2gl_config.h's defaults. PUBLIC, so the
-# generated units and the test itself see the same values the library does.
+# U8G2GL_GENERATED_CONFIG naming the generated header — the integration the
+# header itself advises for CMake ([D-21], §16), spelled as it advises. The pools
+# are sized inside src/u8g2gl_obj.cpp, so including the header only from
+# generated code would leave the library on u8g2gl_config.h's defaults; the
+# definition makes u8g2gl_config.h include it there. PUBLIC, so the generated
+# units and the test itself see the same values the library does.
 # support/capacity_probe.cpp is compiled into the library target beside
 # u8g2gl_obj.cpp, and static_asserts the counted total from inside that build.
 #
@@ -614,8 +648,8 @@ target_include_directories(u8g2gl_fixture_runtime PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/stubs
     ${U8G2GL_FIXTURE_DIR}/support
 )
-target_compile_options(u8g2gl_fixture_runtime PUBLIC
-    "SHELL:-include ${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
+target_compile_definitions(u8g2gl_fixture_runtime PUBLIC
+    U8G2GL_GENERATED_CONFIG="${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
 )
 target_compile_options(u8g2gl_fixture_runtime PRIVATE
     -Wall -Wextra -Wpedantic
@@ -647,7 +681,9 @@ target_include_directories(test_generated_fixture PRIVATE
 # because it does not link the runtime target.
 #
 # A <builtin> font also names U8G2's own table, which real U8G2 declares and
-# the stub does not, so the fixture's two are declared by a forced include.
+# the stub does not, so the fixture's two are declared by a forced include. The
+# generated capacities reach this unit as they reach the runtime: through
+# U8G2GL_GENERATED_CONFIG, which is project-wide in the advised integration.
 add_library(u8g2gl_fixture_fonts OBJECT
     ${U8G2GL_FIXTURE_GENERATED}/ui_fonts.cpp
 )
@@ -656,10 +692,11 @@ target_include_directories(u8g2gl_fixture_fonts PRIVATE
     ${U8G2GL_FIXTURE_GENERATED}
     ${PROJECT_SOURCE_DIR}/include
 )
+target_compile_definitions(u8g2gl_fixture_fonts PRIVATE
+    U8G2GL_GENERATED_CONFIG="${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
+)
 target_compile_options(u8g2gl_fixture_fonts PRIVATE
-    # SHELL: keeps each flag with its argument; CMake would otherwise
-    # de-duplicate the second -include and pass the header as an input file.
-    "SHELL:-include ${U8G2GL_FIXTURE_GENERATED}/u8g2gl_generated_config.h"
+    # SHELL: keeps the flag with its argument.
     "SHELL:-include ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.h"
     -Wall -Wextra -Wpedantic
 )

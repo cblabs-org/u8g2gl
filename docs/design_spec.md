@@ -1009,6 +1009,8 @@ Note the asymmetry this creates with the drawing set — a bound `<u8g2gl_box>` 
 
 Variants: `bind_flag_if_eq`, `_if_not_eq`, `_if_gt`, `_if_lt`. Flags: `hidden`, `disabled`.
 
+An int subject takes all four variants and an integer `ref_value`. A bool subject takes `_if_eq` and `_if_not_eq`, and its `ref_value` is `true`, `false`, `0` or `1`; the generator always emits it as a C++ `bool`, `0` as `false` and `1` as `true` (§13.8).
+
 **C++ callback escape hatch:**
 ```xml
 <u8g2gl_label name="status">
@@ -1194,17 +1196,18 @@ uint32_t tick(now_ms)          → ms until this widget next needs a tick
 └── Return own next deadline (UINT32_MAX if idle)
 
 render(display)
-├── Framework constructs u8g2gl_state_saver (RAII: draw colour and font only)
+├── Framework constructs u8g2gl_state_saver (RAII: saves the caller's state,
+│   establishes setFontPosTop(), setFontRefHeightAll() and direction 0)
 ├── Framework calls setClipWindow(x, y, x+w, y+h) — far corner excluded
 ├── Widget draws
-└── StateSaver destructor restores previous state
+└── StateSaver destructor restores the caller's state
 ```
 
 Two phases, not three. Widgets do not clear their own background — `clearBuffer()` already did (**[D-4]**).
 
 `tick()` returns its own next deadline, and `ui_handler()` returns the minimum across all widgets ([D-15]). A widget knows this cheaply: a clock blinking at 500 ms returns the remainder to the next toggle, a scrolling label returns its step interval, a static label returns `UINT32_MAX`. Widget authors who do not care may return `UINT32_MAX` and lose nothing but the sleep hint.
 
-**The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver saves draw colour and font only** — U8G2 exposes no getter for the clip window, font mode or bitmap mode, so none of those can be restored. Clip lifetime is therefore the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards.
+**The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver is the boundary between the application's U8G2 state and the framework's: U8G2GL's state inside each object's render, the caller's at every other moment.** On entry it captures draw colour, font, font mode, bitmap mode, font position, reference-height mode and (where U8G2 is built with font rotation) font direction — each readable from U8G2's state struct (`u8g2.h`) though U8G2 offers getters for few of them — and establishes the framework's text baseline, which every text widget assumes: `setFontPosTop()`, `setFontRefHeightAll()` and direction 0. The reference height is all, not U8G2's default text mode, because every text widget centres on `getAscent() - getDescent()` and clips to its own box, so the height it centres on must cover every glyph the font can draw rather than `A` and `g`. Font, colour and the font and bitmap modes are not established: widgets set them from their style. Each item is compared before it is set, on entry and on exit, so a caller already in the framework's state pays a load per item. On exit it restores everything it captured, the font before the reference-height mode: each height-mode setter recomputes the reference ascent and descent from the current font (`u8g2_UpdateRefHeight()`), so the last computation is the caller's font in the caller's mode. A null font (a display that has had `begin()` but no `setFont()`) is written back directly, because `u8g2_SetFont()` would read a font header at address 0; the height-mode setters read nothing on a null font. Nothing allocates. The one thing it cannot save is the clip window — U8G2 has no clip getter — so clip lifetime is the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards. A widget's blocked-loop repaint ([D-5]) runs inside the same guard, through `u8g2gl_repaint_object()`, clipped to the widget's own bounds.
 
 The clip window is set by the framework, not the widget. It is containment insurance: a widget that miscalculates a text width cannot corrupt its neighbours. It costs two comparisons per drawn pixel and is worth it.
 
@@ -1653,8 +1656,10 @@ ui_obj_temp.bind_text(&ui_subject_temperature, "%d°C");
 The generator type-checks the format string against the subject's declared type and rejects a mismatch at build time (§8.4). Conditional flags emit similarly:
 
 ```cpp
-ui_obj_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+ui_obj_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
 ```
+
+The runtime has **one comparison overload per subject type**: an int subject's takes an `int32_t`, a bool subject's a `bool`. A bool subject's `ref_value` is therefore emitted as `false`/`true` even where the XML writes `0`/`1`. An integer literal beside both an `int32_t` and a `bool` overload would be ambiguous wherever `int32_t` is not `int` — on xtensa (ESP32) it is `long`, and a literal `0` converts to `long` and to `bool` at the same rank — so the host compiled what the ESP32 could not. With one overload, a hand-written integer reference on a bool subject converts to `bool` on every target: `0` is `false`, any other value `true`.
 
 Event callbacks emit an `extern` declaration only; the definition is the user's, and its absence is a link error whose expected signature is stated in the generated header (§8.4).
 
@@ -1758,7 +1763,7 @@ void ui_screen_home_init() {
 
     // bindings registered last — §13.7
     ui_obj_bar_location.bind_text(&ui_subject_station_name);
-    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
     ui_obj_bar_clock.bind_time(&ui_subject_system_time);
     ui_obj_msg.bind_text(&ui_subject_service_message);
 }
@@ -1928,6 +1933,19 @@ No `u8g2gl.xml` in the wild declares 0.3 outside this repository's own fixtures,
 
 The runtime library ships as a **PlatformIO library** (`library.json`, pinned by git reference — PR-05). **The Arduino library is deferred, and that is a decision rather than an omission:** Arduino's 1.5 format compiles only `src/`, while the runtime's public headers live in `include/u8g2gl/`, so serving it would mean either relocating the headers — breaking the CMake and PlatformIO layout — or carrying a second include path to keep in step. Neither is worth doing for an audience that does not exist yet (§1.5), and it will be built after the PR-07 gate as a **release artefact with a flattened layout** rather than as the repository's working shape. This matters because [D-11] commits `generated/` specifically for Arduino IDE users, so the gap must not become permanent by default — see [Q-18].
 
+**The generated capacities must reach the runtime's own compilation.** `u8g2gl_generated_config.h` sets the [D-21] capacities, but the binding pool is sized inside `src/u8g2gl_obj.cpp`, which is compiled as part of the library and never includes the generated header itself. A project that included the header only from generated code would link a library built on `u8g2gl_config.h`'s defaults, and §18's report would be false. The project therefore names the header in **`U8G2GL_GENERATED_CONFIG`**, defined project-wide, and `u8g2gl_config.h` includes it ahead of its defaults:
+
+| Environment | Definition |
+|---|---|
+| **CMake / ESP-IDF** | `target_compile_definitions(u8g2gl PUBLIC U8G2GL_GENERATED_CONFIG="${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h")` |
+| **PlatformIO** | `build_flags =` `-I generated` and `-D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"` |
+
+The generated header carries the same text, and the forms are the ones built: the CMake form by the C++ suite's compile fixture (an ESP-IDF build, which is CMake underneath, has not been built separately), the PlatformIO form on an `esp32dev` Arduino build with unrelated C and C++ libraries. In PlatformIO the quotes must be escaped — unescaped, PlatformIO strips them and `#include` reports `expects "FILENAME" or <FILENAME>` — and the macro names the file, not a project-relative path: `#include` searches the including file's directory and the `-I` list, never the working directory, so `\"generated/u8g2gl_generated_config.h\"` is not found. `-I generated` is resolved against the project directory, where PlatformIO runs the compiler. `${PROJECT_DIR}/generated/u8g2gl_generated_config.h` also builds.
+
+Only runtime sources and generated code include `u8g2gl_config.h`, so the definition is inert in every other unit; on the measured build each unrelated compile line gained the `-D` and nothing else. **A project-wide forced `-include` of the header is not a substitute**: it reaches every unit in the build, and on that `esp32dev` build stopped in the first unrelated library — Arduino `SPI` and `Wire` — with `u8g2gl/u8g2gl_version.h: No such file or directory`. It would also reach C units, where `static_assert` is not a keyword before C23. Build middleware that adds the `-include` to the runtime's sources alone works, but it matches the library by its installed directory name, which a `symlink://` or renamed dependency changes, and it misses silently: a pattern that matches nothing leaves the defaults in place and the build green.
+
+**A native PlatformIO environment builds the runtime** (`library.json` declares `"frameworks": "*"`): a `platform = native` environment with no framework finds and compiles it. The consumer still supplies what U8G2 needs off Arduino. U8G2 is an Arduino-format library, which the finder treats as framework-incompatible there and ignores as the runtime's dependency, so the consumer adds its `src/` and `src/clib/` to the include path and compiles `src/clib/` itself (for example `build_src_filter = +<../.pio/libdeps/native/U8g2/src/clib/>`). `U8g2lib.h` includes `Arduino.h` and `Print.h`, so the consumer supplies those too: a minimal `Arduino.h` with `<stdint.h>` and `<stddef.h>`, and a `Print` class with the two `write()` virtuals, as the C++ suite's `test/real_u8g2/` does. Nothing else was needed on a macOS host build that linked and ran the generated UI. An Arduino build is unaffected.
+
 **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements.
 
 | Requirement | Emitted as | Guards against |
@@ -2078,6 +2096,19 @@ exceeds it, naming the screen and its count. The other figures have no fixed
 ceiling: they are what the generator emitted, and they exist in the report so a
 project can see itself approaching a limit rather than meeting one.
 
+**A counted capacity holds only where the header reaches the runtime.** The
+budget's `binding pool slots` line states the slot count
+`u8g2gl_generated_config.h` sets, the default it replaces
+(`U8G2GL_MAX_OBJECTS_PER_SCREEN` x `U8G2GL_MAX_BINDINGS_PER_OBJ`, 32 x 8 = 256
+slots), and that the count holds only when the header reaches the runtime's own
+sources through `U8G2GL_GENERATED_CONFIG` (§16); a firmware built without it
+keeps the default. The difference is not small. On a real multi-library
+`esp32dev` firmware the generated header cut `s_binding_pool` from **6144 B to
+96 B**, and static RAM from 63388 B to 57340 B; on a smaller `esp32dev`
+measurement build, from 6144 B to 144 B, six 24-byte slots. The generator
+cannot see the firmware's build, so the line says what its figure depends on
+rather than implying it, and the size of a slot stays unmeasured (§13.7).
+
 ## 19. Naming Conventions
 
 | Convention | U8G2GL | LVGL Pro |
@@ -2091,6 +2122,20 @@ project can see itself approaching a limit rather than meeting one.
 | Screen files | `screen_*.xml` | `screen_*.xml` |
 | Element dirs | `widgets/name/name.xml` | `components/`, `widgets/` |
 | Generated files | `ui_screen_*.cpp` | similar |
+
+Discovery reads `screens/screen_*.xml` and nothing else: the prefix is `screen_` and the extension
+is a lower-case `.xml`, directly inside `screens/`. An `.xml` file the project does not read is
+**reported, never dropped silently** (§1.2, §15.1): `validate` and `generate` each emit a
+`U8G2GL_SCREEN_FILE_SKIPPED` **warning** — it does not change the exit code, so a notes file kept
+beside the screens does not block a build — located at line 1, column 1 of the file, naming why it
+was skipped and the rename that would make it count. Three forms are reported:
+
+- a file in `screens/` ending `.xml` (in any case) whose name is not `screen_*.xml` exactly —
+  `home.xml`, `Screen_home.xml`, `screen_home.XML`; a case variant is told its lower-cased name;
+- an `.xml` file at the project root other than `u8g2gl.xml` and `globals.xml`;
+- a subdirectory of `screens/`, since discovery is not recursive — once per directory.
+
+Warnings are ordered by path, by code unit (§13.9).
 
 ### 19.1 The `u8g2gl_` Prefix — [D-12]
 
@@ -2238,7 +2283,7 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 
 **Bitmaps** — `drawXBMP` (PROGMEM, preferred), `drawXBM` (RAM)
 
-**State** — `setDrawColor`, `setFont`, `setFontMode`, `setBitmapMode`, `setClipWindow`, `setMaxClipWindow`, `setFontPosTop`
+**State** — `setDrawColor`, `setFont`, `setFontMode`, `setBitmapMode`, `setClipWindow`, `setMaxClipWindow`, `setFontPosTop`, `setFontRefHeightAll`
 
 **Metrics** — `getStrWidth`, `getUTF8Width`, `getMaxCharWidth`, `getMaxCharHeight`, `getAscent`, `getDescent`
 
@@ -2246,12 +2291,13 @@ Every visual element compiles to calls from this API. The full audit is in [docs
 
 ### Key Implementation Notes
 
-- **`setFontPosTop()`** is the framework default — widget `y` is top-left, not baseline.
+- **`setFontPosTop()`** is the framework's text baseline — widget `y` is top-left, not baseline. The render guard, `u8g2gl_state_saver`, establishes it around every object's render and restores the caller's position afterwards (§11.3); nothing else needs to set it.
+- **`setFontRefHeightAll()`** completes that baseline: `getAscent()`, `getDescent()` and top positioning measure the font's whole bounding box, not `A` and `g`, so a text widget's centring covers every glyph its box can hold. The same guard establishes it and restores the caller's mode (§11.3).
 - **`setDrawColor(2)` (XOR)** enables selection highlighting and blink without a second render path. Exposed as `draw_color="xor"` / `invert="true"`.
 - **`drawXBMP`** always; the generator emits `PROGMEM` arrays.
 - **`drawButtonUTF8`** handles border, padding, centring, and inversion in one call — the intended implementation of `u8g2gl_button`.
 - **`updateDisplayArea`** uses 8-pixel tiles; use `u8g2gl_partial_refresh` (§11.4), never hand-rolled tile maths.
-- **`u8g2gl_state_saver`** wraps every widget render (framework-applied, not per-widget).
+- **`u8g2gl_state_saver`** wraps every widget render and blocked-loop repaint (framework-applied, not per-widget): it saves the caller's ambient state, establishes the framework's, and restores the caller's (§11.3).
 
 ---
 

@@ -106,7 +106,7 @@ void ui_screen_home_init() {
     ui_obj_lvl_b.bind_width(&ui_subject_level);
     ui_obj_lvl_c.bind_width(&ui_subject_level);
     ui_obj_clock.bind_time(&ui_subject_system_time);
-    ui_obj_wifi.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+    ui_obj_wifi.bind_flag_if_eq(&ui_subject_wifi_connected, false, U8G2GL_FLAG_HIDDEN);
 }
 
 // --- activate / deactivate (§12.4) ---

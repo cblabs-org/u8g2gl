@@ -13,19 +13,23 @@
 // part of the library and never includes this header. A project that included
 // it only from generated code would leave the library built with the defaults
 // in u8g2gl_config.h, so the capacities below would silently not take effect
-// and the budget in section 18 would be false. Force this header into every
-// translation unit that reads a capacity:
+// and the budget in section 18 would be false. Name this header in
+// U8G2GL_GENERATED_CONFIG, project-wide, and u8g2gl_config.h includes it
+// wherever a capacity is read. Units that never include the runtime ignore it.
 //
 //   CMake / ESP-IDF
-//     target_compile_options(u8g2gl PUBLIC
-//         -include ${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h)
+//     target_compile_definitions(u8g2gl PUBLIC
+//         U8G2GL_GENERATED_CONFIG="${CMAKE_CURRENT_LIST_DIR}/generated/u8g2gl_generated_config.h")
 //
-//   PlatformIO (platformio.ini)
-//     build_flags = -include generated/u8g2gl_generated_config.h
+//   PlatformIO (platformio.ini; -I is relative to the project directory)
+//     build_flags =
+//         -I generated
+//         -D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"
 //
-// A forced include rather than a second file of -D definitions: a define list
-// would spell these four numbers a second time, and two spellings of one
-// number is how they come to disagree.
+// Not a forced -include of this header: that reaches every unit in the build,
+// and fails in the first library that cannot find u8g2gl/u8g2gl_version.h.
+// Not a second file of -D capacities: that would spell these four numbers a
+// second time, and two spellings of one number is how they come to disagree.
 
 #include "u8g2gl/u8g2gl_version.h"
 
@@ -41,9 +45,9 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // report a syntax error instead of a refusal, so say what is needed here.
 // The call sits in the #else, so a runtime without the macro reports only this #error.
 #ifndef U8G2GL_REQUIRE_RUNTIME_VERSION
-#error "This code requires u8g2gl runtime 0.7 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
+#error "This code requires u8g2gl runtime 0.8 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
 #else
-U8G2GL_REQUIRE_RUNTIME_VERSION(0, 7);
+U8G2GL_REQUIRE_RUNTIME_VERSION(0, 8);
 #endif
 
 // --- Static capacities, counted from this document ([D-21]) ---

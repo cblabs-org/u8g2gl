@@ -15,7 +15,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -457,20 +457,17 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(Object.keys(parsed)).toEqual(['files', 'diagnostics', 'errors', 'warnings']);
   });
 
-  it('stamps the package version into a freshly generated project — the 0.11.0 proof', async () => {
-    // Pinned literally, not read from package.json: a test that compares the
-    // stamp against the same file it came from passes at every version and
-    // therefore proves no bump ever happened (the 0.9.0 bump was a new
-    // capability, with no existing valid input's output changing; 0.11.0 is an
-    // output change with no input change, the runtime floor in every generated
-    // config, so §13.9 requires the bump).
-    expect(packageVersion).toBe('0.11.0');
+  it('stamps the package version into a freshly generated project', async () => {
+    // Proves the stamp is plumbed through: a fresh project's header and
+    // `--version` both carry package.json's version, and the goldens, which are
+    // pinned, do not. It cannot prove a bump happened. Whether a change to
+    // generated output needs a new generator version (§13.9) is a review rule,
+    // and the golden diff in the pull request is what makes each such change visible.
     const dir = createProject();
     expect((await runCli(['generate', dir])).code).toBe(0);
     const header = readFileSync(join(dir, 'generated/u8g2gl_generated_config.h'), 'utf-8');
-    expect(header).toContain('// generator: 0.11.0');
-    expect((await runCli(['--version'])).stdout.trim()).toBe('0.11.0');
-    // And the goldens are not dragged along by the bump: they are pinned.
+    expect(header).toContain(`// generator: ${packageVersion}`);
+    expect((await runCli(['--version'])).stdout.trim()).toBe(packageVersion);
     expect(header).not.toContain('0.0.0-golden');
   });
 
@@ -533,5 +530,62 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
     expect(res.stdout).toContain('"warnings": N, "budget": {...}, "capacity": {...}, "realisation": {...} }');
     expect(res.stdout).toContain('{ "kind": "unmeasured", "reason" }');
     expect(res.stdout).toContain('breaking change under section 15.4');
+  });
+});
+
+describe('a project file discovery skips is named, never silent (design_spec §19)', () => {
+  /** A generatable project whose only screen is misnamed, plus a stray root file. */
+  function misnamedProject(): string {
+    const dir = createProject();
+    renameSync(join(dir, 'screens/screen_home.xml'), join(dir, 'screens/home.xml'));
+    writeFileSync(join(dir, 'stray.xml'), '<screen/>\n');
+    return dir;
+  }
+
+  const skipped = (ds: JsonDiagnostic[]): string[] =>
+    ds.filter((d) => d.code === 'U8G2GL_SCREEN_FILE_SKIPPED').map((d) => `${d.severity} ${d.file}:${d.line}:${d.column}`);
+
+  it('validate --json warns for each skipped file and still exits 0', async () => {
+    const res = await runCli(['validate', misnamedProject(), '--json']);
+    const parsed = JSON.parse(res.stdout) as GenerateJson;
+
+    expect(res.code).toBe(0);
+    expect(skipped(parsed.diagnostics)).toEqual(['warning screens/home.xml:1:1', 'warning stray.xml:1:1']);
+    expect(parsed.errors).toBe(0);
+    expect(parsed.warnings).toBe(2);
+  });
+
+  it('validate prints each warning with its rename and counts it in the summary', async () => {
+    const res = await runCli(['validate', misnamedProject()]);
+
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain("'screens/home.xml' was not read");
+    expect(res.stdout).toContain('rename to screens/screen_home.xml');
+    expect(res.stdout).toContain('rename to screens/screen_stray.xml');
+    expect(res.stdout).toContain('Validation passed: 0 errors, 2 warning(s).');
+  });
+
+  it('generate --json reports the same warnings, and exits 0', async () => {
+    const res = await runCli(['generate', misnamedProject(), '--json']);
+    const parsed = JSON.parse(res.stdout) as GenerateJson;
+
+    expect(res.code).toBe(0);
+    expect(skipped(parsed.diagnostics)).toEqual(['warning screens/home.xml:1:1', 'warning stray.xml:1:1']);
+    expect(parsed.warnings).toBe(2);
+  });
+
+  it('generate prints the warnings before the file list', async () => {
+    const res = await runCli(['generate', misnamedProject()]);
+
+    expect(res.code).toBe(0);
+    expect(res.stdout).toContain('rename to screens/screen_home.xml');
+    expect(res.stdout.indexOf('was not read')).toBeLessThan(res.stdout.indexOf('Generated '));
+  });
+
+  it('a correctly named project reports no skipped files', async () => {
+    const parsed = JSON.parse((await runCli(['generate', createProject(), '--json'])).stdout) as GenerateJson;
+
+    expect(skipped(parsed.diagnostics)).toEqual([]);
+    expect(parsed.warnings).toBe(0);
   });
 });

@@ -24,10 +24,12 @@
  *          records as 65531. The recording fields stay int so a test can compare
  *          them directly.
  *
- * Description: u8g2_uint_t and a minimal u8g2_t (the current font), then the U8G2
- *              class: draw calls with per-call counters and last-argument
- *              fields, draw colour / font / mode state, clip-window recording,
- *              and configurable text metrics.
+ * Description: u8g2_uint_t and a minimal u8g2_t — the ambient state fields
+ *              u8g2gl_state_saver reads, under real U8G2's names, kept in step
+ *              by the stub's setters — then the U8G2 class: draw calls with
+ *              per-call counters and last-argument fields, draw colour / font /
+ *              mode / position / direction / height-mode state, clip-window
+ *              recording, and configurable text metrics.
  *
  *              Every call that draws or changes draw state is also appended, in
  *              order, to a fixed-capacity call log (PR-04 WO11). Counters and
@@ -38,14 +40,18 @@
  *
  * Exported Classes:
  * - u8g2_uint_t: U8G2's pixel coordinate type (uint16_t, U8G2_16BIT)
- * - u8g2_t:      U8G2's state struct, reduced to the `font` member the runtime reads
+ * - u8g2_font_calc_vref_fnptr: U8G2's font-position function pointer type
+ * - u8g2_font_decode_t: U8G2's glyph-decode state, reduced to mode and direction
+ * - u8g2_t:      U8G2's state struct, reduced to the members the runtime reads
  * - u8g2_stub_call: One entry of the ordered call log
  * - U8G2:        Recording test double for U8G2's C++ class
  *
  *     Drawing:    drawBox/Frame/RBox/RFrame, drawH/VLine, drawLine, drawPixel,
  *                 drawCircle/Disc, drawEllipse/FilledEllipse, drawTriangle,
  *                 drawXBMP, drawGlyph, drawStr, drawUTF8, drawButtonUTF8
- *     State:      set/getDrawColor, setFont, getU8g2, setFontMode, setBitmapMode
+ *     State:      set/getDrawColor, setFont, getU8g2, setFontMode, setBitmapMode,
+ *                 setFontPosTop/Baseline/Bottom/Center, setFontDirection,
+ *                 setFontRefHeightText/ExtendedText/All
  *     Clipping:   setClipWindow, setMaxClipWindow
  *     Metrics:    getUTF8Width, getStrWidth, getAscent, getDescent,
  *                 getMaxCharWidth/Height, getDisplayWidth/Height
@@ -71,19 +77,78 @@
 #define U8G2_FONT_SECTION(name)
 #endif
 
+/**
+ * @brief Font rotation is compiled in, as u8g2.h defines it by default, so
+ *        u8g2_font_decode_t carries `dir` and code guarded by this macro
+ *        compiles here exactly as it does against real U8G2.
+ */
+#ifndef U8G2_WITH_FONT_ROTATION
+#define U8G2_WITH_FONT_ROTATION
+#endif
+
+/**
+ * @brief U8G2's reference-height modes (u8g2.h), the values
+ *        setFontRefHeightText/ExtendedText/All() store in font_height_mode.
+ */
+#define U8G2_FONT_HEIGHT_MODE_TEXT 0
+#define U8G2_FONT_HEIGHT_MODE_XTEXT 1
+#define U8G2_FONT_HEIGHT_MODE_ALL 2
+
 /** @brief U8G2's pixel coordinate type; uint16_t because U8G2_16BIT is on. */
 typedef uint16_t u8g2_uint_t;
+
+struct u8g2_t;
+
+/**
+ * @brief U8G2's font-position function type (u8g2.h). setFontPos*() stores one
+ *        of four such functions, declared below.
+ */
+typedef u8g2_uint_t (*u8g2_font_calc_vref_fnptr)(u8g2_t* u8g2);
+
+/** @brief U8G2's glyph-decode state, reduced to the two fields read back. */
+struct u8g2_font_decode_t {
+    uint8_t is_transparent = 0;  ///< Font mode, as set by setFontMode()
+#ifdef U8G2_WITH_FONT_ROTATION
+    uint8_t dir = 0;             ///< Font direction, as set by setFontDirection()
+#endif
+};
 
 /**
  * @brief U8G2's state struct, reduced to what the runtime reads.
  *
- * Real U8G2 exposes the current font only as getU8g2()->font; there is no
- * getFont(). Keeping the stub to that shape stops the runtime compiling against
- * an accessor that does not exist.
+ * Real U8G2 has no getFont(), font-mode, bitmap-mode or font-position getter;
+ * that state is readable only here, through getU8g2(). Keeping the stub to the
+ * same field names stops the runtime compiling against an accessor or a field
+ * that does not exist. Defaults are u8g2_SetupBuffer()'s (u8g2_setup.c): no
+ * font, draw colour 1, solid modes, baseline position, text reference height.
+ * The stub has no font metrics, so it records the height mode but not the
+ * reference ascent and descent real U8G2 derives from it.
  */
 struct u8g2_t {
-    const uint8_t* font = nullptr;  ///< Current font, as set by setFont()
+    const uint8_t* font = nullptr;               ///< Current font, as set by setFont()
+    u8g2_font_calc_vref_fnptr font_calc_vref;    ///< Font position, as set by setFontPos*()
+    u8g2_font_decode_t font_decode;              ///< Font mode and direction
+    uint8_t bitmap_transparency = 0;             ///< Bitmap mode, as set by setBitmapMode()
+    uint8_t draw_color = 1;                      ///< Draw colour, as set by setDrawColor()
+    uint8_t font_height_mode = U8G2_FONT_HEIGHT_MODE_TEXT;  ///< As set by setFontRefHeight*()
+
+    u8g2_t();
 };
+
+/**
+ * @brief The four font-position functions, under U8G2's own names and C
+ *        linkage (u8g2_font.c), so code that compares font_calc_vref against
+ *        one of them compiles identically here. Each returns 0; only their
+ *        identity matters to a test.
+ */
+extern "C" {
+inline u8g2_uint_t u8g2_font_calc_vref_font(u8g2_t*) { return 0; }    ///< Baseline
+inline u8g2_uint_t u8g2_font_calc_vref_top(u8g2_t*) { return 0; }     ///< Top
+inline u8g2_uint_t u8g2_font_calc_vref_bottom(u8g2_t*) { return 0; }  ///< Bottom
+inline u8g2_uint_t u8g2_font_calc_vref_center(u8g2_t*) { return 0; }  ///< Center
+}
+
+inline u8g2_t::u8g2_t() : font_calc_vref(u8g2_font_calc_vref_font) {}
 
 /**
  * @brief One call in the stub's ordered call log.
@@ -411,12 +476,13 @@ public:
     }
 
     uint8_t getDrawColor() const {
-        return last_draw_color;
+        return u8g2.draw_color;
     }
 
     void setDrawColor(uint8_t c) {
         log_call("setDrawColor", {c});
         last_draw_color = c;
+        u8g2.draw_color = c;
     }
 
     /** @brief U8G2's own state; the only way real U8G2 exposes the current font. */
@@ -433,10 +499,12 @@ public:
     void setFontMode(uint8_t m) {
         log_call("setFontMode", {m});
         last_font_mode = m;
+        u8g2.font_decode.is_transparent = m;
     }
     void setBitmapMode(uint8_t m) {
         log_call("setBitmapMode", {m});
         last_bitmap_mode = m;
+        u8g2.bitmap_transparency = m;
     }
     void setClipWindow(u8g2_uint_t x0, u8g2_uint_t y0, u8g2_uint_t x1, u8g2_uint_t y1) {
         log_call("setClipWindow", {x0, y0, x1, y1});
@@ -452,6 +520,37 @@ public:
     }
     void setFontPosTop() {
         log_call("setFontPosTop", {});
+        u8g2.font_calc_vref = u8g2_font_calc_vref_top;
+    }
+    void setFontPosBaseline() {
+        log_call("setFontPosBaseline", {});
+        u8g2.font_calc_vref = u8g2_font_calc_vref_font;
+    }
+    void setFontPosBottom() {
+        log_call("setFontPosBottom", {});
+        u8g2.font_calc_vref = u8g2_font_calc_vref_bottom;
+    }
+    void setFontPosCenter() {
+        log_call("setFontPosCenter", {});
+        u8g2.font_calc_vref = u8g2_font_calc_vref_center;
+    }
+    void setFontRefHeightText() {
+        log_call("setFontRefHeightText", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_TEXT;
+    }
+    void setFontRefHeightExtendedText() {
+        log_call("setFontRefHeightExtendedText", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_XTEXT;
+    }
+    void setFontRefHeightAll() {
+        log_call("setFontRefHeightAll", {});
+        u8g2.font_height_mode = U8G2_FONT_HEIGHT_MODE_ALL;
+    }
+    void setFontDirection(uint8_t dir) {
+        log_call("setFontDirection", {dir});
+#ifdef U8G2_WITH_FONT_ROTATION
+        u8g2.font_decode.dir = dir;
+#endif
     }
 
     // Measurement getters return U8G2's own types (U8g2lib.h 2.36.18), so the

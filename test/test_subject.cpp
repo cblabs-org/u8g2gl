@@ -19,6 +19,8 @@
  */
 #include <gtest/gtest.h>
 #include <cstring>
+#include <type_traits>
+#include <utility>
 #include "u8g2gl/u8g2gl_config.h"
 #include "u8g2gl/u8g2gl_types.h"
 #include "u8g2gl/u8g2gl_subject.h"
@@ -305,6 +307,7 @@ TEST(Binding, FlagIfLt) {
     EXPECT_FALSE(obj.has_flag(U8G2GL_FLAG_HIDDEN));
 }
 
+// A hand-written integer reference on a bool subject: 0 converts to false.
 TEST(Binding, BoolFlagIfEq) {
     u8g2gl_subject_bool subject(true);
     u8g2gl_obj obj;
@@ -318,6 +321,47 @@ TEST(Binding, BoolFlagIfEq) {
 
     subject.set(true);
     EXPECT_FALSE(obj.has_flag(U8G2GL_FLAG_HIDDEN));
+}
+
+// A bool subject's comparison resolves to exactly one overload whatever integer
+// type the reference has. With an int32_t overload beside the bool one, a
+// reference of a type other than int32_t converted to both at the same rank:
+// on xtensa (ESP32) int32_t is long, so a literal 0 was ambiguous there while
+// the host, where int32_t is int, compiled it. `0L` and `0LL` reproduce that
+// ambiguity on any host, since one of them always differs from int32_t.
+template <typename Ref, typename = void>
+struct bool_eq_resolves : std::false_type {};
+template <typename Ref>
+struct bool_eq_resolves<Ref, decltype(void(std::declval<u8g2gl_obj&>().bind_flag_if_eq(
+                                 std::declval<u8g2gl_subject_bool_base*>(), std::declval<Ref>(),
+                                 uint8_t{0})))> : std::true_type {};
+template <typename Ref, typename = void>
+struct bool_not_eq_resolves : std::false_type {};
+template <typename Ref>
+struct bool_not_eq_resolves<Ref, decltype(void(std::declval<u8g2gl_obj&>().bind_flag_if_not_eq(
+                                     std::declval<u8g2gl_subject_bool_base*>(), std::declval<Ref>(),
+                                     uint8_t{0})))> : std::true_type {};
+
+TEST(Binding, BoolComparisonResolvesForEveryIntegerType) {
+    static_assert(bool_eq_resolves<bool>::value, "bool");
+    static_assert(bool_eq_resolves<int>::value, "int");
+    static_assert(bool_eq_resolves<long>::value, "long");
+    static_assert(bool_eq_resolves<long long>::value, "long long");
+    static_assert(bool_not_eq_resolves<int>::value, "int");
+    static_assert(bool_not_eq_resolves<long>::value, "long");
+    static_assert(bool_not_eq_resolves<long long>::value, "long long");
+
+    // And each integer form means what the bool form means.
+    u8g2gl_subject_bool subject(false);
+    u8g2gl_obj by_long;
+    u8g2gl_obj by_bool;
+    by_long.bind_flag_if_eq(&subject, 0L, U8G2GL_FLAG_HIDDEN);
+    by_bool.bind_flag_if_eq(&subject, false, U8G2GL_FLAG_HIDDEN);
+    EXPECT_TRUE(by_long.has_flag(U8G2GL_FLAG_HIDDEN));
+    EXPECT_EQ(by_long.has_flag(U8G2GL_FLAG_HIDDEN), by_bool.has_flag(U8G2GL_FLAG_HIDDEN));
+    subject.set(true);
+    EXPECT_FALSE(by_long.has_flag(U8G2GL_FLAG_HIDDEN));
+    EXPECT_EQ(by_long.has_flag(U8G2GL_FLAG_HIDDEN), by_bool.has_flag(U8G2GL_FLAG_HIDDEN));
 }
 
 TEST(Binding, BoolFlagIfNotEq) {

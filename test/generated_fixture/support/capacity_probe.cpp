@@ -11,7 +11,7 @@
  * Purpose: The proof, from inside the library build, that the generated
  *          capacities reached the runtime's own compilation ([D-21], PR-04 WO4
  *          F5). Compiled into u8g2gl_fixture_runtime beside src/u8g2gl_obj.cpp,
- *          with the same forced include of the generated config, so a macro here
+ *          with the same U8G2GL_GENERATED_CONFIG definition (§16), so a macro here
  *          expands exactly as it does where s_binding_pool is sized.
  *
  * Description: A static_assert that the pool equals the total the fixture's
@@ -19,7 +19,7 @@
  *              held against the generator's — and three accessors a test reads
  *              at run time (capacity_probe.h).
  *
- *              If the forced include were dropped from the library target, this
+ *              If the definition were dropped from the library target, this
  *              file would see u8g2gl_config.h's default (32 x 8 = 256) and stop
  *              compiling here, rather than the fixture quietly running on a pool
  *              the document never asked for.
@@ -40,7 +40,7 @@
 static_assert(U8G2GL_MAX_TOTAL_BINDINGS == 7,
               "The runtime library was not compiled with the generated capacities: "
               "U8G2GL_MAX_TOTAL_BINDINGS is not the fixture's counted total of 7. "
-              "Check the forced include of u8g2gl_generated_config.h on "
+              "Check the U8G2GL_GENERATED_CONFIG definition on "
               "u8g2gl_fixture_runtime in test/CMakeLists.txt.");
 
 // No object in the fixture binds more than once.

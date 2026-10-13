@@ -169,6 +169,8 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
       fileContents.set(path, text);
     }
     hasProjectManifest = true;
+    // Files discovery passed over are warnings, merged with the parsers' own.
+    loadDiagnostics.push(...files.skippedFiles);
 
     const projRes = parseProjectFile(files.projectXml, 'u8g2gl.xml');
     loadDiagnostics.push(...projRes.diagnostics);

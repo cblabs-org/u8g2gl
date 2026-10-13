@@ -16,6 +16,11 @@
  *              ([D-18], design_spec §15.4), and a silently-ignored directory would leave a
  *              migrating author's composites simply missing with no explanation.
  *
+ *              XML the project does not read — a screen file whose name is not
+ *              `screen_*.xml`, a stray `.xml` at the project root, a subdirectory of
+ *              `screens/` — is never dropped silently (design_spec §1.2, §15.1,
+ *              §19): each is returned as a warning diagnostic in `skippedFiles`.
+ *
  * Exports:
  * - ProjectFileEntry: Paired relative filename and XML content
  * - ProjectFiles: Structured collection of all project XML file contents
@@ -25,6 +30,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '../core/schema/diagnostic.js';
 import { COMPONENT_REMOVED_MIGRATION } from '../core/parser/parse-widget-manifest.js';
 import { compareCodeUnits } from '../core/order.js';
 
@@ -53,6 +59,51 @@ export interface ProjectFiles {
    * widgets and composites (a `<widget>` carrying a `<view>`, [D-18]).
    */
   readonly widgetManifestXmls: readonly ProjectFileEntry[];
+  /**
+   * One `U8G2GL_SCREEN_FILE_SKIPPED` warning per `.xml` file or `screens/`
+   * subdirectory the reader did not take (§19), ordered by path code unit
+   * (§13.9). Empty when nothing was skipped.
+   */
+  readonly skippedFiles: readonly Diagnostic[];
+}
+
+/** The only file names read from the project root (§19); every other root `.xml` is skipped. */
+const ROOT_XML_NAMES: readonly string[] = ['u8g2gl.xml', 'globals.xml'];
+
+/** A screen file name exactly as discovery accepts it: `screen_` prefix, lower-case `.xml`. */
+const SCREEN_FILE_NAME = /^screen_.*\.xml$/;
+
+// skippedDiagnostic
+// Builds one SCREEN_FILE_SKIPPED warning, located at the start of the skipped
+// file — the file itself is the subject, so there is no finer position.
+//   path       — project-relative, forward-slash path of the file or directory
+//   reason     — why it was not read, as a clause finishing "'<path>' was not read: ..."
+//   suggestion — the project-relative path to rename or move it to, if one applies
+function skippedDiagnostic(path: string, reason: string, suggestion: string | undefined): Diagnostic {
+  return {
+    code: DIAGNOSTIC_CODES.SCREEN_FILE_SKIPPED,
+    severity: 'warning',
+    file: path,
+    line: 1,
+    column: 1,
+    message:
+      `'${path}' was not read: ${reason}.` +
+      (suggestion !== undefined ? ` To use it as a screen, rename to ${suggestion}.` : ''),
+    offendingText: path.slice(path.lastIndexOf('/') + 1),
+    ...(suggestion !== undefined ? { suggestions: [suggestion] } : {}),
+  };
+}
+
+// screenNameFor
+// The name a misnamed screens/ file would be read under: a case variant of a
+// valid name is lower-cased; any other name gains the screen_ prefix.
+//   name — the file's name, ending in .xml in any case
+function screenNameFor(name: string): string {
+  const lower = name.toLowerCase();
+  if (SCREEN_FILE_NAME.test(lower)) {
+    return lower;
+  }
+  return `screen_${lower.slice(0, -'.xml'.length)}.xml`;
 }
 
 /**
@@ -62,6 +113,7 @@ export interface ProjectFiles {
  * - `u8g2gl.xml` at project root (throws if missing)
  * - `globals.xml` at project root (optional, defaults to empty string)
  * - `screens/screen_*.xml`
+ * - Reports, without reading, every other `.xml` it passes over (`skippedFiles`)
  * - `widgets/[name]/[name].xml` (or `widgets/*.xml`) — plain widgets and composites alike
  *
  * @param dir Path to the project root directory.
@@ -102,15 +154,29 @@ export function readProjectFiles(dir: string): ProjectFiles {
   // --- Step 3: Glob screens/screen_*.xml ---
   const screensDir = join(projectRoot, 'screens');
   const screenXmls: ProjectFileEntry[] = [];
+  const skippedFiles: Diagnostic[] = [];
   if (existsSync(screensDir)) {
     const entries = readdirSync(screensDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.isFile() && entry.name.endsWith('.xml') && entry.name.startsWith('screen_')) {
+      const relativePath = `screens/${entry.name}`;
+      if (entry.isFile() && SCREEN_FILE_NAME.test(entry.name)) {
         const fullPath = join(screensDir, entry.name);
         screenXmls.push({
-          filename: `screens/${entry.name}`,
+          filename: relativePath,
           content: readFileSync(fullPath, 'utf-8'),
         });
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.xml')) {
+        skippedFiles.push(skippedDiagnostic(
+          relativePath,
+          "screen files are named 'screen_*.xml' exactly (design_spec §19)",
+          `screens/${screenNameFor(entry.name)}`,
+        ));
+      } else if (entry.isDirectory()) {
+        skippedFiles.push(skippedDiagnostic(
+          relativePath,
+          "'screens/' is not searched recursively (design_spec §19), so nothing inside this directory is read",
+          undefined,
+        ));
       }
     }
     // By code unit, never by locale (§13.9, PR-04 WO12 follow-up). This order
@@ -121,6 +187,19 @@ export function readProjectFiles(dir: string): ProjectFiles {
     // filenames, generating different bytes on two machines.
     screenXmls.sort((a, b) => compareCodeUnits(a.filename, b.filename));
   }
+
+  // --- Step 3b: Report root-level .xml files other than the two the project reads ---
+  for (const entry of readdirSync(projectRoot, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.toLowerCase().endsWith('.xml') && !ROOT_XML_NAMES.includes(entry.name)) {
+      const lower = entry.name.toLowerCase();
+      skippedFiles.push(skippedDiagnostic(
+        entry.name,
+        "only 'u8g2gl.xml' and 'globals.xml' are read from the project root (design_spec §19)",
+        ROOT_XML_NAMES.includes(lower) ? lower : `screens/${screenNameFor(entry.name)}`,
+      ));
+    }
+  }
+  skippedFiles.sort((a, b) => compareCodeUnits(a.file, b.file));
 
   // --- Step 4: Glob widgets/*/[name].xml (plain widgets and composites alike) ---
   const widgetsDir = join(projectRoot, 'widgets');
@@ -158,6 +237,7 @@ export function readProjectFiles(dir: string): ProjectFiles {
     globalsXml,
     screenXmls,
     widgetManifestXmls,
+    skippedFiles,
   };
 }
 

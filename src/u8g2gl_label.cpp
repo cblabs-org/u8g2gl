@@ -29,7 +29,7 @@
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_helpers.h"
-#include "u8g2gl/u8g2gl_tree.h"
+#include "u8g2gl/u8g2gl_state_saver.h"
 
 // U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
 // pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
@@ -331,9 +331,10 @@ void u8g2gl_label::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 4: Compute vertical centering ---
-    // setFontPosTop() is the framework standard (the Y coordinate is the top
-    // of glyph bounding boxes). getAscent() is positive, getDescent() negative,
-    // so (ascent - descent) gives total glyph box height.
+    // The y coordinate is the top of the glyph box: the framework's state
+    // guard, u8g2gl_state_saver, establishes setFontPosTop() around every
+    // render (§11.3). getAscent() is positive, getDescent() negative, so
+    // (ascent - descent) gives total glyph box height.
     int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int y_offset = (h_ > 0) ? (h_ - font_height) / 2 : 0;
     int16_t draw_y = static_cast<int16_t>(y_ + y_offset);
@@ -455,7 +456,9 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
     }
 
     // --- Step 2: Measure text if layout is uninitialized ---
+    // Measuring needs the label's font; the guard puts the caller's back.
     if (needs_layout_) {
+        const u8g2gl_state_saver saver(display);
         if (style_.font != nullptr) {
             display.setFont(style_.font);
         }
@@ -477,23 +480,10 @@ void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {
     tick(now_ms);
 
     // --- Step 5: Partial refresh on pixel shift ---
+    // The repaint clears and redraws inside the label's own bounds under the
+    // render wrapper's state guard ([D-5], §11.3).
     if (scroll_x_ != old_scroll_x) {
-        // Clear own bounding box first ([D-5])
-        display.setDrawColor(0);
-        u8g2gl_draw_box(display, x_, y_, w_, h_);
-
-        // Re-render text inside the label's own bounds. This path runs outside
-        // u8g2gl_render_object(), while the main loop is blocked, so no
-        // framework clip is in force — render() no longer sets one — and the
-        // marquee would otherwise draw across the whole row. The label has no
-        // access to its ancestry here, so its own bounds are the best clip
-        // available; the reset matches what the render wrapper leaves between
-        // objects.
-        const u8g2gl_rect bounds = { x_, y_, w_, h_ };
-        if (u8g2gl_apply_clip(display, bounds)) {
-            render(display);
-            display.setMaxClipWindow();
-        }
+        u8g2gl_repaint_object(display, *this);
 
         // Hardware partial update to avoid full frame transfer
         u8g2gl_partial_refresh(display, x_, y_, w_, h_);

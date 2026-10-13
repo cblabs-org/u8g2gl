@@ -1644,10 +1644,10 @@ static const u8g2gl_editor_directive ui_editor_directives[] = {
     // bind_flag_if_eq (bool subject): the flag is clear when get() != ref
     {"bind_flag_if_eq",
         [](u8g2gl_obj* obj, void* subject, const u8g2gl_editor_value& ref, uint8_t flag) -> bool {
-            return ref.type == U8G2GL_EDITOR_BOOL ? obj->bind_flag_if_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.boolean, flag) : obj->bind_flag_if_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.integer, flag);
+            return ref.type == U8G2GL_EDITOR_BOOL ? obj->bind_flag_if_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.boolean, flag) : obj->bind_flag_if_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.integer != 0, flag);
         },
         [](const void* subject, const u8g2gl_editor_value& ref) -> bool {
-            return ref.type == U8G2GL_EDITOR_BOOL ? static_cast<const u8g2gl_subject_bool_base*>(subject)->get() != ref.boolean : static_cast<const u8g2gl_subject_bool_base*>(subject)->get() != ref.integer;
+            return ref.type == U8G2GL_EDITOR_BOOL ? static_cast<const u8g2gl_subject_bool_base*>(subject)->get() != ref.boolean : static_cast<const u8g2gl_subject_bool_base*>(subject)->get() != (ref.integer != 0);
         },
         U8G2GL_SUBJECT_BOOL},
     // bind_flag_if_not_eq (int subject): the flag is clear when get() == ref
@@ -1662,10 +1662,10 @@ static const u8g2gl_editor_directive ui_editor_directives[] = {
     // bind_flag_if_not_eq (bool subject): the flag is clear when get() == ref
     {"bind_flag_if_not_eq",
         [](u8g2gl_obj* obj, void* subject, const u8g2gl_editor_value& ref, uint8_t flag) -> bool {
-            return ref.type == U8G2GL_EDITOR_BOOL ? obj->bind_flag_if_not_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.boolean, flag) : obj->bind_flag_if_not_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.integer, flag);
+            return ref.type == U8G2GL_EDITOR_BOOL ? obj->bind_flag_if_not_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.boolean, flag) : obj->bind_flag_if_not_eq(static_cast<u8g2gl_subject_bool_base*>(subject), ref.integer != 0, flag);
         },
         [](const void* subject, const u8g2gl_editor_value& ref) -> bool {
-            return ref.type == U8G2GL_EDITOR_BOOL ? static_cast<const u8g2gl_subject_bool_base*>(subject)->get() == ref.boolean : static_cast<const u8g2gl_subject_bool_base*>(subject)->get() == ref.integer;
+            return ref.type == U8G2GL_EDITOR_BOOL ? static_cast<const u8g2gl_subject_bool_base*>(subject)->get() == ref.boolean : static_cast<const u8g2gl_subject_bool_base*>(subject)->get() == (ref.integer != 0);
         },
         U8G2GL_SUBJECT_BOOL},
     // bind_flag_if_gt (int subject): the flag is clear when get() <= ref

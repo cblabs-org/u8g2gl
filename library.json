@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "A declarative, LVGL-style widget runtime for monochrome and low-colour displays, built on U8g2",
   "keywords": "u8g2, display, ui, widgets, oled, lcd, embedded",
   "license": "MIT",
@@ -14,7 +14,7 @@
     "type": "git",
     "url": "https://github.com/cblabs-org/u8g2gl.git"
   },
-  "frameworks": "arduino",
+  "frameworks": "*",
   "platforms": "*",
   "dependencies": {
     "olikraus/U8g2": "^2.36.18"

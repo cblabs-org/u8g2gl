@@ -14,7 +14,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { readProjectFiles, getProjectFileMap } from '../../src/node/read-project.js';
 
 describe('readProjectFiles', () => {
@@ -86,5 +86,101 @@ describe('readProjectFiles', () => {
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('readProjectFiles — files discovery passes over (design_spec §19)', () => {
+  const dirs: string[] = [];
+
+  /** Makes a project with the given extra files (path -> text); u8g2gl.xml is always present. */
+  function project(files: Record<string, string>): string {
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/skipped-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'u8g2gl.xml'), '<u8g2gl schema="0.4" name="t" version="1.0.0"></u8g2gl>');
+    for (const [path, text] of Object.entries(files)) {
+      mkdirSync(join(dir, path, '..'), { recursive: true });
+      writeFileSync(join(dir, path), text);
+    }
+    return dir;
+  }
+
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('warns for a screens/ file not named screen_*.xml, with the rename', () => {
+    const files = readProjectFiles(project({ 'screens/home.xml': '<screen/>' }));
+
+    expect(files.screenXmls).toEqual([]);
+    expect(files.skippedFiles).toHaveLength(1);
+    expect(files.skippedFiles[0]).toMatchObject({
+      code: 'U8G2GL_SCREEN_FILE_SKIPPED',
+      severity: 'warning',
+      file: 'screens/home.xml',
+      line: 1,
+      column: 1,
+      suggestions: ['screens/screen_home.xml'],
+    });
+    expect(files.skippedFiles[0]?.message).toContain('rename to screens/screen_home.xml');
+  });
+
+  it('suggests the lower-cased form for a case variant of a valid name', () => {
+    const files = readProjectFiles(
+      project({ 'screens/Screen_home.xml': '<screen/>', 'screens/screen_menu.XML': '<screen/>' }),
+    );
+
+    expect(files.screenXmls).toEqual([]);
+    expect(files.skippedFiles.map((d) => [d.file, d.suggestions])).toEqual([
+      ['screens/Screen_home.xml', ['screens/screen_home.xml']],
+      ['screens/screen_menu.XML', ['screens/screen_menu.xml']],
+    ]);
+  });
+
+  it('warns once for a subdirectory of screens/, naming it, and does not read inside', () => {
+    const files = readProjectFiles(
+      project({ 'screens/old/screen_a.xml': '<screen/>', 'screens/old/screen_b.xml': '<screen/>' }),
+    );
+
+    expect(files.screenXmls).toEqual([]);
+    expect(files.skippedFiles).toHaveLength(1);
+    expect(files.skippedFiles[0]).toMatchObject({ file: 'screens/old', severity: 'warning' });
+    expect(files.skippedFiles[0]?.message).toContain('not searched recursively');
+  });
+
+  it('warns for a stray .xml at the project root, but not for u8g2gl.xml or globals.xml', () => {
+    const files = readProjectFiles(project({ 'globals.xml': '<globals/>', 'home.xml': '<screen/>' }));
+
+    expect(files.skippedFiles.map((d) => d.file)).toEqual(['home.xml']);
+    expect(files.skippedFiles[0]?.suggestions).toEqual(['screens/screen_home.xml']);
+  });
+
+  it('does not warn for correctly named screens, non-XML files or widget manifests', () => {
+    const files = readProjectFiles(
+      project({
+        'screens/screen_home.xml': '<screen/>',
+        'screens/notes.txt': 'notes',
+        'widgets/w/w.xml': '<widget/>',
+      }),
+    );
+
+    expect(files.screenXmls.map((s) => s.filename)).toEqual(['screens/screen_home.xml']);
+    expect(files.skippedFiles).toEqual([]);
+  });
+
+  it('orders warnings by code unit of path, not locale (§13.9)', () => {
+    const files = readProjectFiles(
+      project({ 'screens/beta.xml': '', 'screens/Zed.xml': '', 'screens/alpha.xml': '', 'zzz.xml': '', 'Aaa.xml': '' }),
+    );
+
+    expect(files.skippedFiles.map((d) => d.file)).toEqual([
+      'Aaa.xml',
+      'screens/Zed.xml',
+      'screens/alpha.xml',
+      'screens/beta.xml',
+      'zzz.xml',
+    ]);
   });
 });

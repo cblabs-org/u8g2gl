@@ -817,7 +817,7 @@
               "directive": "bind_flag_if_eq",
               "subject": "wifi_connected",
               "subject_type": "bool",
-              "ref": 0,
+              "ref": false,
               "flag": "hidden"
             }
           ]

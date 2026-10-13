@@ -676,17 +676,113 @@ TEST(StateSaver, SavesAndRestores) {
     const uint8_t font2 = 2;
     display.setDrawColor(1);
     display.setFont(&font1);
+    display.setFontMode(1);
+    display.setBitmapMode(1);
+    display.setFontPosBaseline();
+    display.setFontDirection(2);
+    display.setFontRefHeightExtendedText();
 
     {
         u8g2gl_state_saver saver(display);
+
+        // Established on construction: top positioning, reference height over
+        // every glyph, direction 0.
+        EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_top);
+        EXPECT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_ALL);
+        EXPECT_EQ(display.getU8g2()->font_decode.dir, 0);
+        // Captured but not established: the widget's style sets these.
+        EXPECT_EQ(display.getDrawColor(), 1);
+        EXPECT_EQ(display.getU8g2()->font, &font1);
+
         display.setDrawColor(2);
         display.setFont(&font2);
+        display.setFontMode(0);
+        display.setBitmapMode(0);
+        display.setFontPosCenter();
+        display.setFontDirection(1);
+        display.setFontRefHeightText();
         EXPECT_EQ(display.getDrawColor(), 2);
         EXPECT_EQ(display.getU8g2()->font, &font2);
     }
 
     EXPECT_EQ(display.getDrawColor(), 1);
     EXPECT_EQ(display.getU8g2()->font, &font1);
+    EXPECT_EQ(display.getU8g2()->font_decode.is_transparent, 1);
+    EXPECT_EQ(display.getU8g2()->bitmap_transparency, 1);
+    EXPECT_TRUE(display.getU8g2()->font_calc_vref == u8g2_font_calc_vref_font);
+    EXPECT_EQ(display.getU8g2()->font_decode.dir, 2);
+    EXPECT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_XTEXT);
+}
+
+// Each height-mode setter recomputes U8G2's reference heights from the font
+// current at the call (u8g2_UpdateRefHeight(), u8g2_font.c), so the caller's
+// mode must go back after the caller's font, not before.
+TEST(StateSaver, HeightModeIsRestoredAfterTheFont) {
+    U8G2 display;
+    const uint8_t caller_font = 1;
+    const uint8_t widget_font = 2;
+    display.setFont(&caller_font);
+    const int before = display.call_log_count;
+
+    {
+        u8g2gl_state_saver saver(display);
+        display.setFont(&widget_font);
+    }
+
+    int set_font_at = -1;
+    int set_mode_at = -1;
+    for (int i = before; i < display.call_log_count; ++i) {
+        const std::string op = display.call_log[i].op;
+        if (op == "setFont" && display.call_log[i].pointer == &caller_font) set_font_at = i;
+        if (op == "setFontRefHeightText") set_mode_at = i;
+    }
+    ASSERT_GE(set_font_at, 0) << "the caller's font was not restored";
+    ASSERT_GE(set_mode_at, 0) << "the caller's height mode was not restored";
+    EXPECT_GT(set_mode_at, set_font_at);
+    EXPECT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_TEXT);
+}
+
+// Compare first: a caller already in the framework's mode costs no setter call
+// on either side of the render, and an unknown mode value comes back verbatim.
+TEST(StateSaver, HeightModeIsSetOnlyWhenItDiffers) {
+    U8G2 display;
+    display.setFontRefHeightAll();
+    const int before = display.call_log_count;
+    {
+        u8g2gl_state_saver saver(display);
+    }
+    for (int i = before; i < display.call_log_count; ++i) {
+        EXPECT_NE(std::string(display.call_log[i].op).rfind("setFontRefHeight", 0), 0u)
+            << display.call_log[i].op << " at call " << i;
+    }
+
+    display.getU8g2()->font_height_mode = 7;
+    {
+        u8g2gl_state_saver saver(display);
+        EXPECT_EQ(display.getU8g2()->font_height_mode, U8G2_FONT_HEIGHT_MODE_ALL);
+    }
+    EXPECT_EQ(display.getU8g2()->font_height_mode, 7);
+}
+
+// A null font must come back without setFont(nullptr): real u8g2_SetFont()
+// reads the font header of any pointer it has not seen, and 0 is no header.
+// The stub cannot crash, so the check is that the call is never made.
+TEST(StateSaver, NullFontIsWrittenBackWithoutSetFont) {
+    U8G2 display;
+    const uint8_t font = 1;
+    ASSERT_EQ(display.getU8g2()->font, nullptr);
+
+    {
+        u8g2gl_state_saver saver(display);
+        display.setFont(&font);
+    }
+
+    EXPECT_EQ(display.getU8g2()->font, nullptr);
+    for (int i = 0; i < display.call_log_count; ++i) {
+        const u8g2_stub_call& call = display.call_log[i];
+        EXPECT_FALSE(std::string(call.op) == "setFont" && call.pointer == nullptr)
+            << "setFont(nullptr) at call " << i;
+    }
 }
 
 TEST(PartialRefresh, TileAligned) {

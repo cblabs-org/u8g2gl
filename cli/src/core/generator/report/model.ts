@@ -103,10 +103,15 @@ export interface BudgetLine {
   readonly names?: readonly string[];
   readonly figure: Figure;
   /**
-   * A caveat on a figure that **is** reported — what it is not, as distinct from
-   * {@link Measured.derivation}, which is where it came from.
+   * A caveat on a figure or count that is reported — what it is not, or what it
+   * depends on, as distinct from {@link Measured.derivation}, which is where it
+   * came from. Two lines use it: the framebuffer, and the binding pool slots.
    *
-   * It exists for the framebuffer. That figure is exact for the constructor the
+   * The binding pool line's count holds only when the generated header reaches the
+   * runtime's own sources (§16, §18.1); a firmware built without it keeps the
+   * runtime default, and the generator cannot tell which happened.
+   *
+   * The framebuffer's figure is exact for the constructor the
    * `<target>` names, and §18 asks for it; but the application builds the `U8G2`
    * instance itself (§12.1, §13.10) and may build a page-mode or differently
    * sized one. Reporting the figure and saying so is honest. Refusing to report

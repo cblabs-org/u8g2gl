@@ -89,6 +89,18 @@ export const DIAGNOSTIC_CODES = {
   MALFORMED_XML: 'U8G2GL_MALFORMED_XML',
   MISSING_FILE: 'U8G2GL_MISSING_FILE',
   /**
+   * An `.xml` file in the project directory was not read as part of the project,
+   * because discovery only takes `screens/screen_*.xml` (design_spec §19): a
+   * misnamed screen file, an `.xml` file at the project root other than
+   * `u8g2gl.xml` and `globals.xml`, or a subdirectory of `screens/`, which is
+   * not searched. A **warning** in both `validate` and `generate`, so a notes
+   * file kept beside the screens does not block a build, but a screen that
+   * silently never reaches the output cannot go unnoticed. Located at line 1,
+   * column 1 of the skipped file (or directory); `suggestions` carries the
+   * project-relative path it would be read under.
+   */
+  SCREEN_FILE_SKIPPED: 'U8G2GL_SCREEN_FILE_SKIPPED',
+  /**
    * `<output dir>` names a directory that is not inside the project (PR-04
    * WO5b carry, closed in WO12). §13.10 is absolute about the boundary:
    * generation writes only to the configured output directory and never to

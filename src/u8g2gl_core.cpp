@@ -18,6 +18,8 @@
  *              dirty gating, the ui_handler entry points, the two calls
  *              generated code makes into the frame — the per-object render
  *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
+ *              the blocked-loop repaint that shares the wrapper's state guard
+ *              ([D-5]),
  *              u8g2gl_apply_clip(), the single owner of the clip-corner
  *              convention, and u8g2gl_clip_scope, the one set-and-reset of an
  *              object's effective clip, shared by the render wrapper and a
@@ -25,6 +27,7 @@
  */
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_coord.h"
+#include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_tree.h"
 
@@ -114,7 +117,8 @@ void u8g2gl_frame_dirty_observer(void* /*user_data*/) {
 
 // u8g2gl_render_object
 // Renders one object with the framework's containment around it: effective
-// visibility, effective clip, saved font and colour.
+// visibility, effective clip, and the state guard — the caller's U8G2 state
+// saved, the framework's text baseline established, the caller's restored.
 //   display — the application's U8G2 instance
 //   objs    — flat object array in document order
 //   parents — parallel parent-index array, or nullptr for each object's own
@@ -132,9 +136,9 @@ void u8g2gl_render_object(
         return;
     }
 
-    // --- Step 2: Save draw state, then set the effective clip ---
+    // --- Step 2: Guard the ambient state, then set the effective clip ---
     // Declared in this order so they unwind in the reverse: the clip is reset
-    // to the full display first, then colour and font are restored. Neither
+    // to the full display first, then the caller's state is restored. Neither
     // touches the other's state.
     u8g2gl_state_saver saver(display);
     const u8g2gl_clip_scope clip(display, objs, parents, index);
@@ -147,6 +151,38 @@ void u8g2gl_render_object(
         return;
     }
     objs[index]->render(display);
+}
+
+// u8g2gl_repaint_object
+// Clears and re-renders one object outside the frame, under the same state
+// guard as u8g2gl_render_object(), clipped to its own bounds.
+//   display — the application's U8G2 instance
+//   obj     — the object to repaint
+bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj) {
+    // --- Step 1: Guard the ambient state ---
+    // Before anything is drawn, so the clear below cannot leave draw colour 0
+    // behind for the caller.
+    u8g2gl_state_saver saver(display);
+
+    // --- Step 2: Clip to the object's own bounds ---
+    // No framework clip is in force on this path, and without one a marquee
+    // draws across the whole row. A rejected rect leaves the display untouched,
+    // so there is nothing to clear or reset.
+    const u8g2gl_rect bounds = { obj.get_x(), obj.get_y(), obj.get_w(), obj.get_h() };
+    if (!u8g2gl_apply_clip(display, bounds)) {
+        return false;
+    }
+
+    // --- Step 3: Clear, then draw ---
+    // The buffer still holds the previous frame here, so the object's old
+    // pixels must go first ([D-5]).
+    display.setDrawColor(0);
+    u8g2gl_draw_box(display, bounds.x, bounds.y, bounds.w, bounds.h);
+    obj.render(display);
+
+    // --- Step 4: Leave the full display clipped, as between objects ---
+    display.setMaxClipWindow();
+    return true;
 }
 
 // u8g2gl_clip_scope

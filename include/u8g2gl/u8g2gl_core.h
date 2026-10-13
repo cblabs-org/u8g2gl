@@ -32,7 +32,8 @@
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
  *
  *     Support for generated code (§11.3, §13.5):
- *     - u8g2gl_render_object():        Render one object with visibility, clip and state saved
+ *     - u8g2gl_render_object():        Render one object with visibility, clip and state guarded
+ *     - u8g2gl_repaint_object():       Clear and re-render one object while the main loop is blocked
  *     - u8g2gl_frame_dirty_observer(): Subject observer that marks the active screen dirty
  *
  *     Clipping:
@@ -247,12 +248,15 @@ private:
  * @brief Render one object of a screen's flat tree inside the framework's
  *        containment (§11.3).
  *
- * In order: skips the object if it or any ancestor is hidden; otherwise saves
- * draw colour and font with u8g2gl_state_saver, sets the clip window to the
+ * In order: skips the object if it or any ancestor is hidden; otherwise
+ * constructs a u8g2gl_state_saver, which saves the caller's U8G2 state and
+ * establishes the framework's text baseline (top font positioning, reference
+ * height over every glyph, direction 0); sets the clip window to the
  * effective clip (own bounds intersected with every ancestor's) with a
- * u8g2gl_clip_scope, calls the object's render() unless that clip is empty or
- * off the display, and lets the scope reset the clip window to the full
- * display before the saver restores colour and font.
+ * u8g2gl_clip_scope; calls the object's render() unless that clip is empty or
+ * off the display; and lets the scope reset the clip window to the full
+ * display before the saver restores the caller's state. U8G2GL's state is in force inside the render; the caller's at every
+ * other moment.
  *
  * Clip lifetime is this function's responsibility, not the state saver's: its
  * u8g2gl_clip_scope sets the clip and resets it, the same guard a generated
@@ -287,6 +291,32 @@ void u8g2gl_render_object(
     const uint8_t* parents,
     uint8_t index
 );
+
+/**
+ * @brief Clear and re-render one object while the main loop is blocked
+ *        ([D-5]), inside the same state guard as u8g2gl_render_object().
+ *
+ * The one implementation of a widget's render_animation_update() repaint. In
+ * order: constructs a u8g2gl_state_saver (the caller's state saved, the
+ * framework's baseline established); clips to the object's **own** bounds
+ * through u8g2gl_apply_clip(); clears those bounds with draw colour 0, because
+ * the buffer was not cleared on this path; calls render(); and resets the clip
+ * window to the full display before the saver restores the caller's state.
+ *
+ * Own bounds rather than the effective clip because a widget holds no
+ * reference to its screen's arrays, so its ancestors' bounds are out of reach.
+ * Effective visibility is not checked for the same reason: an ancestor's hidden
+ * flag is out of reach too.
+ *
+ * The caller pushes the result itself, with u8g2gl_partial_refresh() over the
+ * same bounds, after this returns.
+ *
+ * @param display U8G2 instance to draw into.
+ * @param obj     The object to repaint.
+ * @return true if the object was repainted; false — and the display untouched —
+ *         if its bounds are empty or lie wholly off the display.
+ */
+bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj);
 
 // --- The main handler ---
 
