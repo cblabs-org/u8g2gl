@@ -141,6 +141,14 @@ commits, so no two parties share HEAD.
   corrected: +568 B), and checked foundation's real compile line (`-std=gnu++17 -std=gnu++2b`).
   EVIDENCE.md written; rig sources and serial logs preserved under `rig/` (absolute paths replaced
   by `${U8G2GL_WORKTREE}`).
+- **2026-10-13 — Owner rulings.** **Q-14, verbatim: "ok agreed"** — SPI half answered on this rig,
+  I²C open, §21 wording as proposed in EVIDENCE.md. **PR-06, verbatim: "yes, sounds sensible"** —
+  freeze the positive control into the repository as a fixture pair. **Criterion 4:** owner reframes
+  the edit loop around the editor (XML → scene → prebuilt Wasm for live editing; XML → CLI → Wasm
+  compile with a harness and sample data as a "test run"); PA proposed recording the firmware loop's
+  +6 s as a PlatformIO cost and moving the design-loop criterion to the editor track — awaiting the
+  owner. **Q-C:** owner's direction — a clock widget must own its seconds within the framework, and
+  widgets need animation/binding-update hooks; exact ruling wording awaiting the owner.
 
 ## Session Log
 
