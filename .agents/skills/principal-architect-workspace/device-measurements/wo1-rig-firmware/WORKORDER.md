@@ -176,22 +176,167 @@ Report with a reproduction. Do not file issues and do not fix it.
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete (all three images built, none flashed, none run on hardware; every number below is a
+build fact or a computation from the driver source, not a measurement)
 
-### Changes Made
-- `path/to/file` — what changed and why
+Provenance checked first: `PROJECT.md` Status Log, 2026-10-12, records the owner's verbatim
+"approve" of the decomposition; the 2026-10-13 entry (direct `pio` for compiling and flashing,
+PA flashes) is in the working tree and was relayed by the PA.
+
+### Images (all under /Users/mcneillm/Documents/Projects/U8G2GL-device/tmp/)
+Flash `firmware.bin` (0x10000). The `firmware.factory.bin` beside each also embeds
+`nora_recovery.ino.bin` at 0xf70000 and is not needed.
+
+| Image | Firmware | Bytes | sha256 |
+|---|---|---|---|
+| A (device_after) | `device/.pio/build/device_after/firmware.bin` | 356608 | `9739f991c675e84d85724da73bbb3a7b238f29449a695257257cbb113e49d6b8` |
+| B1 (m2) | `device-m2/.pio/build/m2/firmware.bin` | 357776 | `e2c4c5c29f408b8070f2c72355d18d3cbf8df9e19af0065e72e302d1fbc10f68` |
+| B2 (m1) | `device-m1/.pio/build/m1/firmware.bin` | 361920 | `acb06d92c8b90d78a12a89178193c56ad58d6bce393288b587fc287c06ab9800` |
+
+Image A was built once by me (MCP); the PA then rebuilt it in `tmp/device/` himself, so compare
+against what is actually flashed. B1 and B2 were rebuilt twice and hashed identically both times.
+
+### Build results
+- A: MCP `build_project` env `device_after`, SUCCESS 13.6 s. RAM 8.3 % (27196 B), flash 8.3 %
+  (349634 B). Only warning: the framework's `io_pin_remap.cpp` `#warning` (library, not mine).
+  `device_before` not built (not flashed this session).
+- B1: `pio run -d tmp/device-m2 -e m2` (compile only, owner-permitted), SUCCESS 13 s. RAM 8.6 %
+  (28140 B), flash 8.4 % (350778 B). No warnings from `main.cpp`.
+- B2: `pio run -d tmp/device-m1 -e m1`, SUCCESS 19 s (after fixing the source filter path). RAM
+  9.6 % (31388 B), flash 8.5 % (354622 B). No warnings from `main.cpp`.
+- Library warnings: only the `io_pin_remap.cpp` `#warning` above, in all three.
+- The MCP refused B1's build with QUEUE_ENFORCEMENT_FAILED ("hardware tied up by an implicit
+  session"). I did not reset server state; I used `pio run` once the owner's compile permission
+  arrived. No upload, flash, erase, lock, policy file or enrolment anywhere.
+
+### Changes Made (all git-ignored under `tmp/`; `git status --short` shows only the PA's own
+uncommitted `PROJECT.md` edit, nothing of mine)
+- `tmp/device/platformio.ini` - only the two `symlink://` paths: `device_after`
+  `.../U8G2GL-05r` -> `.../U8G2GL-device`; `device_before`
+  `.../U8G2GL-05r/tmp/device/runtime-before` -> `.../U8G2GL-device/tmp/device/runtime-before`.
+- `tmp/device-m2/` (new) - `platformio.ini`, `partitions.csv`, `src/main.cpp` (image B1).
+- `tmp/device-m1/` (new) - `platformio.ini`, `partitions.csv`, `src/main.cpp`, and the scratch
+  UI `ui/u8g2gl.xml`, `ui/globals.xml`, `ui/screens/screen_measure.xml`, `ui/generated/*` (image B2).
+- `tmp/CAPTURE.md` (new) - per-image firmware, hash, first line, capture command and panel notes.
+- `cli/node_modules/` and `cli/dist/` (git-ignored): created by `npm ci && npm run build` because
+  this worktree had no built CLI. `tmp/device-m1/ui/generated` came from it.
+- `.pio-mcp-workspace/` directories under `tmp/device` and `tmp/device-m2` were written by the MCP
+  (git-ignored).
+
+### CLI command and stamps (B2 scratch project)
+    cd tmp/device-m1 && node ../../cli/dist/node/cli.js validate ui
+    node ../../cli/dist/node/cli.js generate ui --target ssd1322
+CLI prints `0.12.0`. Generated headers stamp `schema: 0.4`, `generator: 0.12.0`, `target: ssd1322`;
+config asserts `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4)` and `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 8)`
+(runtime here is 0.8.0). Validation: 0 errors, 0 warnings. Screen: `ticker`
+(`u8g2gl_label`, `long_mode=scroll_circular`, 40 px/s, `initial_delay_ms=1000`, text far wider
+than 256 px), `clock` (`u8g2gl_clock`, `hh_mm_ss`, `blink=true`, secondary font, `bind_time` to a
+`<time>` subject, bounds x=4 y=18 w=160 h=20), `caption` (static label). The schema offered
+everything needed; nothing was substituted.
+
+### Serial protocols (115200, USB CDC on boot)
+- **A**: unchanged: `U8G2GL-DEVICE boot env=... runtime=...`, `buffer_bytes=2048`, then
+  `runtime=0.8.0 lit=<n> sha256=<hex>` + four `row<k>=` lines, repeated every 5 s.
+- **B1 (`U8G2GL-M2 `)**: `boot env=m2 runtime=0.8.0`; then once after the measurement and every
+  5 s: `runtime= buffer_bytes= lit= sha256=` (must be `lit=1405`, `b9042618...f62d`);
+  `method clock=esp_timer_get_time unit=us warmup=5 reps=200 p95=nearest_rank blocking_spi=1`;
+  `bus sck_clock_hz=` (read at runtime from `display_info`); `label=uptime obj_index=2 px_x px_y
+  px_w px_h` (read from the generated object); `tiles tx ty tw th tile_count full_tile_count`;
+  `wire_bytes full partial one_tile`; four lines `T_full|T_tiles|T_render|T_change n= unit=us
+  min= median= p95= max=`; `end`.
+- **B2 (`U8G2GL-M1 ` / `U8G2GL-M3 `)**: banners `U8G2GL-M1 phase=U start`, `phase=D start`,
+  `U8G2GL-M3 watch enter bounds_x.. duration_ms=10000` and `watch exit`. Then, every 5 s after the
+  run: per phase `summary` (calls, calls/s, sent, changed, changed/s, wasted sends), `call_us`
+  (mean/min/max with a send and mean/max without, and a `separated=` flag for the 2000 us send
+  threshold), `deadline_hist_ms` (11 buckets), `scroll` (1 px steps, wraps, jumps >1 px vs
+  expected steps), `clock` (subject changes, skipped seconds, write lateness); phase D adds
+  `deadline` (cap hits, idle returns), `wake_vs_promise_us` (early/on-time/late counts and
+  max), `change_appear_after_promise_us`, `woken_with_nothing_to_do`. M3: `bounds`, `repaints=
+  true_returns= false_returns= repaint_us_*`, `state_mismatch_calls` with a per-field breakdown,
+  `buffer_outside_bounds changed_calls changed_bytes`, `resume ui_handler ...`. Ends
+  `U8G2GL-M1 end` and `U8G2GL-M3 end`. Every figure carries its unit and n in its line.
+
+### Bus facts (from `u8x8_d_ssd1322.c`, U8g2 2.36.18, computed, not measured)
+- Bus clock U8G2 configures: `sck_clock_hz = 10000000UL` (10 MHz), SPI mode 0, `tile_width` 32,
+  `default_x_offset` 0x1c. (B1 also prints it at runtime.)
+- The 1-bit 2048 B buffer is expanded to 4 bpp per 8x8 tile (`u8x8_ssd1322_8to32`): 8 buffer
+  bytes become 32 data bytes. Per tile: `0x15, x, x+1, 0x5c` (4 bytes) + 32 data = 36 bytes. Per tile
+  row: `0x75, y, y+7` = 3 bytes.
+- Full frame: 8 rows x (3 + 32 x 36) = **9240 bytes** on the wire (not 2048); one tile row =
+  1155; one tile = 39 incl. its row header. Raw minimum at 10 MHz: full 7.39 ms, uptime
+  rectangle 2.77 ms (overheads per byte and per transaction come on top; that is what B1 measures).
+- Uptime label, bounds (px) x=4 y=30 w=248 h=12 -> tiles tx=0, ty=3, tw=32, th=3 -> 3465 bytes,
+  i.e. 3/8 of a frame. Since the label spans the full width, even a one-label change pushes 37.5 %
+  of the full frame's bytes (see findings).
 
 ### Decisions Made
-- Decision description and rationale
+- `u8g2gl_partial_refresh()` does the px-to-tile math internally and returns nothing, so the tile
+  rectangle cannot be read from the helper. The timed path calls the helper itself; the printed
+  tx/ty/tw/th restate the helper's formula (helpers.h Step 2) and are marked as such.
+- The uptime change flips between "Up: 2h 14m 36s" and "...37s" (same width) and T_change includes
+  subject set + `tick_fn` + clear + render + partial refresh.
+- "Sent" is inferred from call duration > 2000 us; B2 prints min send / max no-send time and a
+  `separated` flag so a wrong threshold is visible rather than silent.
+- B2 reads the label's `scroll_x_` through `#define private public` around one `#include` of
+  `u8g2gl_label.h` in `main.cpp` only (no runtime file touched; class layout unaffected).
+- The application writes the clock subject once per loop pass from `millis()`. M3 uses the real
+  epoch too, so the panel digits change once per second although repaints run every 500 ms.
+- M3 snapshots the state_saver's fields (font, font position function, draw colour, font mode,
+  bitmap mode, height mode). `U8G2_WITH_FONT_ROTATION` is off in this build, so direction is not
+  there. The clip window is also compared but reported separately (not a state_saver field).
+- M3 resume also checks that `ui_handler()` over the non-framework state leaves it unchanged.
+- 20 s, 20 s, 10 s phase lengths as specified; they run back to back from boot.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- First B2 link failed: `build_src_filter` path was copied as `../../ui/generated/` but
+  `src/` is one level below the project; correct form is `../ui/generated/` (fixed).
+- A `find /` across the disk (to locate the SSD1322 driver) ran into the background after 120 s; it
+  was harmless but wasteful; the driver is at
+  `tmp/device/.pio/libdeps/device_after/U8g2/src/clib/u8x8_d_ssd1322.c`.
+- Image A shares `.pio` with the PA's rebuild: I stopped building in `tmp/device` as asked.
+- None of the three images has run on hardware: layout of the wire-byte numbers, the 2000 us send
+  threshold and the 25 ms-per-scroll-step expectations are untested assumptions until the capture.
 
-### Out-of-Scope Findings
-- Finding description and suggested action
+### Out-of-Scope Findings (on paper; none reproduced on a device)
+1. **Clock seconds have no deadline.** `u8g2gl_clock::tick()` (src/u8g2gl_clock.cpp:137) returns
+   only the colon-blink deadline (500 ms) or IDLE. The displayed second changes only when the app
+   writes the time subject, so a loop that sleeps to the returned deadline sees a new second up to
+   ~500 ms late (blink on) or never promptly (blink off: IDLE). In B2 the scrolling ticker's
+   25 ms deadline masks this; the `clock write_lateness_ms_*` figures will show the unmasked
+   effect only if you want a variant with the ticker removed (not built).
+   Repro: clock only, blink on, `delay(ui_handler())` loop, write subject from `millis()/1000`.
+2. **Scroll never skips; it slows.** `u8g2gl_label::tick()` advances `scroll_x_` by exactly one
+   pixel per call regardless of elapsed time (src/u8g2gl_label.cpp, Step 5). A late call therefore
+   cannot skip a step; it lowers the effective speed below `scroll_px_per_sec`. B2 reports
+   `steps_1px` against `expected_steps_at_40pxps` so the drift is a number.
+3. **One changed label is not one tile column.** A full-width label (the diagnostics rows are 248
+   px wide) makes `u8g2gl_partial_refresh` push 32 tiles x its rows: 3/8 of the frame for the
+   uptime row. Q-14's saving for such screens is bounded by the label's tile rows, not its text.
+4. `label::tick` uses `last_scroll_ms_ == 0` as "not started" (Step 3); a deadline computed to
+   exactly 0 after `millis()` wrap would restart the initial delay. Not exercised here.
 
 ### Blockers
 (none)
+
+### Addendum - Image B3 (M1C, clock-only deadline test; approved by the PA)
+- Firmware: `tmp/device-m1c/.pio/build/m1c/firmware.bin`, 354192 bytes, sha256
+  `584bc80dd2b900a5bb279df600f7efe0e2fb6a63f09dcd5ccd13df226db66429`. `pio run -e m1c`, SUCCESS
+  21 s, RAM 8.9 %, flash 8.3 %, no warnings from `main.cpp` (only the framework `io_pin_remap`
+  `#warning`). Not flashed, not run.
+- Scratch UI `tmp/device-m1c/ui/`: the same `clock` element as B2 (blink="true", bind_time), no
+  other widget; same CLI command, CLI 0.12.0, schema 0.4, generator 0.12.0, validation clean.
+- Firmware: two phases of 30 s, `U8G2GL-M1C ` tag. D1 blink on; D2 blink off. The clock does
+  support runtime toggling (`set_blink()` is public), so D2 is in the same image and no further
+  image is needed. Each: `d = ui_handler(); delay(min(d,1000))`, subject written once per pass
+  from `kBaseEpoch + esp_timer/1e6`.
+- Measured per second: latency in ms from the boundary (esp_timer multiple of 1e6 us) to the end
+  of the `ui_handler()` call that first drew the new second ("shown" = buffer changed and
+  `clock.get_time()` equals the new epoch); n, min, median, p95, max; `not_shown` and
+  `skipped_seconds`; deadline histogram (same buckets as B2, plus cap hits and idle returns); call
+  durations; colon toggles.
+- Note on method: latency is bounded below by the app's wake-up phase. The subject is written only
+  when the loop wakes, so in D1 the expected spread is 0..~500 ms (wake every blink toggle) and in
+  D2 up to the 1000 ms cap (clock returns IDLE). These are the predictions from reading
+  `u8g2gl_clock::tick()`; the capture decides.
