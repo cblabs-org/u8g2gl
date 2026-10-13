@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="measure">
+    <view>
+        <!-- Clock only: same element as image B2. No ticker, no other animated widget. -->
+        <u8g2gl_clock name="clock" x="4" y="18" width="160" height="20"
+                      font="u8g2_font_helvB12_tr" secondary_font="u8g2_font_helvR08_tr"
+                      format="hh_mm_ss" blink="true" bind_time="clock_time" />
+    </view>
+</screen>

@@ -33,15 +33,15 @@ SSD1322 256×64: CS 10, DC 9, SCK 48, MOSI 38, no reset. `SPI.begin(48, 47, 38, 
 
 ## Work-Order ledger
 
-- **[ ] [wo1-rig-firmware](wo1-rig-firmware/WORKORDER.md):** Re-point the copied rig at this
+- **[x] [wo1-rig-firmware](wo1-rig-firmware/WORKORDER.md):** Re-point the copied rig at this
   worktree; build image A (unchanged `device_after`), image B1 (M2) and image B2 (M1 → M3).
   Build only, through the MCP. `standard`.
-- **[ ] [wo2-build-measurements](wo2-build-measurements/WORKORDER.md):** M4 xtensa sweep (with
+- **[x] [wo2-build-measurements](wo2-build-measurements/WORKORDER.md):** M4 xtensa sweep (with
   a positive control at the pre-fix runtime), then M5. Build only, through the MCP. `standard`.
-- **[ ] wo3-flash-session:** PA with the owner present. F1 (image A), F2 (image B1), F3 (image
+- **[x] wo3-flash-session:** PA with the owner present. F1 (image A), F2 (image B1), F3 (image
   B2), asked for once, lock around each. MCP `upload_firmware` first; if refused, ask the owner in the moment before any
   direct `pio`. A third flash only on a broken image B, asked separately. `interactive`.
-- **[ ] wo4-evidence:** PA reproduces headline figures from raw logs, writes `EVIDENCE.md` to the
+- **[x] wo4-evidence:** [EVIDENCE.md](EVIDENCE.md), with [PR06-SPEC.md](PR06-SPEC.md) and [rig/](rig/). PA reproduces headline figures from raw logs, writes `EVIDENCE.md` to the
   `CRITERION-1.md` standard, commits on this branch.
 
 WO1 and WO2 run in parallel: disjoint `tmp/` directories (`tmp/device/` against `tmp/m4/`,
@@ -135,5 +135,25 @@ commits, so no two parties share HEAD.
     discrepancy open; resolve from the device buffer.
   - **Q-C, [D-15] cannot express subject-driven content.** The clock's deadline covers only its blink;
     seconds come from the app writing the subject. For ruling, not a defect per the current spec text.
+- **2026-10-13 — WO2 complete; PA verified** the M4 control failure (both targets, from the logs),
+  recomputed Criterion 4 from `obs.tsv` (exact match), mapped every M5 log to its runtime (the
+  PA's earlier in-chat "0.8.0 is 2.4 KB smaller" was a misread of a no-diagnostics 0.7.0 build;
+  corrected: +568 B), and checked foundation's real compile line (`-std=gnu++17 -std=gnu++2b`).
+  EVIDENCE.md written; rig sources and serial logs preserved under `rig/` (absolute paths replaced
+  by `${U8G2GL_WORKTREE}`).
 
 ## Session Log
+
+### 2026-10-13 — Session wrap-up
+- **Outcome:** C1 still device = host. Q-14's SPI half answered (full 11.76 ms / label tiles
+  4.41 ms; material above ~10 frames/s); I²C open. [D-15] deadlines honoured to ±1 ms; repaint
+  holds the state guard and its clip on hardware. xtensa sweep clean with a working positive
+  control; PR06-SPEC.md is PR-06's input. Criterion 3: +568 B on 0.8.0. Criterion 4: +6.2 s
+  reproduced, structural to PlatformIO's deep LDF; `off` + explicit deps removes it at a config
+  and ~430 B cost.
+- **Defects for a remediation:** D-A (label scroll 4% slow, deadline-0 spins), D-B (clock seconds
+  2 px low). **Ruling needed:** Q-C (D-15 and subject-driven content).
+- **Lessons:** the MCP's implicit lock serialises unrelated builds behind the hardware queue, so
+  parallel build workers stall the flasher; workers and the PA flashing should not share it. Clean
+  ESP-IDF builds here are not size-deterministic (esp_diagnostics), so size comparisons need a
+  same-state pair. Map every number to its log before quoting it, including in chat.

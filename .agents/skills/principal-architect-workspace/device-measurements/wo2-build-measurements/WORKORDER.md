@@ -161,22 +161,99 @@ reproduction. Do not file issues and do not fix them.
 ---
 
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete (M4 and M5 done; two deviations from the checklist stated under Decisions: the MCP was switched off by the owner mid-task so Criterion 4 and the later builds are `pio` wall time, and S1/S2 are not byte-identical to S0).
+
+All paths below are under `tmp/` of this worktree (git-ignored). Logs: `tmp/m4/.pio-mcp-workspace/logs/build/` (MCP builds), `tmp/m4/logs/pio-*.log`, `tmp/m5/logs/`.
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- Nothing tracked was edited. Created only under `tmp/m4/` and `tmp/m5/`, plus this report.
+- `tmp/m4/PR06-SPEC.md` - input to PR-06's CI (steps, packages, flags, self-test, limits).
+- `tmp/m5/EVIDENCE-499142f8.md` - read-only `git show` of foundation's EVIDENCE.md (baseline source).
+- Worktree `git status --short`: empty before this report was written (HEAD moved to `da4b86a` during the run, PA's commit; `git diff 81e533f..HEAD -- src include library.json CMakeLists.txt cli` is empty, so the runtime under test is unchanged). Foundation `git status --short`: empty at start, empty at end (only `git archive`/`show` were run there).
+
+### M4 - xtensa sweep
+
+Setup (`tmp/m4/platformio.ini`, `src/main.cpp`): platform `espressif32` = pioarduino commit `5f39b6db`, platform.json 55.03.311 (PlatformIO prints `55.3.311+sha.5f39b6d`), arduino-esp32 3.3.11, ESP-IDF 5.5.5, `toolchain-xtensa-esp-elf` 14.2.0+20260121, U8g2 2.36.18, PlatformIO Core 6.1.19. Source = a COPY of the corpus (`tmp/m4/corpus/`, from `cli/test/generator/fixtures/emit-project/expected/`) selected with `build_src_filter`, plus `src/main.cpp`. Envs `esp32dev` (LX6) and `nano_esp32` (`arduino_nano_esp32`, LX7). Every flag and why is in PR06-SPEC.md section 3.
+
+Headline results:
+| Run | esp32dev | nano_esp32 |
+|---|---|---|
+| Corpus, runtime 0.8.0 (default flags) | SUCCESS 11.5 s; RAM 26604, Flash 318264; 0 errors, 0 warnings from generated/runtime/third-party | SUCCESS 12.4 s; RAM 27228, Flash 348202; 0 errors; only the framework `#warning` in `variants/arduino_nano_nora/io_pin_remap.cpp` |
+| Same, `-std=gnu++17` made effective (`*_std17`) | SUCCESS, identical sizes | SUCCESS, identical sizes |
+| **Positive control** (`git archive u8g2gl-05r/wo3-platformio`: runtime 0.7.0 + its fixture) | **FAILED** 7.8 s | **FAILED** 8.6 s |
+| Foundation committed generated project (`fdn_*`, runtime 0.8.0) | SUCCESS; RAM 26452, Flash 317716; 0 warnings | SUCCESS; RAM 27060, Flash 348050; framework `#warning` only |
+| WO1 `device-m1/ui/generated` (snapshot, `wo1_m1_*`, pio) | SUCCESS; RAM 26068, Flash 316572; 0 warnings | SUCCESS; RAM 26676, Flash 346806 |
+| WO1 `device-m1c/ui/generated` (`wo1_m1c_*`, pio) | SUCCESS; RAM 25956, Flash 314136; 0 warnings | SUCCESS; RAM 26564, Flash 344730 |
+
+- **Diagnostics found in the current state: none** of the host-clean/target-broken class (0 errors, 0 warnings from generated code or the runtime, both targets, both standards). Warnings by class in the default builds: generated 0, runtime 0, third-party/framework: the S3 `#warning` only.
+- **Positive control: the check catches the known defect.** Both control envs fail with exactly `ui_screen_home.cpp:109:32: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<1>*, int, const uint8_t&)' is ambiguous`, candidates `u8g2gl_obj.h:369 (int32_t)` and `:370 (bool)`. (The line is 109 in the wo3-platformio fixture; PR-05R's note said :75 in a different committed copy.) Logs: `build-2026-10-12T21-22-36-696Z-44b085a5.log`, `...21-22-44-700Z-db23d395.log`.
+- **Host contrast:** `c++ -std=gnu++17 -fsyntax-only -Wall -Wextra` (Apple clang 21) on the control's `ui_screen_home.cpp` with the same includes: accepted, no output. Probes (`tmp/m4/logs/probe*.cpp`): `int32_t` is `int` on host and not `int` on xtensa; plain `char` is signed on host and UNSIGNED on xtensa; `size_t` is 8 bytes on host and 4 on xtensa.
+- **Stricter pass (informational, envs `*_strict`):** re-enabling the warnings the platform mutes (`-Wno-unused-parameter -Wno-sign-compare -Wno-missing-field-initializers` are in the platform's flags) plus `-Wconversion -Wshadow -Wformat=2`: esp32dev 1226 warnings, nano 1543; framework/platform 550/744, U8g2 224/224, runtime 1/1 (`src/u8g2gl_obj.cpp:690` `-Wformat-nonliteral`, `snprintf` with the binding's own format; not a host/target issue), generated 0/0. Logs `tmp/m4/logs/pio-*_strict.log`.
+- **Finding for PR-06:** the platform's own flags end `-std=gnu++2b ... -std=gnu++2a`, and the last `-std` wins, so `-std=gnu++17` in `build_flags` (foundation's, and mine) is silently overridden: everything compiles as gnu++2a unless the platform's `-std` flags are `build_unflags`ed. `-Wall -Wextra` are already in the platform flags.
+- Wall times: 7.8-12.4 s per env, warm package cache. Cold-cache time and network fetch were not measured (everything was already installed). Disk: framework-libs 2.0 GB, toolchain 1.2 GB, per-env build tree ~170 MB.
+
+### M5 - Criterion 3 (esp32dev flash/RAM)
+
+Method deviations: the MCP was switched off after the first fdn-07 builds, so all later builds and the `size_report` equivalent used `~/.platformio/penv/bin/pio run -d <dir> -e esp32dev -v` and `xtensa-esp32-elf-size -A` / `-nm -S -C --size-sort` on `firmware.elf` (`tmp/m5/logs/size-*.txt`, `nm-*.txt`). Every figure below is a `RAM:`/`Flash:` line.
+
+| | RAM (B) | Flash (B) | Source |
+|---|---:|---:|---|
+| Recorded gate figure (EVIDENCE.md, 499142f8, runtime 0.7.0) | 57340 (17.5%) | 1344575 (85.5%) | EVIDENCE-499142f8.md line 620 |
+| Same-session 0.7.0 (`fdn-07`, pin `82ec83f`, clean) | 57340 | 1344547 | `logs/fdn-07.clean2.pio.log` |
+| 0.8.0 (`fdn-08`, symlink, clean) | 57340 | 1345115 | `logs/fdn-08.clean.pio.log` |
+| Delta same-session 0.7.0 to 0.8.0 | **0** | **+568 (+0.04%)** | |
+| Delta recorded to 0.8.0 | 0 | +540 | |
+| Same-session vs recorded (toolchain drift) | 0 | -28 | |
+
+- Flash 1345115 / 1572864 = 85.5%; headroom 227749 B (14.48%).
+- **Attribution of +568 B (`.flash.text` +568, `.dram0.bss` 0, rodata 0; nm named net +537, all added, none removed):** `u8g2gl_repaint_object` +184, `u8g2gl_state_saver::~u8g2gl_state_saver` +146 (new, R7's font-mode guard), `u8g2gl_label::render_animation_update` +91, `u8g2gl_render_object` +40, `WebServerManager::tick` +32 (not a runtime symbol; moves with layout, not investigated), `u8g2_SetFontRefHeightExtendedText` +18, `u8g2_SetFontRefHeightText` +18 (linked because of R7), `u8g2_SetBitmapMode` +8.
+- **Binding pool:** `nm` `s_binding_pool` = 0x60 = **96 B (4 bindings) in fdn-07 and fdn-08** (and S0/S1/S2). PR-05R's middleware-glob finding applies like this: the glob `*/u8g2gl/src/*.cpp` matches a symlinked library only if the library DIRECTORY is named `u8g2gl`. Reproduced: `tmp/m5/diag/fdn-08-othername` (same tree, symlink to a copy of the runtime named `U8G2GL-lib`) builds with RAM **63388** (+6048) and `s_binding_pool` 0x1800 = **6144 B**, while the script still prints "forced into the u8g2gl runtime sources only". Silent.
+- **Two foundation build-system findings, with reproductions:**
+  1. **A bare `symlink://` to this worktree's root does not build in foundation.** `tmp/m5/diag/fdn-08-rootlink` (pin replaced by `symlink:///Users/mcneillm/Documents/Projects/U8G2GL-device`): `fatal error: EventBus.hpp: No such file or directory` at `modules/Application/Application.hpp:69`. The dependency graph (`logs/fdn-08.pio.build.log`) stops after `u8g2gl`, `LittleFS`, `WiFi`: none of foundation's `modules/*` libraries are discovered. The same symlink works in the M4 rig (which includes only `ui.hpp`). A symlink to a library-only copy (library.json, include/, src/, LICENSE; byte-identical to the worktree's `src`/`include`, diffed) works. Cause inside PlatformIO not isolated (candidates: the repo root has `tmp/`, `test/`, `docs/` trees, or the `U8G2GL-device` name). **The "minimum change" I made in the fdn-08 copy: pin -> `symlink:///.../tmp/m5/rt/u8g2gl` (the library-only copy).** Nothing else needed for 0.8.0 (generated floor `(0, 7)` is satisfied).
+  2. **A clean build's numbers depend on state.** fdn-07's first (MCP) build, with no `sdkconfig.esp32dev` ("will be created from defaults on first build"), gave RAM 57324 / Flash 1342679; a clean rebuild with the generated sdkconfig present gave 1342735 once and 1344547 the next time. The difference is `diag_log_add` (+1543 B) and friends (`esp_diag_log_write`, `esp_diag_timestamp_get`) from managed component `espressif__esp_diagnostics`, present in some clean builds and not others (same sdkconfig md5). All figures in the table use the "with diagnostics" state, which is the one the recorded 57340 / 1344575 corresponds to (nm of fdn-07b and fdn-08 both contain `diag_log_add`). Compare only builds in the same state.
+
+### M5 - Criterion 4 (no-change builds)
+
+**Method (changed): direct `pio` wall time, not the MCP task time of EVIDENCE.md.** Only the S0 minus legacy gap is comparable with the recorded +4.99 s; absolute seconds are not. `pio run -d <dir> -e esp32dev -v`, foreground, one at a time, 5 interleaved rounds legacy, S0, S1, S2 (script `tmp/m5/scripts/rounds.sh`, table `tmp/m5/logs/c4/obs.tsv`, logs `logs/c4/r<k>-<variant>.log`), UTC stamp and `uptime` before each, untimed warm-ups of each beforehand. Wall = Python `time.time()` around the call. No MCP-timed Criterion 4 builds exist, so nothing is mixed. Host load 1-min: 4.7 to 5.6 throughout (rounds ran 07:40:50-07:48:40 UTC 2026-10-13).
+- legacy = `git archive 7396e43d` (`tmp/m5/legacy`). S0 = `fdn-08` as is. S1 = S0 + `lib_ldf_mode = chain`. S2 = S0 + `lib_ldf_mode = off` + explicit `lib_deps` for the 48 libraries in S0's dependency graph, **plus** `-I modules/<each>`, `-I lib/<each>`, `-I .../generated` in `build_flags`, and `WebServer` as `symlink://.../modules/WebServer`. Both extras were needed: with `off`, libraries do not get each other's include dirs (`fatal error: Application.hpp: No such file`), and the name `WebServer` also matches Arduino's framework library (multiple-definition link errors). So S2 needs ~45 lines of hand-maintained config.
+
+| Variant | wall median (s) | range (s) | paired minus legacy, rounds 1-5 | median paired |
+|---|---:|---|---|---:|
+| legacy | 23.03 | 21.81-23.49 | - | - |
+| S0 (deep, as is) | 29.27 | 28.36-29.58 | +5.90, +6.24, +6.52, +6.22, +7.01 | **+6.24** |
+| S1 (`chain`) | 33.64 | 32.76-33.98 | +10.27, +10.95, +10.58, +10.62, +11.15 | +10.62 |
+| S2 (`off` + explicit) | 8.66 | 8.36-8.98 | -14.83, -14.05, -14.35, -13.67, -13.45 | **-14.05** |
+
+(PlatformIO's own `Took` medians: 22.86 / 29.06 / 33.44 / 8.48 s.) **S0 - legacy = +6.2 s today (5.9 to 7.0), against the recorded +4.99 s: the regression reproduces, a little larger, and it is present in a no-change build.** Graph size from the verbose logs: legacy 6265 lines / 78 libraries, S0 8934 / 81, S1 10648 / 81, S2 130 / 82 (no scan).
+- **S1 makes it worse** (+4.4 s over S0): `chain` walks more.
+- **S2 removes the regression and more** (S0 - S2 = 20.6 s, 12.6 s better than legacy): the dependency walk is essentially the entire no-change build time. But see below.
+- **Firmware identity (same directory, same path, `tmp/m5/fdn-id`, `scripts/ident.sh`, `logs/ident-*.size/.nm`):** S0 RAM 57340 / Flash 1345115; **S1 57340 / 1345535 (+420)**; **S2 57348 / 1345543 (+428, bss +8)**. NOT unchanged. The differences are scattered (65 / 144 symbols, mostly ArduinoJson template instantiations and unrelated module code, e.g. `WifiManager::tick` +52); S1's compile flags for a sampled TU are identical to S0's (`logs/cc-*.txt`), S2's differ by the extra `-I` flags. Cause not isolated; run-to-run noise on S0 itself is ~70 B (1345115 clean vs 1345043 incremental), so +420 is real but small. Functional equivalence not tested.
+- **N-edit (`tmp/m5/scripts/nedit.sh`, `uptime` row y 30 -> 31 with `custom_u8g2gl_cli` set to this worktree's `cli/dist/node/cli.js`, 0.12.0):** hook regenerates under S0, S1 and S2 (`[u8g2gl_generate] regenerating ... updated: ui_screen_diagnostics.cpp`, `ui_screen_diagnostics.cpp.o` recompiled): wall 31.0 s (S0), 35.3 s (S1), 12.5 s (S2), at host load 8 to 16 (another process was building; indicative only, not a comparison). Edit reverted in all three copies, platformio.ini and `generated/` restored from the originals. Note: the first hook run regenerates ALL generated files, because CLI 0.12.0 output differs from foundation's committed generated files (version stamp / runtime floor); it was an untimed warm-up.
+- **Verdict:** S0's +6 s is structural in the sense that it is the deep LDF walk over a larger graph (U8G2GLDisplay, U8G2GLUI and u8g2gl add ~2.7k graph lines), not the hook, the generator or compiling. `lib_ldf_mode = chain` (S1) leaves it and increases it. `lib_ldf_mode = off` with an explicit dependency list (S2) removes it, at the price of a ~45-line hand-maintained list (including `-I` flags and a name-collision workaround) and a firmware that differs by ~430 B. It is a mitigation for foundation's maintainers to weigh, not a free default.
 
 ### Decisions Made
-- Decision description and rationale
+- Corpus compiled from a copy via `build_src_filter` (so PlatformIO applies the env's flags to it).
+- Because the platform overrides `-std`, ran both the default build and `*_std17` (unflagged); results are identical.
+- Platform left as `platform = espressif32` (what foundation uses; resolves to the installed pioarduino checkout) rather than a git-URL pin that would clone from the network; recorded the resolved commit/version instead. PR-06 must pin it (spec section 2).
+- fdn-08 uses a library-only copy of the runtime named `u8g2gl` (see finding 1), not a symlink to the worktree root.
+- Criterion 3 comparison uses the "diagnostics present" build state (finding 2) for both sides.
+- After the owner switched the MCP off, `size_report` was replaced by toolchain `size -A`/`nm`; Criterion 4 by `pio` wall time with legacy timed the same way, as instructed by the coordinator.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- `verbose: true` on the MCP `build_project` returns ~525k characters and exceeds the tool-result limit (it is saved to a file); use `rawLogPath` or `pio -v`.
+- The MCP's non-verbose raw log omits compile command lines, so `-Wall`/`-std` cannot be checked from it.
+- The first fdn-07 MCP `size_report` call failed (`ENOENT` for `firmware.elf`): the ELF had been removed from the build dir in the meantime; a rebuild restored it. Not investigated.
+- S2 without the `-I` flags / with the plain name `WebServer`: see Criterion 4 (both fail to build).
+- `lib_ldf_mode = chain` is slower, not faster.
+- I wrote `tmp/m5_evidence.md` at `tmp/` root by mistake at first and moved it into `tmp/m5/` immediately (outside the box for a moment, nothing else touched).
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- Foundation: the u8g2gl middleware glob depends on the library directory's name (silent 6144 B pool); a `symlink://` to a repo root breaks foundation's LDF; clean-build numbers vary by ~1.8 KB with managed-component state; `-std=gnu++17` is overridden by the platform. Reproductions are the directories named above.
+- PR-06: spec for the check is `tmp/m4/PR06-SPEC.md`; the control fixture should be frozen into the repo rather than read from an old branch.
+- `cli/dist/node/cli.js` regenerates foundation's committed `generated/` differently (stamp/floor), as expected when the generator is newer; foundation's cut-over will need a regeneration commit.
+- Plain `char` is unsigned on xtensa and signed on the host: no diagnostic today, but a class the sweep cannot see (spec section 6).
 
 ### Blockers
 (none)
