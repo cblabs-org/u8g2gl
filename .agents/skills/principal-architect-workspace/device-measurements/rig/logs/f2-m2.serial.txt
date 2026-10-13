@@ -1,0 +1,37 @@
+[   883][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 46 is not set as GPIO. Execute digitalMode(46, OUTPUT) first.
+[   893][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 0 is not set as GPIO. Execute digitalMode(0, OUTPUT) first.
+[   903][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 45 is not set as GPIO. Execute digitalMode(45, OUTPUT) first.
+U8G2GL-M2 boot env=m2 runtime=0.8.0
+U8G2GL-M2 runtime=0.8.0 buffer_bytes=2048 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-M2 method clock=esp_timer_get_time unit=us warmup=5 reps=200 p95=nearest_rank blocking_spi=1
+U8G2GL-M2 bus sck_clock_hz=10000000
+U8G2GL-M2 label=uptime obj_index=2 px_x=4 px_y=30 px_w=248 px_h=12
+U8G2GL-M2 tiles tx=0 ty=3 tw=32 th=3 tile_count=96 full_tile_count=256
+U8G2GL-M2 wire_bytes full=9240 partial=3465 one_tile=39 (per tile 4 cmd/arg + 32 data; per tile row 3 cmd/arg)
+U8G2GL-M2 T_full n=200 unit=us min=11757 median=11764 p95=11768 max=11768
+U8G2GL-M2 T_tiles n=200 unit=us min=4406 median=4413 p95=4417 max=4423
+U8G2GL-M2 T_render n=200 unit=us min=1707 median=1712 p95=1713 max=1713
+U8G2GL-M2 T_change n=200 unit=us min=6147 median=6155 p95=6161 max=6167
+U8G2GL-M2 end
+U8G2GL-M2 runtime=0.8.0 buffer_bytes=2048 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-M2 method clock=esp_timer_get_time unit=us warmup=5 reps=200 p95=nearest_rank blocking_spi=1
+U8G2GL-M2 bus sck_clock_hz=10000000
+U8G2GL-M2 label=uptime obj_index=2 px_x=4 px_y=30 px_w=248 px_h=12
+U8G2GL-M2 tiles tx=0 ty=3 tw=32 th=3 tile_count=96 full_tile_count=256
+U8G2GL-M2 wire_bytes full=9240 partial=3465 one_tile=39 (per tile 4 cmd/arg + 32 data; per tile row 3 cmd/arg)
+U8G2GL-M2 T_full n=200 unit=us min=11757 median=11764 p95=11768 max=11768
+U8G2GL-M2 T_tiles n=200 unit=us min=4406 median=4413 p95=4417 max=4423
+U8G2GL-M2 T_render n=200 unit=us min=1707 median=1712 p95=1713 max=1713
+U8G2GL-M2 T_change n=200 unit=us min=6147 median=6155 p95=6161 max=6167
+U8G2GL-M2 end
+U8G2GL-M2 runtime=0.8.0 buffer_bytes=2048 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-M2 method clock=esp_timer_get_time unit=us warmup=5 reps=200 p95=nearest_rank blocking_spi=1
+U8G2GL-M2 bus sck_clock_hz=10000000
+U8G2GL-M2 label=uptime obj_index=2 px_x=4 px_y=30 px_w=248 px_h=12
+U8G2GL-M2 tiles tx=0 ty=3 tw=32 th=3 tile_count=96 full_tile_count=256
+U8G2GL-M2 wire_bytes full=9240 partial=3465 one_tile=39 (per tile 4 cmd/arg + 32 data; per tile row 3 cmd/arg)
+U8G2GL-M2 T_full n=200 unit=us min=11757 median=11764 p95=11768 max=11768
+U8G2GL-M2 T_tiles n=200 unit=us min=4406 median=4413 p95=4417 max=4423
+U8G2GL-M2 T_render n=200 unit=us min=1707 median=1712 p95=1713 max=1713
+U8G2GL-M2 T_change n=200 unit=us min=6147 median=6155 p95=6161 max=6167
+U8G2GL-M2 end

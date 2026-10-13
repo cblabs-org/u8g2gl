@@ -45,7 +45,7 @@ Image A is PR-05R's Criterion 1 firmware, unchanged apart from the two `symlink:
 - **Expected** ([CRITERION-1.md](../pr-05r-runtime-fixes/CRITERION-1.md) on #13's branch):
   lit 1405, sha256 `b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d`.
 - **Got (F1):** `U8G2GL-DEVICE runtime=0.8.0 lit=1405 sha256=b9042618…f62d`, the same on every
-  5-second repeat. **The rig behaves as it did for PR-05R.** Log: `rig/logs/f1-c1.log`.
+  5-second repeat. **The rig behaves as it did for PR-05R.** Log: `rig/logs/f1-c1.serial.txt`.
 
 ---
 
@@ -66,7 +66,7 @@ must match C1, which proves the timings are of the Criterion 1 frame. Got: `lit=
   out. Per 8×8 tile it sends `0x15, x, x+1, 0x5c` and then 32 data bytes; per tile row,
   `0x75, y, y+7` (`u8x8_d_ssd1322.c`, `DRAW_TILE`, PA-checked). That makes **9240 B per full frame**
   and **3465 B for the label's tiles**.
-- **Timing:** 5 untimed warm-ups, then n = 200 timed runs each (µs). Log: `rig/logs/f2-m2.log`.
+- **Timing:** 5 untimed warm-ups, then n = 200 timed runs each (µs). Log: `rig/logs/f2-m2.serial.txt`.
 
 | Series | What is timed | min | **median** | p95 | max |
 |---|---|---:|---:|---:|---:|
@@ -117,7 +117,7 @@ The firmware drives the **real `ui_handler()`**. The app writes the time subject
 - **Private read:** the firmware reads the ticker's private scroll offset through `#define private public`
   around one include in its own `main.cpp`. This is a test-only shortcut; no runtime file changed.
 
-Log: `rig/logs/f3-m1-m3.log`. **Owner watching the panel:** ticker "scrolling perfectly", colon
+Log: `rig/logs/f3-m1-m3.serial.txt`. **Owner watching the panel:** ticker "scrolling perfectly", colon
 blink fine, caption fine. The owner also saw the seconds sitting low (defect D-B).
 
 | | Phase U: uncapped, 20 s | Phase D: `delay(deadline)`, 20 s |
@@ -161,7 +161,7 @@ B2 the ticker's 25 ms deadline hides that, so image B3 (`rig/m1c-image-b3/`) has
   of the call that first draws the new second.
 - **Phases:** D1 for 30 s with blink on, then D2 for 30 s with blink off (`set_blink(false)` at runtime).
 
-Log: `rig/logs/f4-m1c.log`. Owner: "Everything steps evenly that I can see."
+Log: `rig/logs/f4-m1c.serial.txt`. Owner: "Everything steps evenly that I can see."
 
 | Phase | Returned deadlines | Second shown after its boundary (ms) | Skipped seconds |
 |---|---|---|---|
@@ -346,7 +346,7 @@ attribution above is the checked one.)
 - **Line 284** returns `last_scroll_ms_ - now_ms`, which is **0** when the two are equal. Line 218
   then refuses to step, so a deadline-sleeping loop wakes with nothing to do until `millis()` advances.
 - **Reproduction:** image B2, phase D: 4 389 zero deadlines and 4 343 idle wakes in 20 s, and 758
-  steps where 800 were due (`rig/logs/f3-m1-m3.log`).
+  steps where 800 were due (`rig/logs/f3-m1-m3.serial.txt`).
 - **Fix direction, for the remediation:** schedule each step from its due time, and make the
   comparison and the returned remainder agree.
 - **Severity:** low visually (the owner saw a smooth scroll); real for power and for any app that trusts the deadline.

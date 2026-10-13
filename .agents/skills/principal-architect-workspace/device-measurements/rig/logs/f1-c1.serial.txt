@@ -1,0 +1,20 @@
+[   883][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 46 is not set as GPIO. Execute digitalMode(46, OUTPUT) first.
+[   893][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 0 is not set as GPIO. Execute digitalMode(0, OUTPUT) first.
+[   903][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 45 is not set as GPIO. Execute digitalMode(45, OUTPUT) first.
+U8G2GL-DEVICE boot env=device_after runtime=0.8.0
+U8G2GL-DEVICE buffer_bytes=2048
+U8G2GL-DEVICE runtime=0.8.0 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-DEVICE row1="esp32-foundation"
+U8G2GL-DEVICE row2="MyNetwork \xC2\xB7 192.168.1.42"
+U8G2GL-DEVICE row3="Up: 2h 14m 36s"
+U8G2GL-DEVICE row4="Heap: 278KB  v0.0.12-dev.83"
+U8G2GL-DEVICE runtime=0.8.0 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-DEVICE row1="esp32-foundation"
+U8G2GL-DEVICE row2="MyNetwork \xC2\xB7 192.168.1.42"
+U8G2GL-DEVICE row3="Up: 2h 14m 36s"
+U8G2GL-DEVICE row4="Heap: 278KB  v0.0.12-dev.83"
+U8G2GL-DEVICE runtime=0.8.0 lit=1405 sha256=b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
+U8G2GL-DEVICE row1="esp32-foundation"
+U8G2GL-DEVICE row2="MyNetwork \xC2\xB7 192.168.1.42"
+U8G2GL-DEVICE row3="Up: 2h 14m 36s"
+U8G2GL-DEVICE row4="Heap: 278KB  v0.0.12-dev.83"
