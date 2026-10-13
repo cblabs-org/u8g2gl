@@ -149,6 +149,14 @@ commits, so no two parties share HEAD.
   +6 s as a PlatformIO cost and moving the design-loop criterion to the editor track — awaiting the
   owner. **Q-C:** owner's direction — a clock widget must own its seconds within the framework, and
   widgets need animation/binding-update hooks; exact ruling wording awaiting the owner.
+- **2026-10-13 — Owner, verbatim: "approved proceed"** — in answer to the three pending items:
+  (1) **Criterion 4 reframed**: firmware build loop's +6.2 s recorded as PlatformIO's library-finder
+  cost (S2 the known way out, not adopted); design loop moves to the editor track as an E-2
+  acceptance criterion (< 16 ms edit to pixels), written up in
+  [ED-INPUT-EDIT-LOOP.md](ED-INPUT-EDIT-LOOP.md). (2) **Q-C ruled**: time-dependent widgets own
+  their schedule (the clock returns a deadline to its next second, from a framework-provided wall
+  clock source); a subject write is work and ends the loop's sleep. Goes to a remediation PR with
+  D-A and D-B. (3) **Push** `u8g2gl-device/measurements` to origin.
 
 ## Session Log
 

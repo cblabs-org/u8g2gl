@@ -393,25 +393,21 @@ attribution above is the checked one.)
 
 ---
 
-## Questions for a ruling
+## Rulings (owner, 2026-10-13; verbatim in PROJECT.md)
 
-1. **Q-C — Does [D-15]'s deadline have to cover content that a subject drives?** The clock's
-   deadline covers only its blink. With blink off it returns `U8G2GL_IDLE` while showing a new second
-   every second. With blink on, seconds lag by however far the blink is out of phase with the
-   second (260 ms here, up to 500 ms). The options:
-   - **(a)** It is the application's job: whoever writes the subject wakes the loop. Document this in §11.1.
-   - **(b)** The clock returns a deadline to the next second from its own time and the tick clock.
-     That needs the subject's sub-second phase, which the clock does not have.
-   - **(c)** A subject write wakes `ui_handler()` with a deadline of 0 (an app-side notification).
-2. **Q-14 — record the SPI half as answered, with I²C still open?** Proposed spec §21 wording:
-   *"SPI (SSD1322, 10 MHz) measured 2026-10-13: full frame 11.8 ms, one label's tiles 4.4 ms; the
-   saving is material above roughly 10 frames/s. I²C open."*
-3. **Criterion 4 — offer S2 to foundation?** It removes the regression but costs about 45
-   hand-maintained lines and changes the image by about 430 B. Or record the regression as
-   structural, with S2 as the known way out.
-4. **PR-06 — freeze the positive control into the repository** instead of reading it from
-   `u8g2gl-05r/wo3-platformio`?
-5. **F-LINK — pursue it in foundation,** or rely on the library-only layout for the cut-over?
+1. **Q-C — ruled.** Widgets that depend on time own their schedule: the clock returns a deadline
+   for its next second, from a wall-clock source the framework provides. A subject write is work,
+   and ends the loop's sleep. This is a design change (new API and spec §11.1) for a remediation PR,
+   together with D-A and D-B.
+2. **Q-14 — agreed.** The SPI half is answered on this rig and the I²C half stays open. Proposed §21
+   wording: *"SPI (SSD1322, 10 MHz) measured 2026-10-13: full frame 11.8 ms, one label's tiles
+   4.4 ms; the saving is material above roughly 10 frames/s. I²C open."*
+3. **Criterion 4 — reframed.** Record the firmware loop's +6.2 s as a cost of PlatformIO's library
+   finder, with S2 as the known way out, not adopted. The design loop moves to the editor track as an
+   E-2 acceptance criterion: under 16 ms from edit to pixels. See
+   [ED-INPUT-EDIT-LOOP.md](ED-INPUT-EDIT-LOOP.md).
+4. **PR-06 — agreed.** Freeze the positive control into the repository as a fixture pair.
+5. **F-LINK — not ruled.** Left for foundation's cut-over; the library-only layout works.
 
 ## What this does not show
 
