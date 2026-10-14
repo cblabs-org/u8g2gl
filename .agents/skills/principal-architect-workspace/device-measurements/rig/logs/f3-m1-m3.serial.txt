@@ -1,0 +1,162 @@
+[   883][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 46 is not set as GPIO. Execute digitalMode(46, OUTPUT) first.
+[   893][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 0 is not set as GPIO. Execute digitalMode(0, OUTPUT) first.
+[   903][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 45 is not set as GPIO. Execute digitalMode(45, OUTPUT) first.
+U8G2GL-M1 boot env=m1 runtime=0.8.0
+U8G2GL-M1 phase=U start duration_ms=20000 (uncapped ui_handler loop; ticker scrolls, colon blinks)
+U8G2GL-M1 phase=D start duration_ms=20000 (delay(deadline); ticker, clock seconds and colon should run smoothly)
+U8G2GL-M3 watch enter bounds_x=4 bounds_y=18 bounds_w=160 bounds_h=20 duration_ms=10000 repaint_every_ms=500 (only the clock box should update; ticker and colon freeze)
+U8G2GL-M3 watch exit repaints=20
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end
+U8G2GL-M1 runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time unit=us buffer_bytes=2048
+U8G2GL-M1 phase=U summary duration_ms=20000 calls=295668 calls_per_s=14783.4 sent=783 changed=750 changed_per_s=37.50 wasted_sends=33
+U8G2GL-M1 phase=U call_us n_send=783 mean_send_us=13521 min_send_us=12858 max_send_us=13765 n_nosend=294885 mean_nosend_us=4 max_nosend_us=17 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=U deadline_hist_ms 0=20995 1_4=88449 5_9=106020 10_14=51153 15_19=313 20_24=313 25=63 26_99=4632 100_499=23730 500_plus=0 idle=0
+U8G2GL-M1 phase=U scroll steps_1px=722 wraps=1 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=40 expected_colon_toggles=40
+U8G2GL-M1 phase=U clock subject_changes=20 skipped_seconds=0 write_lateness_ms_mean=7 write_lateness_ms_max=12 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D summary duration_ms=20000 calls=5144 calls_per_s=257.2 sent=801 changed=801 changed_per_s=40.05 wasted_sends=0
+U8G2GL-M1 phase=D call_us n_send=801 mean_send_us=13568 min_send_us=12923 max_send_us=13755 n_nosend=4343 mean_nosend_us=4 max_nosend_us=12 send_threshold_us=2000 separated=1
+U8G2GL-M1 phase=D deadline_hist_ms 0=4389 1_4=0 5_9=35 10_14=720 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0
+U8G2GL-M1 phase=D scroll steps_1px=758 wraps=0 jumps_gt1px=0 back=0 expected_steps_at_40pxps=760 (after 1000 ms initial delay) colon_toggles=39 expected_colon_toggles=40
+U8G2GL-M1 phase=D clock subject_changes=22 skipped_seconds=1 write_lateness_ms_mean=48 write_lateness_ms_max=787 (ms past the second at the app's write, before the frame)
+U8G2GL-M1 phase=D deadline cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1 phase=D wake_vs_promise_us early_gt1ms=0 ontime_pm1ms=5143 late_gt1ms=0 (late_1_5ms=0 late_5_10ms=0 late_gt10ms=0) max_late_us=515 most_early_us=-476
+U8G2GL-M1 phase=D change_appear_after_promise_us n=801 mean=13796 max=14253 (promise to end of the call that drew it, frame time included)
+U8G2GL-M1 phase=D woken_with_nothing_to_do calls_without_send_or_change=4343
+U8G2GL-M1 end
+U8G2GL-M3 bounds x=4 y=18 w=160 h=20 duration_ms=10000 repaint_every_ms=500
+U8G2GL-M3 repaints=20 true_returns=20 false_returns=0 repaint_us_min=378 repaint_us_mean=390 repaint_us_max=422 (repaint only, partial refresh excluded)
+U8G2GL-M3 state_mismatch_calls=0 of n=20 by_field font=0 font_pos=0 draw_color=0 font_mode=0 bitmap_mode=0 height_mode=0 clip_window=0 (clip window is not a state_saver field; reported for information)
+U8G2GL-M3 buffer_outside_bounds changed_calls=0 of n=20 changed_bytes=0 repaints_that_changed_only_inside=10
+U8G2GL-M3 resume ui_handler calls=60 first_call_changed_buffer=1 calls_with_change=31 calls_with_send=31 calls_state_mismatch=0 (state left at the app's M3 state)
+U8G2GL-M3 end

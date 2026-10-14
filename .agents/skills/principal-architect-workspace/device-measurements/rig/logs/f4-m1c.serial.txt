@@ -1,0 +1,46 @@
+[   883][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 46 is not set as GPIO. Execute digitalMode(46, OUTPUT) first.
+[   893][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 0 is not set as GPIO. Execute digitalMode(0, OUTPUT) first.
+[   903][E][esp32-hal-gpio.c:185] __digitalWrite(): IO 45 is not set as GPIO. Execute digitalMode(45, OUTPUT) first.
+U8G2GL-M1C boot env=m1c runtime=0.8.0
+U8G2GL-M1C phase=D1 start blink=1 duration_ms=30000 (clock only; delay(min(deadline,1000)))
+U8G2GL-M1C phase=D2 start blink=0 duration_ms=30000 (clock only; delay(min(deadline,1000)))
+U8G2GL-M1C runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time
+U8G2GL-M1C phase=D1 blink=1 calls=61 sent=61 changed=61 call_us_mean=12046 call_us_max=12093 colon_toggles=60
+U8G2GL-M1C phase=D1 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=61 500_plus=0 idle=0 cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1C phase=D1 second_latency n=31 unit=ms min=260 median=260 p95=260 max=774 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C phase=D2 blink=0 calls=30 sent=30 changed=30 call_us_mean=12052 call_us_max=12078 colon_toggles=0
+U8G2GL-M1C phase=D2 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=30 cap_ms=1000 cap_hits=30 idle_returns=30
+U8G2GL-M1C phase=D2 second_latency n=30 unit=ms min=261 median=441 p95=597 max=609 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C end
+U8G2GL-M1C runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time
+U8G2GL-M1C phase=D1 blink=1 calls=61 sent=61 changed=61 call_us_mean=12046 call_us_max=12093 colon_toggles=60
+U8G2GL-M1C phase=D1 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=61 500_plus=0 idle=0 cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1C phase=D1 second_latency n=31 unit=ms min=260 median=260 p95=260 max=774 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C phase=D2 blink=0 calls=30 sent=30 changed=30 call_us_mean=12052 call_us_max=12078 colon_toggles=0
+U8G2GL-M1C phase=D2 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=30 cap_ms=1000 cap_hits=30 idle_returns=30
+U8G2GL-M1C phase=D2 second_latency n=30 unit=ms min=261 median=441 p95=597 max=609 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C end
+U8G2GL-M1C runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time
+U8G2GL-M1C phase=D1 blink=1 calls=61 sent=61 changed=61 call_us_mean=12046 call_us_max=12093 colon_toggles=60
+U8G2GL-M1C phase=D1 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=61 500_plus=0 idle=0 cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1C phase=D1 second_latency n=31 unit=ms min=260 median=260 p95=260 max=774 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C phase=D2 blink=0 calls=30 sent=30 changed=30 call_us_mean=12052 call_us_max=12078 colon_toggles=0
+U8G2GL-M1C phase=D2 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=30 cap_ms=1000 cap_hits=30 idle_returns=30
+U8G2GL-M1C phase=D2 second_latency n=30 unit=ms min=261 median=441 p95=597 max=609 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C end
+U8G2GL-M1C runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time
+U8G2GL-M1C phase=D1 blink=1 calls=61 sent=61 changed=61 call_us_mean=12046 call_us_max=12093 colon_toggles=60
+U8G2GL-M1C phase=D1 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=61 500_plus=0 idle=0 cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1C phase=D1 second_latency n=31 unit=ms min=260 median=260 p95=260 max=774 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C phase=D2 blink=0 calls=30 sent=30 changed=30 call_us_mean=12052 call_us_max=12078 colon_toggles=0
+U8G2GL-M1C phase=D2 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=30 cap_ms=1000 cap_hits=30 idle_returns=30
+U8G2GL-M1C phase=D2 second_latency n=30 unit=ms min=261 median=441 p95=597 max=609 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C end
+U8G2GL-M1C runtime=0.8.0 schema=0.4 generator=0.12.0 clock=esp_timer_get_time
+U8G2GL-M1C phase=D1 blink=1 calls=61 sent=61 changed=61 call_us_mean=12046 call_us_max=12093 colon_toggles=60
+U8G2GL-M1C phase=D1 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=61 500_plus=0 idle=0 cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-M1C phase=D1 second_latency n=31 unit=ms min=260 median=260 p95=260 max=774 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C phase=D2 blink=0 calls=30 sent=30 changed=30 call_us_mean=12052 call_us_max=12078 colon_toggles=0
+U8G2GL-M1C phase=D2 deadline_hist_ms 0=0 1_4=0 5_9=0 10_14=0 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=30 cap_ms=1000 cap_hits=30 idle_returns=30
+U8G2GL-M1C phase=D2 second_latency n=30 unit=ms min=261 median=441 p95=597 max=609 (boundary to end of the ui_handler() call that first drew the new second) not_shown=0 skipped_seconds=0
+U8G2GL-M1C end

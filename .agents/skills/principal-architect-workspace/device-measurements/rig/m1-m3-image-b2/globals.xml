@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <time name="clock_time" />
+    </subjects>
+    <fonts>
+        <builtin name="u8g2_font_helvB12_tr" />
+        <builtin name="u8g2_font_helvR08_tr" />
+    </fonts>
+</globals>
