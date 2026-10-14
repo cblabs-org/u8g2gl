@@ -119,6 +119,8 @@ complete
 ### Dead Ends & Warnings
 - None. Totals: 495 (1 skip) before, 501 (1 skip) after, fresh build dir, 0 warnings; editor and generated-fixture tests pass; CLI vitest 1353 passed; goldens untouched.
 
+- Control run (tests built against pre-fix obj/label sources in tmp/ctl6): Narrowing FAILS on old code, Widening FAILS (after the coordinator found my first version passed on old code; it now asserts the drawn x stays at its resting non-negative position across several due times), BoundWidth FAILS, PureMove passes, SizeChangeMarksDirty passes (both already-correct behaviours). All 5 pass with the fix.
+
 ### Out-of-Scope Findings
 - No test or fixture needed changing for the non-copyable subjects: WO4 had already fixed the one copy site, and nothing else (tests, editor host, generated fixtures) copies a subject.
 

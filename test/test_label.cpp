@@ -1414,7 +1414,16 @@ TEST(LabelResize, WideningAScrollingLabelEnoughToFitStopsIt) {
     EXPECT_TRUE(marquee_moved(label, display, 0));
 
     label.set_w(60);
-    EXPECT_FALSE(marquee_moved(label, display, 10000));
+    // A stale needs_scroll_ would keep the marquee stepping through every due
+    // time below, so the drawn x would drift off its resting position.
+    label.render(display);
+    const int rest_x = display.last_draw_utf8_x;
+    for (uint32_t t : {10000u, 13001u, 20000u, 40000u}) {
+        label.tick(t);
+        label.render(display);
+        EXPECT_EQ(display.last_draw_utf8_x, rest_x) << "at t=" << t;
+    }
+    EXPECT_LT(rest_x, 32768);   // a non-negative x, not a wrapped scroll offset
 }
 
 TEST(LabelResize, APureMoveDoesNotResetTheScroll) {
