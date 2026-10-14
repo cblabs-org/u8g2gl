@@ -214,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-10, after PR-05.**
+**Revised 2026-10-14, after PR-5R2.**
 
 ### Where the programme is
 
@@ -224,7 +224,9 @@ PR-04 the generator · **#6**+**#7** PR-4R corrections · **#8** PR-04b the font
 and image pipeline · **#9** PR-4R2 (bound children clipped, `<bind>` aliasing
 refused, the radius bound checked however configured) · **#10** PR-4R3 (the
 runtime version floor, `extends` restricted to elements with a class) · **#11**
-PR-05's U8G2GL half (the runtime packaged as a PlatformIO library).
+PR-05's U8G2GL half (the runtime packaged as a PlatformIO library) · **#13**
+PR-05R (nine integration defects; criterion 1 made evidence about U8G2GL) ·
+**#14** PR-5R2 (timing — scroll, clock seconds, timers and the resume callback).
 
 **PR-05's foundation half is deliberately unmerged** —
 [esp32-app-foundation#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292),
@@ -233,18 +235,17 @@ renderer". It is *verified* on its branch, with all four gate evidence sets. The
 U8G2GL repository continues to merge normally. Wherever a plan says "PR-05
 lands", read "PR-05 verified on its branch".
 
-Baselines at `main` @ `c32f2ca`: **C++ 401** tests (one known skip,
-`SizeOfReport.ThirtyTwoBitTarget`), **CLI 1338**, zero warnings. Schema **0.4**,
-CLI **0.11.0**, runtime **0.7.0**, scene format **3**. Foundation's held branch:
-native tests **1018**. U8G2 pinned at
+Baselines at `main` @ `8e73506`: **C++ 501** tests (one known skip,
+`SizeOfReport.ThirtyTwoBitTarget`), **CLI 1353**, zero warnings. Schema **0.4**,
+CLI **0.13.0**, runtime **0.9.0**, scene format **3**. Every project regenerated
+with 0.13.0 requires runtime ≥ 0.9. Foundation's held branch: native **1018**. U8G2 pinned at
 **2.36.18** (`d66b49af`) in `extern/u8g2`. **Take these from a merged `main`,
 never from a report** — a PA's figures are correct when written and stale by the
 time they are read.
 
-**Next: PR-05R** — six runtime and CLI defects the first real integration
-surfaced, one of them the first thing any new user would hit. Then PR-06, then
-the **PR-07 gate**. The editor track (E-D, then E-1..E-3) begins only on a GO —
-owner decision CA-1, 2026-10-05.
+**Next: PR-06** — the Wasm renderer and snapshot harness, and the programme's
+**first CI** (§17.3). Then the **PR-07 gate**. The editor track (E-D, then
+E-1..E-3) begins only on a GO — owner decision CA-1, 2026-10-05.
 
 PR-05's font risk is effectively nil: all twelve of departures-board-v3's font
 arrays are byte-identical to generator output, so its font work is renaming to
@@ -296,42 +297,70 @@ contract under `[UD-3]`, so it waits for E-1.
 
 Full reasoning for both: `PROGRAM.md`, 2026-10-05.
 
-### Carried — PR-05R, then PR-06
+### Carried — PR-06's inputs
 
-**PR-05R is next**, and it exists because the first real integration found six
-things no amount of host testing would have. Full detail in the ledger and in
-`PROGRAM.md` (2026-10-10). The one to understand before anything else:
+PR-06 was always the Wasm renderer and snapshot harness. It now also carries the
+programme's first CI (§17.3) and four inputs from the device session, all on
+`main` since the measurement branch was merged:
 
-> **Nothing in the runtime calls `setFontPosTop()`**, although `u8g2gl_label.cpp`
-> and `u8g2gl_clock.cpp` both document it as the framework standard — in
-> comments only. A plain `begin()` + `ui_handler()` user gets **15 lit pixels
-> instead of 1392**.
+- **`device-measurements/PR06-SPEC.md`** — the xtensa check, with a pinned
+  platform and the cache. This is the specification, not a suggestion.
+- **The frozen positive control**, committed as a fixture pair (owner ruling). A
+  check that cannot be shown to fail is not a check.
+- **The editor-target Emscripten build and JS bridge**, per
+  `ED-INPUT-EDIT-LOOP.md`'s "missing" rows.
+- **F-STD** — the check must assert a C++ standard, and foundation actually
+  compiles as **`gnu++2b`**, because the platform's `-std` lands *after*
+  `build_flags`. Anyone assuming `gnu++17` from reading `platformio.ini` is
+  wrong.
 
-**That defect also conditions the gate's best result.** PR-05's pixel identity
-passed with 0 differing pixels on host and device, but only because foundation's
-*legacy* module sets the font position — and the cut-over deletes it. **Criterion
-1 must be re-measured after PR-05R.** Do not let the 0-pixel figure be read as
-settled before then.
+**One open finding, deliberately not fixed in #14:** a circular-scrolling label
+re-sends identical frames while its text crosses the blank 30 px gap — 33
+redundant sends per wrap, 0 without one. The cheap fix is to skip `mark_dirty()`
+while the text is fully clipped. It is an optimisation, not a defect, and it is
+worth more once [Q-14] is settled.
 
-**PR-06 still owes** `u8g2gl_u8g2_csrc_arduino` from PR-4R2: under `ARDUINO`,
-`u8x8.h` adds `pins[]` to `u8x8_t`, and the mismatch is two struct layouts and a
-crash.
+### Carried — foundation's cut-over
 
-**Two open questions** sit in §21: **Q-17** (manifest diagnostics locate at the
-`<widget>`, not the attribute — §15.1 unmet) and **Q-18** (Arduino IDE
-packaging, deferred until after the gate, with [D-11] the reason it must not be
-dropped quietly).
+Four requirements, beyond the NTP and system-information sources foundation now
+owns (see the boundary decision in `PROGRAM.md`, 2026-10-14):
+
+- **F-LINK** — a `symlink://` to the repository root breaks foundation's library
+  finding. Use a library-only layout.
+- **F-GLOB** — the middleware glob misses *silently* unless the directory is
+  named `u8g2gl`. Switch to the `U8G2GL_GENERATED_CONFIG` macro.
+- **F-REGEN** — CLI output has moved since foundation's pinned commit, so the
+  cut-over needs a regeneration commit.
+- **Repin to the tag.** `v0.7.0-integration` exists and foundation still pins a
+  bare SHA; until it switches, `rules/04`'s no-squash constraint binds. A
+  cut-over on runtime 0.9.0 will need its own tag.
 
 ### The gate's state, so nobody rediscovers it
 
-Criterion 1 passed (conditionally, above). Criterion 3 is met tightly — 85.5% of
-a partition legacy already had at 84.9%. **Criteria 2 and 4 are not met as
-written**, and both have identified causes rather than mysteries: criterion 2 was
-measured whole-board against whole-board when it asks about "the C++ it
-replaces", and criterion 4's whole +4.99 s is PlatformIO's library scan, with the
-generator at 0.05 s and compilation actually *faster*. `PROGRAM.md` 2026-10-10
-says what is still to measure. **The verdict is PR-07's, not the Chief
-Architect's** — do not pre-empt it in either direction.
+**Criterion 1 passed, unconditionally, on host and device** — the condition
+earlier revisions carried is discharged. PR-05R made the framework establish its
+own ambient state, and the device frame is byte-identical to the host's for a
+plain `begin()` user (`lit=1405`, sha256 `b9042618…f62d`), re-confirmed on
+runtime 0.9.0.
+
+**Criterion 3 is +568 B of flash and 0 RAM** on foundation's `esp32dev` against
+runtime 0.8.0. Clean builds there vary by about 1.8 KB (`esp_diagnostics`), so
+compare like for like or the noise swamps the signal.
+
+**Criterion 4 is reframed** (owner, 2026-10-14). The firmware loop's +6.2 s
+reproduces and belongs to PlatformIO's deep library finder, not the
+architecture: `lib_ldf_mode = chain` makes it worse; `off` plus explicit
+`lib_deps` beats legacy by 14 s, but costs ~45 hand-kept lines and moves the
+image ~430 B. Not adopted — recorded as a cost of the build system. The *design*
+loop moves to the editor track as an **E-2 acceptance criterion: under 16 ms
+from edit to pixels**.
+
+**Criterion 2 is the one still open**, and it is a reading exercise nobody has
+done: how many of legacy's 99 lines the 33 XML lines actually replaced, plus a
+written "clearer" judgement with the two files side by side. The 39% rise in
+total authored lines stands as a finding either way.
+
+**The verdict is PR-07's, not the Chief Architect's** — do not pre-empt it.
 
 ### Setting up a fresh PA worktree — three things that have cost time
 

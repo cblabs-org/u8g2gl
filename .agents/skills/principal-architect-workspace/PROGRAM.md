@@ -1696,3 +1696,94 @@ decision taken at work-order depth: the alternatives are bounded by what the
 work order happened to consider. Two of the three inputs that changed the
 answer — the goldens' fixed stamp, and the absence of CI — were visible only
 from outside the work order.
+
+---
+
+## 2026-10-14 — the device session and PR-5R2 ingested (#13 and #14 merged)
+
+**#13** PR-05R (`99ac4a3`) and **#14** PR-5R2 (`8e73506`) are both in, and the
+`u8g2gl-device/measurements` branch is merged to `main` as programme evidence.
+C++ 415 → **501**, CLI **1353**, runtime **0.9.0**, CLI **0.13.0**, schema 0.4.
+
+### [D-4]'s rationale is refuted by measurement — the first time a decision record's reasoning has been
+
+[D-4] ended: *"the SPI/I²C transfer dominates **and happens either way**"*. On an
+SSD1322 at 10 MHz, a full frame is **11.76 ms** — 9,240 bytes on the wire,
+because the panel is 4bpp and U8G2 expands a 2,048-byte buffer — while the tiles
+covering one changed label are **4.41 ms**, linear in tiles.
+
+Sending less is 2.7× cheaper. It does not happen either way.
+
+**The decision stands and the clause is amended, dated, not rewritten.** [D-4]
+is about the *redraw* being full-frame, which `clearBuffer()` requires and which
+the measurement does not touch. What the measurement removes is the argument
+that there is nothing to gain by sending less — which is exactly [Q-14], now
+backed by evidence rather than a hunch. The old note's guess that "on SPI the
+saving may not matter" was wrong and is recorded as wrong.
+
+[Q-14]'s **I²C half stays open**: the rig has no I²C display, and the 25 ms
+estimate for a 1 KB SSD1306 frame remains an estimate. Still not adopted —
+the union must include each object's *previous* bounds, and nothing yet needs
+the frame rate.
+
+### Rulings
+
+- **The measurement branch merges to `main`.** `EVIDENCE.md`, `PR06-SPEC.md` and
+  `ED-INPUT-EDIT-LOOP.md` are *inputs* to PR-06 and E-D, and an input that lives
+  only on an unmerged branch is a failure this programme has already had — PR-04b's
+  rulings had to be copied into this file for the same reason. The rig sources
+  come too: Q-14's I²C half is open and whoever closes it will want the firmware
+  that answered the SPI half.
+- **`on_size_changed()` is documented** (§11.3). It was public and absent from
+  the spec. A widget caching anything derived from its own size must recompute
+  there; under [D-20] a dimension can change at run time, which is how the
+  scrolling label came to scroll against stale geometry.
+- **Criterion 1 is discharged unconditionally**, host and device. The condition
+  carried since PR-05 — that the legacy module was setting the font position —
+  is gone.
+- **Criterion 4's reframing is accepted.** The +6.2 s is PlatformIO's library
+  finder, and `lib_ldf_mode = off` buys 14 s for ~45 hand-kept lines and ~430 B.
+  Not worth it. Moving the *design* loop to E-2 as "under 16 ms from edit to
+  pixels" is the better test anyway: it measures the thing the programme exists
+  to make fast, rather than a firmware build nobody does while designing.
+- **Criterion 2 remains the open one**, and it is a reading, not an experiment.
+
+### Design decisions worth keeping out of a PR folder
+
+1. **Timers follow LVGL's API, not its implementation.** LVGL has no "data
+   source"; the idiom is a timer whose callback writes a subject. Its own timers
+   drift (`last_run = lv_tick_get()`) — the same flaw as D-A — so ours schedule
+   from the due time.
+2. **Host-owned timer storage, no pool**, which the owner challenged and was
+   right to. A fixed pool is justified where the generator counts objects from
+   XML; host code creates timers the generator never sees, so there is nothing
+   to count.
+3. **The boundary: U8G2GL owns the mechanism and the generic wall clock;
+   foundation owns the concrete sources** — NTP, system information, event
+   bridges. These are now cut-over requirements rather than nice-to-haves.
+4. **Widgets keep `tick()`**, a recorded and deliberate divergence from LVGL.
+   Converting them to timers is not planned.
+5. **`u8g2gl_resume_notify()`** lives in `src/u8g2gl_internal.h`, the library's
+   first private header, so it is not public API.
+
+### Carried, and where
+
+PR-06 gains `PR06-SPEC.md`, the frozen positive control, the editor-target
+Emscripten build, and **F-STD** — foundation compiles as `gnu++2b`, not the
+`gnu++17` its `platformio.ini` implies, because the platform's `-std` lands
+after `build_flags`. Foundation's cut-over gains **F-LINK**, **F-GLOB**,
+**F-REGEN** and the repin. One optimisation is recorded and not taken: a
+circular scroll re-sends identical frames across its blank gap, 33 per wrap.
+
+### Housekeeping the PA could not see
+
+**The tag already exists.** `v0.7.0-integration` → `82ec83f` was pushed on
+2026-10-12; item 7 of the bridge is half done. What remains is foundation
+switching its pin from the bare SHA, and a fresh tag when the cut-over moves to
+runtime 0.9.0.
+
+**A caution for every future session.** The Chief Architect's own local `main`
+was three commits stale while reading this report, and `git show main:` quietly
+answered from it. Everything here was re-checked against `origin/main`. That is
+`rules/04`'s warning arriving in a new disguise: not a wrong branch, a stale
+ref.
