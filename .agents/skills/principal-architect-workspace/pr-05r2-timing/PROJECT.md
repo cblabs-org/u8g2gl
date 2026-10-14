@@ -69,11 +69,18 @@ how deadlines behave, which WO1, WO3 and WO4 change.
 - **[x] [wo3-timers-wall-clock](wo3-timers-wall-clock/WORKORDER.md):** `ca442c9`…`189ab4b`. `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
   `ui_handler()` merges timer and widget deadlines, the wall-clock helper, clock blink phase-locked,
   `--:--`, spec §11.1 LVGL table. `architect`.
-- **[ ] [wo4-dirty-and-resume](wo4-dirty-and-resume/WORKORDER.md):** the dirty-flag bug, the resume callback, the threading contract in
+- **[x] [wo4-dirty-and-resume](wo4-dirty-and-resume/WORKORDER.md):** `cf39c3e`…`656a30b`. the dirty-flag bug, the resume callback, the threading contract in
   §11.1. `standard`.
-- **[ ] wo5-release-device:** runtime 0.9.0, changelog, Q-14 wording in §21, device re-run of the
-  measurement rig with the owner. `interactive`.
-- **[ ] wo6-readability:** house standards pass. `standard`.
+- **[ ] [wo5-release](wo5-release/WORKORDER.md):** runtime 0.9.0, CLI runtime floor re-stamped,
+  CLI 0.13.0 (goldens move with the floor), goldens regenerated, Q-14 wording in §21. `standard`.
+- **[ ] wo6-readability:** house standards pass over the whole PR, then remediation. `standard`.
+- **[ ] wo7-device:** worker builds the rig firmware against the final tip (the clock driven by
+  `u8g2gl_wall_clock`, no app-fed seconds); the PA flashes with the owner watching. Pass: 40.0 px/s,
+  no idle wakes, seconds within a frame of the boundary, baselines aligned; the 33 redundant sends
+  re-checked. `interactive`.
+
+*Reordered 2026-10-14 by the PA within the approved scope: readability before the device check, so
+the owner watches the final code.*
 
 Stacked and serial: WO2 and WO3 both touch `u8g2gl_clock.cpp`; WO3 and WO4 both touch
 `u8g2gl_core.cpp`.
@@ -132,5 +139,17 @@ converting widgets to timers.
     (§8.1 time subject, §11.3 blink lock) → WO4. Generator emitting a wall clock: not needed now
     (a generated `<time>` subject works with `u8g2gl_wall_clock_init`); a possible later item.
 - **2026-10-14 — WO4 dispatched** on `u8g2gl-05r2/wo4-dirty-and-resume`.
+- **2026-10-14 — WO4 verified** (`cf39c3e` core, `f05b753` spec, `656a30b` report). PA fresh build:
+  ctest **495/495** (1 skip), 0 warnings. One helper (`mark_screen_dirty`) is the only clean→dirty
+  site and fires the resume callback on the transition only; an RAII scope silences it inside
+  `ui_handler()`; dirty cleared before drawing, 0 returned if dirtied during the draw. Bug
+  reproduced against the old code first (change never drawn; 500 returned instead of 0).
+  - **PA rulings:** suppression also covering timer-call firings inside `ui_handler()` — accepted
+    (consistent). `u8g2gl_resume_notify()` public-but-internal in `u8g2gl_core.h` — accepted for
+    now; WO6 to judge.
+  - **Second out-of-scope finding, put to the owner with the label-resize one:** the
+    `u8g2gl_subject_*_n` types are copyable, and a copy shares the source's observer storage
+    (silently breaks the subject). Suggested fix: `= delete` the copy operations.
+- **2026-10-14 — WO5 dispatched** on `u8g2gl-05r2/wo5-release`.
 
 ## Session Log
