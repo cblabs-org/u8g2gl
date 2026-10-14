@@ -102,19 +102,25 @@ Anything outside the box goes in your Completion Report with a reproduction. Do 
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `include/u8g2gl/u8g2gl_obj.h`, `src/u8g2gl_obj.cpp` - protected virtual `on_size_changed()` (no-op default); `set_coords`, `set_w`, `set_h` call it only when width or height actually changed. The bound-geometry path (`on_width_bound`/`on_height_bound`) goes through `set_w`/`set_h`, so it is covered.
+- `include/u8g2gl/u8g2gl_label.h`, `src/u8g2gl_label.cpp` - override sets `needs_layout_ = true` and calls `reset_scroll()` (rewinds offset, clears `timing_started_`, marks dirty).
+- `include/u8g2gl/u8g2gl_subject.h` - copy and move constructors and assignments `= delete` on all 4 `_base` and 4 `_n` types, plus a doc comment on why.
+- `test/test_label.cpp` - 5 `LabelResize` tests (repro, reverse, pure move, dirty, bound width).
+- `test/test_subject.cpp` - static_asserts for copy and move traits on every type, plus one placeholder TEST.
 
 ### Decisions Made
-- Decision description and rationale
+- Hook adds a vtable slot only (one pointer in the shared vtable per class), no per-object bytes; sizeof report unchanged (the 32-bit test is skipped on this host, as before).
+- Move deleted too; nothing prevented it.
+- Only `set_x`/`set_y` do not call the hook (pure moves).
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- None. Totals: 495 (1 skip) before, 501 (1 skip) after, fresh build dir, 0 warnings; editor and generated-fixture tests pass; CLI vitest 1353 passed; goldens untouched.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- No test or fixture needed changing for the non-copyable subjects: WO4 had already fixed the one copy site, and nothing else (tests, editor host, generated fixtures) copies a subject.
 
 ### Blockers
 (none)

@@ -167,6 +167,15 @@ void u8g2gl_label::reset_scroll() {
     mark_dirty();
 }
 
+// u8g2gl_label::on_size_changed
+// A new width or height invalidates needs_scroll_ and message_width_. Flag the
+// re-measure, and rewind the scroll (which also clears timing_started_ so the
+// next tick re-seeds the due time) and mark the frame dirty.
+void u8g2gl_label::on_size_changed() {
+    needs_layout_ = true;
+    reset_scroll();
+}
+
 // u8g2gl_label::schedule
 // Records when the next scroll step (or dwell end) is due and converts it into
 // the delay tick() reports. The one place a deadline leaves this widget, so the

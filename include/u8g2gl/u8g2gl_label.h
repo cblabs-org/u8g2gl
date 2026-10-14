@@ -293,6 +293,14 @@ protected:
      */
     void on_text_binding_changed() override;
 
+    /**
+     * @brief The label was resized: its cached overflow decision is stale.
+     *
+     * Marks the layout for re-measurement and rewinds the marquee, so a label
+     * that now overflows starts scrolling and one that now fits stops.
+     */
+    void on_size_changed() override;
+
 private:
     // u8g2gl_label::current_text
     // The text drawn now: the bound subject's when bind_text() is active,

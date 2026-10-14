@@ -542,3 +542,27 @@ TEST(ObserverPool, DistinctCapacitiesOverflowIndependently) {
     EXPECT_DEATH(big.add_observer(&counter, count_observer_cb), "");
 #endif
 }
+
+// --- PR-05R2 WO6: subjects are not copyable or movable ---
+// observers_ points into the subject's own storage, so a copy or move would
+// alias the source's array. These fail to compile if a deletion is dropped.
+
+template <typename T>
+static constexpr bool is_pinned_v =
+    !std::is_copy_constructible_v<T> && !std::is_copy_assignable_v<T> &&
+    !std::is_move_constructible_v<T> && !std::is_move_assignable_v<T>;
+
+static_assert(is_pinned_v<u8g2gl_subject_int>, "int subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string>, "string subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_bool>, "bool subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_time>, "time subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_int_n<2>>, "sized int subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string_n<8, 2>>, "sized string subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_int_base>, "int base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string_base>, "string base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_bool_base>, "bool base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_time_base>, "time base must be pinned");
+
+TEST(SubjectCopy, TypesAreNonCopyableAndNonMovable) {
+    SUCCEED();   // the assertions above are the test
+}

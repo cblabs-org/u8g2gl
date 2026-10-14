@@ -1373,3 +1373,84 @@ TEST(LabelScrollTiming, RenderAnimationUpdateAndTickCannotBothStepOneDueTime) {
     EXPECT_EQ(rig.offset(), 1);
     EXPECT_EQ(deadline, 25u);
 }
+
+// --- PR-05R2 WO6: a resized label re-measures ---
+
+namespace {
+
+// Renders, runs past the initial delay starting from `t0`, renders again, and
+// reports whether the marquee has moved off its origin (drawn at x = -1).
+bool marquee_moved(u8g2gl_label& label, U8G2& display, uint32_t t0) {
+    label.render(display);
+    label.tick(t0);
+    label.tick(t0 + 3001);
+    label.render(display);
+    return display.last_draw_utf8_x == 65535;
+}
+
+}  // namespace
+
+TEST(LabelResize, NarrowingALabelThatFitStartsItScrolling) {
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(0, 0, 60, 16);
+    label.set_text("sixty px of text");
+    U8G2 display;
+    display.utf8_width_val = 60;
+
+    EXPECT_FALSE(marquee_moved(label, display, 0));
+
+    label.set_coords(0, 0, 50, 16);   // the repro
+    EXPECT_TRUE(marquee_moved(label, display, 10000));
+}
+
+TEST(LabelResize, WideningAScrollingLabelEnoughToFitStopsIt) {
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(0, 0, 50, 16);
+    label.set_text("sixty px of text");
+    U8G2 display;
+    display.utf8_width_val = 60;
+    EXPECT_TRUE(marquee_moved(label, display, 0));
+
+    label.set_w(60);
+    EXPECT_FALSE(marquee_moved(label, display, 10000));
+}
+
+TEST(LabelResize, APureMoveDoesNotResetTheScroll) {
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(0, 0, 50, 16);
+    label.set_text("sixty px of text");
+    U8G2 display;
+    display.utf8_width_val = 60;
+    ASSERT_TRUE(marquee_moved(label, display, 0));
+
+    label.set_coords(0, 3, 50, 16);   // y only; size unchanged
+    label.render(display);
+    EXPECT_EQ(display.last_draw_utf8_x, 65535);   // marquee still advanced
+}
+
+TEST(LabelResize, ASizeChangeMarksTheLabelDirty) {
+    u8g2gl_label label;
+    label.set_coords(0, 0, 50, 16);
+    label.clear_dirty();
+    label.set_h(20);
+    EXPECT_TRUE(label.is_dirty());
+}
+
+TEST(LabelResize, ABoundWidthChangeRemeasures) {
+    u8g2gl_subject_int width;
+    width.set(60);
+    u8g2gl_label label;
+    label.set_long_mode(U8G2GL_LONG_SCROLL);
+    label.set_coords(0, 0, 60, 16);
+    label.set_text("sixty px of text");
+    ASSERT_TRUE(label.bind_width(&width));
+    U8G2 display;
+    display.utf8_width_val = 60;
+    EXPECT_FALSE(marquee_moved(label, display, 0));
+
+    width.set(50);
+    EXPECT_TRUE(marquee_moved(label, display, 10000));
+}
