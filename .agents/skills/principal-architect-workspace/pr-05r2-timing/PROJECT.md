@@ -64,9 +64,9 @@ how deadlines behave, which WO1, WO3 and WO4 change.
 - **[x] [wo1-scroll-timing](wo1-scroll-timing/WORKORDER.md):** `5b7d8d9`. D-A. Label steps scheduled from the due
   time, exact rate, no zero deadlines, no bursts after a stall; the 33 redundant sends explained.
   `standard`.
-- **[ ] [wo2-clock-baseline](wo2-clock-baseline/WORKORDER.md):** D-B. Seconds aligned by baseline; pixel test against real U8G2.
+- **[x] [wo2-clock-baseline](wo2-clock-baseline/WORKORDER.md):** `75d801f`. D-B. Seconds aligned by baseline; pixel test against real U8G2.
   `standard`.
-- **[ ] wo3-timers-wall-clock:** `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
+- **[ ] [wo3-timers-wall-clock](wo3-timers-wall-clock/WORKORDER.md):** `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
   `ui_handler()` merges timer and widget deadlines, the wall-clock helper, clock blink phase-locked,
   `--:--`, spec §11.1 LVGL table. `architect`.
 - **[ ] wo4-dirty-and-resume:** the dirty-flag bug, the resume callback, the threading contract in
@@ -108,5 +108,14 @@ converting widgets to timers.
     layout stale, so `needs_scroll_` / `message_width_` go stale after a resize (repro: 60 px label,
     60 px text, render, `set_coords(0,0,50,16)` → never scrolls). PA recommends folding into WO2.
 - **2026-10-14 — WO2 dispatched** on `u8g2gl-05r2/wo2-clock-baseline` (from WO1's tip).
+- **2026-10-14 — WO2 verified** (`75d801f`). PA fresh build: ctest **429/429** (1 skip), 0
+  warnings. Fix: `sec_draw_y = draw_y + (main_ascent − sec_ascent)`. New real-U8G2 pixel test
+  (`test/test_clock_baseline.cpp`, ARDUINO-built U8G2 + SSD1322 driver): lowest lit row HH:MM / SS
+  helvB12/helvR08 32/34 → 32/32; profont22/6x10 39/41 → 39/39; helvB18/helvR10 39/41 → 39/39.
+  Control: old formula fails all three. HH:MM-only and no-secondary frames byte-identical
+  before/after. No spec text described descender alignment, so no spec edit. Worker's commit trailer
+  names Sonnet 5.5, the model that wrote it — kept.
+- **2026-10-14 — WO3 dispatched** on `u8g2gl-05r2/wo3-timers-wall-clock`. The label-resize finding
+  is still with the owner (not in WO3).
 
 ## Session Log
