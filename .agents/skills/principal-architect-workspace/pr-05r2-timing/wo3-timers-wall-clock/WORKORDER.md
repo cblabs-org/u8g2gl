@@ -238,19 +238,135 @@ not fix them and do not file issues.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
+
+Commits on `u8g2gl-05r2/wo3-timers-wall-clock` (not pushed): `ca442c9` timer + `ui_handler()`
+integration, `41d045b` wall clock + sentinel + sizeof, `826c10f` clock, `e028312` spec.
+
+**Verification.** Fresh build (`tmp/build-wo3`): ctest **481/481** passed, 1 skip
+(`SizeOfReport.ThirtyTwoBitTarget`), **0 warnings**; baseline (fresh build of `64813b0`) was
+429/429, 1 skip, 0 warnings. +52 tests. Editor target builds; `test_editor` (parity) and the
+`EditorSymbols.*` checks pass. Each of the three code commits also built and passed from a clean
+`git archive` export (457, 468, 481). CLI: `npm ci && npx vitest run` → **1353 passed**
+(unchanged). `git status --short` clean.
+
+Mutation checks on the end-to-end test: with the wall clock re-aimed at a flat 1000 ms instead of
+the boundary, both end-to-end cases fail ("second 24 drawn late"); with timers removed from
+`ui_handler()`, they fail at once ("the loop would sleep forever at 0").
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `include/u8g2gl/u8g2gl_timer.h`, `src/u8g2gl_timer.cpp` — new. Host-owned `u8g2gl_timer`
+  (intrusive `next_`, callback, user data, period, due time, repeat count, flags; private, with the
+  free functions as friends), the LVGL-named subset, and `u8g2gl_timer_handler(now)`.
+- `src/u8g2gl_core.cpp`, `include/u8g2gl/u8g2gl_core.h` — `ui_handler()` runs timers first, also
+  with no active screen; returns min(timer, widget) through the existing elapsed-time correction,
+  now a static helper so both paths share it. Dirty-flag clear untouched. Docs updated.
+- `include/u8g2gl/u8g2gl_wall_clock.h`, `src/u8g2gl_wall_clock.cpp` — new. `u8g2gl_wall_clock`
+  (contains its timer), `u8g2gl_wall_time_cb_t`, `u8g2gl_wall_clock_init()`.
+- `include/u8g2gl/u8g2gl_types.h` — `U8G2GL_TIME_UNKNOWN = UINT32_MAX` beside `U8G2GL_IDLE`.
+- `src/u8g2gl_clock.cpp`, `include/u8g2gl/u8g2gl_clock.h` — blink phase-locked to value changes,
+  due-time scheduled, never 0; unknown time renders `--`. Private members only:
+  `last_blink_ms_` → `next_blink_due_ms_`, new `blink_restart_` (sizeof unchanged, 72 B on 64-bit).
+  WO2's baseline code and all public signatures untouched.
+- `CMakeLists.txt`, `test/CMakeLists.txt` — the two sources; `test_timer`, `test_wall_clock`.
+  `library.json` lists no sources (PlatformIO compiles `src/`), and there is no Arduino
+  `library.properties`, so nothing else needed editing.
+- `test/test_timer.cpp` (26 cases), `test/test_wall_clock.cpp` (11), `test/test_core.cpp` (+3),
+  `test/test_clock.cpp` (+13, incl. 3 end-to-end), `test/test_sizeof_report.cpp` (timer 40 B, wall
+  clock 56 B on a 64-bit host; ceilings 40/56 in both size tests).
+- `test/test_ambient_state.cpp` — **outside the listed files**; see Decisions.
+- `docs/design_spec.md` — §11.1 and §6.3 (the clock's passage); quoted in the PA message.
 
 ### Decisions Made
-- Decision description and rationale
+- **API as implemented:**
+  `using u8g2gl_timer_cb_t = void (*)(u8g2gl_timer*);`
+  `void u8g2gl_timer_init(u8g2gl_timer*, u8g2gl_timer_cb_t, uint32_t period_ms, void* user_data);`
+  `void u8g2gl_timer_delete(u8g2gl_timer*); void u8g2gl_timer_pause(u8g2gl_timer*);`
+  `void u8g2gl_timer_resume(u8g2gl_timer*); void u8g2gl_timer_set_period(u8g2gl_timer*, uint32_t);`
+  `void u8g2gl_timer_ready(u8g2gl_timer*); void u8g2gl_timer_reset(u8g2gl_timer*);`
+  `void u8g2gl_timer_set_repeat_count(u8g2gl_timer*, int32_t);`
+  `void* u8g2gl_timer_get_user_data(const u8g2gl_timer*);`
+  `uint32_t u8g2gl_timer_handler(uint32_t now);`
+  `using u8g2gl_wall_time_cb_t = bool (*)(uint32_t* epoch_seconds, uint16_t* millis_into_second);`
+  `void u8g2gl_wall_clock_init(u8g2gl_wall_clock*, u8g2gl_subject_time_base*, u8g2gl_wall_time_cb_t);`
+  All accept nullptr as a no-op.
+- **Encapsulation:** `u8g2gl_timer` is a class with private state and the API functions as
+  friends (house rule: members private), rather than a public-field struct. Non-copyable,
+  non-movable.
+- **`set_period` rule:** `due = (due − old_period) + new_period`, i.e. the last run's due time (or
+  the init/reset time before the first run) plus the new period; if already passed, it runs on the
+  next pass. From its own callback, "last run" is the run in progress (the due time was already
+  advanced, so subtracting the old period recovers it).
+- **`ready`:** `due = tick_now() − period` (LVGL's `now − period − 1` analogue). Being a full
+  period late makes the handler run it once and resync to `now + period`; from a callback on a
+  timer that already ran, the handler returns 0.
+- **"now" outside the handler** (`init`, `reset`, `ready`, `resume`) is `u8g2gl_tick_now()`, as
+  LVGL uses `lv_tick_get()`.
+- **Period 0 → 1 ms** (a zero period would make the loop spin). Periods must be < 2^31 ms;
+  documented.
+- **Repeat count:** decremented before the callback, timer paused after it if the count is 0 and
+  the callback did not delete it (so a callback can extend its own count, as in LVGL).
+  `set_repeat_count(t, 0)` pauses at once (LVGL would run it once more before pausing; with no
+  auto-delete, an immediate pause is the clearer meaning).
+- **Resume keeps the schedule** (LVGL keeps `last_run`). A due time that looks more than one
+  period in the future can only be one that fell > 2^31 ms behind during a long pause and wrapped;
+  resume makes it due now. Tested.
+- **Link order:** head insertion, as `lv_ll_ins_head`; order only matters for same-tick ties.
+- **Handler safety:** a per-timer `ran_this_pass_` flag (cleared at the start of each pass), a
+  restart from the head whenever a callback linked/unlinked anything, and a `s_running` pointer
+  that `delete` clears — so the handler never touches a timer the callback deleted or destroyed.
+  `init` on a linked timer resets every field but neither relinks it nor clears its run mark.
+- **Deadline:** min over unpaused timers of `due − now`; returns 0 only for a timer that is due
+  after the pass (only possible if it became due during it).
+- **Handler visibility:** `u8g2gl_timer_handler()` is declared in `u8g2gl_timer.h`, documented as
+  called by `ui_handler()` and not by applications; tests drive it directly.
+- **Elapsed correction on the no-screen path too:** timer callbacks take time, so the correction
+  is applied whether or not a screen is active.
+- **Wall clock re-aims its timer with `set_period(delay)` + `reset()`**, public API only (no
+  friend access into the timer). `reset` measures from `tick_now()` at the moment the time
+  function was read, which is what the boundary is relative to. `millis_into_second > 999` is
+  clamped to 999 (delay ≥ 1). A null time function is "never known"; a null subject publishes
+  nothing but keeps the timer.
+- **Clock blink lock:** `set_time()` (and so the binding) shows the colon and sets a restart flag;
+  the next `tick(now)` starts the cycle at `now + 500`. A flag rather than `tick_now()` inside
+  `set_time()` keeps the widget learning time only through `tick()`; since timers run first in the
+  same `ui_handler()` call, that tick's `now` is the instant the second changed. The flag also
+  serves as the "not started" state (no timestamp-0 sentinel). `set_blink(true)` restarts the
+  cycle too.
+- **Unknown time:** `--:--`, and `--:--:--` in `hh_mm_ss` (the seconds' dashes in the secondary
+  font, on WO2's baseline) — the consistent extension the WO anticipated. Each `--` is
+  right-aligned in the `"00"` slot, so columns do not move (tested with proportional widths).
+  `tick()` returns `U8G2GL_IDLE` while unknown; the colon is steady.
+- **Blink constant** is file-static in `u8g2gl_clock.cpp`, so no new public surface.
+- **Spec placement:** there is no dedicated clock section, so the clock paragraph went into §6.3
+  beside the clock's row in the framework-element table.
+- **Boundary deviation — `test/test_ambient_state.cpp`:**
+  `AmbientState.ClockRepaintKeepsCallerStateAndMatchesRender` relied on the old free-running
+  phase (first ever `render_animation_update(…, 1000)` toggled because `last_blink_ms_` started at
+  0). The mandated blink lock makes the time change restart the cycle, so it no longer toggled and
+  the repaint never happened. Fixed with a `clock.tick(0)` to start the cycle and the repaint at
+  the due toggle (500); what the test checks is unchanged. Recorded in the clock commit message.
+  The file is not in the "May edit" list — please confirm or redirect.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- None significant. The first pass of the new tests had three wrong expectations of my own (the
+  arithmetic of a 50 ms-late resume and a shorter `set_period`), corrected to the documented rule;
+  the implementation did not change.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- **§8.1 time-subject row** (`docs/design_spec.md`, the `time` row: "Unix seconds; consumed by
+  `<u8g2gl_clock>`") does not mention `U8G2GL_TIME_UNKNOWN` or the wall clock. Outside the two
+  sections I may edit; suggest WO5/WO6 adds one clause.
+- **§11.3** still says "a clock blinking at 500 ms returns the remainder to the next toggle". Still
+  true; it could mention the phase lock. Same suggestion.
+- **Re-entrancy:** calling `ui_handler()` (or `u8g2gl_timer_handler()`) from inside a timer
+  callback is unsupported (the per-pass flags and `s_running` assume one pass at a time). Not
+  documented beyond the thread rule; WO4 writes the threading contract into §11.1 and could add it.
+- **WO4 hook points:** a resume callback for "a timer gains work" belongs in `u8g2gl_timer_init`,
+  `_resume`, `_ready`, `_reset` and `_set_period` (all in `src/u8g2gl_timer.cpp`).
+- **Generator:** a generated `<time name="system_time">` subject works with the wall clock as is
+  (`u8g2gl_wall_clock_init(&wc, &ui_subject_system_time, fn)`); no generated output changed.
+  Whether the generator should ever emit the wall clock is an owner question, not needed here.
 
 ### Blockers
 (none)
