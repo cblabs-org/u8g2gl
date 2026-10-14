@@ -224,12 +224,18 @@ void u8g2gl_clock::render(U8G2& display) {
     int font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
     int16_t draw_y = static_cast<int16_t>(y_ + ((h_ > font_height) ? (h_ - font_height) / 2 : 0));
 
+    // Digits sit on the baseline, and fonts differ in how far their descenders
+    // hang below it (helvB12 4 px, helvR08 2 px). Lining up the bottoms of the
+    // two descender boxes therefore leaves the smaller font's digits low by the
+    // difference. In top position a glyph's baseline is y + ascent, so aligning
+    // the ascents puts both fonts' digits on one baseline. The main digits'
+    // centring above is untouched; only the seconds origin moves.
     int16_t sec_draw_y = draw_y;
     if (format_ == U8G2GL_CLOCK_HH_MM_SS && secondary_font_ != nullptr) {
+        int main_ascent = static_cast<int>(display.getAscent());
         display.setFont(secondary_font_);
-        int sec_font_height = static_cast<int>(display.getAscent()) - static_cast<int>(display.getDescent());
-        // Bottom-align font descenders so secondary seconds digits align flush with main digits
-        sec_draw_y = static_cast<int16_t>(draw_y + font_height - sec_font_height);
+        int sec_ascent = static_cast<int>(display.getAscent());
+        sec_draw_y = static_cast<int16_t>(draw_y + (main_ascent - sec_ascent));
         if (style_.font != nullptr) {
             display.setFont(style_.font);
         }

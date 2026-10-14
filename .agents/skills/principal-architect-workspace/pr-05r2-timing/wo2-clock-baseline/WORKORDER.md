@@ -108,19 +108,32 @@ not fix them and do not file issues.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `src/u8g2gl_clock.cpp` - Step 5 only: `sec_draw_y = draw_y + (main_ascent - sec_ascent)`, each ascent read with its own font set; main font restored as before. Why-comment added (digits sit on the baseline; descender depths differ). Old: `draw_y + font_height - sec_font_height` (bottom-aligned descender boxes).
+- `test/test_clock_baseline.cpp` (new) - real-U8G2 pixel test, SSD1322 256x64 full buffer, real `u8g2gl_clock` through `u8g2gl_render_object()` (state saver in force). Three tests: seconds baseline equals HH:MM baseline for three font pairs; no-secondary-font path; HH:MM columns of an HH:MM:SS clock identical to an HH:MM-only clock.
+- `test/CMakeLists.txt` - `u8g2gl_u8g2_ssd1322_arduino` (u8x8_d_ssd1322.c built with ARDUINO, matching the `_arduino` C sources) and `test_clock_baseline`.
+- Tests 426 (1 skip) -> 429 (1 skip); 0 warnings before and after, fresh build dir `tmp/build-wo2`.
+
+Lowest lit row, HH:MM / SS (old formula -> new):
+- helvB12/helvR08 (clock y=18 h=20, the panel case): 32/34 -> 32/32
+- profont22/6x10 (y=10 h=44): 39/41 -> 39/39
+- helvB18/helvR10 (y=10 h=44): 39/41 -> 39/39
+Control: with the old formula restored the test fails on all three pairs (rows above), then the fix was re-applied. Not committed failing.
 
 ### Decisions Made
-- Decision description and rationale
+- The seconds colon is excluded from the SS measurement: 6x10 hangs its colon dot 1 px below the digit baseline, which made an early version read a false mismatch. The SS columns are the last N columns, N = ink width of "56" in the secondary font (measured in a scratch render).
+- The taller pairs use a taller bounds box (y=10, h=44); at y=18 h=20 the old placement's lower rows were clipped to row 37, which hid the defect (3rd pair read 37/37 both ways). The device pair keeps the owner's exact bounds.
+- hh_mm and no-secondary-font unchanged: verified by an out-of-tree frame hash (FNV over the 2048-byte buffer) with old and new sources, identical for both; only HH:MM:SS with a secondary font changed. The committed tests pin this within one build.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- `real_display` instances share one static frame buffer (`u8g2_m_32_8_f`), so a scratch render must finish before the real one starts.
+- `git stash`/`pop` preserved an mtime that made make skip a rebuild once; `touch` the source when A/B-ing.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- None new. No existing test asserted the old `sec_draw_y` (stub tests never check y), so none was changed.
+- Spec: no text describes "bottom-align descenders"; the only mentions (design_spec.md lines ~226, ~2008) say "dual-font baseline alignment", which is now true. No spec edit.
 
 ### Blockers
 (none)
