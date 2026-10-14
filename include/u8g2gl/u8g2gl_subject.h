@@ -88,10 +88,27 @@ struct u8g2gl_observer {
 // tolerated.
 // ---------------------------------------------------------------------------
 
+// Non-copyable, non-movable: `observers_` points into the subject's own
+// storage (the `_n<>` array member), so a copy or move would leave the new
+// subject pointing into the source's array and corrupt both. Copy and move are
+// deleted on every base and `_n` type; declare a subject once and refer to it.
+
 // --- Int subject (32-bit signed) ---
 
+/**
+ * @brief Base of the int subject: a 32-bit value and the observers told when it changes.
+ *
+ * @note Non-copyable and non-movable. `observers_` points into the subject's own
+ *       storage (the `_n<>` array member), so a copy or move would leave the new
+ *       subject pointing into the source's array. Declare a subject once and
+ *       refer to it. The same holds for every subject base and `_n` type.
+ */
 class u8g2gl_subject_int_base {
 public:
+    u8g2gl_subject_int_base(const u8g2gl_subject_int_base&) = delete;
+    u8g2gl_subject_int_base& operator=(const u8g2gl_subject_int_base&) = delete;
+    u8g2gl_subject_int_base(u8g2gl_subject_int_base&&) = delete;
+    u8g2gl_subject_int_base& operator=(u8g2gl_subject_int_base&&) = delete;
     int32_t get() const;
     void set(int32_t value);     // notifies observers if value changed
 
@@ -123,6 +140,10 @@ private:
 template<uint8_t N = U8G2GL_DEFAULT_OBSERVERS>
 class u8g2gl_subject_int_n : public u8g2gl_subject_int_base {
 public:
+    u8g2gl_subject_int_n(const u8g2gl_subject_int_n&) = delete;
+    u8g2gl_subject_int_n& operator=(const u8g2gl_subject_int_n&) = delete;
+    u8g2gl_subject_int_n(u8g2gl_subject_int_n&&) = delete;
+    u8g2gl_subject_int_n& operator=(u8g2gl_subject_int_n&&) = delete;
     u8g2gl_subject_int_n() : u8g2gl_subject_int_base(slots_, N) {}
     explicit u8g2gl_subject_int_n(int32_t initial) : u8g2gl_subject_int_base(slots_, N, initial) {}
 
@@ -136,6 +157,10 @@ using u8g2gl_subject_int = u8g2gl_subject_int_n<>;   // source compatibility
 
 class u8g2gl_subject_string_base {
 public:
+    u8g2gl_subject_string_base(const u8g2gl_subject_string_base&) = delete;
+    u8g2gl_subject_string_base& operator=(const u8g2gl_subject_string_base&) = delete;
+    u8g2gl_subject_string_base(u8g2gl_subject_string_base&&) = delete;
+    u8g2gl_subject_string_base& operator=(u8g2gl_subject_string_base&&) = delete;
     // max_len is the declared usable-character capacity (from the XML
     // declaration); it may be lowered at runtime but never raised past the
     // compile-time buffer capacity. WO6 Finding A: the buffer itself is now
@@ -170,6 +195,10 @@ private:
 template<uint16_t MaxLen = U8G2GL_MAX_STRING_LEN, uint8_t N = U8G2GL_DEFAULT_OBSERVERS>
 class u8g2gl_subject_string_n : public u8g2gl_subject_string_base {
 public:
+    u8g2gl_subject_string_n(const u8g2gl_subject_string_n&) = delete;
+    u8g2gl_subject_string_n& operator=(const u8g2gl_subject_string_n&) = delete;
+    u8g2gl_subject_string_n(u8g2gl_subject_string_n&&) = delete;
+    u8g2gl_subject_string_n& operator=(u8g2gl_subject_string_n&&) = delete;
     u8g2gl_subject_string_n()
         : u8g2gl_subject_string_base(buffer_, MaxLen + 1, slots_, N) {}
     explicit u8g2gl_subject_string_n(uint16_t max_len)
@@ -188,6 +217,10 @@ using u8g2gl_subject_string = u8g2gl_subject_string_n<>;   // source compatibili
 
 class u8g2gl_subject_bool_base {
 public:
+    u8g2gl_subject_bool_base(const u8g2gl_subject_bool_base&) = delete;
+    u8g2gl_subject_bool_base& operator=(const u8g2gl_subject_bool_base&) = delete;
+    u8g2gl_subject_bool_base(u8g2gl_subject_bool_base&&) = delete;
+    u8g2gl_subject_bool_base& operator=(u8g2gl_subject_bool_base&&) = delete;
     bool get() const;
     void set(bool value);
 
@@ -207,6 +240,10 @@ private:
 template<uint8_t N = U8G2GL_DEFAULT_OBSERVERS>
 class u8g2gl_subject_bool_n : public u8g2gl_subject_bool_base {
 public:
+    u8g2gl_subject_bool_n(const u8g2gl_subject_bool_n&) = delete;
+    u8g2gl_subject_bool_n& operator=(const u8g2gl_subject_bool_n&) = delete;
+    u8g2gl_subject_bool_n(u8g2gl_subject_bool_n&&) = delete;
+    u8g2gl_subject_bool_n& operator=(u8g2gl_subject_bool_n&&) = delete;
     u8g2gl_subject_bool_n() : u8g2gl_subject_bool_base(slots_, N) {}
     explicit u8g2gl_subject_bool_n(bool initial) : u8g2gl_subject_bool_base(slots_, N, initial) {}
 
@@ -220,6 +257,10 @@ using u8g2gl_subject_bool = u8g2gl_subject_bool_n<>;   // source compatibility
 
 class u8g2gl_subject_time_base {
 public:
+    u8g2gl_subject_time_base(const u8g2gl_subject_time_base&) = delete;
+    u8g2gl_subject_time_base& operator=(const u8g2gl_subject_time_base&) = delete;
+    u8g2gl_subject_time_base(u8g2gl_subject_time_base&&) = delete;
+    u8g2gl_subject_time_base& operator=(u8g2gl_subject_time_base&&) = delete;
     uint32_t get() const;
     void set(uint32_t epoch_secs);
 
@@ -239,6 +280,10 @@ private:
 template<uint8_t N = U8G2GL_DEFAULT_OBSERVERS>
 class u8g2gl_subject_time_n : public u8g2gl_subject_time_base {
 public:
+    u8g2gl_subject_time_n(const u8g2gl_subject_time_n&) = delete;
+    u8g2gl_subject_time_n& operator=(const u8g2gl_subject_time_n&) = delete;
+    u8g2gl_subject_time_n(u8g2gl_subject_time_n&&) = delete;
+    u8g2gl_subject_time_n& operator=(u8g2gl_subject_time_n&&) = delete;
     u8g2gl_subject_time_n() : u8g2gl_subject_time_base(slots_, N) {}
     explicit u8g2gl_subject_time_n(uint32_t initial) : u8g2gl_subject_time_base(slots_, N, initial) {}
 

@@ -15,9 +15,11 @@
  *          reader assume the two are the same. §1.3 forbids a figure the
  *          measurement cannot substantiate.
  *
- * Description: Prints sizeof for u8g2gl_obj and the 7 concrete widgets (label,
- *              xbm, glyph, progress_bar, clock, switch, button) and asserts
- *              upper bounds that hold on any supported pointer width.
+ * Description: Prints sizeof for u8g2gl_obj, the 7 concrete widgets (label,
+ *              xbm, glyph, progress_bar, clock, switch, button), and the two
+ *              host-declared timing objects (u8g2gl_timer, u8g2gl_wall_clock,
+ *              §11.1), and asserts upper bounds that hold on any supported
+ *              pointer width.
  *              u8g2gl_scrolling_label was absorbed into u8g2gl_label as
  *              long_mode="scroll" (PR-3R WO2, [D-19]) and no longer exists as
  *              a separate type.
@@ -45,6 +47,8 @@
 #include "u8g2gl/u8g2gl_button.h"
 #include "u8g2gl/u8g2gl_config.h"
 #include "u8g2gl/u8g2gl_subject.h"
+#include "u8g2gl/u8g2gl_timer.h"
+#include "u8g2gl/u8g2gl_wall_clock.h"
 
 namespace {
 
@@ -78,6 +82,8 @@ void report_all_sizes() {
     U8G2GL_REPORT_SIZE(u8g2gl_clock);
     U8G2GL_REPORT_SIZE(u8g2gl_switch);
     U8G2GL_REPORT_SIZE(u8g2gl_button);
+    U8G2GL_REPORT_SIZE(u8g2gl_timer);
+    U8G2GL_REPORT_SIZE(u8g2gl_wall_clock);
 }
 
 /// Field-for-field mirror of the private `u8g2gl_binding_desc` declared
@@ -116,6 +122,8 @@ TEST(SizeOfReport, AllWidgets) {
     EXPECT_LE(sizeof(u8g2gl_clock), 96u);
     EXPECT_LE(sizeof(u8g2gl_switch), 72u);
     EXPECT_LE(sizeof(u8g2gl_button), 80u);
+    EXPECT_LE(sizeof(u8g2gl_timer), 40u);
+    EXPECT_LE(sizeof(u8g2gl_wall_clock), 56u);
 }
 
 // Measures the width the §18 RAM budget is actually a claim about. ESP32,
@@ -149,6 +157,8 @@ TEST(SizeOfReport, ThirtyTwoBitTarget) {
     EXPECT_LE(sizeof(u8g2gl_clock), 96u);
     EXPECT_LE(sizeof(u8g2gl_switch), 72u);
     EXPECT_LE(sizeof(u8g2gl_button), 80u);
+    EXPECT_LE(sizeof(u8g2gl_timer), 40u);
+    EXPECT_LE(sizeof(u8g2gl_wall_clock), 56u);
 }
 
 // Reports the RAM cost of PR-3R WO7's default change: raising

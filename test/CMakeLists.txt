@@ -190,6 +190,63 @@ target_compile_options(test_clock PRIVATE
 
 gtest_discover_tests(test_clock)
 
+add_executable(test_timer
+    test_timer.cpp
+)
+
+target_include_directories(test_timer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_timer PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_timer PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_timer)
+
+add_executable(test_resume
+    test_resume.cpp
+)
+
+target_include_directories(test_resume PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_resume PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_resume PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_resume)
+
+add_executable(test_wall_clock
+    test_wall_clock.cpp
+)
+
+target_include_directories(test_wall_clock PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_wall_clock PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_wall_clock PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_wall_clock)
+
 add_executable(test_switch
     test_switch.cpp
 )
@@ -616,6 +673,39 @@ target_compile_options(test_ambient_state PRIVATE
     -Wall -Wextra -Wpedantic
 )
 gtest_discover_tests(test_ambient_state)
+
+# --- Real U8G2: the clock's seconds share its HH:MM baseline ---
+# The panel is an SSD1322 256x64, so the test draws through that driver, which
+# no other target links; it is compiled here with ARDUINO defined like
+# u8g2gl_u8g2_csrc_arduino, whose struct layout it must share. Built as
+# test_ambient_state is, plus U8G2's font data.
+add_library(u8g2gl_u8g2_ssd1322_arduino STATIC ${U8G2GL_U8G2_DIR}/csrc/u8x8_d_ssd1322.c)
+target_include_directories(u8g2gl_u8g2_ssd1322_arduino PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2)
+target_include_directories(u8g2gl_u8g2_ssd1322_arduino SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_definitions(u8g2gl_u8g2_ssd1322_arduino PUBLIC ARDUINO=10819)
+target_compile_options(u8g2gl_u8g2_ssd1322_arduino PRIVATE -w)
+
+add_executable(test_clock_baseline
+    test_clock_baseline.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_clock_baseline PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_clock_baseline SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_clock_baseline PRIVATE
+    u8g2gl_u8g2_ssd1322_arduino
+    u8g2gl_u8g2_csrc_arduino
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_clock_baseline PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_clock_baseline)
 
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is

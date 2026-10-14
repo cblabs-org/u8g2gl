@@ -12,7 +12,9 @@
  *          bindings built on them: set/get, notify-only-on-change, per-subject
  *          observer capacity ([D-21]), string truncation at the declared length
  *          (§8.2), and that conditional-flag, text and geometry bindings
- *          propagate a subject's value into an object and mark it dirty.
+ *          propagate a subject's value into an object and mark it dirty. Also
+ *          pins, with static_asserts, that subjects are neither copyable nor
+ *          movable.
  *
  * Description: GoogleTest cases for u8g2gl_subject_* and the u8g2gl_obj bind_*
  *              entry points, including observer-pool exhaustion.
@@ -541,4 +543,28 @@ TEST(ObserverPool, DistinctCapacitiesOverflowIndependently) {
 #else
     EXPECT_DEATH(big.add_observer(&counter, count_observer_cb), "");
 #endif
+}
+
+// --- Subjects are not copyable or movable ---
+// observers_ points into the subject's own storage, so a copy or move would
+// alias the source's array. These fail to compile if a deletion is dropped.
+
+template <typename T>
+static constexpr bool is_pinned_v =
+    !std::is_copy_constructible_v<T> && !std::is_copy_assignable_v<T> &&
+    !std::is_move_constructible_v<T> && !std::is_move_assignable_v<T>;
+
+static_assert(is_pinned_v<u8g2gl_subject_int>, "int subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string>, "string subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_bool>, "bool subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_time>, "time subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_int_n<2>>, "sized int subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string_n<8, 2>>, "sized string subject must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_int_base>, "int base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_string_base>, "string base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_bool_base>, "bool base must be pinned");
+static_assert(is_pinned_v<u8g2gl_subject_time_base>, "time base must be pinned");
+
+TEST(SubjectCopy, TypesAreNonCopyableAndNonMovable) {
+    SUCCEED();   // the assertions above are the test
 }

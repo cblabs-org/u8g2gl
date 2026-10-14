@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="measure">
+    <view>
+        <!-- One scrolling label: text far wider than its 256 px box, circular marquee. -->
+        <u8g2gl_label name="ticker" x="0" y="0" width="256" height="12"
+                      font="u8g2_font_helvR08_tr" long_mode="scroll_circular"
+                      scroll_px_per_sec="40" initial_delay_ms="1000"
+                      text="U8G2GL device measurement ticker - this text is deliberately much wider than the label so that it scrolls continuously across the panel - 0123456789" />
+        <!-- One clock bound to a time subject: HH:MM:SS, blinking colon, smaller seconds. -->
+        <u8g2gl_clock name="clock" x="4" y="18" width="160" height="20"
+                      font="u8g2_font_helvB12_tr" secondary_font="u8g2_font_helvR08_tr"
+                      format="hh_mm_ss" blink="true" bind_time="clock_time" />
+        <!-- One static label. -->
+        <u8g2gl_label name="caption" x="4" y="46" width="248" height="12"
+                      font="u8g2_font_helvR08_tr" text="PR-5R2 V static caption" />
+    </view>
+</screen>

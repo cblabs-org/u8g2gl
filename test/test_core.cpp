@@ -9,7 +9,8 @@
  * File: test/test_core.cpp
  *
  * Purpose: Verifies the frame: tick-source registration, screen activation,
- *          the dirty gate around sendBuffer(), deadline aggregation, and the
+ *          the dirty gate around sendBuffer(), deadline aggregation (widgets'
+ *          and timers', which run first and with no screen active), and the
  *          two calls generated code makes into the frame — the per-object
  *          render wrapper (§11.3) and the frame-dirty subject observer (§13.5).
  *
@@ -24,6 +25,7 @@
 #include "u8g2gl/u8g2gl_progress_bar.h"
 #include "u8g2gl/u8g2gl_style.h"
 #include "u8g2gl/u8g2gl_subject.h"
+#include "u8g2gl/u8g2gl_timer.h"
 #include "U8g2lib.h"
 #include <iostream>
 #include <string>
@@ -907,6 +909,154 @@ TEST_F(Core, RunInPeriod) {
     uint32_t res3 = ui_handler_run_in_period(display, 50);
     EXPECT_EQ(res3, U8G2GL_IDLE);
     EXPECT_EQ(s_render_count, 2); // Executed!
+}
+
+// --- Timers in ui_handler() (§11.1) ---
+
+namespace {
+int s_timer_runs = 0;
+void count_timer_run(u8g2gl_timer* /*timer*/) {
+    ++s_timer_runs;
+}
+}  // namespace
+
+TEST_F(Core, HandlerReturnsEarlierOfTimerAndWidgetDeadlines) {
+    u8g2gl_set_tick_cb(mock_millis);
+    u8g2gl_timer timer;
+    u8g2gl_timer_init(&timer, count_timer_run, 100, nullptr);   // due at 100
+
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_single;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    s_widget1.next_deadline = 300;
+    EXPECT_EQ(ui_handler(display), 100u);   // the timer is sooner
+    s_widget1.next_deadline = 40;
+    EXPECT_EQ(ui_handler(display), 40u);    // the widget is sooner
+    s_widget1.next_deadline = U8G2GL_IDLE;
+    EXPECT_EQ(ui_handler(display), 100u);   // an idle widget leaves the timer's
+}
+
+TEST_F(Core, TimersRunWithNoActiveScreen) {
+    u8g2gl_set_tick_cb(mock_millis);
+    s_timer_runs = 0;
+    u8g2gl_timer timer;
+    u8g2gl_timer_init(&timer, count_timer_run, 100, nullptr);
+    U8G2 display;
+
+    EXPECT_EQ(ui_handler(display), 100u);   // the timer's deadline is still returned
+    s_mock_time = 100;
+    EXPECT_EQ(ui_handler(display), 100u);
+    EXPECT_EQ(s_timer_runs, 1);
+    EXPECT_EQ(display.send_count, 0);       // and nothing is drawn
+}
+
+// The point of running timers first: a subject a timer writes is drawn by the
+// same ui_handler() call, not one deadline later.
+TEST_F(Core, TimerWritingBoundSubjectRedrawsInSameCall) {
+    u8g2gl_set_tick_cb(mock_millis);
+    u8g2gl_subject_int_n<1> subject(0);
+    ASSERT_TRUE(subject.add_observer(nullptr, u8g2gl_frame_dirty_observer));
+    u8g2gl_timer timer;
+    u8g2gl_timer_init(&timer, [](u8g2gl_timer* t) {
+        auto* subj = static_cast<u8g2gl_subject_int_base*>(u8g2gl_timer_get_user_data(t));
+        subj->set(subj->get() + 1);
+    }, 1000, &subject);
+
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    ui_handler(display);                    // the activation frame
+    ASSERT_EQ(s_render_count, 1);
+    ui_handler(display);                    // nothing changed: no frame
+    ASSERT_EQ(s_render_count, 1);
+
+    s_mock_time = 1000;
+    EXPECT_EQ(ui_handler(display), 1000u);
+    EXPECT_EQ(subject.get(), 1);
+    EXPECT_EQ(s_render_count, 2);           // drawn by the call that ran the timer
+    EXPECT_EQ(display.send_count, 2);
+}
+
+// --- Dirty flag ordering: a subject written during a render is not lost ---
+
+namespace {
+
+// Stands in for any render path that writes a subject bound elsewhere on the
+// screen (an observer that fires mid-frame, a widget publishing a value). It
+// writes once, so the frame it dirties is the only extra frame.
+u8g2gl_subject_int s_render_written;
+int s_ordering_render_count = 0;
+bool s_ordering_wrote = false;
+
+void cb_render_writes_subject(U8G2& /*display*/) {
+    ++s_ordering_render_count;
+    if (!s_ordering_wrote) {
+        s_ordering_wrote = true;
+        s_render_written.set(1);   // frame-dirty observer: marks the frame dirty
+    }
+}
+
+class DirtyOrdering : public Core {
+protected:
+    void SetUp() override {
+        Core::SetUp();
+        // Static subject: its one observer is added once, and the value is
+        // reset in place (assigning a fresh subject would copy a pointer into
+        // the temporary's slots).
+        static bool s_observer_added = false;
+        if (!s_observer_added) {
+            ASSERT_TRUE(s_render_written.add_observer(nullptr, u8g2gl_frame_dirty_observer));
+            s_observer_added = true;
+        }
+        s_render_written.set(0);
+        s_ordering_render_count = 0;
+        s_ordering_wrote = false;
+        u8g2gl_set_tick_cb(mock_millis);
+    }
+};
+
+}  // namespace
+
+TEST_F(DirtyOrdering, SubjectWrittenDuringRenderIsDrawnByTheNextCall) {
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render_writes_subject;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    ui_handler(display);                    // activation frame; the render writes the subject
+    ASSERT_EQ(s_ordering_render_count, 1);
+
+    // The write came after this frame's content was drawn, so the frame on
+    // screen is stale. The old order cleared dirty after rendering and lost it.
+    EXPECT_TRUE(screen.dirty);
+    ui_handler(display);
+    EXPECT_EQ(s_ordering_render_count, 2);
+    EXPECT_EQ(display.send_count, 2);
+}
+
+TEST_F(DirtyOrdering, PendingWorkReturnsZeroAndPlainFrameReturnsTheDeadline) {
+    s_widget1.next_deadline = 500;
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_single;
+    screen.render_fn = cb_render_writes_subject;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    // Work is left over: the caller must not sleep through the redraw.
+    EXPECT_EQ(ui_handler(display), 0u);
+    EXPECT_EQ(s_ordering_render_count, 1);
+
+    // The follow-up frame draws, writes nothing, and reports the real deadline.
+    EXPECT_EQ(ui_handler(display), 500u);
+    EXPECT_EQ(s_ordering_render_count, 2);
+
+    // A frame with nothing pending neither redraws nor reports 0.
+    EXPECT_EQ(ui_handler(display), 500u);
+    EXPECT_EQ(s_ordering_render_count, 2);
 }
 
 // --- Final sizeof Report (§18/Q-4) ---

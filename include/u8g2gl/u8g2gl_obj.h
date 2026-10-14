@@ -564,6 +564,16 @@ protected:
      */
     virtual void on_text_binding_changed();
 
+    /**
+     * @brief Called by the geometry setters after the width or height actually
+     *        changed. Never called for a pure move.
+     *
+     * The default does nothing. A widget that caches a measurement taken
+     * against its size (a label's scroll decision) overrides it to discard the
+     * cache. Adds a vtable slot only; no per-object bytes.
+     */
+    virtual void on_size_changed();
+
 private:
     /**
      * @brief Register a conditional flag binding in the shared binding pool.

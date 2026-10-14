@@ -395,6 +395,9 @@ TEST(AmbientState, ClockRepaintKeepsCallerStateAndMatchesRender) {
     clock.set_font(u8g2_font_6x10_tf);
     clock.set_time(12 * 3600 + 34 * 60);
     clock.set_blink(true);
+    // The time change above restarts the blink cycle at the next tick, which
+    // starts it here; the colon is then due to toggle at 500.
+    clock.tick(0);
 
     uint8_t repainted[kBufferBytes];
     {
@@ -402,7 +405,7 @@ TEST(AmbientState, ClockRepaintKeepsCallerStateAndMatchesRender) {
         U8G2& display = real.display();
         set_caller_state(display);
         const ambient_state before = ambient_state::read(display);
-        clock.render_animation_update(display, 1000);  // 1000 ms since 0: toggles
+        clock.render_animation_update(display, 500);  // due: toggles
         expect_state_equal(before, ambient_state::read(display));
         real.snapshot(repainted);
     }

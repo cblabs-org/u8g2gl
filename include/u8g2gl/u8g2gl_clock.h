@@ -29,7 +29,7 @@
  *     - set_blink():          Enable or disable 1Hz colon blink animation
  *
  *     Time input:
- *     - set_time():           Update current time using raw epoch seconds
+ *     - set_time():           Update current time using raw epoch seconds (restarts the blink)
  *     - bind_time():          Drive the time from a time subject (§6.3, §8.1)
  *
  *     Query:
@@ -40,7 +40,7 @@
  *     - is_colon_visible():   Query current colon visibility state
  *
  *     Lifecycle (overrides):
- *     - tick():               Update blink phase; return remainder to next toggle
+ *     - tick():               Drift-free blink, locked to time changes; never 0
  *     - render():             Draw formatted time with dual-font baseline alignment
  *     - render_animation_update(): Targeted partial refresh during blocked loop
  *
@@ -52,6 +52,7 @@
 
 #include <cstdint>
 #include "u8g2gl_obj.h"
+#include "u8g2gl_types.h"
 
 // Forward declaration of U8G2 display class
 class U8G2;
@@ -69,6 +70,16 @@ enum u8g2gl_clock_format_t : uint8_t {
  * eliminate horizontal jitter as digits transition. Supports an optional smaller
  * secondary font for seconds digits aligned to the primary font baseline.
  * Colon blinks at 1Hz (500ms on / 500ms off) when enabled.
+ *
+ * The time normally comes from a time subject that a u8g2gl_wall_clock keeps
+ * current (bind_time()); the clock writes no seconds logic of its own. Its
+ * tick() schedules only the blink, and the blink is locked to the time: each
+ * change of value shows the colon and restarts the cycle, so with a wall clock
+ * publishing on the second the colon appears with every new second.
+ *
+ * A time of U8G2GL_TIME_UNKNOWN renders as `--:--` (`--:--:--` in HH_MM_SS,
+ * the seconds' dashes in the secondary font), in the same digit columns as a
+ * real time, with a steady colon.
  */
 class u8g2gl_clock : public u8g2gl_obj {
 public:
@@ -116,7 +127,12 @@ public:
      * Decomposes seconds into hours, minutes, and seconds via integer arithmetic.
      * Does not require framework time services or external clock objects.
      *
-     * @param epoch_seconds Seconds since UNIX epoch (or seconds since midnight).
+     * A change of value shows the colon and restarts the blink cycle from the
+     * next tick(), so seconds and colon move together. Setting the value it
+     * already holds changes nothing.
+     *
+     * @param epoch_seconds Seconds since UNIX epoch (or seconds since midnight),
+     *                      or U8G2GL_TIME_UNKNOWN to render `--:--`.
      */
     void set_time(uint32_t epoch_seconds);
 
@@ -178,12 +194,16 @@ public:
     /**
      * @brief Update blink animation state and return next deadline.
      *
-     * When blink is enabled, toggles show_colon_ every 500ms and returns
-     * the remaining milliseconds until the next toggle. When blink is disabled,
-     * returns U8G2GL_IDLE.
+     * When blink is enabled, toggles the colon every 500 ms, each toggle due
+     * 500 ms after the previous one's due time; a call 500 ms or more late
+     * toggles once and resyncs from @p now_ms. The first tick after a time
+     * change or after blink is enabled starts a new cycle with the colon shown.
+     *
+     * Blink off, or the time unknown, returns U8G2GL_IDLE: the per-second
+     * deadline belongs to the wall clock's timer, not to this widget.
      *
      * @param now_ms Current system timestamp in milliseconds.
-     * @return Milliseconds until next blink toggle, or U8G2GL_IDLE if disabled.
+     * @return Milliseconds until the next blink toggle, never 0; or U8G2GL_IDLE.
      */
     uint32_t tick(uint32_t now_ms) override;
 
@@ -219,10 +239,13 @@ private:
     // pointer (8B) -> uint32_t (4B) -> uint8_t/bool/enum (1B)
     const uint8_t* secondary_font_ = nullptr;            ///< Optional font for seconds digits
     uint32_t epoch_seconds_ = 0;                         ///< Stored epoch time in seconds
-    uint32_t last_blink_ms_ = 0;                         ///< Timestamp of last blink toggle
+    uint32_t next_blink_due_ms_ = 0;                     ///< When the next colon toggle is due
     u8g2gl_clock_format_t format_ = U8G2GL_CLOCK_HH_MM;  ///< Active display format mode
     bool show_colon_ = true;                             ///< Current colon visibility state
     bool blink_enabled_ = true;                          ///< Whether colon blink animation is enabled
+    /// The next tick() starts a new blink cycle. Also the "not started" state: a
+    /// due time of 0 is a legitimate tick, so it cannot double as a sentinel.
+    bool blink_restart_ = true;
 };
 
 #endif // U8G2GL_CLOCK_H

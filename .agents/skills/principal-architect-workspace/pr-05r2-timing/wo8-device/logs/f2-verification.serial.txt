@@ -1,0 +1,112 @@
+--- forcing RTS inactive
+--- Terminal on /dev/cu.usbmodem1101 | 115200 8-N-1
+--- Available filters and text transformations: debug, default, direct, esp32_exception_decoder, hexlify, log2file, nocontrol, printable, send_on_enter, time
+--- More details at https://bit.ly/pio-monitor-filters
+--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+U8G2GL-V phase=D1 start duration_ms=30000 blink=1 loop=delay_to_deadline_cap_1000ms
+U8G2GL-V phase=D2 start duration_ms=20000 blink=0 loop=delay_to_deadline_cap_1000ms
+U8G2GL-V phase=U start duration_ms=10000 blink=1 loop=uncapped_no_delay
+--- forcing RTS inactive
+--- Terminal on /dev/cu.usbmodem1101 | 115200 8-N-1
+--- Available filters and text transformations: debug, default, direct, esp32_exception_decoder, hexlify, log2file, nocontrol, printable, send_on_enter, time
+--- More details at https://bit.ly/pio-monitor-filters
+--- Quit: Ctrl+C | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+_per_s=40.01 (n=1199 steps over 29.97 s; px_per_s_target=40) max_step_gap_us=27561 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=61 blink=1
+U8G2GL-V phase=D1 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D1 second_latency_us n=30 min=13059 median=15496 p95=15562 max=15569 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=30 second_changes_without_buffer_change=0
+U8G2GL-V phase=D2 summary measured_s=20.02 calls=821 calls_per_s=41.0 sent=821 changed=788 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D2 call_us n_send=821 mean_send_us=13423 min_send_us=12878 max_send_us=13756 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D2 deadline_hist_ms 0=40 1_4=0 5_9=11 10_14=770 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=40
+U8G2GL-V phase=D2 scroll steps=801 steps_per_s=40.01 (n=800 steps over 20.00 s; px_per_s_target=40) max_step_gap_us=27550 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=0 blink=0
+U8G2GL-V phase=D2 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D2 second_latency_us n=20 min=13004 median=15083 p95=15577 max=15577 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=20 second_changes_without_buffer_change=0
+U8G2GL-V phase=U summary measured_s=10.01 calls=138575 calls_per_s=13842.2 sent=421 changed=421 redundant_sends=0 idle_wakes=138154
+U8G2GL-V phase=U call_us n_send=421 mean_send_us=13553 min_send_us=13073 max_send_us=13806 n_nosend=138154 mean_nosend_us=4 max_nosend_us=21 send_threshold_us=2000 separated=1
+U8G2GL-V phase=U deadline_hist_ms 0=80 1_4=48920 5_9=61086 10_14=28489 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=80
+U8G2GL-V phase=U scroll steps=401 steps_per_s=40.01 (n=400 steps over 10.00 s; px_per_s_target=40) max_step_gap_us=27555 wraps=0 jumps_gt1px=0 back_other=0 colon_toggles=19 blink=1
+U8G2GL-V phase=U redundant_sends=0 at_ms_since_phase_start=none (first 0 logged) skipped_seconds=0
+U8G2GL-V end
+U8G2GL-V method runtime=0.9.0 schema=0.4 generator=0.13.0 clock=esp_timer_get_time unit=us buffer_bytes=2048 time_unknown_for_ms=5000 base_epoch=45296
+U8G2GL-V method defs sent=call_gt_threshold changed=buffer_differs redundant=sent_and_not_changed idle_wake=not_sent_and_not_changed second_latency=boundary_to_end_of_drawing_call scroll_rate=(steps-1)/span_of_scroll_x_changes (reads label offset via private-as-public; logical offset, not pixels)
+U8G2GL-V boot_pump calls=173 redundant_sends=1 (before the phases, from boot to ~6500 ms)
+U8G2GL-V phase=D1 summary measured_s=30.01 calls=1261 calls_per_s=42.0 sent=1261 changed=1228 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D1 call_us n_send=1261 mean_send_us=13508 min_send_us=12866 max_send_us=13769 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D1 deadline_hist_ms 0=120 1_4=1 5_9=39 10_14=1101 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=120
+U8G2GL-V phase=D1 scroll steps=1200 steps_per_s=40.01 (n=1199 steps over 29.97 s; px_per_s_target=40) max_step_gap_us=27561 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=61 blink=1
+U8G2GL-V phase=D1 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D1 second_latency_us n=30 min=13059 median=15496 p95=15562 max=15569 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=30 second_changes_without_buffer_change=0
+U8G2GL-V phase=D2 summary measured_s=20.02 calls=821 calls_per_s=41.0 sent=821 changed=788 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D2 call_us n_send=821 mean_send_us=13423 min_send_us=12878 max_send_us=13756 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D2 deadline_hist_ms 0=40 1_4=0 5_9=11 10_14=770 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=40
+U8G2GL-V phase=D2 scroll steps=801 steps_per_s=40.01 (n=800 steps over 20.00 s; px_per_s_target=40) max_step_gap_us=27550 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=0 blink=0
+U8G2GL-V phase=D2 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D2 second_latency_us n=20 min=13004 median=15083 p95=15577 max=15577 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=20 second_changes_without_buffer_change=0
+U8G2GL-V phase=U summary measured_s=10.01 calls=138575 calls_per_s=13842.2 sent=421 changed=421 redundant_sends=0 idle_wakes=138154
+U8G2GL-V phase=U call_us n_send=421 mean_send_us=13553 min_send_us=13073 max_send_us=13806 n_nosend=138154 mean_nosend_us=4 max_nosend_us=21 send_threshold_us=2000 separated=1
+U8G2GL-V phase=U deadline_hist_ms 0=80 1_4=48920 5_9=61086 10_14=28489 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=80
+U8G2GL-V phase=U scroll steps=401 steps_per_s=40.01 (n=400 steps over 10.00 s; px_per_s_target=40) max_step_gap_us=27555 wraps=0 jumps_gt1px=0 back_other=0 colon_toggles=19 blink=1
+U8G2GL-V phase=U redundant_sends=0 at_ms_since_phase_start=none (first 0 logged) skipped_seconds=0
+U8G2GL-V end
+U8G2GL-V method runtime=0.9.0 schema=0.4 generator=0.13.0 clock=esp_timer_get_time unit=us buffer_bytes=2048 time_unknown_for_ms=5000 base_epoch=45296
+U8G2GL-V method defs sent=call_gt_threshold changed=buffer_differs redundant=sent_and_not_changed idle_wake=not_sent_and_not_changed second_latency=boundary_to_end_of_drawing_call scroll_rate=(steps-1)/span_of_scroll_x_changes (reads label offset via private-as-public; logical offset, not pixels)
+U8G2GL-V boot_pump calls=173 redundant_sends=1 (before the phases, from boot to ~6500 ms)
+U8G2GL-V phase=D1 summary measured_s=30.01 calls=1261 calls_per_s=42.0 sent=1261 changed=1228 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D1 call_us n_send=1261 mean_send_us=13508 min_send_us=12866 max_send_us=13769 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D1 deadline_hist_ms 0=120 1_4=1 5_9=39 10_14=1101 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=120
+U8G2GL-V phase=D1 scroll steps=1200 steps_per_s=40.01 (n=1199 steps over 29.97 s; px_per_s_target=40) max_step_gap_us=27561 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=61 blink=1
+U8G2GL-V phase=D1 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D1 second_latency_us n=30 min=13059 median=15496 p95=15562 max=15569 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=30 second_changes_without_buffer_change=0
+U8G2GL-V phase=D2 summary measured_s=20.02 calls=821 calls_per_s=41.0 sent=821 changed=788 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D2 call_us n_send=821 mean_send_us=13423 min_send_us=12878 max_send_us=13756 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D2 deadline_hist_ms 0=40 1_4=0 5_9=11 10_14=770 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=40
+U8G2GL-V phase=D2 scroll steps=801 steps_per_s=40.01 (n=800 steps over 20.00 s; px_per_s_target=40) max_step_gap_us=27550 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=0 blink=0
+U8G2GL-V phase=D2 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D2 second_latency_us n=20 min=13004 median=15083 p95=15577 max=15577 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=20 second_changes_without_buffer_change=0
+U8G2GL-V phase=U summary measured_s=10.01 calls=138575 calls_per_s=13842.2 sent=421 changed=421 redundant_sends=0 idle_wakes=138154
+U8G2GL-V phase=U call_us n_send=421 mean_send_us=13553 min_send_us=13073 max_send_us=13806 n_nosend=138154 mean_nosend_us=4 max_nosend_us=21 send_threshold_us=2000 separated=1
+U8G2GL-V phase=U deadline_hist_ms 0=80 1_4=48920 5_9=61086 10_14=28489 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=80
+U8G2GL-V phase=U scroll steps=401 steps_per_s=40.01 (n=400 steps over 10.00 s; px_per_s_target=40) max_step_gap_us=27555 wraps=0 jumps_gt1px=0 back_other=0 colon_toggles=19 blink=1
+U8G2GL-V phase=U redundant_sends=0 at_ms_since_phase_start=none (first 0 logged) skipped_seconds=0
+U8G2GL-V end
+U8G2GL-V method runtime=0.9.0 schema=0.4 generator=0.13.0 clock=esp_timer_get_time unit=us buffer_bytes=2048 time_unknown_for_ms=5000 base_epoch=45296
+U8G2GL-V method defs sent=call_gt_threshold changed=buffer_differs redundant=sent_and_not_changed idle_wake=not_sent_and_not_changed second_latency=boundary_to_end_of_drawing_call scroll_rate=(steps-1)/span_of_scroll_x_changes (reads label offset via private-as-public; logical offset, not pixels)
+U8G2GL-V boot_pump calls=173 redundant_sends=1 (before the phases, from boot to ~6500 ms)
+U8G2GL-V phase=D1 summary measured_s=30.01 calls=1261 calls_per_s=42.0 sent=1261 changed=1228 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D1 call_us n_send=1261 mean_send_us=13508 min_send_us=12866 max_send_us=13769 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D1 deadline_hist_ms 0=120 1_4=1 5_9=39 10_14=1101 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=120
+U8G2GL-V phase=D1 scroll steps=1200 steps_per_s=40.01 (n=1199 steps over 29.97 s; px_per_s_target=40) max_step_gap_us=27561 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=61 blink=1
+U8G2GL-V phase=D1 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D1 second_latency_us n=30 min=13059 median=15496 p95=15562 max=15569 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=30 second_changes_without_buffer_change=0
+U8G2GL-V phase=D2 summary measured_s=20.02 calls=821 calls_per_s=41.0 sent=821 changed=788 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D2 call_us n_send=821 mean_send_us=13423 min_send_us=12878 max_send_us=13756 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D2 deadline_hist_ms 0=40 1_4=0 5_9=11 10_14=770 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=40
+U8G2GL-V phase=D2 scroll steps=801 steps_per_s=40.01 (n=800 steps over 20.00 s; px_per_s_target=40) max_step_gap_us=27550 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=0 blink=0
+U8G2GL-V phase=D2 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D2 second_latency_us n=20 min=13004 median=15083 p95=15577 max=15577 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=20 second_changes_without_buffer_change=0
+U8G2GL-V phase=U summary measured_s=10.01 calls=138575 calls_per_s=13842.2 sent=421 changed=421 redundant_sends=0 idle_wakes=138154
+U8G2GL-V phase=U call_us n_send=421 mean_send_us=13553 min_send_us=13073 max_send_us=13806 n_nosend=138154 mean_nosend_us=4 max_nosend_us=21 send_threshold_us=2000 separated=1
+U8G2GL-V phase=U deadline_hist_ms 0=80 1_4=48920 5_9=61086 10_14=28489 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=80
+U8G2GL-V phase=U scroll steps=401 steps_per_s=40.01 (n=400 steps over 10.00 s; px_per_s_target=40) max_step_gap_us=27555 wraps=0 jumps_gt1px=0 back_other=0 colon_toggles=19 blink=1
+U8G2GL-V phase=U redundant_sends=0 at_ms_since_phase_start=none (first 0 logged) skipped_seconds=0
+U8G2GL-V end
+U8G2GL-V method runtime=0.9.0 schema=0.4 generator=0.13.0 clock=esp_timer_get_time unit=us buffer_bytes=2048 time_unknown_for_ms=5000 base_epoch=45296
+U8G2GL-V method defs sent=call_gt_threshold changed=buffer_differs redundant=sent_and_not_changed idle_wake=not_sent_and_not_changed second_latency=boundary_to_end_of_drawing_call scroll_rate=(steps-1)/span_of_scroll_x_changes (reads label offset via private-as-public; logical offset, not pixels)
+U8G2GL-V boot_pump calls=173 redundant_sends=1 (before the phases, from boot to ~6500 ms)
+U8G2GL-V phase=D1 summary measured_s=30.01 calls=1261 calls_per_s=42.0 sent=1261 changed=1228 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D1 call_us n_send=1261 mean_send_us=13508 min_send_us=12866 max_send_us=13769 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D1 deadline_hist_ms 0=120 1_4=1 5_9=39 10_14=1101 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=120
+U8G2GL-V phase=D1 scroll steps=1200 steps_per_s=40.01 (n=1199 steps over 29.97 s; px_per_s_target=40) max_step_gap_us=27561 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=61 blink=1
+U8G2GL-V phase=D1 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D1 second_latency_us n=30 min=13059 median=15496 p95=15562 max=15569 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=30 second_changes_without_buffer_change=0
+U8G2GL-V phase=D2 summary measured_s=20.02 calls=821 calls_per_s=41.0 sent=821 changed=788 redundant_sends=33 idle_wakes=0
+U8G2GL-V phase=D2 call_us n_send=821 mean_send_us=13423 min_send_us=12878 max_send_us=13756 n_nosend=0 mean_nosend_us=0 max_nosend_us=0 send_threshold_us=2000 separated=1
+U8G2GL-V phase=D2 deadline_hist_ms 0=40 1_4=0 5_9=11 10_14=770 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=40
+U8G2GL-V phase=D2 scroll steps=801 steps_per_s=40.01 (n=800 steps over 20.00 s; px_per_s_target=40) max_step_gap_us=27550 wraps=1 jumps_gt1px=0 back_other=0 colon_toggles=0 blink=0
+U8G2GL-V phase=D2 loop cap_ms=1000 cap_hits=0 idle_returns=0
+U8G2GL-V phase=D2 second_latency_us n=20 min=13004 median=15083 p95=15577 max=15577 (boundary to end of the ui_handler() call that drew it) skipped_seconds=0 second_changes=20 second_changes_without_buffer_change=0
+U8G2GL-V phase=U summary measured_s=10.01 calls=138575 calls_per_s=13842.2 sent=421 changed=421 redundant_sends=0 idle_wakes=138154
+U8G2GL-V phase=U call_us n_send=421 mean_send_us=13553 min_send_us=13073 max_send_us=13806 n_nosend=138154 mean_nosend_us=4 max_nosend_us=21 send_threshold_us=2000 separated=1
+U8G2GL-V phase=U deadline_hist_ms 0=80 1_4=48920 5_9=61086 10_14=28489 15_19=0 20_24=0 25=0 26_99=0 100_499=0 500_plus=0 idle=0 zero_deadlines=80
+U8G2GL-V phase=U scroll steps=401 steps_per_s=40.01 (n=400 steps over 10.00 s; px_per_s_target=40) max_step_gap_us=27555 wraps=0 jumps_gt1px=0 back_other=0 colon_toggles=19 blink=1
+U8G2GL-V phase=U redundant_sends=0 at_ms_since_phase_start=none (first 0 logged) skipped_seconds=0
+U8G2GL-V end

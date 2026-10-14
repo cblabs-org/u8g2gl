@@ -34,14 +34,23 @@
 // binding observer re-notifying with the same value) would dirty the frame on
 // every call and defeat §11.2's gate — the exact cost the gate exists to
 // avoid. A real change is still marked immediately, so no repaint is lost.
+// A change of width or height (never a pure move) also calls on_size_changed(),
+// so a widget that caches a measurement against its size can discard it.
+
+void u8g2gl_obj::on_size_changed() {}
+
 void u8g2gl_obj::set_coords(int16_t x, int16_t y, int16_t w, int16_t h) {
     if (x == x_ && y == y_ && w == w_ && h == h_) {
         return;
     }
+    const bool size_changed = (w != w_) || (h != h_);
     x_ = x;
     y_ = y;
     w_ = w;
     h_ = h;
+    if (size_changed) {
+        on_size_changed();
+    }
     mark_dirty();
 }
 
@@ -66,6 +75,7 @@ void u8g2gl_obj::set_w(int16_t w) {
         return;
     }
     w_ = w;
+    on_size_changed();
     mark_dirty();
 }
 
@@ -74,6 +84,7 @@ void u8g2gl_obj::set_h(int16_t h) {
         return;
     }
     h_ = h;
+    on_size_changed();
     mark_dirty();
 }
 
