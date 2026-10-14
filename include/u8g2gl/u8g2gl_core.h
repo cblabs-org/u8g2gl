@@ -27,7 +27,7 @@
  * - u8g2gl_screen: struct holding screen lifecycle callbacks and object arrays
  *
  *     UI Core:
- *     - ui_handler(): The main handler for rendering and ticking
+ *     - ui_handler(): The main handler: runs timers, ticks, renders
  *     - u8g2gl_mark_dirty(): Mark the active screen dirty
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
  *
@@ -321,19 +321,24 @@ bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj);
 // --- The main handler ---
 
 /**
- * @brief Tick the active screen, redraw if needed, and report when to return.
+ * @brief Run due timers, tick the active screen, redraw if needed, and report
+ *        when to return.
  *
  * The one call an application makes each time round its loop. It is safe to
  * call as often as you like — if nothing has changed it ticks and returns
  * without touching the display.
  *
+ * Due timers (u8g2gl_timer.h) run first, so a subject a timer writes is drawn
+ * in the same frame. They run even when no screen is active.
+ *
  * @param display The U8G2 instance. The application owns it, including its
  *                construction and its wiring; the framework only draws into it
  *                (§12.1).
  * @return Milliseconds until this needs calling again — the minimum deadline
- *         across every widget that is animating. U8G2GL_IDLE means nothing is
- *         animating and only an external change (a subject write, a screen
- *         switch) will require another frame.
+ *         across every unpaused timer and every widget that is animating.
+ *         U8G2GL_IDLE means no timer is pending and nothing is animating, and
+ *         only an external change (a subject write, a screen switch) will
+ *         require another frame.
  *
  *         Returning a deadline rather than a bool is what lets a battery-powered
  *         project sleep precisely instead of polling ([D-15]). Ignoring the

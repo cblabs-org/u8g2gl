@@ -190,6 +190,25 @@ target_compile_options(test_clock PRIVATE
 
 gtest_discover_tests(test_clock)
 
+add_executable(test_timer
+    test_timer.cpp
+)
+
+target_include_directories(test_timer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_timer PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_timer PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+gtest_discover_tests(test_timer)
+
 add_executable(test_switch
     test_switch.cpp
 )

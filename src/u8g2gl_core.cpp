@@ -15,7 +15,8 @@
  *          widget's own deadline ([D-15]).
  *
  * Description: Tick-source registration, active-screen management, frame-level
- *              dirty gating, the ui_handler entry points, the two calls
+ *              dirty gating, the ui_handler entry points (which run the
+ *              host's timers before ticking widgets, §11.1), the two calls
  *              generated code makes into the frame — the per-object render
  *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
  *              the blocked-loop repaint that shares the wrapper's state guard
@@ -29,6 +30,7 @@
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_state_saver.h"
+#include "u8g2gl/u8g2gl_timer.h"
 #include "u8g2gl/u8g2gl_tree.h"
 
 #include <type_traits>
@@ -267,38 +269,12 @@ bool u8g2gl_apply_clip(U8G2& display, const u8g2gl_rect& clip) {
     return true;
 }
 
-// ui_handler
-// One frame: tick every widget, redraw if anything changed, and report how long
-// the caller may sleep. This is the whole of the framework's per-loop work.
-//   display — the application's U8G2 instance; the framework only draws into it
-uint32_t ui_handler(U8G2& display) {
-    if (!s_active_screen) {
-        return U8G2GL_IDLE;
-    }
-
-    uint32_t now = u8g2gl_tick_now();
-    uint32_t next_deadline = U8G2GL_IDLE;
-
-    // --- Step 1: Tick all widgets, collect deadlines ---
-    if (s_active_screen->tick_fn) {
-        next_deadline = s_active_screen->tick_fn(now);
-    }
-
-    // --- Step 2: Render the whole frame, or none of it ---
-    // There is no per-object skipping: clearBuffer() has wiped the buffer, so an
-    // object that declined to draw would leave a hole rather than its previous
-    // appearance ([D-4]). The gate is the whole frame, and what it saves is the
-    // sendBuffer below — the SPI or I2C transfer, which dominates frame cost.
-    if (s_active_screen->dirty) {
-        display.clearBuffer();
-        if (s_active_screen->render_fn) {
-            s_active_screen->render_fn(display);
-        }
-        display.sendBuffer();
-        s_active_screen->dirty = false;
-    }
-
-    // --- Step 3: Convert the deadline into a sleep the caller can use ---
+// u8g2gl_sleep_after_frame
+// Converts a deadline measured at `now` into the sleep the caller can still
+// take, after whatever the frame (timer callbacks, ticks, rendering) consumed.
+//   now           — the tick the deadline was measured against
+//   next_deadline — milliseconds from `now`, or U8G2GL_IDLE
+static uint32_t u8g2gl_sleep_after_frame(uint32_t now, uint32_t next_deadline) {
     if (next_deadline == U8G2GL_IDLE) {
         return U8G2GL_IDLE;
     }
@@ -313,6 +289,48 @@ uint32_t ui_handler(U8G2& display) {
         return 0;  // The frame overran its own deadline: due again immediately.
     }
     return next_deadline - elapsed;
+}
+
+// ui_handler
+// One frame: run due timers, tick every widget, redraw if anything changed, and
+// report how long the caller may sleep. This is the whole of the framework's
+// per-loop work.
+//   display — the application's U8G2 instance; the framework only draws into it
+uint32_t ui_handler(U8G2& display) {
+    uint32_t now = u8g2gl_tick_now();
+
+    // --- Step 1: Run due timers, before any widget ticks ---
+    // First, so a subject a timer writes (the wall clock's time, say) has
+    // reached its bound widgets and marked the frame dirty before Step 3
+    // decides whether to draw: the new value appears in this frame, not the
+    // next. Timers are data rather than screen state, so they run, and their
+    // deadline counts, with no screen active at all.
+    uint32_t next_deadline = u8g2gl_timer_handler(now);
+    if (!s_active_screen) {
+        return u8g2gl_sleep_after_frame(now, next_deadline);
+    }
+
+    // --- Step 2: Tick all widgets, and keep the earlier deadline ---
+    if (s_active_screen->tick_fn) {
+        next_deadline = u8g2gl_min(next_deadline, s_active_screen->tick_fn(now));
+    }
+
+    // --- Step 3: Render the whole frame, or none of it ---
+    // There is no per-object skipping: clearBuffer() has wiped the buffer, so an
+    // object that declined to draw would leave a hole rather than its previous
+    // appearance ([D-4]). The gate is the whole frame, and what it saves is the
+    // sendBuffer below — the SPI or I2C transfer, which dominates frame cost.
+    if (s_active_screen->dirty) {
+        display.clearBuffer();
+        if (s_active_screen->render_fn) {
+            s_active_screen->render_fn(display);
+        }
+        display.sendBuffer();
+        s_active_screen->dirty = false;
+    }
+
+    // --- Step 4: Convert the deadline into a sleep the caller can use ---
+    return u8g2gl_sleep_after_frame(now, next_deadline);
 }
 
 // ui_handler_run_in_period
