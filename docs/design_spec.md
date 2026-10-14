@@ -962,7 +962,7 @@ Together with `#screen_width` / `#screen_height`, the above means **one screen f
 | `int` | `<int name="temperature" value="0" />` | `ui_set_temperature(22)` | 32-bit signed |
 | `string` | `<string name="station" max_len="48" />` | `ui_set_station("Euston")` | Framework-owned buffer, see §8.2 |
 | `bool` | `<bool name="wifi" value="true" />` | `ui_set_wifi(false)` | |
-| `time` | `<time name="system_time" />` | `ui_set_system_time(epoch_secs)` | Unix seconds; consumed by `<u8g2gl_clock>` |
+| `time` | `<time name="system_time" />` | `ui_set_system_time(epoch_secs)` | Unix seconds; consumed by `<u8g2gl_clock>`. The value `U8G2GL_TIME_UNKNOWN` means the time is not known, and a clock draws it as `--:--`; a `u8g2gl_wall_clock` (§11.1) keeps the subject current from the host's time function, and sets it to `U8G2GL_TIME_UNKNOWN` while that function reports no time |
 
 The `time` type is new in 0.2. v0.1 used `bind_time="system_time"` in examples without ever declaring the type it referred to.
 
@@ -1181,6 +1181,7 @@ Verified against LVGL 9.5.0:
 | Convenience | Three tiers: `lv_timer_handler()`, `lv_timer_handler_run_in_period(period)`, `lv_timer_periodic_handler()` | One: `ui_handler_run_in_period(u8g2, period_ms)` |
 | Timers | `lv_timer_create(cb, period, user_data)` — allocated by LVGL and kept on a list it owns | `u8g2gl_timer_init(&timer, cb, period_ms, user_data)` on storage the caller owns (LVGL's `_init` convention, as `lv_style_init`) |
 | Output | App supplies `flush_cb`; LVGL never touches hardware | App owns the `U8G2` instance and its constructor |
+| Waking a sleeping loop | `lv_timer_handler_set_resume_cb(cb, user_data)`; `lv_timer_handler_resume()` runs it from every timer call that gives a timer work and from a display's refresh request | `u8g2gl_set_resume_cb(cb, user_data)`; fired by the same timer calls, and when the active screen goes from clean to dirty |
 
 **The decisive borrowing is the return value.** v0.1 and earlier drafts of this spec had a boolean `ui_needs_render()`, which tells the application *that* something changed but not *when* the next thing will. Returning a deadline is strictly more useful and costs nothing to compute — every animating widget already knows its own next deadline, so the framework returns the minimum across them.
 
@@ -1193,6 +1194,7 @@ This matters more here than it does for LVGL. Monochrome projects skew towards b
 3. **Timer storage is the host's, and there is no heap.** The host declares each `u8g2gl_timer` — a static, or a member of its own object — and U8G2GL links them intrusively, keeping only a head pointer: no pool, no capacity setting, no allocation ([D-1]). A fixed pool would need a count, and unlike objects and bindings ([D-21]) timers are created by host code the generator never sees. A timer's destructor unlinks it, so one that leaves scope is never run.
 4. **Timers are scheduled from their due time.** LVGL records `last_run = lv_tick_get()` when a callback runs, so every late wake pushes all later runs back and a 1 s timer runs slow. U8G2GL's next run is due one period after the previous *due* time; a timer a whole period or more late runs once and resyncs to one period from now, rather than running repeatedly to catch up.
 5. **A subset of the timer calls.** `init`, `delete`, `pause`, `resume`, `set_period`, `ready`, `reset`, `set_repeat_count` and `get_user_data`, with LVGL's names and meanings — except that an exhausted repeat count pauses the timer, as there is no heap to auto-delete it from. Auto-delete, external data, global enable, idle statistics and list walking are omitted: each is a heap or OS artefact, or surface no U8G2GL use needs.
+6. **The resume callback fires on the transition, not on every write.** LVGL resumes its refresh timer, and so calls the resume callback, on every invalidation. A subject write here would be that call per write, a storm of wake-ups for a frame that is already owed; U8G2GL fires it only when the active screen goes from clean to dirty (through `u8g2gl_mark_dirty()`, the frame-dirty observer, or `u8g2gl_set_active_screen()`), and not again until the frame has been drawn. It is also silent inside `ui_handler()`, where the loop is awake by definition.
 
 #### Timers and the wall clock
 
@@ -1217,11 +1219,29 @@ u8g2gl_wall_clock_init(&s_wall_clock, &ui_subject_time, read_time);
 
 Concrete sources — NTP time, system information, event bridges — belong to the host project, not to U8G2GL, which stays free of NTP, RTC and platform calls and works without them.
 
-There is no locking: every timer function, and every callback, runs on the thread that calls `ui_handler()`, as in LVGL built without an OS layer.
+#### The resume callback
+
+`void u8g2gl_set_resume_cb(u8g2gl_resume_cb_t cb, void* user_data)` registers a function that wakes a loop sleeping on the deadline `ui_handler()` returned (`nullptr` clears it). It is `lv_timer_handler_set_resume_cb`, and it fires where LVGL's `lv_timer_handler_resume()` does: from `u8g2gl_timer_init`, `_resume`, `_set_period`, `_ready` and `_reset`, and when the frame becomes dirty, which is LVGL's subject, widget, invalidate, refresh-timer-resume chain. It runs **synchronously, in the caller's context**; U8G2GL defers nothing, so the function must only do what is safe wherever it was triggered (give a semaphore, send a task notification, set a flag). It is **suppressed inside `ui_handler()`**: a timer callback or a render that writes a subject is running while the loop is awake, and the call's return value (0 when it leaves the frame dirty, the timers' deadline otherwise) already says not to sleep. LVGL does not suppress; here that would turn every such write into a spurious wake.
+
+```cpp
+static void wake_ui_task(void* sem) { xSemaphoreGive(static_cast<SemaphoreHandle_t>(sem)); }
+
+u8g2gl_set_resume_cb(wake_ui_task, s_ui_wake);   // then block on s_ui_wake for idle_ms
+```
+
+#### Threads
+
+U8G2GL is single-threaded, as LVGL is without `LV_USE_OS`. Subjects, timers and `ui_handler()` are used from one thread, the one that calls `ui_handler()`. Data produced on another task is handed to that thread (a queue or a task notification) and written to the subjects there; it is never written from the producing task. The resume callback is the hook for waking the UI thread out of its own sleep when something needs a frame sooner than the deadline it is sleeping on.
+
+`ui_handler()` must not be called from a timer callback: the handler would be running inside itself, and the timer list it is walking, its run-this-pass marks and its resume suppression are not re-entrant.
+
+There is no locking. If these rules are violated, the behaviour is **undefined**: a subject or timer touched from a second thread can corrupt an observer count or the timer list, lose a notification, or leave the dirty flag out of step with the display, and a re-entrant `ui_handler()` can run a timer twice, follow a freed list link, or clear its own suppression early. The library does not detect it.
 
 ### 11.2 Dirty Tracking Gates the Frame, Not the Widget
 
 A frame is rendered only if a widget reported a visual state change during its tick. Subject observers, animation state, and visibility changes all set the flag.
+
+`ui_handler()` **clears the flag before it draws**, not after `sendBuffer()`. A subject written during the render (an observer, a widget's render path) then sets it again and the change is drawn by the next call; cleared afterwards, that write would be erased with the flag and the display would stay stale until something unrelated dirtied the frame. A frame left dirty when `ui_handler()` is about to return is work already pending, so it **returns 0** rather than the deadline: the caller must not sleep through the redraw. The dirty flag's clean-to-dirty transition is also what fires the resume callback (§11.1).
 
 This saves the **`sendBuffer()`** — the expensive part, since it is the full SPI/I²C transfer — not the buffer drawing. An idle screen costs one tick pass and nothing else. This is the correct and achievable form of the optimisation v0.1 mis-specified as per-widget skipping.
 
@@ -1246,7 +1266,7 @@ render(display)
 
 Two phases, not three. Widgets do not clear their own background — `clearBuffer()` already did (**[D-4]**).
 
-`tick()` returns its own next deadline, and `ui_handler()` returns the minimum across all widgets ([D-15]). A widget knows this cheaply: a clock blinking at 500 ms returns the remainder to the next toggle, a scrolling label returns the time left until its next step is due (never 0, and measured from the previous due time rather than from when the step ran, so the scroll holds its configured rate), a static label returns `UINT32_MAX`. Widget authors who do not care may return `UINT32_MAX` and lose nothing but the sleep hint.
+`tick()` returns its own next deadline, and `ui_handler()` returns the minimum across all widgets ([D-15]). A widget knows this cheaply: a clock blinking at 500 ms returns the remainder to the next toggle (the blink is locked to changes in the clock's time value, and those per-second changes come from the wall clock's timer (§11.1), not from the clock's own `tick()`), a scrolling label returns the time left until its next step is due (never 0, and measured from the previous due time rather than from when the step ran, so the scroll holds its configured rate), a static label returns `UINT32_MAX`. Widget authors who do not care may return `UINT32_MAX` and lose nothing but the sleep hint.
 
 **The clip window's far corner is excluded.** `u8g2.h:352/354` document `clip_x1`/`clip_y1` as "(excluded)", so an element occupying `x .. x+w-1` is clipped with `setClipWindow(x, y, x+w, y+h)`; the `x+w-1` form of earlier drafts lost the last column and row. **The state saver is the boundary between the application's U8G2 state and the framework's: U8G2GL's state inside each object's render, the caller's at every other moment.** On entry it captures draw colour, font, font mode, bitmap mode, font position, reference-height mode and (where U8G2 is built with font rotation) font direction — each readable from U8G2's state struct (`u8g2.h`) though U8G2 offers getters for few of them — and establishes the framework's text baseline, which every text widget assumes: `setFontPosTop()`, `setFontRefHeightAll()` and direction 0. The reference height is all, not U8G2's default text mode, because every text widget centres on `getAscent() - getDescent()` and clips to its own box, so the height it centres on must cover every glyph the font can draw rather than `A` and `g`. Font, colour and the font and bitmap modes are not established: widgets set them from their style. Each item is compared before it is set, on entry and on exit, so a caller already in the framework's state pays a load per item. On exit it restores everything it captured, the font before the reference-height mode: each height-mode setter recomputes the reference ascent and descent from the current font (`u8g2_UpdateRefHeight()`), so the last computation is the caller's font in the caller's mode. A null font (a display that has had `begin()` but no `setFont()`) is written back directly, because `u8g2_SetFont()` would read a font header at address 0; the height-mode setters read nothing on a null font. Nothing allocates. The one thing it cannot save is the clip window — U8G2 has no clip getter — so clip lifetime is the render wrapper's responsibility: it sets the clip before a widget draws and resets it afterwards. A widget's blocked-loop repaint ([D-5]) runs inside the same guard, through `u8g2gl_repaint_object()`, clipped to the widget's own bounds.
 
