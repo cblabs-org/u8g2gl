@@ -18,7 +18,8 @@
  *
  * Description: Alignment, draw colour, font and bitmap modes, object flags,
  *              event kinds, and the sentinel constants (U8G2GL_NO_PARENT,
- *              U8G2GL_IDLE) that mark "no value" in their respective domains
+ *              U8G2GL_IDLE, U8G2GL_TIME_UNKNOWN) that mark "no value" in their
+ *              respective domains
  *
  * Exported Types:
  * - u8g2gl_align_t: Text alignment
@@ -36,6 +37,13 @@
 #include <climits>
 
 static constexpr uint32_t U8G2GL_IDLE = UINT32_MAX;
+
+/// A time subject's value while the wall-clock time is not known — before NTP
+/// has synced, or with no RTC fitted. u8g2gl_wall_clock publishes it, and
+/// u8g2gl_clock renders it as "--:--" rather than a plausible but wrong time.
+/// UINT32_MAX is 2106-02-07 as Unix epoch seconds, so it cannot be mistaken for
+/// a real time a device will display.
+static constexpr uint32_t U8G2GL_TIME_UNKNOWN = UINT32_MAX;
 static constexpr uint8_t U8G2GL_NO_PARENT = UINT8_MAX;
 
 // Flag constants (as uint8_t)
