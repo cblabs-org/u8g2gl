@@ -213,6 +213,10 @@ converting widgets to timers.
     this PR** — recorded as a finding.
 - **2026-10-14 — Owner, verbatim: "Yes push the stack and PR - let's move on and close out this
   one".** PR opened from `u8g2gl-05r2/wo8-device` (description: [PR-DESCRIPTION.md](PR-DESCRIPTION.md)).
+- **2026-10-14 — Closed out by the PA.** CA bridge written:
+  [CA-BRIDGE-2026-10-14-PR5R2.md](CA-BRIDGE-2026-10-14-PR5R2.md) (covers the device-measurements
+  session as well). Owner reviews and merges #14 manually. On merge: graduate this project in
+  `memory/MEMORY.md` (Active → Recently Completed).
 
 ## Session Log
 
