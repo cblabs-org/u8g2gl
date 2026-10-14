@@ -147,19 +147,28 @@ not fix them and do not file issues.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `src/u8g2gl_core.cpp` — `ui_handler()` clears `dirty` before `clearBuffer()`/render and returns 0 when the frame is dirty again at the end; one `mark_screen_dirty()` is the only place a screen becomes dirty and fires the resume callback on the clean-to-dirty transition (used by `u8g2gl_mark_dirty()`, hence the frame-dirty observer, and `u8g2gl_set_active_screen()`); `u8g2gl_set_resume_cb()`, `u8g2gl_resume_notify()`; an RAII scope marks `ui_handler()` as running on every exit path.
+- `include/u8g2gl/u8g2gl_core.h` — `u8g2gl_resume_cb_t`, `u8g2gl_set_resume_cb()` (beside `u8g2gl_set_tick_cb()`), `u8g2gl_resume_notify()` (library-internal), export list.
+- `src/u8g2gl_timer.cpp`, `include/u8g2gl/u8g2gl_timer.h` — `u8g2gl_resume_notify()` from `_init` (both the link and the already-linked path), `_resume`, `_set_period`, `_ready`, `_reset`; a header comment saying so.
+- `test/test_core.cpp` — `DirtyOrdering` fixture, 2 tests. `test/test_resume.cpp` (new) + `test/CMakeLists.txt` — 12 tests.
+- `docs/design_spec.md` — §8.1 time row, §11.1 (LVGL row, divergence 6, "The resume callback", "Threads"), §11.2, §11.3 deadline paragraph. Passages quoted in the message to the PA.
 
 ### Decisions Made
-- Decision description and rationale
+- Name `u8g2gl_set_resume_cb` (not `..._timer_handler_set_resume_cb`): the house prefix is `u8g2gl_`, it sits beside `u8g2gl_set_tick_cb`, and it is the frame's resume, not a timer's. Type `u8g2gl_resume_cb_t` after `u8g2gl_tick_cb_t`.
+- Suppress inside `ui_handler()` (the recommended rule), for all firings, not only dirty ones: a timer callback calling `ready()`/`reset()` also happens with the loop awake, and the return value (0 / the timer deadline) covers it. Direct calls to `u8g2gl_timer_handler()` outside `ui_handler()` are not suppressed.
+- `u8g2gl_resume_notify()` is public in the header (timer.cpp needs it) but documented library-internal.
+- A re-`_init` of an already-linked timer fires too (it reschedules).
+- Pending work returns 0 as an early return at the end of `ui_handler()`, ahead of `u8g2gl_sleep_after_frame()`, which is unchanged.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- My first fixtures assigned `subject = u8g2gl_subject_int{}` on static subjects; that copies `observers_` pointing into the temporary's slots (dangling), and the new tests then failed for the wrong reason. Subjects are not safely assignable; reset with `set()` and add the observer once.
+- `ReadyFromOwnCallback`-style test: readying a timer *later* in the list from a callback runs it in the same pass, so the 0 return is only reached by a timer readied after it has run (self-ready).
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- `u8g2gl_subject_*_n` copy/assignment is not deleted: assigning one leaves its `observers_` pointer aimed at the source's storage. Suggest `= delete` on the copy operations (subject.h, outside this WO's box).
 
 ### Blockers
 (none)
