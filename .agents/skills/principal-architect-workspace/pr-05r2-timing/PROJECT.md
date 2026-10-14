@@ -71,7 +71,7 @@ how deadlines behave, which WO1, WO3 and WO4 change.
   `--:--`, spec §11.1 LVGL table. `architect`.
 - **[x] [wo4-dirty-and-resume](wo4-dirty-and-resume/WORKORDER.md):** `cf39c3e`…`656a30b`. the dirty-flag bug, the resume callback, the threading contract in
   §11.1. `standard`.
-- **[ ] [wo5-release](wo5-release/WORKORDER.md):** runtime 0.9.0, CLI runtime floor re-stamped,
+- **[x] [wo5-release](wo5-release/WORKORDER.md):** `90d9ef8`. runtime 0.9.0, CLI runtime floor re-stamped,
   CLI 0.13.0 (goldens move with the floor), goldens regenerated, Q-14 wording in §21. `standard`.
 - **[ ] wo6-readability:** house standards pass over the whole PR, then remediation. `standard`.
 - **[ ] wo7-device:** worker builds the rig firmware against the final tip (the clock driven by
@@ -151,5 +151,13 @@ converting widgets to timers.
     `u8g2gl_subject_*_n` types are copyable, and a copy shares the source's observer storage
     (silently breaks the subject). Suggested fix: `= delete` the copy operations.
 - **2026-10-14 — WO5 dispatched** on `u8g2gl-05r2/wo5-release`.
+- **2026-10-14 — WO5 verified** (`90d9ef8`). PA fresh build: ctest **495/495** (1 skip), 0 warnings;
+  CLI vitest **1353/1353** (run after ctest, not alongside); `cli.js --version` → 0.13.0. Runtime
+  0.9.0 in `u8g2gl_version.h`, `CMakeLists.txt`, `library.json`; `runtime-version.json` re-stamped.
+  Golden diff is the floor only (`(0, 8)` → `(0, 9)` and its `#error` text) in the two
+  `u8g2gl_generated_config.h` goldens; editor outputs unchanged. §21 Q-14 marked "SPI half
+  answered … I²C open", row left open. Schema 0.4 unchanged; nothing tagged or published.
+- **Holding before WO6** for the owner's answer on the two out-of-scope fixes (label resize layout;
+  non-copyable subjects), so readability runs once over the final code.
 
 ## Session Log
