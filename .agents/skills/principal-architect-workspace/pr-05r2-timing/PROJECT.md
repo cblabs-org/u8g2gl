@@ -76,7 +76,7 @@ how deadlines behave, which WO1, WO3 and WO4 change.
 - **[x] [wo6-small-fixes](wo6-small-fixes/WORKORDER.md):** `e01b85a`, `8c39d2b`. the two out-of-scope findings, owner-approved:
   a resized label re-measures its layout; subjects cannot be copied. `standard`.
 - **[x] [wo7-readability](wo7-readability/WORKORDER.md):** `a163bf7` + PA comment fix. house standards pass over the whole PR, then remediation. `standard`.
-- **[ ] [wo8-device](wo8-device/WORKORDER.md):** worker builds the rig firmware against the final tip (the clock driven by
+- **[x] [wo8-device](wo8-device/WORKORDER.md):** PASS on hardware, 2026-10-14. worker builds the rig firmware against the final tip (the clock driven by
   `u8g2gl_wall_clock`, no app-fed seconds); the PA flashes with the owner watching. Pass: 40.0 px/s,
   no idle wakes, seconds within a frame of the boundary, baselines aligned; the 33 redundant sends
   re-checked. `interactive`.
@@ -185,5 +185,31 @@ converting widgets to timers.
   ticked. The one leftover unpublished tag the worker flagged (`test_label.cpp:1117`, "D-A") fixed
   by the PA as a comment-only edit; that test re-run and passing.
 - **2026-10-14 — WO8 dispatched** (build-only device firmware; the PA flashes with the owner).
+- **2026-10-14 — WO8 on hardware: PASS.** Flashed through the **PlatformIO MCP** end to end (the
+  first time in the programme: `acquire_lock` → `upload_firmware` → `capture_serial_window` →
+  `release_lock`), on the owner-provided board (`303A:1001`, SER `80:65:99:A1:8E:90`, now
+  `/dev/cu.usbmodem1101`). Before flashing, a stale monitor from another session (Gemini MCP, project
+  `Echenon-hr-relay`, idle 17 h) held the port; the owner freed it. Logs: `wo8-device/logs/`.
+  - **F1 (image A′, `bb810f6c…6a56`):** `runtime=0.9.0 lit=1405 sha256=b9042618…f62d`, stable — the
+    Criterion 1 frame is unchanged by PR-5R2.
+  - **F2 (image V, `2871ef26…8134`), owner watching — "clock is good now":**
+    | | D1 blink on, 30 s | D2 blink off, 20 s | U uncapped, 10 s | before PR-5R2 |
+    |---|---|---|---|---|
+    | scroll | 40.01 px/s | 40.01 px/s | 40.01 px/s | 37.9 |
+    | idle wakes | 0 | 0 | n/a | 4 343 / 20 s |
+    | cap hits | 0 | 0 | n/a | — |
+    | second latency (median / max) | 15.5 / 15.6 ms | 15.1 / 15.6 ms | — | 260 ms (blink on); never drawn if IDLE honoured (blink off) |
+    | skipped seconds | 0 | 0 | 0 | — |
+    | redundant sends | 33 | 33 | 0 | 33 |
+    Second latency ≈ one frame (render + 11.8 ms SPI send ≈ 13.5 ms), i.e. the second is drawn in
+    the first frame after its boundary. **Zero deadlines** (120 / 40 / 80) all led to work — idle
+    wakes are 0 — so they are frames overrunning the next due time, the elapsed-correction's
+    intended 0, not the old spin.
+  - **The 33 redundant sends — cause identified from the data:** exactly 33 in each phase with one
+    circular-scroll wrap (D1, D2) and 0 in the phase with none (U), independent of phase length. The
+    `scroll_circular` label keeps stepping (and marking dirty) through its blank 30 px gap plus the
+    off-screen run-in, where nothing visible changes. Harmless (a re-send of identical pixels); a
+    possible optimisation: skip `mark_dirty()` while the text is entirely outside the clip. **Not in
+    this PR** — recorded as a finding.
 
 ## Session Log

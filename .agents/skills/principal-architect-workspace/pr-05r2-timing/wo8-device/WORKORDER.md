@@ -121,19 +121,47 @@ units and n.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete (both images build; nothing flashed, no tracked file changed)
 
 ### Changes Made
-- `path/to/file` — what changed and why
+All under `tmp/` (git-ignored); `git status --short` is empty.
+- `tmp/device-a/` (copy of `device-m` rig `tmp/device/`, no `.pio`/logs/runtime-before) and `tmp/fdn/`.
+  `src/main.cpp` is byte-identical (`cmp`). Only `device_after`'s `lib_deps` symlink now points at this worktree.
+  Firmware `tmp/device-a/.pio/build/device_after/firmware.bin`, 356912 bytes,
+  sha256 `bb810f6cc07d5d16939b9cab968690ab2885b07b7cd6fc241d5aea98f2536a56`.
+  (The expected `b9042618...` is the frame hash the firmware prints, not the image hash.) Log `tmp/build-a.log`.
+- `tmp/device-v/` (from `device-m1`): new `src/main.cpp`, env `v`, symlink to this worktree; screen XML
+  unchanged except the caption text. UI regenerated with this worktree's CLI:
+  `cd tmp/device-v && node ../../cli/dist/node/cli.js generate ui --target ssd1322` (after `cd cli && npm run build`).
+  Header stamps: `schema: 0.4`, `generator: 0.13.0`, `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 9)`.
+  Firmware `tmp/device-v/.pio/build/v/firmware.bin`, 360368 bytes,
+  sha256 `2871ef262665b5fc36fbce5f3d5c986325dd21888b5206e4fc3adffc53cb8134`. Logs `tmp/build-v.log`, `tmp/gen-v.log`.
+- Both build logs: `|-- u8g2gl @ 0.9.0`. Only warning is the framework's `io_pin_remap.cpp` `#warning`; none from `main.cpp`.
+- `tmp/CAPTURE-5R2.md`: capture plan, what to watch, thresholds.
 
 ### Decisions Made
-- Decision description and rationale
+- Image V pre-phases: UI and wall clock come up first, then Serial (up to 3 s, UI pumped meanwhile), so the
+  5 s unknown window is not eaten by the serial wait; a boot pump runs to 6.5 s so the first known second has landed
+  before D1. Boot-pump redundant sends are reported separately (`boot_pump`).
+- Second latency is read from the subject after each `ui_handler()` call: the call in which the subject takes a
+  new value; latency = end of that call minus `(sec - kBaseEpoch) * 1e6` us on the esp_timer axis (includes frame
+  time). The first second of each run is a baseline, not a sample. `second_changes_without_buffer_change`
+  checks that the changing call also changed the buffer.
+- Scroll rate = (steps - 1) / (last step - first step) from `scroll_x_` after each call (private-as-public, in
+  `main.cpp` only). Limitation (also in the serial method line): logical offset at call end, not panel pixels.
+- Cap hits exclude U8G2GL_IDLE returns; those are counted as `idle_returns`.
+- Time-unknown path: the wall clock retries every 1000 ms when unknown, so the first known second may appear up to
+  ~1 s after 5 s; expect the panel to leave `--:--:--` between 5 and 6 s.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- None blocking. The PA should be aware phase U starts after ~56 s of steady state, so the "33 redundant sends in
+  the first second" will only reappear if they are tied to the start of an uncapped loop; the boot-pump count
+  covers the real first seconds.
+- `device_before` env is left in `device-a/platformio.ini` untouched and points at a `runtime-before` directory
+  that is not copied; I built with `-e device_after` only.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- None.
 
 ### Blockers
 (none)
