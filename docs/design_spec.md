@@ -673,6 +673,18 @@ arriving from LVGL will try it, so the omission is documented rather than
 silent. `truncate` is deleted; `long_mode="clip"` is its replacement and says
 what it does.
 
+**The clock binds to a wall-clock subject and schedules only its colon.** Bound
+(`bind_time`) to a time subject that a `u8g2gl_wall_clock` keeps current
+(§11.1), `<u8g2gl_clock>` shows each new second within a millisecond of its
+boundary with no application code. Its own `tick()` handles only the blink: each
+change of the time value shows the colon and restarts the 500 ms cycle, so the
+colon appears with every new second instead of drifting against it, and each
+toggle is due 500 ms after the previous one's due time. With the blink off it
+returns no deadline at all — the wall clock's timer supplies the per-second one.
+A time of `U8G2GL_TIME_UNKNOWN` renders as `--:--` (`--:--:--` in `hh_mm_ss`,
+the seconds' dashes in the secondary font), in the same digit columns as a real
+time so the layout does not jump when the time arrives, with a steady colon.
+
 **All time-valued properties carry a `_ms` suffix and are milliseconds. All rate
 properties name their unit.** v0.1 had `scroll_speed="25"` documented as
 frames-per-second in one document, unitless in another, and implemented as
@@ -1147,7 +1159,7 @@ void loop() {
 }
 ```
 
-`ui_handler()` ticks every widget, renders if the frame is dirty (§11.2), and **returns the number of milliseconds until it next has work to do** — the next colon blink, scroll step, or animation frame. `UINT32_MAX` means nothing is animating and only a subject change will require a redraw.
+`ui_handler()` runs any due timers (below), ticks every widget, renders if the frame is dirty (§11.2), and **returns the number of milliseconds until it next has work to do** — the next timer, colon blink, scroll step, or animation frame. `UINT32_MAX` means no timer is pending, nothing is animating, and only a subject change will require a redraw.
 
 ```cpp
 // generated ui_render(), called by ui_handler() when dirty
@@ -1167,16 +1179,45 @@ Verified against LVGL 9.5.0:
 | Time source | `lv_tick_set_cb(cb)` — LVGL *pulls* the app's clock. `lv_tick_inc()` remains for ISR-driven *push* | `u8g2gl_set_tick_cb(cb)`, defaulting to `millis()`. Pull only |
 | Pump | `uint32_t lv_timer_handler(void)` — *"Call it periodically... @return time till it needs to be run next (in ms)"* | `uint32_t ui_handler(U8G2&)`, same contract |
 | Convenience | Three tiers: `lv_timer_handler()`, `lv_timer_handler_run_in_period(period)`, `lv_timer_periodic_handler()` | One: `ui_handler_run_in_period(u8g2, period_ms)` |
+| Timers | `lv_timer_create(cb, period, user_data)` — allocated by LVGL and kept on a list it owns | `u8g2gl_timer_init(&timer, cb, period_ms, user_data)` on storage the caller owns (LVGL's `_init` convention, as `lv_style_init`) |
 | Output | App supplies `flush_cb`; LVGL never touches hardware | App owns the `U8G2` instance and its constructor |
 
 **The decisive borrowing is the return value.** v0.1 and earlier drafts of this spec had a boolean `ui_needs_render()`, which tells the application *that* something changed but not *when* the next thing will. Returning a deadline is strictly more useful and costs nothing to compute — every animating widget already knows its own next deadline, so the framework returns the minimum across them.
 
 This matters more here than it does for LVGL. Monochrome projects skew towards battery and low-power work — e-paper dashboards, sensor displays, handhelds — where the ability to sleep precisely until the next visible change is worth more than it is on a mains-powered colour TFT.
 
-**Two deliberate divergences from LVGL:**
+**Deliberate divergences from LVGL:**
 
 1. **Pull-only time.** LVGL keeps `lv_tick_inc()` for ISR-driven ticking because it must support platforms with no cheap monotonic clock. Every target in [D-1] has `millis()` or equivalent. Supporting both doubles the porting surface for no benefit here.
 2. **One convenience wrapper, not three.** LVGL's three tiers exist because it is ported to an enormous range of OS and bare-metal environments. U8G2GL's audience is narrower, and each extra entry point is another contract to document, test, and keep consistent.
+3. **Timer storage is the host's, and there is no heap.** The host declares each `u8g2gl_timer` — a static, or a member of its own object — and U8G2GL links them intrusively, keeping only a head pointer: no pool, no capacity setting, no allocation ([D-1]). A fixed pool would need a count, and unlike objects and bindings ([D-21]) timers are created by host code the generator never sees. A timer's destructor unlinks it, so one that leaves scope is never run.
+4. **Timers are scheduled from their due time.** LVGL records `last_run = lv_tick_get()` when a callback runs, so every late wake pushes all later runs back and a 1 s timer runs slow. U8G2GL's next run is due one period after the previous *due* time; a timer a whole period or more late runs once and resyncs to one period from now, rather than running repeatedly to catch up.
+5. **A subset of the timer calls.** `init`, `delete`, `pause`, `resume`, `set_period`, `ready`, `reset`, `set_repeat_count` and `get_user_data`, with LVGL's names and meanings — except that an exhausted repeat count pauses the timer, as there is no heap to auto-delete it from. Auto-delete, external data, global enable, idle statistics and list walking are omitted: each is a heap or OS artefact, or surface no U8G2GL use needs.
+
+#### Timers and the wall clock
+
+**A timer whose callback writes a subject is how time-dependent data stays fresh.** It is LVGL's idiom — LVGL has no data-source concept, and refreshes such data from a timer callback that sets a subject — and it needs nothing new from widgets: the subject notifies its bound widgets, they mark the frame dirty, and the frame is drawn. `ui_handler()` runs due timers *before* ticking widgets, so a value a timer writes is drawn by the same call, and it runs them even with no screen active, because timers are data rather than screen state. Their deadline joins the widgets' in the value `ui_handler()` returns. Widgets themselves keep their `tick()` deadlines (§11.3) rather than becoming timers, a known difference from LVGL.
+
+```cpp
+static u8g2gl_timer s_battery_timer;            // host-owned storage
+
+static void on_battery_timer(u8g2gl_timer* t) {
+    auto* level = static_cast<u8g2gl_subject_int*>(u8g2gl_timer_get_user_data(t));
+    level->set(read_battery_percent());          // bound widgets redraw
+}
+
+u8g2gl_timer_init(&s_battery_timer, on_battery_timer, 5000, &ui_subject_battery);
+```
+
+The library supplies the mechanism and one generic helper, `u8g2gl_wall_clock`: an object the host declares, containing a timer, that publishes a time subject on each second boundary. The host supplies only a time function, `bool (*)(uint32_t* epoch_seconds, uint16_t* millis_into_second)`, which returns false while the time is unknown (before NTP has synced, say) and otherwise the **local** epoch to display — the library applies no time zone. Each run sets the subject to the time and re-aims the timer at the next boundary, `1000 − millis_into_second` ms away; while the time is unknown it sets `U8G2GL_TIME_UNKNOWN` and retries a second later. A developer who adds a clock writes no seconds logic:
+
+```cpp
+u8g2gl_wall_clock_init(&s_wall_clock, &ui_subject_time, read_time);
+```
+
+Concrete sources — NTP time, system information, event bridges — belong to the host project, not to U8G2GL, which stays free of NTP, RTC and platform calls and works without them.
+
+There is no locking: every timer function, and every callback, runs on the thread that calls `ui_handler()`, as in LVGL built without an OS layer.
 
 ### 11.2 Dirty Tracking Gates the Frame, Not the Widget
 
