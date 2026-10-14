@@ -173,5 +173,11 @@ converting widgets to timers.
   pass on the new (the move and dirty tests pass on both, correctly). Fresh build: ctest
   **501/501** (1 skip), 0 warnings.
 - **2026-10-14 — WO7 started:** readability-reviewer audit of `99ac4a3..HEAD`, then remediation.
+- **2026-10-14 — WO7 audit received** ([AUDIT.md](wo7-readability/AUDIT.md)): P1 0, P2 1 (stale
+  "Step 5" comment), P3 5 items (work-order tags on new lines; `ui_handler()` Doxygen missing the
+  timer-callback rule and the 0 return; stale Purpose blocks), P4 3. New timer and wall-clock
+  modules called exemplary; no allocation. **PA decision:** `u8g2gl_resume_notify()` moves to a new
+  private `src/u8g2gl_internal.h` now — cheap before 0.9 ships, a breaking change after. All items
+  incl. P4 dispatched to a remediation worker.
 
 ## Session Log
