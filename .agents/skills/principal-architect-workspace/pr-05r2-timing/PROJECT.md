@@ -211,5 +211,23 @@ converting widgets to timers.
     off-screen run-in, where nothing visible changes. Harmless (a re-send of identical pixels); a
     possible optimisation: skip `mark_dirty()` while the text is entirely outside the clip. **Not in
     this PR** — recorded as a finding.
+- **2026-10-14 — Owner, verbatim: "Yes push the stack and PR - let's move on and close out this
+  one".** PR opened from `u8g2gl-05r2/wo8-device` (description: [PR-DESCRIPTION.md](PR-DESCRIPTION.md)).
 
 ## Session Log
+
+### 2026-10-14 — Project wrap-up
+- **Outcome:** animation keeps time on hardware — scroll 40.01 px/s, 0 idle wakes, each second drawn
+  one frame after its boundary with blink on or off, baselines aligned. Q-C delivered as an
+  LVGL-shaped timer with host-owned storage plus a wall-clock helper and a resume callback; the
+  dirty-ordering bug and two smaller defects fixed. Runtime 0.9.0, CLI 0.13.0, schema 0.4.
+- **Design lessons:** (1) copy LVGL's *API*, not its scheduling — its timers drift exactly as D-A
+  did. (2) A fixed pool is only justified where the generator can count the objects; host-created
+  objects need host-owned storage. (3) "A self-refreshing data source" is just a timer writing a
+  subject — the owner's framing led straight to LVGL's own idiom.
+- **Process lessons:** run every bug-catching test against the pre-fix code (the PA's control caught
+  a widening test that could not fail). Readability before the device check, so the owner watches
+  final code. The PlatformIO MCP now flashes end to end; a stale monitor from another session can
+  hold the port.
+- **Open:** circular-scroll redundant sends (an optimisation); widget ticks as timers; foundation's
+  concrete sources (its cut-over).
