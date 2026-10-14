@@ -66,10 +66,10 @@ how deadlines behave, which WO1, WO3 and WO4 change.
   `standard`.
 - **[x] [wo2-clock-baseline](wo2-clock-baseline/WORKORDER.md):** `75d801f`. D-B. Seconds aligned by baseline; pixel test against real U8G2.
   `standard`.
-- **[ ] [wo3-timers-wall-clock](wo3-timers-wall-clock/WORKORDER.md):** `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
+- **[x] [wo3-timers-wall-clock](wo3-timers-wall-clock/WORKORDER.md):** `ca442c9`…`189ab4b`. `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
   `ui_handler()` merges timer and widget deadlines, the wall-clock helper, clock blink phase-locked,
   `--:--`, spec §11.1 LVGL table. `architect`.
-- **[ ] wo4-dirty-and-resume:** the dirty-flag bug, the resume callback, the threading contract in
+- **[ ] [wo4-dirty-and-resume](wo4-dirty-and-resume/WORKORDER.md):** the dirty-flag bug, the resume callback, the threading contract in
   §11.1. `standard`.
 - **[ ] wo5-release-device:** runtime 0.9.0, changelog, Q-14 wording in §21, device re-run of the
   measurement rig with the owner. `interactive`.
@@ -117,5 +117,20 @@ converting widgets to timers.
   names Sonnet 5.5, the model that wrote it — kept.
 - **2026-10-14 — WO3 dispatched** on `u8g2gl-05r2/wo3-timers-wall-clock`. The label-resize finding
   is still with the owner (not in WO3).
+- **2026-10-14 — WO3 verified** (`ca442c9` timer + `ui_handler()`, `41d045b` wall clock +
+  `U8G2GL_TIME_UNKNOWN`, `826c10f` clock, `e028312` spec, `189ab4b` report). PA fresh build: ctest
+  **481/481** (1 skip), 0 warnings; no allocation in the new files. Handler read: reschedules from
+  the due time before the callback (the callback's own reset/ready/set_period wins), restarts from
+  the head when a callback changes the list, run-once flags prevent a double run, a `s_running`
+  pointer guards a self-deleted timer. `ui_handler()` runs timers first, min()s with widget
+  deadlines, keeps the elapsed correction (factored into one helper), and runs timers with no
+  screen. End-to-end: a clock bound to a wall-clock subject, app sleeping exactly the returned
+  deadline, draws every second within ≤ 1 ms of its boundary, blink on and off, over 125 s; the
+  assertion was mutation-tested. Sizes (64-bit host): timer 40 B, wall clock 56 B.
+  - **PA rulings:** the edit to `test/test_ambient_state.cpp` (outside the WO's list) accepted: the
+    blink lock removed the free-running toggle it relied on; the assertion is unchanged. Spec gaps
+    (§8.1 time subject, §11.3 blink lock) → WO4. Generator emitting a wall clock: not needed now
+    (a generated `<time>` subject works with `u8g2gl_wall_clock_init`); a possible later item.
+- **2026-10-14 — WO4 dispatched** on `u8g2gl-05r2/wo4-dirty-and-resume`.
 
 ## Session Log
