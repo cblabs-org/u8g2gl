@@ -378,7 +378,10 @@ TEST(LabelScroll, InitialDelayBeforeScroll) {
 
     // Once initial delay elapses (t=4001 > 4000), scrolling begins
     uint32_t d3 = label.tick(4001);
-    EXPECT_EQ(d3, 40u); // 1000ms / 25 fps = 40ms interval
+    // The step was due at t=4000 and ran at 4001, one ms late. The next step is
+    // due one 40 ms interval after the DUE time (4040), so 39 ms remain — the
+    // old "40" restarted the interval from when the step ran (PR-5R2 WO1, D-A).
+    EXPECT_EQ(d3, 39u);
 
     // Verify pixel offset has incremented to 1 (drawn at x - scroll_x = 0 - 1 = -1)
     label.render(display);
@@ -441,8 +444,10 @@ TEST(LabelScroll, ConfigurableScrollSpeed) {
     // First tick at t=0 returns initial delay of 500ms
     EXPECT_EQ(label.tick(0), 500u);
 
-    // Tick at t=501 advances scroll and returns 1000 / 50 = 20ms interval
-    EXPECT_EQ(label.tick(501), 20u);
+    // The step was due at t=500 and ran at 501. The next is due at 500 + 20 (the
+    // 1000 / 50 interval, from the DUE time), so 19 ms remain from 501. The old
+    // value, 20, restarted the interval from when the step ran (PR-5R2 WO1, D-A).
+    EXPECT_EQ(label.tick(501), 19u);
 }
 
 // WO2b: long_mode="scroll" must reverse at each end rather than wrap
@@ -1073,4 +1078,298 @@ TEST(Label, SizeOf) {
     // the moved marquee state. Per §1.3, this ceiling is the measured number,
     // not the estimate — see WO2's Completion Report.
     EXPECT_LE(sizeof(u8g2gl_label), 80u);
+}
+
+// =====================================================================
+// Scroll timing (PR-5R2 WO1, defect D-A) — due-time scheduling
+//
+// Every test here drives the label with a simulated clock; none reads real
+// time, so a failure is a property of the scheduling and not of the machine.
+// =====================================================================
+
+namespace {
+
+// Screen harness for the ui_handler-level tests: one label, one scripted
+// clock, so the test sees exactly the frames a real loop would send.
+u8g2gl_label* s_timing_label = nullptr;
+uint32_t s_timing_now = 0;
+
+uint32_t timing_clock() { return s_timing_now; }
+uint32_t timing_tick(uint32_t now_ms) { return s_timing_label->tick(now_ms); }
+void timing_render(U8G2& display) { s_timing_label->render(display); }
+
+// Builds a scrolling label that needs the marquee: 200 px of text in a 60 px
+// widget, so scroll_max is 140 and the bounce never turns inside a 20 s run.
+void configure_marquee(u8g2gl_label& label, u8g2gl_long_mode_t mode,
+                       uint8_t px_per_sec, uint16_t initial_delay_ms) {
+    label.set_long_mode(mode);
+    label.set_coords(0, 0, 60, 16);
+    label.set_text("A long marquee line that needs scrolling");
+    label.set_scroll_px_per_sec(px_per_sec);
+    label.set_initial_delay_ms(initial_delay_ms);
+}
+
+}  // namespace
+
+// D-A, the 33 redundant sends. Phase U on hardware ran an uncapped loop and saw
+// 33 full-frame sends with no buffer change inside the initial-delay window.
+// An uncapped loop calls ui_handler() every millisecond; inside the delay the
+// only frames that may be sent are the first paint, so any more is the defect.
+TEST(LabelScrollTiming, NoRedundantFramesInsideInitialDelay) {
+    u8g2gl_label label;
+    configure_marquee(label, U8G2GL_LONG_SCROLL, 40, 1000);
+
+    u8g2gl_obj* objs[] = { &label };
+    uint8_t parents[] = { 0xFF };
+    u8g2gl_screen screen{};
+    screen.objs = objs;
+    screen.parents = parents;
+    screen.obj_count = 1;
+    screen.tick_fn = timing_tick;
+    screen.render_fn = timing_render;
+
+    s_timing_label = &label;
+    s_timing_now = 0;
+    u8g2gl_set_tick_cb(timing_clock);
+    u8g2gl_set_active_screen(&screen);
+
+    U8G2 display;
+    display.utf8_width_val = 200;
+
+    // Millisecond 0 is the first paint; every later millisecond up to the end of
+    // the delay is an uncapped-loop wake with nothing new to show.
+    for (s_timing_now = 0; s_timing_now < 1000; ++s_timing_now) {
+        ui_handler(display);
+    }
+
+    // First paint, plus the one repaint the layout measurement is allowed to
+    // cause (render() measures, then rewinds the marquee).
+    EXPECT_LE(display.send_count, 2);
+
+    u8g2gl_set_active_screen(nullptr);
+    u8g2gl_set_tick_cb(nullptr);
+}
+
+namespace {
+
+// A label that scrolls for the whole run: 2000 px of text in a 60 px widget, so
+// neither the bounce nor the circular wrap occurs inside a 20 s test.
+struct TimingRig {
+    u8g2gl_label label;
+    U8G2 display;
+
+    TimingRig(u8g2gl_long_mode_t mode, uint8_t px_per_sec, uint16_t initial_delay_ms,
+              int16_t text_width = 2000, int16_t widget_w = 60) {
+        configure_marquee(label, mode, px_per_sec, initial_delay_ms);
+        label.set_coords(0, 0, widget_w, 16);   // before the first render measures
+        display.utf8_width_val = text_width;
+        label.render(display);   // measures the text and rewinds the marquee
+        label.clear_dirty();
+    }
+
+    // The marquee offset, read from where render() draws. The stub records the
+    // x U8G2 received; the 16-bit wrap in u8g2gl_coord_pos() is undone here.
+    int offset() {
+        label.render(display);
+        return -static_cast<int16_t>(display.last_draw_utf8_x);
+    }
+
+    // One tick; true when it moved the marquee (a step marks the label dirty).
+    bool tick_stepped(uint32_t now, uint32_t& deadline) {
+        label.clear_dirty();
+        deadline = label.tick(now);
+        return label.is_dirty();
+    }
+};
+
+// Runs the loop an application would: sleep for the returned deadline, wake
+// 0-1 ms late (deterministic jitter), tick. Counts steps and checks the two
+// timing promises as it goes. `start` lets a run straddle the uint32_t wrap.
+struct RateResult {
+    int steps = 0;
+    int wakes = 0;
+    int zero_returns = 0;
+    int wakes_without_step = 0;
+};
+
+RateResult run_at_deadlines(TimingRig& rig, uint32_t start, uint32_t first_step_offset_ms,
+                            uint32_t run_ms) {
+    RateResult r;
+    uint32_t deadline = 0;
+    uint32_t now = start;
+    rig.tick_stepped(now, deadline);            // establishes the initial delay
+    if (deadline == 0) r.zero_returns++;
+    const uint32_t end = start + first_step_offset_ms + run_ms;
+    uint32_t lcg = 12345;
+    while (true) {
+        lcg = lcg * 1103515245u + 12345u;
+        now += deadline + ((lcg >> 16) & 1u);   // 0 or 1 ms of jitter
+        if (static_cast<int32_t>(now - end) >= 0) break;
+        r.wakes++;
+        if (rig.tick_stepped(now, deadline)) r.steps++; else r.wakes_without_step++;
+        if (deadline == 0) r.zero_returns++;
+    }
+    return r;
+}
+
+}  // namespace
+
+TEST(LabelScrollTiming, RateIsExactAt40PxPerSecond) {
+    for (u8g2gl_long_mode_t mode : {U8G2GL_LONG_SCROLL, U8G2GL_LONG_SCROLL_CIRCULAR}) {
+        TimingRig rig(mode, 40, 1000);
+        RateResult r = run_at_deadlines(rig, 5000, 1000, 20000);
+        EXPECT_NEAR(r.steps, 800, 1);
+        EXPECT_EQ(r.zero_returns, 0);
+        EXPECT_EQ(r.wakes_without_step, 0);   // every wake at a deadline stepped
+    }
+}
+
+TEST(LabelScrollTiming, RateIsExactAt30PxPerSecond) {
+    // 1000 / 30 truncates to 33 ms, which is 30.3 px/s: 606 steps in 20 s.
+    for (u8g2gl_long_mode_t mode : {U8G2GL_LONG_SCROLL, U8G2GL_LONG_SCROLL_CIRCULAR}) {
+        TimingRig rig(mode, 30, 1000);
+        RateResult r = run_at_deadlines(rig, 5000, 1000, 20000);
+        EXPECT_NEAR(r.steps, 600, 1);
+        EXPECT_EQ(r.zero_returns, 0);
+        EXPECT_EQ(r.wakes_without_step, 0);
+    }
+}
+
+TEST(LabelScrollTiming, RateHoldsAcrossTheUint32Wrap) {
+    // Start 10 s before UINT32_MAX so the initial delay ends just before the wrap
+    // and the 20 s run crosses it.
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 1000);
+    RateResult r = run_at_deadlines(rig, UINT32_MAX - 10000u, 1000, 20000);
+    EXPECT_NEAR(r.steps, 800, 1);
+    EXPECT_EQ(r.zero_returns, 0);
+    EXPECT_EQ(r.wakes_without_step, 0);
+}
+
+TEST(LabelScrollTiming, StartingAtMillisecondZeroStillScrolls) {
+    // A timestamp of 0 is a real time. It used to double as "not started".
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 0);
+    uint32_t deadline = 0;
+    EXPECT_FALSE(rig.tick_stepped(0, deadline));
+    EXPECT_EQ(deadline, 1u);
+    EXPECT_TRUE(rig.tick_stepped(1, deadline));
+    EXPECT_EQ(deadline, 25u);
+}
+
+TEST(LabelScrollTiming, StepIsDueAtTheDeadlineNotAfterIt) {
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 1000);
+    uint32_t deadline = 0;
+    EXPECT_FALSE(rig.tick_stepped(0, deadline));
+    EXPECT_EQ(deadline, 1000u);                 // first step due at t=1000
+
+    // One ms early: nothing happens, and the answer is 1, not 0.
+    EXPECT_FALSE(rig.tick_stepped(999, deadline));
+    EXPECT_EQ(deadline, 1u);
+    EXPECT_EQ(rig.offset(), 0);
+
+    // Exactly due: steps (the old test was strictly greater, so this was a miss).
+    EXPECT_TRUE(rig.tick_stepped(1000, deadline));
+    EXPECT_EQ(rig.offset(), 1);
+    EXPECT_EQ(deadline, 25u);
+
+    // The same edge on a later step.
+    EXPECT_FALSE(rig.tick_stepped(1024, deadline));
+    EXPECT_EQ(deadline, 1u);
+    EXPECT_TRUE(rig.tick_stepped(1025, deadline));
+    EXPECT_EQ(rig.offset(), 2);
+}
+
+TEST(LabelScrollTiming, LateWakeKeepsTheScheduleAndDoesNotDriftItBack) {
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 1000);
+    uint32_t deadline = 0;
+    rig.tick_stepped(0, deadline);
+    // 10 ms late (less than one 25 ms interval) is not a stall.
+    EXPECT_TRUE(rig.tick_stepped(1010, deadline));
+    EXPECT_EQ(deadline, 15u);                   // next step still due at 1025
+    EXPECT_TRUE(rig.tick_stepped(1025, deadline));
+    EXPECT_EQ(deadline, 25u);                   // 1050
+}
+
+TEST(LabelScrollTiming, StallTakesOneStepThenResumesWithoutABurst) {
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 1000);
+    uint32_t deadline = 0;
+    rig.tick_stepped(0, deadline);
+    EXPECT_TRUE(rig.tick_stepped(1000, deadline));    // offset 1
+    EXPECT_EQ(rig.offset(), 1);
+
+    // The loop is blocked for a second. The next call takes exactly one step...
+    EXPECT_TRUE(rig.tick_stepped(2025, deadline));
+    EXPECT_EQ(rig.offset(), 2);
+    EXPECT_NE(deadline, 0u);
+    EXPECT_EQ(deadline, 25u);                   // ...and the schedule restarts from now
+    // A second call in the same millisecond finds nothing due.
+    EXPECT_FALSE(rig.tick_stepped(2025, deadline));
+    EXPECT_EQ(rig.offset(), 2);
+
+    // Then the rate resumes: 40 steps in the next second, one per call.
+    int steps = 0;
+    for (uint32_t t = 2026; t < 3025; ++t) {
+        if (rig.tick_stepped(t, deadline)) steps++;
+    }
+    EXPECT_EQ(steps, 39);                       // 2050 ... 3025 exclusive
+    EXPECT_EQ(rig.offset(), 2 + 39);
+}
+
+TEST(LabelScrollTiming, BounceDwellLastsExactlyStaticDwellAndDirectionFlips) {
+    // message 60, widget 50: scroll_max = 10.
+    TimingRig rig(U8G2GL_LONG_SCROLL, 40, 100, 60, 50);
+    rig.label.set_static_dwell_ms(2000);
+
+    uint32_t deadline = 0;
+    rig.tick_stepped(0, deadline);              // initial delay: due at 100
+    EXPECT_EQ(deadline, 100u);
+
+    // Ten steps reach the far edge (due 100, 125, ... 325); the tenth dwells.
+    uint32_t now = 100;
+    for (int i = 0; i < 9; ++i) {
+        ASSERT_TRUE(rig.tick_stepped(now, deadline));
+        now += deadline;
+    }
+    EXPECT_EQ(now, 325u);
+    ASSERT_TRUE(rig.tick_stepped(now, deadline));
+    EXPECT_EQ(rig.offset(), 10);
+    EXPECT_EQ(deadline, 2000u);                 // the dwell, to the millisecond
+
+    // One ms before the dwell ends: held, and asking for 1 ms.
+    EXPECT_FALSE(rig.tick_stepped(now + 1999, deadline));
+    EXPECT_EQ(deadline, 1u);
+    EXPECT_EQ(rig.offset(), 10);
+
+    // Dwell over: the direction has flipped, so the offset now falls.
+    EXPECT_TRUE(rig.tick_stepped(now + 2000, deadline));
+    EXPECT_EQ(rig.offset(), 9);
+    EXPECT_EQ(deadline, 25u);
+}
+
+TEST(LabelScrollTiming, ZeroDwellStillNeverReturnsZero) {
+    TimingRig rig(U8G2GL_LONG_SCROLL, 40, 0, 52, 50);   // scroll_max = 2
+    rig.label.set_static_dwell_ms(0);
+
+    uint32_t deadline = 0;
+    rig.tick_stepped(0, deadline);
+    uint32_t now = 1;
+    for (int i = 0; i < 40; ++i) {
+        rig.tick_stepped(now, deadline);
+        ASSERT_NE(deadline, 0u);
+        now += deadline;
+    }
+}
+
+TEST(LabelScrollTiming, RenderAnimationUpdateAndTickCannotBothStepOneDueTime) {
+    TimingRig rig(U8G2GL_LONG_SCROLL_CIRCULAR, 40, 1000);
+    uint32_t deadline = 0;
+    rig.tick_stepped(0, deadline);
+
+    // The blocked-loop path steps once at t=1000...
+    rig.label.render_animation_update(rig.display, 1000);
+    EXPECT_EQ(rig.offset(), 1);
+    // ...and neither it nor ui_handler()'s tick may take the same due time again.
+    rig.label.render_animation_update(rig.display, 1000);
+    EXPECT_FALSE(rig.tick_stepped(1000, deadline));
+    EXPECT_EQ(rig.offset(), 1);
+    EXPECT_EQ(deadline, 25u);
 }

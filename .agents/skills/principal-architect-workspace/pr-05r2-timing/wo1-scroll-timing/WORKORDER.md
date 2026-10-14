@@ -132,19 +132,56 @@ not fix them and do not file issues.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `src/u8g2gl_label.cpp` - `tick()` rewritten to due-time scheduling. A step is due when
+  `int32(now - next_due_ms_) >= 0`; the next due time is the previous due time plus an exact interval
+  (`1000 / speed`, remainder carried in `step_rem_`, so 30 px/s averages exactly 30). A call at least
+  one interval late takes one step and restarts the schedule from `now` (no burst). New private
+  `schedule()` is the single exit for deadlines and clamps to >= 1, so `tick()` never returns 0 (also
+  on the initial delay, the bounce dwell, and the static-fit dwell). The sentinel `last_scroll_ms_ == 0`
+  is replaced by `timing_started_` (0 is a real time). The bounce dwell runs from `now` (when the edge
+  is shown), so it lasts exactly `static_dwell_ms_`. `reset_scroll()` resets the new state.
+  `render_animation_update()` comment documents that it cannot double-step.
+- `include/u8g2gl/u8g2gl_label.h` - private only: `last_scroll_ms_` renamed `next_due_ms_`; added
+  `step_rem_` (uint8_t), `timing_started_` (bool), `schedule()`; `tick()` Doxygen updated. No public
+  signature changed. sizeof stays within the 80-byte ceiling.
+- `test/test_label.cpp` - 11 new `LabelScrollTiming` tests (rate 40 and 30 px/s in both modes, uint32
+  wrap, ms-zero start, due-edge, late-wake, stall/no-burst, bounce dwell and flip, zero dwell, render
+  path vs tick, and the redundant-frames repro). Two existing assertions updated (below).
+- `docs/design_spec.md` line 1208 - old: "a scrolling label returns its step interval"; new: "a scrolling
+  label returns the time left until its next step is due (never 0, and measured from the previous due
+  time rather than from when the step ran, so the scroll holds its configured rate)".
 
 ### Decisions Made
-- Decision description and rationale
+- Resync threshold is `late >= interval` (so an on-time wake is always < one interval late).
+- Dwell is measured from `now`, not the due time: measuring from due shortened the visible pause by
+  the lateness and broke the existing `DwellsAtFarEndForStaticDwellMs` (1990 vs 2000).
+- `scroll_px_per_sec == 0` keeps the historical 40 ms default (25 px/s).
+- Initial delay of 0 returns 1 and makes the first step due at now + 1.
+- Existing tests changed (both encoded "interval restarted from when the step ran"):
+  `LabelScroll.InitialDelayBeforeScroll`: step due 4000, run at 4001, `EXPECT_EQ(d3, 40u)` -> `39u`
+  (next due 4040). `LabelScroll.ConfigurableScrollSpeed`: step due 500, run at 501,
+  `EXPECT_EQ(tick(501), 20u)` -> `19u` (next due 520). Neither assertion was weakened; both are exact.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- The 33 redundant sends did NOT reproduce inside the label. Host repro: `LabelScrollTiming.
+  NoRedundantFramesInsideInitialDelay` drives the real `ui_handler()` uncapped (every ms) through a
+  1000 ms delay: 1 send. A second scratch repro (not committed) added a blinking `u8g2gl_clock`, a
+  non-zero boot time and a 13 ms frame cost: the only send in the delay window was the clock colon
+  toggle at +500 ms, which changes pixels. So the cause is outside the label's scheduling or depends on
+  the real generated app. The test is kept as a regression guard (passes before and after the fix).
+  Untested candidates: the clock's `bind_time` subject path, or app code re-setting a subject. Needs the
+  hardware rig with a per-call dirty-reason log.
+- Fresh worktree needed `git submodule update --init extern/u8g2` (used `--reference` to the main
+  checkout); no tracked change.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- `u8g2gl_obj::set_coords()` (and set_w) does not set `needs_layout_` on a label, so changing the width
+  after the first render leaves `needs_scroll_`/`message_width_` stale. Repro: render a 60 px-wide label
+  with 60 px text, then `set_coords(0,0,50,16)`: it still does not scroll. Not fixed (outside the box).
+- The clock's `tick()` still has the same class of drift (WO scope: later work order).
 
 ### Blockers
 (none)

@@ -237,8 +237,15 @@ public:
      * Outside U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR this always
      * returns U8G2GL_IDLE — clip and dots are static text and never animate.
      *
+     * Scrolling is scheduled by due time (PR-5R2 WO1): a step happens when
+     * `now_ms` has reached the due time, the next due time follows the previous
+     * one by exactly 1000 / speed ms (remainder carried, so the rate is exact),
+     * and a call more than one interval late takes a single step and restarts
+     * the schedule rather than bursting. The returned deadline is the time to
+     * the next due time and is never 0. Clock arithmetic is wrap-safe.
+     *
      * @param now_ms Current timestamp in milliseconds.
-     * @return Milliseconds until next tick deadline, or U8G2GL_IDLE.
+     * @return Milliseconds until next tick deadline (>= 1), or U8G2GL_IDLE.
      */
     uint32_t tick(uint32_t now_ms) override;
 
@@ -318,6 +325,13 @@ private:
     //   dots    — true to overdraw the ellipsis when text overflows
     void render_static(U8G2& display, const char* text, int16_t draw_y, bool dots);
 
+    // u8g2gl_label::schedule
+    // Stores the next due time and returns the delay to report: always >= 1,
+    // wrap-safe. See the .cpp for why this is the single exit for deadlines.
+    //   now_ms — the time passed to tick()
+    //   due_ms — when the next step or dwell end should happen
+    uint32_t schedule(uint32_t now_ms, uint32_t due_ms);
+
     // Members ordered largest-alignment-first to prevent struct padding holes:
     // pointer (8B) -> uint32_t (4B) -> int16_t/uint16_t (2B) -> uint8_t/bool (1B).
     // Measured, not estimated (§1.3): sizeof(u8g2gl_label) is 80 bytes on a
@@ -325,19 +339,21 @@ private:
     // rationale, not a substitute for checking it against a real build (see
     // docs/decisions/d19-label-long-mode.md's cost correction, where an
     // arithmetic-only +16-byte estimate had missed 8 of the actual +24).
-    // last_scroll_ms_ through scroll_finished_ are the former
+    // next_due_ms_ through scroll_finished_ are the former
     // u8g2gl_scrolling_label's members, moved unchanged (PR-3R WO2, [D-19]).
     const char* text_ = nullptr;          ///< Zero-copy literal string pointer; a binding overrides it
-    uint32_t last_scroll_ms_ = 0;         ///< Timestamp of last or next scheduled tick step
+    uint32_t next_due_ms_ = 0;            ///< When the next step, or the end of the dwell, is due
     int16_t scroll_x_ = 0;                ///< Current marquee horizontal pixel offset
     int16_t message_width_ = 0;           ///< Measured text pixel width under active font
     uint16_t initial_delay_ms_ = 3000;    ///< Milliseconds before scroll begins
     uint16_t static_dwell_ms_ = 5000;     ///< Milliseconds before static text finishes
     uint8_t scroll_px_per_sec_ = 25;      ///< Marquee speed in pixels per second
+    uint8_t step_rem_ = 0;                ///< Carried remainder of 1000 / speed, so the rate is exact
     u8g2gl_long_mode_t long_mode_ = U8G2GL_LONG_CLIP;  ///< Overflow behaviour ([D-19])
     bool needs_scroll_ = false;           ///< True if a scrolling mode's text width > widget width
     bool needs_layout_ = true;            ///< True if text measurement is required
     bool scroll_finished_ = false;        ///< True when cycle or dwell completes
+    bool timing_started_ = false;         ///< False until the first tick after a reset sets next_due_ms_
     bool overflow_ = false;               ///< True if measured text is wider than the widget
     bool scroll_forward_ = true;          ///< U8G2GL_LONG_SCROLL only: true while advancing away
                                            ///< from the origin, false while reversing back to it
