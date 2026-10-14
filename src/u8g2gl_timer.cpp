@@ -78,6 +78,7 @@ void u8g2gl_timer_init(u8g2gl_timer* timer, u8g2gl_timer_cb_t cb, uint32_t perio
     // timer re-initialised by its own callback cannot run a second time in the
     // same pass.
     if (timer->linked_) {
+        u8g2gl_resume_notify();
         return;
     }
     // Head insertion, as LVGL's lv_ll_ins_head: O(1), and the order only
@@ -87,6 +88,7 @@ void u8g2gl_timer_init(u8g2gl_timer* timer, u8g2gl_timer_cb_t cb, uint32_t perio
     timer->linked_ = true;
     s_head = timer;
     s_list_changed = true;
+    u8g2gl_resume_notify();   // a new timer is work the sleeping loop must hear of
 }
 
 // u8g2gl_timer_delete
@@ -139,6 +141,7 @@ void u8g2gl_timer_resume(u8g2gl_timer* timer) {
             timer->due_ms_ = now;
         }
     }
+    u8g2gl_resume_notify();
 }
 
 // u8g2gl_timer_set_period
@@ -155,6 +158,7 @@ void u8g2gl_timer_set_period(u8g2gl_timer* timer, uint32_t period_ms) {
     const uint32_t last_run_ms = timer->due_ms_ - timer->period_ms_;
     timer->period_ms_ = u8g2gl_timer_clamp_period(period_ms);
     timer->due_ms_ = last_run_ms + timer->period_ms_;
+    u8g2gl_resume_notify();
 }
 
 // u8g2gl_timer_ready
@@ -165,12 +169,14 @@ void u8g2gl_timer_set_period(u8g2gl_timer* timer, uint32_t period_ms) {
 void u8g2gl_timer_ready(u8g2gl_timer* timer) {
     if (timer != nullptr) {
         timer->due_ms_ = u8g2gl_tick_now() - timer->period_ms_;
+        u8g2gl_resume_notify();
     }
 }
 
 void u8g2gl_timer_reset(u8g2gl_timer* timer) {
     if (timer != nullptr) {
         timer->due_ms_ = u8g2gl_tick_now() + timer->period_ms_;
+        u8g2gl_resume_notify();
     }
 }
 

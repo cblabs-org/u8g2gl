@@ -143,6 +143,11 @@ private:
 };
 
 // --- Lifecycle ---
+//
+// u8g2gl_timer_init, _resume, _set_period, _ready and _reset each give a timer
+// work, so each fires the resume callback (u8g2gl_set_resume_cb()) as
+// lv_timer_handler_resume() is fired by the matching LVGL calls — except inside
+// ui_handler(), where the loop is awake already.
 
 /**
  * @brief Initialise host-owned timer storage, link it, and schedule its first

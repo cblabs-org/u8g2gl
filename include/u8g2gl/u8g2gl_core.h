@@ -30,6 +30,8 @@
  *     - ui_handler(): The main handler: runs timers, ticks, renders
  *     - u8g2gl_mark_dirty(): Mark the active screen dirty
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
+ *     - u8g2gl_set_resume_cb(): Set a callback that wakes a sleeping loop
+ *     - u8g2gl_resume_notify(): Library-internal: fire that callback
  *
  *     Support for generated code (§11.3, §13.5):
  *     - u8g2gl_render_object():        Render one object with visibility, clip and state guarded
@@ -57,6 +59,43 @@ class U8G2;
 using u8g2gl_tick_cb_t = uint32_t(*)();
 void u8g2gl_set_tick_cb(u8g2gl_tick_cb_t cb);
 uint32_t u8g2gl_tick_now();   // calls the registered callback
+
+// --- Resume callback ---
+/**
+ * @brief Callback that wakes a loop sleeping on ui_handler()'s returned deadline.
+ *
+ * Mirrors lv_timer_handler_set_resume_cb (§11.1). A host whose loop blocks for
+ * the deadline (an RTOS task on a semaphore or notification) gives this a
+ * function that releases it, so a change that needs a frame sooner than the
+ * deadline is not left waiting.
+ *
+ * It runs synchronously, in the caller's context: wherever the active screen
+ * went from clean to dirty, or a timer was initialised, resumed, made ready,
+ * reset or given a new period. It is not deferred, and it may run on any
+ * thread that made such a call, so it must only do what is safe there (give a
+ * semaphore, set a flag).
+ *
+ * @param user_data The pointer registered with the callback.
+ */
+using u8g2gl_resume_cb_t = void(*)(void* user_data);
+
+/**
+ * @brief Register the resume callback; nullptr clears it.
+ *
+ * @param cb        Function to call, or nullptr for none.
+ * @param user_data Passed back to @p cb.
+ */
+void u8g2gl_set_resume_cb(u8g2gl_resume_cb_t cb, void* user_data);
+
+/**
+ * @brief Library-internal: fire the resume callback, unless inside ui_handler().
+ *
+ * Called by the frame when the active screen goes clean to dirty, and by the
+ * timer calls that give a timer work. Inside ui_handler() it does nothing: the
+ * loop is awake by definition and the returned deadline already accounts for
+ * the work. Host code has no reason to call it.
+ */
+void u8g2gl_resume_notify();
 
 // --- Screen structure ---
 // Represents a complete screen: its widget array, parent table, and lifecycle.

@@ -981,6 +981,84 @@ TEST_F(Core, TimerWritingBoundSubjectRedrawsInSameCall) {
     EXPECT_EQ(display.send_count, 2);
 }
 
+// --- Dirty flag ordering: a subject written during a render is not lost ---
+
+namespace {
+
+// Stands in for any render path that writes a subject bound elsewhere on the
+// screen (an observer that fires mid-frame, a widget publishing a value). It
+// writes once, so the frame it dirties is the only extra frame.
+u8g2gl_subject_int s_render_written;
+int s_ordering_render_count = 0;
+bool s_ordering_wrote = false;
+
+void cb_render_writes_subject(U8G2& /*display*/) {
+    ++s_ordering_render_count;
+    if (!s_ordering_wrote) {
+        s_ordering_wrote = true;
+        s_render_written.set(1);   // frame-dirty observer: marks the frame dirty
+    }
+}
+
+class DirtyOrdering : public Core {
+protected:
+    void SetUp() override {
+        Core::SetUp();
+        // Static subject: its one observer is added once, and the value is
+        // reset in place (assigning a fresh subject would copy a pointer into
+        // the temporary's slots).
+        static bool s_observer_added = false;
+        if (!s_observer_added) {
+            ASSERT_TRUE(s_render_written.add_observer(nullptr, u8g2gl_frame_dirty_observer));
+            s_observer_added = true;
+        }
+        s_render_written.set(0);
+        s_ordering_render_count = 0;
+        s_ordering_wrote = false;
+        u8g2gl_set_tick_cb(mock_millis);
+    }
+};
+
+}  // namespace
+
+TEST_F(DirtyOrdering, SubjectWrittenDuringRenderIsDrawnByTheNextCall) {
+    u8g2gl_screen screen{};
+    screen.render_fn = cb_render_writes_subject;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    ui_handler(display);                    // activation frame; the render writes the subject
+    ASSERT_EQ(s_ordering_render_count, 1);
+
+    // The write came after this frame's content was drawn, so the frame on
+    // screen is stale. The old order cleared dirty after rendering and lost it.
+    EXPECT_TRUE(screen.dirty);
+    ui_handler(display);
+    EXPECT_EQ(s_ordering_render_count, 2);
+    EXPECT_EQ(display.send_count, 2);
+}
+
+TEST_F(DirtyOrdering, PendingWorkReturnsZeroAndPlainFrameReturnsTheDeadline) {
+    s_widget1.next_deadline = 500;
+    u8g2gl_screen screen{};
+    screen.tick_fn = cb_tick_single;
+    screen.render_fn = cb_render_writes_subject;
+    u8g2gl_set_active_screen(&screen);
+    U8G2 display;
+
+    // Work is left over: the caller must not sleep through the redraw.
+    EXPECT_EQ(ui_handler(display), 0u);
+    EXPECT_EQ(s_ordering_render_count, 1);
+
+    // The follow-up frame draws, writes nothing, and reports the real deadline.
+    EXPECT_EQ(ui_handler(display), 500u);
+    EXPECT_EQ(s_ordering_render_count, 2);
+
+    // A frame with nothing pending neither redraws nor reports 0.
+    EXPECT_EQ(ui_handler(display), 500u);
+    EXPECT_EQ(s_ordering_render_count, 2);
+}
+
 // --- Final sizeof Report (§18/Q-4) ---
 
 TEST_F(Core, SizeOfReport) {
