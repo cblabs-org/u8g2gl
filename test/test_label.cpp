@@ -1114,8 +1114,8 @@ void configure_marquee(u8g2gl_label& label, u8g2gl_long_mode_t mode,
 
 }  // namespace
 
-// D-A, the 33 redundant sends. Phase U on hardware ran an uncapped loop and saw
-// 33 full-frame sends with no buffer change inside the initial-delay window.
+// Redundant sends during the initial delay. An uncapped loop on hardware once
+// saw 33 full-frame sends with no buffer change inside the initial-delay window.
 // An uncapped loop calls ui_handler() every millisecond; inside the delay the
 // only frames that may be sent are the first paint, so any more is the defect.
 TEST(LabelScrollTiming, NoRedundantFramesInsideInitialDelay) {

@@ -75,8 +75,8 @@ how deadlines behave, which WO1, WO3 and WO4 change.
   CLI 0.13.0 (goldens move with the floor), goldens regenerated, Q-14 wording in §21. `standard`.
 - **[x] [wo6-small-fixes](wo6-small-fixes/WORKORDER.md):** `e01b85a`, `8c39d2b`. the two out-of-scope findings, owner-approved:
   a resized label re-measures its layout; subjects cannot be copied. `standard`.
-- **[ ] [wo7-readability](wo7-readability/WORKORDER.md):** house standards pass over the whole PR, then remediation. `standard`.
-- **[ ] wo8-device:** worker builds the rig firmware against the final tip (the clock driven by
+- **[x] [wo7-readability](wo7-readability/WORKORDER.md):** `a163bf7` + PA comment fix. house standards pass over the whole PR, then remediation. `standard`.
+- **[ ] [wo8-device](wo8-device/WORKORDER.md):** worker builds the rig firmware against the final tip (the clock driven by
   `u8g2gl_wall_clock`, no app-fed seconds); the PA flashes with the owner watching. Pass: 40.0 px/s,
   no idle wakes, seconds within a frame of the boundary, baselines aligned; the 33 redundant sends
   re-checked. `interactive`.
@@ -179,5 +179,11 @@ converting widgets to timers.
   modules called exemplary; no allocation. **PA decision:** `u8g2gl_resume_notify()` moves to a new
   private `src/u8g2gl_internal.h` now — cheap before 0.9 ships, a breaking change after. All items
   incl. P4 dispatched to a remediation worker.
+- **2026-10-14 — WO7 verified** (`a163bf7`). PA fresh build: ctest **501/501** (1 skip), 0 warnings.
+  Non-comment diff is only the `u8g2gl_resume_notify()` move: removed from `u8g2gl_core.h`, new
+  private `src/u8g2gl_internal.h` (include guard + declaration), two quoted includes. All AUDIT items
+  ticked. The one leftover unpublished tag the worker flagged (`test_label.cpp:1117`, "D-A") fixed
+  by the PA as a comment-only edit; that test re-run and passing.
+- **2026-10-14 — WO8 dispatched** (build-only device firmware; the PA flashes with the owner).
 
 ## Session Log
