@@ -73,9 +73,9 @@ how deadlines behave, which WO1, WO3 and WO4 change.
   §11.1. `standard`.
 - **[x] [wo5-release](wo5-release/WORKORDER.md):** `90d9ef8`. runtime 0.9.0, CLI runtime floor re-stamped,
   CLI 0.13.0 (goldens move with the floor), goldens regenerated, Q-14 wording in §21. `standard`.
-- **[ ] [wo6-small-fixes](wo6-small-fixes/WORKORDER.md):** the two out-of-scope findings, owner-approved:
+- **[x] [wo6-small-fixes](wo6-small-fixes/WORKORDER.md):** `e01b85a`, `8c39d2b`. the two out-of-scope findings, owner-approved:
   a resized label re-measures its layout; subjects cannot be copied. `standard`.
-- **[ ] wo7-readability:** house standards pass over the whole PR, then remediation. `standard`.
+- **[ ] [wo7-readability](wo7-readability/WORKORDER.md):** house standards pass over the whole PR, then remediation. `standard`.
 - **[ ] wo8-device:** worker builds the rig firmware against the final tip (the clock driven by
   `u8g2gl_wall_clock`, no app-fed seconds); the PA flashes with the owner watching. Pass: 40.0 px/s,
   no idle wakes, seconds within a frame of the boundary, baselines aligned; the 33 redundant sends
@@ -164,5 +164,14 @@ converting widgets to timers.
 - **2026-10-14 — Owner, verbatim: "yes - fix the bugs please"** — both out-of-scope findings join
   the PR as WO6 (label resize re-layout; non-copyable subjects). Readability becomes WO7, the
   device check WO8. WO6 dispatched on `u8g2gl-05r2/wo6-small-fixes`.
+- **2026-10-14 — WO6 verified** (`e01b85a` fixes, `8c39d2b` stronger test). Protected virtual
+  `on_size_changed()` on `u8g2gl_obj`, called by `set_coords`/`set_w`/`set_h` only on a real size
+  change (bindings go through them); the label re-measures and resets its scroll. All 8 subject
+  types `= delete` copy and move; nothing needed changing. PA ran the control the worker skipped:
+  against the pre-fix sources the widening test first **passed** (did not detect the bug) — sent
+  back; after `8c39d2b` the narrowing, widening and bound-width tests all fail on the old code and
+  pass on the new (the move and dirty tests pass on both, correctly). Fresh build: ctest
+  **501/501** (1 skip), 0 warnings.
+- **2026-10-14 — WO7 started:** readability-reviewer audit of `99ac4a3..HEAD`, then remediation.
 
 ## Session Log
