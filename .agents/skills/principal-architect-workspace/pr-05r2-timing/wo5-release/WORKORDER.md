@@ -93,19 +93,41 @@ Anything outside the box goes in your Completion Report. Do not fix it.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete (committed on `u8g2gl-05r2/wo5-release`; not pushed, tagged or published)
+
+### Counts
+| | Before | After |
+|---|---|---|
+| C++ ctest | 495, 1 skip (`SizeOfReport.ThirtyTwoBitTarget`) | 495, same skip (clean configure); 0 warnings |
+| vitest | 1353 | 1353 |
+| `tsc --noEmit`, `npm run lint` | clean | clean |
+`VersionGuard.*`: 10 of 10 pass.
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- Runtime 0.8.0 -> 0.9.0: `include/u8g2gl/u8g2gl_version.h` (`U8G2GL_VERSION_MINOR` 9, and the doc example `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 9)`), `CMakeLists.txt`, `library.json`. Root CMake accepted the three as consistent. No other runtime-version literal exists (`test/version_guard/pre_macro/.../u8g2gl_version.h` is a deliberately old fixture header, untouched).
+- `cli/src/data/runtime-version.json` -> `{0, 9, 0}` via `npm run build:runtime-version`; drift test passes.
+- CLI 0.12.0 -> 0.13.0: `cli/package.json`, `cli/package-lock.json` (both version fields) via `npm version`.
+- Goldens: `cli/test/generator/fixtures/emit-project/expected/u8g2gl_generated_config.h` and `test/generated_fixture/generated/u8g2gl_generated_config.h`.
+- `docs/design_spec.md` §21 Q-14 row.
+
+### Golden diff
+Floor only: `#error` text "runtime 0.8 or newer" -> "0.9 or newer" and `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 8);` -> `(0, 9);`, in each of the two files (2 lines each). Editor outputs unchanged. Nothing else moved; no determinism finding.
+
+### Spec §21 Q-14 (before / after)
+Before: row ended "...Adopt it only if the saving matters. U8G2 can also cap ..."
+After: inserted after "Adopt it only if the saving matters.": "**SPI half answered:** SPI (SSD1322, 10 MHz) measured 2026-10-13: full frame 11.8 ms, one label's tiles 4.4 ms; the saving is material above roughly 10 frames/s. **I²C open.**" Row stays open.
+Spec states no current runtime or CLI version anywhere (mentions at line ~2042 are history), so no other spec place changed.
 
 ### Decisions Made
-- Decision description and rationale
+- Updated the doc-comment example in `u8g2gl_version.h` to (0, 9), as PR-05R did.
+- CLI tests: grep for `0.12.0`, `0.8.0`, `0.8` found only the golden's floor text; no literal assertions to remove.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- Used `perl -pi` rather than `sed -i` (macOS).
+- The Q-14 wording was taken verbatim from the WORKORDER; PROJECT.md contains no "11.8" text to cross-check against.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- Rule 04 still applies: merge this PR with a merge commit; foundation's pin is a bare commit until the owner tags.
 
 ### Blockers
 (none)
