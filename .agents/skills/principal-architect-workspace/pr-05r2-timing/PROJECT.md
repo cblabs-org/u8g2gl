@@ -73,8 +73,10 @@ how deadlines behave, which WO1, WO3 and WO4 change.
   §11.1. `standard`.
 - **[x] [wo5-release](wo5-release/WORKORDER.md):** `90d9ef8`. runtime 0.9.0, CLI runtime floor re-stamped,
   CLI 0.13.0 (goldens move with the floor), goldens regenerated, Q-14 wording in §21. `standard`.
-- **[ ] wo6-readability:** house standards pass over the whole PR, then remediation. `standard`.
-- **[ ] wo7-device:** worker builds the rig firmware against the final tip (the clock driven by
+- **[ ] [wo6-small-fixes](wo6-small-fixes/WORKORDER.md):** the two out-of-scope findings, owner-approved:
+  a resized label re-measures its layout; subjects cannot be copied. `standard`.
+- **[ ] wo7-readability:** house standards pass over the whole PR, then remediation. `standard`.
+- **[ ] wo8-device:** worker builds the rig firmware against the final tip (the clock driven by
   `u8g2gl_wall_clock`, no app-fed seconds); the PA flashes with the owner watching. Pass: 40.0 px/s,
   no idle wakes, seconds within a frame of the boundary, baselines aligned; the 33 redundant sends
   re-checked. `interactive`.
@@ -159,5 +161,8 @@ converting widgets to timers.
   answered … I²C open", row left open. Schema 0.4 unchanged; nothing tagged or published.
 - **Holding before WO6** for the owner's answer on the two out-of-scope fixes (label resize layout;
   non-copyable subjects), so readability runs once over the final code.
+- **2026-10-14 — Owner, verbatim: "yes - fix the bugs please"** — both out-of-scope findings join
+  the PR as WO6 (label resize re-layout; non-copyable subjects). Readability becomes WO7, the
+  device check WO8. WO6 dispatched on `u8g2gl-05r2/wo6-small-fixes`.
 
 ## Session Log
