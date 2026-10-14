@@ -61,10 +61,10 @@ how deadlines behave, which WO1, WO3 and WO4 change.
 
 ## Work-Order ledger
 
-- **[ ] [wo1-scroll-timing](wo1-scroll-timing/WORKORDER.md):** D-A. Label steps scheduled from the due
+- **[x] [wo1-scroll-timing](wo1-scroll-timing/WORKORDER.md):** `5b7d8d9`. D-A. Label steps scheduled from the due
   time, exact rate, no zero deadlines, no bursts after a stall; the 33 redundant sends explained.
   `standard`.
-- **[ ] wo2-clock-baseline:** D-B. Seconds aligned by baseline; pixel test against real U8G2.
+- **[ ] [wo2-clock-baseline](wo2-clock-baseline/WORKORDER.md):** D-B. Seconds aligned by baseline; pixel test against real U8G2.
   `standard`.
 - **[ ] wo3-timers-wall-clock:** `u8g2gl_timer` (host-owned, intrusive, due-time scheduling, guards),
   `ui_handler()` merges timer and widget deadlines, the wall-clock helper, clock blink phase-locked,
@@ -95,5 +95,18 @@ converting widgets to timers.
   get_user_data, resume callback; omit auto-delete, external data, global enable, idle statistics,
   list walking). Worktree `../U8G2GL-05r2` created on `u8g2gl-05r2/wo1-scroll-timing` @
   `99ac4a3`. WO1 dispatched.
+- **2026-10-14 — WO1 verified** (`5b7d8d9`). PA re-ran in a fresh build dir: ctest **426/426**
+  (1 skip, `SizeOfReport.ThirtyTwoBitTarget`), 0 warnings; was 415. Diff read: due-time
+  scheduling, exact rate with carried remainder (`step_rem_` is `uint8_t`, safe: speed is `uint8_t`
+  and the remainder < speed), one step and resync when ≥ 1 interval late, `schedule()` the single
+  exit (≥ 1), `timing_started_` replaces the 0 sentinel, uint32 wrap by difference arithmetic. Two
+  existing expectations corrected (interval + 1 → due-based), none weakened. Spec line 1208 updated.
+  - **PA rulings:** dwell measured from now (what the viewer sees) — accepted. Clock drift → WO3.
+  - **The 33 redundant sends are not the label's scheduling** (host repro: 1 send through the
+    initial delay). → WO5's device run, with a log of why each frame was marked dirty.
+  - **Out-of-scope finding, put to the owner:** `set_coords()` / `set_w()` do not mark a label's
+    layout stale, so `needs_scroll_` / `message_width_` go stale after a resize (repro: 60 px label,
+    60 px text, render, `set_coords(0,0,50,16)` → never scrolls). PA recommends folding into WO2.
+- **2026-10-14 — WO2 dispatched** on `u8g2gl-05r2/wo2-clock-baseline` (from WO1's tip).
 
 ## Session Log
