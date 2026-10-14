@@ -13,7 +13,9 @@
  *          blink logic from legacy ClockWidget while adhering to U8G2GL's
  *          strict zero-heap allocation discipline ([D-1], [PD-3]). Eliminates
  *          TimeManager dependency injection; epoch seconds are provided directly
- *          to set_time() or via subject binding.
+ *          to set_time() or via subject binding — normally a subject a
+ *          u8g2gl_wall_clock keeps current, which is why tick() schedules only
+ *          the blink, phase-locked to each change of the time (§11.1).
  *
  * Description: Implementation of u8g2gl_clock methods: set_format,
  *              set_secondary_font, set_blink, set_time, get_format,
@@ -25,6 +27,9 @@
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_helpers.h"
 #include <cstdio>
+
+// Half the colon's blink cycle: shown for this long, then hidden for as long.
+static constexpr uint32_t U8G2GL_CLOCK_BLINK_HALF_MS = 500;
 
 // U8G2's header is `U8g2lib.h` in every distribution — the Arduino library, the
 // pinned submodule (extern/u8g2/cppsrc/, checked by the root CMakeLists.txt) and
@@ -58,22 +63,33 @@ void u8g2gl_clock::set_secondary_font(const uint8_t* font) {
 
 // u8g2gl_clock::set_blink
 // Toggles the 1Hz colon blink animation.
-// Resetting show_colon_ ensures the colon is immediately visible when blink is disabled.
+// Resetting show_colon_ ensures the colon is immediately visible when blink is
+// disabled; re-enabling restarts the blink phase on the next tick.
 //   enable — true to blink every 500ms, false for solid colon
 void u8g2gl_clock::set_blink(bool enable) {
     if (blink_enabled_ != enable) {
         blink_enabled_ = enable;
         show_colon_ = true;
+        blink_restart_ = true;
         mark_dirty();
     }
 }
 
 // u8g2gl_clock::set_time
-// Updates the clock with epoch seconds.
-//   epoch_seconds — total seconds since epoch (or midnight)
+// Updates the clock with epoch seconds, and locks the blink to the change: the
+// colon is shown now and the next toggle is scheduled from the next tick. A
+// wall clock publishes on each second boundary, so the colon then appears with
+// every new second instead of drifting against it on a free-running phase.
+// The restart is taken up by tick() rather than here because tick() is where
+// this widget learns the time; the binding fires from a timer inside the same
+// ui_handler() call, so that tick's `now` is the instant the second changed.
+//   epoch_seconds — total seconds since epoch (or midnight), or
+//                   U8G2GL_TIME_UNKNOWN
 void u8g2gl_clock::set_time(uint32_t epoch_seconds) {
     if (epoch_seconds_ != epoch_seconds) {
         epoch_seconds_ = epoch_seconds;
+        show_colon_ = true;
+        blink_restart_ = true;
         mark_dirty();
     }
 }
@@ -131,26 +147,48 @@ bool u8g2gl_clock::is_colon_visible() const {
 }
 
 // u8g2gl_clock::tick
-// Advances colon blink state machine every 500ms.
-// Returns milliseconds until next blink toggle, or U8G2GL_IDLE if blink is disabled.
+// The colon blink, and nothing else: the time itself arrives through
+// set_time() or the binding, normally from a u8g2gl_wall_clock's timer, which
+// supplies the per-second deadline. Scheduled by due time, the rule the label's
+// scroll uses: the next toggle is due 500 ms after the previous DUE time, and a
+// call 500 ms or more late toggles once and resyncs from now rather than
+// toggling repeatedly to catch up. Never returns 0.
 //   now_ms — current system timestamp in milliseconds
 uint32_t u8g2gl_clock::tick(uint32_t now_ms) {
-    // --- Step 1: Return idle if blink is disabled ---
-    if (!blink_enabled_) {
+    // --- Step 1: Nothing to schedule with blink off or the time unknown ---
+    // An unknown time shows a steady "--:--"; a blinking colon between dashes
+    // would suggest a clock that is running. The colon is already up: both
+    // set_blink() and set_time() show it whenever they change anything.
+    if (!blink_enabled_ || epoch_seconds_ == U8G2GL_TIME_UNKNOWN) {
         return U8G2GL_IDLE;
     }
 
-    // --- Step 2: Check elapsed time since last blink toggle ---
-    uint32_t elapsed = now_ms - last_blink_ms_;
-    if (elapsed >= 500) {
-        show_colon_ = !show_colon_;
-        last_blink_ms_ = now_ms;
-        mark_dirty();
-        return 500;
+    // --- Step 2: Restart the phase after a time change or (re-)enable ---
+    // set_time() has already shown the colon; it stays up for a half period.
+    if (blink_restart_) {
+        blink_restart_ = false;
+        next_blink_due_ms_ = now_ms + U8G2GL_CLOCK_BLINK_HALF_MS;
+        return U8G2GL_CLOCK_BLINK_HALF_MS;
     }
 
-    // Return remaining milliseconds until next 500ms blink toggle
-    return 500 - elapsed;
+    // --- Step 3: Not yet due: report the time left, which is at least 1 ---
+    // Difference arithmetic, so the comparison survives the tick wrapping.
+    const int32_t late = static_cast<int32_t>(now_ms - next_blink_due_ms_);
+    if (late < 0) {
+        return static_cast<uint32_t>(-late);
+    }
+
+    // --- Step 4: Toggle, and schedule from the due time ---
+    show_colon_ = !show_colon_;
+    mark_dirty();
+    if (static_cast<uint32_t>(late) >= U8G2GL_CLOCK_BLINK_HALF_MS) {
+        next_blink_due_ms_ = now_ms + U8G2GL_CLOCK_BLINK_HALF_MS;
+    } else {
+        next_blink_due_ms_ += U8G2GL_CLOCK_BLINK_HALF_MS;
+    }
+    // On time, the due time is now + (500 - late) with late < 500, so this is
+    // always at least 1.
+    return next_blink_due_ms_ - now_ms;
 }
 
 // u8g2gl_clock::render
@@ -165,18 +203,22 @@ void u8g2gl_clock::render(U8G2& display) {
     display.setFontMode(static_cast<uint8_t>(style_.font_mode));
 
     // --- Step 2: Decompose epoch seconds using integer arithmetic ---
-    uint32_t day_seconds = epoch_seconds_ % 86400;
-    uint8_t hours = static_cast<uint8_t>(day_seconds / 3600);
-    uint8_t minutes = static_cast<uint8_t>((day_seconds % 3600) / 60);
-    uint8_t seconds = static_cast<uint8_t>(day_seconds % 60);
-
-    // Format two-digit strings into stack buffers (no heap allocation)
-    char hour_str[3];
-    char min_str[3];
-    char sec_str[3];
-    snprintf(hour_str, sizeof(hour_str), "%02u", hours);
-    snprintf(min_str, sizeof(min_str), "%02u", minutes);
-    snprintf(sec_str, sizeof(sec_str), "%02u", seconds);
+    // Format two-digit strings into stack buffers (no heap allocation). An
+    // unknown time renders every field as "--": it goes through the same
+    // columns below, each right-aligned in a "00"-wide slot, so the layout does
+    // not jump when the time arrives.
+    char hour_str[3] = "--";
+    char min_str[3] = "--";
+    char sec_str[3] = "--";
+    if (epoch_seconds_ != U8G2GL_TIME_UNKNOWN) {
+        uint32_t day_seconds = epoch_seconds_ % 86400;
+        uint8_t hours = static_cast<uint8_t>(day_seconds / 3600);
+        uint8_t minutes = static_cast<uint8_t>((day_seconds % 3600) / 60);
+        uint8_t seconds = static_cast<uint8_t>(day_seconds % 60);
+        snprintf(hour_str, sizeof(hour_str), "%02u", hours);
+        snprintf(min_str, sizeof(min_str), "%02u", minutes);
+        snprintf(sec_str, sizeof(sec_str), "%02u", seconds);
+    }
 
     // --- Step 3: Measure widths for right-aligned digit columns ---
     // Right-aligning digit columns within a fixed "00" width prevents jitter
