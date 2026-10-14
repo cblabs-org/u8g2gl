@@ -22,6 +22,7 @@
 #include "u8g2gl/u8g2gl_timer.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_types.h"
+#include "u8g2gl_internal.h"
 
 // Module state. The head is the only thing the library owns; every timer is
 // the host's. The two guards exist only while the handler is running a
@@ -118,6 +119,9 @@ void u8g2gl_timer_delete(u8g2gl_timer* timer) {
     }
 }
 
+// u8g2gl_timer_pause
+// Stops the timer running without unlinking it or touching its schedule.
+//   timer — timer to pause; nullptr is a no-op
 void u8g2gl_timer_pause(u8g2gl_timer* timer) {
     if (timer != nullptr) {
         timer->paused_ = true;
@@ -173,6 +177,10 @@ void u8g2gl_timer_ready(u8g2gl_timer* timer) {
     }
 }
 
+// u8g2gl_timer_reset
+// Restarts the interval from now: due = now + period. Wakes the loop, since the
+// earliest deadline the sleeping caller computed has just moved.
+//   timer — timer to restart; nullptr is a no-op
 void u8g2gl_timer_reset(u8g2gl_timer* timer) {
     if (timer != nullptr) {
         timer->due_ms_ = u8g2gl_tick_now() + timer->period_ms_;
@@ -195,6 +203,9 @@ void u8g2gl_timer_set_repeat_count(u8g2gl_timer* timer, int32_t repeat_count) {
     }
 }
 
+// u8g2gl_timer_get_user_data
+// Returns the pointer the host registered with the timer.
+//   timer — timer to query; nullptr gives nullptr
 void* u8g2gl_timer_get_user_data(const u8g2gl_timer* timer) {
     return timer != nullptr ? timer->user_data_ : nullptr;
 }

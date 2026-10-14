@@ -81,19 +81,35 @@ breaking change, and hosts must never call it.
 <!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+PA decision (resume_notify move):
+- `src/u8g2gl_internal.h` (new) - house header, SPDX, Purpose; holds `u8g2gl_resume_notify()` and its Doxygen.
+- `include/u8g2gl/u8g2gl_core.h` - declaration and Doxygen removed; exported-symbol entry (was line 34) removed.
+- `src/u8g2gl_core.cpp`, `src/u8g2gl_timer.cpp` - `#include "u8g2gl_internal.h"` (quoted, relative).
+- Checked: no CMake install rule and nothing in `library.json` lists headers (export only excludes dirs); no test, editor or other host references the symbol (grep over the tree outside docs/.agents).
+
+AUDIT items:
+- [x] P2 `src/u8g2gl_label.cpp:216` - now "Step 7 branches on long_mode_ ...", WO2b dropped.
+- [x] P3 tags: `u8g2gl_label.h:240` tag deleted; `u8g2gl_label.cpp:~202` "reworked (PR-5R2 WO1, D-A)" -> "schedules by DUE TIME ..."; `u8g2gl_label.cpp:~519` tag deleted; `test_label.cpp:383`, `:449` tags deleted; `:1084` banner -> "Scroll timing - due-time scheduling"; `:1377` and `test_subject.cpp:546` prefix dropped; `test/CMakeLists.txt:677` tag dropped.
+- [x] P3 `u8g2gl_core.h` ui_handler() Doxygen - not re-entrant (timer callback or observer it runs, §11.1); `@return` 0 when frame left dirty (§11.2).
+- [x] P3 Purpose, `u8g2gl_core.h` ("runs the host's due timers", resume callback) and `u8g2gl_core.cpp` ("timer's and every widget's deadline", timers first, dirty check after render).
+- [x] P3 Purpose, `test_label.cpp` (Purpose and Description: due-time scheduling, resize re-measure) and `test_subject.cpp` (non-copy/non-move static_asserts).
+- [x] P4 `u8g2gl_timer.cpp` banners for pause, reset, get_user_data.
+- [x] P4 `u8g2gl_subject.h` - deleted-members rationale promoted to a `@note` on `u8g2gl_subject_int_base` (the old plain `//` block left in place).
+- [x] P4 resume_notify placement - done as the PA decision above.
 
 ### Decisions Made
-- Decision description and rationale
+- Left the older plain `//` subject comment in place beside the new `@note` rather than deleting it (it also covers the `_n` types).
+- Added a one-sentence resume-callback mention to the core.h Purpose, as the WO asked for it.
 
 ### Dead Ends & Warnings
-- What was attempted, why it failed, and what to avoid
+- None. Verification: fresh build 0 warnings; ctest 501 tests, 1 skip (SizeOfReport.ThirtyTwoBitTarget), 100% passed; CLI vitest 1353 passed; goldens untouched. The audit's non-comment grep prints only the moved declaration line.
 
 ### Out-of-Scope Findings
-- Finding description and suggested action
+- `test/test_label.cpp:~1114` still cites "D-A" (unpublished reference); not on the audit list, left.
+- Untracked `wo8-device/` workspace folder exists in the worktree; not mine, not committed.
 
 ### Blockers
 (none)

@@ -12,7 +12,9 @@
  *          worth knowing: the whole frame is redrawn or none of it is ([D-4]),
  *          the dirty flag gates the expensive sendBuffer rather than individual
  *          objects, and the return value is a sleep hint aggregated from every
- *          widget's own deadline ([D-15]).
+ *          timer's and every widget's own deadline ([D-15]). Timers run first,
+ *          and the dirty check follows the render, so a subject written by
+ *          either leaves the frame dirty and the hint 0.
  *
  * Description: Tick-source registration, active-screen management, frame-level
  *              dirty gating, the ui_handler entry points (which run the
@@ -32,6 +34,7 @@
 #include "u8g2gl/u8g2gl_state_saver.h"
 #include "u8g2gl/u8g2gl_timer.h"
 #include "u8g2gl/u8g2gl_tree.h"
+#include "u8g2gl_internal.h"
 
 #include <type_traits>
 

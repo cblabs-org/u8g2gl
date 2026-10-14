@@ -674,7 +674,7 @@ target_compile_options(test_ambient_state PRIVATE
 )
 gtest_discover_tests(test_ambient_state)
 
-# --- Real U8G2: the clock's seconds share its HH:MM baseline (PR-05R2 WO2) ---
+# --- Real U8G2: the clock's seconds share its HH:MM baseline ---
 # The panel is an SSD1322 256x64, so the test draws through that driver, which
 # no other target links; it is compiled here with ARDUINO defined like
 # u8g2gl_u8g2_csrc_arduino, whose struct layout it must share. Built as

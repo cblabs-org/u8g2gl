@@ -200,8 +200,8 @@ uint32_t u8g2gl_label::schedule(uint32_t now_ms, uint32_t due_ms) {
 // Outside the two scrolling modes, labels are static text and never animate —
 // this is the original u8g2gl_label::tick() contract, preserved for clip and
 // dots. Under U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR, the state
-// machine below is u8g2gl_scrolling_label::tick() reworked (PR-5R2 WO1, D-A)
-// to schedule by DUE TIME rather than by when a step happened to run:
+// machine below schedules by DUE TIME rather than by when a step happened to
+// run:
 //
 //  - a step is due when now >= next_due_ms_, not strictly after it;
 //  - the following step is due one interval after the previous DUE time, so a
@@ -213,8 +213,8 @@ uint32_t u8g2gl_label::schedule(uint32_t now_ms, uint32_t due_ms) {
 //  - the value returned is always >= 1, never 0, so a caller that sleeps for
 //    it neither spins nor wakes to find nothing due.
 //
-// Step 5 branches on long_mode_ because WO2b gave U8G2GL_LONG_SCROLL its own
-// reversing mechanic while leaving U8G2GL_LONG_SCROLL_CIRCULAR's wrap intact.
+// Step 7 branches on long_mode_ because U8G2GL_LONG_SCROLL has its own
+// reversing mechanic while U8G2GL_LONG_SCROLL_CIRCULAR keeps the wrap.
 //   now_ms — current system millisecond timestamp
 uint32_t u8g2gl_label::tick(uint32_t now_ms) {
     if (long_mode_ != U8G2GL_LONG_SCROLL && long_mode_ != U8G2GL_LONG_SCROLL_CIRCULAR) {
@@ -516,7 +516,7 @@ void u8g2gl_label::render_static(U8G2& display, const char* text, int16_t draw_y
 // This path and ui_handler()'s tick() both advance the same schedule, and that
 // is safe: a step moves next_due_ms_ past `now`, so whichever call comes second
 // in the same millisecond finds nothing due and takes no step. One due time can
-// never advance the marquee twice (PR-5R2 WO1).
+// never advance the marquee twice.
 //   display — U8G2 display driver instance
 //   now_ms  — current system timestamp in milliseconds
 void u8g2gl_label::render_animation_update(U8G2& display, uint32_t now_ms) {

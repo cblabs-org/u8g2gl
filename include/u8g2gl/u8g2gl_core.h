@@ -10,8 +10,10 @@
  * Purpose: The application's entry point into the framework and the owner of the
  *          frame. Everything else in the library is passive; this is what drives
  *          it. ui_handler() is the single call an application makes each loop —
- *          it ticks the active screen, redraws only if something changed, and
- *          returns how long the caller may sleep ([D-15]).
+ *          it runs the host's due timers, ticks the active screen, redraws only
+ *          if something changed, and returns how long the caller may sleep
+ *          ([D-15]). A resume callback lets a sleeping loop be woken early when
+ *          a timer gains work or the frame turns dirty.
  *
  *          The application owns the U8G2 instance and the main loop; the
  *          framework owns scheduling and rendering. That boundary is deliberate
@@ -31,7 +33,6 @@
  *     - u8g2gl_mark_dirty(): Mark the active screen dirty
  *     - u8g2gl_set_tick_cb(): Set a callback to get current time
  *     - u8g2gl_set_resume_cb(): Set a callback that wakes a sleeping loop
- *     - u8g2gl_resume_notify(): Library-internal: fire that callback
  *
  *     Support for generated code (§11.3, §13.5):
  *     - u8g2gl_render_object():        Render one object with visibility, clip and state guarded
@@ -86,16 +87,6 @@ using u8g2gl_resume_cb_t = void(*)(void* user_data);
  * @param user_data Passed back to @p cb.
  */
 void u8g2gl_set_resume_cb(u8g2gl_resume_cb_t cb, void* user_data);
-
-/**
- * @brief Library-internal: fire the resume callback, unless inside ui_handler().
- *
- * Called by the frame when the active screen goes clean to dirty, and by the
- * timer calls that give a timer work. Inside ui_handler() it does nothing: the
- * loop is awake by definition and the returned deadline already accounts for
- * the work. Host code has no reason to call it.
- */
-void u8g2gl_resume_notify();
 
 // --- Screen structure ---
 // Represents a complete screen: its widget array, parent table, and lifecycle.
@@ -370,10 +361,15 @@ bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj);
  * Due timers (u8g2gl_timer.h) run first, so a subject a timer writes is drawn
  * in the same frame. They run even when no screen is active.
  *
+ * Not re-entrant: do not call it from a timer callback or a subject observer
+ * it runs (§11.1).
+ *
  * @param display The U8G2 instance. The application owns it, including its
  *                construction and its wiring; the framework only draws into it
  *                (§12.1).
- * @return Milliseconds until this needs calling again — the minimum deadline
+ * @return 0 when the frame is left dirty (a subject was written during the
+ *         render): call again at once (§11.2). Otherwise milliseconds until
+ *         this needs calling again — the minimum deadline
  *         across every unpaused timer and every widget that is animating.
  *         U8G2GL_IDLE means no timer is pending and nothing is animating, and
  *         only an external change (a subject write, a screen switch) will

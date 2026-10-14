@@ -95,6 +95,14 @@ struct u8g2gl_observer {
 
 // --- Int subject (32-bit signed) ---
 
+/**
+ * @brief Base of the int subject: a 32-bit value and the observers told when it changes.
+ *
+ * @note Non-copyable and non-movable. `observers_` points into the subject's own
+ *       storage (the `_n<>` array member), so a copy or move would leave the new
+ *       subject pointing into the source's array. Declare a subject once and
+ *       refer to it. The same holds for every subject base and `_n` type.
+ */
 class u8g2gl_subject_int_base {
 public:
     u8g2gl_subject_int_base(const u8g2gl_subject_int_base&) = delete;

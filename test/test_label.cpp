@@ -15,14 +15,17 @@
  *          long_mode="scroll" rather than rewritten — the work order was a
  *          relocation, and a relocation that quietly altered timing would be
  *          a regression no test here would catch if the assertions had been
- *          rewritten instead of moved.
+ *          rewritten instead of moved. Also proves that scrolling is scheduled
+ *          by due time and that a resized label re-measures its text.
  *
  * Description: GoogleTest suite exercising the complete contract of
  *              u8g2gl_label across all four long_mode values, and bound text
  *              (PR-04 WO10b): a label bound to a subject draws that subject's
  *              value, asserted on the text the U8G2 stub's ordered call log
  *              recorded (it copies the text, so a value formatted on render()'s
- *              stack can still be read after render() returns).
+ *              stack can still be read after render() returns). It also covers
+ *              due-time scroll scheduling (exact rate, no catch-up burst, one
+ *              step per due time) and re-measuring a label when it is resized.
  */
 #include <gtest/gtest.h>
 #include "u8g2gl/u8g2gl_label.h"
@@ -380,7 +383,7 @@ TEST(LabelScroll, InitialDelayBeforeScroll) {
     uint32_t d3 = label.tick(4001);
     // The step was due at t=4000 and ran at 4001, one ms late. The next step is
     // due one 40 ms interval after the DUE time (4040), so 39 ms remain — the
-    // old "40" restarted the interval from when the step ran (PR-5R2 WO1, D-A).
+    // old "40" restarted the interval from when the step ran.
     EXPECT_EQ(d3, 39u);
 
     // Verify pixel offset has incremented to 1 (drawn at x - scroll_x = 0 - 1 = -1)
@@ -446,7 +449,7 @@ TEST(LabelScroll, ConfigurableScrollSpeed) {
 
     // The step was due at t=500 and ran at 501. The next is due at 500 + 20 (the
     // 1000 / 50 interval, from the DUE time), so 19 ms remain from 501. The old
-    // value, 20, restarted the interval from when the step ran (PR-5R2 WO1, D-A).
+    // value, 20, restarted the interval from when the step ran.
     EXPECT_EQ(label.tick(501), 19u);
 }
 
@@ -1081,7 +1084,7 @@ TEST(Label, SizeOf) {
 }
 
 // =====================================================================
-// Scroll timing (PR-5R2 WO1, defect D-A) — due-time scheduling
+// Scroll timing - due-time scheduling
 //
 // Every test here drives the label with a simulated clock; none reads real
 // time, so a failure is a property of the scheduling and not of the machine.
@@ -1374,7 +1377,7 @@ TEST(LabelScrollTiming, RenderAnimationUpdateAndTickCannotBothStepOneDueTime) {
     EXPECT_EQ(deadline, 25u);
 }
 
-// --- PR-05R2 WO6: a resized label re-measures ---
+// --- A resized label re-measures ---
 
 namespace {
 

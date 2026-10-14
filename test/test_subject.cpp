@@ -12,7 +12,9 @@
  *          bindings built on them: set/get, notify-only-on-change, per-subject
  *          observer capacity ([D-21]), string truncation at the declared length
  *          (§8.2), and that conditional-flag, text and geometry bindings
- *          propagate a subject's value into an object and mark it dirty.
+ *          propagate a subject's value into an object and mark it dirty. Also
+ *          pins, with static_asserts, that subjects are neither copyable nor
+ *          movable.
  *
  * Description: GoogleTest cases for u8g2gl_subject_* and the u8g2gl_obj bind_*
  *              entry points, including observer-pool exhaustion.
@@ -543,7 +545,7 @@ TEST(ObserverPool, DistinctCapacitiesOverflowIndependently) {
 #endif
 }
 
-// --- PR-05R2 WO6: subjects are not copyable or movable ---
+// --- Subjects are not copyable or movable ---
 // observers_ points into the subject's own storage, so a copy or move would
 // alias the source's array. These fail to compile if a deletion is dropped.
 

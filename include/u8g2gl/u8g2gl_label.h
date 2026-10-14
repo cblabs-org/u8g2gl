@@ -237,7 +237,7 @@ public:
      * Outside U8G2GL_LONG_SCROLL / U8G2GL_LONG_SCROLL_CIRCULAR this always
      * returns U8G2GL_IDLE — clip and dots are static text and never animate.
      *
-     * Scrolling is scheduled by due time (PR-5R2 WO1): a step happens when
+     * Scrolling is scheduled by due time: a step happens when
      * `now_ms` has reached the due time, the next due time follows the previous
      * one by exactly 1000 / speed ms (remainder carried, so the rate is exact),
      * and a call more than one interval late takes a single step and restarts
