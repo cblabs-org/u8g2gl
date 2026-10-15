@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "A declarative, LVGL-style widget runtime for monochrome and low-colour displays, built on U8g2",
   "keywords": "u8g2, display, ui, widgets, oled, lcd, embedded",
   "license": "MIT",

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(u8g2gl VERSION 0.9.0 LANGUAGES CXX)
+project(u8g2gl VERSION 0.10.0 LANGUAGES CXX)
 
 # --- Runtime version agreement (§16, .agents/rules/03-versioning.md) ---
 # The runtime version is stated three times: here, for CMake packaging; in
