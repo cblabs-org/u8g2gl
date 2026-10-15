@@ -1,0 +1,72 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cpp-tests:
+    # Build and run the C++ test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build -j$(nproc)
+      - name: Test
+        run: cd build && ctest --output-on-failure
+
+  cli-tests:
+    # Build and run the CLI test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: cd cli && npm ci
+      - name: Test
+        run: cd cli && npm test
+
+  xtensa-cross-compile:
+    # Cross-compile generated fixtures against the xtensa target
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - env_name: esp32dev_std17
+            std_label: "gnu++17 (asserted)"
+          - env_name: esp32dev_injected
+            std_label: "platform-injected standard"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-xtensa-${{ hashFiles('test/xtensa/platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: "Build xtensa (${{ matrix.std_label }})"
+        run: cd test/xtensa && pio run -e ${{ matrix.env_name }}
+      - name: "Positive control must FAIL"
+        run: |
+          cd test/xtensa
+          if pio run -e ctl_${{ matrix.env_name }} 2>&1; then
+            echo "::error::Positive control passed — the check no longer detects the defect class"
+            exit 1
+          else
+            echo "Positive control failed as expected (xtensa overload ambiguity detected)"
+          fi
