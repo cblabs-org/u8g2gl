@@ -22,8 +22,11 @@ CI asserts this failure with an inverted assertion:
     fi
 ```
 
-If the positive control ever passes (meaning the defect class is no longer
-detected), the CI step fails.
+**The inverted control caught a real misconfiguration during CA review.** When
+the platform pin was changed to bare `espressif32` (resolving to legacy v7.1.3
+on CI), the positive control *passed* — and the inverted assertion fired:
+`::error::Positive control passed — the check no longer detects the defect class`.
+This led to the finding that `espressif32` is not a stable identifier.
 
 ## 2. Determinism Check (§13.9)
 
@@ -36,19 +39,23 @@ Generator output changed without an input change and without a CLI version bump 
 Exit code: 1
 ```
 
-Recorded in the determinism check CI job header comment.
+## 3. D-9 Parity Proof
 
-## 3. C++ and CLI Suites
+`test_wasm_parity.cpp` asserts SHA-256 golden
+`bca55545ebb5a40cef2a296b7218c0192d5339717c18212360c89ff0581b03ef`.
+The Wasm snapshot test (`wasm/test/snapshot.test.mjs:89`) asserts the same hash.
+Any divergence between native and Wasm renders fails one or both tests.
 
-Well-established suites with known failure modes. The suites themselves are the
-evidence — 511 and 1353 tests respectively. A broken commit would cause test
-failures visible in the CI output.
+Verified identical on macOS (local) and Linux (CI runner), confirming
+platform-independent pixel buffers.
 
-## 4. Wasm Snapshot Determinism
+## 4. Use-After-Free (CI-caught)
 
-The snapshot test (`wasm/test/snapshot.test.mjs`) produces a SHA-256 hash of
-the rendered frame buffer. Any runtime change affecting pixel output would
-change the hash. The test exits non-zero on an empty frame.
+Commit `0a42b23` fixed a use-after-free that was **silent on macOS but caused
+14 segfaults on Linux CI**. This is direct evidence that CI catches defects
+the developer's local machine cannot.
 
-SHA-256: `90c427579704cc78a830363008464e62f8af98e7edf3ea648c73a9ff9b10fcee`
-Display: 128×64, 82 lit pixels
+## 5. C++ and CLI Suites
+
+512 C++ tests, 1353 CLI tests. A broken commit causes visible test failures
+in the CI output.
