@@ -952,6 +952,86 @@ target_compile_options(test_editor PRIVATE
 )
 gtest_discover_tests(test_editor)
 
+# --- D-9 parity proof: native bridge renders the same pixels as Wasm ---
+# Compiles bridge.cpp natively (it guards Emscripten-only code behind
+# __EMSCRIPTEN__) and calls the same applyScene/renderFrame path the Wasm
+# snapshot test uses. Both assert the same SHA-256 golden, proving the
+# preview is the runtime, not a second implementation that could drift.
+#
+# The golden hash lives here as a compile definition so it's in one place
+# for the native side; the Wasm test asserts the same string literal.
+set(U8G2GL_PARITY_SHA256 "bca55545ebb5a40cef2a296b7218c0192d5339717c18212360c89ff0581b03ef" CACHE STRING "D-9 parity golden SHA-256" FORCE)
+
+# Real U8G2 C sources needed by the bridge (same list as wasm/CMakeLists.txt)
+set(PARITY_U8G2_C_SOURCES
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_box.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_buffer.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_circle.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_d_memory.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_font.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_hvline.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_intersection.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_kerning.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_ll_hvline.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_setup.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_8x8.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_byte.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_cad.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_capture.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_d_ssd1306_128x64_noname.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_d_ssd1322.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_display.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_gpio.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_setup.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_u16toa.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_bitmap.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_line.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_polygon.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_fonts.c
+)
+add_library(u8g2gl_parity_csrc STATIC ${PARITY_U8G2_C_SOURCES})
+target_include_directories(u8g2gl_parity_csrc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2)
+target_include_directories(u8g2gl_parity_csrc SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_definitions(u8g2gl_parity_csrc PUBLIC ARDUINO=10819)
+target_compile_options(u8g2gl_parity_csrc PRIVATE -w)
+
+add_executable(test_wasm_parity
+    test_wasm_parity.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/bridge.cpp
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host/scene_json.cpp
+    ${U8G2GL_FIXTURE_EDITOR}/ui_editor_registry.cpp
+    ${U8G2GL_FIXTURE_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_FIXTURE_DIR}/generated/ui_images.cpp
+)
+target_include_directories(test_wasm_parity PRIVATE
+    ${PROJECT_SOURCE_DIR}/wasm
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host
+    ${U8G2GL_FIXTURE_DIR}/generated
+)
+target_include_directories(test_wasm_parity SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(test_wasm_parity PRIVATE
+    ARDUINO=10819
+    U8G2GL_EDITOR
+    U8G2GL_GENERATED_CONFIG="editor_config.h"
+    U8G2GL_EDITOR_SCENE_PATH="${U8G2GL_FIXTURE_EDITOR}/ui_scene.json"
+    U8G2GL_PARITY_SHA256="${U8G2GL_PARITY_SHA256}"
+)
+target_link_libraries(test_wasm_parity PRIVATE
+    u8g2gl_parity_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_wasm_parity PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+gtest_discover_tests(test_wasm_parity)
+
+
 # --- Firmware pays nothing for the editor ([UD-4]) ---
 # The registry and src/u8g2gl_editor.cpp compile to nothing without
 # U8G2GL_EDITOR. Proven on the linked artefacts rather than assumed: nm must find

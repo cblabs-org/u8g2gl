@@ -46,20 +46,8 @@ async function main() {
   console.log(`  Display: ${width}x${height}`);
   console.log('  Scene applied successfully.\n');
 
-  // --- Step 4: Apply sample data (connected scenario for parity) ---
-  const sampleData = JSON.stringify({
-    wifi_connected: true,
-    battery_level: 85,
-  });
-  console.log(`Applying sample data: ${sampleData}`);
-  const dataOk = editor.applySampleData(sampleData);
-  if (!dataOk) {
-    console.error(`  FAILED: ${editor.getLastError()}`);
-    // Non-fatal — subjects may not exist in this fixture
-    console.log('  (continuing without sample data)\n');
-  } else {
-    console.log('  Sample data applied.\n');
-  }
+  // No sample data: the D-9 parity proof requires identical inputs to the
+  // native test (test_wasm_parity.cpp), which renders the bare scene.
 
   // --- Step 5: Render frame ---
   console.log('Rendering frame...');
@@ -93,24 +81,21 @@ async function main() {
   console.log(`SHA-256:    ${hash}`);
   console.log('');
 
-  // D-9 parity check: criterion 1 target
-  // sha256: b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d
-  // lit: 1405, display: 256x64 (SSD1322)
-  // This may not match because:
-  //   1. The fixture is the emit-project test fixture, not foundation's scene
-  //   2. The display driver/buffer layout may differ
-  // The parity proof here is: Wasm produces a non-empty, deterministic frame.
-  // Full D-9 parity with criterion 1 requires foundation's scene.
+  // --- Step 7: D-9 parity assertion ---
+  // This hash must match the native build's output (test_wasm_parity.cpp,
+  // golden in test/CMakeLists.txt). If they differ, the Wasm renderer has
+  // diverged from the host — the failure [D-9] names as the one that
+  // discredits a design tool.
+  const GOLDEN_SHA256 = 'bca55545ebb5a40cef2a296b7218c0192d5339717c18212360c89ff0581b03ef';
 
-  console.log('=== Parity Proof ===');
-  if (litPixels > 0 && buffer.length > 0) {
-    console.log('PASS: Wasm rendered a non-empty frame successfully.');
-    console.log('      For full D-9 parity with criterion 1 (sha256 b9042618...,');
-    console.log('      lit=1405, 256x64), foundation\'s scene is required.');
-    console.log('      This proof demonstrates the Wasm bridge renders the');
-    console.log('      emit-project fixture deterministically.');
+  console.log('=== D-9 Parity Check ===');
+  if (hash === GOLDEN_SHA256) {
+    console.log('PASS: Wasm SHA-256 matches native build.');
+    console.log(`  Golden: ${GOLDEN_SHA256}`);
   } else {
-    console.log('FAIL: Wasm produced an empty frame.');
+    console.error('FAIL: D-9 parity broken — Wasm SHA-256 differs from native build.');
+    console.error(`  Expected: ${GOLDEN_SHA256}`);
+    console.error(`  Got:      ${hash}`);
     process.exit(1);
   }
 

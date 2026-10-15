@@ -152,6 +152,11 @@ These come from the design spec and are enforced in review:
   differ from the merge base. The goldens are stamped `0.0.0-golden`, so they
   never move on a version bump — a golden diff is always a real output change,
   requiring a generator version bump when unaccompanied by an input change.
+  **Runtime-version coupling**: a runtime minor bump changes the golden's
+  `U8G2GL_REQUIRE_RUNTIME_VERSION` floor, which the check sees as an output
+  change without an input change, forcing a CLI patch bump. This coupling is
+  intentional — runtime and CLI ship together, and the patch bump signals that
+  the generated output changed for a non-input reason (`rules/03`).
 - **Honest cost reporting** — §1.3 forbids claims the budget cannot substantiate.
   If a change makes the §18 report inaccurate, the change is wrong.
 - **Zero warnings** under `-Wall -Wextra -Wpedantic`. Not "few". Zero.
