@@ -69,6 +69,35 @@ static bool u8g2gl_add_observer_internal(u8g2gl_observer* pool, uint8_t capacity
     return false;
 }
 
+// u8g2gl_remove_observer_internal
+// Unregisters an observer by matching both user_data and cb. Lives here so the
+// logic exists once across all four subject types.
+//   pool      — the subject's observer slots, owned by its _n<> wrapper
+//   count     — high-water mark bounding the scan
+//   user_data — context pointer registered with the callback
+//   cb        — callback pointer registered
+//
+// Matches by (user_data, cb) pair, not user_data alone, because an object with
+// multiple bindings on one subject passes itself (or its binding desc) as
+// user_data for all of them, and removing by user_data alone would silently
+// take all of them.
+// Does not compact the pool or decrement count ([D-1]); nulls out the slot,
+// leaving existing observers at their indices and maintaining their notify order.
+static bool u8g2gl_remove_observer_internal(u8g2gl_observer* pool, uint8_t count,
+                                            void* user_data, u8g2gl_observer_cb cb) {
+    if (!cb) {
+        return false;
+    }
+    for (uint8_t i = 0; i < count; ++i) {
+        if (pool[i].cb == cb && pool[i].user_data == user_data) {
+            pool[i].cb = nullptr;
+            pool[i].user_data = nullptr;
+            return true;
+        }
+    }
+    return false;
+}
+
 // u8g2gl_notify_observers_internal
 // Fires every registered observer. Callers reach here only when a value actually
 // changed, so this does no comparison of its own.
@@ -106,6 +135,10 @@ void u8g2gl_subject_int_base::set(int32_t value) {
 
 bool u8g2gl_subject_int_base::add_observer(void* user_data, u8g2gl_observer_cb cb) {
     return u8g2gl_add_observer_internal(observers_, capacity_, observer_count_, user_data, cb);
+}
+
+bool u8g2gl_subject_int_base::remove_observer(void* user_data, u8g2gl_observer_cb cb) {
+    return u8g2gl_remove_observer_internal(observers_, observer_count_, user_data, cb);
 }
 
 void u8g2gl_subject_int_base::notify() {
@@ -168,6 +201,10 @@ bool u8g2gl_subject_string_base::add_observer(void* user_data, u8g2gl_observer_c
     return u8g2gl_add_observer_internal(observers_, observer_capacity_, observer_count_, user_data, cb);
 }
 
+bool u8g2gl_subject_string_base::remove_observer(void* user_data, u8g2gl_observer_cb cb) {
+    return u8g2gl_remove_observer_internal(observers_, observer_count_, user_data, cb);
+}
+
 void u8g2gl_subject_string_base::notify() {
     u8g2gl_notify_observers_internal(observers_, observer_count_);
 }
@@ -200,6 +237,10 @@ bool u8g2gl_subject_bool_base::add_observer(void* user_data, u8g2gl_observer_cb 
     return u8g2gl_add_observer_internal(observers_, capacity_, observer_count_, user_data, cb);
 }
 
+bool u8g2gl_subject_bool_base::remove_observer(void* user_data, u8g2gl_observer_cb cb) {
+    return u8g2gl_remove_observer_internal(observers_, observer_count_, user_data, cb);
+}
+
 void u8g2gl_subject_bool_base::notify() {
     u8g2gl_notify_observers_internal(observers_, observer_count_);
 }
@@ -222,6 +263,10 @@ void u8g2gl_subject_time_base::set(uint32_t epoch_secs) {
 
 bool u8g2gl_subject_time_base::add_observer(void* user_data, u8g2gl_observer_cb cb) {
     return u8g2gl_add_observer_internal(observers_, capacity_, observer_count_, user_data, cb);
+}
+
+bool u8g2gl_subject_time_base::remove_observer(void* user_data, u8g2gl_observer_cb cb) {
+    return u8g2gl_remove_observer_internal(observers_, observer_count_, user_data, cb);
 }
 
 void u8g2gl_subject_time_base::notify() {
