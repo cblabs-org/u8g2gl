@@ -45,9 +45,9 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // report a syntax error instead of a refusal, so say what is needed here.
 // The call sits in the #else, so a runtime without the macro reports only this #error.
 #ifndef U8G2GL_REQUIRE_RUNTIME_VERSION
-#error "This code requires u8g2gl runtime 0.9 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
+#error "This code requires u8g2gl runtime 0.10 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
 #else
-U8G2GL_REQUIRE_RUNTIME_VERSION(0, 9);
+U8G2GL_REQUIRE_RUNTIME_VERSION(0, 10);
 #endif
 
 // --- Static capacities, counted from this document ([D-21]) ---

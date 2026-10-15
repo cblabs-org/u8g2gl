@@ -1,14 +1,15 @@
 # Principal Architect Memory
-<!-- Last updated: 2026-10-12T12:00:00Z -->
+<!-- Last updated: 2026-10-15T10:00:00Z -->
 
 ## Active Programs
 | Program | Plan | Status |
 |---|---|---|
-| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — **merged through #14** (PR-5R2, timing). Runtime 0.9.0, CLI 0.13.0, C++ 501 / CLI 1353. Criterion 1 holds on host and device; Q-14's SPI half answered, I²C open; C2 still open. **Next PR-06** (Wasm harness + the programme's first CI, §17.3). PR-05's foundation half stays held off its `main` until the cut-over (R10). Editor track (E-D, then E-1..3) runs after the PR-07 gate |
+| [U8G2GL](../PROGRAM.md) | [PROGRAM-PLAN.md](../PROGRAM-PLAN.md) | Executing — **submitted through #15** (PR-06, Wasm + CI). Runtime 0.10.0, CLI 0.13.1, C++ 511 / CLI 1353. Criterion 1 holds on host and device; Q-14's SPI half answered, I²C open; C2 still open. PR-06 adds the programme's first CI (4 checks). PR-05's foundation half stays held off its `main` until the cut-over (R10). Editor track (E-D, then E-1..3) runs after the PR-07 gate |
 
 ## Active Projects
 | Project | Status | Modules | Context |
 |---|---|---|---|
+| pr-06-wasm-ci | **Submitted** — 6/6 WOs, PR [#15](https://github.com/cblabs-org/u8g2gl/pull/15) from `u8g2gl-06/wo6-readability`. Wasm harness (bridge.cpp, JS wrapper, snapshot test), GitHub Actions CI (4 checks: cpp, cli, xtensa cross-compile with F-STD matrix, §13.9 determinism). Runtime debts: observer removal, stale-binding fix, int-narrowing assert, container-edge pixels, csrc_arduino link fix. Runtime 0.10.0, CLI 0.13.1. C++ 511 / CLI 1353. Worktree `../U8G2GL-06` | Firmware Runtime / Host Tooling / CI | [PROJECT.md](../pr-06-wasm-ci/PROJECT.md) |
 | pr-05r2-timing | **Submitted** — 8/8 WOs, PR from `u8g2gl-05r2/wo8-device`. Device PASS (scroll 40.01 px/s, 0 idle wakes, seconds one frame after the boundary). LVGL-shaped host-owned timers, wall clock, resume callback, dirty-order fix, label resize, non-copyable subjects. Runtime 0.9.0, CLI 0.13.0. C++ 501 / CLI 1353. Worktree `../U8G2GL-05r2` | Firmware Runtime | [PROJECT.md](../pr-05r2-timing/PROJECT.md) |
 | device-measurements | **Complete and pushed**; rulings Q-C, Q-14, C4 reframe, PR-06 recorded — C1 holds; Q-14 SPI answered (11.76 / 4.41 ms), I²C open; D-15 deadlines honoured; repaint verified; xtensa sweep + PR06-SPEC; C3 +568 B; C4 +6.2 s structural (LDF). Remediation needed: D-A (scroll), D-B (clock 2 px), Q-C (clock owns seconds; subject write wakes loop). E-D input: ED-INPUT-EDIT-LOOP.md. Branch `u8g2gl-device/measurements`, worktree `../U8G2GL-device` | Device / Build | [PROJECT.md](../device-measurements/PROJECT.md) |
 | pr-05r-runtime-fixes | **Submitted — [#13](https://github.com/cblabs-org/u8g2gl/pull/13)**, merge commit not squash (tip `u8g2gl-05r/wo6-readability`). C++ 415 / CLI 1353, runtime 0.8.0, CLI 0.12.0. Criterion 1 holds for U8G2GL alone, host and device (device sha = host sha) | Firmware Runtime / Host Tooling / Packaging | [PROJECT.md](../pr-05r-runtime-fixes/PROJECT.md) |

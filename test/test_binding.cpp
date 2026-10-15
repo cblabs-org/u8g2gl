@@ -69,10 +69,14 @@ void expect_free_observers(Subject& subject, int expected) {
 //   obj — the object whose pool allowance is measured
 int remaining_slots(u8g2gl_obj& obj) {
     // One more observer than the cap, so the per-object cap — not the filler's
-    // observer capacity — is always what stops the loop. A local is safe: it is
-    // never set, so it never notifies, and the object's destructor releases
-    // the pool slots regardless of the filler's lifetime.
-    u8g2gl_subject_int_n<U8G2GL_MAX_BINDINGS_PER_OBJ + 1> filler;
+    // observer capacity — is always what stops the loop.
+    //
+    // Static so it outlives the function call: the obj destructor (WO1) now
+    // calls remove_observer() on every bound subject, so filler must still be
+    // alive when obj is destroyed by the caller. A stack-local filler would be
+    // destroyed at function return while obj still holds bindings into it —
+    // use-after-free on Linux, silent on macOS by accident.
+    static u8g2gl_subject_int_n<U8G2GL_MAX_BINDINGS_PER_OBJ + 1> filler;
     int count = 0;
     while (count <= U8G2GL_MAX_BINDINGS_PER_OBJ &&
            obj.bind_flag_if_eq(&filler, 0, U8G2GL_FLAG_HIDDEN)) {

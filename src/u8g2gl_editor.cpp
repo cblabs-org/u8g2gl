@@ -26,11 +26,13 @@
 
 #ifdef U8G2GL_EDITOR
 
+#include <cassert>
 #include <cstring>
 
 // --- Values ---
 
 u8g2gl_editor_value u8g2gl_editor_int(int32_t v) {
+    assert(static_cast<int64_t>(v) >= INT32_MIN && static_cast<int64_t>(v) <= INT32_MAX);
     u8g2gl_editor_value value;
     value.type = U8G2GL_EDITOR_INT;
     value.integer = v;
@@ -203,6 +205,13 @@ bool u8g2gl_editor_set_property(const u8g2gl_editor_class& cls, u8g2gl_obj* obj,
     const u8g2gl_editor_property* property = u8g2gl_editor_find_property(cls, name);
     if (obj == nullptr || property == nullptr || property->type != value.type) {
         return false;
+    }
+    // Narrowing guard: progress bar value narrows int32_t -> uint8_t (0..100)
+    if (value.type == U8G2GL_EDITOR_INT && cls.tag != nullptr &&
+        std::strcmp(cls.tag, "u8g2gl_progress_bar") == 0 &&
+        name != nullptr && std::strcmp(name, "value") == 0) {
+        assert(value.integer >= 0 && value.integer <= 100 &&
+               "u8g2gl: progress bar value must be within 0..100");
     }
     return property->set(obj, value);
 }

@@ -568,3 +568,127 @@ static_assert(is_pinned_v<u8g2gl_subject_time_base>, "time base must be pinned")
 TEST(SubjectCopy, TypesAreNonCopyableAndNonMovable) {
     SUCCEED();   // the assertions above are the test
 }
+
+// --- Stale Observer Removal on Object Destruction ---
+
+TEST(SubjectObserverRemoval, DestroyedObjectRemovesObserver) {
+    u8g2gl_subject_int_n<1> subject(10);
+
+    {
+        u8g2gl_obj obj;
+        EXPECT_TRUE(obj.bind_x(&subject, 0));
+        EXPECT_EQ(obj.get_x(), 10);
+    } // obj is destroyed here
+
+    // 1. Setting the subject must not fire into dead object / stale binding
+    subject.set(20);
+
+    // 2. The subject's single observer slot should now be free to reuse
+    int new_counter = 0;
+    EXPECT_TRUE(subject.add_observer(&new_counter, count_observer_cb));
+    subject.set(30);
+    EXPECT_EQ(new_counter, 1);
+}
+
+TEST(SubjectObserverRemoval, DirectRemovalOnAllBases) {
+    // Int
+    u8g2gl_subject_int_n<2> s_int(1);
+    int c_int = 0;
+    EXPECT_TRUE(s_int.add_observer(&c_int, count_observer_cb));
+    EXPECT_TRUE(s_int.remove_observer(&c_int, count_observer_cb));
+    s_int.set(2);
+    EXPECT_EQ(c_int, 0);
+
+    // String
+    u8g2gl_subject_string_n<16, 2> s_str;
+    int c_str = 0;
+    EXPECT_TRUE(s_str.add_observer(&c_str, count_observer_cb));
+    EXPECT_TRUE(s_str.remove_observer(&c_str, count_observer_cb));
+    s_str.set("hello");
+    EXPECT_EQ(c_str, 0);
+
+    // Bool
+    u8g2gl_subject_bool_n<2> s_bool(false);
+    int c_bool = 0;
+    EXPECT_TRUE(s_bool.add_observer(&c_bool, count_observer_cb));
+    EXPECT_TRUE(s_bool.remove_observer(&c_bool, count_observer_cb));
+    s_bool.set(true);
+    EXPECT_EQ(c_bool, 0);
+
+    // Time
+    u8g2gl_subject_time_n<2> s_time(0);
+    int c_time = 0;
+    EXPECT_TRUE(s_time.add_observer(&c_time, count_observer_cb));
+    EXPECT_TRUE(s_time.remove_observer(&c_time, count_observer_cb));
+    s_time.set(100);
+    EXPECT_EQ(c_time, 0);
+}
+
+TEST(SubjectObserverRemoval, NotifyOrderPreservedAfterRemoval) {
+    u8g2gl_subject_int_n<4> subject(0);
+    std::vector<int> fired;
+
+    auto cb1 = [](void* ctx) { static_cast<std::vector<int>*>(ctx)->push_back(1); };
+    auto cb2 = [](void* ctx) { static_cast<std::vector<int>*>(ctx)->push_back(2); };
+    auto cb3 = [](void* ctx) { static_cast<std::vector<int>*>(ctx)->push_back(3); };
+
+    EXPECT_TRUE(subject.add_observer(&fired, cb1));
+    EXPECT_TRUE(subject.add_observer(&fired, cb2));
+    EXPECT_TRUE(subject.add_observer(&fired, cb3));
+
+    // Remove the middle observer cb2
+    EXPECT_TRUE(subject.remove_observer(&fired, cb2));
+
+    subject.set(10);
+    ASSERT_EQ(fired.size(), 2u);
+    EXPECT_EQ(fired[0], 1);
+    EXPECT_EQ(fired[1], 3);
+}
+
+TEST(SubjectObserverRemoval, MatchByUserDataAndCallbackPair) {
+    u8g2gl_subject_int_n<4> subject(0);
+
+    auto cb_a = [](void* ctx) { (*static_cast<int*>(ctx)) += 1; };
+    auto cb_b = [](void* ctx) { (*static_cast<int*>(ctx)) += 10; };
+
+    int shared_ctx = 0;
+    EXPECT_TRUE(subject.add_observer(&shared_ctx, cb_a));
+    EXPECT_TRUE(subject.add_observer(&shared_ctx, cb_b));
+
+    // Removing with cb_a must NOT remove cb_b even though shared_ctx is the same
+    EXPECT_TRUE(subject.remove_observer(&shared_ctx, cb_a));
+    subject.set(5);
+    EXPECT_EQ(shared_ctx, 10); // cb_b fired (+10)
+
+    // Second removal of cb_a must fail
+    EXPECT_FALSE(subject.remove_observer(&shared_ctx, cb_a));
+    // Removing cb_b succeeds
+    EXPECT_TRUE(subject.remove_observer(&shared_ctx, cb_b));
+    subject.set(10);
+    EXPECT_EQ(shared_ctx, 10);
+}
+
+TEST(SubjectObserverRemoval, RemoveNonExistentReturnsFalse) {
+    u8g2gl_subject_int_n<2> subject(0);
+    int dummy = 0;
+    EXPECT_FALSE(subject.remove_observer(nullptr, count_observer_cb));
+    EXPECT_FALSE(subject.remove_observer(&dummy, nullptr));
+    EXPECT_FALSE(subject.remove_observer(&dummy, count_observer_cb));
+}
+
+TEST(SubjectObserverRemoval, RebindTextRemovesOldObserver) {
+    u8g2gl_subject_int_n<1> subject_a(100);
+    u8g2gl_subject_int_n<1> subject_b(200);
+
+    u8g2gl_obj obj;
+    EXPECT_TRUE(obj.bind_text(&subject_a));
+
+    // Rebinding to subject_b must release the observer from subject_a
+    EXPECT_TRUE(obj.bind_text(&subject_b));
+
+    // subject_a's single observer slot should now be reusable
+    int counter = 0;
+    EXPECT_TRUE(subject_a.add_observer(&counter, count_observer_cb));
+    subject_a.set(101);
+    EXPECT_EQ(counter, 1);
+}

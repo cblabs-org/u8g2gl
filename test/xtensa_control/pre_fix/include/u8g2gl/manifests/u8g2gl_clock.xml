@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_clock" extends="u8g2gl_obj">
+  <api>
+    <prop name="time" type="int" setter="set_time" default="0"
+          help="Initial epoch time in seconds." />
+    <prop name="format" type="enum" setter="set_format"
+          values="hh_mm,hh_mm_ss" default="hh_mm"
+          emit="U8G2GL_CLOCK_{VALUE^^}"
+          help="Clock display format: HH:MM or HH:MM:SS." />
+    <prop name="font" type="font" setter="set_font" required="true"
+          help="Primary U8G2 font for hours and minutes." />
+    <prop name="secondary_font" type="font" setter="set_secondary_font"
+          help="Secondary U8G2 font for seconds digits." />
+    <prop name="blink" type="bool" setter="set_blink" default="true"
+          help="Enable 1Hz colon blink animation." />
+    <bind name="bind_time" type="time" setter="bind_time" />
+  </api>
+</widget>

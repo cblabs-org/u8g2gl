@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_switch" extends="u8g2gl_obj">
+  <api>
+    <prop name="value" type="bool" setter="set_value" default="false"
+          help="Initial switch toggle state (true = ON, false = OFF)." />
+    <bind name="bind_value" type="bool" setter="bind_value" />
+  </api>
+</widget>

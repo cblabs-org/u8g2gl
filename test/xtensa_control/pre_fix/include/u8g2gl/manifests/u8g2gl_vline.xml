@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_vline">
+  <api>
+    <prop name="x" type="int" draw="u8g2gl_draw_vline" help="Left edge" />
+    <prop name="y" type="int" draw="u8g2gl_draw_vline" help="Top edge" />
+    <prop name="height" type="int" draw="u8g2gl_draw_vline" help="Length in pixels" />
+    <bind name="bind_x" type="int" setter="x" />
+    <bind name="bind_y" type="int" setter="y" />
+    <bind name="bind_height" type="int" setter="height" />
+  </api>
+</widget>

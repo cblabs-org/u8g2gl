@@ -122,6 +122,17 @@ public:
      *         builds, as capacity is declared and statically known.
      */
     bool add_observer(void* user_data, u8g2gl_observer_cb cb);
+    /**
+     * @brief Unregister an observer callback previously registered on this subject.
+     *
+     * Removes the first observer matching both @p user_data and @p cb.
+     * Does not compact the pool; existing observers keep their notify order.
+     *
+     * @param user_data Context pointer that was registered with the observer.
+     * @param cb        The callback function pointer that was registered.
+     * @return true if a matching observer was found and removed, false otherwise.
+     */
+    bool remove_observer(void* user_data, u8g2gl_observer_cb cb);
     void notify();
 
 protected:
@@ -171,6 +182,17 @@ public:
     void set(const char* value);   // copies into internal buffer, truncates at max_len
 
     bool add_observer(void* user_data, u8g2gl_observer_cb cb);
+    /**
+     * @brief Unregister an observer callback previously registered on this subject.
+     *
+     * Removes the first observer matching both @p user_data and @p cb.
+     * Does not compact the pool; existing observers keep their notify order.
+     *
+     * @param user_data Context pointer that was registered with the observer.
+     * @param cb        The callback function pointer that was registered.
+     * @return true if a matching observer was found and removed, false otherwise.
+     */
+    bool remove_observer(void* user_data, u8g2gl_observer_cb cb);
     void notify();
 
     uint16_t get_max_len() const;      // current runtime truncation limit (usable chars)
@@ -225,6 +247,17 @@ public:
     void set(bool value);
 
     bool add_observer(void* user_data, u8g2gl_observer_cb cb);
+    /**
+     * @brief Unregister an observer callback previously registered on this subject.
+     *
+     * Removes the first observer matching both @p user_data and @p cb.
+     * Does not compact the pool; existing observers keep their notify order.
+     *
+     * @param user_data Context pointer that was registered with the observer.
+     * @param cb        The callback function pointer that was registered.
+     * @return true if a matching observer was found and removed, false otherwise.
+     */
+    bool remove_observer(void* user_data, u8g2gl_observer_cb cb);
     void notify();
 
 protected:
@@ -265,6 +298,17 @@ public:
     void set(uint32_t epoch_secs);
 
     bool add_observer(void* user_data, u8g2gl_observer_cb cb);
+    /**
+     * @brief Unregister an observer callback previously registered on this subject.
+     *
+     * Removes the first observer matching both @p user_data and @p cb.
+     * Does not compact the pool; existing observers keep their notify order.
+     *
+     * @param user_data Context pointer that was registered with the observer.
+     * @param cb        The callback function pointer that was registered.
+     * @return true if a matching observer was found and removed, false otherwise.
+     */
+    bool remove_observer(void* user_data, u8g2gl_observer_cb cb);
     void notify();
 
 protected:

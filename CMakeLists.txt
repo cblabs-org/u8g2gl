@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(u8g2gl VERSION 0.9.0 LANGUAGES CXX)
+project(u8g2gl VERSION 0.10.0 LANGUAGES CXX)
 
 # --- Runtime version agreement (§16, .agents/rules/03-versioning.md) ---
 # The runtime version is stated three times: here, for CMake packaging; in
@@ -75,6 +75,7 @@ set(U8G2GL_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_editor.cpp
 )
 
+if(NOT EMSCRIPTEN)
 add_library(u8g2gl STATIC ${U8G2GL_RUNTIME_SOURCES})
 
 target_include_directories(u8g2gl PUBLIC
@@ -85,8 +86,9 @@ target_include_directories(u8g2gl PUBLIC
 target_compile_options(u8g2gl PRIVATE
     -Wall -Wextra -Wpedantic
 )
+endif()
 
-if(U8G2GL_BUILD_TESTS)
+if(U8G2GL_BUILD_TESTS AND NOT EMSCRIPTEN)
     target_include_directories(u8g2gl PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/test/stubs
     )
@@ -116,4 +118,8 @@ if(U8G2GL_BUILD_TESTS)
     FetchContent_MakeAvailable(googletest)
 
     add_subdirectory(test)
+endif()
+
+if(EMSCRIPTEN)
+    add_subdirectory(wasm)
 endif()

@@ -1,0 +1,205 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cpp-tests:
+    # Build and run the C++ test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Build
+        run: cmake --build build -j$(nproc)
+      - name: Test
+        run: cd build && ctest --output-on-failure
+
+  cli-tests:
+    # Build and run the CLI test suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Init U8G2 submodule
+        # CLI tests need BDF font files from extern/u8g2
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: cd cli && npm ci
+      - name: Test
+        run: cd cli && npm test
+
+  determinism-check:
+    # §13.9 determinism condition:
+    # A generator change that alters output without an input change requires a CLI version bump.
+    # Checked as a diff property between merge-base (origin/main) and HEAD.
+    #
+    # Demonstrated failure evidence (recorded per WO4 checklist):
+    #   Synthetic commit modifying golden without input change or version bump failed with:
+    #   "::error::Generator output changed without an input change and without a CLI version bump (§13.9)."
+    #   "Generator output changed without an input change and without a CLI version bump (§13.9)."
+    #   Exit code: 1
+    needs: cli-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch origin/main
+        run: git fetch origin main --depth=1 || git fetch origin main || true
+      - name: Run determinism check (§13.9)
+        run: |
+          MERGE_BASE=$(git merge-base HEAD origin/main 2>/dev/null || true)
+          if [ -z "$MERGE_BASE" ]; then
+            echo "Warning: Could not compute merge-base between HEAD and origin/main; falling back to HEAD~1"
+            MERGE_BASE=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+          fi
+
+          echo "Determinism check (§13.9)"
+          echo "  Merge base: $MERGE_BASE"
+          echo "  HEAD:       $(git rev-parse HEAD)"
+
+          CHANGED_FILES=$(git diff --name-only "$MERGE_BASE" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No files changed. Determinism check passed trivially."
+            exit 0
+          fi
+
+          # Find all changed golden files under cli/test/generator/fixtures/*/expected/**
+          CHANGED_GOLDENS=()
+          CHANGED_FIXTURE_DIRS=()
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            case "$file" in
+              cli/test/generator/fixtures/*/expected/*)
+                CHANGED_GOLDENS+=("$file")
+                FIXTURE_DIR=$(echo "$file" | sed -E 's|^(cli/test/generator/fixtures/[^/]+)/expected/.*|\1|')
+                case " ${CHANGED_FIXTURE_DIRS[*]:-} " in
+                  *" $FIXTURE_DIR "*) ;;
+                  *) CHANGED_FIXTURE_DIRS+=("$FIXTURE_DIR") ;;
+                esac
+                ;;
+            esac
+          done <<< "$CHANGED_FILES"
+
+          if [ ${#CHANGED_GOLDENS[@]} -eq 0 ]; then
+            echo "No fixture goldens changed. Determinism check passed trivially."
+            exit 0
+          fi
+
+          echo "Found ${#CHANGED_GOLDENS[@]} changed golden file(s) across ${#CHANGED_FIXTURE_DIRS[@]} fixture(s):"
+          for f in "${CHANGED_GOLDENS[@]}"; do
+            echo "  - $f"
+          done
+
+          # For each fixture directory with changed goldens, check for changed input files.
+          # Input files are anything under the fixture directory that is NOT under expected/.
+          UNACCOMPANIED_FIXTURES=()
+
+          for fdir in "${CHANGED_FIXTURE_DIRS[@]}"; do
+            HAS_INPUT=0
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                "${fdir}/expected/"*)
+                  ;;
+                "${fdir}/"*)
+                  HAS_INPUT=1
+                  echo "Fixture '$fdir' has input change: $file"
+                  break
+                  ;;
+              esac
+            done <<< "$CHANGED_FILES"
+
+            if [ $HAS_INPUT -eq 0 ]; then
+              UNACCOMPANIED_FIXTURES+=("$fdir")
+            fi
+          done
+
+          if [ ${#UNACCOMPANIED_FIXTURES[@]} -eq 0 ]; then
+            echo "All changed goldens have corresponding fixture input changes. Determinism check passed."
+            exit 0
+          fi
+
+          echo "The following fixture(s) had golden changes WITHOUT input changes:"
+          for uf in "${UNACCOMPANIED_FIXTURES[@]}"; do
+            echo "  - $uf"
+          done
+
+          get_version() {
+            local ref="$1"
+            local content
+            content=$(git show "${ref}:cli/package.json" 2>/dev/null || echo "{}")
+            if command -v node >/dev/null 2>&1; then
+              echo "$content" | node -e 'let d="";process.stdin.on("data",c=>d+=c);process.stdin.on("end",()=>{try{console.log(JSON.parse(d).version||"")}catch{console.log("")}})'
+            elif command -v jq >/dev/null 2>&1; then
+              echo "$content" | jq -r '.version // empty'
+            else
+              echo "$content" | grep '"version"' | head -1 | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/'
+            fi
+          }
+
+          BASE_VER=$(get_version "$MERGE_BASE")
+          HEAD_VER=$(get_version "HEAD")
+
+          echo "CLI version at merge base ($MERGE_BASE): '$BASE_VER'"
+          echo "CLI version at HEAD:                     '$HEAD_VER'"
+
+          if [ -z "$HEAD_VER" ] || [ "$BASE_VER" = "$HEAD_VER" ]; then
+            echo "::error::Generator output changed without an input change and without a CLI version bump (§13.9)."
+            echo "Generator output changed without an input change and without a CLI version bump (§13.9)." >&2
+            exit 1
+          fi
+
+          echo "CLI version was bumped from $BASE_VER to $HEAD_VER. Determinism check passed (§13.9)."
+          exit 0
+
+  xtensa-cross-compile:
+    # Cross-compile generated fixtures against the xtensa target
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - env_name: esp32dev_std17
+            std_label: "gnu++17 (asserted)"
+          - env_name: esp32dev_injected
+            std_label: "platform-injected standard"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-xtensa-${{ hashFiles('test/xtensa/platformio.ini') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PlatformIO
+        run: pip install platformio
+      - name: "Build xtensa (${{ matrix.std_label }})"
+        run: cd test/xtensa && pio run -e ${{ matrix.env_name }}
+      - name: "Positive control must FAIL"
+        run: |
+          cd test/xtensa
+          if pio run -e ctl_${{ matrix.env_name }} 2>&1; then
+            echo "::error::Positive control passed — the check no longer detects the defect class"
+            exit 1
+          else
+            echo "Positive control failed as expected (xtensa overload ambiguity detected)"
+          fi
