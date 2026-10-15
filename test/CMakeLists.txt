@@ -651,6 +651,29 @@ target_compile_options(test_bound_child_clip PRIVATE
 )
 gtest_discover_tests(test_bound_child_clip)
 
+# --- Real U8G2: container-edge pixel tests (§11.3, [D-18]) ---
+# Guards the exclusive far-corner convention of u8g2gl_apply_clip(), wrapped
+# negative origins for partially off-screen containers, and diagonal line clipping.
+add_executable(test_container_edge_pixels
+    test_container_edge_pixels.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_container_edge_pixels PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_container_edge_pixels SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_container_edge_pixels PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    GTest::gtest_main
+)
+target_compile_options(test_container_edge_pixels PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+gtest_discover_tests(test_container_edge_pixels)
+
 # --- Real U8G2: ambient state established inside a render, restored after (§11.3) ---
 # The state saver's faults are U8G2's to show, not the stub's: restoring a null
 # font crashes only inside u8g2_SetFont(), and font position moves only real
