@@ -12,8 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
           fetch-depth: 0
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build
@@ -28,6 +30,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Init U8G2 submodule
+        # CLI tests need BDF font files from extern/u8g2
+        run: git submodule update --init --checkout extern/u8g2
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -175,8 +180,9 @@ jobs:
             std_label: "platform-injected standard"
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
       - uses: actions/cache@v4
         with:
           path: ~/.platformio
