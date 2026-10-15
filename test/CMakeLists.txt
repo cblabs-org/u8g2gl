@@ -593,8 +593,11 @@ add_executable(test_rbox_bound
 target_include_directories(test_rbox_bound PRIVATE
     ${PROJECT_SOURCE_DIR}/include
 )
+target_compile_definitions(test_rbox_bound PRIVATE
+    ARDUINO=10819
+)
 target_link_libraries(test_rbox_bound PRIVATE
-    u8g2gl_u8g2_csrc
+    u8g2gl_u8g2_csrc_arduino
     GTest::gtest_main
 )
 target_compile_options(test_rbox_bound PRIVATE
