@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_glyph" extends="u8g2gl_obj">
+  <api>
+    <prop name="glyph" type="int" setter="set_glyph" required="true"
+          help="16-bit glyph codepoint from font table." />
+    <prop name="font" type="font" setter="set_font" required="true"
+          help="U8G2 font containing the glyph." />
+  </api>
+</widget>

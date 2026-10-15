@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="u8g2gl_button" extends="u8g2gl_obj">
+  <api>
+    <prop name="text" type="string" setter="set_text" default=""
+          help="Button label text string." />
+    <prop name="font" type="font" setter="set_font" required="true"
+          help="U8G2 font for button text." />
+    <prop name="border_width" type="int" setter="set_border_width" default="1"
+          help="Border stroke thickness in pixels." />
+    <bind name="bind_text" type="string" setter="bind_text"
+          fmt="bind_text_fmt" />
+    <bind name="bind_text" type="int" setter="bind_text"
+          fmt="bind_text_fmt" />
+  </api>
+</widget>
