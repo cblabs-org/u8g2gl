@@ -368,6 +368,7 @@ struct u8g2gl_binding_desc {
         int32_t ref_value = 0;   ///< Flag bindings only
         int16_t coord_origin;    ///< bind_x / bind_y only; set before the first read
     };
+    u8g2gl_observer_cb cb = nullptr;
     u8g2gl_subject_type_t subject_type = U8G2GL_SUBJECT_INT;
     u8g2gl_binding_op_t op = U8G2GL_BIND_OP_EQ;
     uint8_t flag = 0;
@@ -502,21 +503,48 @@ static u8g2gl_binding_desc* u8g2gl_allocate_binding(u8g2gl_obj* obj) {
     return nullptr;
 }
 
+// u8g2gl_remove_binding_observer
+// Unregisters a binding slot's observer from its subject, casting back via
+// subject_type. Idempotent: clears the subject's observer slot without altering
+// the binding pool slot itself.
+//   slot — the binding slot to detach from its subject
+static void u8g2gl_remove_binding_observer(u8g2gl_binding_desc* slot) {
+    if (!slot || !slot->subject || !slot->cb) {
+        return;
+    }
+    switch (slot->subject_type) {
+        case U8G2GL_SUBJECT_INT:
+            static_cast<u8g2gl_subject_int_base*>(slot->subject)->remove_observer(slot, slot->cb);
+            break;
+        case U8G2GL_SUBJECT_STRING:
+            static_cast<u8g2gl_subject_string_base*>(slot->subject)->remove_observer(slot, slot->cb);
+            break;
+        case U8G2GL_SUBJECT_BOOL:
+            static_cast<u8g2gl_subject_bool_base*>(slot->subject)->remove_observer(slot, slot->cb);
+            break;
+        case U8G2GL_SUBJECT_TIME:
+            static_cast<u8g2gl_subject_time_base*>(slot->subject)->remove_observer(slot, slot->cb);
+            break;
+    }
+}
+
 // u8g2gl_obj::~u8g2gl_obj
-// Releases every pool slot belonging to this object.
+// Releases every pool slot belonging to this object and removes all observer
+// registrations from the bound subjects.
 //
 // This is the counterpart to u8g2gl_allocate_binding and it is not optional:
-// slots hold a raw u8g2gl_obj*, so a destroyed object leaving its slots active
-// would leave the pool pointing at freed memory, and the next subject
-// notification would evaluate a binding against it. Generated screens use static
-// objects that outlive the program, so this rarely runs in production — but
-// tests construct and destroy objects freely, which is exactly where a dangling
-// slot would surface as an unrelated failure.
+// slots hold a raw u8g2gl_obj*, so a destroyed object leaving its observers
+// registered would leave the subject firing into freed memory or dangling slots.
+// For each active slot belonging to this object, remove the observer from the
+// subject first, then deactivate the pool slot.
 u8g2gl_obj::~u8g2gl_obj() {
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
         if (s_binding_pool[i].active && s_binding_pool[i].obj == this) {
+            u8g2gl_remove_binding_observer(&s_binding_pool[i]);
             s_binding_pool[i].active = false;
             s_binding_pool[i].obj = nullptr;
+            s_binding_pool[i].subject = nullptr;
+            s_binding_pool[i].cb = nullptr;
         }
     }
 }
@@ -547,6 +575,7 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
     slot->op = op;
     slot->ref_value = ref_value;
     slot->flag = flag;
+    slot->cb = u8g2gl_on_binding_flag_change;
     slot->is_text = false;
     slot->active = true;
 
@@ -565,6 +594,8 @@ bool u8g2gl_obj::add_flag_binding(void* subject, u8g2gl_subject_type_t type, u8g
     if (!added) {
         slot->active = false;
         slot->obj = nullptr;
+        slot->subject = nullptr;
+        slot->cb = nullptr;
         return false;
     }
 
@@ -620,7 +651,9 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
         return false;
     }
     u8g2gl_binding_desc* slot = u8g2gl_find_text_binding(this);
-    if (!slot) {
+    if (slot) {
+        u8g2gl_remove_binding_observer(slot);
+    } else {
         slot = u8g2gl_allocate_binding(this);
     }
     if (!slot) {
@@ -630,6 +663,7 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     slot->obj = this;
     slot->subject = subject;
     slot->fmt = fmt;
+    slot->cb = &u8g2gl_obj::on_text_bound;
     slot->subject_type = U8G2GL_SUBJECT_INT;
     slot->is_text = true;
     slot->active = true;
@@ -637,6 +671,8 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_int_base* subject, const char* fmt) {
     if (!subject->add_observer(slot, &u8g2gl_obj::on_text_bound)) {
         slot->active = false;
         slot->obj = nullptr;
+        slot->subject = nullptr;
+        slot->cb = nullptr;
         return false;
     }
     on_text_binding_changed();
@@ -653,7 +689,9 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
         return false;
     }
     u8g2gl_binding_desc* slot = u8g2gl_find_text_binding(this);
-    if (!slot) {
+    if (slot) {
+        u8g2gl_remove_binding_observer(slot);
+    } else {
         slot = u8g2gl_allocate_binding(this);
     }
     if (!slot) {
@@ -663,6 +701,7 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     slot->obj = this;
     slot->subject = subject;
     slot->fmt = nullptr;
+    slot->cb = &u8g2gl_obj::on_text_bound;
     slot->subject_type = U8G2GL_SUBJECT_STRING;
     slot->is_text = true;
     slot->active = true;
@@ -670,6 +709,8 @@ bool u8g2gl_obj::bind_text(u8g2gl_subject_string_base* subject) {
     if (!subject->add_observer(slot, &u8g2gl_obj::on_text_bound)) {
         slot->active = false;
         slot->obj = nullptr;
+        slot->subject = nullptr;
+        slot->cb = nullptr;
         return false;
     }
     on_text_binding_changed();
@@ -727,6 +768,7 @@ static u8g2gl_binding_desc* u8g2gl_register_value_binding(u8g2gl_obj* obj, void*
     }
     slot->subject = subject;
     slot->subject_type = type;
+    slot->cb = cb;
     slot->is_text = false;
 
     // --- Step 2: Register with the subject, casting back via the type tag ---
@@ -752,6 +794,8 @@ static u8g2gl_binding_desc* u8g2gl_register_value_binding(u8g2gl_obj* obj, void*
     if (!added) {
         slot->active = false;
         slot->obj = nullptr;
+        slot->subject = nullptr;
+        slot->cb = nullptr;
         return nullptr;
     }
     return slot;
