@@ -19,6 +19,12 @@
  *
  *              This is the proof [D-9] requires: the preview is the runtime,
  *              not a second implementation that could drift.
+ *
+ *              Scope: this proves the bridge compiled to Wasm equals the bridge
+ *              compiled natively (one implementation, two targets). It does NOT
+ *              prove the editor path equals the firmware path (generated direct
+ *              setter calls, [D-17]); criterion 1 covers that separately, on
+ *              host and device. Both proofs are needed and are not the same.
  */
 #include <gtest/gtest.h>
 
