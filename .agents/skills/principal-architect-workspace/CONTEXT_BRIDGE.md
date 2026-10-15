@@ -214,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-14, after PR-5R2.**
+**Revised 2026-10-15, after PR-06.**
 
 ### Where the programme is
 
@@ -226,7 +226,9 @@ refused, the radius bound checked however configured) · **#10** PR-4R3 (the
 runtime version floor, `extends` restricted to elements with a class) · **#11**
 PR-05's U8G2GL half (the runtime packaged as a PlatformIO library) · **#13**
 PR-05R (nine integration defects; criterion 1 made evidence about U8G2GL) ·
-**#14** PR-5R2 (timing — scroll, clock seconds, timers and the resume callback).
+**#14** PR-5R2 (timing — scroll, clock seconds, timers and the resume callback) ·
+**#15** PR-06 (the Wasm harness with its [D-9] parity proof, the programme's
+first CI, and the deferred runtime debts).
 
 **PR-05's foundation half is deliberately unmerged** —
 [esp32-app-foundation#292](https://github.com/matthewmcneill/esp32-app-foundation/pull/292),
@@ -235,17 +237,29 @@ renderer". It is *verified* on its branch, with all four gate evidence sets. The
 U8G2GL repository continues to merge normally. Wherever a plan says "PR-05
 lands", read "PR-05 verified on its branch".
 
-Baselines at `main` @ `8e73506`: **C++ 501** tests (one known skip,
+Baselines at `main` @ `ce0046c`: **C++ 512** tests (one known skip,
 `SizeOfReport.ThirtyTwoBitTarget`), **CLI 1353**, zero warnings. Schema **0.4**,
-CLI **0.13.0**, runtime **0.9.0**, scene format **3**. Every project regenerated
-with 0.13.0 requires runtime ≥ 0.9. Foundation's held branch: native **1018**. U8G2 pinned at
+CLI **0.13.1**, runtime **0.10.0**, scene format **3**. Every project
+regenerated with 0.13.1 requires runtime ≥ 0.10. Foundation's held branch:
+native **1018**.
+
+**These are now machine-produced.** CI runs both suites, the xtensa
+cross-compile and the determinism condition on every push (§17.3), so a figure
+in a report can be checked rather than taken on trust. U8G2 pinned at
 **2.36.18** (`d66b49af`) in `extern/u8g2`. **Take these from a merged `main`,
 never from a report** — a PA's figures are correct when written and stale by the
 time they are read.
 
-**Next: PR-06** — the Wasm renderer and snapshot harness, and the programme's
-**first CI** (§17.3). Then the **PR-07 gate**. The editor track (E-D, then
-E-1..E-3) begins only on a GO — owner decision CA-1, 2026-10-05.
+**Next: the PR-07 gate.** Both prerequisites are met — PR-05 verified on its
+branch ([R10]), PR-06 merged — and **all four criteria now have evidence**. So
+the gate is a *verdict on what exists*, not a build, and it is the owner's to
+give. On a GO the editor track starts (E-D, then E-1..E-3, per CA-1); on a
+NO-GO the programme stops and PR-01..PR-06 remain additive, with
+`modules/U8G2Display` untouched.
+
+Read `C2-ANALYSIS.md` before forming a view: criterion 2 is the one that did
+not come back clean, and the analysis that settled it was deliberately
+commissioned to be able to say so.
 
 PR-05's font risk is effectively nil: all twelve of departures-board-v3's font
 arrays are byte-identical to generator output, so its font work is renaming to
@@ -329,6 +343,14 @@ owns (see the boundary decision in `PROGRAM.md`, 2026-10-14):
   finding. Use a library-only layout.
 - **F-GLOB** — the middleware glob misses *silently* unless the directory is
   named `u8g2gl`. Switch to the `U8G2GL_GENERATED_CONFIG` macro.
+- **F-PLATFORM** — **foundation's build is environment-dependent.**
+  `platformio.ini:26` says `platform = espressif32`, which is not a stable
+  identifier: it resolves to **pioarduino** on the owner's machine (because
+  pioarduino is installed there) and to Espressif's legacy **v7.1.3, GCC 8.4**
+  on a fresh runner. The same `platformio.ini` therefore compiles with two
+  different toolchains depending on the machine. Pin it explicitly. Found by
+  PR-06 (2026-10-15), when a Chief Architect ruling to "pin what foundation
+  ships" made the xtensa positive control *pass*.
 - **F-REGEN** — CLI output has moved since foundation's pinned commit, so the
   cut-over needs a regeneration commit.
 - **Repin to the tag.** `v0.7.0-integration` exists and foundation still pins a

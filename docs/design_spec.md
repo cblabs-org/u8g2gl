@@ -2072,11 +2072,11 @@ Absent from v0.1 entirely. It is what makes the project maintainable.
 
 Per **[D-9]** the same Emscripten build of the runtime plus U8G2 serves as the browser preview *and* the snapshot-test harness — and departures-board's `tools/layoutsim` is a working precedent to port rather than a green-field build. A rendering regression in `u8g2gl_clock`'s dual-font alignment fails CI as a pixel diff. This is the single highest-leverage piece of infrastructure in the project and should be built early — during Phase 1, not Phase 3.
 
-### 17.3 Continuous integration — required, and absent until PR-06
+### 17.3 Continuous integration
 
-**There is no CI.** No workflow, no hooks, nothing automated. Every figure in every review has been a human running the suites and reporting the result to another human. §17.1's Compilation row has said "in CI" since the first revision, and has been describing something that does not exist.
+**Delivered by PR-06 (2026-10-15):** `.github/workflows/ci.yml`, running the C++ and CLI suites, the xtensa cross-compile with its F-STD matrix, and §13.9's determinism condition.
 
-That was a defensible trade while nothing shipped. Two findings ended it.
+Until then there was none — no workflow, no hooks, nothing automated — and every figure in every review was a human running the suites and reporting the result to another human, while §17.1's Compilation row had said "in CI" since the first revision. That was a defensible trade while nothing shipped. Two findings ended it, and they remain the justification for what each check does.
 
 **A host-only suite cannot see target type widths.** PR-05R found an overload ambiguity that is an error on xtensa and fine on the host. It passed 401 C++ tests, 1338 CLI tests, a Principal Architect's verification and a readability review, and reached a **committed fixture**. Nothing human caught it; a target compile did, immediately. No amount of care at the layers in §17.1 can reach this class of defect, because every one of them runs on the developer's architecture.
 
@@ -2091,6 +2091,10 @@ That was a defensible trade while nothing shipped. Two findings ended it.
 | **The §13.9 determinism condition** | Generated output changing without a generator version bump |
 
 The cross-compile is the one with no substitute. The other two replace a human's diligence with a machine's; this one reaches a place no human reading host output can go.
+
+**Both arguments were vindicated inside PR-06 itself.** The observer-removal work introduced a use-after-free — a stack-local subject outlived by the objects bound to it — that was **silent on macOS and segfaulted fourteen tests on Linux**. The CI built in that PR caught a defect introduced by that PR, which is the same class as the xtensa ambiguity: a host-only suite on one developer's machine cannot see what another environment does.
+
+**A check must be able to fail, and must assert that it can.** PR-06's xtensa job carries a frozen pre-fix fixture as a positive control, and CI fails if the control ever *passes*. That inverted assertion immediately earned itself: a change to the platform pin — made on a Chief Architect ruling that `platform = espressif32` names a stable toolchain, which it does not — resolved CI to a compiler too old to see the defect class, and the control went green. Nothing else would have noticed. **A platform identifier is not a toolchain**, and that finding applies to any consumer's `platformio.ini`, not only ours.
 
 ---
 

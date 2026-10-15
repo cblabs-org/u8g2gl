@@ -67,8 +67,23 @@ commit and the rule is about two. The committed goldens are stamped
 `0.0.0-golden`, so they never move on a version bump and move only on a real
 output change; the check is therefore "a golden changed, its fixture inputs did
 not, so the CLI version must differ from the merge base" (§13.9). It runs in CI,
-which PR-06 introduces (§17.3). **Until then it is a review question, and that is
-a stopgap with a named successor, not the answer.**
+which PR-06 delivered (§17.3).
+
+### A runtime bump forces a CLI patch bump, and that is intended
+
+A runtime minor bump changes the floor the generator emits
+(`U8G2GL_REQUIRE_RUNTIME_VERSION`), so every golden moves. The condition above
+sees an output change with no *fixture* input change and fires.
+
+**That is correct, not a false positive, and the right response is a CLI patch
+bump.** The runtime version genuinely is an input to generated output; it is
+simply not one the diff condition can see, because it lives outside the fixture
+directory. The two ship from one repository at one commit, so coupling their
+versions costs nothing and keeps the stamp honest.
+
+A **patch** bump, not a minor: the generator did not change, its output did, and
+for a reason the next reader can find from the runtime's own version. Observed
+first at PR-06 (runtime 0.9.0 → 0.10.0 forcing CLI 0.13.0 → 0.13.1).
 
 ## Agent autonomy
 

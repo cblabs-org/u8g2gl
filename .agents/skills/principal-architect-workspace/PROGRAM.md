@@ -1787,3 +1787,88 @@ was three commits stale while reading this report, and `git show main:` quietly
 answered from it. Everything here was re-checked against `origin/main`. That is
 `rules/04`'s warning arriving in a new disguise: not a wrong branch, a stale
 ref.
+
+---
+
+## 2026-10-15 — PR-06 ingested (#15, `ce0046c`). The gate is next.
+
+C++ 501 → **512**, CLI **1353**, zero warnings. Runtime **0.10.0**, CLI
+**0.13.1**, schema 0.4. The Wasm harness, the programme's first CI, and the
+deferred runtime debts all landed together.
+
+**PR-06 was the last gate prerequisite.** PR-05 is verified on its branch
+([R10]) and all four criteria have evidence, so **PR-07 is a verdict on what
+exists rather than a build**, and it is the owner's to give.
+
+### A Chief Architect ruling was wrong, and the mechanism that caught it was another one
+
+Decision 4 of PR-06's decomposition: the PA proposed pinning the xtensa
+cross-compile to pioarduino; the Chief Architect ruled "pin what foundation
+actually ships", which is `platform = espressif32`.
+
+**That ruling rested on a false premise.** `espressif32` is not a stable
+identifier. It resolves to **pioarduino** on the owner's machine, because
+pioarduino is installed there, and to Espressif's legacy **v7.1.3 (GCC 8.4)**
+on a fresh runner — a compiler too old to produce the overload ambiguity the
+check exists to find. Following the ruling gave a cross-compile that tested a
+toolchain incapable of failing.
+
+**The inverted positive control caught it.** Ruling 8 had required that CI fail
+if the frozen pre-fix fixture ever *passes*, argued on the grounds that a
+control nobody asserts must fail "silently stops controlling the first time the
+check is misconfigured". Within days it did exactly that — against its own
+author's other ruling, in the same PR.
+
+Two things follow, and both are larger than this PR:
+
+- **A platform identifier is not a toolchain.** Recorded in §17.3, and as
+  **F-PLATFORM** in the cut-over requirements, because *foundation's own build
+  is environment-dependent*: the same `platformio.ini` compiles with two
+  different compilers depending on the machine. That is a live risk for the
+  cut-over, not a CI detail.
+- **Inverted controls earn their cost.** Prefer them wherever a check's whole
+  value is that it can fail.
+
+### CI caught a defect introduced by the PR that built it
+
+WO1's observer removal introduced a use-after-free — `remaining_slots()` bound
+an object to a stack-local filler subject and returned, so a later destructor
+dereferenced it. **Silent on macOS, fourteen segfaults on Linux.**
+
+Second instance of §17.3's class, after PR-05R's xtensa ambiguity, and the
+strongest available argument for that ruling: a host-only suite on one
+developer's machine cannot see what another environment does. Recorded in
+§17.3 beside the cross-compile rationale.
+
+### The [D-9] parity proof, and what it does not cover
+
+`test_wasm_parity.cpp` builds the bridge natively against real U8G2 and
+`snapshot.test.mjs` builds it through Emscripten; both assert one golden held
+in a single place (`test/CMakeLists.txt`). Two builds, one byte string.
+
+**Scope, so it is not over-read at the gate:** this proves *bridge-in-Wasm
+equals bridge-native* — [D-9]'s claim of one implementation rather than two. It
+does **not** prove the editor path equals the **firmware** path, which is
+generated direct setter calls ([D-17]). Criterion 1 covers that, on host and
+device. Both proofs are needed and they are different proofs. The PA took the
+note and wrote it into the test header (`8e81395`).
+
+### Reviewing well
+
+Two blocking findings were raised on #15 and both were resolved properly: the
+first parity test asserted `litPixels > 0`, which a renderer drawing everything
+in the wrong place would pass. What makes this worth recording is the second
+round — the PA **pushed back on the platform ruling with evidence instead of
+complying**, and was right. That is the behaviour the three-tier model exists
+to produce, and it has now happened in four consecutive PRs.
+
+### Landed with this ingest
+
+- **`rules/03`:** the runtime-to-CLI version coupling as policy, not just as a
+  reviewer's note in the standards skill. A runtime minor bump moves every
+  golden's floor, the §13.9 condition fires, and a CLI **patch** bump is the
+  correct response — the generator did not change, its output did.
+- **§17.3 brought up to date.** It said "there is no CI", which stopped being
+  true at `ce0046c`; a spec asserting an absent capability is bad, and one
+  denying a present capability is worse.
+- **F-PLATFORM** in the cut-over requirements.
