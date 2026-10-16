@@ -14,7 +14,7 @@ This probe is two work orders, not three. The analysis (Part 2) depends on havin
 
 ### Work Order Ledger
 
-- **[ ] [wo1-xml-authoring](wo1-xml-authoring/WORKORDER.md):** Author the U8G2GL XML that expresses as much of `layoutSWR.json` as schema 0.4 allows. For each widget that cannot be expressed (ServiceListWidget, TrainFormationWidget, ScrollingMessagePoolWidget), write the XML *up to the gap* and document precisely where the schema stops. Produce a hand-expanded workaround for the formation widget (12 carriages) — labelled as a workaround, not a solution. Render what can be rendered against the mock data via the Wasm harness. Archive the source material from the two departures-board repos into `tmp/g-probe-source/`.
+- **[x] [wo1-xml-authoring](wo1-xml-authoring/WORKORDER.md):** Author the U8G2GL XML that expresses as much of `layoutSWR.json` as schema 0.4 allows. For each widget that cannot be expressed (ServiceListWidget, TrainFormationWidget, ScrollingMessagePoolWidget), write the XML *up to the gap* and document precisely where the schema stops. Produce a hand-expanded workaround for the formation widget (12 carriages) — labelled as a workaround, not a solution. Render what can be rendered against the mock data via the Wasm harness. Archive the source material from the two departures-board repos into `tmp/g-probe-source/`.
 
 - **[ ] [wo2-expressiveness-report](wo2-expressiveness-report/WORKORDER.md):** Write `EXPRESSIVENESS.md` at the repo root. Part 1: what rendered and how (include the render script, reference the XML, show what pixels appeared). Part 2: for each gap — what the layout needs, why the schema cannot say it, which open question it maps to, what closing it would cost in schema surface. Part 3: line-count comparison using C2-ANALYSIS.md's methodology — separate layout from scaffolding. One-paragraph gate summary at the end.
 
@@ -59,6 +59,17 @@ Serialised, not parallel. No file overlap.
 6. **`visible: false`** → `hidden` flag exists but is runtime-driven via `bind_flag_if_eq`, not a static attribute. Need to check if there's a literal `hidden="true"`.
 
 **Decision:** Two WOs is correct. WO1 is `standard` — clear boundary, concrete checklist. WO2 is `standard` — the analysis is structured by the template the bridge gave.
+
+### 2026-10-16 — WO1 Complete
+
+**Deliverables in `tmp/g-probe/`:**
+- `departures_static.xml` (50 lines) — the subset schema 0.4 can express without workarounds: platform box, "Plat" label, platform number, separator line, clock, hidden fallback label. Rendered: 518 lit pixels.
+- `departures_workaround.xml` (163 lines) — hand-expanded all 7 widgets: 3 service-1 columns, 12 carriage boxes+labels, 3 secondary service rows (1 visible, 2 hidden), single scroll label. Rendered: 2,196 lit pixels.
+- Three gap documents: `gap-service-list.md` ([Q-8], [Q-13]), `gap-formation.md` ([Q-8], [Q-15]), `gap-scrolling-pool.md` ([Q-15]).
+- `render.mjs` — hand-crafted scene JSON directly (bypassed CLI generator), rendered via Wasm harness. PBM and PNG outputs.
+- SHA-256 (workaround): `8ae65c023005d2e04d951617848ae0c764ae505f71f36866d5eddba04bf48f8b`
+
+**Surfaced defect (out of WO scope):** `wasm/bridge.cpp:708` checks `realisation == "draw"` but the CLI generator (`cli/src/core/generator/emit/scene.ts:277`) emits `"draw_calls"`. Drawing primitives in CLI-generated scene JSON are silently skipped by the Wasm bridge. The worker worked around this by hand-crafting scene JSON with `"draw"`. This is a real bug — it means the Wasm harness does not faithfully render CLI-generated scenes that contain drawing elements. **File as a defect against PR-06's Wasm harness.**
 
 ---
 
