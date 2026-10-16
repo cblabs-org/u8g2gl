@@ -100,3 +100,45 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ## Completion Report
 <!-- Written by the worker at task completion -->
+
+### Executive Summary
+
+Work Order 2 (Expressiveness Report) was successfully completed under strict boundary constraints (no files modified in `src/`, `cli/`, `wasm/`, `docs/`, `test/`, or `tmp/g-probe/`). The single primary deliverable, [`EXPRESSIVENESS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/EXPRESSIVENESS.md), was authored at the repository root and verified to satisfy all PR-07 gate evaluation criteria.
+
+The report provides an objective, evidence-based assessment of U8G2GL Schema 0.4 expressiveness using the empirical Wasm rendering output and hand-authored XML from Work Order 1. Adhering strictly to tone guidance, gaps are documented not as project failures or verdicts, but as deliberate deferrals governed by the §1.5 deferral rule ("Lite by design"), with clear mappings to Phase 2 backlog open questions.
+
+### Checklist Reconciliation
+
+- [x] **Read all WO1 output:** Ingested `departures_static.xml`, `departures_workaround.xml`, all three gap documents in `tmp/g-probe/gaps/`, `MANIFEST.md`, and execution output from `render.mjs`.
+- [x] **Write Part 1 — "What Rendered":** Documented expressible widgets/primitives, element mappings to Schema 0.4, exact framebuffer verification metrics (256×64, 2,048 bytes, 518 lit pixels for baseline vs. 2,196 lit pixels for workaround, SHA-256 hashes), comparison note detailing data schema divergence between v1 mock data and v3 layout expectations, and full inline code blocks of the baseline XML.
+- [x] **Write Part 2 — "What Could Not Be Expressed":** Analyzed three expressiveness gaps organised by gap category rather than widget:
+  1. *Repeaters (`[Q-8]`)*: Service list rows (`row0Widget`, `servicesWidget`) and carriage lists. Cited §6.5 (static view structure), §9 (collections are not subjects [D-8]), and `[Q-13]` ($prop interpolation). Evaluated schema surface cost (1 container element, 5 attributes, scoped variable expressions).
+  2. *Message pool carousel (`[Q-15]`)*: Sequential message cycling (`msgWidget`). Cited ui_spec §7.3 and `[Q-15]` (`<cards>` element). Evaluated schema surface cost (1 container element, 1 attribute).
+  3. *Per-carriage indicators & heterogeneous sub-assemblies*: Carriage amenity icons, first-class styling, and passenger load gauges. Cited §3 [D-6], §6.5, `[Q-8]`, `[Q-15]`, `[Q-12]`. Evaluated why this belongs in a custom C++ widget with an `<api>` manifest rather than expanding XML into a procedural graphics schema.
+  - Workarounds evaluated honestly: confirmed that manual unrolling is unmaintainable for human authors and unusable in a visual designer.
+- [x] **Write Part 3 — "What It Cost":** Implemented line attribution following `C2-ANALYSIS.md`:
+  - Classified lines by kind (Total / Blank / Comment / Code) and concern (Layout vs. Scaffolding / Envelope).
+  - Derived exact counts: Legacy v3 JSON (174 lines / 174 code; 7 scaffolding, 167 layout), Static XML (49 lines / 22 code; 7 scaffolding, 15 layout), Workaround XML (162 lines / 86 code; 7 scaffolding, 79 layout).
+  - Calculated comparative ratios: Workaround XML requires 51% fewer code lines than legacy JSON (86 vs. 174).
+  - Projected XML with `[Q-8]` repeaters: ~41 code lines (~70 total lines), representing a 76% reduction in authored code over legacy JSON.
+- [x] **Write the gate summary paragraph:** Delivered a calibrated, actionable one-paragraph verdict answering all three gate questions: the framework cannot describe dynamic screens *yet*, the shortest path to yes is implementing `[Q-8]` repeaters and `[Q-15]` cards in Phase 2, and the core architecture and line savings hold.
+- [x] **Final review:** Validated that all claims are backed by spec/file citations, totals sum consistently, tone is constructive, and document is self-contained.
+- [x] **Verification & approval:** Validated and confirmed by caller agent approval.
+
+### Verification Matrix
+
+| Requirement | Status | Evidence / Location |
+|---|---|---|
+| `EXPRESSIVENESS.md` at repo root | Confirmed | [`EXPRESSIVENESS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/EXPRESSIVENESS.md) |
+| Three numbered parts + Gate Summary | Confirmed | Parts 1, 2, 3 and Gate Summary present |
+| Every gap maps to spec section & open question | Confirmed | §6.5, §9, §1.5, [D-8], [Q-8], [Q-15], [Q-13], [Q-12] |
+| Line counts internally consistent | Confirmed | Exact kind & concern breakdowns reconcile line-for-line |
+| Self-contained readability | Confirmed | Explicit paths, context, and methodology described |
+| Boundary box respected | Confirmed | Only `EXPRESSIVENESS.md` authored; core trees untouched |
+
+### Issue Surfacing (For Principal Architect Triage)
+
+1. **Wasm Bridge Drawing Dispatch Discrepancy (from WO1):**
+   - **Location:** `wasm/bridge.cpp:708` vs `cli/src/core/generator/emit/scene.ts:277`
+   - **Summary:** The C++ Wasm dispatcher expects `realisation == "draw"`, but the CLI scene generator emits `"draw_calls"`. This causes drawing primitives (`u8g2gl_box`, `u8g2gl_line`) in CLI-generated scene JSON to be silently skipped during Wasm rendering. Recorded for triage against PR-06.
+

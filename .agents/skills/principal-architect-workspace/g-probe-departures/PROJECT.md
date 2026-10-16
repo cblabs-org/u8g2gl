@@ -16,7 +16,7 @@ This probe is two work orders, not three. The analysis (Part 2) depends on havin
 
 - **[x] [wo1-xml-authoring](wo1-xml-authoring/WORKORDER.md):** Author the U8G2GL XML that expresses as much of `layoutSWR.json` as schema 0.4 allows. For each widget that cannot be expressed (ServiceListWidget, TrainFormationWidget, ScrollingMessagePoolWidget), write the XML *up to the gap* and document precisely where the schema stops. Produce a hand-expanded workaround for the formation widget (12 carriages) — labelled as a workaround, not a solution. Render what can be rendered against the mock data via the Wasm harness. Archive the source material from the two departures-board repos into `tmp/g-probe-source/`.
 
-- **[ ] [wo2-expressiveness-report](wo2-expressiveness-report/WORKORDER.md):** Write `EXPRESSIVENESS.md` at the repo root. Part 1: what rendered and how (include the render script, reference the XML, show what pixels appeared). Part 2: for each gap — what the layout needs, why the schema cannot say it, which open question it maps to, what closing it would cost in schema surface. Part 3: line-count comparison using C2-ANALYSIS.md's methodology — separate layout from scaffolding. One-paragraph gate summary at the end.
+- **[x] [wo2-expressiveness-report](wo2-expressiveness-report/WORKORDER.md):** Write `EXPRESSIVENESS.md` at the repo root. Part 1: what rendered and how (include the render script, reference the XML, show what pixels appeared). Part 2: for each gap — what the layout needs, why the schema cannot say it, which open question it maps to, what closing it would cost in schema surface. Part 3: line-count comparison using C2-ANALYSIS.md's methodology — separate layout from scaffolding. One-paragraph gate summary at the end.
 
 ### Dependencies
 
@@ -70,6 +70,21 @@ Serialised, not parallel. No file overlap.
 - SHA-256 (workaround): `8ae65c023005d2e04d951617848ae0c764ae505f71f36866d5eddba04bf48f8b`
 
 **Surfaced defect (out of WO scope):** `wasm/bridge.cpp:708` checks `realisation == "draw"` but the CLI generator (`cli/src/core/generator/emit/scene.ts:277`) emits `"draw_calls"`. Drawing primitives in CLI-generated scene JSON are silently skipped by the Wasm bridge. The worker worked around this by hand-crafting scene JSON with `"draw"`. This is a real bug — it means the Wasm harness does not faithfully render CLI-generated scenes that contain drawing elements. **File as a defect against PR-06's Wasm harness.**
+
+### 2026-10-16 — WO2 Complete · Project Complete
+
+**Deliverable:** `EXPRESSIVENESS.md` (366 lines) at repo root.
+
+**Key findings confirmed by measurement:**
+1. Schema 0.4 natively expresses 4 of 7 widgets + all 3 primitives (platform label, clock with secondary font, hidden fallback label, box/line/text).
+2. Three gaps, all mapped to deferred open questions:
+   - **[Q-8] Repeaters:** ServiceListWidget ×2 and TrainFormationWidget. Schema cost: 1 element + 5 attributes + scoped variable resolution.
+   - **[Q-15] Cards:** ScrollingMessagePoolWidget. Schema cost: 1 element + 1 attribute (clean, minimal).
+   - **Custom C++ widget (§6.5):** Per-carriage indicators (fill gauges, icons, class styling). Not a schema gap — this is the correct use of custom elements.
+3. Line counts (workaround vs legacy): 86 vs 174 code lines (−51%). Projected with repeaters: ~41 vs 174 (−76%).
+4. The gate summary: **not yet**, shortest path is [Q-8] + [Q-15] + custom widget, all already on the Phase 2 roadmap.
+
+**Surfaced defect filed for triage:** `wasm/bridge.cpp:708` realisation string mismatch with CLI generator.
 
 ---
 
