@@ -354,9 +354,21 @@ renumbered across three documents.*
 **Pass requires all four:**
 
 1. Renders **pixel-identically** to the legacy board, by automated diff — not by eye.
-2. The XML is materially shorter and clearer than the C++ it replaces.
+2. **The layout is wholly declarative, and the framework does not inflate authored code.** No positioning, typography or truncation decision remains in C++. Total authored code is compared against the legacy board with the growth **attributed by concern** — growth from the framework itself must be immaterial; growth from choices made independently of it is named and excluded rather than assumed.
 3. Measured flash and RAM comfortable on `esp32dev` alongside WiFi and TLS ([D-1], §18, Q-4).
 4. Edit → regenerate → rebuild faster in practice than editing C++ was.
+
+**Criterion 2 was rewritten on 2026-10-16, after it was measured and failed. The original wording and the reason for the change are recorded here rather than replaced, because a gate that quietly redefines a criterion it has failed is not a gate.**
+
+It read: *"The XML is materially shorter and clearer than the C++ it replaces."* Measured in `pr-05-integration/C2-ANALYSIS.md`, which was commissioned to be able to fail and did: the XML replaced **24 legacy layout code lines and cost 18** — −25% on that concern, −7% on lines a reader actually reads, and **+46%** at PR-05's own commit. No framing of the two files produced a material shortening.
+
+**It was the wrong question.** Brevity was never the point. U8G2GL exists to make displays designable — editable visually, then generated — on a runtime that costs nothing (§1.2, [concept.md §2.1](concept.md)). Against that purpose, authored code coming out **roughly level** is not a consolation but a result: a declarative layer a machine can read and write, costing the same lines as hand-written C++, is an abstraction that is free. C3's +568 B of flash says the same thing from the other side.
+
+The failure was also predicted. **CA-2** (2026-10-05) recorded that every gate criterion was firmware-side and that criteria 2 and 4 would be judged against *hand-written* XML, which is the architecture's weakest case. The owner weighed that and chose to prove the foundation first. This is that choice's consequence arriving, not a defect in the work.
+
+**What the new wording does and does not claim.** Both halves are measured today: the layout concern left C++ entirely (zero layout code lines remain in the migrated board), and authored code is 99 against legacy's 105 once WO2's testability refactor is attributed out. **Designability is deliberately not in the criterion** — there is no editor yet, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. It is tested at **E-2**, as "under 16 ms from edit to pixels" (CA-1).
+
+**The new first half is stricter than the old.** "Materially shorter" could be satisfied by a partial migration that left some coordinates in C++ and trimmed the rest; "wholly declarative" cannot — one surviving `y = 16` fails it. The second half demands the attribution be *shown*, because the raw totals do grow and only attribution makes them level; `C2-ANALYSIS.md` flags its own counterfactual as approximate, and that caveat travels with the number.
 
 **On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
 
