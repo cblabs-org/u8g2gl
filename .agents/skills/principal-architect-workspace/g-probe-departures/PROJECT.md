@@ -64,4 +64,4 @@ Serialised, not parallel. No file overlap.
 
 ## Owner Approval
 
-> *(awaiting owner approval of this decomposition)*
+> **Approved** — 2026-10-16T21:33Z. Owner approved the two-WO decomposition as presented.
