@@ -1,0 +1,174 @@
+{
+  "layout": "IBoardLayout",
+  "widgets": [
+    {
+      "id": "platformWidget",
+      "type": "LabelWidget",
+      "geometry": {
+        "x": 4,
+        "y": 20,
+        "w": 20,
+        "h": 24
+      },
+      "align": "CENTER",
+      "visible": true,
+      "font": "RailClockMega13"
+    },
+    {
+      "id": "row0Widget",
+      "type": "ServiceListWidget",
+      "geometry": {
+        "x": 32,
+        "y": 0,
+        "w": 224,
+        "h": 16
+      },
+      "visible": true,
+      "skipRows": 0,
+      "maxRows": 1,
+      "font": "RailTextLarge12",
+      "columns": [
+        {
+          "width": 0,
+          "align": "LEFT"
+        },
+        {
+          "width": 34,
+          "align": "LEFT"
+        },
+        {
+          "width": 126,
+          "align": "LEFT"
+        },
+        {
+          "width": 0,
+          "align": "RIGHT"
+        },
+        {
+          "width": 60,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "id": "msgWidget",
+      "type": "ScrollingMessagePoolWidget",
+      "geometry": {
+        "x": 32,
+        "y": 17,
+        "w": 224,
+        "h": 14
+      },
+      "visible": true,
+      "font": "RailTextLarge12"
+    },
+    {
+      "id": "servicesWidget",
+      "type": "ServiceListWidget",
+      "geometry": {
+        "x": 0,
+        "y": 54,
+        "w": 190,
+        "h": 13
+      },
+      "visible": true,
+      "skipRows": 1,
+      "font": "RailTextSmall9",
+      "columns": [
+        {
+          "width": 32,
+          "align": "CENTER"
+        },
+        {
+          "width": 30,
+          "align": "LEFT"
+        },
+        {
+          "width": 70,
+          "align": "LEFT"
+        },
+        {
+          "width": 0,
+          "align": "RIGHT"
+        },
+        {
+          "width": 50,
+          "align": "RIGHT"
+        }
+      ]
+    },
+    {
+      "id": "sysClock",
+      "type": "ClockWidget",
+      "align": "RIGHT",
+      "geometry": {
+        "x": 190,
+        "y": 51,
+        "w": 66,
+        "h": 16
+      },
+      "visible": true,
+      "blink": false,
+      "format": "HH_MM_SS",
+      "font": "RailClockHuge11",
+      "secondaryFont": "RailTextSmall9"
+    },
+    {
+      "id": "noDataLabel",
+      "type": "LabelWidget",
+      "geometry": {
+        "x": 32,
+        "y": 17,
+        "w": 224,
+        "h": 14
+      },
+      "visible": false,
+      "font": "RailTextLarge12",
+      "text": "No services found."
+    },
+    {
+      "id": "formationWidget",
+      "type": "TrainFormationWidget",
+      "geometry": {
+        "x": 32,
+        "y": 32,
+        "w": 224,
+        "h": 17
+      },
+      "visible": true
+    }
+  ],
+  "primitives": [
+    {
+      "type": "box",
+      "isFilled": false,
+      "geometry": {
+        "x": 0,
+        "y": 0,
+        "w": 28,
+        "h": 51
+      }
+    },
+    {
+      "type": "text",
+      "text": "Plat",
+      "font": "RailTextLarge12",
+      "align": "CENTER",
+      "geometry": {
+        "x": 5,
+        "y": 6,
+        "w": 18,
+        "h": 13
+      }
+    },
+    {
+      "type": "line",
+      "geometry": {
+        "x1": 30,
+        "y1": 50,
+        "x2": 256,
+        "y2": 50
+      }
+    }
+  ]
+}

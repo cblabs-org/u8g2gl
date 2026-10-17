@@ -1,0 +1,1917 @@
+{
+  "u8g2gl_generated": "GENERATED for g-probe WO1 expressiveness evaluation.",
+  "format": "u8g2gl-scene",
+  "version": 3,
+  "generated": {
+    "source": "tmp/g-probe/departures_workaround.xml",
+    "schema": "0.4",
+    "generator": "0.0.0-probe",
+    "target": "host"
+  },
+  "display": {
+    "width": 256,
+    "height": 64
+  },
+  "init": [
+    "styles",
+    "properties",
+    "bindings"
+  ],
+  "subjects": [
+    {
+      "name": "platform",
+      "type": "string",
+      "max_len": 8
+    },
+    {
+      "name": "system_time",
+      "type": "time"
+    },
+    {
+      "name": "row0_time",
+      "type": "string",
+      "max_len": 16
+    },
+    {
+      "name": "row0_dest",
+      "type": "string",
+      "max_len": 64
+    },
+    {
+      "name": "row0_status",
+      "type": "string",
+      "max_len": 32
+    },
+    {
+      "name": "msg_text",
+      "type": "string",
+      "max_len": 128
+    },
+    {
+      "name": "row1_ordinal",
+      "type": "string",
+      "max_len": 8
+    },
+    {
+      "name": "row1_time",
+      "type": "string",
+      "max_len": 16
+    },
+    {
+      "name": "row1_dest",
+      "type": "string",
+      "max_len": 64
+    },
+    {
+      "name": "row1_status",
+      "type": "string",
+      "max_len": 32
+    },
+    {
+      "name": "row2_ordinal",
+      "type": "string",
+      "max_len": 8
+    },
+    {
+      "name": "row2_time",
+      "type": "string",
+      "max_len": 16
+    },
+    {
+      "name": "row2_dest",
+      "type": "string",
+      "max_len": 64
+    },
+    {
+      "name": "row2_status",
+      "type": "string",
+      "max_len": 32
+    },
+    {
+      "name": "row3_ordinal",
+      "type": "string",
+      "max_len": 8
+    },
+    {
+      "name": "row3_time",
+      "type": "string",
+      "max_len": 16
+    },
+    {
+      "name": "row3_dest",
+      "type": "string",
+      "max_len": 64
+    },
+    {
+      "name": "row3_status",
+      "type": "string",
+      "max_len": 32
+    }
+  ],
+  "styles": [
+    {
+      "name": "plat_text",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_6x10_mr"
+        },
+        {
+          "name": "align",
+          "value": "center"
+        }
+      ]
+    },
+    {
+      "name": "plat_num",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_helvR08_tr"
+        },
+        {
+          "name": "align",
+          "value": "center"
+        }
+      ]
+    },
+    {
+      "name": "clock_style",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_helvR08_tr"
+        },
+        {
+          "name": "align",
+          "value": "right"
+        }
+      ]
+    },
+    {
+      "name": "row0_font",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_6x10_mr"
+        },
+        {
+          "name": "align",
+          "value": "left"
+        }
+      ]
+    },
+    {
+      "name": "row0_font_right",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_6x10_mr"
+        },
+        {
+          "name": "align",
+          "value": "right"
+        }
+      ]
+    },
+    {
+      "name": "msg_font",
+      "properties": [
+        {
+          "name": "font",
+          "value": "u8g2_font_6x10_mr"
+        },
+        {
+          "name": "align",
+          "value": "left"
+        }
+      ]
+    },
+    {
+      "name": "coach_font",
+      "properties": [
+        {
+          "name": "font",
+          "value": "font_4x6"
+        },
+        {
+          "name": "align",
+          "value": "center"
+        }
+      ]
+    },
+    {
+      "name": "sub_font",
+      "properties": [
+        {
+          "name": "font",
+          "value": "font_4x6"
+        },
+        {
+          "name": "align",
+          "value": "left"
+        }
+      ]
+    },
+    {
+      "name": "sub_font_center",
+      "properties": [
+        {
+          "name": "font",
+          "value": "font_4x6"
+        },
+        {
+          "name": "align",
+          "value": "center"
+        }
+      ]
+    },
+    {
+      "name": "sub_font_right",
+      "properties": [
+        {
+          "name": "font",
+          "value": "font_4x6"
+        },
+        {
+          "name": "align",
+          "value": "right"
+        }
+      ]
+    }
+  ],
+  "fonts": [
+    "u8g2_font_6x10_mr",
+    "u8g2_font_5x7_mr",
+    "u8g2_font_helvR08_tr",
+    "font_4x6",
+    "font_arrow_mini"
+  ],
+  "images": [],
+  "screens": [
+    {
+      "name": "departures_workaround",
+      "objects": 32,
+      "parents": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "elements": [
+        {
+          "name": "plat_box",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 0
+            },
+            {
+              "name": "y",
+              "value": 0
+            },
+            {
+              "name": "width",
+              "value": 28
+            },
+            {
+              "name": "height",
+              "value": 51
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "plat_label",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 0,
+          "parent": null,
+          "rect": [
+            5,
+            6,
+            18,
+            13
+          ],
+          "styles": [
+            "plat_text"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "Plat"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "plat_num",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 1,
+          "parent": null,
+          "rect": [
+            4,
+            20,
+            20,
+            24
+          ],
+          "styles": [
+            "plat_num"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "9"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "platform",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "header_sep",
+          "tag": "u8g2gl_line",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x1",
+              "value": 30
+            },
+            {
+              "name": "y1",
+              "value": 50
+            },
+            {
+              "name": "x2",
+              "value": 256
+            },
+            {
+              "name": "y2",
+              "value": 50
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "sys_clock",
+          "tag": "u8g2gl_clock",
+          "realisation": "object",
+          "class": "u8g2gl_clock",
+          "object": 2,
+          "parent": null,
+          "rect": [
+            190,
+            51,
+            66,
+            16
+          ],
+          "styles": [
+            "clock_style"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "secondary_font",
+              "value": "font_4x6"
+            },
+            {
+              "name": "format",
+              "value": "hh_mm_ss"
+            },
+            {
+              "name": "blink",
+              "value": false
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_time",
+              "subject": "system_time",
+              "subject_type": "time"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "no_data_label",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 3,
+          "parent": null,
+          "rect": [
+            32,
+            17,
+            224,
+            14
+          ],
+          "styles": [
+            "msg_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "No services found."
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "row0_time",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 4,
+          "parent": null,
+          "rect": [
+            32,
+            0,
+            34,
+            16
+          ],
+          "styles": [
+            "row0_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "19:55"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row0_time",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row0_dest",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 5,
+          "parent": null,
+          "rect": [
+            66,
+            0,
+            126,
+            16
+          ],
+          "styles": [
+            "row0_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "London Paddington"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row0_dest",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row0_status",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 6,
+          "parent": null,
+          "rect": [
+            194,
+            0,
+            60,
+            16
+          ],
+          "styles": [
+            "row0_font_right"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "On time"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row0_status",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "msg_scroller",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 7,
+          "parent": null,
+          "rect": [
+            32,
+            17,
+            224,
+            14
+          ],
+          "styles": [
+            "msg_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "long_mode",
+              "value": "scroll_circular"
+            },
+            {
+              "name": "text",
+              "value": "A reduced train service will be running to and from London Waterloo from Good Friday 3 April to Easter Monday 6 April inclusi..."
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "msg_text",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "coach_box_1",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 34
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_1",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 8,
+          "parent": null,
+          "rect": [
+            35,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "1"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_2",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 52
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_2",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 9,
+          "parent": null,
+          "rect": [
+            53,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "2"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_3",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 70
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_3",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 10,
+          "parent": null,
+          "rect": [
+            71,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "3"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_4",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 88
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_4",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 11,
+          "parent": null,
+          "rect": [
+            89,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "4"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_5",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 106
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_5",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 12,
+          "parent": null,
+          "rect": [
+            107,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "5"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_6",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 124
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_6",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 13,
+          "parent": null,
+          "rect": [
+            125,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "6"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_7",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 142
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_7",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 14,
+          "parent": null,
+          "rect": [
+            143,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "7"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_8",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 160
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_8",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 15,
+          "parent": null,
+          "rect": [
+            161,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "8"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_9",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 178
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_9",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 16,
+          "parent": null,
+          "rect": [
+            179,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "9"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_10",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 196
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_10",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 17,
+          "parent": null,
+          "rect": [
+            197,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "10"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_11",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 214
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_11",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 18,
+          "parent": null,
+          "rect": [
+            215,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "11"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "coach_box_12",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 232
+            },
+            {
+              "name": "y",
+              "value": 34
+            },
+            {
+              "name": "width",
+              "value": 16
+            },
+            {
+              "name": "height",
+              "value": 12
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "coach_lbl_12",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 19,
+          "parent": null,
+          "rect": [
+            233,
+            35,
+            14,
+            10
+          ],
+          "styles": [
+            "coach_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "12"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "row1_ordinal",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 20,
+          "parent": null,
+          "rect": [
+            0,
+            54,
+            32,
+            10
+          ],
+          "styles": [
+            "sub_font_center"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "2nd"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row1_ordinal",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row1_time",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 21,
+          "parent": null,
+          "rect": [
+            32,
+            54,
+            30,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "19:38"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row1_time",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row1_dest",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 22,
+          "parent": null,
+          "rect": [
+            62,
+            54,
+            70,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "London Victoria"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row1_dest",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row1_status",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 23,
+          "parent": null,
+          "rect": [
+            132,
+            54,
+            50,
+            10
+          ],
+          "styles": [
+            "sub_font_right"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "19:41"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row1_status",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row2_ordinal",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 24,
+          "parent": null,
+          "rect": [
+            0,
+            54,
+            32,
+            10
+          ],
+          "styles": [
+            "sub_font_center"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "3rd"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row2_ordinal",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row2_time",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 25,
+          "parent": null,
+          "rect": [
+            32,
+            54,
+            30,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "--:--"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row2_time",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row2_dest",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 26,
+          "parent": null,
+          "rect": [
+            62,
+            54,
+            70,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "Clapham Junction"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row2_dest",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row2_status",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 27,
+          "parent": null,
+          "rect": [
+            132,
+            54,
+            50,
+            10
+          ],
+          "styles": [
+            "sub_font_right"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "Delayed"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row2_status",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row3_ordinal",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 28,
+          "parent": null,
+          "rect": [
+            0,
+            54,
+            32,
+            10
+          ],
+          "styles": [
+            "sub_font_center"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "4th"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row3_ordinal",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row3_time",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 29,
+          "parent": null,
+          "rect": [
+            32,
+            54,
+            30,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "19:39"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row3_time",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row3_dest",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 30,
+          "parent": null,
+          "rect": [
+            62,
+            54,
+            70,
+            10
+          ],
+          "styles": [
+            "sub_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "Epsom Downs"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row3_dest",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "row3_status",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 31,
+          "parent": null,
+          "rect": [
+            132,
+            54,
+            50,
+            10
+          ],
+          "styles": [
+            "sub_font_right"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "On time"
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "row3_status",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        }
+      ]
+    },
+    {
+      "name": "departures_static",
+      "objects": 4,
+      "parents": [
+        null,
+        null,
+        null,
+        null
+      ],
+      "elements": [
+        {
+          "name": "plat_box",
+          "tag": "u8g2gl_box",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x",
+              "value": 0
+            },
+            {
+              "name": "y",
+              "value": 0
+            },
+            {
+              "name": "width",
+              "value": 28
+            },
+            {
+              "name": "height",
+              "value": 51
+            },
+            {
+              "name": "filled",
+              "value": false
+            },
+            {
+              "name": "radius",
+              "value": 0
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "plat_label",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 0,
+          "parent": null,
+          "rect": [
+            5,
+            6,
+            18,
+            13
+          ],
+          "styles": [
+            "plat_text"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "Plat"
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        },
+        {
+          "name": "plat_num",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 1,
+          "parent": null,
+          "rect": [
+            4,
+            20,
+            20,
+            24
+          ],
+          "styles": [
+            "plat_num"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "9"
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_text",
+              "subject": "platform",
+              "subject_type": "string"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "header_sep",
+          "tag": "u8g2gl_line",
+          "realisation": "draw",
+          "arguments": [
+            {
+              "name": "x1",
+              "value": 30
+            },
+            {
+              "name": "y1",
+              "value": 50
+            },
+            {
+              "name": "x2",
+              "value": 256
+            },
+            {
+              "name": "y2",
+              "value": 50
+            }
+          ],
+          "visibility": []
+        },
+        {
+          "name": "sys_clock",
+          "tag": "u8g2gl_clock",
+          "realisation": "object",
+          "class": "u8g2gl_clock",
+          "object": 2,
+          "parent": null,
+          "rect": [
+            190,
+            51,
+            66,
+            16
+          ],
+          "styles": [
+            "clock_style"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "secondary_font",
+              "value": "font_4x6"
+            },
+            {
+              "name": "format",
+              "value": "hh_mm_ss"
+            },
+            {
+              "name": "blink",
+              "value": false
+            }
+          ],
+          "bindings": [
+            {
+              "name": "bind_time",
+              "subject": "system_time",
+              "subject_type": "time"
+            }
+          ],
+          "flags": []
+        },
+        {
+          "name": "no_data_label",
+          "tag": "u8g2gl_label",
+          "realisation": "object",
+          "class": "u8g2gl_label",
+          "object": 3,
+          "parent": null,
+          "rect": [
+            32,
+            17,
+            224,
+            14
+          ],
+          "styles": [
+            "msg_font"
+          ],
+          "style_overrides": [],
+          "properties": [
+            {
+              "name": "text",
+              "value": "No services found."
+            },
+            {
+              "name": "hidden",
+              "value": true
+            }
+          ],
+          "bindings": [],
+          "flags": []
+        }
+      ]
+    }
+  ]
+}

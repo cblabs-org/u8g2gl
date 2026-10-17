@@ -4,13 +4,13 @@
 **Hardware Profile:** 256×64 monochrome OLED (`SSD1322`, 4-wire SPI)  
 **Schema Version:** Schema 0.4 (`docs/design_spec.md`)  
 **Execution Context:** PR-07 Gate Deliverable (G-PROBE Work Order 2)  
-**Evidence Artifacts:** [`tmp/g-probe/`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/)  
+**Evidence Artifacts:** [`evidence/`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/)  
 
 ---
 
 ## Executive Overview
 
-This report evaluates whether U8G2GL Schema 0.4 can express a production embedded departures display: the 174-line `layoutSWR.json` from `departures-board-v3`. The probe was executed under strict methodology: authoring declarative XML up to the schema boundary, documenting every expressiveness gap against the design specification, rendering the output through the WebAssembly display harness (`wasm/u8g2gl_editor.mjs`), and measuring line counts against the line attribution methodology established in [`C2-ANALYSIS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md).
+This report evaluates whether U8G2GL Schema 0.4 can express a production embedded departures display: the 173-line `layoutSWR.json` from `departures-board-v3`. The probe was executed under strict methodology: authoring declarative XML up to the schema boundary, documenting every expressiveness gap against the design specification, rendering the output through the WebAssembly display harness (`wasm/u8g2gl_editor.mjs`), and measuring line counts against the line attribution methodology established in [`C2-ANALYSIS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md).
 
 The evaluation is structured into three formal parts followed by an actionable gate summary:
 1. **Part 1 — What Rendered:** The subset of widgets and primitives expressible in Schema 0.4, verification hashes, and rendered frame geometry.
@@ -40,7 +40,7 @@ The evaluation is structured into three formal parts followed by an actionable g
 
 ### 1.2 Rendering Output & Framebuffer Verification
 
-Both the static baseline layout ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_static.xml)) and the fully unrolled workaround layout ([`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml)) were executed through the Wasm harness at `t = 0 ms` against a virtual SSD1322 256×64 display buffer (`u8g2_ll_hvline_vertical_top_lsb`, 8 tile rows × 256 columns = 2,048 bytes).
+Both the static baseline layout ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)) and the fully unrolled workaround layout ([`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml)) were executed through the Wasm harness at `t = 0 ms` against a virtual SSD1322 256×64 display buffer (`u8g2_ll_hvline_vertical_top_lsb`, 8 tile rows × 256 columns = 2,048 bytes).
 
 ```
 ================================================================================
@@ -54,15 +54,15 @@ Execution Timestamp:      t = 0 ms
    - Framebuffer Size:    2,048 bytes
    - Lit Pixels:          518 / 16,384 (3.16% display fill)
    - Framebuffer SHA-256: e1d37fd4307c82fde2c2576451f8fdf7ed206792499b496d6a81dd99f18f550b
-   - Output Artifacts:    tmp/g-probe/render_static.pbm (1-bit Netpbm P4)
-                          tmp/g-probe/render_static.png (RGB Preview)
+   - Output Artifacts:    evidence/render_static.pbm (1-bit Netpbm P4)
+                          evidence/render_static.png (RGB Preview)
 
 2. Workaround Layout (departures_workaround.xml):
    - Framebuffer Size:    2,048 bytes
    - Lit Pixels:          2,196 / 16,384 (13.40% display fill)
    - Framebuffer SHA-256: 8ae65c023005d2e04d951617848ae0c764ae505f71f36866d5eddba04bf48f8b
-   - Output Artifacts:    tmp/g-probe/render.pbm (1-bit Netpbm P4)
-                          tmp/g-probe/render.png (RGB Preview, Amber #FFA000)
+   - Output Artifacts:    evidence/render.pbm (1-bit Netpbm P4)
+                          evidence/render.png (RGB Preview, Amber #FFA000)
 ================================================================================
 ```
 
@@ -74,11 +74,11 @@ Does `departures-board-v3` produce an exact reference rendering of `layoutSWR.js
 - v1 formats `services` as an untyped 2D array of strings (`[["1st", "19:55", "London Paddington", "9", "On time"], ...]`), whereas v3 expects structured service objects (`services.main[]`).
 - v1 formats carriage formation as `header.firstServiceFormation[]` with properties `classType`, `hasWheelchair`, `hasBike`, and `loading`, whereas v3 structures formation data nested within `services.main[0].formation.carriages[]`.
 
-Because `layoutSWR.json` was authored for the v3 data model, running v3's legacy firmware directly against the v1 mock file produces a runtime data-binding mismatch rather than a valid visual frame. The Wasm bridge execution in WO1 therefore ingested the raw v1 data via an explicit field mapping adapter ([`render.mjs:45–65`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/render.mjs#L45-L65)). We report the resulting 2,196 lit pixels and SHA-256 hash honestly as the empirical measurement of this layout under U8G2GL, rather than inventing an unverified legacy reference.
+Because `layoutSWR.json` was authored for the v3 data model, running v3's legacy firmware directly against the v1 mock file produces a runtime data-binding mismatch rather than a valid visual frame. The Wasm bridge execution in WO1 therefore ingested the raw v1 data via an explicit field mapping adapter ([`render.mjs:45–65`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/render.mjs#L45-L65)). We report the resulting 2,196 lit pixels and SHA-256 hash honestly as the empirical measurement of this layout under U8G2GL, rather than inventing an unverified legacy reference.
 
 ### 1.4 Baseline Rendered XML
 
-The following complete XML document represents the maximum screen surface expressible in Schema 0.4 without unrolling workarounds ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_static.xml)):
+The following complete XML document represents the maximum screen surface expressible in Schema 0.4 without unrolling workarounds ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -120,6 +120,9 @@ The following complete XML document represents the maximum screen surface expres
 ---
 
 ## Part 2 — What Could Not Be Expressed
+
+> [!WARNING]
+> **Framing under review.** §9.2 already specifies `wd_service_list` as a custom widget with a declared-capacity API (`begin()` / `add_row()` / `commit()`), placed there by [D-8]. All three gaps below may be custom-widget problems, not schema problems. The [Q-8]/[Q-15] scoping in this section should not be acted on until the custom-widget path has been tried.
 
 > [!NOTE]
 > **Tone & Calibration:** A gap is not a verdict. The framework has not failed; it has adhered strictly to its design charter. Under [`docs/design_spec.md §1.5`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L80-L95) (*"Lite by design — the deferral rule"*), omission is the default, and features earn inclusion by demonstrated need. Repeaters ([Q-8]) and cards ([Q-15]) were explicitly deferred to Phase 2 and Phase 3. The fact that a full departures board encounters these exact deferred capabilities confirms the roadmap's precision.
@@ -180,7 +183,7 @@ Under the §1.5 deferral rule, generator complexity is cheap but schema surface 
 This expands the schema grammar significantly and introduces scoped variable resolution into an engine that currently only resolves global subjects. Deferring this to Phase 2 was the correct architectural choice.
 
 #### 5. Workaround Evaluation
-In [`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml#L60-L69), the first departure row was unrolled into three distinct `<u8g2gl_label>` elements:
+In [`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L60-L69), the first departure row was unrolled into three distinct `<u8g2gl_label>` elements:
 
 ```xml
 <!-- Workaround: row0Widget (Service 1 Columns Hand-Expanded) -->
@@ -192,7 +195,7 @@ In [`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2G
               style="row0_font_right" text="On time" bind_text="row0_status" />
 ```
 
-For subsequent services (`servicesWidget`), Services 2, 3, and 4 were unrolled into 12 separate labels (4 per row), manually positioning Service 2 at `y=54` and setting `hidden="true"` on Services 3 and 4 ([`departures_workaround.xml:130–161`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml#L130-L161)).
+For subsequent services (`servicesWidget`), Services 2, 3, and 4 were unrolled into 12 separate labels (4 per row), manually positioning Service 2 at `y=54` and setting `hidden="true"` on Services 3 and 4 ([`departures_workaround.xml:130–161`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L130-L161)).
 
 **Honest Assessment:** No human engineer would write or maintain this in production. It couples the XML to fixed row counts, requires individual subject publications for every single cell (`row1_time`, `row2_time`, `row3_time`), and forces the host controller to manage visibility flags manually. In a visual designer, having to position 15 discrete labels to simulate a 3-row table defeats the primary purpose of direct manipulation.
 
@@ -231,7 +234,7 @@ Under §1.5, policy belongs in C++ (`modules/U8G2GLDisplay`), but the schema req
 This is a clean, minimal addition (1 element, 1 attribute) that preserves the declarative boundary without embedding timers or carousel logic in the XML schema.
 
 #### 5. Workaround Evaluation
-The probe expressed this via a single scrolling label bound to a sanitized string subject ([`departures_workaround.xml:70–77`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml#L70-L77)):
+The probe expressed this via a single scrolling label bound to a sanitized string subject ([`departures_workaround.xml:70–77`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L70-L77)):
 
 ```xml
 <!-- Workaround: msgWidget (Single Circular Scrolling Label) -->
@@ -248,7 +251,7 @@ The probe expressed this via a single scrolling label bound to a sanitized strin
 ### Gap 3: Per-Carriage Indicators & Heterogeneous Sub-assemblies
 
 #### 1. What the layout needs
-`formationWidget` renders a dynamic 12-carriage train formation diagram ([`layoutSWR.json:130–139`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe-source/layoutSWR.json#L130-L139)) driven by structured data ([`nationalRailBoard.json:7–20`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe-source/nationalRailBoard.json#L7-L20)):
+`formationWidget` renders a dynamic 12-carriage train formation diagram ([`layoutSWR.json:130–139`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/layoutSWR.json#L130-L139)) driven by structured data ([`nationalRailBoard.json:7–20`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/nationalRailBoard.json#L7-L20)):
 
 ```json
 { "number": 1, "classType": "standard", "hasWheelchair": true, "hasBike": false, "loading": "30%" },
@@ -284,7 +287,7 @@ Under §1.5, this would dramatically inflate the schema surface for a highly dom
 A train formation diagram is fundamentally a **custom C++ widget** (`extends u8g2gl_obj`) declaring an `<api>` manifest. The nose cone and static carriage cell boundary could be designed, but the repetition and cell drawing belong in C++.
 
 #### 5. Workaround Evaluation
-The probe hand-expanded 12 static carriage boxes and 12 text labels across the available 224-pixel width ([`departures_workaround.xml:81–128`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml#L81-L128)):
+The probe hand-expanded 12 static carriage boxes and 12 text labels across the available 224-pixel width ([`departures_workaround.xml:81–128`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L81-L128)):
 
 ```xml
 <!-- Workaround for formationWidget: Hand-expanded 12 carriage boxes -->
@@ -312,41 +315,51 @@ Line counting follows the rigorous methodology established in [`C2-ANALYSIS.md`]
 ### 3.2 Quantitative Line Counts
 
 The physical files measured in this probe:
-- **`layoutSWR.json`:** Original legacy layout from `departures-board-v3` ([`tmp/g-probe-source/layoutSWR.json`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe-source/layoutSWR.json)).
-- **`departures_static.xml`:** Statically expressible Schema 0.4 baseline ([`tmp/g-probe/departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_static.xml)).
-- **`departures_workaround.xml`:** Full hand-unrolled workaround layout ([`tmp/g-probe/departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/tmp/g-probe/departures_workaround.xml)).
+- **`layoutSWR.json`:** Original legacy layout from `departures-board-v3` ([`evidence/source/layoutSWR.json`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/layoutSWR.json)).
+- **`departures_static.xml`:** Statically expressible Schema 0.4 baseline ([`evidence/departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)).
+- **`departures_workaround.xml`:** Full hand-unrolled workaround layout ([`evidence/departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml)).
 
-| Metric | Legacy `layoutSWR.json` | Static XML (`departures_static`) | Workaround XML (`departures_workaround`) | Projected XML (with Repeaters [Q-8]) |
+| Metric | Legacy `layoutSWR.json` | Static XML (`departures_static`) | Workaround XML (`departures_workaround`) | *Projected XML (with [Q-8])* |
 |---|---:|---:|---:|---:|
-| **Total Lines** | **174** | **49** | **162** | **~70** |
-| Blank Lines | 0 | 7 | 25 | ~10 |
-| Comment Lines | 0 | 20 | 51 | ~19 |
-| **Authored Code Lines** | **174** | **22** | **86** | **~41** |
-| *— Scaffolding / Envelope Code* | 7 | 7 | 7 | 7 |
-| *— Layout / Content Code* | 167 | 15 | 79 | ~34 |
+| **Total Lines (read by an author)** | **173** | **49** | **162** | *~70 (projection)* |
+| Blank Lines | 0 | 7 | 25 | *~10* |
+| Comment Lines | 0 | 20 | 37 | *~19* |
+| **Code Lines** | **173** | **22** | **~100** | *~41 (projection)* |
+| *— Scaffolding / Envelope Code* | 7 | 7 | 7 | *7* |
+| *— Layout / Content Code* | 166 | 15 | ~93 | *~34* |
+
+> [!IMPORTANT]
+> **Asymmetry in the comparison.** `layoutSWR.json` is machine-formatted JSON: zero blanks, zero comments, 173 total lines = 173 code lines by construction. The XML files carry blanks and comments that the JSON has no occasion to carry. The like-for-like figure an author reads is **total lines: 162 against 173 (−6%)**. The code-line figure (−42%) measures a real property — XML elements are denser than JSON key-value pairs — but it compares apples to oranges because only one side has non-code lines to discard.
+
+*The "Projected XML" column is a projection, not a measurement.* It estimates line counts if [Q-8] repeaters and [Q-15] cards replaced the hand-unrolled workaround sections, following the same attribution approach `C2-ANALYSIS.md` used for its own counterfactual (which it labelled approximate).
 
 *Note on Project-Level Scaffolding:* In a full standalone U8G2GL application, `u8g2gl.xml` adds 7 code lines (28 total lines) of target display scaffolding, and `globals.xml` adds 8–12 code lines of subject definitions. These costs are paid once per project, not per screen.
 
 ### 3.3 Comparative Ratios & Analysis
 
-Comparing authored code lines across the implementations:
+Comparing total lines read by an author, and code lines separately:
 
 ```
-Authored Code Lines Comparison:
-  Legacy v3 JSON:              174 code lines  [========================================]
-  Workaround XML (Complete):    86 code lines  [====================]  (-51% vs JSON)
-  Projected XML (with [Q-8]):   ~41 code lines  [==========]            (-76% vs JSON)
-  Static XML (Incomplete):      22 code lines  [=====]                 (-87% vs JSON)
+Total Lines (what an author reads):
+  Legacy v3 JSON:              173 total lines  [========================================]
+  Workaround XML (Complete):   162 total lines  [=====================================]   (-6% vs JSON)
+  Static XML (Incomplete):      49 total lines  [===========]                             (-72% vs JSON)
+
+Code Lines (excluding blanks & comments):
+  Legacy v3 JSON:              173 code lines   [========================================]
+  Workaround XML (Complete):  ~100 code lines   [=======================]                 (-42% vs JSON)
+  Projected XML (with [Q-8]): ~41 code lines    [==========]                              (projection)
+  Static XML (Incomplete):      22 code lines   [=====]                                   (-87% vs JSON)
 ```
 
-1. **Static Baseline Ratio (`departures_static.xml` / `layoutSWR.json`):**
-   - **Code Lines:** $22 / 174 = \mathbf{0.13}$ (**−87%**).
-   - **Meaning:** Highly concise, but incomplete. It only renders the platform box, headers, clock, and fallback label. It demonstrates that where Schema 0.4 has native primitives, XML is exceptionally compact.
-2. **Workaround Ratio (`departures_workaround.xml` / `layoutSWR.json`):**
-   - **Code Lines:** $86 / 174 = \mathbf{0.49}$ (**−51%**).
-   - **Meaning:** Even with 12 unrolled carriage boxes and 15 individual departure column labels, the XML requires half the code lines of the legacy JSON (86 vs 174). However, as established in Part 2, nobody would author or maintain this file manually.
-3. **Projected Ratio with Repeaters ([Q-8]):**
-   - **Code Lines:** $\sim 41 / 174 = \mathbf{0.24}$ (**−76%**).
+1. **Total Lines — Workaround vs Legacy:**
+   - **Total:** 162 / 173 = **−6%**. On the lines an author actually reads, the workaround XML is about the same size as the legacy JSON.
+2. **Code Lines — Workaround vs Legacy:**
+   - **Code:** ~100 / 173 ≈ **−42%**. The XML is denser per element, but this comparison is asymmetric: the JSON is machine-formatted with zero blanks and zero comments by construction, so 173 total = 173 code. The XML's blanks and comments are a readability choice the JSON never had occasion to make.
+3. **Code Lines — Static Baseline:**
+   - **Code:** 22 / 173 = **−87%**. Highly concise, but incomplete — it only renders the platform box, headers, clock, and fallback label. Where Schema 0.4 has native primitives, XML is exceptionally compact.
+4. **Projected Code Lines with Repeaters ([Q-8]) — *projection, not measurement*:**
+   - **Code:** ~41 / 173 ≈ **−76%** *(approximate, following `C2-ANALYSIS.md`'s precedent for labelling counterfactuals)*.
    - **Attribution Breakdown of the ~41 Projected Code Lines:**
      - Screen & Styles Envelope: 7 scaffolding lines + 6 style lines = 13 lines
      - Platform Header & Primitives: 11 lines
@@ -355,11 +368,11 @@ Authored Code Lines Comparison:
      - Carriage Formation Repeater (`<repeater collection="formation">`): ~5 lines
      - Secondary Departures Repeater (`<repeater collection="services" skip="1" max="3">`): ~5 lines
 
-This projection demonstrates the true value proposition of Phase 2's composition roadmap: with `<repeater>` ([Q-8]) and `<cards>` ([Q-15]), an author describes the full, dynamic screen in approximately 41 lines of clean, maintainable declarative XML.
+This projection estimates the value of Phase 2's composition roadmap: with `<repeater>` ([Q-8]) and `<cards>` ([Q-15]), an author would describe the full, dynamic screen in approximately 41 lines of declarative XML — if those features are needed at all (see Part 2 framing note).
 
 ---
 
 ## Gate Summary
 
-**Can U8G2GL describe the screens it exists to describe?**  
-**Not yet.** Schema 0.4 describes the static framework of a departures board with remarkable brevity—the platform box, status indicators, and system clock require just 15 lines of layout code against legacy's 174. However, a production departures display is inherently dynamic: it requires tabular collection iteration across service rows, sequential cycling through a pool of disruption messages, and structured carriage diagrams. None of these three can be expressed in Schema 0.4 without abusive hand-unrolling. The shortest path to full expressiveness is not a redesign, but the execution of Phase 2 as planned: implementing collection repeaters (**`[Q-8]`**) and the card-switching container (**`[Q-15]`**), while leaving custom graphical assemblies like train formations to custom C++ widgets with declared `<api>` manifests (§6.5). For the PR-07 gate, this probe confirms that the core architecture holds, the line-cost advantage is real (a 51% to 76% reduction in authored code), and the expressiveness gaps are known backlog items already scheduled on the critical path.
+**Can U8G2GL describe the screens it exists to describe?**
+**Not yet — but the path is shorter than it looks.** Schema 0.4 describes the static framework of a departures board with remarkable brevity — the platform box, status indicators, and system clock require just 15 lines of layout code against legacy's 173. However, a production departures display is inherently dynamic: it requires tabular collection iteration across service rows, sequential cycling through a pool of disruption messages, and structured carriage diagrams. None of these three can be expressed in Schema 0.4 without abusive hand-unrolling (and hand-unrolling produces a file about the same size as the legacy JSON: 162 vs 173 total lines). Whether the path forward is schema features ([Q-8] repeaters, [Q-15] cards) or custom widgets (§9.2's `wd_service_list` pattern) is under review — the spec already provides for the latter, and it may be sufficient. For the PR-07 gate, this probe confirms that the core architecture holds, the expressiveness gaps are known, and no redesign is needed.
