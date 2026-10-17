@@ -7,6 +7,7 @@
         <string name="row0_dest" value="London Paddington" max_len="64" />
         <string name="row0_status" value="On time" max_len="32" />
         <int name="box_fill" value="8" />
+        <string name="message_text" value="" max_len="256" />
     </subjects>
 
     <fonts>

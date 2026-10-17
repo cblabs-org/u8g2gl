@@ -58,6 +58,10 @@ void ui_set_row0_status(const char* value);
 extern u8g2gl_subject_int_n<1> ui_subject_box_fill;
 void ui_set_box_fill(int32_t value);
 
+// message_text (string)
+extern u8g2gl_subject_string_n<256, 1> ui_subject_message_text;
+void ui_set_message_text(const char* value);
+
 // --- Styles (§10) ---
 // The project declares no styles.
 

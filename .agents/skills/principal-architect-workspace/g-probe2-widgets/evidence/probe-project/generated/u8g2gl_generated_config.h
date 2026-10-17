@@ -42,13 +42,13 @@ U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);
 // which is why this header must be included first (§13.7).
 
 // The busiest screen is 'departures'.
-#define U8G2GL_MAX_OBJECTS_PER_SCREEN 5
+#define U8G2GL_MAX_OBJECTS_PER_SCREEN 7
 
 // The busiest object is 'plat_num'.
 #define U8G2GL_MAX_BINDINGS_PER_OBJ 1
 
 // The true sum across every object, never objects x bindings ([D-21]).
-#define U8G2GL_MAX_TOTAL_BINDINGS 2
+#define U8G2GL_MAX_TOTAL_BINDINGS 3
 
 // The project declares no styles.
 #define U8G2GL_MAX_STYLES 0

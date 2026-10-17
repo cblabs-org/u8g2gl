@@ -26,6 +26,9 @@ u8g2gl_subject_string_n<32, 1> ui_subject_row0_status;
 // box_fill: 1 observer; 0 object bindings; no frame-dirty observer; floored from 0: a zero-length array is ill-formed.
 u8g2gl_subject_int_n<1> ui_subject_box_fill(8);
 
+// message_text: 1 observer; 1 object binding; no frame-dirty observer; 256 usable characters, so max_len + 1 bytes (§8.2).
+u8g2gl_subject_string_n<256, 1> ui_subject_message_text;
+
 // --- Setters (§8.1) ---
 
 void ui_set_platform(const char* value) {
@@ -50,6 +53,10 @@ void ui_set_row0_status(const char* value) {
 
 void ui_set_box_fill(int32_t value) {
     ui_subject_box_fill.set(value);
+}
+
+void ui_set_message_text(const char* value) {
+    ui_subject_message_text.set(value);
 }
 
 // --- Initial values (§8.2) ---

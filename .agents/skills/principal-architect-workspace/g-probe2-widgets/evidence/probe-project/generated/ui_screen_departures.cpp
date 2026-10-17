@@ -10,13 +10,16 @@
 #include "u8g2gl/u8g2gl_draw.h"
 #include "u8g2gl/u8g2gl_label.h"
 #include "wd_service_list.hpp"
+#include "wd_train_formation.hpp"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
 static u8g2gl_label ui_obj_plat_label;  // 0
 static u8g2gl_label ui_obj_plat_num;  // 1
 static wd_service_list ui_obj_row0;  // 2
-static wd_service_list ui_obj_services;  // 3
-static u8g2gl_clock ui_obj_sys_clock;  // 4
+static u8g2gl_label ui_obj_message_bar;  // 3
+static wd_train_formation ui_obj_formation;  // 4
+static wd_service_list ui_obj_services;  // 5
+static u8g2gl_clock ui_obj_sys_clock;  // 6
 // "plat_box" is not here: no object required (§13.5)
 // "header_sep" is not here: no object required (§13.5)
 
@@ -28,6 +31,8 @@ static u8g2gl_obj* const ui_screen_departures_objs[] = {
     &ui_obj_plat_label,
     &ui_obj_plat_num,
     &ui_obj_row0,
+    &ui_obj_message_bar,
+    &ui_obj_formation,
     &ui_obj_services,
     &ui_obj_sys_clock,
 };
@@ -35,6 +40,8 @@ static const uint8_t ui_screen_departures_parents[] = {
     U8G2GL_NO_PARENT,  // ui_obj_plat_label
     U8G2GL_NO_PARENT,  // ui_obj_plat_num
     U8G2GL_NO_PARENT,  // ui_obj_row0
+    U8G2GL_NO_PARENT,  // ui_obj_message_bar
+    U8G2GL_NO_PARENT,  // ui_obj_formation
     U8G2GL_NO_PARENT,  // ui_obj_services
     U8G2GL_NO_PARENT,  // ui_obj_sys_clock
 };
@@ -61,6 +68,14 @@ void ui_screen_departures_init() {
     ui_obj_row0.set_font(ui_font_u8g2_font_6x10_mr);
     ui_obj_row0.set_max_rows(1);
 
+    ui_obj_message_bar.set_coords(30, 17, 226, 13);
+    ui_obj_message_bar.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_message_bar.set_long_mode(U8G2GL_LONG_SCROLL_CIRCULAR);
+
+    ui_obj_formation.set_coords(0, 17, 256, 32);
+    ui_obj_formation.set_font(ui_font_u8g2_font_6x10_mr);
+    ui_obj_formation.set_max_carriages(12);
+
     ui_obj_services.set_coords(0, 51, 190, 13);
     ui_obj_services.set_font(ui_font_u8g2_font_6x10_mr);
     ui_obj_services.set_max_rows(10);
@@ -75,6 +90,7 @@ void ui_screen_departures_init() {
     // Each bind_*() returns false only when a pool is full. The pools are
     // sized from exactly these bindings ([D-21]), so the result is not checked.
     ui_obj_plat_num.bind_text(&ui_subject_platform);
+    ui_obj_message_bar.bind_text(&ui_subject_message_text);
     ui_obj_sys_clock.bind_time(&ui_subject_system_time);
 }
 
@@ -91,6 +107,8 @@ uint32_t ui_screen_departures_tick(uint32_t now_ms) {
     next = u8g2gl_min(next, ui_obj_plat_label.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_plat_num.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_row0.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_message_bar.tick(now_ms));
+    next = u8g2gl_min(next, ui_obj_formation.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_services.tick(now_ms));
     next = u8g2gl_min(next, ui_obj_sys_clock.tick(now_ms));
     return next;
@@ -108,15 +126,17 @@ void ui_screen_departures_render(U8G2& display) {
     u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 1);  // ui_obj_plat_num
     u8g2gl_draw_line(display, 30, 50, 255, 50);  // header_sep: no object (§13.5)
     u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 2);  // ui_obj_row0
-    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 3);  // ui_obj_services
-    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 4);  // ui_obj_sys_clock
+    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 3);  // ui_obj_message_bar
+    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 4);  // ui_obj_formation
+    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 5);  // ui_obj_services
+    u8g2gl_render_object(display, ui_screen_departures_objs, ui_screen_departures_parents, 6);  // ui_obj_sys_clock
 }
 
 // --- The screen descriptor ui_handler() drives (§12.4) ---
 u8g2gl_screen ui_screen_departures = {
     ui_screen_departures_objs,
     ui_screen_departures_parents,
-    5,
+    7,
     ui_screen_departures_init,
     ui_screen_departures_activate,
     ui_screen_departures_deactivate,

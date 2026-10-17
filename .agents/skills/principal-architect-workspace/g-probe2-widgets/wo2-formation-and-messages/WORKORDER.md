@@ -217,19 +217,29 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 ## Completion Report
 
 ### Status
-pending
+complete
 
 ### Changes Made
-[fill on completion]
+- Created widget manifest `evidence/probe-project/widgets/wd_train_formation/wd_train_formation.xml` with `<prop name="font" type="font" required="true" />` and `<prop name="max_carriages" type="int" default="12" />`.
+- Implemented C++ header `evidence/probe-project/widgets/wd_train_formation/wd_train_formation.hpp` (154 SLOC) with `u8g2gl_carriage_t`, static array buffer (`MAX_CARRIAGES = 16`), atomic `begin()` / `add_carriage()` / `commit()` ingestion API, and zero heap allocation.
+- Implemented C++ class `evidence/probe-project/widgets/wd_train_formation/wd_train_formation.cpp` (285 SLOC) implementing step-by-step rendering: step 1 state saving, step 2 coordinate geometry, step 3 carriage loop (top coach number badge, outline rectangle, loading gauge proportional fill, XOR-mode indicators for class "1", wheelchair "W", bicycle "B").
+- Updated `evidence/probe-project/globals.xml` to declare `<string name="message_text" value="" max_len="256" />`.
+- Updated `evidence/probe-project/screens/screen_departures.xml` adding `<u8g2gl_label name="message_bar" ... />` and `<wd_train_formation name="formation" x="0" y="17" width="256" height="32" font="u8g2_font_4x6_tr" max_carriages="12" />`.
+- Ran `u8g2gl validate` (0 errors, 0 warnings) and `u8g2gl generate` (cleanly updated 8 files in `evidence/probe-project/generated/`).
+- Verified C++ compilation with `clang++ -Wall -Wextra -Wpedantic -Werror -std=c++17 -fsyntax-only` across all widget files and generated screen files with 0 errors and 0 warnings.
+- Executed smoke ingestion test with 12 carriages from `nationalRailBoard.json`.
+- Authored `evidence/FINDINGS-WO2.md` documenting generator behavior, widget SLOC/storage, author experience, message pool evaluation, and verification summary.
 
 ### Decisions Made
-[fill on completion]
+- **Carriage Layout Geometry**: For 12 carriages on a 256×64 display with widget bounding box `[0, 17, 256, 32]`: allocated `cell_w = 20px`, `gap = 1px`, `x_margin = 2px` (2 + 12*20 + 11*1 = 251px <= 256px). Split 32px height into a 10px top badge region for coach numbers (`y=17..26`) and a 22px carriage box (`y=27..48`) with 20px interior height, yielding exact integer scaling for loading gauge heights (e.g. 80% = 16px).
+- **Legibility with XOR Draw Mode**: Indicator glyphs ('1', 'W', 'B') are rendered using `u8g2.setDrawColor(2)` (XOR mode) in distinct 6px column slots (`x+2`, `x+8`, `x+13`). This ensures full legibility whether inside an empty outline or inverted over a dark loading gauge fill bar without needing erase rects or branchy fill logic.
+- **Message Pool Host Policy**: Confirmed `long_mode="scroll_circular"` alone cannot rotate a pool of messages because `is_scroll_finished()` always returns `false` and silent wrap has no notification callback. Evaluated and designed host policy using `u8g2gl_timer` to coordinate message rotation every N seconds.
 
 ### Dead Ends & Warnings
-[fill on completion]
+- None encountered in widget generation or compilation. `u8g2gl validate` and `u8g2gl generate` worked out of the box with custom widget discovery in the project tree.
 
 ### Out-of-Scope Findings
-[fill on completion]
+- **`u8g2gl_label` Carousel Notification**: While `long_mode="scroll_circular"` works well for an infinite single marquee, multi-message carousels currently require external timer polling. Adding an optional `scroll_once` mode or an on-completion cycle callback / event to `u8g2gl_label` would allow pure event-driven message carousels without host timer synchronization. (Surfaced for backlog triage; non-blocking).
 
 ### Blockers
-[fill on completion]
+- None.
