@@ -57,7 +57,7 @@ Research into the CLI generator source (`cli/src/core/`) revealed three facts th
 
 ### Work Order Ledger
 
-- **[ ] [wo1-widget-path](wo1-widget-path/WORKORDER.md):** **Prove the end-to-end path.** Build a minimal probe project fixture with a C++ custom widget extending `u8g2gl_obj`: manifest, `.hpp`, `.cpp`, a screen that places it, and a render through the Wasm harness to pixels. This is the first time this path has ever been walked. Then build `wd_service_list` for real — the §9.2 example, with declared capacity props (using `<prop>` not `<element>`), the C++ class with manual collection storage (`begin()`/`add_row()`/`commit()` as class methods), and column definitions. Drive it with the mock data's services array (10 services, including the `null` in the time column for service 3). Document: what the generator emits, what it refuses (`<element>` → `NOT_YET_SUPPORTED`), what the widget author had to write, what the spec told them and what it didn't.
+- **[x] [wo1-widget-path](wo1-widget-path/WORKORDER.md):** **Prove the end-to-end path.** Build a minimal probe project fixture with a C++ custom widget extending `u8g2gl_obj`: manifest, `.hpp`, `.cpp`, a screen that places it, and a render through the Wasm harness to pixels. This is the first time this path has ever been walked. Then build `wd_service_list` for real — the §9.2 example, with declared capacity props (using `<prop>` not `<element>`), the C++ class with manual collection storage (`begin()`/`add_row()`/`commit()` as class methods), and column definitions. Drive it with the mock data's services array (10 services, including the `null` in the time column for service 3). Document: what the generator emits, what it refuses (`<element>` → `NOT_YET_SUPPORTED`), what the widget author had to write, what the spec told them and what it didn't.
 
 - **[ ] [wo2-formation-and-messages](wo2-formation-and-messages/WORKORDER.md):** **Build `wd_train_formation` and test the message pool.** Two items in one WO because the message pool test is expected to be small:
   - **`wd_train_formation`**: Twelve carriages with per-carriage class, wheelchair, bike and loading indicators. Pixel arithmetic for loading gauges. Exercises: extending `u8g2gl_obj`, manual `render()`, the state saver around widget draws, container clipping of child content. The first probe concluded this is a C++ widget; prove it can be one.
@@ -171,6 +171,44 @@ If WO1 finds the generator processes the manifest but the Wasm harness cannot re
 - **Probe project as fixture.** All widget code lives in `evidence/probe-project/` under the workspace, following the `pr-4r2-corrections/evidence/probes/` pattern. Nothing enters `src/` or the runtime library.
 
 - **"Do not make it work by writing a better widget than an author would."** Each widget is written as a competent author would write it, following the spec's guidance. If that takes 400 lines of C++, that is the finding.
+
+### 2026-10-17 — WO1 Complete
+
+**The custom widget path works.** First-ever end-to-end proof: manifest → validate → generate → C++ → rendered pixels.
+
+**Key findings:**
+1. **Generator behavior — fully functional for C++ widgets:**
+   - Emits `#include "wd_service_list.hpp"`, `static wd_service_list ui_obj_row0;`
+   - Emits setter calls from `<prop>` declarations: `ui_obj_row0.set_max_rows(1);`
+   - Emits `u8g2gl_render_object()` wrapping — state saver and clip hierarchy handled
+   - Capacity report: 5 objects, 2 bindings — correct
+   - Out-of-bounds geometry caught: `y=54, height=13` → `extends to y=67, display is 64px`
+
+2. **`<element>` refusal captured (expected):**
+   - Validate: warning with source location and §9 reference
+   - Generate: error refusing output — "Nothing was written"
+
+3. **Widget author experience — 369 lines total:**
+   - 71 SLOC for multi-column rendering (the core value)
+   - 59 SLOC for setters (generator-emitted calls land on these)
+   - 45 SLOC for data ingestion API (`begin`/`add_row`/`commit`)
+   - Static storage: `cells_[16][6][24]` = 2,304 bytes, zero heap
+   - Compiled with `clang++ -Wall -Wextra -Wpedantic -Werror` — 0 warnings
+
+4. **Wasm harness gap confirmed:**
+   - `bridge.cpp` class registry refuses `wd_service_list`: "no class in registry"
+   - Version mismatch: CLI emits scene version 2, bridge expects 3
+   - Realisation tag mismatch: CLI emits `"draw_calls"`, bridge expects `"draw"`
+   - Workaround: hand-crafted scene JSON (same pattern as G-PROBE-1)
+
+5. **Undocumented author knowledge:**
+   - Font positioning: `u8g2gl_state_saver` calls `setFontPosTop()` — `y` is top of glyph box, not baseline
+   - Column configuration must be done in C++ (not XML) due to `<element>` deferral
+   - Editor registry: `generate --target-kind editor` emits reflection, but compiling it into Wasm requires rebuild
+
+**Rendered output:** 256×64, 1,225 lit pixels (7.48% fill), SHA-256 `7e1e6c73...`
+
+**Deliverables in `evidence/`:** `FINDINGS.md`, `render.mjs/pbm/png`, `probe-project/` with widget source and generated code, validation/generation logs
 
 ---
 
