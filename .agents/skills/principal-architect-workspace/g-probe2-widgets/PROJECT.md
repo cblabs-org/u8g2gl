@@ -176,4 +176,4 @@ If WO1 finds the generator processes the manifest but the Wasm harness cannot re
 
 ## Owner Approval
 
-*Awaiting owner approval of the five-WO decomposition.*
+> **Approved** — 2026-10-17T21:48Z. Owner approved the four-WO decomposition as presented.
