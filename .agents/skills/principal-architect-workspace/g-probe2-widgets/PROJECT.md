@@ -59,7 +59,7 @@ Research into the CLI generator source (`cli/src/core/`) revealed three facts th
 
 - **[x] [wo1-widget-path](wo1-widget-path/WORKORDER.md):** **Prove the end-to-end path.** Build a minimal probe project fixture with a C++ custom widget extending `u8g2gl_obj`: manifest, `.hpp`, `.cpp`, a screen that places it, and a render through the Wasm harness to pixels. This is the first time this path has ever been walked. Then build `wd_service_list` for real — the §9.2 example, with declared capacity props (using `<prop>` not `<element>`), the C++ class with manual collection storage (`begin()`/`add_row()`/`commit()` as class methods), and column definitions. Drive it with the mock data's services array (10 services, including the `null` in the time column for service 3). Document: what the generator emits, what it refuses (`<element>` → `NOT_YET_SUPPORTED`), what the widget author had to write, what the spec told them and what it didn't.
 
-- **[ ] [wo2-formation-and-messages](wo2-formation-and-messages/WORKORDER.md):** **Build `wd_train_formation` and test the message pool.** Two items in one WO because the message pool test is expected to be small:
+- **[x] [wo2-formation-and-messages](wo2-formation-and-messages/WORKORDER.md):** **Build `wd_train_formation` and test the message pool.** Two items in one WO because the message pool test is expected to be small:
   - **`wd_train_formation`**: Twelve carriages with per-carriage class, wheelchair, bike and loading indicators. Pixel arithmetic for loading gauges. Exercises: extending `u8g2gl_obj`, manual `render()`, the state saver around widget draws, container clipping of child content. The first probe concluded this is a C++ widget; prove it can be one.
   - **Message pool as host policy**: A `u8g2gl_label` with `long_mode="scroll_circular"` and C++ host code writing the subject. Test whether `ui_spec §7.3`'s assignment of carousel policy to the host is genuinely sufficient. If a timer is needed to rotate messages, use `u8g2gl_timer` from PR-5R2. Document whether this is enough or what is missing.
 
@@ -209,6 +209,41 @@ If WO1 finds the generator processes the manifest but the Wasm harness cannot re
 **Rendered output:** 256×64, 1,225 lit pixels (7.48% fill), SHA-256 `7e1e6c73...`
 
 **Deliverables in `evidence/`:** `FINDINGS.md`, `render.mjs/pbm/png`, `probe-project/` with widget source and generated code, validation/generation logs
+
+### 2026-10-17 — WO2 Complete
+
+**`wd_train_formation` — second custom widget confirmed working.** Same path: manifest → validate → generate → compile → clean.
+
+**Key findings:**
+1. **Generator behavior — identical to WO1:**
+   - Emits `#include "wd_train_formation.hpp"`, `static wd_train_formation ui_obj_formation;`
+   - Emits setter calls: `set_coords(0, 17, 256, 32)`, `set_font(...)`, `set_max_carriages(12)`
+   - Object table registration + `u8g2gl_render_object()` wrapping — state saver handles all
+
+2. **Widget author experience — 439 lines total (vs. 369 for `wd_service_list`):**
+   - 157 SLOC for pixel arithmetic rendering (the core — carriage outlines, loading gauges, indicators)
+   - 73 SLOC for data ingestion API (`begin`/`add_carriage`/`commit`)
+   - 30 SLOC for configuration setters
+   - Static storage: `u8g2gl_carriage_t[16]` = 96 bytes + 32 bytes members = 128 bytes total, zero heap
+   - XOR draw mode (`setDrawColor(2)`) elegantly handles indicator visibility over loading gauges
+
+3. **Pixel arithmetic approach:**
+   - 12 carriages × 20px cells + 11px gaps = 251px, centered with 2px margin
+   - Vertical: 10px label band (carriage numbers) + 22px carriage boxes
+   - Loading gauge: proportional filled bar from bottom, rounding `(pct * inner_h + 50) / 100`
+   - Indicators: "W" (wheelchair), "B" (bike), 4×4 box (first class) — XOR'd for contrast
+
+4. **Message pool evaluation (§7.3):**
+   - **`scroll_circular` is sufficient for a single message** — loops indefinitely without host intervention
+   - **NOT sufficient for message rotation** — `is_scroll_finished()` is permanently false under `scroll_circular`, no completion callback, no wrap notification
+   - **Host timer required:** `u8g2gl_timer` with ~15s period rotates messages by writing the subject
+   - **Backlog recommendation:** `scroll_once` mode or completion callback would make this cleaner. Not a blocker — the timer path works today.
+
+5. **Screen now has 7 objects, 2 draw calls:**
+   - `plat_box` (draw), `plat_label`, `plat_num`, `header_sep` (draw), `row0` (wd_service_list), `message_bar` (label), `formation` (wd_train_formation), `services` (wd_service_list), `sys_clock`
+   - 3 bindings (platform, message_text, system_time)
+
+**Compiled:** `clang++ -Wall -Wextra -Wpedantic -Werror -std=c++17` — 0 errors, 0 warnings on both widgets and generated screen code.
 
 ---
 
