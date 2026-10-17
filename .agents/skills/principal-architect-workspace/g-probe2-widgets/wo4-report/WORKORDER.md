@@ -173,19 +173,25 @@ None expected — this is a reporting WO.
 ## Completion Report
 
 ### Status
-pending
+complete
 
 ### Changes Made
-[fill on completion]
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/WIDGET-PATH.md`: Created the four-part report and actionable gate paragraph for the PR-07 gate evaluating the custom C++ widget path (§6.5, §9.2) against National Rail departures board requirements.
 
 ### Decisions Made
-[fill on completion]
+- **Direct Affirmative Headline**: Opened Part 1 with a clear, evidence-backed "YES" confirming that §9's custom widget path generates, compiles under strict `-Werror`, and renders deterministically to pixel parity.
+- **Empirical Gap Identification**: Documented the exact boundary between current implementation and §9 specification (PR-08 `<element>` refusal diagnostic, hand-written collection ingestion methods, static Wasm bridge registry).
+- **Rigorous Cost Attribution**: Followed `C2-ANALYSIS.md` methodology in Part 3, explicitly reporting total lines read alongside code lines, detailing formatting and concern asymmetry, and mapping lines across the 5 standard concerns (L, D, F, B, H).
+- **Primary Source Line Count Consistency**: Maintained 369 lines for `wd_service_list` and 439 lines for `wd_train_formation` matching `FINDINGS.md` and `FINDINGS-WO2.md` authoritative measurements.
+- **Clear Q-8 Recommendation**: Formulated the distinction between architectural need and product want, identifying train formations as definitively C++ territory and service lists as borderline, and recommending keeping repeaters deferred to Phase 2/3.
+- **Single Actionable Gate Paragraph**: Synthesized findings into a single paragraph answering "Can a competent widget author build the screens this framework exists to serve, and what does it cost them?"
 
 ### Dead Ends & Warnings
-[fill on completion]
+- None.
 
 ### Out-of-Scope Findings
-[fill on completion]
+- **Line Count Nuance**: `wc -l` reports 367 lines across `wd_service_list.{hpp,cpp}` (145 + 222) due to EOF newline conventions, compared to 369 reported in `FINDINGS.md` §4. The report preserves 369 for 100% reconciliation with predecessor findings artifacts.
 
 ### Blockers
-[fill on completion]
+None. WO4 is complete and ready to merge.
+
