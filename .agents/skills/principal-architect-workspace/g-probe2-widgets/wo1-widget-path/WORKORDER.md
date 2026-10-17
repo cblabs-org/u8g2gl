@@ -156,32 +156,38 @@ Expected findings to document (not defects):
 
 ---
 
-## Completion Report (written by the worker at task completion)
-
-```markdown
----
 ## Completion Report
-<!-- Written by the worker at task completion -->
 
 ### Status
-complete | partial | blocked
+complete
 
 ### Changes Made
-- `path/to/file` — what changed and why
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/u8g2gl.xml`: Project manifest configuring target SSD1322 256x64 under schema 0.4.
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/globals.xml`: Declared subjects (`platform`, `system_time`, `row0_time`, `row0_dest`, `row0_status`, `box_fill`) and fonts (`u8g2_font_6x10_mr`, `u8g2_font_helvR08_tr`).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/screens/screen_departures.xml`: Screen placing `plat_box`, `plat_label`, `plat_num`, `header_sep`, `wd_service_list` (`row0`), `wd_service_list` (`services`), and `sys_clock`.
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_probe_box/`: Minimal proof-of-concept custom widget (`wd_probe_box.xml`, `.hpp`, `.cpp`).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_service_list/`: Full custom tabular widget implementing the §9.2 declared-capacity collection model (`wd_service_list.xml`, `.hpp`, `.cpp`).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated/`: Emitted C++ firmware translation units from `u8g2gl generate` (`ui_screen_departures.cpp`, `ui_subjects.cpp`, `ui_styles.cpp`, `ui_fonts.cpp`, `ui_images.cpp`, `ui.hpp`, `ui.cpp`, `u8g2gl_generated_config.h`).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/`: Emitted designer translation units from `u8g2gl generate --target-kind editor` (`ui_editor_registry.cpp`, `ui_scene.json`).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.mjs`: Wasm harness execution script ingesting `nationalRailBoard.json`, probing the generator scene gap, rendering the display output, and exporting bitmaps.
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.pbm` & `render.png`: Rendered 256x64 display bitmaps showing National Rail departure data with 1,225 lit pixels (amber phosphor preview).
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/FINDINGS.md`: Comprehensive evaluation covering generator behavior, author experience, Wasm harness gap analysis, SLOC breakdown, and exact `<element>` refusal diagnostics.
+- `.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/*.log`: Execution logs (`validate.log`, `generate.log`, `generate_editor.log`, `render.log`).
 
 ### Decisions Made
-<!-- Only non-obvious decisions. -->
-- Decision description and rationale
+- **Zero-Heap Static 2D Storage**: `wd_service_list` allocates `cells_[16][6][24]` (2,304 bytes) statically, completely fulfilling U8G2GL memory non-negotiables (no dynamic allocations on MCU).
+- **C++ Column Configuration**: Since child `<element>` collection tags like `<column>` are deferred to PR-08 and refused by the generator, column geometry and alignment are configured programmatically via `wd_service_list::add_column()`.
+- **Display Bounds Alignment**: In `screen_departures.xml`, bottom widgets were aligned to `y=51, height=13` (51..63) to fit cleanly within the 64px display height while matching the separator line at `y=50`.
+- **Wasm Scene Realisation**: Because the prebuilt Wasm binary `bridge.cpp` uses a static registry containing only framework classes, `render.mjs` probes the raw generator scene to verify and document the refusal, and translates `wd_service_list::render()`'s layout into scene JSON elements to generate pixel-accurate bitmaps.
 
 ### Dead Ends & Warnings
-<!-- Things that didn't work. Critical for preventing future agents from repeating mistakes. -->
-- What was attempted, why it failed, and what to avoid
+- **Pre-tool Hook Protection on `cli/`**: Modifying or symlinking inside `cli/` in the probe worktree triggers pre-tool hook blocks. The CLI was executed cleanly using the global wrapper `/Users/mcneillm/.local/bin/u8g2gl` pointing to `cli/dist/node/cli.js`.
+- **`u8g2gl_state_saver` Font Position**: The framework establishes `setFontPosTop()` inside `u8g2gl_state_saver` before invoking widget render methods. Custom widget authors must treat `y` as the top of the glyph bounding box rather than the baseline.
+- **Scene Format Version in `bridge.cpp`**: `wasm/bridge.cpp` strictly requires `"version": 3` and `realisation == "draw"` for drawing elements. `u8g2gl generate --target-kind editor` currently writes `"version": 2` and `"draw_calls"`.
 
 ### Out-of-Scope Findings
-<!-- Defects, bugs, or concerns outside the boundary box. The PA will triage these. -->
-- Finding description and suggested action
+- **Generator vs Wasm Scene Version Mismatch**: `u8g2gl generate --target-kind editor` writes `"version": 2` in `ui_scene.json`, but `wasm/bridge.cpp` requires `s_scene.get("version").as_int() == 3`. Recommend updating generator's `SCENE_FORMAT_VERSION` to 3.
+- **Drawing Element Realisation String**: Generator emits `"realisation": "draw_calls"`, while `wasm/bridge.cpp` line 708 checks `else if (realisation == "draw")`. Recommend standardizing this between the CLI generator and Wasm bridge.
 
 ### Blockers
-<!-- Empty if status is 'complete'. If partial/blocked, explain what prevents completion. -->
 (none)
-```
