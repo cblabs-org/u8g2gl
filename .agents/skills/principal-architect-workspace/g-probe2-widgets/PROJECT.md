@@ -65,7 +65,7 @@ Research into the CLI generator source (`cli/src/core/`) revealed three facts th
 
 - **[x] [wo3-full-screen](wo3-full-screen/WORKORDER.md):** **Assemble and render the complete departures screen.** Compose all three widgets plus the static elements (platform box, "Plat" label, separator line, clock, no-data label) into one screen XML. Render in the Wasm harness against the same mock data. This is the visual proof that the widget path produces a working screen.
 
-- **[ ] [wo4-report](wo4-report/WORKORDER.md):** **Write `WIDGET-PATH.md`.** The four-part report:
+- **[x] [wo4-report](wo4-report/WORKORDER.md):** **Write `WIDGET-PATH.md`.** The four-part report:
   1. Does §9's typed API generate, and is it usable?
   2. Where does the path strain? (manifest sufficiency for [UD-5], composition, undocumented author knowledge)
   3. What it costs — using C2-ANALYSIS methodology **including lines read** (the metric the first probe dropped)
@@ -259,6 +259,22 @@ If WO1 finds the generator processes the manifest but the Wasm harness cannot re
 **Additional findings:**
 - Wasm bridge string subject limit: `max_len <= 128` — `message_text` capped. Not a framework gap, bridge limitation.
 - Formation overlaps `plat_box` and `message_bar` in screen_departures.xml — rendered per document order. Layout refinement is a design concern, not a framework concern.
+
+### 2026-10-17 — WO4 Complete / G-PROBE-2 COMPLETE
+
+**`WIDGET-PATH.md` delivered.** The four-part gate report is committed.
+
+**Report headline:** The custom C++ widget path works end-to-end. Schema 0.4 can express a production departures board through the path the spec designed for it (§6.5, §9.2).
+
+**The four parts:**
+1. **Does §9's typed API generate?** YES — manifest → validate → generate → compile → render, all proven with evidence
+2. **Where does the path strain?** Property panel functional but lacks grouping/conditional visibility. Four undocumented author knowledge items. `<element>` deferred to PR-08.
+3. **What it costs?** 15 lines XML + 808 lines C++ (458 code). XML replaces Layout concern (0% L in C++). C++ is amortized: additional screens reuse widgets at 1 line XML per placement.
+4. **Is Q-8 still wanted?** Not needed — wanted. Formation is definitively C++ territory. Service list is borderline. Recommend deferring repeaters to Phase 2/3.
+
+**Gate paragraph:** A competent embedded C++ author can build production screens like a National Rail departures board using Schema 0.4 today.
+
+**All four work orders complete.** G-PROBE-2 programme is finished.
 
 ---
 
