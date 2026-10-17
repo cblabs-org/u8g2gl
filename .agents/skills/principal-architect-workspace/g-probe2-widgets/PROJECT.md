@@ -63,7 +63,7 @@ Research into the CLI generator source (`cli/src/core/`) revealed three facts th
   - **`wd_train_formation`**: Twelve carriages with per-carriage class, wheelchair, bike and loading indicators. Pixel arithmetic for loading gauges. Exercises: extending `u8g2gl_obj`, manual `render()`, the state saver around widget draws, container clipping of child content. The first probe concluded this is a C++ widget; prove it can be one.
   - **Message pool as host policy**: A `u8g2gl_label` with `long_mode="scroll_circular"` and C++ host code writing the subject. Test whether `ui_spec §7.3`'s assignment of carousel policy to the host is genuinely sufficient. If a timer is needed to rotate messages, use `u8g2gl_timer` from PR-5R2. Document whether this is enough or what is missing.
 
-- **[ ] [wo3-full-screen](wo3-full-screen/WORKORDER.md):** **Assemble and render the complete departures screen.** Compose all three widgets plus the static elements (platform box, "Plat" label, separator line, clock, no-data label) into one screen XML. Render in the Wasm harness against the same mock data. This is the visual proof that the widget path produces a working screen.
+- **[x] [wo3-full-screen](wo3-full-screen/WORKORDER.md):** **Assemble and render the complete departures screen.** Compose all three widgets plus the static elements (platform box, "Plat" label, separator line, clock, no-data label) into one screen XML. Render in the Wasm harness against the same mock data. This is the visual proof that the widget path produces a working screen.
 
 - **[ ] [wo4-report](wo4-report/WORKORDER.md):** **Write `WIDGET-PATH.md`.** The four-part report:
   1. Does §9's typed API generate, and is it usable?
@@ -244,6 +244,21 @@ If WO1 finds the generator processes the manifest but the Wasm harness cannot re
    - 3 bindings (platform, message_text, system_time)
 
 **Compiled:** `clang++ -Wall -Wextra -Wpedantic -Werror -std=c++17` — 0 errors, 0 warnings on both widgets and generated screen code.
+
+### 2026-10-17 — WO3 Complete
+
+**Full departures screen rendered.** All three widgets plus static elements composed and rendered through Wasm harness.
+
+**Metrics:**
+- 256×64, 4,810 lit pixels (29.36% fill) — vs. 1,225 lit pixels (7.48%) in WO1's partial render
+- SHA-256: `0b0e554ab9037e3c9d620001e3e80486a2e7633fc2198fdbe97d77d93f308156`
+- 12 carriages with loading gauges visible, all service data rendered, platform box, clock
+
+**Visual proof:** The departures board that G-PROBE-1 said Schema 0.4 could not express is now rendered from: XML screen composition + C++ custom widgets + subject bindings + mock data.
+
+**Additional findings:**
+- Wasm bridge string subject limit: `max_len <= 128` — `message_text` capped. Not a framework gap, bridge limitation.
+- Formation overlaps `plat_box` and `message_bar` in screen_departures.xml — rendered per document order. Layout refinement is a design concern, not a framework concern.
 
 ---
 
