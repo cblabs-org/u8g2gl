@@ -1,0 +1,2 @@
+Geometry checked against target 'primary' (U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI, 256x64); 'generate --target' checks the target it builds.
+Validation passed: 0 errors, 0 warnings.

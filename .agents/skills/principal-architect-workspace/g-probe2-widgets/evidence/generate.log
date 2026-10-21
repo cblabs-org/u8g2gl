@@ -1,0 +1,72 @@
+Generated 8 firmware file(s) in .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated for target 'primary':
+  unchanged: u8g2gl_generated_config.h
+  unchanged: ui.hpp
+  unchanged: ui_subjects.cpp
+  unchanged: ui_styles.cpp
+  unchanged: ui_fonts.cpp
+  unchanged: ui_images.cpp
+  unchanged: ui.cpp
+  unchanged: ui_screen_departures.cpp
+
+u8g2gl 0.13.1 — target 'primary' (U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI 256x64)
+
+  FLASH
+    runtime core                          unmeasured
+    framework element classes (2)         unmeasured
+    custom element classes (1)            unmeasured
+    fonts (2)                             unmeasured
+    image data (xbm arrays) (0)              0 bytes
+    generated code                        unmeasured
+    ------------------------------------------------
+    derivable                                0 bytes
+
+  RAM (static)
+    framebuffer (256x64)                  2048 bytes
+    element objects (5)                   unmeasured
+    string subject storage (4)             124 bytes
+    subject observer slots (2)            unmeasured
+    binding pool slots (2)                unmeasured
+    styles (0)                            unmeasured
+    ------------------------------------------------
+    derivable                             2172 bytes
+    note — framebuffer (256x64): the application constructs the U8G2 instance and owns
+    its buffer (§12.1, §13.10), so this is the full-buffer cost of the setup target
+    'primary' names, not a measurement of the application's own buffer: a page-mode or
+    differently sized constructor costs something else
+
+  NOT MEASURED — and why (§1.3: no figure the tooling cannot substantiate)
+    runtime core, framework element classes, custom element classes, generated code:
+      flash cost needs a linker map for a reference build (§18); §13.7 forbids the
+      generator assuming any runtime class size or layout
+    fonts:
+      a <builtin> font's array lives in U8G2, not in generated code, so its size is
+      U8G2's: flash cost needs a linker map for a reference build (§18); §13.7 forbids
+      the generator assuming any runtime class size or layout
+    element objects, subject observer slots, binding pool slots, styles:
+      sizeof is the runtime's, not the generator's: §13.7 lets the generator know only
+      that a class is default-constructible and what its manifest declares
+
+  CAPACITY (generated — see u8g2gl_generated_config.h)
+    objects, busiest screen         5 / 254   departures
+    bindings, busiest object              1   plat_num
+    bindings, total                       2
+    styles                                0
+
+  REALISATION (§13.5 — what each element became, and why)
+    screen 'departures': 5 object(s), 2 element(s) as draw calls
+      plat_box                u8g2gl_box            draw calls
+      plat_label              u8g2gl_label          object     class_backed  [amendment]
+      plat_num                u8g2gl_label          object     class_backed, binding
+      header_sep              u8g2gl_line           draw calls
+      row0                    wd_service_list       object     class_backed  [amendment]
+      services                wd_service_list       object     class_backed  [amendment]
+      sys_clock               u8g2gl_clock          object     class_backed, binding
+    5 object(s) and 2 draw-call element(s) across 1 screen(s).
+
+  NOTE — [D-18]'s 2026-09-13 amendment:
+      Classed-element demotion is not yet delivered ([D-18] amendment, 2026-09-13): an
+      element backed by a C++ class is always realised as an object, even where §13.5
+      says it need not be. This report is therefore not the realisation rule's full
+      saving.
+      3 object(s) here are marked [amendment] above and are due to it alone: plat_label,
+      row0, services.

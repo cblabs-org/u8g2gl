@@ -1,0 +1,39 @@
+================================================================
+   U8G2GL Full Departures Screen — Wasm Render Harness (WO3)    
+================================================================
+
+1. Loading Wasm Editor Module...
+   Module loaded successfully from: /Users/mcneillm/Documents/Projects/U8G2GL/build-wasm/wasm
+
+2. Probing Generator Scene JSON: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
+   [HARNESS GAP VERIFIED]: applyScene() refused with: "row0: no class 'wd_service_list' in registry"
+   Explanation: Custom C++ classes (wd_service_list, wd_train_formation) are compiled
+   into native firmware but not registered in the precompiled Wasm harness bridge.
+
+3. Applying Full Departures Screen Scene JSON...
+   Scene applied successfully.
+   Configured Display: 256x64 (SSD1322 256x64)
+
+4. Applying Mock Data from nationalRailBoard.json...
+   Sample data applied successfully:
+   - Platform:       "9"
+   - System Time:    71700s (19:55:00)
+   - Row 0 (Fast):   "19:55" | "London Paddington" | "On time"
+   - Message Bar:    "A reduced train service will be running to and fro..." (128 chars)
+   - Formation:      12 carriages ingested
+   - Services Total: 10 services in feed (Service 3 has null time: cancelled/delayed)
+   - Services Row:   "2nd" | "19:38" | "London Victoria" | "19:41"
+
+5. Rendering Frame at t=0 ms...
+   Framebuffer size: 2048 bytes
+   Lit pixels:       4810 / 16384 (29.36%)
+   SHA-256 Digest:   0b0e554ab9037e3c9d620001e3e80486a2e7633fc2198fdbe97d77d93f308156
+
+6. Evidence Bitmaps Written:
+   - PBM Bitmap: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.pbm
+   - Amber PNG:  /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.png
+   - Log File:   /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.log
+
+================================================================
+   Full Screen Render Completed Successfully                    
+================================================================

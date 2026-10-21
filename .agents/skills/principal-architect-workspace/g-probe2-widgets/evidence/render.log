@@ -1,0 +1,37 @@
+================================================================
+   U8G2GL Custom Widget Probe — Wasm Render Harness (WO1)       
+================================================================
+
+1. Loading Wasm Editor Module...
+   Module loaded successfully from: /Users/mcneillm/Documents/Projects/U8G2GL/build-wasm/wasm
+
+2. Probing Generator Scene JSON: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
+   [HARNESS GAP VERIFIED]: applyScene() refused with: "row0: no class 'wd_service_list' in registry"
+   Explanation: The precompiled Wasm harness bridge.cpp uses a static class registry
+   (ui_editor_registry()) containing only framework classes. Custom C++ classes like
+   wd_service_list cannot be dynamically loaded into Wasm without rebuilding the Wasm.
+
+3. Applying Render-Parity Scene (modeling wd_service_list::render())...
+   Scene applied successfully.
+   Configured Display: 256x64 (SSD1322 256x64)
+
+4. Applying Sample Data from nationalRailBoard.json...
+   Sample data applied successfully:
+   - Platform:     "9"
+   - System Time:  71700s (19:55:00)
+   - Row 0 (Fast): "19:55" | "London Paddington" | "On time"
+   - Services Row: "2nd" | "19:38" | "London Victoria" | "19:41"
+
+5. Rendering Frame at t=0 ms...
+   Framebuffer size: 2048 bytes
+   Lit pixels:       1225 / 16384 (7.48%)
+   SHA-256 Digest:   7e1e6c73e3b2610e3a51b88c5a8bb2102b0df2e08d997463f5c30b82ba6b6d14
+
+6. Evidence Bitmaps Written:
+   - PBM Bitmap: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.pbm
+   - Amber PNG:  /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.png
+
+================================================================
+   Custom Widget Probe Render Completed Successfully            
+================================================================
+
