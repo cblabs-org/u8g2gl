@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  U8G2GL Expressiveness Probe — G-PROBE Work Order 1
+  File: tmp/g-probe/departures_static.xml
+  Description: Static representation of layoutSWR.json expressible within Schema 0.4.
+  Includes:
+    - Primitives: Platform bounding box, "Plat" header text, separator line
+    - platformWidget: Platform number display (<u8g2gl_label>)
+    - sysClock: System clock with seconds (<u8g2gl_clock>)
+    - noDataLabel: Hidden "No services found." fallback label (<u8g2gl_label hidden="true">)
+  
+  Omitted (cannot be expressed statically without custom C++ or schema extensions):
+    - row0Widget / servicesWidget (ServiceListWidget) -> see gaps/gap-service-list.md
+    - formationWidget (TrainFormationWidget) -> see gaps/gap-formation.md
+    - msgWidget (ScrollingMessagePoolWidget) -> see gaps/gap-scrolling-pool.md
+-->
+<screen name="departures_static">
+    <styles>
+        <style name="plat_text" font="u8g2_font_6x10_mr" align="center" />
+        <style name="plat_num" font="u8g2_font_helvR08_tr" align="center" />
+        <style name="clock_style" font="u8g2_font_helvR08_tr" align="right" />
+        <style name="msg_font" font="u8g2_font_6x10_mr" align="left" />
+    </styles>
+
+    <view>
+        <!-- Primitives: Left platform header box (x=0, y=0, w=28, h=51, unfilled) -->
+        <u8g2gl_box name="plat_box" x="0" y="0" width="28" height="51" filled="false" radius="0" />
+
+        <!-- Primitives: Static text "Plat" (x=5, y=6, w=18, h=13) -->
+        <u8g2gl_label name="plat_label" x="5" y="6" width="18" height="13"
+                      style="plat_text" text="Plat" />
+
+        <!-- platformWidget: Platform indicator (x=4, y=20, w=20, h=24) -->
+        <u8g2gl_label name="plat_num" x="4" y="20" width="20" height="24"
+                      style="plat_num" text="9" bind_text="platform" />
+
+        <!-- Primitives: Horizontal separator line (x1=30, y1=50, x2=256, y2=50) -->
+        <u8g2gl_line name="header_sep" x1="30" y1="50" x2="256" y2="50" />
+
+        <!-- sysClock: System Clock (x=190, y=51, w=66, h=16) -->
+        <u8g2gl_clock name="sys_clock" x="190" y="51" width="66" height="16"
+                      style="clock_style" secondary_font="font_4x6"
+                      format="hh_mm_ss" blink="false" bind_time="system_time" />
+
+        <!-- noDataLabel: "No services found." fallback label (x=32, y=17, w=224, h=14, hidden by default) -->
+        <u8g2gl_label name="no_data_label" x="32" y="17" width="224" height="14"
+                      style="msg_font" text="No services found." hidden="true" />
+    </view>
+</screen>

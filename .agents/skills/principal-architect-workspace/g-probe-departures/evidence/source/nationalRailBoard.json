@@ -1,0 +1,102 @@
+{
+  "header": {
+    "title": "Manchester Piccadilly",
+    "callingPoint": "via Crewe",
+    "platform": "9",
+    "firstServiceCalling": "Calling at Stockport (20:00), Macclesfield (20:15), Stoke-on-Trent (20:30), Stafford (20:45), Wolverhampton (21:05), Birmingham New Street (21:25), Birmingham International (21:35), Coventry (21:45), Leamington Spa (22:00), Banbury (22:15), Oxford (22:40), Reading (23:10), and London Paddington (23:45).",
+    "firstServiceFormation": [
+      { "number": 1, "classType": "standard", "hasWheelchair": true, "hasBike": false, "loading": "30%" },
+      { "number": 2, "classType": "standard", "hasWheelchair": false, "hasBike": true, "loading": "50%" },
+      { "number": 3, "classType": "first", "hasWheelchair": true, "hasBike": true, "loading": "80%" },
+      { "number": 4, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "100%" },
+      { "number": 5, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "40%" },
+      { "number": 6, "classType": "standard", "hasWheelchair": true, "hasBike": false, "loading": "20%" },
+      { "number": 7, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "10%" },
+      { "number": 8, "classType": "standard", "hasWheelchair": false, "hasBike": true, "loading": "60%" },
+      { "number": 9, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "90%" },
+      { "number": 10, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "70%" },
+      { "number": 11, "classType": "first", "hasWheelchair": true, "hasBike": false, "loading": "5%" },
+      { "number": 12, "classType": "standard", "hasWheelchair": false, "hasBike": false, "loading": "55%" }
+    ]
+  },
+  "services": [
+    [
+      "1st",
+      "19:55",
+      "London Paddington",
+      "9",
+      "On time"
+    ],
+    [
+      "2nd",
+      "19:38",
+      "London Victoria",
+      "12",
+      "19:41"
+    ],
+    [
+      "3rd",
+      null,
+      "Clapham Junction",
+      null,
+      null
+    ],
+    [
+      "4th",
+      "19:39",
+      "Epsom Downs",
+      "15",
+      "On time"
+    ],
+    [
+      "5th",
+      "19:39",
+      "London Waterloo",
+      "7",
+      "On time"
+    ],
+    [
+      "6th",
+      "19:39",
+      "London Waterloo",
+      "10",
+      "On time"
+    ],
+    [
+      "7th",
+      "19:40",
+      "Teddington",
+      "5",
+      "On time"
+    ],
+    [
+      "8th",
+      "19:41",
+      "London Victoria",
+      "12",
+      "19:43"
+    ],
+    [
+      "9th",
+      "19:42",
+      "Portsmouth Harbour",
+      "13",
+      "On time"
+    ],
+    [
+      "10th",
+      "19:42",
+      "Guildford",
+      "11",
+      "On time"
+    ]
+  ],
+  "messages": [
+    "A reduced train service will be running to and from London Waterloo from Good Friday 3 April to Easter Monday 6 April inclusive. Also, no trains will call at Queenstown Road (Battersea). More details and the full impact to your journey can be found in <a href=\"https://www.nationalrail.co.uk/engineering-works/queenstown-road-battersea-20260403/\">Status and Disruptions.</a>",
+    "Trains between Norwood Junction / Crystal Palace and New Cross Gate may be delayed by up to 20 minutes, cancelled or diverted. Latest information can be found in <a href=\"https://www.nationalrail.co.uk/service-disruptions/penge-west-20260404/\">Status and Disruptions</a>."
+  ],
+  "weather": {
+    "id": 800,
+    "isNight": false
+  }
+}
