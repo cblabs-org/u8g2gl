@@ -372,15 +372,26 @@ The failure was also predicted. **CA-2** (2026-10-05) recorded that every gate c
 
 **Criterion 4 was rewritten on 2026-10-22, bringing §6 into line with a ruling already made on 2026-10-13. The original wording is kept here for the same reason criterion 2's is.**
 
-It read: *"Edit → regenerate → rebuild faster in practice than editing C++ was."* Measured in `device-measurements/EVIDENCE.md`: **+6.2 s per round**, interleaved over five rounds. On that text the criterion is **not met**.
+It read: *"Edit → regenerate → rebuild faster in practice than editing C++ was."* On that text the criterion is **not met**.
 
-**But the decomposition is the finding.** The generator takes **0.05 s**. Compilation is **0.75 s faster** than the legacy board's. The entire regression is PlatformIO's deep library dependency finder resolving three more libraries — `lib_ldf_mode = chain` makes it worse, and `off` with an explicit `lib_deps` beats legacy by 14 s but costs about 45 hand-kept lines and moves the image by ~430 B. Not adopted.
+**Two measurements bear on this, from different bases, and they must not be combined.** PR-07's Principal Architect found them conflated in an earlier draft of this note:
 
-So the architecture made the loop faster and the packaging made it slower, and the original wording could not distinguish those. It would have reported a build-system default as an architectural result.
+| Figure | Source | Basis | Runtime |
+|---|---|---|---|
+| **+6.2 s** per round (S0) | `device-measurements/EVIDENCE.md` §"Criterion 4" | wall clock, interleaved | 0.8.0 |
+| **+4.99 s**, with a breakdown — generator 0.05 s, compilation faster | foundation `pr-u8g2gl-05/evidence/EVIDENCE.md` | **MCP task time** | 0.7.0 |
 
-**This is not a second concession.** The owner reframed this criterion on 2026-10-13 — the firmware loop's cost recorded as the build tool's, the design loop moved to **E-2** as "under 16 ms from edit to pixels". That ruling was recorded in `PROGRAM.md` and `CONTEXT_BRIDGE.md` and, through a Chief Architect omission, never reached this section. §6 was eight days out of step with a decision already taken; this corrects the omission rather than softening the test. Found by PR-07's Principal Architect while scoping against the text rather than the summary.
+`device-measurements/EVIDENCE.md` states the caveat itself: *"Not comparable with the recorded +4.99 s in absolute terms. That figure was MCP task time."* The regression **reproduces** in both; its magnitude does not transfer between them. Cite each to its own source.
 
-**What the new wording claims, and what it does not.** "Not slower for any reason the framework controls" is measurable today and this board satisfies it. The designer's loop is deliberately *not* tested here — there is no editor, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. That is E-2's job (CA-1).
+**What both agree on** is that the regression is structural to PlatformIO's default library finder: `lib_ldf_mode = chain` is worse, and `off` with an explicit `lib_deps` beats legacy but costs about 45 hand-kept lines and moves the image by ~430 B. Not adopted.
+
+**On provenance.** The owner reframed this criterion's *substance* on 2026-10-13 — record the firmware loop's cost as the build tool's, move the design loop to **E-2** as "under 16 ms from edit to pixels" — and that ruling reached `PROGRAM.md` and `CONTEXT_BRIDGE.md` but, through a Chief Architect omission, never reached this section. **The wording above is not the owner's words from that ruling**; it was drafted by the Chief Architect and approved by the owner on 2026-10-22. Both dates matter: the decision is eight days older than the sentence that expresses it.
+
+**What the new wording does not do is decide the verdict.** PR-07 measures criterion 4; this section does not pre-judge it, and an earlier draft of this note wrongly asserted that the migrated board satisfies it.
+
+**The open question this wording leaves, which the gate must answer.** The three extra libraries PlatformIO scans are `u8g2gl`, `U8G2GLDisplay` and `U8G2GLUI` — **U8G2GL's own integration packaging.** So whether the framework "controls" that cost is exactly what decides this criterion, and the word is not defined here on purpose: it is the judgement, and resolving it in the spec to suit a pass would be the third amendment to this gate doing the gate's work for it. PR-07 must state the case both ways and the owner decides. It is the strongest argument against a pass, and the dossier is required to name it as such.
+
+**The designer's loop is deliberately not tested here.** There is no editor, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. That is E-2's job (CA-1).
 
 **On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
 
