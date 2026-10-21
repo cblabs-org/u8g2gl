@@ -1872,3 +1872,97 @@ to produce, and it has now happened in four consecutive PRs.
   true at `ce0046c`; a spec asserting an absent capability is bad, and one
   denying a present capability is worse.
 - **F-PLATFORM** in the cut-over requirements.
+
+---
+
+## 2026-10-21 — the two pre-gate probes ingested. The gate is next and nothing is left before it.
+
+Branches on the remote: `u8g2gl-probe/wo2-expressiveness-report` (G-PROBE),
+and `u8g2gl-probe2/wo1-widget-path`, `wo2-formation-and-messages`,
+`wo3-full-screen`, `wo4-report` (G-PROBE-2). Neither probe is a PR; both are
+evidence.
+
+### What the two probes together establish
+
+**The custom-widget path works, end to end, for the first time.** A project
+widget's `<api>` manifest validates, generates, compiles clean under `-Werror`,
+composes — bound geometry, clipping, the state saver, a timer — and renders. A
+full National Rail departures screen came out at 256×64, 4,810 lit pixels,
+hashed. None of that had ever been tried.
+
+**The screen needs 15 lines of XML and two C++ widgets.** `wd_train_formation`
+at 157 SLOC of pixel arithmetic settles that a formation diagram is C++
+territory rather than schema surface — §6.5's rule applied and now demonstrated
+rather than argued.
+
+**Neither [Q-8] repeaters nor [Q-15] cards is required to ship this screen.**
+Both stay deferred. G-PROBE-2's recommendation is to keep them in Phase 2/3,
+and the evidence supports it.
+
+### The owner's correction, which reframed both probes
+
+G-PROBE-1 concluded Schema 0.4 cannot express a departures board and that Phase
+2 therefore needs repeaters and cards. **That was the wrong question**, and the
+owner spotted it: all three "gaps" are custom widgets in the design's own terms.
+§9.2's worked example is literally
+`<wd_service_list max_rows="16" max_cols="6" max_cell_chars="24" />`, and §6.5
+sends a variable row count, a mode machine and pixel arithmetic to C++ by
+design. The probe had evaluated the built-in element set as if it were the whole
+framework.
+
+Worth recording as a pattern: **a probe that asks "can the schema express X?"
+will answer no for everything the schema deliberately delegates.** The question
+has to name the whole path, not one layer of it.
+
+### The correction to G-PROBE-2's headline — and Q-19
+
+G-PROBE-2 answers *"Does §9's typed API generate?"* with **YES**, qualified as
+"collection API is manual C++ (as §9.2 describes)". §9.2 describes the opposite:
+its listing is headed `// generated/ui.hpp — emitted from the XML above`.
+
+Verified on the branch: `generated/ui.hpp` has no collection accessor;
+`wd_service_list.hpp:80-105` hand-writes the methods; line 142 allocates
+`cells_[DEFAULT_MAX_ROWS][DEFAULT_MAX_COLS][DEFAULT_MAX_CELL_CHARS]` — the
+**defaults**, not the declared values. `generated/u8g2gl_generated_config.h`
+emits objects, bindings and styles and nothing about collections.
+
+So the honest headline is **the custom-widget path works; §9.2's
+declared-capacity model does not exist**, and a collection widget costs 2,304
+bytes per instance whatever the XML says. Opened as **[Q-19]** (§21), touching
+§9.2, §18, [D-21] and §1.3.
+
+**This is not the PA's failure.** They built a working widget and the framework
+offered no mechanism to do otherwise; the probe found a real gap and then
+recorded it as satisfied. The report stands as written — as every PA's report
+does — and this entry is the correction over it, which is where the gate should
+read from.
+
+**And it is partly the Chief Architect's.** The bridge asked "does §9's typed
+API generate, and is it usable?" without naming the artefact to look for, so
+"it works" and "it generated" were allowed to blur. **A bridge that can be
+satisfied two ways will be.** Name the output and the check, not just the
+question.
+
+### Other findings, all backlog
+
+- **`scroll_circular` never signals completion** — `is_scroll_finished()` is
+  permanently false, so message rotation needs a `u8g2gl_timer`. The timer path
+  works. A `scroll_once` mode or a completion callback is additive.
+- **Scene version mismatch** and a **realisation tag mismatch** in the editor
+  scene, both surfaced out of scope.
+- **The property panel lacks grouping and conditional visibility** — already
+  [Q-7], now with a real manifest behind it.
+- **Four things a widget author has to know that the spec does not say:** font
+  positioning under `setFontPosTop()`, configuring columns in C++ pending
+  PR-08's `<element>`, XOR for contrast, and rebuilding the Wasm target. Worth
+  a §6.5 author's note when someone next edits it.
+
+### Process, third occurrence
+
+Both probes finished with **everything unpushed** — G-PROBE's branch went up
+only when asked, G-PROBE-2's four sat in a worktree for three days with ~808
+lines of C++ and the renders existing nowhere else. PR-06 lost six work orders
+to the same pattern. The Chief Architect pushed them on 2026-10-21.
+
+**Pushing belongs at the end of each work order, not the end of the project.**
+That now goes in every bridge.

@@ -214,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-15, after PR-06.**
+**Revised 2026-10-21, after the two pre-gate probes.**
 
 ### Where the programme is
 
@@ -250,8 +250,19 @@ in a report can be checked rather than taken on trust. U8G2 pinned at
 never from a report** — a PA's figures are correct when written and stale by the
 time they are read.
 
-**Next: the PR-07 gate.** Both prerequisites are met — PR-05 verified on its
-branch ([R10]), PR-06 merged — and **all four criteria now have evidence**. So
+**Next: the PR-07 gate**, and nothing stands before it — G-PROBE and G-PROBE-2
+are done (evidence only, no PRs), and **G-BOARDS is an open owner question**
+rather than a commitment. All four criteria have evidence.
+
+**The two probes answered the question the gate could not.** The custom-widget
+path works end to end: a project widget's `<api>` manifest validates,
+generates, compiles under `-Werror`, composes with bound geometry, clipping, the
+state saver and a timer, and renders. A full National Rail departures screen is
+15 lines of XML plus two C++ widgets, and **neither [Q-8] repeaters nor [Q-15]
+cards is needed to ship it**. The correction worth carrying: §9.2's *generated*
+collection API and *generated* capacity do not exist, so a collection widget
+costs **2,304 bytes per instance whatever the XML declares** and §18 cannot
+report it — **[Q-19]**. So
 the gate is a *verdict on what exists*, not a build, and it is the owner's to
 give. On a GO the editor track starts (E-D, then E-1..E-3, per CA-1); on a
 NO-GO the programme stops and PR-01..PR-06 remain additive, with
