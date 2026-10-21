@@ -356,7 +356,7 @@ renumbered across three documents.*
 1. Renders **pixel-identically** to the legacy board, by automated diff — not by eye.
 2. **The layout is wholly declarative, and the framework does not inflate authored code.** No positioning, typography or truncation decision remains in C++. Total authored code is compared against the legacy board with the growth **attributed by concern** — growth from the framework itself must be immaterial; growth from choices made independently of it is named and excluded rather than assumed.
 3. Measured flash and RAM comfortable on `esp32dev` alongside WiFi and TLS ([D-1], §18, Q-4).
-4. Edit → regenerate → rebuild faster in practice than editing C++ was.
+4. **The edit–regenerate–rebuild loop is not slower for any reason the framework controls.** The generator's own cost and the compile time are measured separately from the build system's. Growth attributable to U8G2GL must be immaterial; growth from the build tool's dependency resolution is named, quantified and attributed, not absorbed. The *designer's* loop — edit to pixels — is tested at **E-2**, under 16 ms, not here.
 
 **Criterion 2 was rewritten on 2026-10-16, after it was measured and failed. The original wording and the reason for the change are recorded here rather than replaced, because a gate that quietly redefines a criterion it has failed is not a gate.**
 
@@ -369,6 +369,18 @@ The failure was also predicted. **CA-2** (2026-10-05) recorded that every gate c
 **What the new wording does and does not claim.** Both halves are measured today: the layout concern left C++ entirely (zero layout code lines remain in the migrated board), and authored code is 99 against legacy's 105 once WO2's testability refactor is attributed out. **Designability is deliberately not in the criterion** — there is no editor yet, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. It is tested at **E-2**, as "under 16 ms from edit to pixels" (CA-1).
 
 **The new first half is stricter than the old.** "Materially shorter" could be satisfied by a partial migration that left some coordinates in C++ and trimmed the rest; "wholly declarative" cannot — one surviving `y = 16` fails it. The second half demands the attribution be *shown*, because the raw totals do grow and only attribution makes them level; `C2-ANALYSIS.md` flags its own counterfactual as approximate, and that caveat travels with the number.
+
+**Criterion 4 was rewritten on 2026-10-22, bringing §6 into line with a ruling already made on 2026-10-13. The original wording is kept here for the same reason criterion 2's is.**
+
+It read: *"Edit → regenerate → rebuild faster in practice than editing C++ was."* Measured in `device-measurements/EVIDENCE.md`: **+6.2 s per round**, interleaved over five rounds. On that text the criterion is **not met**.
+
+**But the decomposition is the finding.** The generator takes **0.05 s**. Compilation is **0.75 s faster** than the legacy board's. The entire regression is PlatformIO's deep library dependency finder resolving three more libraries — `lib_ldf_mode = chain` makes it worse, and `off` with an explicit `lib_deps` beats legacy by 14 s but costs about 45 hand-kept lines and moves the image by ~430 B. Not adopted.
+
+So the architecture made the loop faster and the packaging made it slower, and the original wording could not distinguish those. It would have reported a build-system default as an architectural result.
+
+**This is not a second concession.** The owner reframed this criterion on 2026-10-13 — the firmware loop's cost recorded as the build tool's, the design loop moved to **E-2** as "under 16 ms from edit to pixels". That ruling was recorded in `PROGRAM.md` and `CONTEXT_BRIDGE.md` and, through a Chief Architect omission, never reached this section. §6 was eight days out of step with a decision already taken; this corrects the omission rather than softening the test. Found by PR-07's Principal Architect while scoping against the text rather than the summary.
+
+**What the new wording claims, and what it does not.** "Not slower for any reason the framework controls" is measurable today and this board satisfies it. The designer's loop is deliberately *not* tested here — there is no editor, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. That is E-2's job (CA-1).
 
 **On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
 
