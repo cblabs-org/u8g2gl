@@ -73,6 +73,23 @@ the result has been about U8G2GL alone (`pr-05r-runtime-fixes/CRITERION-1.md`).
 for byte on the device for `connected`, at the runtime on `main`, for a user who has done nothing
 but `begin()`.
 
+**Observation (2026-10-22, owner, at the panel): the spacing between rows 2–3 and 3–4 is uneven.
+Not a gate finding: it is legacy's own layout, and criterion 1 requires reproducing it.** No action.
+Measured in the legacy `connected` baseline, which the device reproduces byte for byte:
+
+| | Row 2 | Row 3 | Row 4 |
+|---|---:|---:|---:|
+| Declared box top | 16 | 30 | 44 |
+| First inked row | 20 (box + 4) | 32 (box + 2) | 46 (box + 2) |
+| Baseline | 27 | 39 | 53 |
+
+The boxes are evenly spaced, 14 px apart. The baselines are not: 12 px from row 2 to row 3, and
+14 px from row 3 to row 4. Text height is 8 px in all three rows. The cause is row 2's font,
+`helvR08_tf`, chosen because it has the U+00B7 separator. Its Latin-1 glyphs give it a taller
+maximum height than rows 3 and 4's `helvR08_tr`, and with position-top and reference-height-all
+its text sits 2 px lower in its box. After the gate this is a one-line XML change (row 2
+`y="14"`); before it, it would break pixel identity.
+
 **Does not show:** the device for the four scenarios other than `connected` (the rig draws one);
 other screens; the SSD1322 at other bus speeds; I²C displays; the cut-over
 itself (the legacy module is not removed in the harness).
