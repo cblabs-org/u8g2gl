@@ -4,6 +4,8 @@ C1 was last confirmed on the device at runtime **0.9.0** (`pr-05r2-timing/wo8-de
 f1-criterion1.serial.txt`) and on the host at 0.8.0 (`pr-05r-runtime-fixes/CRITERION-1.md`).
 `main` is 0.10.0, which changed `~u8g2gl_obj()` (observer removal). This file re-measures it.
 
+**Result: unchanged on both.** Host and device at 0.10.0 produce the legacy frame byte for byte.
+
 ## Host — measured 2026-10-22
 
 - **What was compiled.** Foundation's render harness from `git archive 499142f8` (held
@@ -34,13 +36,31 @@ f1-criterion1.serial.txt`) and on the host at 0.8.0 (`pr-05r-runtime-fixes/CRITE
 
 **Result: unchanged from 0.8.0, to the byte.** The 0.10.0 destructor change moved no pixel.
 
-## Device — PENDING
+## Device — measured 2026-10-22
 
-Image `device-measurements/rig/c1-image-a`, `main.cpp` byte-identical, repointed at this
-worktree ([evidence/c1-device-platformio.ini](evidence/c1-device-platformio.ini); only the
-`device_after` env). Built through the MCP 2026-10-22: dependency graph `u8g2gl @ 0.10.0`,
-`U8g2 @ 2.36.18`; only warning the framework's `io_pin_remap.cpp` `#warning`;
-`firmware.bin` sha256 `ea3b29f87fc7690ffa37b63dd64e52ac73d62a6bb59d81bef50fd479bda92e5e`.
+- **Image:** `device-measurements/rig/c1-image-a`, `main.cpp` byte-identical, repointed at this
+  worktree ([evidence/c1-device-platformio.ini](evidence/c1-device-platformio.ini); only the
+  `device_after` env). A plain user: `SPI.begin(48, 47, 38, -1)` and `begin()`, no other U8G2
+  call before the first frame; the 2048-byte buffer hashed with mbedTLS before `sendBuffer()`.
+- **Build:** through the MCP. Dependency graph `u8g2gl @ 0.10.0`, `U8g2 @ 2.36.18`. The only
+  warning is the framework's `io_pin_remap.cpp` `#warning`. `firmware.bin` sha256
+  `ea3b29f87fc7690ffa37b63dd64e52ac73d62a6bb59d81bef50fd479bda92e5e`, re-checked immediately
+  before the flash.
+- **Hardware:** ESP32-S3 Nano (`arduino_nano_esp32`) with the SSD1322 256×64 on hardware SPI
+  (CS 10, DC 9, SCK 48, MOSI 38). The USB device had changed since the build: now
+  `/dev/cu.usbmodem2101`, chip MAC `80:65:99:a1:8e:90` (ESP32-S3 QFN56 rev v0.2). The owner
+  confirmed it is the SSD1322 rig before anything was written.
+- **Flash:** the owner's explicit permission, through the MCP's `upload_firmware`. esptool:
+  "Hash of data verified" for all five regions.
+- **Serial:** 20 s through the MCP. Log: [evidence/c1-device.serial.txt](evidence/c1-device.serial.txt).
 
-**Not flashed.** Asked 2026-10-22; owner answered **"Not now"**. Until it is, C1's device half
-stands at **0.9.0**, one minor behind `main`.
+| | Runtime | Lit | sha256 |
+|---|---|---:|---|
+| **Device** (four of four repeats) | 0.10.0 | **1405** | `b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d` |
+| Host, `connected` (above) | 0.10.0 | 1405 | `b9042618dac87853d16f56f103b19352b3683428b15a9699b303583878d0f62d` |
+
+The device also prints the four row strings it published, and they are the `connected`
+scenario's exactly.
+
+**Result: device = host, byte for byte, at runtime 0.10.0, for a plain U8G2GL user.** The 0.9.0
+device result (`pr-05r2-timing/wo8-device`) is superseded.

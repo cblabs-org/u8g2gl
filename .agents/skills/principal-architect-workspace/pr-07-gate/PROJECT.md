@@ -40,7 +40,7 @@ was not here can evaluate, and makes a recommendation. **The GO/NO-GO verdict is
 The PA executes all four: each is measurement or writing only, and the flashes need the owner live.
 
 - **[x] WO0 — setup.** Worktree, this file, owner approval recorded. Push.
-- **[~] WO1 — C1 at runtime 0.10.0.** Host: foundation's render harness from a `git archive` of
+- **[x] WO1 — C1 at runtime 0.10.0.** Host: foundation's render harness from a `git archive` of
   `499142f8`, built against this worktree's runtime; all five scenarios and the state probe.
   Expect `lit=1405`, sha256 `b9042618…f62d` for `connected`. Device: `device-measurements/rig/
   c1-image-a` rebuilt against 0.10.0 through the MCP; **flash only on the owner's word**. If
@@ -83,3 +83,10 @@ system-information sources).
   truncation decision in C++; the format strings' double space and U+00B7 classed as content.
 - **2026-10-22 — WO4 done.** `RECOMMENDATION.md`: GO, with four conditions on post-gate work;
   counter-case stated. Docs-only PR on `u8g2gl`, to be merged with a merge commit.
+- **2026-10-22 — WO1 device done.** Owner, verbatim: "Yes, flash the C1 image (ea3b29f8…2e5e) to
+  the ESP32-S3 Nano now, capture serial, and update C1-REVERIFY.md and the dossier on the PR."
+  The board on USB had changed (now `/dev/cu.usbmodem2101`, MAC `80:65:99:a1:8e:90`; yesterday
+  `/dev/cu.usbmodem101`, `3C:0F:02:DE:72:24`); the owner confirmed it is the SSD1322 rig before
+  the flash. Flashed through the MCP, esptool hash verified; serial `runtime=0.10.0 lit=1405
+  sha256=b9042618…f62d`, four of four repeats. **Device = host at 0.10.0.** C1 is met without
+  qualification; the dossier and recommendation are updated (condition 1 satisfied).

@@ -15,13 +15,14 @@ CLI **0.13.1**, schema **0.4**. Foundation's held integration branch
 
 | # | Criterion (§6, current text) | Result | Measured at |
 |---|---|---|---|
-| 1 | Pixel-identical to the legacy board, by automated diff | **Met-with-qualification** — host at 0.10.0; device still at 0.9.0 | host `c30cd2d`; device `pr-05r2` 0.9.0 |
+| 1 | Pixel-identical to the legacy board, by automated diff | **Met** — host and device, byte for byte, at 0.10.0 | `c30cd2d`, host and ESP32-S3 + SSD1322 |
 | 2 | Wholly declarative; the framework does not inflate authored code | **Met-with-qualification** — declarative half met; "does not inflate" rests on one board and an uncompiled estimate | foundation `499142f8` |
 | 3 | Flash and RAM comfortable on `esp32dev` alongside WiFi and TLS | **Met-with-qualification** — link-time only; no run-time heap measurement | `c30cd2d` + `499142f8` |
 | 4 | The loop is not slower for any reason the framework controls | **Met-with-qualification** — met only if the build tool's per-library scan is not something U8G2GL "controls"; §6 leaves that word to the owner | `c30cd2d` + `499142f8` / `7396e43d` |
 
-**No criterion is met without qualification, and none is not met.** Every qualification is
-stated in full below, and criterion 4's is the strongest case against a pass.
+**Criterion 1 is met outright. The other three are met-with-qualification, and none is not met.**
+Every qualification is stated in full below, and criterion 4's is the strongest case against a
+pass.
 
 ### Three limitations that bound every result above
 
@@ -57,21 +58,23 @@ stated in full below, and criterion 4's is the strongest case against a pass.
   — draws the same frame: 0 differing.
 - Truncation probe: 181 of 181 lengths identical, 41 of 41 truncated identical.
 
-**Measurement (device).** ESP32-S3 Nano + SSD1322, a plain-user sketch hashing the frame buffer:
-`runtime=0.9.0 lit=1405 sha256=b9042618…f62d`, identical to the host
-(`pr-05r2-timing/wo8-device/logs/f1-criterion1.serial.txt`). The same image built against 0.10.0
-on 2026-10-22 (`firmware.bin` `ea3b29f8…2e5e`) **was not flashed: the owner answered "Not now".**
+**Measurement (device, 2026-10-22, runtime 0.10.0).** ESP32-S3 Nano + SSD1322, a plain-user
+sketch hashing the frame buffer before it is sent (`firmware.bin` `ea3b29f8…2e5e`, flashed with
+the owner's permission, esptool hash verified): `runtime=0.10.0 lit=1405 sha256=b9042618…f62d`
+on four of four repeats, **identical to the host** ([C1-REVERIFY.md](C1-REVERIFY.md),
+`evidence/c1-device.serial.txt`). The previous device result was at 0.9.0.
 
 **History.** PR-05 passed with 0 pixels, but with the legacy module setting `setFontPosTop()`;
 without it, 1,407 pixels differed, and a further 274 on reference height. PR-05R fixed both in the
 runtime; on `main` at the time a plain user crashed on the first frame on the device. Since 0.8.0
 the result has been about U8G2GL alone (`pr-05r-runtime-fixes/CRITERION-1.md`).
 
-**Result: met-with-qualification.** The qualification is narrow: the device half is one runtime
-minor behind `main` (0.9.0 against 0.10.0). 0.10.0 moved no pixel on the host, against real U8G2,
-for any scenario. Flashing the built image removes the qualification.
+**Result: met.** Pixel-identical by automated diff on the host for all five scenarios, and byte
+for byte on the device for `connected`, at the runtime on `main`, for a user who has done nothing
+but `begin()`.
 
-**Does not show:** other screens; the SSD1322 at other bus speeds; I²C displays; the cut-over
+**Does not show:** the device for the four scenarios other than `connected` (the rig draws one);
+other screens; the SSD1322 at other bus speeds; I²C displays; the cut-over
 itself (the legacy module is not removed in the harness).
 
 ---
@@ -285,7 +288,7 @@ criterion it does not belong to.
 
 | Criterion | Document | Taken at |
 |---|---|---|
-| 1 | `pr-07-gate/C1-REVERIFY.md` (this PR); `pr-05r-runtime-fixes/CRITERION-1.md`; `pr-05r2-timing/wo8-device/logs/f1-criterion1.serial.txt` | 0.10.0 host; 0.8.0; 0.9.0 device |
+| 1 | `pr-07-gate/C1-REVERIFY.md` (this PR); `pr-05r-runtime-fixes/CRITERION-1.md`; `pr-05r2-timing/wo8-device/logs/f1-criterion1.serial.txt` | 0.10.0 host and device; 0.8.0; 0.9.0 device |
 | 2 | `pr-05-integration/C2-ANALYSIS.md`; PA re-read in this document | foundation `499142f8` |
 | 3 | `pr-07-gate/C3-C4-REMEASURE.md` (this PR); `device-measurements/EVIDENCE.md` §M5 | 0.10.0; 0.8.0 |
 | 4 | `pr-07-gate/C3-C4-REMEASURE.md` (this PR); `device-measurements/EVIDENCE.md` §M5; foundation `pr-u8g2gl-05/evidence/EVIDENCE.md` (on `499142f8`) | 0.10.0; 0.8.0; 0.7.0 |

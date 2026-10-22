@@ -5,17 +5,17 @@ can disagree with it point by point. **The verdict is the owner's; §6 binds it,
 
 ## For the owner
 
-**The evidence supports continuing. The PA recommends GO, with four conditions attached to what
+**The evidence supports continuing. The PA recommends GO, with three conditions attached to what
 comes after the gate, not to its criteria.**
-- The new runtime draws the migrated board pixel-identically, as a plain user, on the host at
-  0.10.0 and on the device at 0.9.0.
+- The new runtime draws the migrated board pixel-identically, as a plain user, on the host and on
+  the device at 0.10.0.
 - It costs at most 0.6 points of flash and no static RAM.
 - It removes every layout decision from the board's C++ without growing it.
 - Its own work in the edit loop (0.05 s of generation, a compile 0.71 s faster) is not where the
   loop's +4.9 s comes from.
 
-**The strongest argument against is that this gate certifies very little.** Every criterion passes
-only with a qualification. Both criteria that failed on measurement passed after being reworded.
+**The strongest argument against is that this gate certifies very little.** Only criterion 1
+passes without a qualification. Both criteria that failed on measurement passed after being reworded.
 All four were measured on four static labels, on one board, with no animation, conditional
 visibility, collections, input or second screen. And the thing U8G2GL exists for — a visual
 designer over the XML — is deliberately untested until E-2. A GO here says "the foundation is not
@@ -31,7 +31,7 @@ The PA weighs that, below, and still recommends GO.
 
 | # | Dossier result | PA's reading | Weight |
 |---|---|---|---|
-| 1 | Met-with-qualification | Strong. The qualification is one flash away from gone | Supports GO |
+| 1 | Met | Strongest result the gate has: host and device, byte for byte, at 0.10.0 | Supports GO |
 | 2 | Met-with-qualification | The declarative half is the real claim and passes strictly. The inflation half is neutral, which is the right answer for a free abstraction, on thin evidence | Supports GO, weakly |
 | 3 | Met-with-qualification | Strong on what was measured. The missing run-time heap figure is a gap, not a doubt | Supports GO |
 | 4 | Met-with-qualification | Met on the text as a whole, but the +5 s is real and has an owner | Supports GO only with condition 2 |
@@ -93,14 +93,13 @@ measurements, and §6's whole value is that the criteria were fixed before the m
 
 ---
 
-## The four conditions
+## The conditions
 
 These attach to the work after a GO. None changes a criterion.
 
-1. **Before the verdict is recorded: flash the C1 image.** It is already built at 0.10.0
-   (`firmware.bin` `ea3b29f8…2e5e`) and takes minutes. It removes criterion 1's only
-   qualification. The owner answered "Not now" on 2026-10-22. That is the owner's call, and it is
-   the only open measurement.
+1. ~~**Before the verdict is recorded: flash the C1 image.**~~ **Satisfied 2026-10-22:** flashed
+   with the owner's permission. Device = host at 0.10.0, and criterion 1 is met outright. No
+   measurement remains open.
 2. **The cut-over must either remove the +5 s or record its acceptance as an owner decision.** It
    can be removed by U8G2GL needing fewer libraries, or by foundation adopting explicit `lib_deps`
    with `lib_ldf_mode = off` (measured at 0.8.0: 14 s faster than legacy, about 45 lines of
