@@ -39,25 +39,25 @@ was not here can evaluate, and makes a recommendation. **The GO/NO-GO verdict is
 
 The PA executes all four: each is measurement or writing only, and the flashes need the owner live.
 
-- **[ ] WO0 — setup.** Worktree, this file, owner approval recorded. Push.
-- **[ ] WO1 — C1 at runtime 0.10.0.** Host: foundation's render harness from a `git archive` of
+- **[x] WO0 — setup.** Worktree, this file, owner approval recorded. Push.
+- **[~] WO1 — C1 at runtime 0.10.0.** Host: foundation's render harness from a `git archive` of
   `499142f8`, built against this worktree's runtime; all five scenarios and the state probe.
   Expect `lit=1405`, sha256 `b9042618…f62d` for `connected`. Device: `device-measurements/rig/
   c1-image-a` rebuilt against 0.10.0 through the MCP; **flash only on the owner's word**. If
   either has moved, that is the finding — reported, not reconciled. Push.
-- **[ ] WO2 — C3 and C4 at runtime 0.10.0 / CLI 0.13.1.** Build only, no flash.
+- **[x] WO2 — C3 and C4 at runtime 0.10.0 / CLI 0.13.1.** Build only, no flash.
   - C3: clean `esp32dev` builds of `499142f8`, 0.8.0 against 0.10.0 (library-only copy, F-LINK),
     several clean builds each, compared like for like on `esp_diagnostics` presence; delta
     attributed by `nm`.
   - C4: interleaved rounds, legacy against migrated; generator timed alone, compilation separated
     from dependency resolution in the verbose logs. Push.
-- **[ ] WO3 — the dossier** (`GATE-DOSSIER.md`). Per criterion: measurement, method, commit, and
+- **[x] WO3 — the dossier** (`GATE-DOSSIER.md`). Per criterion: measurement, method, commit, and
   **met / not met / met-with-qualification**. Includes the PA's re-read of the migrated board at
   `499142f8` for any surviving positioning, typography or truncation decision. The three
   limitations stand where the verdict is read: C2 rests on DiagnosticsBoard alone (G-BOARDS
   dropped 2026-10-21); one screen, four static labels; [Q-19]. Probe results in a section labelled
   context, not criterion evidence. Push.
-- **[ ] WO4 — the recommendation.** Reasoning, the strongest counter-case, and the owner's
+- **[x] WO4 — the recommendation.** Reasoning, the strongest counter-case, and the owner's
   paragraph. Docs-only PR on `u8g2gl`, merged with a merge commit (`rules/04`).
 
 **Not in scope:** the cut-over (F-LINK, F-GLOB, F-REGEN, F-PLATFORM, the repin to a tag, NTP and
@@ -68,3 +68,18 @@ system-information sources).
 - **2026-10-22 — Decomposition approved by the owner, verbatim:** "Approved, proceed with the
   PR-07 decomposition as last proposed: WO0 setup, WO1 C1 host + device (ask before each flash),
   WO2 C3 and C4 at 0.10.0 / CLI 0.13.1, WO3 dossier, WO4 recommendation, docs PR on u8g2gl."
+- **2026-10-22 — WO0 done** (`7471e19`). Worktree `../U8G2GL-07` from `c30cd2d`.
+- **2026-10-22 — WO1, host done; device held** (`37954af`). Host at 0.10.0: five scenarios 0
+  differing, hashes equal the committed baseline, plain user 0. Device image built at 0.10.0
+  (`ea3b29f8…2e5e`); asked before flashing, **owner, verbatim: "Not now".** Device half stands at
+  0.9.0. `[~]` until it is flashed.
+- **2026-10-22 — WO2 done** (`f4f1266`). C3: 0.8.0 → 0.10.0 RAM +40 B, flash +472..488 B,
+  attributed by symbol; 85.6%, 227 233 B free; regeneration by CLI 0.13.1 changes no byte.
+  C4: edit loop +4.90 s; generator 0.04–0.06 s; edit compile 0.71 s faster; fixed overhead
+  +5.48 s. The second build of each tree recompiled everything with no input change and was
+  discarded as a warm-up; S2 not repeated at 0.10.0.
+- **2026-10-22 — WO3 done** (`a28cbec`). `GATE-DOSSIER.md`: all four criteria
+  met-with-qualification. PA re-read of the migrated board finds no positioning, typography or
+  truncation decision in C++; the format strings' double space and U+00B7 classed as content.
+- **2026-10-22 — WO4 done.** `RECOMMENDATION.md`: GO, with four conditions on post-gate work;
+  counter-case stated. Docs-only PR on `u8g2gl`, to be merged with a merge commit.
