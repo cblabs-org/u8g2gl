@@ -1,0 +1,35 @@
+# Symbol size delta, foundation 499142f8 esp32dev: runtime 0.8.0 (99ac4a3) -> 0.10.0 (c30cd2d)
+# nm -S -C --defined-only firmware.elf; type t=text, v=weak object, d=data, b=bss
+# net by type: {'t': 487, 'v': 40, 'b': 25, 'd': 16}
+   +91	t	u8g2gl_label::tick(unsigned long)
+   +62	t	u8g2gl_remove_binding_observer(u8g2gl_binding_desc*)
+   +52	t	u8g2gl_obj::~u8g2gl_obj()
+   +47	t	u8g2gl_remove_observer_internal(u8g2gl_observer*, unsigned char, void*, void (*)(void*))
+   +36	v	vtable for u8g2gl_obj
+   +34	t	u8g2gl_obj::set_coords(short, short, short, short)
+   +28	t	u8g2gl_resume_notify()
+   +22	t	u8g2gl_subject_bool_base::remove_observer(void*, void (*)(void*))
+   +22	t	u8g2gl_subject_string_base::remove_observer(void*, void (*)(void*))
+   +22	t	u8g2gl_subject_int_base::remove_observer(void*, void (*)(void*))
+   +22	t	u8g2gl_subject_time_base::remove_observer(void*, void (*)(void*))
+   +18	t	u8g2gl_label::on_size_changed()
+   +16	b	s_binding_pool
+   +13	t	u8g2gl_obj::bind_text(u8g2gl_subject_string_base*)
+   +11	t	u8g2gl_set_active_screen(u8g2gl_screen*)
+   +10	t	u8g2gl_mark_dirty()
+   +10	t	u8g2gl_obj::on_text_binding_changed()
+    +7	t	u8g2gl_obj::tick(unsigned long)
+    -5	t	u8g2gl_label::invalidate_text()
+    +5	t	u8g2gl_obj::render(U8G2&)
+    +5	t	u8g2gl_obj::on_size_changed()
+    +5	t	u8g2gl_obj::render_animation_update(U8G2&, unsigned long)
+    +4	t	std::_Function_handler<int (PsychicRequest*, PsychicResponse*), WebServerManager::begin(std::vector<IWebContributor*, std::allocator<IWebContributor*> > const&, AuthManager*, WifiManager*)::{lambda(PsychicRequest*, PsychicResponse*)#15}>::_M_invoke(std::_Any_data const&, PsychicRequest*&&, PsychicResponse*&&)
+    +4	d	ui_obj_heap
+    +4	d	ui_obj_wifi
+    +4	b	s_resume_cb
+    +4	b	s_resume_user_data
+    +4	d	ui_obj_uptime
+    +4	v	vtable for u8g2gl_label
+    +4	d	ui_obj_hostname
+    +2	t	u8g2gl_label::reset_scroll()
+    +1	b	s_in_handler
