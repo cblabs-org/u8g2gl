@@ -4,13 +4,13 @@
 **Hardware Profile:** 256×64 monochrome OLED (`SSD1322`, 4-wire SPI)  
 **Schema Version:** Schema 0.4 (`docs/design_spec.md`)  
 **Execution Context:** PR-07 Gate Deliverable (G-PROBE Work Order 2)  
-**Evidence Artifacts:** [`evidence/`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/)  
+**Evidence Artifacts:** [`evidence/`](evidence/)  
 
 ---
 
 ## Executive Overview
 
-This report evaluates whether U8G2GL Schema 0.4 can express a production embedded departures display: the 173-line `layoutSWR.json` from `departures-board-v3`. The probe was executed under strict methodology: authoring declarative XML up to the schema boundary, documenting every expressiveness gap against the design specification, rendering the output through the WebAssembly display harness (`wasm/u8g2gl_editor.mjs`), and measuring line counts against the line attribution methodology established in [`C2-ANALYSIS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md).
+This report evaluates whether U8G2GL Schema 0.4 can express a production embedded departures display: the 173-line `layoutSWR.json` from `departures-board-v3`. The probe was executed under strict methodology: authoring declarative XML up to the schema boundary, documenting every expressiveness gap against the design specification, rendering the output through the WebAssembly display harness (`wasm/u8g2gl_editor.mjs`), and measuring line counts against the line attribution methodology established in [`C2-ANALYSIS.md`](../pr-05-integration/C2-ANALYSIS.md).
 
 The evaluation is structured into three formal parts followed by an actionable gate summary:
 1. **Part 1 — What Rendered:** The subset of widgets and primitives expressible in Schema 0.4, verification hashes, and rendered frame geometry.
@@ -40,7 +40,7 @@ The evaluation is structured into three formal parts followed by an actionable g
 
 ### 1.2 Rendering Output & Framebuffer Verification
 
-Both the static baseline layout ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)) and the fully unrolled workaround layout ([`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml)) were executed through the Wasm harness at `t = 0 ms` against a virtual SSD1322 256×64 display buffer (`u8g2_ll_hvline_vertical_top_lsb`, 8 tile rows × 256 columns = 2,048 bytes).
+Both the static baseline layout ([`departures_static.xml`](evidence/departures_static.xml)) and the fully unrolled workaround layout ([`departures_workaround.xml`](evidence/departures_workaround.xml)) were executed through the Wasm harness at `t = 0 ms` against a virtual SSD1322 256×64 display buffer (`u8g2_ll_hvline_vertical_top_lsb`, 8 tile rows × 256 columns = 2,048 bytes).
 
 ```
 ================================================================================
@@ -74,11 +74,11 @@ Does `departures-board-v3` produce an exact reference rendering of `layoutSWR.js
 - v1 formats `services` as an untyped 2D array of strings (`[["1st", "19:55", "London Paddington", "9", "On time"], ...]`), whereas v3 expects structured service objects (`services.main[]`).
 - v1 formats carriage formation as `header.firstServiceFormation[]` with properties `classType`, `hasWheelchair`, `hasBike`, and `loading`, whereas v3 structures formation data nested within `services.main[0].formation.carriages[]`.
 
-Because `layoutSWR.json` was authored for the v3 data model, running v3's legacy firmware directly against the v1 mock file produces a runtime data-binding mismatch rather than a valid visual frame. The Wasm bridge execution in WO1 therefore ingested the raw v1 data via an explicit field mapping adapter ([`render.mjs:45–65`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/render.mjs#L45-L65)). We report the resulting 2,196 lit pixels and SHA-256 hash honestly as the empirical measurement of this layout under U8G2GL, rather than inventing an unverified legacy reference.
+Because `layoutSWR.json` was authored for the v3 data model, running v3's legacy firmware directly against the v1 mock file produces a runtime data-binding mismatch rather than a valid visual frame. The Wasm bridge execution in WO1 therefore ingested the raw v1 data via an explicit field mapping adapter ([`render.mjs:45–65`](evidence/render.mjs#L45-L65)). We report the resulting 2,196 lit pixels and SHA-256 hash honestly as the empirical measurement of this layout under U8G2GL, rather than inventing an unverified legacy reference.
 
 ### 1.4 Baseline Rendered XML
 
-The following complete XML document represents the maximum screen surface expressible in Schema 0.4 without unrolling workarounds ([`departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)):
+The following complete XML document represents the maximum screen surface expressible in Schema 0.4 without unrolling workarounds ([`departures_static.xml`](evidence/departures_static.xml)):
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -125,7 +125,7 @@ The following complete XML document represents the maximum screen surface expres
 > **Framing under review.** §9.2 already specifies `wd_service_list` as a custom widget with a declared-capacity API (`begin()` / `add_row()` / `commit()`), placed there by [D-8]. All three gaps below may be custom-widget problems, not schema problems. The [Q-8]/[Q-15] scoping in this section should not be acted on until the custom-widget path has been tried.
 
 > [!NOTE]
-> **Tone & Calibration:** A gap is not a verdict. The framework has not failed; it has adhered strictly to its design charter. Under [`docs/design_spec.md §1.5`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L80-L95) (*"Lite by design — the deferral rule"*), omission is the default, and features earn inclusion by demonstrated need. Repeaters ([Q-8]) and cards ([Q-15]) were explicitly deferred to Phase 2 and Phase 3. The fact that a full departures board encounters these exact deferred capabilities confirms the roadmap's precision.
+> **Tone & Calibration:** A gap is not a verdict. The framework has not failed; it has adhered strictly to its design charter. Under [`docs/design_spec.md §1.5`](../../../../docs/design_spec.md#L80-L95) (*"Lite by design — the deferral rule"*), omission is the default, and features earn inclusion by demonstrated need. Repeaters ([Q-8]) and cards ([Q-15]) were explicitly deferred to Phase 2 and Phase 3. The fact that a full departures board encounters these exact deferred capabilities confirms the roadmap's precision.
 
 ### Gap 1: Repeaters ([Q-8]) — Service Lists and Carriage Formation
 
@@ -165,10 +165,10 @@ The following complete XML document represents the maximum screen surface expres
 ```
 
 #### 2. Why the schema cannot say it
-Under [`design_spec.md §6.5`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L785-L796), a `<view>` is strictly a *static structure* resolved at compile time:
+Under [`design_spec.md §6.5`](../../../../docs/design_spec.md#L785-L796), a `<view>` is strictly a *static structure* resolved at compile time:
 > *"A `<view>` is a static structure: the generator resolves it at build time, so it can express 'three carriages' but not 'N carriages'. Reach for C++ when the structure itself depends on runtime data — a variable row count, a mode machine, content-dependent sizing..."*
 
-Furthermore, per [D-8] and [`design_spec.md §9`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L1039-L1092), collections are not subjects. Schema 0.4 provides no syntax to iterate over an array in XML, no row slicing concepts (`skipRows`, `maxRows`), and no declarative flexbox/grid layout to align multi-column table cells.
+Furthermore, per [D-8] and [`design_spec.md §9`](../../../../docs/design_spec.md#L1039-L1092), collections are not subjects. Schema 0.4 provides no syntax to iterate over an array in XML, no row slicing concepts (`skipRows`, `maxRows`), and no declarative flexbox/grid layout to align multi-column table cells.
 
 #### 3. Open Question Mapping
 - **Primary:** `[Q-8]` (*Repeaters*, `design_spec.md §21`). *"A composite instantiated N times against a declared-capacity collection (§9) would let list rows and similar repeating structures be designed rather than hand-written in C++ — it is the difference between the designer reaching `wd_service_list`-shaped problems and not."*
@@ -183,7 +183,7 @@ Under the §1.5 deferral rule, generator complexity is cheap but schema surface 
 This expands the schema grammar significantly and introduces scoped variable resolution into an engine that currently only resolves global subjects. Deferring this to Phase 2 was the correct architectural choice.
 
 #### 5. Workaround Evaluation
-In [`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L60-L69), the first departure row was unrolled into three distinct `<u8g2gl_label>` elements:
+In [`departures_workaround.xml`](evidence/departures_workaround.xml#L60-L69), the first departure row was unrolled into three distinct `<u8g2gl_label>` elements:
 
 ```xml
 <!-- Workaround: row0Widget (Service 1 Columns Hand-Expanded) -->
@@ -195,7 +195,7 @@ In [`departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2G
               style="row0_font_right" text="On time" bind_text="row0_status" />
 ```
 
-For subsequent services (`servicesWidget`), Services 2, 3, and 4 were unrolled into 12 separate labels (4 per row), manually positioning Service 2 at `y=54` and setting `hidden="true"` on Services 3 and 4 ([`departures_workaround.xml:130–161`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L130-L161)).
+For subsequent services (`servicesWidget`), Services 2, 3, and 4 were unrolled into 12 separate labels (4 per row), manually positioning Service 2 at `y=54` and setting `hidden="true"` on Services 3 and 4 ([`departures_workaround.xml:130–161`](evidence/departures_workaround.xml#L130-L161)).
 
 **Honest Assessment:** No human engineer would write or maintain this in production. It couples the XML to fixed row counts, requires individual subject publications for every single cell (`row1_time`, `row2_time`, `row3_time`), and forces the host controller to manage visibility flags manually. In a visual designer, having to position 15 discrete labels to simulate a 3-row table defeats the primary purpose of direct manipulation.
 
@@ -234,7 +234,7 @@ Under §1.5, policy belongs in C++ (`modules/U8G2GLDisplay`), but the schema req
 This is a clean, minimal addition (1 element, 1 attribute) that preserves the declarative boundary without embedding timers or carousel logic in the XML schema.
 
 #### 5. Workaround Evaluation
-The probe expressed this via a single scrolling label bound to a sanitized string subject ([`departures_workaround.xml:70–77`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L70-L77)):
+The probe expressed this via a single scrolling label bound to a sanitized string subject ([`departures_workaround.xml:70–77`](evidence/departures_workaround.xml#L70-L77)):
 
 ```xml
 <!-- Workaround: msgWidget (Single Circular Scrolling Label) -->
@@ -251,7 +251,7 @@ The probe expressed this via a single scrolling label bound to a sanitized strin
 ### Gap 3: Per-Carriage Indicators & Heterogeneous Sub-assemblies
 
 #### 1. What the layout needs
-`formationWidget` renders a dynamic 12-carriage train formation diagram ([`layoutSWR.json:130–139`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/layoutSWR.json#L130-L139)) driven by structured data ([`nationalRailBoard.json:7–20`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/nationalRailBoard.json#L7-L20)):
+`formationWidget` renders a dynamic 12-carriage train formation diagram ([`layoutSWR.json:130–139`](evidence/source/layoutSWR.json#L130-L139)) driven by structured data ([`nationalRailBoard.json:7–20`](evidence/source/nationalRailBoard.json#L7-L20)):
 
 ```json
 { "number": 1, "classType": "standard", "hasWheelchair": true, "hasBike": false, "loading": "30%" },
@@ -267,7 +267,7 @@ Each carriage cell in the diagram requires:
 
 #### 2. Why the schema cannot say it
 Even if basic list repetition ([Q-8]) existed, Schema 0.4 cannot express the internal contents of a carriage cell:
-- **No Dynamic Fill Gauges:** Schema 0.4 has no bar or progress gauge primitive. As noted in [`design_spec.md §3 [D-6]`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L202-L211), progress rendering on monochrome displays requires stipple pixel arithmetic that belongs in a C++ widget class.
+- **No Dynamic Fill Gauges:** Schema 0.4 has no bar or progress gauge primitive. As noted in [`design_spec.md §3 [D-6]`](../../../../docs/design_spec.md#L202-L211), progress rendering on monochrome displays requires stipple pixel arithmetic that belongs in a C++ widget class.
 - **No Conditional Styling:** Schema 0.4 styles are static compile-time assignments; an element cannot switch to an inverted style (`style_invert="true"`) dynamically based on a boolean data property like `classType == "first"`.
 - **No Icon Glyph Binding:** `[Q-12]` (*`bind_src` / `bind_glyph`*) was deferred; icons cannot currently be bound to boolean subject states without individual visibility toggles on discrete bitmap elements.
 
@@ -281,13 +281,13 @@ Attempting to make Schema 0.4 express train formations declaratively would requi
 - Conditional attribute syntax (`style_if="is_first_class"`).
 - Per-cell sub-element layout templates.
 
-Under §1.5, this would dramatically inflate the schema surface for a highly domain-specific use case. [`design_spec.md §6.5`](file:///Users/mcneillm/Documents/Projects/U8G2GL/docs/design_spec.md#L785-L796) gives the exact architectural rule:
+Under §1.5, this would dramatically inflate the schema surface for a highly domain-specific use case. [`design_spec.md §6.5`](../../../../docs/design_spec.md#L785-L796) gives the exact architectural rule:
 > *"Reach for C++ when the structure itself depends on runtime data — a variable row count, a mode machine, content-dependent sizing — or when the drawing is pixel arithmetic rather than composition."*
 
 A train formation diagram is fundamentally a **custom C++ widget** (`extends u8g2gl_obj`) declaring an `<api>` manifest. The nose cone and static carriage cell boundary could be designed, but the repetition and cell drawing belong in C++.
 
 #### 5. Workaround Evaluation
-The probe hand-expanded 12 static carriage boxes and 12 text labels across the available 224-pixel width ([`departures_workaround.xml:81–128`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml#L81-L128)):
+The probe hand-expanded 12 static carriage boxes and 12 text labels across the available 224-pixel width ([`departures_workaround.xml:81–128`](evidence/departures_workaround.xml#L81-L128)):
 
 ```xml
 <!-- Workaround for formationWidget: Hand-expanded 12 carriage boxes -->
@@ -306,7 +306,7 @@ The probe hand-expanded 12 static carriage boxes and 12 text labels across the a
 
 ### 3.1 Line Attribution Methodology
 
-Line counting follows the rigorous methodology established in [`C2-ANALYSIS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md):
+Line counting follows the rigorous methodology established in [`C2-ANALYSIS.md`](../pr-05-integration/C2-ANALYSIS.md):
 1. **Kind Classification:** Lines are classified by kind into `Total`, `Blank`, `Comment`, and `Code`. A line containing code and a trailing comment is counted as `Code`. An empty line inside a comment block is counted as `Blank`.
 2. **Concern Separation:** Lines are attributed to two distinct concerns:
    - **Layout Concern (L):** Positioning, coordinates, dimensions, fonts, alignments, styles, and widget declarations.
@@ -315,9 +315,9 @@ Line counting follows the rigorous methodology established in [`C2-ANALYSIS.md`]
 ### 3.2 Quantitative Line Counts
 
 The physical files measured in this probe:
-- **`layoutSWR.json`:** Original legacy layout from `departures-board-v3` ([`evidence/source/layoutSWR.json`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/source/layoutSWR.json)).
-- **`departures_static.xml`:** Statically expressible Schema 0.4 baseline ([`evidence/departures_static.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml)).
-- **`departures_workaround.xml`:** Full hand-unrolled workaround layout ([`evidence/departures_workaround.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml)).
+- **`layoutSWR.json`:** Original legacy layout from `departures-board-v3` ([`evidence/source/layoutSWR.json`](evidence/source/layoutSWR.json)).
+- **`departures_static.xml`:** Statically expressible Schema 0.4 baseline ([`evidence/departures_static.xml`](evidence/departures_static.xml)).
+- **`departures_workaround.xml`:** Full hand-unrolled workaround layout ([`evidence/departures_workaround.xml`](evidence/departures_workaround.xml)).
 
 | Metric | Legacy `layoutSWR.json` | Static XML (`departures_static`) | Workaround XML (`departures_workaround`) | *Projected XML (with [Q-8])* |
 |---|---:|---:|---:|---:|

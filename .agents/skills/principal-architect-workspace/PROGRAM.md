@@ -1966,3 +1966,102 @@ to the same pattern. The Chief Architect pushed them on 2026-10-21.
 
 **Pushing belongs at the end of each work order, not the end of the project.**
 That now goes in every bridge.
+
+---
+
+## 2026-10-22 — the PR-07 gate: **GO**
+
+The owner, in full: *"Go"*. Recorded verbatim in `implementation_plan.md` §6
+with its conditions, its qualifications and the limitations it was given
+despite. Criterion 1 met outright; 2, 3 and 4 met-with-qualification; none not
+met. Dossier and recommendation in `pr-07-gate/`, PR #16.
+
+### What the GO rests on, and the thing most likely to be misquoted later
+
+**The decisive evidence was not a criterion.** The owner's words:
+
+> For me the side-project where the probe built the widgets and proved out a
+> departures board is good enough. We should make sure that we keep that
+> evidence. I think we could split hairs all the way, but we have something
+> that works now.
+
+That weighting is right, and the reason is worth stating because it is not
+obvious: **G-PROBE-2 carries more weight than the criteria precisely because it
+was not designed to pass.** It was commissioned able to fail, and G-PROBE-1 did
+fail. Two of the four criteria, by contrast, were reworded and then passed —
+which `GATE-DOSSIER.md` and `RECOMMENDATION.md` both state as their own
+counter-case rather than bury. Evidence should be read by how it was produced,
+not by what it was labelled.
+
+**What works is the firmware half.** No editor, no serializer, and E-2's 16 ms
+is a target. **The GO means "the foundation holds; now build the thing it was
+for" — not "it is built."** In six months "PR-07 passed" will be read more
+broadly than that, which is why §6 says it explicitly. **CA-2** predicted this
+gap on 2026-10-05: every criterion is firmware-side, so a GO says nothing about
+the programme's stated purpose. The owner took that trade knowingly and has now
+acted on it.
+
+### The three conditions
+
+1. The cut-over removes the ~+5 s edit-loop cost or records the owner's
+   acceptance of it.
+2. **[Q-19] resolved before any collection widget ships in foundation.** The
+   one to hold firmly: 2,304 bytes per instance whatever `max_rows` declares,
+   invisible to §18, which is a silent cost inside the subsystem whose whole
+   job is honest reporting (§1.3). The others are measurement hygiene.
+3. PR-10 reports criterion 2 **per board, with a stop tripwire on the second** —
+   where G-BOARDS' dropped measurement returns and a false "neutral" is caught.
+
+### Evidence durability — the owner's explicit instruction
+
+> We should make sure that we keep that evidence.
+
+Done, in the sense that matters:
+
+- Both probe workspaces are on `main` (merged `dc3ace8`, `de08e29`) — 41 files
+  under `g-probe2-widgets/`, 19 under `g-probe-departures/`, including the
+  widget sources and every rendered frame.
+- **41 `file:///` links rewritten to repository-relative paths**, then a further
+  13 repointed where they named pre-merge locations — `tmp/g-probe/` (the
+  gitignored original) and a repo-root `EXPRESSIVENESS.md` that never reached
+  `main`. All 54 local links now resolve, verified by script. A report whose
+  citations 404 is evidence nobody can follow.
+- **§6.5 now names both widgets as worked examples**, with [Q-19]'s caveat
+  attached to `wd_service_list` so nobody reads it as §9.2's model. Findable
+  beats merely present: a widget author looking for "how do I write one" lands
+  on them instead of rediscovering the four undocumented items.
+
+### How PR-07 went, and why it matters to how the next one is briefed
+
+This PA corrected **both** of the gate's criteria texts, and then corrected the
+Chief Architect's correction. In one scoping pass it found: §6's criterion 4 was
+eight days behind a ruling already made; the fix for it conflated two
+measurements from different time bases, which the source file itself disclaims
+("not comparable in absolute terms"); that same note asserted the board
+satisfied the criterion, deciding the verdict inside the document that binds it;
+and §6 recorded an owner approval without quoting it, alone among every ruling
+in the programme.
+
+All four were in normative text and all four were the Chief Architect's. The
+method that found them was the same each time: **read the normative document,
+not the summary of it.** Tier 1 had been amending the spec from its own earlier
+messages — the programme's rule *verify a PA's claim when it becomes spec
+wording* applies with equal force to Tier 1's own.
+
+It also declined to settle "controls" in its own favour, argued it both ways,
+and named it as the strongest case against a pass. That is what a recommendation
+is supposed to look like.
+
+### Carried forward
+
+- `U8G2GLScreenBoard::render()` still carries a null-font guard and a font-mode
+  restore — work-arounds for runtime bugs fixed since 0.8.0. The cut-over drops
+  them.
+- F-REGEN changes only stamps and the runtime floor: **0 bytes of code
+  difference**.
+- The rig board's USB address changed to `/dev/cu.usbmodem2101` (MAC
+  `80:65:99:a1:8e:90`), owner-confirmed as the SSD1322 rig before the flash. It
+  now carries the C1 image.
+- Rows 2–4 are unevenly spaced on the panel — 12 px then 14 px, because row 2's
+  `helvR08_tf` sits 2 px below `_tr`. **This is legacy's layout faithfully
+  reproduced**, which is criterion 1 working. A one-line XML fix after the gate.

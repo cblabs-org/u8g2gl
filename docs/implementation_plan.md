@@ -397,6 +397,34 @@ That reply is quoted because every other ruling in this programme is recorded wo
 
 **The designer's loop is deliberately not tested here.** There is no editor, so a criterion asserting it could not fail, and an unfalsifiable gate is worse than none. That is E-2's job (CA-1).
 
+## The verdict — GO, 2026-10-22
+
+The owner, in full:
+
+> Go
+
+Given on PR-07's dossier (`pr-07-gate/GATE-DOSSIER.md`, PR #16) and its recommendation. **Criterion 1 met outright; criteria 2, 3 and 4 met-with-qualification; none not met.**
+
+### Three conditions on post-gate work
+
+1. The cut-over either removes the ~+5 s edit-loop cost or records the owner's acceptance of it.
+2. **[Q-19] is resolved before any collection widget ships in foundation.** A collection widget costs 2,304 bytes per instance whatever `max_rows` declares, and §18 cannot see it. The departures probe used two. This is the condition to hold firmly: the others are measurement hygiene, this one is a silent cost inside the subsystem whose job is honest reporting (§1.3).
+3. PR-10 reports criterion 2 **per board, with a stop tripwire on the second board** — which is where G-BOARDS' dropped measurement returns, and where a false "neutral" would be caught.
+
+### What this GO rests on, and what it does not
+
+**The decisive evidence was not a criterion.** The owner's reasoning: *"the side-project where the probe built the widgets and proved out a departures board is good enough… we could split hairs all the way, but we have something that works now."* G-PROBE-2 showed a real National Rail departures screen as 15 lines of XML plus two C++ widgets, with [Q-8] and [Q-15] left deferred.
+
+That evidence carries weight **because it was not designed to pass.** It was commissioned able to fail, and the first probe did fail. A criterion that was reworded and then passed is weaker evidence than that, even where the rewording was right — and two of these four were reworded, which `GATE-DOSSIER.md` and `RECOMMENDATION.md` both state as the counter-case rather than hiding.
+
+**What works is the firmware half.** There is no editor, no serializer, and E-2's "under 16 ms from edit to pixels" is a target, not a measurement. **So this GO means "the foundation holds; now build the thing it was for" — not "it is built."** Recorded explicitly because in six months "PR-07 passed" will be read more broadly than it should be, and **CA-2** predicted this gap on 2026-10-05: every criterion here is firmware-side, so a GO says nothing about the programme's stated purpose. The owner took that trade knowingly then and has now acted on it.
+
+**The limitations it was given despite**, all stated beside the verdict rather than under it: criterion 2's non-inflation rests on **one board** (G-BOARDS dropped deliberately) and an uncompiled estimate; the migrated screen is **four static labels**, no animation and no conditional visibility; criterion 3 is **link-time only**, with no run-time heap measured alongside WiFi and TLS; and criterion 4 is met **only if "controls" excludes U8G2GL's own packaging**, which §6 leaves to the owner and the dossier argues both ways.
+
+**Two rewordings were defensible. A third would not be.** That is the Principal Architect's position and the Chief Architect's.
+
+---
+
 **On failure, stop.** PR-01 through PR-06 leave the foundation with a clean object model, a subject system, a display catalogue, a Wasm preview and a pixel-regression harness — all additive, none dependent on the XML layer, and `modules/U8G2Display` still running untouched under PD-4's strangler-fig. That is what makes stopping cheap, and a gate nobody can afford to honour is not a gate.
 
 **CA-2 resolved by the owner, 2026-10-05 — the four criteria stand and the gate stays firmware-side.** Equivalency is verified before any designer effort is spent. The Chief Architect's recommendation had been to add a fifth, editor-facing criterion; it is **declined**, and the reasoning is recorded here rather than dropped, because it names the one thing a GO will not tell us:

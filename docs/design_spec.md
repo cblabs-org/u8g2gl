@@ -826,6 +826,26 @@ no such members. An element that wants box-like drawing has two routes, and
 neither of them extends the box. Declare a drawing element of its own (`draw=`
 props, no `extends`), or extend `u8g2gl_obj` and draw from your own class.
 
+#### Worked examples, built and rendered
+
+Two custom elements exist as reference implementations, written against this
+section and rendered through the Wasm harness during G-PROBE-2 (2026-10-18).
+They are the answer to "how do I actually write one", and they are the shortest
+route to the four things a widget author currently has to discover for
+themselves — font positioning under `setFontPosTop()`, configuring columns in
+C++ while `<element>` waits on PR-08, XOR for contrast, and rebuilding the Wasm
+target.
+
+| Example | What it demonstrates |
+|---|---|
+| [`wd_service_list`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_service_list/) | §9's declared-capacity collection — the manifest, the `begin()`/`add_row()`/`commit()` API, static storage, no heap. **Read [Q-19] first:** its storage is fixed at the manifest's defaults because §9.2's *generated* capacity does not exist, so it is the reference for what an author must hand-write today rather than for what §9.2 describes |
+| [`wd_train_formation`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_train_formation/) | Pixel arithmetic that belongs in C++ — twelve carriages, per-carriage indicators, proportional fill gauges. The case this section's "reach for C++" rule exists for |
+
+The full screen they compose is
+[`WIDGET-PATH.md`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/WIDGET-PATH.md):
+15 lines of XML over 808 lines of C++, with the two widgets reusable at one line
+of XML per placement.
+
 ### 6.6 Naming
 
 Framework element tags carry the `u8g2gl_` prefix ([D-12]). User element tags

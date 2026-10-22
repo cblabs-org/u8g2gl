@@ -5,8 +5,8 @@
 **Schema Version:** Schema 0.4 (`docs/design_spec.md` §6.5, §9.2)  
 **Execution Context:** PR-07 Gate Deliverable (Programme G-PROBE-2, Work Order 4)  
 **Branch:** `u8g2gl-probe2/wo4-report`  
-**Evidence Artifacts:** [`evidence/`](file:///Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/)  
-**Predecessors:** [G-PROBE-1 EXPRESSIVENESS.md](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/g-probe-departures/EXPRESSIVENESS.md), [C2-ANALYSIS.md](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md)
+**Evidence Artifacts:** [`evidence/`](evidence/)  
+**Predecessors:** [G-PROBE-1 EXPRESSIVENESS.md](../g-probe-departures/EXPRESSIVENESS.md), [C2-ANALYSIS.md](../pr-05-integration/C2-ANALYSIS.md)
 
 ---
 
@@ -29,10 +29,10 @@ The screen XML is **15 lines long** (13 code lines). The custom widgets require 
 ### 1.1 Manifest Parsing and CLI Generation
 
 The CLI generator (`u8g2gl generate`) discovers and parses widget manifests declared under `widgets/<name>/<name>.xml`. In this probe, two manifests were evaluated:
-- [`widgets/wd_service_list/wd_service_list.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_service_list/wd_service_list.xml) (12 lines) declaring capacity props (`max_rows`, `max_cols`, `max_cell_chars`, `scroll_dwell_ms`, `scroll_duration_ms`).
-- [`widgets/wd_train_formation/wd_train_formation.xml`](file:///Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_train_formation/wd_train_formation.xml) (8 lines) declaring `max_carriages` and `font`.
+- [`widgets/wd_service_list/wd_service_list.xml`](evidence/probe-project/widgets/wd_service_list/wd_service_list.xml) (12 lines) declaring capacity props (`max_rows`, `max_cols`, `max_cell_chars`, `scroll_dwell_ms`, `scroll_duration_ms`).
+- [`widgets/wd_train_formation/wd_train_formation.xml`](evidence/probe-project/widgets/wd_train_formation/wd_train_formation.xml) (8 lines) declaring `max_carriages` and `font`.
 
-As evidenced in [`evidence/probe-project/generated/ui_screen_departures.cpp`](file:///Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated/ui_screen_departures.cpp), the generator emitted:
+As evidenced in [`evidence/probe-project/generated/ui_screen_departures.cpp`](evidence/probe-project/generated/ui_screen_departures.cpp), the generator emitted:
 1. **Header includes**: `#include "wd_service_list.hpp"` and `#include "wd_train_formation.hpp"`.
 2. **Static object instantiations**:
    ```cpp
@@ -119,7 +119,7 @@ Four critical runtime behaviours must be learned by inspection:
 
 ### 3.1 Line Attribution Methodology and Asymmetry
 
-Following the methodology established in [`C2-ANALYSIS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md), lines are classified by physical kind (`Total`, `Blank`, `Comment`, `Code`) and categorized across five mutually exclusive concerns:
+Following the methodology established in [`C2-ANALYSIS.md`](../pr-05-integration/C2-ANALYSIS.md), lines are classified by physical kind (`Total`, `Blank`, `Comment`, `Code`) and categorized across five mutually exclusive concerns:
 - **Layout (L):** Coordinates, dimensions, fonts, alignments, and element placements. **This is the sole concern XML replaces.**
 - **Draw Dispatch (D):** Render loops, primitive draw commands, pixel arithmetic.
 - **Data Fetch & Formatting (F):** Ingestion staging buffers, commit logic, subject declarations.

@@ -214,7 +214,7 @@ independently versioned artefacts), `04-branch-hygiene`.
 
 ## 7. Immediate state and what to do next
 
-**Revised 2026-10-21, after the two pre-gate probes.**
+**Revised 2026-10-22. The PR-07 gate passed.**
 
 ### Where the programme is
 
@@ -250,19 +250,25 @@ in a report can be checked rather than taken on trust. U8G2 pinned at
 never from a report** — a PA's figures are correct when written and stale by the
 time they are read.
 
-**Next: the PR-07 gate**, and nothing stands before it — G-PROBE and G-PROBE-2
-are done (evidence only, no PRs), and **G-BOARDS is an open owner question**
-rather than a commitment. All four criteria have evidence.
+**The gate passed. GO, owner, 2026-10-22** — recorded verbatim in
+`implementation_plan.md` §6 with its three conditions. Criterion 1 met outright;
+2, 3 and 4 met-with-qualification; none not met.
 
-**The two probes answered the question the gate could not.** The custom-widget
-path works end to end: a project widget's `<api>` manifest validates,
-generates, compiles under `-Werror`, composes with bound geometry, clipping, the
-state saver and a timer, and renders. A full National Rail departures screen is
-15 lines of XML plus two C++ widgets, and **neither [Q-8] repeaters nor [Q-15]
-cards is needed to ship it**. The correction worth carrying: §9.2's *generated*
-collection API and *generated* capacity do not exist, so a collection widget
-costs **2,304 bytes per instance whatever the XML declares** and §18 cannot
-report it — **[Q-19]**. So
+**Next: E-D**, the editor design — which is what the whole programme was for
+(CA-1 put the track after a GO, and the GO has come). Then E-1..E-3, and the
+cut-over of foundation's held branch carrying F-LINK, F-GLOB, F-REGEN,
+F-PLATFORM and the repin.
+
+**Read §6 before you repeat the verdict to anyone.** Three things in it are
+easy to lose: the decisive evidence was **G-PROBE-2, which was not a
+criterion** — a real departures screen as 15 lines of XML and two C++ widgets;
+**two of the four criteria were reworded and then passed**, which the dossier
+states as its own counter-case; and **what works is the firmware half** — there
+is no editor, no serializer, and E-2's 16 ms is a target. The GO means *the
+foundation holds, now build the thing it was for*, not *it is built*.
+
+The condition to hold firmly is **[Q-19]**: a collection widget costs 2,304
+bytes per instance whatever `max_rows` declares, and §18 cannot see it. So
 the gate is a *verdict on what exists*, not a build, and it is the owner's to
 give. On a GO the editor track starts (E-D, then E-1..E-3, per CA-1); on a
 NO-GO the programme stops and PR-01..PR-06 remain additive, with

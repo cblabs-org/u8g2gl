@@ -103,7 +103,7 @@ If you discover a defect, upstream bug, or concern *outside your boundary box*, 
 
 ### Executive Summary
 
-Work Order 2 (Expressiveness Report) was successfully completed under strict boundary constraints (no files modified in `src/`, `cli/`, `wasm/`, `docs/`, `test/`, or `tmp/g-probe/`). The single primary deliverable, [`EXPRESSIVENESS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/EXPRESSIVENESS.md), was authored at the repository root and verified to satisfy all PR-07 gate evaluation criteria.
+Work Order 2 (Expressiveness Report) was successfully completed under strict boundary constraints (no files modified in `src/`, `cli/`, `wasm/`, `docs/`, `test/`, or `tmp/g-probe/`). The single primary deliverable, [`EXPRESSIVENESS.md`](../EXPRESSIVENESS.md), was authored at the repository root and verified to satisfy all PR-07 gate evaluation criteria.
 
 The report provides an objective, evidence-based assessment of U8G2GL Schema 0.4 expressiveness using the empirical Wasm rendering output and hand-authored XML from Work Order 1. Adhering strictly to tone guidance, gaps are documented not as project failures or verdicts, but as deliberate deferrals governed by the §1.5 deferral rule ("Lite by design"), with clear mappings to Phase 2 backlog open questions.
 
@@ -129,7 +129,7 @@ The report provides an objective, evidence-based assessment of U8G2GL Schema 0.4
 
 | Requirement | Status | Evidence / Location |
 |---|---|---|
-| `EXPRESSIVENESS.md` at repo root | Confirmed | [`EXPRESSIVENESS.md`](file:///Users/mcneillm/Documents/Projects/U8G2GL/EXPRESSIVENESS.md) |
+| `EXPRESSIVENESS.md` at repo root | Confirmed | [`EXPRESSIVENESS.md`](../EXPRESSIVENESS.md) |
 | Three numbered parts + Gate Summary | Confirmed | Parts 1, 2, 3 and Gate Summary present |
 | Every gap maps to spec section & open question | Confirmed | §6.5, §9, §1.5, [D-8], [Q-8], [Q-15], [Q-13], [Q-12] |
 | Line counts internally consistent | Confirmed | Exact kind & concern breakdowns reconcile line-for-line |
