@@ -385,7 +385,11 @@ It read: *"Edit → regenerate → rebuild faster in practice than editing C++ w
 
 **What both agree on** is that the regression is structural to PlatformIO's default library finder: `lib_ldf_mode = chain` is worse, and `off` with an explicit `lib_deps` beats legacy but costs about 45 hand-kept lines and moves the image by ~430 B. Not adopted.
 
-**On provenance.** The owner reframed this criterion's *substance* on 2026-10-13 — record the firmware loop's cost as the build tool's, move the design loop to **E-2** as "under 16 ms from edit to pixels" — and that ruling reached `PROGRAM.md` and `CONTEXT_BRIDGE.md` but, through a Chief Architect omission, never reached this section. **The wording above is not the owner's words from that ruling**; it was drafted by the Chief Architect and approved by the owner on 2026-10-22. Both dates matter: the decision is eight days older than the sentence that expresses it.
+**On provenance.** The owner reframed this criterion's *substance* on 2026-10-13 — record the firmware loop's cost as the build tool's, move the design loop to **E-2** as "under 16 ms from edit to pixels" — and that ruling reached `PROGRAM.md` and `CONTEXT_BRIDGE.md` but, through a Chief Architect omission, never reached this section. **The wording above is not the owner's words from that ruling**; it was drafted by the Chief Architect, put to the owner verbatim, and approved by them on 2026-10-22:
+
+> ok - land the replacement, then give me a short message to pass back to the pa.
+
+That reply is quoted because every other ruling in this programme is recorded word for word, and a criterion that binds a stop-or-go decision should not be the exception. PR-07's Principal Architect noticed it was. Both dates matter: the decision is eight days older than the sentence that expresses it.
 
 **What the new wording does not do is decide the verdict.** PR-07 measures criterion 4; this section does not pre-judge it, and an earlier draft of this note wrongly asserted that the migrated board satisfies it.
 
