@@ -1,0 +1,4 @@
+sizeof(u8g2gl_state_saver) = 32
+label, same font, caller text: 7.68 ns | caller font 5x7, text: 54.13 ns | same font, caller all: 4.01 ns
+label, same font, caller text: 8.05 ns | caller font 5x7, text: 53.02 ns | same font, caller all: 3.98 ns
+label, same font, caller text: 7.43 ns | caller font 5x7, text: 53.19 ns | same font, caller all: 4.01 ns

@@ -1,0 +1,13 @@
+.iram0.vectors             1028   1074266112
+.iram0.text               90843   1074267140
+.dram0.data               16012   1073414144
+.dram0.bss                41312   1073430160
+.flash.appdesc              256   1061158944
+.flash.rodata            264532   1061159200
+.flash.tdata                  1   1061423732
+.flash.rodata_noload      13808   1061423732
+.flash.text              970320   1074593824
+.iram0.text_end               1   1074357983
+.iram0.data                   0   1074357984
+.iram0.bss                    0   1074357984
+.dram0.heap_start             0   1073471472

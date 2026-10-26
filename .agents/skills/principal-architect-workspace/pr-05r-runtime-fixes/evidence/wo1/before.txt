@@ -1,0 +1,5 @@
+sizeof(u8g2gl_state_saver) = 24
+run 0: 2.64 ns per pair (10000000 iterations)
+run 1: 2.33 ns per pair (10000000 iterations)
+run 2: 2.55 ns per pair (10000000 iterations)
+loop without saver: 0.97 ns

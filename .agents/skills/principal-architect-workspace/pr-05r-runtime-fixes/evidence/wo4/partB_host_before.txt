@@ -1,0 +1,22 @@
+test/test_subject.cpp:348:19: error: static assertion failed due to requirement 'bool_eq_resolves<long, void>::value': long
+  348 |     static_assert(bool_eq_resolves<long>::value, "long");
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test/test_subject.cpp:349:19: error: static assertion failed due to requirement 'bool_eq_resolves<long long, void>::value': long long
+  349 |     static_assert(bool_eq_resolves<long long>::value, "long long");
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test/test_subject.cpp:351:19: error: static assertion failed due to requirement 'bool_not_eq_resolves<long, void>::value': long
+  351 |     static_assert(bool_not_eq_resolves<long>::value, "long");
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test/test_subject.cpp:352:19: error: static assertion failed due to requirement 'bool_not_eq_resolves<long long, void>::value': long long
+  352 |     static_assert(bool_not_eq_resolves<long long>::value, "long long");
+      |                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+test/test_subject.cpp:358:13: error: call to member function 'bind_flag_if_eq' is ambiguous
+  358 |     by_long.bind_flag_if_eq(&subject, 0L, U8G2GL_FLAG_HIDDEN);
+      |     ~~~~~~~~^~~~~~~~~~~~~~~
+tmp/oldinc/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate function
+  369 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+      |          ^
+tmp/oldinc/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate function
+  370 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+      |          ^
+5 errors generated.

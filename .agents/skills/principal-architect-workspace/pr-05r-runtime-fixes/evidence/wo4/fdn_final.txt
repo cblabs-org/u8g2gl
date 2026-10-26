@@ -1,0 +1,22 @@
+compare with /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/fdn/test/render/baseline/diagnostics_board
+  connected     identical=yes differing_pixels=0
+  ap_mode       identical=yes differing_pixels=0
+  disconnected  identical=yes differing_pixels=0
+  long_ssid     identical=yes differing_pixels=0
+  device_dev91  identical=yes differing_pixels=0
+connected     lit=1405
+ap_mode       lit=1477
+disconnected  lit=1326
+long_ssid     lit=1679
+device_dev91  lit=1362
+state probe (connected, versus the normal migrated frame):
+  no_font_pos_top          differing_pixels=0 (rendered-only 0, normal-only 0)
+  no_font_ref_height_all   differing_pixels=0 (rendered-only 0, normal-only 0)
+  plain_user_ui_handler    differing_pixels=0 (rendered-only 0, normal-only 0)
+  font mode after runtime render_fn=1, after board render=1 (before=1)
+  long_ssid_scenario   38 lengths, 38 identical;  9 truncated,  9 of those identical
+  all_wide_W           40 lengths, 40 identical; 22 truncated, 22 of those identical
+  all_narrow_i         60 lengths, 60 identical;  0 truncated,  0 of those identical
+  latin1               43 lengths, 43 identical; 10 truncated, 10 of those identical
+truncation probe: 181 of 181 lengths identical; of the 41 truncated, 41 identical
+[100%] Built target after

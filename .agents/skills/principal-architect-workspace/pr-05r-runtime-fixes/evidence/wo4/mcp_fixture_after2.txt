@@ -1,0 +1,66 @@
+Processing fixture_after (platform: espressif32; board: esp32dev; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
+PLATFORM: Espressif 32 (55.3.311+sha.5f39b6d) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.11 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-esptoolpy @ 5.3.0 
+ - tool-xtensa-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-xtensa-esp-elf @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ deep+, Compatibility ~ soft
+Found 47 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- u8g2gl @ 0.7.0
+|-- U8g2 @ 2.36.18
+Building in release mode
+Compiling .pio/build/fixture_after/fixture/main.cpp.o
+Linking .pio/build/fixture_after/firmware.elf
+                            Memory Type Usage Summary                             
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃ Memory Type/Section ┃ Used [bytes] ┃ Used [%] ┃ Remain [bytes] ┃ Total [bytes] ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ Flash Code          │       170472 │          │                │               │
+│    .text            │       170472 │          │                │               │
+│ Flash Data          │        75020 │          │                │               │
+│    .rodata          │        68516 │          │                │               │
+│    .eh_frame        │         6248 │          │                │               │
+│    .appdesc         │          256 │          │                │               │
+│ IRAM                │        63923 │    48.77 │          67149 │        131072 │
+│    .text            │        62895 │    47.99 │                │               │
+│    .vectors         │         1028 │     0.78 │                │               │
+│ DRAM                │        26097 │    20.95 │          98483 │        124580 │
+│    .data            │        17921 │    14.39 │                │               │
+│    .bss             │         8176 │     6.56 │                │               │
+└─────────────────────┴──────────────┴──────────┴────────────────┴───────────────┘
+Total image size: 327336 bytes (.bin may be padded larger)
+Note: The reported total sizes may be smaller than those in the technical reference manual due to reserved memory and application configuration. The total flash size available for the application is not included by default, as it cannot be reliably determined due to the presence of other data like the bootloader, partition table, and application partition size.
+Retrieving maximum program size .pio/build/fixture_after/firmware.elf
+Checking size .pio/build/fixture_after/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=         ]   8.0% (used 26100 bytes from 327680 bytes)
+Flash: [==        ]  24.5% (used 320832 bytes from 1310720 bytes)
+Building .pio/build/fixture_after/firmware.bin
+esptool v5.3.0
+Creating ESP32 image...
+Merged 3 ELF sections.
+Successfully created ESP32 image.
+Creating binary "firmware.factory.bin" with:
+    Offset   | File
+ -  0x1000   | bootloader.bin
+ -  0x8000   | partitions.bin
+ -  0xe000   | boot_app0.bin
+ -  0x10000  | firmware.bin
+Successfully created combined binary image.
+========================= [SUCCESS] Took 5.08 seconds =========================
+
+Environment    Status    Duration
+-------------  --------  ------------
+fixture_after  SUCCESS   00:00:05.081
+========================= 1 succeeded in 00:00:05.081 =========================

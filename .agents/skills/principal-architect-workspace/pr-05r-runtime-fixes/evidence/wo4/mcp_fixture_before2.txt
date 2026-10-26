@@ -1,0 +1,106 @@
+Processing fixture_before (platform: espressif32; board: esp32dev; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
+PLATFORM: Espressif 32 (55.3.311+sha.5f39b6d) > Espressif ESP32 Dev Module
+HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, esp-bridge, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.11 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-esptoolpy @ 5.3.0 
+ - tool-xtensa-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-xtensa-esp-elf @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ deep+, Compatibility ~ soft
+Found 47 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- u8g2gl @ 0.7.0
+|-- U8g2 @ 2.36.18
+Building in release mode
+Compiling .pio/build/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp.o
+Compiling .pio/build/fixture_before/fixture/main.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/StreamString.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/StringUtils.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/Tone.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/USB.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/USBCDC.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/USBMSC.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/WMath.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/WString.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/base64.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/cbuf.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/chip-debug-report.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-adc.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-bt.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-cpu.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-dac.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-gpio.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-hosted.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-i2c-ng.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-i2c-slave.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-i2c.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-ldo.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-ledc.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-log-wrapper.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-matrix.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-misc.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-periman.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-psram.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-rgb-led.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-rmt.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-sigmadelta.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-spi.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-time.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-timer.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-tinyusb.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-touch-ng.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-touch.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/esp32-hal-uart.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/firmware_msc_fat.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/freertos_stats.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/idf_openthread_mpool_wrapper.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/libb64/cdecode.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/libb64/cencode.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/main.cpp.o
+Compiling .pio/build/fixture_before/FrameworkArduino/stdlib_noniso.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/wiring_pulse.c.o
+Compiling .pio/build/fixture_before/FrameworkArduino/wiring_shift.c.o
+Archiving .pio/build/fixture_before/libFrameworkArduino.a
+Indexing .pio/build/fixture_before/libFrameworkArduino.a
+fixture/main.cpp: In function 'void setup()':
+fixture/main.cpp:18:33: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<2>*, int, const uint8_t&)' is ambiguous
+   18 |     hand_written.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
+                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
+                 from fixture/main.cpp:5:
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
+  369 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+      |          ^~~~~~~~~~~~~~~
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
+  370 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+      |          ^~~~~~~~~~~~~~~
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp: In function 'void ui_screen_home_init()':
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:75:41: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<2>*, int, const uint8_t&)' is ambiguous
+   75 |     ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
+      |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
+                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
+                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:7:
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
+  369 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
+      |          ^~~~~~~~~~~~~~~
+/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
+  370 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
+      |          ^~~~~~~~~~~~~~~
+*** [.pio/build/fixture_before/fixture/main.cpp.o] Error 1
+*** [.pio/build/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp.o] Error 1
+========================== [FAILED] Took 3.65 seconds ==========================
+
+Environment     Status    Duration
+--------------  --------  ------------
+fixture_before  FAILED    00:00:03.650
+==================== 1 failed, 0 succeeded in 00:00:03.650 ====================

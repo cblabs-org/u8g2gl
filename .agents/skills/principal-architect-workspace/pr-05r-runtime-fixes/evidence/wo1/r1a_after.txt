@@ -1,0 +1,14 @@
+sizeof(u8g2gl_state_saver) = 32
+run 0: 3.71 ns per pair (10000000 iterations)
+run 1: 4.11 ns per pair (10000000 iterations)
+run 2: 4.11 ns per pair (10000000 iterations)
+loop without saver: 0.79 ns
+colour only:            saver 4.17 ns  delta 3.18 ns
+label, same font:       saver 3.97 ns  delta 3.57 ns
+label, caller font 5x7: saver 47.77 ns  delta 47.40 ns
+colour only:            saver 3.80 ns  delta 2.98 ns
+label, same font:       saver 3.77 ns  delta 3.63 ns
+label, caller font 5x7: saver 46.95 ns  delta 47.84 ns
+colour only:            saver 3.91 ns  delta 2.97 ns
+label, same font:       saver 4.01 ns  delta 3.70 ns
+label, caller font 5x7: saver 47.46 ns  delta 47.86 ns

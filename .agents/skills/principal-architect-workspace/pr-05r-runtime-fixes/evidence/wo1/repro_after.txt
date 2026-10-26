@@ -1,0 +1,10 @@
+[       OK ] AmbientState.NullFontIsRestoredAndASecondRenderWorks (0 ms)
+exit=0
+[       OK ] AmbientState.BaselineCallerDrawsTheSamePixelsAsTopCaller (0 ms)
+exit=0
+[       OK ] AmbientState.CallerStateComesBackAfterRender (0 ms)
+exit=0
+[       OK ] AmbientState.MarqueeRepaintKeepsCallerStateAndMatchesRender (0 ms)
+exit=0
+[       OK ] AmbientState.ClockRepaintKeepsCallerStateAndMatchesRender (0 ms)
+exit=0
