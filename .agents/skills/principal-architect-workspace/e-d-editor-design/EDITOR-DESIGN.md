@@ -510,4 +510,5 @@ E-D changes no source and no other workstream's documents. These are reported fo
 | 5 | `design_spec.md` §21 [Q-10] | Names "a box or a line", which no longer inherit text props since [D-18] (§7) | Chief Architect |
 | 6 | `ui_spec.md` §11 | "Collection subjects" contradicts [D-8] (§7) | Chief Architect |
 | 7 | `ui_spec.md` §15 | The header says these "gate PR-02"; six of the seven are absent from schema 0.4 (§7) | Chief Architect |
-| 8 | This PA, to the owner, 2026-10-24 | "PR-06 already builds Wasm in CI" was **wrong**. It builds none (F10). It did not change the owner's decision, which rested on option D being dropped for user 2, but it was said and is corrected here | — |
+| 8 | `cli/test/architecture/layering.test.ts` | Nothing enforces that `cli/src/core/` is isomorphic. The layering test explicitly ignores `node:` specifiers, so [D-10]'s property, which the designer depends on, rests on review alone. (It holds today: `cli/dist/core` has no `node:` import, checked in WO1) | **E-1a adds the test** |
+| 9 | This PA, to the owner, 2026-10-24 | "PR-06 already builds Wasm in CI" was **wrong**. It builds none (F10). It did not change the owner's decision, which rested on option D being dropped for user 2, but it was said and is corrected here | — |

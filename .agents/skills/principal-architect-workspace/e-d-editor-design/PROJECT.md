@@ -85,7 +85,7 @@ Each work order ends with a push.
   widgets. Scripts and logs go in `evidence/`, build output in `build/`, with no source changes.
 - [x] **WO2 · Design.** Done 2026-10-26: [EDITOR-DESIGN.md](EDITOR-DESIGN.md). Write `EDITOR-DESIGN.md`: the interaction design, the five decisions,
   the rulings on the tagged questions, the reassessment checkpoints, and the biggest risk.
-- [ ] **WO3 · Decompose.** Split E-1 into PRs with acceptance criteria, and draft the
+- [x] **WO3 · Decompose.** Done 2026-10-26: [E1-DECOMPOSITION.md](E1-DECOMPOSITION.md). Split E-1 into PRs with acceptance criteria, and draft the
   amendment text for `[UD-2]` (ui_spec) and the editor-track ledger (implementation_plan).
 
 ## Status Log
@@ -114,3 +114,11 @@ Each work order ends with a push.
   - F7: collection widgets render blank because no data can reach them.
   - F10: no Emscripten is managed, and CI builds no Wasm. This corrects the PA's 2026-10-24
     statement to the owner.
+- **2026-10-26. WO2 and WO3 complete.**
+  - EDITOR-DESIGN.md: the interaction design, the five decisions, six reassessment
+    checkpoints, and the biggest risk (§9): collection widgets render blank until PR-08 can be
+    filled by name.
+  - E1-DECOMPOSITION.md: E-1 as five PRs (E-1a to E-1e) with acceptance criteria, plus
+    proposed Tier-1 text for `[UD-2]`, the ledger, and a requirement on PR-08.
+  - **Awaiting the owner's approval of the E-1 decomposition before any E-1 work begins**
+    (rule 01).
