@@ -1,0 +1,9 @@
+emcc: emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 5.0.3 (285c424dfa9e83b03cf8490c65ceadb7c45f28eb)
+host: Darwin arm64, Apple M5 Pro
+clean   run 1: compile 1.69 s, link 2.50 s, total 4.19 s
+clean   run 2: compile 1.58 s, link 2.17 s, total 3.76 s
+clean   run 3: compile 1.70 s, link 2.19 s, total 3.89 s
+widget  run 1: compile 0.51 s, link 2.18 s, total 2.69 s
+widget  run 2: compile 0.55 s, link 2.18 s, total 2.74 s
+widget  run 3: compile 0.51 s, link 2.15 s, total 2.67 s
+wasm bytes: 111144

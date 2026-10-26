@@ -1,0 +1,5 @@
+cmake --build build/wasm -j8 --target u8g2gl_editor (fixture editor Wasm, clean, including the U8G2 C library)
+real 7.54
+user 18.14
+sys 4.37
+wasm bytes: 107445

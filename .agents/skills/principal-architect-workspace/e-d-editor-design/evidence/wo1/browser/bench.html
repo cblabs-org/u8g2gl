@@ -1,0 +1,175 @@
+<!doctype html>
+<!--
+  E-D WO1: the live editing path, measured in Chromium rather than Node, with
+  Monaco in the loop. One canvas nudge per frame: rewrite an attribute value in
+  Monaco's model, read the text back, run the CLI's TypeScript pipeline on it,
+  hand the scene to the editor Wasm, render, and paint a 4x canvas.
+
+  Measurement only. Served from the repository root by a static file server:
+    python3 -m http.server 8765
+    open http://localhost:8765/<this path>?project=build/stress100&element=l10&wasm=build/probe/wasm
+  Results go to the page and to window.__bench for reading back.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Edit loop bench</title>
+<style>
+  body { font: 13px ui-monospace, monospace; background: #111; color: #ddd; margin: 16px; }
+  #editor { width: 900px; height: 240px; border: 1px solid #333; }
+  canvas { image-rendering: pixelated; border: 1px solid #333; margin-top: 8px; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="editor"></div>
+<canvas id="canvas"></canvas>
+<pre id="out">loading…</pre>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+<script type="module">
+const q = new URLSearchParams(location.search);
+const PROJECT = q.get('project') ?? 'build/probe/project';
+const SCREEN = q.get('screen') ?? 'screen_departures.xml';
+const ELEMENT = q.get('element') ?? 'row0';
+const ATTR = q.get('attr') ?? 'x';
+const WASM = q.get('wasm') ?? 'build/probe/wasm';
+const ITER = Number(q.get('iter') ?? 300);
+const WARMUP = 30;
+const SCALE = 4;
+const out = document.getElementById('out');
+const log = (s) => { out.textContent += `\n${s}`; };
+
+const core = '/cli/dist/core';
+const { parseProjectFile, parseGlobalsFile, parseScreenFile, parseWidgetManifestFile } = await import(`${core}/parser/index.js`);
+const { parseFrameworkManifests, buildManifestRegistry } = await import(`${core}/manifest/index.js`);
+const { createScreenPipeline, findTargetDisplay } = await import(`${core}/resolver/index.js`);
+const { realiseScreens, computeCapacities } = await import(`${core}/realise/index.js`);
+const { checkProject } = await import(`${core}/generator/index.js`);
+const { emitSceneFile } = await import(`${core}/generator/emit/scene.js`);
+const { CATALOGUE } = await import('/cli/dist/data/catalogue.js');
+const { FRAMEWORK_MANIFESTS } = await import('/cli/dist/data/manifests.js');
+
+// --- Load the project from strings, as the served editor would ---
+const text = async (p) => (await fetch(`/${PROJECT}/${p}`)).text();
+const project = parseProjectFile(await text('u8g2gl.xml'), 'u8g2gl.xml').value;
+const globals = parseGlobalsFile(await text('globals.xml'), 'globals.xml').value;
+const widgetNames = (q.get('widgets') ?? 'wd_service_list,wd_train_formation,wd_probe_box').split(',').filter(Boolean);
+const projectManifests = [];
+for (const w of widgetNames) {
+  const r = await fetch(`/${PROJECT}/widgets/${w}/${w}.xml`);
+  if (r.ok) projectManifests.push(parseWidgetManifestFile(await r.text(), `widgets/${w}/${w}.xml`).value);
+}
+const framework = parseFrameworkManifests(FRAMEWORK_MANIFESTS);
+const manifests = buildManifestRegistry({ framework: framework.manifests, project: projectManifests });
+const screenFile = `screens/${SCREEN}`;
+const screenText = await text(screenFile);
+const model = { project, globals, screens: [parseScreenFile(screenText, screenFile).value], manifests,
+  catalogue: CATALOGUE, loadDiagnostics: [], hasProjectManifest: true };
+const target = project.targets[0];
+const display = findTargetDisplay(target, CATALOGUE);
+
+// --- Wasm, loaded the way a page loads an Emscripten MODULARIZE build ---
+await new Promise((ok, fail) => {
+  const s = document.createElement('script');
+  s.src = `/${WASM}/u8g2gl_editor.js`; s.onload = ok; s.onerror = fail; document.head.append(s);
+});
+const Module = await window.createU8g2glEditor({ locateFile: (p) => `/${WASM}/${p}` });
+const call = (fn, str) => {
+  const n = Module.lengthBytesUTF8(str) + 1; const p = Module._malloc(n);
+  Module.stringToUTF8(str, p, n);
+  try { return Module[fn](p); } finally { Module._free(p); }
+};
+
+// --- Monaco ---
+await new Promise((ok) => {
+  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } });
+  require(['vs/editor/editor.main'], ok);
+});
+const editor = monaco.editor.create(document.getElementById('editor'),
+  { value: screenText, language: 'xml', theme: 'vs-dark', minimap: { enabled: false } });
+const textModel = editor.getModel();
+
+const { width, height } = display;
+const canvas = document.getElementById('canvas');
+canvas.width = width * SCALE; canvas.height = height * SCALE;
+const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = false;
+const off = new OffscreenCanvas(width, height); const offCtx = off.getContext('2d');
+const image = offCtx.createImageData(width, height);
+
+const stages = ['monaco', 'parse', 'resolve', 'check', 'scene', 'apply', 'render', 'paint'];
+const samples = Object.fromEntries([...stages, 'total', 'frame'].map((s) => [s, []]));
+const pattern = new RegExp(`(name="${ELEMENT}"[^>]*?\\s${ATTR}=")(-?\\d+)(")`);
+let ms = 0; let i = 0; let lastFrame = 0;
+
+function step(now) {
+  const t = [performance.now()];
+  // A canvas nudge as a CST edit: replace one attribute value's range in place.
+  const current = textModel.getValue();
+  const m = current.match(pattern);
+  const start = m.index + m[1].length;
+  const next = String(Number(m[2]) + (i % 2 ? 1 : -1));
+  const a = textModel.getPositionAt(start), b = textModel.getPositionAt(start + m[2].length);
+  textModel.pushEditOperations([], [{ range: new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column), text: next }], () => null);
+  const edited = textModel.getValue();
+  t.push(performance.now());
+  const screens = [parseScreenFile(edited, screenFile).value];
+  t.push(performance.now());
+  const pipeline = createScreenPipeline({ globals, screens, manifests, display });
+  const realisation = realiseScreens({ globals, manifests, expansion: pipeline.expansion });
+  t.push(performance.now());
+  const checked = checkProject({ ...model, screens }, 'error', target, pipeline, realisation);
+  if (checked.errors) throw new Error(JSON.stringify(checked.diagnostics.filter((d) => d.severity === 'error')));
+  t.push(performance.now());
+  const capacities = computeCapacities({ globals, screens: realisation.screens });
+  const scene = emitSceneFile({
+    project: { project, globals, screens, capacities, manifests, images: new Map(), compiledFonts: new Map(),
+      bdfLicenceFiles: new Map(), stamp: '' },
+    realised: realisation.screens, resolved: pipeline.resolution.screens, manifests,
+    generated: { source: 'u8g2gl.xml', schema: project.schema, generator: '0.0.0-bench', target: target.name },
+  });
+  t.push(performance.now());
+  if (call('_applyScene', scene) !== 1) throw new Error(Module.UTF8ToString(Module._getLastError()));
+  t.push(performance.now());
+  const ptr = Module._renderFrame((ms += 16) >>> 0);
+  const buf = Module.HEAPU8.subarray(ptr, ptr + Module._getBufferSize());
+  t.push(performance.now());
+  const px = image.data;
+  for (let y = 0; y < height; y++) {
+    const row = (y >> 3) * width, bit = 1 << (y & 7);
+    for (let x = 0; x < width; x++) {
+      const o = (y * width + x) * 4, v = buf[row + x] & bit ? 255 : 0;
+      px[o] = v; px[o + 1] = v * 0.63; px[o + 2] = 0; px[o + 3] = 255;
+    }
+  }
+  offCtx.putImageData(image, 0, 0);
+  ctx.drawImage(off, 0, 0, width * SCALE, height * SCALE);
+  t.push(performance.now());
+
+  if (i >= WARMUP) {
+    stages.forEach((s, k) => samples[s].push(t[k + 1] - t[k]));
+    samples.total.push(t[t.length - 1] - t[0]);
+    if (lastFrame) samples.frame.push(now - lastFrame);
+  }
+  lastFrame = now;
+  if (++i < WARMUP + ITER) requestAnimationFrame(step); else report();
+}
+
+function report() {
+  const pct = (xs, p) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor((p / 100) * xs.length))];
+  const lines = [`${navigator.userAgent}`, `project ${PROJECT}; ${ITER} frames after ${WARMUP} warm-up; display ${width}x${height} at ${SCALE}x`,
+    'stage        median     p95      max   (ms)'];
+  const result = {};
+  for (const s of [...stages, 'total', 'frame']) {
+    const xs = samples[s];
+    result[s] = { median: pct(xs, 50), p95: pct(xs, 95), max: Math.max(...xs) };
+    lines.push(`${s.padEnd(10)} ${result[s].median.toFixed(3).padStart(8)} ${result[s].p95.toFixed(3).padStart(8)} ${result[s].max.toFixed(3).padStart(8)}`);
+  }
+  out.textContent = lines.join('\n');
+  window.__bench = { lines, result };
+}
+
+out.textContent = 'running…';
+requestAnimationFrame(step);
+</script>
+</body>
+</html>

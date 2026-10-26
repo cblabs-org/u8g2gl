@@ -1,0 +1,15 @@
+project build/stress20
+node v26.8.1; 200 iterations after 30 warm-up
+display 256x64; screens 1; scene 16362 bytes; lit pixels 321
+stage        median     p95      max   (ms)
+parse         0.039    0.050    0.264
+pipeline      0.001    0.001    0.099
+realise       0.018    0.027    0.254
+check         0.170    0.318    0.449
+capacity      0.002    0.002    0.005
+scene         0.044    0.060    0.073
+apply         0.093    0.116    0.136
+render        0.011    0.017    0.031
+blit          0.014    0.017    0.024
+total         0.404    0.601    0.731
+generate      0.262    0.460    0.591
