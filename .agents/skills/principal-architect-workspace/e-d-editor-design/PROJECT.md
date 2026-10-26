@@ -122,3 +122,15 @@ Each work order ends with a push.
     proposed Tier-1 text for `[UD-2]`, the ledger, and a requirement on PR-08.
   - **Awaiting the owner's approval of the E-1 decomposition before any E-1 work begins**
     (rule 01).
+- **2026-10-26. E-1 decomposition approved.** The owner, verbatim:
+
+  > "Approved — the E-1 decomposition (E-1a to E-1e) as written in E1-DECOMPOSITION.md."
+
+  *Provenance note:* as with the earlier approval, the owner sent this through a reply button
+  whose text the PA drafted, after the PA's closing summary of all three work orders.
+
+  **Scope of this approval:** it approves the *decomposition*: E-1 as five PRs, their
+  boundaries and their acceptance criteria. It does not start any of them. Each E-1 PR is a
+  PR of its own, with its own Principal Architect and plan gate. That PA verifies provenance
+  from this entry (rule 00), and the owner approves that PR's Work-Order breakdown in turn.
+  The proposed Tier-1 text (E1-DECOMPOSITION.md §4) is still the Chief Architect's to land.
