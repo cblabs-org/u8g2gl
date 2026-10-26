@@ -1,0 +1,6 @@
+link -O0 run 1: 1.34 s, wasm 148480 B
+link -O0 run 2: 0.66 s, wasm 148480 B
+link -O0 run 3: 0.63 s, wasm 148480 B
+link -O1 run 1: 0.90 s, wasm 142580 B
+link -O1 run 2: 0.62 s, wasm 142580 B
+link -O1 run 3: 0.62 s, wasm 142580 B

@@ -1,0 +1,15 @@
+project build/probe/project
+node v26.8.1; 200 iterations after 30 warm-up
+display 256x64; screens 1; scene 8764 bytes; lit pixels 141
+stage        median     p95      max   (ms)
+parse         0.023    0.033    0.122
+pipeline      0.001    0.001    0.006
+realise       0.010    0.015    0.110
+check         0.118    0.260    0.536
+capacity      0.001    0.002    0.004
+scene         0.025    0.036    0.135
+apply         0.055    0.074    0.168
+render        0.007    0.012    0.023
+blit          0.013    0.016    0.021
+total         0.260    0.423    0.674
+generate      0.182    0.291    0.419

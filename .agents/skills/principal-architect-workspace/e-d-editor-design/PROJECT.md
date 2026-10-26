@@ -79,7 +79,7 @@ See `EDITOR-DESIGN.md`.
 The PA does the work orders directly. This is design work, so no workers are spawned.
 Each work order ends with a push.
 
-- [ ] **WO1 · Measure.** Write `LOOP-BUDGET.md`: time each stage of the live path (parse,
+- [x] **WO1 · Measure.** Done 2026-10-26: [LOOP-BUDGET.md](LOOP-BUDGET.md). Write `LOOP-BUDGET.md`: time each stage of the live path (parse,
   validate, resolve, scene, Wasm build, render, blit) on the G-PROBE-2 departures project and
   the test fixture, and time a rebuild of the project editor Wasm with G-PROBE-2's two
   widgets. Scripts and logs go in `evidence/`, build output in `build/`, with no source changes.
@@ -104,3 +104,13 @@ Each work order ends with a push.
   answering the revised shape presented that turn. It is recorded as the owner's approval
   because the owner chose to send it. It is flagged here because this programme records its
   rulings word for word, and the reader should know whose words these first were.
+- **2026-10-26. WO1 complete.** 16 ms is reachable: a nudge on the departures screen costs
+  1.1 ms median and 1.9 ms worst in Chromium with Monaco, and 100 elements cost 3.3 ms worst.
+  A widget rebuild takes 2.7 s, or about 1.1 s with an `-O1` link. Five new findings
+  (LOOP-BUDGET.md §6):
+  - F5: G-PROBE-2's widget C++ had never run; its "full screen" render was a JavaScript
+    imitation.
+  - F6: the editor Wasm's capacities are constants, so a 256-byte subject is refused.
+  - F7: collection widgets render blank because no data can reach them.
+  - F10: no Emscripten is managed, and CI builds no Wasm. This corrects the PA's 2026-10-24
+    statement to the owner.

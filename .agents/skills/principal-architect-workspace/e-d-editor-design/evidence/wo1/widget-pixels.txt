@@ -1,0 +1,8 @@
+total lit pixels: 389
+plat_label   u8g2gl_label         rect 5,6 18x13  lit 49
+plat_num     u8g2gl_label         rect 4,20 20x24  lit 19
+row0         wd_service_list      rect 32,0 224x16  lit 0
+message_bar  u8g2gl_label         rect 30,17 226x13  lit 213
+formation    wd_train_formation   rect 0,17 256x32  lit 232
+services     wd_service_list      rect 0,51 190x13  lit 0
+sys_clock    u8g2gl_clock         rect 190,51 66x13  lit 108
