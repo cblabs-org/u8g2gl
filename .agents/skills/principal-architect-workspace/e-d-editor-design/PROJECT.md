@@ -83,7 +83,7 @@ Each work order ends with a push.
   validate, resolve, scene, Wasm build, render, blit) on the G-PROBE-2 departures project and
   the test fixture, and time a rebuild of the project editor Wasm with G-PROBE-2's two
   widgets. Scripts and logs go in `evidence/`, build output in `build/`, with no source changes.
-- [ ] **WO2 · Design.** Write `EDITOR-DESIGN.md`: the interaction design, the five decisions,
+- [x] **WO2 · Design.** Done 2026-10-26: [EDITOR-DESIGN.md](EDITOR-DESIGN.md). Write `EDITOR-DESIGN.md`: the interaction design, the five decisions,
   the rulings on the tagged questions, the reassessment checkpoints, and the biggest risk.
 - [ ] **WO3 · Decompose.** Split E-1 into PRs with acceptance criteria, and draft the
   amendment text for `[UD-2]` (ui_spec) and the editor-track ledger (implementation_plan).
