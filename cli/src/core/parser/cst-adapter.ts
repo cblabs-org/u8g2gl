@@ -15,8 +15,8 @@
  *              offset through the document's LineIndex, and the offsets
  *              themselves are kept beside it as ranges.
  *
- *              The walk reproduces the raw tree the parser has always read, on
- *              which consumers and tests depend:
+ *              The walk builds the raw tree with these rules, on which consumers
+ *              and tests depend:
  *              - values, text and comments have CR and CRLF folded to LF before
  *                entity decoding, so a `&#13;` reference still yields a CR;
  *              - an element's text is the decoded character data of its
@@ -72,6 +72,9 @@ function decodeFolded(raw: string, decoded: string): string {
   return raw.includes('\r') ? decodeEntities(foldNewlines(raw)) : decoded;
 }
 
+// toRawAttribute
+// One CST attribute as the parsers read it: the value newline-folded and
+// decoded, the locations derived from its ranges, the ranges kept.
 function toRawAttribute(ctx: AdapterContext, attr: CstAttribute): RawXmlAttribute {
   return {
     name: attr.name,
@@ -152,6 +155,10 @@ export function rootElementName(xml: string, filename: string): string | undefin
 
 /**
  * Parse XML text into the raw element tree the U8G2GL parsers consume.
+ *
+ * The tree is built from the CST (`parseCst`); nothing here scans the text.
+ * The function keeps its historical name, from when it was a tokeniser,
+ * because it is public API.
  *
  * Never throws. Malformed input yields `U8G2GL_MALFORMED_XML` diagnostics and
  * whatever tree could be recovered; `root` is absent when no element could be.

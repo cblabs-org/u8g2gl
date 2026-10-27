@@ -9,18 +9,16 @@
  *          that over a tree that accounts for every byte and knows exactly
  *          where each attribute value sits. It is also the parser's only XML
  *          reader: parser/cst-adapter.ts derives the parsers' raw tree from it.
- * Description: A single-pass scanner whose control flow — including every
- *              error-recovery path — deliberately mirrors the hand-rolled
- *              scanner the parser used before it, so that on any input it
- *              reports the same diagnostic codes at the same lines and columns
- *              that authors and tests already relied on. That scanner's output
- *              is recorded in cli/test/cst/tokeniser-diagnostics.json and the
- *              parity test holds this one to it. Where it differs, it accepts
- *              well-formed XML the old scanner rejected, never the reverse:
- *              - a leading BOM is recorded and skipped (the old scanner treated
- *                it as the first tag's `<`);
- *              - `<![CDATA[ ... ]]>` in element content is a CDATA node (the
- *                old scanner reported a missing tag name).
+ * Description: A single-pass scanner. Its error-recovery paths are fixed:
+ *              each reports a given malformed input with a set diagnostic
+ *              code, line and column, which authors and tests rely on, and
+ *              cli/test/cst/tokeniser-diagnostics.json records them for the
+ *              parity test to hold every path to. The recovery comments below
+ *              describe those rules; they are deliberate, not accidents of the
+ *              implementation. Beyond that record, it accepts two well-formed
+ *              constructs:
+ *              - a leading BOM, recorded and skipped;
+ *              - `<![CDATA[ ... ]]>` in element content, as a CDATA node.
  *              Recovery paths produce `invalid` nodes for the bytes they skip,
  *              so the tree stays lossless even on malformed input.
  *
@@ -116,8 +114,8 @@ class CstScanner {
     return ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r';
   }
 
-  // The original scanner's name alphabet, including its `$` and `#` extensions,
-  // so every name it accepted is still a name and the recovery paths line up.
+  // The name alphabet: XML's ASCII letters, `_` and `:`, plus `$` and `#`,
+  // which the recorded recovery paths depend on.
   private static isNameStartChar(ch: string): boolean {
     return (
       (ch >= 'a' && ch <= 'z') ||
@@ -141,8 +139,8 @@ class CstScanner {
     }
   }
 
-  // As in the original scanner, a name is any run of name characters; the start-char
-  // rule is not enforced separately, so `<1a>` scans the name `1a`.
+  // A name is any run of name characters; the start-char rule is not enforced
+  // separately, so `<1a>` scans the name `1a`.
   private scanName(): string {
     const start = this.index;
     while (this.index < this.length && CstScanner.isNameChar(this.peek())) {
@@ -153,8 +151,8 @@ class CstScanner {
 
   // whitespaceNode
   // Consumes whitespace at the cursor as a trivia node, or returns undefined
-  // if there is none. Used where the original scanner skipped whitespace between
-  // nodes, so those bytes still belong to the tree.
+  // if there is none. Used where whitespace between nodes carries no meaning,
+  // so those bytes still belong to the tree.
   private whitespaceNode(): CstWhitespace | undefined {
     const start = this.index;
     this.skipWhitespace();
@@ -180,7 +178,7 @@ class CstScanner {
 
   // processingInstruction
   // `<? ... ?>`, cursor on `<`. The target `xml` makes it the declaration;
-  // the original scanner skipped both alike, so the split is the CST's own.
+  // the raw tree drops both alike, so the split matters only to the CST.
   private processingInstruction(): CstXmlDeclaration | CstProcessingInstruction {
     const start = this.index;
     const close = this.text.indexOf('?>', start + 2);
@@ -241,9 +239,9 @@ class CstScanner {
 
   // attribute
   // One attribute, cursor on a name character. Returns undefined, with a
-  // diagnostic, when the original scanner dropped it: no `=`, or an unquoted
-  // value. Each branch reports at that scanner's offset and advances exactly
-  // as far as it did.
+  // diagnostic, when it cannot be read: no `=`, or an unquoted value. Each
+  // branch reports at, and advances to, the offset the recorded diagnostics
+  // fix.
   private attribute(tagName: string): CstAttribute | undefined {
     // --- Step 1: Name, then `=` ---
     const nameStart = this.index;
@@ -301,8 +299,8 @@ class CstScanner {
 
   // element
   // An element from its open tag through its close tag, cursor on `<` — or,
-  // at the document root, on whatever character the original scanner treated as
-  // one. A `<` with no name becomes an invalid node, as that scanner skipped it.
+  // at the document root, on whatever character comes first, which is read as
+  // one. A `<` with no name becomes an invalid node and yields no element.
   element(): CstElement | CstInvalid {
     // --- Step 1: `<` and the tag name ---
     const start = this.index;
@@ -330,8 +328,8 @@ class CstScanner {
         break;
       }
       if (!CstScanner.isNameChar(this.peek())) {
-        // At end of input peek() is '' and the original scanner reported it the
-        // same way, then could not advance — so neither may the cursor here.
+        // At end of input peek() is '' and is reported the same way; the
+        // cursor must not advance past the end.
         this.report(
           this.index,
           `Unexpected character '${this.peek()}' while parsing attributes in <${name}>`,
@@ -404,8 +402,8 @@ class CstScanner {
   }
 
   // misc
-  // Whitespace, comments and PIs at the cursor, as the original scanner skipped them
-  // before and after the root. Returns when anything else is next.
+  // Whitespace, comments and PIs at the cursor, as they may appear before and
+  // after the root. Returns when anything else is next.
   private misc(out: CstContent[]): void {
     for (;;) {
       const ws = this.whitespaceNode();
@@ -423,7 +421,7 @@ class CstScanner {
   }
 
   // document
-  // Prolog, root, epilog — the original scanner's document walk, step for step.
+  // Prolog, root, epilog.
   document(): CstParseResult {
     // --- Step 1: BOM, then the prolog ---
     const bom = this.text.startsWith(BOM);
@@ -436,7 +434,8 @@ class CstScanner {
     // --- Step 2: The root, or the original empty-document diagnostic ---
     let root: CstElement | undefined;
     if (this.atEnd()) {
-      // Reported at 1:1 literally, not at an offset, as the original scanner did.
+      // Reported at 1:1 literally, not at an offset: an empty document has no
+      // position worth pointing at, and the recorded diagnostics fix it there.
       this.pushDiagnostic(1, 1, 'XML document is empty or contains no root element');
     } else {
       const node = this.element();
@@ -472,7 +471,7 @@ class CstScanner {
  *
  * Never throws: malformed input yields a tree whose recovery regions are
  * `invalid` nodes, plus diagnostics with the same codes, lines and columns
- * the parser has always reported for the same text. `printCst(parseCst(t).cst) === t`
+ * cli/test/cst/tokeniser-diagnostics.json records. `printCst(parseCst(t).cst) === t`
  * for every input.
  *
  * @param text  The file's contents, exactly as read. Do not strip a BOM or

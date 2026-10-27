@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/parser/xml-tokeniser.test.ts
- * Purpose: Verification tests for the low-level XML tokeniser and position tracker.
+ * Purpose: Tests `tokenizeXml` and `decodeXmlEntities`, the parser's public reader
+ *          of the raw element tree, which is built from the CST.
  * Description: Asserts accurate line and column source coordinate extraction, entity
  *              decoding, self-closing tag handling, comment preservation, and malformed
  *              syntax diagnostics.
@@ -17,7 +18,7 @@ import {
 } from '../../src/core/parser/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 
-describe('XML Tokeniser', () => {
+describe('tokenizeXml', () => {
   it('decodes standard and numeric XML entities', () => {
     expect(decodeXmlEntities('&lt;hello&gt; &amp; &quot;world&quot; &apos;!&apos;')).toBe(
       '<hello> & "world" \'!\'',

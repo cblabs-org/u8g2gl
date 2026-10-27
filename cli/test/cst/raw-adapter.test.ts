@@ -5,19 +5,18 @@
  *
  * File: test/cst/raw-adapter.test.ts
  * Purpose: `tokenizeXml` is what every parser in core/parser/ reads XML
- *          through, and it is public API. It now builds its RawXmlDocument
- *          from the CST instead of scanning the text itself, and nothing
- *          downstream was changed to accommodate that — so the tree it returns
- *          and the diagnostics it reports must be exactly what the old scanner
- *          produced, on every input it was recorded on.
- * Description: Compares against the two goldens recorded from the old
- *              tokeniser (tokeniser-golden.ts): the full tree for every tracked
- *              `.xml` file and inline case, and every diagnostic including its
+ *          through, and it is public API. It builds its RawXmlDocument from
+ *          the CST, and the consumers downstream depend on that tree's exact
+ *          shape — so the tree it returns and the diagnostics it reports must
+ *          match the recorded tokeniser on every input it was recorded on.
+ * Description: Compares against the two goldens recorded from the tokeniser
+ *              (tokeniser-golden.ts): the full tree for every tracked `.xml`
+ *              file and inline case, and every diagnostic including its
  *              message. A repository file edited since the recording fails as a
  *              stale entry, by hash, before its tree is compared. Then the three
- *              inputs the old tokeniser rejected and the CST accepts, each shown
- *              failing in the recording and parsing now; and the offset ranges
- *              every element and attribute gained, checked against the text.
+ *              inputs the recorded tokeniser rejected and the CST accepts, each
+ *              checked against its recorded failure; and the offset ranges of
+ *              every element and attribute, checked against the text.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -66,8 +65,9 @@ function difference(name: string): (typeof diagnostics.intentionalDifferences)[n
   return entry;
 }
 
-describe('inputs the old tokeniser rejected now parse', () => {
-  it('a leading BOM: two diagnostics before, a clean tree that ignores the BOM now', () => {
+describe('inputs the recorded tokeniser rejected parse cleanly', () => {
+  it('a leading BOM is skipped and occupies no column', () => {
+    // Recorded: two diagnostics.
     const { file, text, diagnostics: before } = difference('leading BOM');
     expect(before?.map((d) => d.message)).toEqual([
       'Expected element tag name after "<"',
@@ -85,7 +85,8 @@ describe('inputs the old tokeniser rejected now parse', () => {
     });
   });
 
-  it('CDATA in content: a missing tag name before, text joined undecoded now', () => {
+  it('CDATA in content joins the text undecoded', () => {
+    // Recorded: a missing tag name.
     const { file, text, diagnostics: before } = difference('CDATA in element content');
     expect(before?.map((d) => [d.line, d.column, d.message])).toEqual([
       [1, 11, 'Expected element tag name after "<"'],
@@ -95,7 +96,8 @@ describe('inputs the old tokeniser rejected now parse', () => {
     expect(doc.root?.textContent).toBe('before x < y && z after');
   });
 
-  it('a character reference beyond U+10FFFF: a thrown RangeError before, left as written now', () => {
+  it('a character reference beyond U+10FFFF is left as written', () => {
+    // Recorded: a thrown RangeError.
     const { file, text, threw } = difference('character reference beyond U+10FFFF');
     expect(threw).toMatch(/^RangeError/);
     const doc = tokenizeXml(text, file);

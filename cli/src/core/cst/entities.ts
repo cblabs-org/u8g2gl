@@ -9,9 +9,7 @@
  *          read values through these rules alone, so a value means the same
  *          thing to both.
  * Description: The one entity decoder in core: the parser's public
- *              `decodeXmlEntities` is this function, re-exported. Its rules are
- *              those of the hand-rolled scanner the parser used before the CST,
- *              apart from the one out-of-range case noted in the body.
+ *              `decodeXmlEntities` is this function, re-exported.
  *
  *              The encoder is the CST's own: it writes the fewest references
  *              that make a value safe inside a given quote character, so an
@@ -27,7 +25,8 @@ import type { CstQuote } from './cst-types.js';
 /**
  * Decode the five predefined XML entities and decimal/hex character
  * references. An unrecognised reference such as `&nbsp;` is left as written,
- * as the parser always has.
+ * because XML predefines only these five and a U8G2GL file declares no
+ * others.
  */
 export function decodeEntities(raw: string): string {
   return raw.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (match, entity: string) => {
@@ -46,9 +45,8 @@ export function decodeEntities(raw: string): string {
         const code = entity.startsWith('#x')
           ? parseInt(entity.slice(2), 16)
           : parseInt(entity.slice(1), 10);
-        // A reference beyond U+10FFFF is left as written. String.fromCodePoint
-        // throws a RangeError there; the parser's original scanner let it
-        // escape, so `&#9999999;` crashed the parse instead of being read.
+        // A reference beyond U+10FFFF is left as written, because
+        // String.fromCodePoint throws a RangeError there and a parse never throws.
         return Number.isNaN(code) || code > 0x10ffff ? match : String.fromCodePoint(code);
       }
     }

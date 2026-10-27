@@ -4,14 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/bom-and-root-dispatch.test.ts
- * Purpose: A file with a leading BOM now parses, and a file is dispatched to
- *          its parser by the root element the parser actually finds. Two
- *          consequences are pinned here. `--fix-names` must insert a name
- *          where the diagnostic points, which on line 1 of a BOM file is one
- *          code unit past where a BOM-blind line table would put it. And a
- *          comment ahead of the root that happens to contain a tag must not
- *          decide which parser reads the file, as the old first-`<name`
- *          search let it.
+ * Purpose: Two guarantees. `--fix-names` inserts a name where the diagnostic
+ *          points, which on line 1 of a file with a leading BOM is one code
+ *          unit past where a BOM-blind line table would put it. And a file is
+ *          dispatched to its parser by the root element the parser finds, so a
+ *          comment ahead of the root that happens to contain a tag does not
+ *          decide which parser reads the file.
  * Description: The edit path through the core functions and through
  *              `fixMissingNames` on real files, BOM with LF and with CRLF; the
  *              dispatch through `rootElementName`, `loadProject` and

@@ -132,9 +132,9 @@ export function createNameInsertion(
 export function applyTextEdits(source: string, edits: readonly SourceEdit[]): string {
   // --- Step 1: Resolve each 1-based coordinate to an absolute offset ---
   // Through the parser's own LineIndex, the table every location was computed
-  // from. A second table is how this once went wrong: one that disagreed on a
-  // line ending misplaced edits on CRLF files only, and one without the BOM
-  // rule put line 1's edits one code unit early.
+  // from. A second table would have to agree with it on every rule: one that
+  // disagreed on a line ending would misplace edits on CRLF files only, and one
+  // without the BOM rule would put line 1's edits one code unit early.
   const lines = new LineIndex(source);
   const resolved: { offset: number; text: string }[] = [];
 

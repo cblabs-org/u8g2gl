@@ -5,9 +5,9 @@
  *
  * File: test/manifests/attribute-locations.test.ts
  * Purpose: A manifest diagnostic about one attribute reports at that
- *          attribute, with its text (§15.1). These used to report at the
- *          `<widget>` or `<bind>` tag, which tells an author — or the editor's
- *          property panel — only that something in the element is wrong.
+ *          attribute, with its text (§15.1). A location at the `<widget>` or
+ *          `<bind>` tag would tell an author — or the editor's property panel —
+ *          only that something in the element is wrong.
  * Description: One test per diagnostic, each from real XML so the location is
  *              the parser's: the three `extends` faults the registry reports
  *              (unknown base, drawing-element base, cycle), the drawing element

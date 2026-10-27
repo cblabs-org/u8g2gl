@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/diagnostics-parity.test.ts
- * Purpose: On malformed input the CST reports what the old hand-rolled
- *          tokeniser reported: the same diagnostic code at the same line and
- *          column, in the same order. The parser now runs on the CST, so every
- *          location an author or a test relied on must have survived the swap
- *          unmoved.
- * Description: The tokeniser is gone, so the comparison is against its
- *              recorded output, tokeniser-diagnostics.json (see
+ * Purpose: On malformed input the CST reports what the recorded tokeniser
+ *          reported: the same diagnostic code at the same line and column, in
+ *          the same order. The parser runs on the CST, so every location an
+ *          author or a test relies on is held to that record.
+ * Description: The comparison is against the recorded output,
+ *              tokeniser-diagnostics.json (see
  *              tokeniser-golden.ts). Three corpora: every tracked `.xml` file in
  *              the repository (which includes the malformed fixtures, and checks
  *              that well-formed files stay diagnostic-free); the inline

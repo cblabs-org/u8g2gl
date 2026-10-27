@@ -5,11 +5,10 @@
  *
  * File: test/integration/single-file-root.test.ts
  * Purpose: `u8g2gl validate <file>` picks a parser by the file's root element.
- *          A file no parser takes used to pass validation unread: `<foo/>`
- *          always did, and a screen with stray text before its root did once
- *          the root was found by the parser rather than by a search for the
- *          first `<name`. Both must fail, and a valid file of every kind must
- *          still pass.
+ *          A file no parser takes must fail, not pass unread: a well-formed
+ *          file with an unknown root such as `<foo/>`, and a screen with stray
+ *          text before its root, which the parser reads as a misnamed root. A
+ *          valid file of every kind must still pass.
  * Description: Runs the built CLI (dist/) in a child process on files written
  *              under the git-ignored cli/tmp/, reading the `--json` contract.
  */
@@ -58,7 +57,6 @@ describe('validate on a single file whose root no parser takes', () => {
     expect(res.diagnostics[0]).toMatchObject({ code: 'U8G2GL_MALFORMED_XML', line: 1, column: 7 });
   });
 
-  // A deliberate change: until now `<foo/>` passed validation silently.
   it('fails on a well-formed unknown root, naming it and the accepted roots', async () => {
     const res = await validateFile('foo.xml', '<foo/>\n');
     expect(res.code).not.toBe(0);

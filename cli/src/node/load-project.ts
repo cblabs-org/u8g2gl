@@ -165,6 +165,11 @@ function unrecognisedRootDiagnostic(root: RawXmlElement | undefined, label: stri
  * --fix-names` writes names to disk *before* calling this, so what is loaded is
  * always what is on disk.
  *
+ * A single file is dispatched to a parser by its root element. One whose root
+ * no parser takes yields `U8G2GL_MALFORMED_XML` diagnostics in the returned
+ * model's `loadDiagnostics`: its own well-formedness errors if it has any, else
+ * one "Unrecognised root element" error naming the roots that are accepted.
+ *
  * @param targetPath Absolute path to a project directory or an XML file.
  * @param options    Label for a single file, and the framework bundle.
  * @return The model, the project root (directories only) and every source text.

@@ -5,11 +5,10 @@
  *
  * File: test/cst/entities.test.ts
  * Purpose: There is one entity rule, the CST's, and the parser's public
- *          `decodeXmlEntities` is it. Two copies existed while the old
- *          tokeniser lived; this test used to keep them from drifting, and now
- *          holds that the public name has not quietly become a second copy.
- * Description: The public name is the CST's function, checked on the inputs
- *              the two copies were once compared over, with their results.
+ *          `decodeXmlEntities` is it. This test holds that the public name has
+ *          not quietly become a second copy, and pins what the rule decodes.
+ * Description: The public name is the CST's function, checked on predefined,
+ *              numeric, unknown and malformed references.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -34,7 +33,7 @@ describe('decodeEntities', () => {
     expect(decodeEntities(input)).toBe(expected);
   });
 
-  it('leaves a reference beyond U+10FFFF as written, where the old tokeniser threw', () => {
+  it('leaves a reference beyond U+10FFFF as written rather than throwing', () => {
     expect(decodeEntities('a&#99999999;b')).toBe('a&#99999999;b');
   });
 });

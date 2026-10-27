@@ -4,16 +4,16 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/tokeniser-golden.ts
- * Purpose: The hand-rolled tokeniser the parser used to scan XML with has been
- *          replaced by the CST, and with it the only thing a parity test could
- *          compare against. Its observable behaviour was recorded first, into
- *          two committed JSON goldens beside this file, so the replacement is
- *          checked against what the old code actually did rather than against
- *          itself. This module is the one place that reads them and the one
- *          place that defines how a tree is written down for comparison.
- * Description: The goldens were produced once, by running the old tokeniser
- *              over the corpus, and are never regenerated: they are a record,
- *              not a cache. Each repository file's entry carries the SHA-256 of
+ * Purpose: The two committed JSON goldens beside this file are the recorded
+ *          output of the hand-rolled tokeniser the CST replaced. The parity
+ *          and adapter tests check the CST and `tokenizeXml` against that
+ *          record, which is an independent reference; comparing the CST with
+ *          itself would prove nothing. This module is the one place that reads
+ *          the goldens and the one place that defines how a tree is written
+ *          down for comparison.
+ * Description: The goldens are a record, not a cache: they are never
+ *              regenerated, because the tokeniser that produced them no
+ *              longer exists. Each repository file's entry carries the SHA-256 of
  *              the text it was recorded from, so a later edit to that file is
  *              reported as a stale entry rather than as a parser regression.
  *
@@ -28,6 +28,8 @@
  * Exports:
  *   Golden shapes:
  *   - FrozenDiagnostic:       One diagnostic as recorded
+ *   - FrozenInlineDiagnostics: An inline input and its recorded diagnostics
+ *   - FrozenDifference:       An input the CST deliberately parses differently
  *   - DiagnosticsGolden:      The shape of tokeniser-diagnostics.json
  *   - FrozenElement:          One element as recorded
  *   - TreesGolden:            The shape of tokeniser-trees.json
@@ -49,7 +51,7 @@ import type { SourceLocation } from '../../src/core/schema/source-location.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** One diagnostic as the old tokeniser reported it. */
+/** One diagnostic as the recorded tokeniser reported it. */
 export interface FrozenDiagnostic {
   readonly code: string;
   readonly line: number;
@@ -57,7 +59,7 @@ export interface FrozenDiagnostic {
   readonly message: string;
 }
 
-/** An inline input and what the old tokeniser reported for it. */
+/** An inline input and what the recorded tokeniser reported for it. */
 export interface FrozenInlineDiagnostics {
   /** Which corpus it came from: `existing` test cases or `branch` (one per recovery branch). */
   readonly group: 'existing' | 'branch';
@@ -69,7 +71,7 @@ export interface FrozenInlineDiagnostics {
 
 /**
  * An input the CST parses differently on purpose. `diagnostics` is what the
- * old tokeniser reported; `threw` is set instead when it threw.
+ * recorded tokeniser reported; `threw` is set instead when it threw.
  */
 export interface FrozenDifference {
   readonly name: string;
@@ -131,8 +133,8 @@ export function freezeDiagnostics(diagnostics: readonly Diagnostic[]): FrozenDia
 }
 
 // at
-// `line:column`, refusing a location in some other file: every location in a
-// tree must name the file it was parsed as.
+// A location as `line:column`, refusing one in some other file: every location
+// in a tree must name the file it was parsed as.
 function at(loc: SourceLocation, file: string): string {
   if (loc.file !== file) {
     throw new Error(`location names '${loc.file}', expected '${file}'`);
