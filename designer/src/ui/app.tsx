@@ -99,7 +99,7 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
         <main className="editor-area">
           <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
         </main>
-        <StatusBar />
+        <StatusBar onShowOutput={() => dock.current?.getPanel('output')?.api.setActive()} />
       </div>
     </WorkspaceContext.Provider>
   );

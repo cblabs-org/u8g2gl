@@ -31,6 +31,9 @@ npm-debug.log*
 yarn-error.log*
 .pnpm-store/
 coverage/
+# The designer's Playwright runs (designer/dist/ is covered by dist/ above).
+designer/test-results/
+designer/playwright-report/
 
 # ─── Emscripten / WebAssembly (editor + snapshot harness, PR-06) ──────────
 emsdk/

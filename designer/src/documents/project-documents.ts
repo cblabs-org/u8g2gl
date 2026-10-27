@@ -24,16 +24,21 @@
  *     Loading:
  *     - load():            List the project and read its documents
  *     - files:             Every project file, as listed
+ *     - fileSystem:        Where the documents come from
+ *     - onDidChangeOnDisk(): Subscribe to files changing on disk
  *
  *     Documents:
  *     - isDocument():      Whether the pipeline reads a path
  *     - open():            The path's model, creating it on first open
  *     - modelOf():         The path's model, if open
+ *     - openPaths():       Every open document
+ *     - pathOf():          The path a model was opened for
  *     - close():           Dispose a model
  *     - texts():           Every document's current text
  *
  *     Change:
  *     - onDidChangeContent(): Subscribe to edits in any open model
+ *     - onDidOpen():          Subscribe to documents being opened
  */
 
 import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
@@ -56,10 +61,17 @@ export class ProjectDocuments {
   private readonly disk = new Map<string, DiskText>();
   private readonly models = new Map<string, monaco.editor.ITextModel>();
   private readonly contentListeners = new Set<(path: string) => void>();
+  private readonly openListeners = new Set<(path: string) => void>();
+  private readonly diskListeners = new Set<(path: string) => void>();
 
   /** @param fs The served project file system, already connected. */
   constructor(fs: ServedProjectFileSystem) {
     this.fs = fs;
+  }
+
+  /** The file system the documents are read from and saved to. */
+  get fileSystem(): ServedProjectFileSystem {
+    return this.fs;
   }
 
   /**
@@ -82,6 +94,47 @@ export class ProjectDocuments {
       this.disk.set(read.path, { text: read.text, version: read.version });
     }
     this.files.set(listing.files);
+    this.fs.watch((event) => {
+      void this.diskChanged(event.path, event.kind).catch((error: unknown) => console.error(error));
+    });
+  }
+
+  /**
+   * @brief Calls `listener` with a project path after the file changed on disk
+   *        and the documents have caught up with it.
+   *
+   * @return The unsubscribe function.
+   */
+  onDidChangeOnDisk(listener: (path: string) => void): () => void {
+    const entry = (path: string): void => listener(path);
+    this.diskListeners.add(entry);
+    return () => {
+      this.diskListeners.delete(entry);
+    };
+  }
+
+  // diskChanged
+  // A watcher event: the listing for an added or removed file, the disk text
+  // for a changed document. A document that is open keeps its buffer here;
+  // what happens to it is the save and reload rules' decision.
+  //   path — project-relative
+  //   kind — what happened
+  private async diskChanged(path: string, kind: 'changed' | 'added' | 'removed'): Promise<void> {
+    if (kind !== 'changed') {
+      const listing = await this.fs.list();
+      if (listing.ok) this.files.set(listing.files);
+    }
+    if (this.isDocument(path)) {
+      if (kind === 'removed') {
+        this.disk.delete(path);
+      } else {
+        const read = await this.fs.read(path);
+        if (read.ok && read.version !== this.disk.get(path)?.version) {
+          this.disk.set(path, { text: read.text, version: read.version });
+        }
+      }
+    }
+    for (const listener of [...this.diskListeners]) listener(path);
   }
 
   /** @brief Whether the pipeline reads this path as a project document. */
@@ -109,7 +162,13 @@ export class ProjectDocuments {
       for (const listener of [...this.contentListeners]) listener(path);
     });
     this.models.set(path, model);
+    for (const listener of [...this.openListeners]) listener(path);
     return model;
+  }
+
+  /** @brief The paths of every open document. */
+  openPaths(): string[] {
+    return [...this.models.keys()];
   }
 
   /** @brief The document's model if it is open. */
@@ -138,6 +197,19 @@ export class ProjectDocuments {
       texts.set(path, this.models.get(path)?.getValue() ?? disk.text);
     }
     return texts;
+  }
+
+  /**
+   * @brief Calls `listener` with a document's path when its model is created.
+   *
+   * @return The unsubscribe function.
+   */
+  onDidOpen(listener: (path: string) => void): () => void {
+    const entry = (path: string): void => listener(path);
+    this.openListeners.add(entry);
+    return () => {
+      this.openListeners.delete(entry);
+    };
   }
 
   /**

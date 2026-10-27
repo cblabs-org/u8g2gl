@@ -49,7 +49,7 @@ async function start(): Promise<void> {
   // --- Step 2: The project, through the server ---
   const fs = new ServedProjectFileSystem({ origin: session.origin, token: session.token });
   await fs.connect();
-  const workspace = new Workspace(fs);
+  const workspace = new Workspace(fs, session);
   await workspace.documents.load();
   const projectText = workspace.documents.texts().get('u8g2gl.xml');
   const projectName = projectText === undefined ? '' : (parseProjectFile(projectText, 'u8g2gl.xml').value?.name ?? '');
@@ -60,6 +60,9 @@ async function start(): Promise<void> {
   const root = document.getElementById('root');
   if (root === null) throw new Error('index.html has no #root');
   createRoot(root).render(<App workspace={workspace} />);
+  workspace.start();
+  // A handle for the end-to-end tests and for a developer's console; nothing
+  // in the application reads it.
   (window as unknown as { __u8g2gl?: Workspace }).__u8g2gl = workspace;
 }
 

@@ -23,7 +23,11 @@ export function OutputPanel(): React.JSX.Element {
   const workspace = useWorkspace();
   const lines = useObservable(workspace.output);
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => end.current?.scrollIntoView({ block: 'end' }), [lines]);
+  useEffect(() => {
+    // Braced, not an expression body: scrollIntoView() returns a promise in
+    // current Chromium, and an effect may only return its clean-up function.
+    void end.current?.scrollIntoView({ block: 'end' });
+  }, [lines]);
   return (
     <pre className="output" aria-label="Output">
       {lines.join('\n')}

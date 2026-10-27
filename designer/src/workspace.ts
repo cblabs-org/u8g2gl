@@ -20,6 +20,10 @@
  *
  *     State:
  *     - documents, activeFile, problems, output, projectName
+ *     - wasm, loop:     The editor Wasm and the edit loop
+ *
+ *     Lifecycle:
+ *     - start():        Start the loop and the Wasm, once loaded
  *
  *     Requests:
  *     - openFile():     Ask the layout to show a file
@@ -30,7 +34,10 @@
 import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import { ProjectDocuments } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
+import { EditLoop } from './pipeline/edit-loop';
+import type { DesignSession } from './session';
 import { Observable } from './state/observable';
+import { EditorWasmController } from './wasm/editor-wasm-controller';
 
 /** A file to show, and optionally the position to put the caret at. */
 export interface OpenRequest {
@@ -57,9 +64,29 @@ export class Workspace {
 
   private readonly openListeners = new Set<(request: OpenRequest) => void>();
 
-  /** @param fs The served project file system, connected. */
-  constructor(fs: ServedProjectFileSystem) {
+  /** The editor Wasm the canvas draws with. */
+  readonly wasm: EditorWasmController;
+  /** The live loop from text to pixels. */
+  readonly loop: EditLoop;
+
+  /**
+   * @param fs      The served project file system, connected.
+   * @param session The server and token, for builds and the Wasm route.
+   */
+  constructor(fs: ServedProjectFileSystem, session: DesignSession) {
     this.documents = new ProjectDocuments(fs);
+    this.wasm = new EditorWasmController(session, (line) => this.log(line));
+    this.loop = new EditLoop(this, this.wasm);
+  }
+
+  /**
+   * @brief Starts the session once the documents are loaded: the edit loop,
+   *        the editor Wasm and its rebuilds on source changes.
+   */
+  start(): void {
+    this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
+    this.loop.start();
+    void this.wasm.start();
   }
 
   /** @brief Asks the layout to show a file, at a position if given. */
