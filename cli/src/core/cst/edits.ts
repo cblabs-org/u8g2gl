@@ -380,13 +380,15 @@ export function removeElement(cst: CstDocument, element: CstElement): TextEdit[]
     // The last line has no break of its own; take the one before it instead,
     // so no empty last line is left behind. `start - 1` is the final
     // character of that previous break (the LF of a CRLF), and lineEndAt maps
-    // it back to where the break begins. On line 1 there is no previous break
-    // (`start === 0`), so the edit runs from the line start: the element was
-    // the whole text. Known gap, left as is: with a BOM, line 1 starts at 1,
-    // so `start > 0` holds and lineEndAt(0) is the end of the text — removing
-    // the sole element of a one-line BOM file then removes nothing.
-    const previousBreak = lineEndAt(cst, Math.max(start - 1, 0));
-    return [{ start: start > 0 ? previousBreak : start, end: cst.text.length, text: '' }];
+    // it back to where the break begins. Line 1 has no previous break, so the
+    // edit runs from the line start: the element was the whole line. The test
+    // is the line number, not `start > 0`, because after a BOM line 1 starts
+    // at offset 1, and the BOM must survive the removal.
+    if (cst.lines.locate(start).line === 1) {
+      return [{ start, end: cst.text.length, text: '' }];
+    }
+    const previousBreak = lineEndAt(cst, start - 1);
+    return [{ start: previousBreak, end: cst.text.length, text: '' }];
   }
 
   // --- Step 2: Shares a line — the element and the spaces before it ---

@@ -396,6 +396,56 @@ describe('renameElementTag', () => {
   });
 });
 
+// A BOM sits on line 1 but is not part of its content, so line 1 starts at
+// offset 1. Every function that reasons about line starts must keep the BOM
+// and treat what follows it as the start of the line. Removing the root leaves
+// a document with no root, so those cases assert exact output rather than
+// going through expectEdit's diagnostic-free re-parse.
+describe('edits after a byte-order mark', () => {
+  const removeRoot = (text: string): string => {
+    const { cst } = parseCst(text, 'bom.xml');
+    return applyEdits(text, removeElement(cst, cst.root!));
+  };
+
+  it('removeElement on a one-line file removes the element and keeps the BOM', () => {
+    expect(removeRoot('﻿<a/>')).toBe('﻿');
+  });
+
+  it('removeElement with two root-level lines removes only the element line', () => {
+    expect(removeRoot('﻿<a/>\n<!-- c -->')).toBe('﻿<!-- c -->');
+    expect(removeRoot('﻿<?xml version="1.0"?>\n<a/>')).toBe('﻿<?xml version="1.0"?>');
+  });
+
+  it('removeElement with CRLF line endings keeps the BOM and the other line', () => {
+    expect(removeRoot('﻿<a/>\r\n<!-- c -->\r\n')).toBe('﻿<!-- c -->\r\n');
+    expect(removeRoot('﻿<?xml version="1.0"?>\r\n<a/>')).toBe('﻿<?xml version="1.0"?>');
+  });
+
+  it('removeElement of a child on line 1 keeps the BOM', () => {
+    const cst = parse('﻿<a><b/></a>');
+    const b = tagged(cst, 'b');
+    const { after } = expectEdit(cst, removeElement(cst, b), b);
+    expect(after).toBe('﻿<a></a>');
+  });
+
+  it('insertElement into a line-1 parent indents from after the BOM', () => {
+    const selfClosing = parse('﻿<a/>');
+    expect(expectEdit(selfClosing, insertElement(selfClosing, selfClosing.root!, 0, '<b/>'), selfClosing.root!).after).toBe(
+      '﻿<a>\n  <b/>\n</a>',
+    );
+    const closeOwnLine = parse('﻿<a>\r\n</a>\r\n');
+    expect(expectEdit(closeOwnLine, insertElement(closeOwnLine, closeOwnLine.root!, 0, '<b/>'), closeOwnLine.root!).after).toBe(
+      '﻿<a>\r\n  <b/>\r\n</a>\r\n',
+    );
+  });
+
+  it('insertAttribute and removeAttribute on line 1 keep the BOM', () => {
+    const cst = parse('﻿<a x="1" y="2"/>');
+    expect(expectEdit(cst, insertAttribute(cst, cst.root!, 'z', '3'), cst.root!).after).toBe('﻿<a x="1" y="2" z="3"/>');
+    expect(expectEdit(cst, removeAttribute(cst, cst.root!.attributes[0]!), cst.root!).after).toBe('﻿<a y="2"/>');
+  });
+});
+
 describe('applyEdits', () => {
   it('applies non-overlapping edits from the end, against the original offsets', () => {
     expect(
