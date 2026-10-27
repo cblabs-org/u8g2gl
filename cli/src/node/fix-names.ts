@@ -29,8 +29,8 @@ import { join, resolve } from 'node:path';
 import {
   applyTextEdits,
   parseScreenFile,
-  rootElementName,
   parseWidgetManifestFile,
+  rootElementName,
   type SourceEdit,
 } from '../core/parser/index.js';
 import { readProjectFiles } from './read-project.js';

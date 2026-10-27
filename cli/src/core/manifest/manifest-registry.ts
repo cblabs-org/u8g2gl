@@ -230,17 +230,18 @@ function parentTagOf(
 }
 
 // manifestDiagnostic
-// One registry diagnostic about `manifest`, at `at` when given, else at its
-// `<widget>` tag.
-//   at — the attribute at fault, when there is one to point at (§15.1)
+// One registry diagnostic about `manifest`, at `options.at` when given, else
+// at its `<widget>` tag.
+//   options.suggestions — machine-applicable replacements for offendingText
+//   options.at          — the attribute at fault, when there is one to point at (§15.1)
 function manifestDiagnostic(
   code: string,
   message: string,
   manifest: WidgetManifest,
   offendingText: string,
-  suggestions: readonly string[] = [],
-  at: SourceLocation | undefined = undefined,
+  options: { readonly suggestions?: readonly string[]; readonly at?: SourceLocation } = {},
 ): Diagnostic {
+  const { suggestions = [], at } = options;
   const loc = at ?? manifest.loc;
   return {
     code,
@@ -355,8 +356,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
               `Manifest 'extends' cycle: ${cycle.join(' -> ')}.`,
               manifest,
               parentTag,
-              [],
-              extendsAt,
+              { at: extendsAt },
             ),
           );
         }
@@ -373,8 +373,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
               `manifest — an <api> with no new props is enough.`,
             manifest,
             parentTag,
-            findClosest(parentTag, tags),
-            extendsAt,
+            { suggestions: findClosest(parentTag, tags), at: extendsAt },
           ),
         );
       } else {
@@ -397,8 +396,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
                 `'extends'), or use extends="u8g2gl_obj" and draw from your own class.`,
               manifest,
               parentTag,
-              [],
-              extendsAt,
+              { at: extendsAt },
             ),
           );
           // The result keeps the parent's props deliberately: dropping them would add an
