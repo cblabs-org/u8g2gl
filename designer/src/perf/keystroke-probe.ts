@@ -18,9 +18,9 @@
  *              closes the sample: key to blit, split into Monaco's handling of
  *              the key (key to the text changing), the wait for the frame
  *              (that change to the run's start), and each stage. A frame
- *              counter, advanced once per animation frame by its timestamp,
- *              gives the frame the key arrived after and the frame the blit was
- *              in. Samples are kept
+ *              counter numbers the display's frame intervals from the
+ *              animation frames' timestamps, and gives the interval the key
+ *              arrived in and the one the blit ended in. Samples are kept
  *              in memory, at most `LIMIT`, and read through
  *              `window.__u8g2glPerf` by the end-to-end test or a developer's
  *              console. Each sample is also a `performance.measure`, so it
@@ -47,8 +47,11 @@ export interface KeystrokeSample {
   /** From the start of the pipeline run to the end of its blit: the work in the frame. */
   readonly runToBlit: number;
   /**
-   * Animation frames from the key to the blit: 1 when the edit is drawn in the
-   * first frame after the key, more when a frame was skipped.
+   * Frame intervals from the key event to the end of the blit. 1 when the edit
+   * is on the canvas in the first frame after the key; 0 when that frame had
+   * begun (its timestamp) just before the key was dispatched, so both fall in
+   * one interval; 2 or more when it missed a frame, whether its run came late
+   * or ran past its frame's end.
    */
   readonly frames: number;
   /** Each stage of that run. */
@@ -70,23 +73,45 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
   let edited: number | undefined;
   let keyFrame = 0;
 
-  // --- Step 0: A frame counter. Every callback of one animation frame shares
-  // its timestamp, so a new timestamp is a new frame, whichever callback of
-  // that frame runs first. ---
-  let frameCount = 0;
+  // --- Step 0: A frame counter, by the display's frame intervals ---
+  // Frame k is the interval [T_k, T_k + period) that begins at an animation
+  // frame's timestamp T_k. Any moment, a key event's or the end of a blit, is
+  // numbered by the interval it falls in, counted on from the latest frame
+  // seen. Counting intervals rather than callbacks is what lets the counter
+  // see a late frame: a run blocked past its frame's end does not delay its
+  // own callback's timestamp, but its blit ends in a later interval.
+  // `frameIndex` is the latest frame's interval number on one grid anchored at
+  // the first frame, advanced by the elapsed periods rather than by one per
+  // callback, so a stall (no callbacks for several periods) moves it as far as
+  // it moves a moment numbered across the stall.
+  let frameIndex = 0;
   let lastFrameTime = -1;
+  const periods: number[] = [];
   const countFrame = (time: number): void => {
     if (time !== lastFrameTime) {
+      const period = time - lastFrameTime;
+      // Only plausible display periods (a 20-200 Hz display) teach the
+      // estimate: the gap after a stall, or the first frame, is not one.
+      if (lastFrameTime >= 0 && period >= 5 && period <= 50) {
+        periods.push(period);
+        if (periods.length > 30) periods.shift();
+      }
+      frameIndex += lastFrameTime < 0 ? 0 : Math.max(1, Math.round(period / framePeriod()));
       lastFrameTime = time;
-      frameCount += 1;
     }
     requestAnimationFrame(countFrame);
   };
   requestAnimationFrame(countFrame);
-  // frameOf
-  // The number of the frame whose callbacks carry `time`: the counted one, or
-  // the next if this frame's counter callback has not run yet.
-  const frameOf = (time: number): number => (time === lastFrameTime ? frameCount : frameCount + 1);
+  // framePeriod
+  // The display's frame period: the median of recent periods, or 60 Hz's.
+  const framePeriod = (): number => {
+    if (periods.length === 0) return 1000 / 60;
+    const sorted = [...periods].sort((x, y) => x - y);
+    return sorted[Math.floor(sorted.length / 2)] ?? 1000 / 60;
+  };
+  // frameAt
+  // The number of the frame interval a moment falls in.
+  const frameAt = (time: number): number => frameIndex + Math.floor((time - lastFrameTime) / framePeriod());
 
   // --- Step 1: Stamp the first key since the last drawn frame ---
   window.addEventListener(
@@ -94,7 +119,7 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
     (event) => {
       if (pendingKey === undefined) {
         pendingKey = event.timeStamp > 0 ? event.timeStamp : performance.now();
-        keyFrame = frameCount;
+        keyFrame = frameAt(pendingKey);
         performance.mark('u8g2gl:key');
       }
     },
@@ -123,7 +148,7 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
       keyToEdit: edit - pendingKey,
       editToFrame: runStart - edit,
       runToBlit: end - runStart,
-      frames: frameOf(timings.frameStart) - keyFrame,
+      frames: frameAt(end) - keyFrame,
       stages,
     });
     performance.measure('u8g2gl:key-to-blit', { start: pendingKey, end });

@@ -73,8 +73,13 @@ interface Spread {
 interface ScreenResult {
   readonly screen: string;
   readonly samples: number;
-  /** Gated: how many keystrokes were drawn in the first frame after the key, and the worst. */
+  /**
+   * Gated: how many keystrokes were drawn by the first frame after the key
+   * (0 or 1 intervals later; see `measure`), the worst, and every count.
+   */
   readonly frames: { readonly firstFrame: number; readonly worst: number; readonly histogram: Readonly<Record<string, number>> };
+  /** Every keystroke that missed its frame, in full, so a failure can be attributed. */
+  readonly misses: readonly { readonly index: number; readonly frames: number; readonly keyToEdit: number; readonly editToFrame: number; readonly runToBlit: number; readonly keyToBlit: number; readonly stages: Readonly<Record<string, number>> }[];
   /** Gated: pipeline-run start to blit end. */
   readonly runToBlit: Spread;
   /** Reported only: key event to blit end. */
@@ -94,19 +99,46 @@ function percentile(values: readonly number[], p: number): number {
 /** Two decimals, for the report. */
 const round = (value: number): number => Math.round(value * 100) / 100;
 
+// gateFailures
+// Ruling 8's two gates for one screen, as the reasons they fail; empty when
+// both pass. The e2 test and its self-test judge with this one function, so
+// the self-test proves the gate the e2 test actually applies.
+//   result — one screen's measurement
+function gateFailures(result: ScreenResult): string[] {
+  const failures: string[] = [];
+  if (result.frames.firstFrame !== result.samples) {
+    failures.push(`${result.samples - result.frames.firstFrame} keystroke(s) missed their frame (worst ${result.frames.worst})`);
+  }
+  if (!(result.runToBlit.p95 < BUDGET_MS)) {
+    failures.push(`run-to-blit p95 ${result.runToBlit.p95} ms is not under ${BUDGET_MS} ms`);
+  }
+  return failures;
+}
+
 // measure
-// Types 2 × (WARMUP + KEYSTROKES) / 2 keys into an open file — alternately a
-// digit after the caret and a Backspace — and returns the probe's samples.
-//   page   — the shell, with `path` open and the caret after the x value's first digit
-//   label  — the screen's name, for the report
-async function measure(page: Page, label: string, digit: string): Promise<ScreenResult> {
+// Types WARMUP + keystrokes keys into an open file — alternately a digit after
+// the caret and a Backspace — and returns the probe's samples for the last
+// `keystrokes` of them.
+//   page       — the shell, with the file open and the caret after the x value's first digit
+//   label      — the screen's name, for the report
+//   digit      — the digit typed
+//   keystrokes — how many keys are measured
+//   beforeKey  — called before measured key i, so a test can arrange that key
+async function measure(
+  page: Page,
+  label: string,
+  digit: string,
+  keystrokes = KEYSTROKES,
+  beforeKey: (i: number) => Promise<void> = async () => undefined,
+): Promise<ScreenResult> {
   type Sample = { keyToBlit: number; wait: number; keyToEdit: number; editToFrame: number; runToBlit: number; frames: number; stages: Record<string, number> };
   const count = (): Promise<number> => page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: unknown[] } }).__u8g2glPerf.samples.length);
   await page.evaluate(() => (window as unknown as { __u8g2glPerf: { reset(): void } }).__u8g2glPerf.reset());
-  for (let i = 0; i < WARMUP + KEYSTROKES; i++) {
+  for (let i = 0; i < WARMUP + keystrokes; i++) {
     if (i === WARMUP) {
       await page.evaluate(() => (window as unknown as { __u8g2glPerf: { reset(): void } }).__u8g2glPerf.reset());
     }
+    if (i >= WARMUP) await beforeKey(i - WARMUP);
     const before = await count();
     await page.keyboard.press(i % 2 === 0 ? digit : 'Backspace');
     await page.waitForFunction((n) => (window as unknown as { __u8g2glPerf: { samples: unknown[] } }).__u8g2glPerf.samples.length > n, before);
@@ -138,10 +170,16 @@ async function measure(page: Page, label: string, digit: string): Promise<Screen
     screen: label,
     samples: samples.length,
     frames: {
-      firstFrame: samples.filter((s) => s.frames === 1).length,
+      // 0 is also the first frame after the key: the frame whose callbacks ran
+      // first after the key event had begun (its timestamp) a moment before the
+      // key was dispatched, so the key's interval and the blit's are the same.
+      firstFrame: samples.filter((s) => s.frames <= 1).length,
       worst: Math.max(...samples.map((s) => s.frames)),
       histogram,
     },
+    misses: samples
+      .map((s, index) => ({ index, frames: s.frames, keyToEdit: round(s.keyToEdit), editToFrame: round(s.editToFrame), runToBlit: round(s.runToBlit), keyToBlit: round(s.keyToBlit), stages: s.stages }))
+      .filter((s) => s.frames > 1),
     runToBlit: spread(samples.map((s) => s.runToBlit)),
     keyToBlit: spread(totals),
     stageMedians: stages,
@@ -186,6 +224,7 @@ test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 und
   for (const r of results) {
     console.log(`  ${r.screen} (${r.samples} samples):`);
     console.log(`    frames key->blit: ${r.frames.firstFrame}/${r.samples} in the first frame, worst ${r.frames.worst}, histogram ${JSON.stringify(r.frames.histogram)}`);
+    for (const miss of r.misses) console.log(`    MISSED (${miss.frames} frames): ${JSON.stringify(miss)}`);
     console.log(`    run->blit: median ${r.runToBlit.median} ms, p95 ${r.runToBlit.p95} ms, max ${r.runToBlit.max} ms`);
     console.log(`    key->blit (reported): median ${r.keyToBlit.median} ms, p95 ${r.keyToBlit.p95} ms, max ${r.keyToBlit.max} ms`);
     console.log(`    stage medians (ms): ${Object.entries(r.stageMedians).map(([k, v]) => `${k} ${v}`).join(', ')}`);
@@ -196,8 +235,65 @@ test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 und
   for (const r of results) {
     expect(r.samples).toBe(KEYSTROKES);
     if (process.env.CI === undefined) {
-      expect.soft(r.frames.firstFrame, `${r.screen}: keystrokes drawn in the first frame after the key`).toBe(r.samples);
-      expect.soft(r.runToBlit.p95, `${r.screen}: run-to-blit p95`).toBeLessThan(BUDGET_MS);
+      expect(gateFailures(r), `${r.screen}: ruling 8's gates`).toEqual([]);
     }
   }
+});
+
+// The self-test of ruling 10: before trusting the frame gate passing, show it
+// can fail. One keystroke is forced to miss its frame by a hook the test
+// injects into the page through the existing `window.__u8g2gl` handle: the
+// loaded editor Wasm's `renderFrame` is wrapped to block the main thread for
+// three frame periods inside the pipeline run that draws that keystroke,
+// before its blit, and then unwrapped.
+// The hook exists only in this file; the built designer contains no such code
+// (checked by grep over `designer/dist` in the completion report).
+test('e2 self-test: a keystroke forced to miss its frame is counted 2 or more, and the gate fails', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
+  session = await startDesign();
+  await openShell(page, session.url);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+  await openFile(page, 'screens/screen_departures.xml');
+  await placeCaret(page, 'screens/screen_departures.xml', 'name="row0" x="32"', 'name="row0" x="32'.length);
+  await page.keyboard.press('Backspace');
+
+  const FORCED = 5;
+  const result = await measure(page, 'departures, one key forced late', '2', 10, async (i) => {
+    if (i !== FORCED) return;
+    await page.evaluate(() => {
+      type Module = { renderFrame(ms: number): Uint8Array | undefined };
+      const workspace = (window as unknown as {
+        __u8g2gl: { wasm: { module: { get(): Module | undefined } }; documents: { onDidChangeContent(listener: () => void): () => void } };
+      }).__u8g2gl;
+      const module = workspace.wasm.module.get();
+      if (module === undefined) throw new Error('no editor Wasm loaded');
+      const original = module.renderFrame.bind(module);
+      // Armed by the next edit, so the block lands in the pipeline run that
+      // draws it, not in the animation ticker's render between keys (the
+      // ticker does not render while a run is booked).
+      let armed = false;
+      const disarm = workspace.documents.onDidChangeContent(() => {
+        armed = true;
+        disarm();
+      });
+      const __u8g2glForceMissedFrame = (ms: number): Uint8Array | undefined => {
+        if (!armed) return original(ms);
+        module.renderFrame = original;
+        const until = performance.now() + 50;
+        while (performance.now() < until) {
+          // Block the main thread for three frame periods, inside the run.
+        }
+        return original(ms);
+      };
+      module.renderFrame = __u8g2glForceMissedFrame;
+    });
+  });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  console.log(`e2 self-test: frames per keystroke ${JSON.stringify(result.frames.histogram)}, worst ${result.frames.worst}; gate: ${JSON.stringify(gateFailures(result))}`);
+
+  const samples = await page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: { frames: number }[] } }).__u8g2glPerf.samples.map((s) => s.frames));
+  expect(samples[FORCED], 'the forced keystroke').toBeGreaterThanOrEqual(2);
+  expect(samples.filter((frames, i) => i !== FORCED).every((frames) => frames <= 1), 'every other keystroke').toBe(true);
+  expect(gateFailures(result).some((failure) => failure.includes('missed their frame'))).toBe(true);
 });
