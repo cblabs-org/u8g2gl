@@ -134,7 +134,7 @@ Each work order ends with a push.
   PR of its own, with its own Principal Architect and plan gate. That PA verifies provenance
   from this entry (rule 00), and the owner approves that PR's Work-Order breakdown in turn.
   The proposed Tier-1 text (E1-DECOMPOSITION.md §4) is still the Chief Architect's to land.
-- **2026-10-27. Tier-1 text landed** (branch `u8g2gl-ca/e-d-tier1`). The owner approved the
+- **2026-10-27. Tier-1 text landed** (PR #19, branch `u8g2gl-ca/e-d-tier1`). The owner approved the
   Chief Architect's plan for it, verbatim:
 
   > "approved - please proceed autonomously from this point on until you run out of quota.  Please spin up sub-agents as needed."
