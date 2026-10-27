@@ -14,12 +14,17 @@
  *              tokeniser (tokeniser-golden.ts): the full tree for every tracked
  *              `.xml` file and inline case, and every diagnostic including its
  *              message. A repository file edited since the recording fails as a
- *              stale entry, by hash, before its tree is compared.
+ *              stale entry, by hash, before its tree is compared. Then the three
+ *              inputs the old tokeniser rejected and the CST accepts, each shown
+ *              failing in the recording and parsing now; and the offset ranges
+ *              every element and attribute gained, checked against the text.
  */
 
 import { describe, expect, it } from 'vitest';
-import { tokenizeXml } from '../../src/core/parser/index.js';
-import { readRepoFile } from './cst-test-helpers.js';
+import { LineIndex } from '../../src/core/cst/index.js';
+import { decodeXmlEntities, tokenizeXml } from '../../src/core/parser/index.js';
+import type { RawXmlElement } from '../../src/core/parser/index.js';
+import { readRepoFile, repoXmlFiles } from './cst-test-helpers.js';
 import {
   freezeDiagnostics,
   freezeTree,
@@ -48,5 +53,99 @@ describe('tokenizeXml matches the recorded tokeniser', () => {
 
   it.each(diagnostics.inlineCases)('diagnostics of $group case: $name', ({ file, text, diagnostics: recorded }) => {
     expect(freezeDiagnostics(tokenizeXml(text, file).diagnostics)).toEqual(recorded);
+  });
+});
+
+// difference
+// The recorded entry for one intentional difference, by name.
+function difference(name: string): (typeof diagnostics.intentionalDifferences)[number] {
+  const entry = diagnostics.intentionalDifferences.find((d) => d.name === name);
+  if (!entry) {
+    throw new Error(`no recorded difference '${name}'`);
+  }
+  return entry;
+}
+
+describe('inputs the old tokeniser rejected now parse', () => {
+  it('a leading BOM: two diagnostics before, a clean tree that ignores the BOM now', () => {
+    const { file, text, diagnostics: before } = difference('leading BOM');
+    expect(before?.map((d) => d.message)).toEqual([
+      'Expected element tag name after "<"',
+      'Multiple root elements or unexpected trailing content',
+    ]);
+    const doc = tokenizeXml(text, file);
+    expect(doc.diagnostics).toEqual([]);
+    expect(freezeTree(doc, file)).toEqual({
+      name: 'screen',
+      loc: '1:1',
+      endLoc: '3:1',
+      attributes: [['name', 'bom', '1:15', '1:9']],
+      comments: [],
+      children: [{ name: 'view', loc: '2:5', endLoc: '2:10', attributes: [], comments: [], children: [] }],
+    });
+  });
+
+  it('CDATA in content: a missing tag name before, text joined undecoded now', () => {
+    const { file, text, diagnostics: before } = difference('CDATA in element content');
+    expect(before?.map((d) => [d.line, d.column, d.message])).toEqual([
+      [1, 11, 'Expected element tag name after "<"'],
+    ]);
+    const doc = tokenizeXml(text, file);
+    expect(doc.diagnostics).toEqual([]);
+    expect(doc.root?.textContent).toBe('before x < y && z after');
+  });
+
+  it('a character reference beyond U+10FFFF: a thrown RangeError before, left as written now', () => {
+    const { file, text, threw } = difference('character reference beyond U+10FFFF');
+    expect(threw).toMatch(/^RangeError/);
+    const doc = tokenizeXml(text, file);
+    expect(doc.diagnostics).toEqual([]);
+    expect(doc.root?.attributes[0]?.value).toBe('x&#99999999;y');
+  });
+});
+
+// eachElement
+// Every element of a raw tree, depth first.
+function eachElement(root: RawXmlElement | undefined, visit: (element: RawXmlElement) => void): void {
+  if (root) {
+    visit(root);
+    root.children.forEach((child) => eachElement(child, visit));
+  }
+}
+
+describe('raw tree ranges', () => {
+  it('locate a small document exactly', () => {
+    const text = '<a x="1&amp;2">\n  <b/>\n</a>';
+    const root = tokenizeXml(text, 'r.xml').root;
+    expect(root?.range).toEqual({ start: 0, end: text.length });
+    const attr = root?.attributes[0];
+    expect(attr?.nameRange).toEqual({ start: 3, end: 4 });
+    expect(attr?.valueRange).toEqual({ start: 6, end: 13 });
+    expect(attr?.value).toBe('1&2');
+    expect(root?.children[0]?.range).toEqual({ start: 18, end: 22 });
+  });
+
+  it('run to end of input on an element never closed', () => {
+    const text = '<a><b>';
+    const root = tokenizeXml(text, 'r.xml').root;
+    expect(root?.range).toEqual({ start: 0, end: 6 });
+    expect(root?.children[0]?.range).toEqual({ start: 3, end: 6 });
+  });
+
+  it.each(repoXmlFiles())('agree with the text and with every loc in %s', (file) => {
+    const text = readRepoFile(file);
+    const lines = new LineIndex(text);
+    const at = (offset: number): { line: number; column: number } => lines.locate(offset);
+    eachElement(tokenizeXml(text, file).root, (element) => {
+      expect(text.startsWith(element.name, element.range.start + 1)).toBe(true);
+      expect(at(element.range.start)).toEqual({ line: element.loc.line, column: element.loc.column });
+      for (const attr of element.attributes) {
+        expect(text.slice(attr.nameRange.start, attr.nameRange.end)).toBe(attr.name);
+        const raw = text.slice(attr.valueRange.start, attr.valueRange.end);
+        expect(decodeXmlEntities(raw.replace(/\r\n?/g, '\n'))).toBe(attr.value);
+        expect(at(attr.nameRange.start)).toEqual({ line: attr.nameLoc.line, column: attr.nameLoc.column });
+        expect(at(attr.valueRange.start)).toEqual({ line: attr.loc.line, column: attr.loc.column });
+      }
+    });
   });
 });

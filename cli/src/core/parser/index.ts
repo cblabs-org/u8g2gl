@@ -20,7 +20,8 @@
  * - parseScreenFile: Parse screen_*.xml files into Screen
  * - parseWidgetManifestFile: Parse widget manifest XML files into WidgetManifest
  *   (plain widget or composite, per [D-18])
- * - tokenizeXml: Low-level XML scanner producing raw element tree
+ * - tokenizeXml: Read XML text into the raw element tree (built from the CST)
+ * - decodeXmlEntities: The entity rule applied to every attribute value and text
  * - RawXmlAttribute, RawXmlElement, RawXmlDocument: Low-level untyped XML types
  * - MissingNamePolicy, ParseOptions, SourceEdit, applyTextEdits: [U-1] name policy and write-back
  */
@@ -34,7 +35,7 @@ import type { SourceEdit } from './name-policy.js';
 export interface ParseResult<T> {
   /** The parsed AST model, present if parsing succeeded without fatal errors. */
   readonly value?: T;
-  /** All diagnostics (errors, warnings, notices) emitted during tokenisation and parsing. */
+  /** All diagnostics (errors, warnings, notices) emitted while reading and parsing. */
   readonly diagnostics: readonly Diagnostic[];
   /**
    * Write-back insertions for names synthesised during this parse, in document
@@ -44,7 +45,7 @@ export interface ParseResult<T> {
   readonly nameEdits?: readonly SourceEdit[];
 }
 
-export { tokenizeXml, decodeXmlEntities } from './xml-tokeniser.js';
+export { tokenizeXml, decodeXmlEntities } from './cst-adapter.js';
 export type {
   RawXmlAttribute,
   RawXmlElement,

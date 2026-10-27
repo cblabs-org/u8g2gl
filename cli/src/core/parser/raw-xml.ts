@@ -24,13 +24,14 @@
  * - getNumberAttribute: Parse attribute value as integer or record a diagnostic
  */
 
-import type { SourceLocation } from '../schema/source-location.js';
+import type { OffsetRange, SourceLocation } from '../schema/source-location.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 
 /**
  * An XML attribute with its decoded string value and source coordinates.
  * `loc` points to the start of the attribute value content.
  * `nameLoc` points to the start of the attribute name.
+ * Both are derived from the offset ranges, which are what an edit replaces.
  */
 export interface RawXmlAttribute {
   /** The attribute identifier (e.g. "name", "width", "bind_text"). */
@@ -41,6 +42,10 @@ export interface RawXmlAttribute {
   readonly loc: SourceLocation;
   /** Source coordinates pointing to the start of the attribute name. */
   readonly nameLoc: SourceLocation;
+  /** Offsets of the name as written. */
+  readonly nameRange: OffsetRange;
+  /** Offsets of the value inside the quotes, entity references undecoded. */
+  readonly valueRange: OffsetRange;
 }
 
 /**
@@ -61,15 +66,20 @@ export interface RawXmlElement {
   readonly loc: SourceLocation;
   /** Source coordinate of the closing tag or self-closing '/>'. */
   readonly endLoc?: SourceLocation;
+  /**
+   * Offsets of the whole element, opening '<' through the end of its closing
+   * tag or '/>' (or to end of input when it was never closed).
+   */
+  readonly range: OffsetRange;
 }
 
 /**
- * Result of low-level XML tokenisation and tree assembly.
+ * Result of reading an XML text into the raw element tree.
  */
 export interface RawXmlDocument {
   /** The single root element of the XML document, if parsed. */
   readonly root?: RawXmlElement;
-  /** Syntax and structural diagnostics emitted during tokenisation. */
+  /** Well-formedness diagnostics found while reading the text. */
   readonly diagnostics: readonly Diagnostic[];
 }
 

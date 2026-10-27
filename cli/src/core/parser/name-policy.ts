@@ -89,8 +89,8 @@ export interface ParseOptions {
 /**
  * @brief Builds the insertion that writes a synthesised name into the source.
  *
- * @param elementLoc  Location of the element's opening `<`, as recorded by the
- *                    tokeniser.
+ * @param elementLoc  Location of the element's opening `<`, as recorded by
+ *                    `tokenizeXml`.
  * @param tagName     The element's tag name, exactly as it appears in source.
  * @param name        The name to insert.
  * @return An insertion of ` name="…"` positioned immediately after the tag name.
@@ -100,7 +100,7 @@ export function createNameInsertion(
   tagName: string,
   name: string,
 ): SourceEdit {
-  // The tokeniser records `loc` at the '<' itself. XML forbids whitespace
+  // `tokenizeXml` records `loc` at the '<' itself. XML forbids whitespace
   // between '<' and the tag name, so the character immediately after the name
   // is at column (loc.column + 1 + tagName.length) — one for the '<', then the
   // name. Inserting there lands before any existing attribute, which keeps the
@@ -119,9 +119,9 @@ export function createNameInsertion(
 /**
  * Builds the absolute offset of the first character of every line.
  *
- * Newline handling matches the tokeniser's own `advance()` — LF, CR and CRLF all
- * end a line — because an offset table that disagreed with the coordinates the
- * tokeniser produced would place edits in the wrong place on CRLF files only,
+ * Newline handling matches the parser's LineIndex (core/cst/) — LF, CR and CRLF
+ * all end a line — because an offset table that disagreed with the coordinates
+ * `tokenizeXml` produces would place edits in the wrong place on CRLF files only,
  * which is the kind of defect that survives every test written on macOS.
  */
 function buildLineStartOffsets(source: string): readonly number[] {

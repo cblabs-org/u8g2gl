@@ -84,7 +84,7 @@ export interface CstAttribute extends CstRange {
   readonly quote: CstQuote;
   /** The value as written, entity references undecoded. */
   readonly rawValue: string;
-  /** The value with entity references decoded (the tokeniser's rules). */
+  /** The value with entity references decoded (entities.ts). */
   readonly value: string;
 }
 

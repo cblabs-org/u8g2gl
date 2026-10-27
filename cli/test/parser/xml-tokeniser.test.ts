@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   tokenizeXml,
   decodeXmlEntities,
-} from '../../src/core/parser/xml-tokeniser.js';
+} from '../../src/core/parser/index.js';
 import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 
 describe('XML Tokeniser', () => {

@@ -6,15 +6,14 @@
  * File: src/core/cst/line-index.ts
  * Purpose: Turns a CST offset into the 1-based line and column a diagnostic
  *          reports. The CST stores offsets only, so this is the single place
- *          the line/column convention lives — and it must be the tokeniser's
- *          convention exactly, or diagnostics move when the parser switches
- *          from the tokeniser to the CST.
+ *          the line/column convention lives — and it is the convention of the
+ *          hand-rolled scanner the parser used before the CST, exactly, so no
+ *          diagnostic moved when the parser switched.
  * Description: Records each line's starting offset once, then answers lookups
- *              by binary search. The convention, checked against
- *              xml-tokeniser.ts's `advance()`: LF, CRLF and a lone CR each end
- *              a line; every other UTF-16 code unit, a tab included, is one
- *              column. One addition the tokeniser has no rule for, because it
- *              cannot parse such a file: a leading BOM occupies no column, so
+ *              by binary search. The convention: LF, CRLF and a lone CR each
+ *              end a line; every other UTF-16 code unit, a tab included, is one
+ *              column. One addition the old scanner had no rule for, because it
+ *              could not parse such a file: a leading BOM occupies no column, so
  *              a file with a BOM reports the same coordinates as without.
  *
  * Exports:

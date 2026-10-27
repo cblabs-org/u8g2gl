@@ -49,7 +49,7 @@ import {
 import { parseWidgetTree } from './parse-widget-tree.js';
 import type { ParseOptions, SourceEdit } from './name-policy.js';
 import { parseFocusRing } from './parse-screen.js';
-import { tokenizeXml } from './xml-tokeniser.js';
+import { tokenizeXml } from './cst-adapter.js';
 import type { ParseResult } from './index.js';
 
 /**
