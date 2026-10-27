@@ -17,6 +17,7 @@
  * - SourceLocation: 1-based line and column coordinates within a source file
  * - SourceRange: Start and end source location span
  * - OffsetRange: Half-open `[start, end)` span of UTF-16 offsets into a source text
+ * - AttributeLocation: Where one attribute's name and value start
  * - Located: Wrapper attaching source location metadata to any value
  */
 
@@ -53,6 +54,19 @@ export interface OffsetRange {
   readonly start: number;
   /** Offset one past the last code unit in the span. */
   readonly end: number;
+}
+
+/**
+ * Where one attribute was written: the start of its name and of its value.
+ * A diagnostic about an attribute reports at one of these (§15.1) — the value
+ * when the value is at fault, the name when the attribute should not be there
+ * at all.
+ */
+export interface AttributeLocation {
+  /** First character of the attribute name. */
+  readonly name: SourceLocation;
+  /** First character of the value, inside the quotes. */
+  readonly value: SourceLocation;
 }
 
 /**

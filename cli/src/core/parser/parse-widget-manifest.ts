@@ -39,6 +39,7 @@ import type {
 import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
+  getAttributeLocation,
   getAttributeValue,
   getBooleanAttribute,
   getChild,
@@ -172,6 +173,9 @@ export function parseWidgetManifest(
         const bindType = bindTypeAttr?.value ?? 'string';
         const setter = getAttributeValue(child, 'setter') ?? bindName;
         const fmt = getAttributeValue(child, 'fmt');
+        const nameLoc = getAttributeLocation(child, 'name');
+        const typeLoc = getAttributeLocation(child, 'type');
+        const setterLoc = getAttributeLocation(child, 'setter');
 
         bindings.push({
           name: bindName,
@@ -179,6 +183,11 @@ export function parseWidgetManifest(
           setter,
           fmt,
           loc: child.loc,
+          attributeLocs: {
+            ...(nameLoc ? { name: nameLoc } : {}),
+            ...(typeLoc ? { type: typeLoc } : {}),
+            ...(setterLoc ? { setter: setterLoc } : {}),
+          },
         });
       } else if (child.name === 'element') {
         const elemNameAttr = requireAttribute(child, 'name', filename, diagnostics);
@@ -255,8 +264,10 @@ export function parseWidgetManifest(
   // 'extends'" diagnostic unreachable and made u8g2gl_obj appear to extend
   // itself. The one legitimate default — a composite realises as u8g2gl_obj
   // (§13.12) — is applied by the manifest registry, where it is visible.
+  const extendsLoc = getAttributeLocation(root, 'extends');
   const extendsVal = getAttributeValue(root, 'extends');
-  const declaredExtends = extendsVal !== undefined ? { extends: extendsVal } : {};
+  const declaredExtends =
+    extendsVal !== undefined && extendsLoc !== undefined ? { extends: extendsVal, extendsLoc } : {};
   const viewEl = getChild(root, 'view');
   if (!viewEl) {
     return {

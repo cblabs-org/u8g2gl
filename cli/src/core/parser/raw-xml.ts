@@ -16,6 +16,7 @@
  * - RawXmlDocument: Complete parse tree containing root element and any diagnostics
  * - getAttribute: Find raw attribute by name
  * - getAttributeValue: Read attribute string value or undefined
+ * - getAttributeLocation: Where an attribute's name and value start, if present
  * - getChild: Find first child element matching tag name
  * - getChildren: Find all child elements matching tag name
  * - hasAttribute: Check whether an attribute is declared
@@ -24,7 +25,7 @@
  * - getNumberAttribute: Parse attribute value as integer or record a diagnostic
  */
 
-import type { OffsetRange, SourceLocation } from '../schema/source-location.js';
+import type { AttributeLocation, OffsetRange, SourceLocation } from '../schema/source-location.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 
 /**
@@ -95,6 +96,15 @@ export function getAttribute(element: RawXmlElement, name: string): RawXmlAttrib
  */
 export function getAttributeValue(element: RawXmlElement, name: string): string | undefined {
   return getAttribute(element, name)?.value;
+}
+
+/**
+ * Returns where the named attribute's name and value start, or undefined if it
+ * is absent. For a model field that a later diagnostic must locate.
+ */
+export function getAttributeLocation(element: RawXmlElement, name: string): AttributeLocation | undefined {
+  const attr = getAttribute(element, name);
+  return attr ? { name: attr.nameLoc, value: attr.loc } : undefined;
 }
 
 /**

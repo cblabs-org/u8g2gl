@@ -30,11 +30,12 @@
  * - PropType: Property data type union per design_spec §13.2
  * - PropDef: Individual property descriptor and C++ setter mapping
  * - BindDef: Reactive subject binding slot descriptor
+ * - BindAttributeLocations: Where a `<bind>`'s attributes were written
  * - ElementDef: Child collection element descriptor (for declared-capacity collections, §9)
  * - ElementArgDef: Parameter definition for a collection element
  */
 
-import type { SourceLocation } from './source-location.js';
+import type { AttributeLocation, SourceLocation } from './source-location.js';
 import type { View } from './screen.js';
 
 /**
@@ -53,6 +54,11 @@ export interface WidgetManifest {
    * props requires it — see `validate-schema.ts` (PR-04 WO3).
    */
   readonly extends?: string;
+  /**
+   * Where `extends` was written, present exactly when `extends` is, so a
+   * diagnostic about the base reports at the attribute rather than the tag.
+   */
+  readonly extendsLoc?: AttributeLocation;
   /** Public API manifest defining accepted properties, bindings, and elements. */
   readonly api: ApiBlock;
   /**
@@ -152,6 +158,19 @@ export interface BindDef {
   readonly fmt?: string;
   /** Source location where this binding definition was declared. */
   readonly loc?: SourceLocation;
+  /**
+   * Where each of `name`, `type` and `setter` was written, for those that
+   * were. A refused `<bind>` reports at the attribute at fault; one that is
+   * absent (a defaulted `setter`, a missing `type`) falls back to `loc`.
+   */
+  readonly attributeLocs?: BindAttributeLocations;
+}
+
+/** The written locations of a `<bind>`'s attributes, by attribute name. */
+export interface BindAttributeLocations {
+  readonly name?: AttributeLocation;
+  readonly type?: AttributeLocation;
+  readonly setter?: AttributeLocation;
 }
 
 /**
