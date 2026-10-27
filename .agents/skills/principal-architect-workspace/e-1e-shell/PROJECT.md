@@ -33,10 +33,10 @@ E-1e's **scope** rests on the 2026-10-26 decomposition approval.
 
 | WO | Topic | Branch | ACs | Status |
 |---|---|---|---|---|
-| WO1 | `designer/` package: Vite, React, Dockview, Monaco; the ui_spec §6 layout; served by `u8g2gl design` | `u8g2gl-e1e/wo1-scaffold` | (structure) | In progress |
-| WO2 | The live pipeline: one run per animation frame, diagnostics as markers and Problems rows, the canvas, the Wasm indicator, placeholders without a toolchain | `u8g2gl-e1e/wo2-pipeline` | e1, e6, e8 | Pending |
-| WO3 | Saving and the IDE beside it: explicit save, reload, the three-way choice, generated names only on save; XML → canvas selection highlight | `u8g2gl-e1e/wo3-save` | e3, e4, e5 | Pending |
-| WO4 | Playwright: e1–e8 end to end, the 16 ms performance test under 4× CPU throttle, three engines, a CI job | `u8g2gl-e1e/wo4-playwright` | e2, e7 (and e1–e8 end to end) | Pending |
+| WO1 | `designer/` package: Vite, React, Dockview, Monaco; the ui_spec §6 layout; served by `u8g2gl design` | `u8g2gl-e1e/wo1-scaffold` | (structure) | ✅ `bb88c11` |
+| WO2 | The live pipeline: one run per animation frame, diagnostics as markers and Problems rows, the canvas, the Wasm indicator, placeholders without a toolchain | `u8g2gl-e1e/wo2-pipeline` | e1, e6, e8 | ✅ `8478d5a` |
+| WO3 | Saving and the IDE beside it: explicit save, reload, the three-way choice, generated names only on save; XML → canvas selection highlight | `u8g2gl-e1e/wo3-save` | e3, e4, e5 | ✅ `266f200` |
+| WO4 | Playwright: e1–e8 end to end, the 16 ms performance test under 4× CPU throttle, three engines, a CI job | `u8g2gl-e1e/wo4-playwright` | e2, e7 (and e1–e8 end to end) | ✅ except **e2** (`1992e7c`, `5c307aa`) |
 | WO5 | Readability review and PA verification | `u8g2gl-e1e/wo5-readability` | all | Pending |
 
 One worker, WO1 to WO4 in order.
@@ -71,3 +71,22 @@ One worker, WO1 to WO4 in order.
 
 - **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
   issued.
+- **2026-10-27. WO1–WO4 complete** (one worker; interrupted once by a usage limit and resumed as
+  the same agent). Dependencies exactly ruling 1's, all published by 2026-10-13, installed with
+  `--before=2026-10-13` so transitive ones are too; Playwright's three browsers downloaded.
+- **2026-10-27. PA verification.** CLI 1596 + 6 skipped, lint clean; designer build clean; unit
+  17 passed; end-to-end 10 passed and 1 skipped (needs Emscripten) excluding e2. The shell
+  renders the departures project from its project-built editor Wasm (screenshot
+  `tmp/wo2-project.png`, not committed).
+- **Checkpoint C3: e2 fails, owner's decision.** Keystroke to blit under 4× CPU throttle, 300
+  keystrokes: departures p95 **19.5 ms** (median 12.4), 20 elements p95 **20.2 ms** (median 12.8).
+  The pipeline itself is about 3 ms; the miss is entirely the wait for the next animation frame
+  (median 7.5, p95 13.8), which EDITOR-DESIGN §3.2 prescribes and §3.3's budget omits. Ruling 5
+  held: the test was not weakened. Put to the owner as C3 asks.
+- **Open, owner's decision:** `npm audit` critical, from DOMPurify 3.4.15 pinned by
+  monaco-editor 0.57.0 (3.4.17 fixes it); an override adds a version ruling 1 does not list.
+- **Follow-ups:** saving drops a BOM and normalises mixed line endings; with no toolchain, a
+  project font or image the framework Wasm lacks makes it refuse the scene; the hatched "live but
+  invalid" state (§3.8) is not built; no-toolchain detection reads the build job's message text
+  (E-1d's job should return a stable code); the npm package does not ship `designer/dist` (joins
+  E-1d ruling 8.3).
