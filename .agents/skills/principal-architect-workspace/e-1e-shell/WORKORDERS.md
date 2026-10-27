@@ -164,6 +164,77 @@ One caveat: no run in this test has skipped a frame, so it has never shown the f
 reporting a delta above 1. The counter reads frames from rAF timestamps, which every callback
 of one frame shares, so a skipped frame would show as 2 or more.
 
+### Rulings 9 and 10 — the frame gate now FAILS intermittently: STOP AND REPORT
+
+Both rulings verified from PROJECT.md at `3f8db62`. Work is on `u8g2gl-e1e/wo4b-e2-frame`.
+
+**Ruling 9, `2db1524`.** `overrides: { dompurify: "3.4.17" }` in `designer/package.json`. The
+lockfile changed for that package only (3.4.15 → 3.4.17). `npm audit`: **found 0
+vulnerabilities**. The designer builds, the 17 unit tests pass, and e1 passes in Chromium,
+Firefox and WebKit.
+
+**Ruling 10, `dffe1b7`.** The self-test forces keystroke 5 of 10 to miss its frame. The hook
+lives only in `e2e/performance.spec.ts`: it wraps the loaded editor Wasm's `renderFrame`
+through the existing `window.__u8g2gl` handle. It is armed by the next edit, so the
+50 ms block lands in the pipeline run that draws that keystroke, and it then unwraps itself.
+The test asserts the forced keystroke counts 2 or more, the others count at most 1, and
+`gateFailures()` (the same function the e2 test gates with) fails.
+Result over 5 repeats: forced keystroke **4 frames**, gate
+`["1 keystroke(s) missed their frame (worst 4)", "run-to-blit p95 53 ms is not under 16 ms"]`.
+`grep -rn ForceMissedFrame designer/dist` finds nothing (exit 1).
+
+**What the self-test exposed.** The WO4b counter could not fail. It counted animation-frame
+*callbacks*, and a run that overruns its frame still blits inside its own callback, so it
+always counted 1. The 300/300 results reported for WO4b above were measured with that
+counter. The counter now numbers the display's **frame intervals**, using the frames'
+timestamps on a single grid that a stall cannot shift. The key event and the end of the blit
+are each numbered by the interval they fall in:
+- 1: the edit was drawn in the first frame after the key;
+- 0: also the first frame. That frame had begun, by its timestamp, just before the key was
+  dispatched, and its run drew the key;
+- 2 or more: the blit ended after the frame's end, or the run came a frame late.
+
+**With that counter, e2's frame gate fails intermittently.** Run-to-blit p95 still passes.
+4× throttle, 300 keystrokes per screen:
+
+| Run | Screen | First frame (≤1) | Histogram | run→blit p95 / max | Verdict |
+|---|---|---|---|---|---|
+| 1 | departures | 297/300 | 0:22 1:275 2:3 | 4.6 / 23.7 | frame gate fails |
+| 1 | 20 elements | 300/300 | 0:16 1:284 | 4.0 / 6.0 | pass |
+| 2 | departures | 300/300 | 0:13 1:287 | 4.1 / 8.6 | pass |
+| 2 | 20 elements | 300/300 | 0:32 1:268 | 4.3 / 8.7 | pass |
+| 3 | departures | 298/300 | 0:15 1:283 2:1 5:1 | 4.8 / 13.3 | frame gate fails |
+| 3 | 20 elements | 299/300 | 0:17 1:282 2:1 | 5.2 / 10.3 | frame gate fails |
+| 4 | departures | 299/300 | 0:22 1:277 2:1 | 4.8 / 17.0 | frame gate fails |
+| 4 | 20 elements | 298/300 | 0:27 1:271 2:2 | 3.9 / 16.3 | frame gate fails |
+| 5 | departures | 300/300 | 0:10 1:290 | 4.3 / 11.7 | pass |
+| 5 | 20 elements | 297/300 | 0:10 1:287 2:2 3:1 | 4.9 / 14.1 | frame gate fails |
+
+(Runs 1 and 3 are the three runs requested; 2, 4 and 5 were extra runs after per-miss
+reporting was added. Run-to-blit medians are 2.9–3.4 ms throughout.)
+
+**Breakdown of every miss reported in runs 4 and 5**, in ms. "Spike" names the stage that
+ran long.
+
+| Screen | Frames | Monaco: key→edit | edit→frame | run→blit | Spike |
+|---|---:|---:|---:|---:|---|
+| departures | 2 | 6.7 | 1.9 | 17.0 | scene 11.2 |
+| 20 elements | 2 | 3.8 | 3.3 | 16.3 | resolve 7.7, validate 5.0 |
+| 20 elements | 2 | **14.4** | 2.4 | 4.4 | Monaco's handling of the key |
+| 20 elements | 3 | **24.1** | 14.5 | 14.1 | Monaco 24 ms, then validate 4.2 |
+| 20 elements | 2 | 2.0 | **15.9** | 6.9 | run started late in its frame |
+| 20 elements | 2 | 4.4 | 11.6 | 10.9 | validate 6.2 |
+
+Reading it: these are 1% tails. A single stage occasionally takes 5–11 ms, which looks like a
+GC pause or the JIT: `scene`, `resolve` and `validate`, each normally under 2 ms. Sometimes
+Monaco's own handling of a key runs past a frame boundary. And a normal-length run fails when
+the frame's earlier callbacks leave it too little time. The gate in ruling 8 says "all 300
+keystrokes", so one such miss fails it; I have not weakened it. Options for the PA, none of
+them taken:
+- accept a stated miss rate (for example ≤ 1%);
+- keep "all 300" and accept that the gate is flaky under 4× throttle;
+- reduce the spikes, for example by cutting allocation in validate, resolve and scene.
+
 ### e2 under the original definition (superseded by ruling 8): p95 was over 16 ms
 
 Chromium headless, CPU throttled 4×, 300 keystrokes per screen after 30 warm-up, keys spaced
