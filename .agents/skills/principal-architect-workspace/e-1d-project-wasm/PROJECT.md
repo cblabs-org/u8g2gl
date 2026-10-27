@@ -30,7 +30,7 @@ authorises starting it within that scope. Precedent: PR-06 (owner, 2026-10-15).
 | WO2 | The bridge driven by the project: fonts and images from a generated table, capacities from the generated config, placeholders | `u8g2gl-e1d/wo2-bridge` | d1, d3, d5, d8 | ✅ `f506628`, `5e42acc`, `db70895` |
 | WO3 | The build job on E-1c's queue: build cache, `-O1`/`-O3`, build hash, the platform-header rule | `u8g2gl-e1d/wo3-build-job` | d1, d2, d4, d6 | ✅ `af9aa1e`, `1d306af` |
 | WO4 | A CI job that builds the framework editor Wasm and runs its snapshot test | `u8g2gl-e1d/wo4-ci` | d7 | ✅ `5803da5` (CI not yet run) |
-| WO5 | Readability fixes, ruling 8.1–8.2, ruling 9 | `u8g2gl-e1d/wo5-readability` | all | In progress |
+| WO5 | Readability fixes, ruling 8.1–8.2, ruling 9 | `u8g2gl-e1d/wo5-readability` | all | ✅ `950590d`..`452669a` |
 
 One worker, WO1 to WO4 in order, each branch from the previous tip.
 
@@ -142,3 +142,13 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
   skipped without Emscripten; **1587 with it** (departures-board emsdk, 5.0.3). **d1:** the probe
   project builds unmodified with its real widgets, 521 lit pixels bare and 880 with sample
   subjects. **d2:** a widget edit rebuilds in 1377 ms (compile 599, link 730), target 2000 ms.
+- **2026-10-27. WO5 complete.** Readability audit: 0 P1, 3 P2, 10 P3, 4 P4; all resolved, three
+  P4s declined. Ruling 9 applied: fixture copied (`diff -r` empty), one shared environment-strip
+  list including `EM_CACHE`, stale errors cleared at every bridge entry point (new
+  `last-error.test.mjs`), heap note, `.gitignore` negations, `editor-wasm` job registered. The
+  consent text now gives a measured size: about 1.3 GB installed, about 2 GB once in use.
+  **Final:** C++ 512 (one skip); CLI 1585 + 6 skipped without Emscripten, 1591 with it.
+- **Follow-ups, not in E-1d:** O3, the Windows shell-argument risk, is documented but not
+  changed; O5, CI actions are pinned by tag, not SHA; O6, `observers_wanted` saturates silently
+  at 255; ruling 8.3, the npm package cannot build a project Wasm; ruling 8.4, the gtest
+  discovery timeout.
