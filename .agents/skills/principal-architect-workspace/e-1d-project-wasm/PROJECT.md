@@ -26,10 +26,10 @@ authorises starting it within that scope. Precedent: PR-06 (owner, 2026-10-15).
 
 | WO | Topic | Branch | ACs | Status |
 |---|---|---|---|---|
-| WO1 | `u8g2gl toolchain install \| status \| path`: the managed, pinned Emscripten | `u8g2gl-e1d/wo1-toolchain` | (toolchain half of the scope) | In progress |
-| WO2 | The bridge driven by the project: fonts and images from a generated table, capacities from the generated config, placeholders | `u8g2gl-e1d/wo2-bridge` | d1, d3, d5, d8 | Pending |
-| WO3 | The build job on E-1c's queue: build cache, `-O1`/`-O3`, build hash, the platform-header rule | `u8g2gl-e1d/wo3-build-job` | d1, d2, d4, d6 | Pending |
-| WO4 | A CI job that builds the framework editor Wasm and runs its snapshot test | `u8g2gl-e1d/wo4-ci` | d7 | Pending |
+| WO1 | `u8g2gl toolchain install \| status \| path`: the managed, pinned Emscripten | `u8g2gl-e1d/wo1-toolchain` | (toolchain half of the scope) | ✅ `3753dec` |
+| WO2 | The bridge driven by the project: fonts and images from a generated table, capacities from the generated config, placeholders | `u8g2gl-e1d/wo2-bridge` | d1, d3, d5, d8 | ✅ `f506628`, `5e42acc`, `db70895` |
+| WO3 | The build job on E-1c's queue: build cache, `-O1`/`-O3`, build hash, the platform-header rule | `u8g2gl-e1d/wo3-build-job` | d1, d2, d4, d6 | ✅ `af9aa1e`, `1d306af` |
+| WO4 | A CI job that builds the framework editor Wasm and runs its snapshot test | `u8g2gl-e1d/wo4-ci` | d7 | ✅ `5803da5` (CI not yet run) |
 | WO5 | Readability review and PA verification | `u8g2gl-e1d/wo5-readability` | all | Pending |
 
 One worker, WO1 to WO4 in order, each branch from the previous tip.
@@ -88,6 +88,21 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
       C++ suite passes at 512 with its one known skip. The fix is its own commit, whose message
       explains why the reference frame moved.
 
+8. **Amendments, 2026-10-27, on WO1–WO4's completion notes:**
+   1. **Boundary extension: `.gitignore`.** Its `build/` pattern hides `cli/src/node/design/build/`
+      and its tests, so a new file there would never show in `git status`. Add negation rules
+      for those two directories.
+   2. **Boundary extension: `cli/src/node/design/design-command.ts`,** one call: register the
+      `editor-wasm` job on the server's build queue, so `u8g2gl design` can actually build.
+   3. **Known limitation, recorded, not fixed here:** the job compiles the runtime and U8G2 from a
+      U8G2GL source tree beside the CLI, which the npm package does not ship. An npm-installed CLI
+      therefore cannot build a project Wasm yet; the job says so clearly. Shipping those sources
+      (or a prebuilt runtime archive per version) is a packaging decision for E-1e or a release PR.
+   4. **Follow-up, not E-1d's:** `gtest_discover_tests`' 5 s timeout fails a fresh, fully parallel
+      C++ build on macOS (four targets), though the next incremental build passes 512. Fix with
+      `DISCOVERY_MODE PRE_TEST` or a larger `DISCOVERY_TIMEOUT` in `test/CMakeLists.txt`, in its
+      own small PR.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1c's tip, `extern/u8g2` checked out. emsdk 5.0.3 found
@@ -98,3 +113,12 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
   pass, framework Wasm unchanged at `bca55545…`. Stopped on four items; the PA's rulings are
   ruling 7 above. The worker then refused to act on the rulings while they existed only as a
   message, as rule 00 requires; this commit is what authorises them.
+- **2026-10-27. WO2–WO4 complete** (after ruling 7 was committed). Font and image table wired
+  (`5e42acc`, CLI 0.13.2, only the editor registry golden moved). `draw_calls` fixed (`db70895`):
+  native `editor_host`, native bridge and Wasm bridge all render `1c0c7bb2…`, 176 lit pixels
+  (+128: the home screen's `rule`, row 11, 128 of 128 lit). Runtime cache keyed by U8G2GL version,
+  emsdk version, framework-source hash and the project config's hash. CI job `wasm-tests` added.
+- **2026-10-27. PA verification.** Suites one at a time. C++: 512, one known skip. CLI: 1581 + 6
+  skipped without Emscripten; **1587 with it** (departures-board emsdk, 5.0.3). **d1:** the probe
+  project builds unmodified with its real widgets, 521 lit pixels bare and 880 with sample
+  subjects. **d2:** a widget edit rebuilds in 1377 ms (compile 599, link 730), target 2000 ms.
