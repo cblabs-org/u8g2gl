@@ -101,6 +101,15 @@ export async function createEditor(wasmDir) {
     },
 
     /**
+     * The active screen's elements drawn as placeholders, because the loaded
+     * Wasm has no class for them.
+     * @returns {{name: string, tag: string, class: string, rect: number[]}[]}
+     */
+    getPlaceholders() {
+      return JSON.parse(Module.UTF8ToString(Module._getPlaceholders()));
+    },
+
+    /**
      * Destroy all objects and free resources.
      */
     teardown() {

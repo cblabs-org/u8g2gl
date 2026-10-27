@@ -9,6 +9,10 @@
 # Purpose: Emscripten build target for the U8G2GL editor WebAssembly module.
 #          Compiles the runtime, editor registry, real U8G2 graphics engine,
 #          and C++ bridge into u8g2gl_editor.js and u8g2gl_editor.wasm.
+#          This is the framework editor Wasm, built from the test fixture's
+#          registry, fonts, images and generated capacities (editor_config.h
+#          includes the fixture's u8g2gl_generated_config.h). A project's own
+#          editor Wasm is built by the design server's build job instead.
 enable_language(C)
 
 set(U8G2GL_U8G2_DIR ${PROJECT_SOURCE_DIR}/extern/u8g2)
@@ -93,7 +97,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sMODULARIZE=1"
     "-sEXPORT_NAME='createU8g2glEditor'"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','HEAPU8','lengthBytesUTF8']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders']"
     "-sALLOW_MEMORY_GROWTH=1"
 )
 string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})

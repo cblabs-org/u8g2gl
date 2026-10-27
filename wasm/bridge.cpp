@@ -8,8 +8,12 @@
  *
  * File: wasm/bridge.cpp
  * Purpose: WebAssembly bridge exporting the C++ editor engine to JavaScript
- *          via Emscripten ([UD-4], PR-06 WO5). Adapts the editor host's
- *          by-name operations to flat C functions that can be called from JS.
+ *          via Emscripten ([UD-4]). Adapts the editor host's by-name
+ *          operations to flat C functions that can be called from JS. It is
+ *          compiled into whichever editor Wasm is being built — the framework
+ *          fixture's, or a project's with its own widgets — so it fixes no
+ *          capacity of its own: every size comes from the scene it is handed
+ *          or from the project configuration it is compiled against ([D-21]).
  *
  * Description: Implements the two-mode architecture's prebuilt Wasm host:
  *              `applyScene()` receives flat `ui_scene.json` text, sets up the
@@ -17,6 +21,19 @@
  *              `applySampleData()` applies key-value pairs to active subjects.
  *              `renderFrame()` ticks animating objects, renders into a virtual
  *              U8G2 display buffer, and returns a pointer to the raw buffer.
+ *
+ *              Sizes are the scene's, not constants: the display buffer is
+ *              allocated for the scene's display, the object arena for the
+ *              classes the active screen constructs, each string subject for
+ *              its declared `max_len` (the runtime default when it declares
+ *              none), and each subject's observer slots for the bindings that
+ *              name it. The binding pool is the runtime's, sized by the
+ *              project's generated configuration.
+ *
+ *              An element whose class the registry does not know (a widget the
+ *              loaded Wasm was not built with) does not fail the scene: it is
+ *              built as a placeholder object at its rectangle, drawn in draw
+ *              order like any object, and listed by `getPlaceholders()`.
  *
  * Exported Functions (extern "C"):
  * - applyScene():       Parse scene JSON and build default/named screen
@@ -29,6 +46,7 @@
  * - teardown():         Destroy objects, clear subjects, reset arena
  * - selectScreen():     Switch active screen and rebuild objects
  * - getLastError():     Return last error message string
+ * - getPlaceholders():  JSON list of the active screen's placeholder elements
  */
 
 #ifdef __EMSCRIPTEN__
@@ -37,16 +55,18 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
+#include <new>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "U8g2lib.h"
-#include "editor_config.h"
 #include "scene_json.h"
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
@@ -71,27 +91,146 @@ extern const u8g2gl_editor_registry& ui_editor_registry();
 
 namespace {
 
-// Virtual display setup parameters
-constexpr size_t kMaxBufferBytes = 2048;  // Fits up to 256x64 1-bit buffer
-alignas(std::max_align_t) uint8_t s_display_buffer[kMaxBufferBytes] = {};
-int32_t s_display_width = 128;
-int32_t s_display_height = 64;
+// --- Host-sized subjects ---
+// The runtime's subject templates fix their observer and string capacity at
+// compile time, which only generated code can know. The editor host learns
+// both from the scene at load, so it derives from the same bases the templates
+// do, passing storage it allocated for this scene. The storage is a base
+// listed first, so it is constructed before the subject base that points into
+// it (base-from-member).
+
+/** Observer slots for one subject, sized when the scene is applied. */
+struct observer_storage {
+    explicit observer_storage(uint8_t count) : slots(count) {}
+    std::vector<u8g2gl_observer> slots;
+};
+
+/** Observer slots plus a character buffer of max_len + 1 for a string subject. */
+struct string_storage : observer_storage {
+    string_storage(uint16_t max_len, uint8_t count) : observer_storage(count), buffer(max_len + 1u, '\0') {}
+    std::vector<char> buffer;
+};
+
+class host_int_subject : private observer_storage, public u8g2gl_subject_int_base {
+public:
+    explicit host_int_subject(uint8_t observers)
+        : observer_storage(observers), u8g2gl_subject_int_base(slots.data(), observers) {}
+};
+
+class host_bool_subject : private observer_storage, public u8g2gl_subject_bool_base {
+public:
+    explicit host_bool_subject(uint8_t observers)
+        : observer_storage(observers), u8g2gl_subject_bool_base(slots.data(), observers) {}
+};
+
+class host_time_subject : private observer_storage, public u8g2gl_subject_time_base {
+public:
+    explicit host_time_subject(uint8_t observers)
+        : observer_storage(observers), u8g2gl_subject_time_base(slots.data(), observers) {}
+};
+
+class host_string_subject : private string_storage, public u8g2gl_subject_string_base {
+public:
+    host_string_subject(uint16_t max_len, uint8_t observers)
+        : string_storage(max_len, observers),
+          u8g2gl_subject_string_base(buffer.data(), static_cast<uint16_t>(max_len + 1u), slots.data(), observers) {
+        init(max_len);
+    }
+};
+
+// --- Placeholder: an element whose class the loaded Wasm does not have ---
+// A plain object at the element's rectangle, so its children, clip and flag
+// directives behave exactly as they would around the real widget, and so it is
+// drawn by u8g2gl_render_object() in draw order: overlap and clipping stay true
+// (EDITOR-DESIGN §5.4). It draws a 1-pixel border, a 45° hatch at 25% density,
+// the tag in the smallest built-in font where it fits, and an information
+// badge.
+class editor_placeholder : public u8g2gl_obj {
+public:
+    explicit editor_placeholder(const char* tag) : tag_(tag) {}
+
+    void render(U8G2& display) override {
+        const int16_t x = get_x();
+        const int16_t y = get_y();
+        const int16_t w = get_w();
+        const int16_t h = get_h();
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        display.setDrawColor(1);
+
+        // --- Step 1: Border ---
+        display.drawFrame(x, y, w, h);
+
+        // --- Step 2: Hatch, every fourth diagonal of the interior ---
+        // Measured from the rectangle's origin, so the hatch moves with the
+        // element instead of crawling under it.
+        for (int16_t dy = 1; dy < h - 1; ++dy) {
+            for (int16_t dx = 1; dx < w - 1; ++dx) {
+                if ((dx + dy) % kHatchPeriod == 0) {
+                    display.drawPixel(x + dx, y + dy);
+                }
+            }
+        }
+
+        // --- Step 3: The tag, on a cleared strip, where it fits ---
+        display.setFont(u8g2_font_4x6_tr);
+        const int16_t text_w = static_cast<int16_t>(display.getStrWidth(tag_));
+        const int16_t text_h = static_cast<int16_t>(display.getMaxCharHeight());
+        if (text_w + 4 <= w && text_h + 4 <= h) {
+            display.setDrawColor(0);
+            display.drawBox(x + 1, y + 1, text_w + 2, text_h + 2);
+            display.setDrawColor(1);
+            display.drawStr(x + 2, y + 2, tag_);
+        }
+
+        // --- Step 4: The badge, top right: a filled cell with an 'i' cut out ---
+        if (w >= kBadgeW + 4 + (text_w + 4 <= w ? text_w + 2 : 0) && h >= kBadgeH + 2) {
+            const int16_t bx = x + w - 1 - kBadgeW;
+            const int16_t by = y + 1;
+            display.drawBox(bx, by, kBadgeW, kBadgeH);
+            display.setDrawColor(0);
+            display.drawPixel(bx + 2, by + 1);
+            display.drawVLine(bx + 2, by + 3, kBadgeH - 4);
+            display.setDrawColor(1);
+        }
+    }
+
+private:
+    static constexpr int16_t kHatchPeriod = 4;  // one diagonal in four: 25% density
+    static constexpr int16_t kBadgeW = 5;
+    static constexpr int16_t kBadgeH = 7;
+    const char* tag_;
+};
+
+// Virtual display, sized for each scene
+std::vector<uint8_t> s_display_buffer;
+u8x8_display_info_t s_display_info = {};
+int32_t s_display_width = 0;
+int32_t s_display_height = 0;
 U8G2 s_display;
 
-// Arena allocation for screen objects
-constexpr size_t kArenaBytes = 65536;
-alignas(std::max_align_t) unsigned char s_arena[kArenaBytes] = {};
+// The active screen's objects live here, sized for the classes it constructs
+std::vector<std::max_align_t> s_arena;
 size_t s_arena_used = 0;
 
 // Host-owned subject slot
 struct subject_slot {
     std::string name;
     u8g2gl_subject_type_t type = U8G2GL_SUBJECT_INT;
+    // The u8g2gl_subject_*_base subobject, which the registry's thunks cast
+    // back to. It must be converted to the base before erasing the type: the
+    // host subjects put their storage first, so the base is not at offset 0.
     void* base = nullptr;
-    std::unique_ptr<u8g2gl_subject_int_n<16>> int_subject;
-    std::unique_ptr<u8g2gl_subject_bool_n<16>> bool_subject;
-    std::unique_ptr<u8g2gl_subject_string_n<128, 16>> string_subject;
-    std::unique_ptr<u8g2gl_subject_time_n<16>> time_subject;
+    std::unique_ptr<host_int_subject> int_subject;
+    std::unique_ptr<host_bool_subject> bool_subject;
+    std::unique_ptr<host_string_subject> string_subject;
+    std::unique_ptr<host_time_subject> time_subject;
+};
+
+/** One element built as a placeholder, for getPlaceholders(). */
+struct placeholder_record {
+    const scene_json* element;
 };
 
 // Scene state
@@ -103,8 +242,10 @@ std::vector<std::pair<std::string, const uint8_t*>> s_images;
 
 const scene_json* s_active_screen = nullptr;
 std::vector<u8g2gl_obj*> s_objects;
-std::vector<const u8g2gl_editor_class*> s_classes;
+std::vector<const u8g2gl_editor_class*> s_classes;  // nullptr for a placeholder
 std::vector<uint8_t> s_parents;
+std::vector<placeholder_record> s_placeholders;
+std::string s_placeholders_json;
 
 bool fail(const std::string& message) {
     if (s_last_error.empty()) {
@@ -113,16 +254,24 @@ bool fail(const std::string& message) {
     return false;
 }
 
+// arena_bytes
+// Bytes one object of this size and alignment takes in the arena, padding
+// included, so the arena can be sized before anything is constructed in it.
+size_t arena_bytes(size_t size, size_t align) {
+    return size + align - 1;
+}
+
 void* arena_allocate(size_t size, size_t align) {
-    if (align == 0) {
+    const size_t capacity = s_arena.size() * sizeof(std::max_align_t);
+    if (align == 0 || align > alignof(std::max_align_t)) {
         return nullptr;
     }
     const size_t start = (s_arena_used + align - 1) / align * align;
-    if (start + size > kArenaBytes) {
+    if (start + size > capacity) {
         return nullptr;
     }
     s_arena_used = start + size;
-    return s_arena + start;
+    return reinterpret_cast<unsigned char*>(s_arena.data()) + start;
 }
 
 subject_slot* find_subject(const std::string& name) {
@@ -201,24 +350,36 @@ void destroy_objects() {
     s_objects.clear();
     s_classes.clear();
     s_parents.clear();
+    s_placeholders.clear();
+    s_arena.clear();
     s_arena_used = 0;
     s_active_screen = nullptr;
 }
 
-bool build_object(const scene_json& element) {
+// build_object
+// Constructs one object element into the arena: through the registry when its
+// class is known, or as a placeholder when it is not.
+//   element — the scene element, realisation "object"
+//   cls     — its registry class, or nullptr to build a placeholder
+bool build_object(const scene_json& element, const u8g2gl_editor_class* cls) {
     const std::string& name = element.get("name").as_string();
-    const u8g2gl_editor_registry& reg = ui_editor_registry();
-    const u8g2gl_editor_class* cls = u8g2gl_editor_find_class(reg, element.get("class").as_string().c_str());
-    if (cls == nullptr) {
-        return fail(name + ": no class '" + element.get("class").as_string() + "' in registry");
-    }
-    void* storage = arena_allocate(cls->size, cls->align);
-    if (storage == nullptr) {
-        return fail(name + ": arena allocation failed for " + std::to_string(cls->size) + " bytes");
-    }
-    u8g2gl_obj* obj = u8g2gl_editor_construct(*cls, storage, cls->size);
-    if (obj == nullptr) {
-        return fail(name + ": construction refused");
+    u8g2gl_obj* obj = nullptr;
+    if (cls != nullptr) {
+        void* storage = arena_allocate(cls->size, cls->align);
+        if (storage == nullptr) {
+            return fail(name + ": arena allocation failed for " + std::to_string(cls->size) + " bytes");
+        }
+        obj = u8g2gl_editor_construct(*cls, storage, cls->size);
+        if (obj == nullptr) {
+            return fail(name + ": construction refused");
+        }
+    } else {
+        void* storage = arena_allocate(sizeof(editor_placeholder), alignof(editor_placeholder));
+        if (storage == nullptr) {
+            return fail(name + ": arena allocation failed for a placeholder");
+        }
+        obj = ::new (storage) editor_placeholder(element.get("tag").as_string().c_str());
+        s_placeholders.push_back({&element});
     }
     s_objects.push_back(obj);
     s_classes.push_back(cls);
@@ -232,8 +393,18 @@ bool build_object(const scene_json& element) {
 
 bool configure_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
-    const u8g2gl_editor_class& cls = *s_classes[index];
     const scene_json& rect = element.get("rect");
+    if (s_classes[index] == nullptr) {
+        // A placeholder takes only its rectangle: its properties belong to a
+        // class this Wasm does not have.
+        const auto& r = rect.items();
+        if (r.size() == 4) {
+            s_objects[index]->set_coords(static_cast<int16_t>(r[0].as_int()), static_cast<int16_t>(r[1].as_int()),
+                                         static_cast<int16_t>(r[2].as_int()), static_cast<int16_t>(r[3].as_int()));
+        }
+        return true;
+    }
+    const u8g2gl_editor_class& cls = *s_classes[index];
     if (rect.is_array()) {
         const auto& r = rect.items();
         if (r.size() != 4 ||
@@ -260,6 +431,9 @@ bool configure_object(size_t index, const scene_json& element) {
 
 bool apply_styles(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
+    if (s_classes[index] == nullptr) {
+        return true;  // a placeholder has no properties to style
+    }
     const u8g2gl_editor_class& cls = *s_classes[index];
     auto set_prop = [&](const scene_json& property, const std::string& where) -> bool {
         const std::string& prop = property.get("name").as_string();
@@ -302,7 +476,13 @@ bool apply_styles(size_t index, const scene_json& element) {
 bool bind_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_registry& reg = ui_editor_registry();
+    // A placeholder's bindings target its missing class; its flag directives
+    // are the base object's, so it keeps them and hides as the widget would.
+    const bool placeholder = s_classes[index] == nullptr;
     for (const scene_json& binding : element.get("bindings").items()) {
+        if (placeholder) {
+            break;
+        }
         subject_slot* slot = find_subject(binding.get("subject").as_string());
         u8g2gl_subject_type_t type{};
         if (slot == nullptr || !subject_type_of(binding, &type) || type != slot->type) {
@@ -346,9 +526,21 @@ bool build_screen(const std::string& screen_name) {
         }
     }
 
-    // --- Step 2: Construct objects into linear arena ---
+    // --- Step 2: Size the arena for exactly these classes, then construct ---
+    // An unknown class is not an error: that element becomes a placeholder.
+    const u8g2gl_editor_registry& reg = ui_editor_registry();
+    std::vector<const u8g2gl_editor_class*> classes;
+    size_t arena_needed = 0;
     for (const scene_json* element : objects) {
-        if (!build_object(*element)) {
+        const u8g2gl_editor_class* cls = u8g2gl_editor_find_class(reg, element->get("class").as_string().c_str());
+        classes.push_back(cls);
+        arena_needed += cls != nullptr ? arena_bytes(cls->size, cls->align)
+                                       : arena_bytes(sizeof(editor_placeholder), alignof(editor_placeholder));
+    }
+    s_arena.assign((arena_needed + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t), std::max_align_t{});
+    s_arena_used = 0;
+    for (size_t i = 0; i < objects.size(); ++i) {
+        if (!build_object(*objects[i], classes[i])) {
             return false;
         }
     }
@@ -460,6 +652,9 @@ bool render_draw_call(U8G2& display, const scene_json& element) {
     return true;
 }
 
+// register_default_assets
+// The framework fixture's fonts and images, by name. Still fixed here: the
+// table the generator is to emit for each project is not yet wired through.
 void register_default_assets() {
     s_fonts.clear();
     s_fonts.emplace_back("u8g2_font_6x10_mr", u8g2_font_6x10_mr);
@@ -473,22 +668,79 @@ void register_default_assets() {
     s_images.emplace_back("logo_mark", ui_image_logo_mark);
 }
 
-void setup_virtual_display() {
-    u8g2_t* u8g2 = s_display.getU8g2();
-    std::memset(s_display_buffer, 0, sizeof(s_display_buffer));
-
-    if (s_display_width == 256 && s_display_height == 64) {
-        u8g2_SetupDisplay(u8g2, u8x8_d_ssd1322_nhd_256x64, u8x8_cad_011,
-                          u8x8_byte_empty, u8x8_dummy_cb);
-        u8g2_SetupBuffer(u8g2, s_display_buffer, 8, u8g2_ll_hvline_vertical_top_lsb, U8G2_R0);
-    } else {
-        u8g2_SetupDisplay(u8g2, u8x8_d_ssd1306_128x64_noname, u8x8_cad_001,
-                          u8x8_byte_empty, u8x8_dummy_cb);
-        const uint8_t tile_buf_height = static_cast<uint8_t>(s_display_height / 8);
-        u8g2_SetupBuffer(u8g2, s_display_buffer, tile_buf_height, u8g2_ll_hvline_vertical_top_lsb, U8G2_R0);
+// memory_display_cb
+// A U8X8 display that is only memory: it reports the scene's geometry and
+// accepts every other message, because nothing is ever sent to hardware. The
+// frame buffer's layout depends only on that geometry and the buffer
+// function, so any panel size renders as the same pixels a real controller of
+// that size would hold.
+uint8_t memory_display_cb(u8x8_t* u8x8, uint8_t msg, uint8_t /*arg_int*/, void* /*arg_ptr*/) {
+    if (msg == U8X8_MSG_DISPLAY_SETUP_MEMORY) {
+        u8x8_d_helper_display_setup_memory(u8x8, &s_display_info);
     }
+    return 1;
+}
+
+// setup_virtual_display
+// Allocates a full frame buffer for the scene's display (one byte per 8-pixel
+// column of each tile row, U8G2's vertical_top_lsb layout) and points U8G2 at it.
+// Fails for a size U8X8's 8-bit tile counts cannot describe.
+bool setup_virtual_display() {
+    const int32_t tile_w = (s_display_width + 7) / 8;
+    const int32_t tile_h = (s_display_height + 7) / 8;
+    if (tile_w > std::numeric_limits<uint8_t>::max() || tile_h > std::numeric_limits<uint8_t>::max()) {
+        return fail("display " + std::to_string(s_display_width) + "x" + std::to_string(s_display_height) +
+                    " is larger than U8G2 can address");
+    }
+    s_display_info = u8x8_display_info_t{};
+    s_display_info.tile_width = static_cast<uint8_t>(tile_w);
+    s_display_info.tile_height = static_cast<uint8_t>(tile_h);
+    s_display_info.pixel_width = static_cast<uint16_t>(s_display_width);
+    s_display_info.pixel_height = static_cast<uint16_t>(s_display_height);
+    s_display_buffer.assign(static_cast<size_t>(tile_w) * 8u * static_cast<size_t>(tile_h), 0);
+
+    u8g2_t* u8g2 = s_display.getU8g2();
+    u8g2_SetupDisplay(u8g2, memory_display_cb, u8x8_cad_001, u8x8_byte_empty, u8x8_dummy_cb);
+    u8g2_SetupBuffer(u8g2, s_display_buffer.data(), static_cast<uint8_t>(tile_h), u8g2_ll_hvline_vertical_top_lsb,
+                     U8G2_R0);
     u8g2_InitDisplay(u8g2);
     s_display.clearBuffer();
+    return true;
+}
+
+// observers_wanted
+// How many observer slots each subject needs: one per binding or flag
+// directive naming it, on any screen, so selecting any screen fits.
+//   name — the subject
+uint8_t observers_wanted(const std::string& name) {
+    size_t count = 0;
+    for (const scene_json& screen : s_scene.get("screens").items()) {
+        for (const scene_json& element : screen.get("elements").items()) {
+            for (const char* list : {"bindings", "flags"}) {
+                for (const scene_json& entry : element.get(list).items()) {
+                    count += entry.get("subject").as_string() == name ? 1 : 0;
+                }
+            }
+        }
+    }
+    return static_cast<uint8_t>(std::min<size_t>(count, std::numeric_limits<uint8_t>::max()));
+}
+
+// json_escape
+// A string as the body of a JSON string literal.
+std::string json_escape(const std::string& text) {
+    std::string out;
+    for (const char c : text) {
+        if (c == '"' || c == '\\') {
+            out += '\\';
+            out += c;
+        } else if (static_cast<unsigned char>(c) < 0x20) {
+            out += ' ';
+        } else {
+            out += c;
+        }
+    }
+    return out;
 }
 
 }  // namespace
@@ -506,6 +758,9 @@ void teardown() {
     s_images.clear();
     s_scene = scene_json{};
     s_last_error.clear();
+    s_display_buffer.clear();
+    s_display_width = 0;
+    s_display_height = 0;
 }
 
 /**
@@ -535,20 +790,17 @@ int applyScene(const char* json_str) {
         return 0;
     }
 
-    // --- Step 3: Configure virtual display dimensions ---
+    // --- Step 3: Configure the virtual display at the scene's size ---
     const scene_json& disp = s_scene.get("display");
-    if (disp.has("width") && disp.get("width").as_int() > 0) {
-        s_display_width = disp.get("width").as_int();
-    } else {
-        s_display_width = 128;
+    s_display_width = disp.get("width").as_int();
+    s_display_height = disp.get("height").as_int();
+    if (s_display_width <= 0 || s_display_height <= 0) {
+        s_last_error = "scene display has no width and height";
+        return 0;
     }
-    if (disp.has("height") && disp.get("height").as_int() > 0) {
-        s_display_height = disp.get("height").as_int();
-    } else {
-        s_display_height = 64;
+    if (!setup_virtual_display()) {
+        return 0;
     }
-
-    setup_virtual_display();
     register_default_assets();
 
     // --- Step 4: Create host subjects ---
@@ -556,28 +808,30 @@ int applyScene(const char* json_str) {
         auto slot = std::make_unique<subject_slot>();
         slot->name = described.get("name").as_string();
         const std::string& type = described.get("type").as_string();
+        const uint8_t observers = observers_wanted(slot->name);
         if (type == "int") {
             slot->type = U8G2GL_SUBJECT_INT;
-            slot->int_subject = std::make_unique<u8g2gl_subject_int_n<16>>();
-            slot->base = slot->int_subject.get();
+            slot->int_subject = std::make_unique<host_int_subject>(observers);
+            slot->base = static_cast<u8g2gl_subject_int_base*>(slot->int_subject.get());
         } else if (type == "bool") {
             slot->type = U8G2GL_SUBJECT_BOOL;
-            slot->bool_subject = std::make_unique<u8g2gl_subject_bool_n<16>>();
-            slot->base = slot->bool_subject.get();
+            slot->bool_subject = std::make_unique<host_bool_subject>(observers);
+            slot->base = static_cast<u8g2gl_subject_bool_base*>(slot->bool_subject.get());
         } else if (type == "string") {
             slot->type = U8G2GL_SUBJECT_STRING;
-            const int32_t max_len = described.has("max_len") ? described.get("max_len").as_int() : 32;
-            if (max_len < 0 || max_len > 128) {
-                s_last_error = "subject '" + slot->name + "' max_len exceeds 128";
+            // No max_len declared means the runtime default, as the firmware
+            // subject's template argument would be (§8.2).
+            const int32_t max_len = described.has("max_len") ? described.get("max_len").as_int() : U8G2GL_MAX_STRING_LEN;
+            if (max_len < 0 || max_len >= std::numeric_limits<uint16_t>::max()) {
+                s_last_error = "subject '" + slot->name + "' has an invalid max_len";
                 return 0;
             }
-            slot->string_subject =
-                std::make_unique<u8g2gl_subject_string_n<128, 16>>(static_cast<uint16_t>(max_len));
-            slot->base = slot->string_subject.get();
+            slot->string_subject = std::make_unique<host_string_subject>(static_cast<uint16_t>(max_len), observers);
+            slot->base = static_cast<u8g2gl_subject_string_base*>(slot->string_subject.get());
         } else if (type == "time") {
             slot->type = U8G2GL_SUBJECT_TIME;
-            slot->time_subject = std::make_unique<u8g2gl_subject_time_n<16>>();
-            slot->base = slot->time_subject.get();
+            slot->time_subject = std::make_unique<host_time_subject>(observers);
+            slot->base = static_cast<u8g2gl_subject_time_base*>(slot->time_subject.get());
         } else {
             s_last_error = "subject '" + slot->name + "' has unknown type '" + type + "'";
             return 0;
@@ -744,7 +998,7 @@ uint8_t* getBufferPtr() {
  */
 EMSCRIPTEN_KEEPALIVE
 uint32_t getBufferSize() {
-    return static_cast<uint32_t>((s_display_width * s_display_height) / 8);
+    return static_cast<uint32_t>(s_display_buffer.size());
 }
 
 /**
@@ -753,6 +1007,33 @@ uint32_t getBufferSize() {
 EMSCRIPTEN_KEEPALIVE
 const char* getLastError() {
     return s_last_error.c_str();
+}
+
+/**
+ * @brief The active screen's placeholder elements, as a JSON array.
+ *
+ * One `{ "name", "tag", "class", "rect": [x, y, w, h] }` per element whose
+ * class the loaded Wasm does not have, in scene order. `[]` when there are
+ * none or no screen is active.
+ *
+ * @return A string owned by the bridge, valid until the next call.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* getPlaceholders() {
+    s_placeholders_json = "[";
+    for (size_t i = 0; i < s_placeholders.size(); ++i) {
+        const scene_json& element = *s_placeholders[i].element;
+        std::string rect;
+        for (const scene_json& value : element.get("rect").items()) {
+            rect += (rect.empty() ? "" : ",") + std::to_string(value.as_int());
+        }
+        s_placeholders_json += (i == 0 ? "" : ",");
+        s_placeholders_json += "{\"name\":\"" + json_escape(element.get("name").as_string()) + "\",\"tag\":\"" +
+                               json_escape(element.get("tag").as_string()) + "\",\"class\":\"" +
+                               json_escape(element.get("class").as_string()) + "\",\"rect\":[" + rect + "]}";
+    }
+    s_placeholders_json += "]";
+    return s_placeholders_json.c_str();
 }
 
 }  // extern "C"
