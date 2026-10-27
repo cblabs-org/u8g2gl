@@ -28,16 +28,22 @@ Run from `cli/`: `npm run build`, `npm test`, and the repo's lint/typecheck. Zer
 
 ### P2 — Stale documentation (actively misleading)
 
-- [ ] `test/parser/xml-tokeniser.test.ts:6-7,20` — The file, its `Purpose:` ("Verification tests for the low-level XML tokeniser and position tracker") and `describe('XML Tokeniser'` describe a module that no longer exists; the diff only changed its import path. **Fix:** rewrite `Purpose:`/`Description:` to say it tests `tokenizeXml`/`decodeXmlEntities` as the public raw-tree reader (built on the CST); retitle the `describe` to `'tokenizeXml'`. Renaming the file to match (`raw-xml-reader.test.ts`) is optional and needs the architect's nod, since `File:` must then be updated too.
-- [ ] `src/core/cst/index.ts:9-10` — Says the CST is "deliberately not re-exported from core/index.ts yet: the public surface is settled when the first consumer lands, not before." The first consumer (`parser/cst-adapter.ts`) has landed, so the stated reason is false. **Fix:** state the current fact and reason (e.g. consumed by `parser/cst-adapter.ts`; still not re-exported from `core/index.ts` because <the reason that is now true — architect to confirm, else drop the sentence>). Same file, line 17: `LineIndex ... Offset → line/column lookup` is now two-way; change to `Offset ↔ line/column lookup` to match `line-index.ts`.
+- [x] `test/parser/xml-tokeniser.test.ts:6-7,20` — The file, its `Purpose:` ("Verification tests for the low-level XML tokeniser and position tracker") and `describe('XML Tokeniser'` describe a module that no longer exists; the diff only changed its import path. **Fix:** rewrite `Purpose:`/`Description:` to say it tests `tokenizeXml`/`decodeXmlEntities` as the public raw-tree reader (built on the CST); retitle the `describe` to `'tokenizeXml'`. Renaming the file to match (`raw-xml-reader.test.ts`) is optional and needs the architect's nod, since `File:` must then be updated too.
+  **Resolved (024d49a): Purpose rewritten, describe retitled `tokenizeXml`. File rename declined: optional, and no architect nod.**
+- [x] `src/core/cst/index.ts:9-10` — Says the CST is "deliberately not re-exported from core/index.ts yet: the public surface is settled when the first consumer lands, not before." The first consumer (`parser/cst-adapter.ts`) has landed, so the stated reason is false. **Fix:** state the current fact and reason (e.g. consumed by `parser/cst-adapter.ts`; still not re-exported from `core/index.ts` because <the reason that is now true — architect to confirm, else drop the sentence>). Same file, line 17: `LineIndex ... Offset → line/column lookup` is now two-way; change to `Offset ↔ line/column lookup` to match `line-index.ts`.
+  **Resolved (024d49a): states the adapter is an internal consumer and the CST becomes public API when the designer's canvas editing needs it (PA ruling); `↔` fixed.**
 
 ### P3 — Consistency and documentation gaps
 
-- [ ] `test/cst/synthetic.test.ts:59` — `// A tab is one column, as in the tokeniser.` points at a deleted module (untouched line, made stale by this change). **Fix:** `// A tab is one column, like every other UTF-16 code unit (line-index.ts).`
-- [ ] `test/cst/tokeniser-golden.ts:28-40` — `Exports:` omits two exported interfaces, `FrozenInlineDiagnostics` and `FrozenDifference`. **Fix:** add them under "Golden shapes".
-- [ ] `test/cst/tokeniser-golden.ts:133-135` — The banner for `at` reads `// at` / ``// `line:column`, refusing…`` with the verb missing, so the description is a fragment. **Fix:** `// at` / `// A location as \`line:column\`, refusing one in some other file: …`.
-- [ ] `src/node/load-project.ts:163-173` — `loadProject`'s Doxygen does not mention the new behaviour: a single file whose root no parser takes yields a `U8G2GL_MALFORMED_XML` diagnostic (its own well-formedness errors if it has any, else "Unrecognised root"). **Fix:** add one sentence to the description and note that diagnostics appear in the returned model's load diagnostics (as the code does).
-- [ ] Change-narrating wording in new/changed comments (34 occurrences across `src/core/parser/cst-adapter.ts`-adjacent files). A comment is read by someone who was never here; "used to / until now / now / the old or original scanner / has always / did once" describe an event, not the code. Keep the fact, drop the narrative:
+- [x] `test/cst/synthetic.test.ts:59` — `// A tab is one column, as in the tokeniser.` points at a deleted module (untouched line, made stale by this change). **Fix:** `// A tab is one column, like every other UTF-16 code unit (line-index.ts).`
+  **Resolved (024d49a).**
+- [x] `test/cst/tokeniser-golden.ts:28-40` — `Exports:` omits two exported interfaces, `FrozenInlineDiagnostics` and `FrozenDifference`. **Fix:** add them under "Golden shapes".
+  **Resolved (024d49a).**
+- [x] `test/cst/tokeniser-golden.ts:133-135` — The banner for `at` reads `// at` / ``// `line:column`, refusing…`` with the verb missing, so the description is a fragment. **Fix:** `// at` / `// A location as \`line:column\`, refusing one in some other file: …`.
+  **Resolved (024d49a).**
+- [x] `src/node/load-project.ts:163-173` — `loadProject`'s Doxygen does not mention the new behaviour: a single file whose root no parser takes yields a `U8G2GL_MALFORMED_XML` diagnostic (its own well-formedness errors if it has any, else "Unrecognised root"). **Fix:** add one sentence to the description and note that diagnostics appear in the returned model's load diagnostics (as the code does).
+  **Resolved (024d49a).**
+- [x] Change-narrating wording in new/changed comments (34 occurrences across `src/core/parser/cst-adapter.ts`-adjacent files). A comment is read by someone who was never here; "used to / until now / now / the old or original scanner / has always / did once" describe an event, not the code. Keep the fact, drop the narrative:
   - `src/core/cst/line-index.ts:8-10,15-16` ("…so no diagnostic moved when the parser switched"; "the old scanner had no rule for") → state the convention only (LF, CRLF, lone CR end a line; BOM occupies no column).
   - `src/core/cst/entities.ts:13,49-52` and `src/core/cst/cst-types.ts:88` → drop "the parser used before the CST" / "original scanner let it escape"; keep "a reference beyond U+10FFFF is left as written because `String.fromCodePoint` throws a RangeError there".
   - `src/core/cst/parse-cst.ts` header (lines ~14-26) and in-body comments at ~120, 144, 156, 183-185, 244-246, 304-305, 333-334, 407, 426, 436-439, 475 ("the original scanner …") → where the point is that recovery paths must keep producing the diagnostics the golden records, say that once, citing `test/cst/tokeniser-diagnostics.json`; elsewhere describe the rule itself ("reported at 1:1 literally, not at an offset").
@@ -48,20 +54,25 @@ Run from `cli/`: `npm run build`, `npm test`, and the repo's lint/typecheck. Zer
   - `test/cst/diagnostics-parity.test.ts:7-13`, `test/cst/raw-adapter.test.ts:7-18,39,69-70` — these legitimately concern the recorded tokeniser (the goldens are its record), so "recorded tokeniser" may stay; remove only the "now/before/gone" framing (e.g. `'a leading BOM: two diagnostics before, a clean tree … now'` → `'a leading BOM is skipped and occupies no column'` with the recorded behaviour in the body).
   - `test/node/bom-and-root-dispatch.test.ts:7-15` ("now parses", "as the old first-`<name` search let it") → state the two guarantees without the comparison.
   - `src/core/parser/name-policy.ts:134-138` ("how this once went wrong … put line 1's edits one code unit early") → keep the reason for sharing `LineIndex` (a second table disagrees on CRLF and on the BOM) in the present tense, drop "once".
+  **Resolved (024d49a), every listed site. One deliberate remainder: `tokenizeXml`'s doc says it "keeps its historical name, from when it was a tokeniser", per the PA ruling. The parity/adapter tests keep "recorded tokeniser".**
 
 ### P4 — Optional, only if the architect approves
 
-- [ ] `src/core/parser/cst-adapter.ts:70` — `toRawAttribute` has no banner while `locate`, `foldNewlines`, `decodeFolded`, `toRawElement` do (§2 completeness). Add a two-line banner, or leave as trivial.
-- [ ] `src/core/manifest/manifest-registry.ts:~236` — `at: SourceLocation | undefined = undefined` plus `[]` placeholders at three call sites to reach it. Use `at?: SourceLocation` and consider an options object. Readability only.
-- [ ] `src/node/fix-names.ts:~31-33` — import list is no longer alphabetical (`rootElementName` sits between `parseScreenFile` and `parseWidgetManifestFile`).
-- [ ] `src/node/load-project.ts:~233` — `tokenizeXml` runs for dispatch and again inside the chosen `parse*File`. Not a standards matter; mention only for awareness.
+- [x] `src/core/parser/cst-adapter.ts:70` — `toRawAttribute` has no banner while `locate`, `foldNewlines`, `decodeFolded`, `toRawElement` do (§2 completeness). Add a two-line banner, or leave as trivial.
+  **Resolved (024d49a): banner added.**
+- [x] `src/core/manifest/manifest-registry.ts:~236` — `at: SourceLocation | undefined = undefined` plus `[]` placeholders at three call sites to reach it. Use `at?: SourceLocation` and consider an options object. Readability only.
+  **Resolved (3508701): `options: { suggestions?, at? }`; no placeholders left.**
+- [x] `src/node/fix-names.ts:~31-33` — import list is no longer alphabetical (`rootElementName` sits between `parseScreenFile` and `parseWidgetManifestFile`).
+  **Resolved (3508701).**
+- [x] `src/node/load-project.ts:~233` — `tokenizeXml` runs for dispatch and again inside the chosen `parse*File`. Not a standards matter; mention only for awareness.
+  **Declined: awareness only, per the audit. Parsing a single file twice costs well under a millisecond; avoiding it would mean threading a parsed document into every `parse*File`, a change to their signatures.**
 
 ## Verification Requirement
 
-- [ ] build — zero warnings/errors
-- [ ] `npm test` — all pass, none weakened or deleted (retitled tests keep their assertions)
-- [ ] `git diff` shows only comments, headers and test titles; goldens untouched
-- [ ] `grep -rniE "tokeni[sz]er?" src test --include='*.ts'` leaves only: `tokenizeXml` identifiers, `tokeniser-golden.ts` / `tokeniser-*.json` references, `expression.ts` (an unrelated tokeniser), and deliberate "recorded tokeniser" wording in the parity/adapter tests
+- [x] build — zero warnings/errors
+- [x] `npm test` — all pass, none weakened or deleted (retitled tests keep their assertions)
+- [x] `git diff` shows only comments, headers and test titles; goldens untouched
+- [x] `grep -rniE "tokeni[sz]er?" src test --include='*.ts'` leaves only: `tokenizeXml` identifiers, `tokeniser-golden.ts` / `tokeniser-*.json` references, `expression.ts` (an unrelated tokeniser), and deliberate "recorded tokeniser" wording in the parity/adapter tests
 
 ## Issue Surfacing
 
@@ -88,4 +99,12 @@ Report any defect outside this checklist in your Completion Report; do not fix o
 
 ## Completion Report
 
-<!-- Written by the remediation worker at task completion -->
+**Branch** `u8g2gl-e1b/wo4-readability`, from `wo3-fixes`'s tip `070bfbd`; not pushed.
+
+**Commits:** `9d2363d` (this audit), `024d49a` (P2/P3, plus the P4 `toRawAttribute` banner; comments, headers and test titles only), `3508701` (P4 code items: the `manifestDiagnostic` options object, fix-names import order), and this report.
+
+**Verification:** build clean; `npm run lint` (eslint + tsc) clean; **2228 passed, 0 failed**, no test weakened or deleted (retitled tests keep their assertions). The goldens `test/cst/tokeniser-*.json` are untouched. `git diff` for `024d49a` is comments, headers and test titles only; `3508701` changes code, and only as P4 recommended.
+
+**Grep** `grep -rniE "tokeni[sz]er?" src test --include='*.ts'`, minus `tokenizeXml` identifiers, golden references, `expression.ts` and "recorded tokeniser": leaves `catalogue/query.ts` (display-search tokenising, unrelated; the audit's list missed it), the `tokenizeXml` doc's historical-name sentence (PA ruling), the `xml-tokeniser.test.ts` file name (rename declined), and "the tokeniser was recorded" / "recorded from the tokeniser" in the parity and adapter tests, which concern the record.
+
+**Outside the checklist:** nothing new found. The audit's observations (`OffsetRange` duplicating `CstRange`; tests writing to `cli/tmp/`) are pre-existing or deliberate and left alone.
