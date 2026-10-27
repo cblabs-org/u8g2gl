@@ -134,7 +134,7 @@ public:
 // A plain object at the element's rectangle, so its children, clip and flag
 // directives behave exactly as they would around the real widget, and so it is
 // drawn by u8g2gl_render_object() in draw order: overlap and clipping stay true
-// (EDITOR-DESIGN §5.4). It draws a 1-pixel border, a 45° hatch at 25% density,
+// in every view of the canvas. It draws a 1-pixel border, a 45° hatch at 25% density,
 // the tag in the smallest built-in font where it fits, and an information
 // badge.
 class editor_placeholder : public u8g2gl_obj {
@@ -766,7 +766,7 @@ int applyScene(const char* json_str) {
     // the scene rather than the project's u8g2gl_generated_config.h: that header
     // carries only the four object and binding ceilings ([D-21]), and the scene
     // is generated from the same document, so the editor is still sized by the
-    // project and never by a constant of its own (LOOP-BUDGET F6).
+    // project and never by a constant of its own.
     const scene_json& disp = s_scene.get("display");
     s_display_width = disp.get("width").as_int();
     s_display_height = disp.get("height").as_int();

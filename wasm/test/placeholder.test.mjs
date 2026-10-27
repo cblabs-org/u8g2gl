@@ -5,7 +5,7 @@
  *
  * File: wasm/test/placeholder.test.mjs
  * Purpose: Proves that one widget the loaded Wasm cannot build costs one
- *          rectangle, not the whole canvas (EDITOR-DESIGN §5.4). For each
+ *          rectangle, not the whole canvas. For each
  *          chosen element of the fixture's home screen, a copy of the scene
  *          names an unknown class for it and another removes it; the two must
  *          render identically everywhere outside the element's rectangle, the
