@@ -1,0 +1,1227 @@
+{
+  "repositoryFiles": [
+    {
+      "file": ".agents/skills/principal-architect-workspace/device-measurements/rig/m1-m3-image-b2/globals.xml",
+      "sha256": "e072f2b87d2f4bf2c3c3695977fa97f4f959f4fb4459a9a7ccb177a23592a283",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/device-measurements/rig/m1-m3-image-b2/screen_measure.xml",
+      "sha256": "35f37606687d734a92640f006e63607448f7ba24c0046005a65e8785cf4574cd",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/device-measurements/rig/m1-m3-image-b2/u8g2gl.xml",
+      "sha256": "599b3192ed80803b01214cc6972b4937d7bfcd839af5258fa71b0edcaab2c6a8",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/device-measurements/rig/m1c-image-b3/screen_measure.xml",
+      "sha256": "de5628d0edc9350e1ecc5d8eccf4dc3527cc660648807345f91969bead773d0a",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_static.xml",
+      "sha256": "15d4046ca4ec8603cdc48e77e16f6bec654249081c7fb1efa51521b7b5b8127d",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe-departures/evidence/departures_workaround.xml",
+      "sha256": "05759c46f4e454fdcbd2ccffbde37297e289fd9c216267300a5870eee467f5fb",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/globals.xml",
+      "sha256": "c6ebde00ea64e87ec05485d57c08d6be8a0f1a3c85494c0f5f36ff609a6b7783",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/screens/screen_departures.xml",
+      "sha256": "79c4ce8341897326a845dcc191ec491af9b41bc5120b52fd0c82f03f9dc73947",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/u8g2gl.xml",
+      "sha256": "243843e7586aa660a7087ec4c77b1f3aabf21be04d144af21b4034ce864cbe84",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_probe_box/wd_probe_box.xml",
+      "sha256": "87c4f9860edbaa4af3a5b771183ac36a0bdfb6d84710fff5d704d9677069d6e8",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_service_list/wd_service_list.xml",
+      "sha256": "fe6660d08db9d2ca72ba73e9cd663ccf16be2d244a66ba6198f2875ffc610799",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_train_formation/wd_train_formation.xml",
+      "sha256": "4aeddb3e92aa3f4432eeb9261e12733153847a8c2245e4660b06af53b144f84a",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-05r2-timing/wo8-device/logs/screen_measure.xml",
+      "sha256": "a9867ccfec90182849f31126d5be697ea9ba8d0706df569a1a39b3779492b1b8",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/a/globals.xml",
+      "sha256": "8295bc5fdac12907f20ff75b3ca670bfdf4bcdd54d27dce90a1eeb311eacc0d6",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/a/screens/screen_home.xml",
+      "sha256": "35b9d7a48d840cfe0497f7a39047d7b59dcd4bf265dfef29f98961cb0824cecb",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/a/u8g2gl.xml",
+      "sha256": "4c5be571a5d6d153495029be3ee7d7bb4020e060d344d6d1260b4338c887cc98",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/c/globals.xml",
+      "sha256": "8295bc5fdac12907f20ff75b3ca670bfdf4bcdd54d27dce90a1eeb311eacc0d6",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/c/screens/screen_home.xml",
+      "sha256": "7081c996a5b79079aeedef891e9735f1d53006c8196dcc9ac8437c93667574be",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/c/u8g2gl.xml",
+      "sha256": "4c5be571a5d6d153495029be3ee7d7bb4020e060d344d6d1260b4338c887cc98",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/c/widgets/wd_t/wd_t.xml",
+      "sha256": "46428916e76eb8e3d96298b6897c9f34d8ce81540263c82d21830fe011e94eb1",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/d/globals.xml",
+      "sha256": "8295bc5fdac12907f20ff75b3ca670bfdf4bcdd54d27dce90a1eeb311eacc0d6",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/d/screens/screen_home.xml",
+      "sha256": "b64e9a390e4503bb2d02edf392c374a06e6ec344cdd42cf3d32d00cd2bacc8ef",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/d/u8g2gl.xml",
+      "sha256": "4c5be571a5d6d153495029be3ee7d7bb4020e060d344d6d1260b4338c887cc98",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/d/widgets/wd_d/wd_d.xml",
+      "sha256": "a35f8dc5619e5136c66f90d11e8cbf03775ff589732dd239843fc31016c1bec3",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/one/globals.xml",
+      "sha256": "8295bc5fdac12907f20ff75b3ca670bfdf4bcdd54d27dce90a1eeb311eacc0d6",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/one/screens/screen_home.xml",
+      "sha256": "2d802dcd1a5f380079ff6fc9872f3a19103855dd94e5fec9b3887198c6917037",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/one/u8g2gl.xml",
+      "sha256": "4c5be571a5d6d153495029be3ee7d7bb4020e060d344d6d1260b4338c887cc98",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/one/widgets/wd_p/wd_p.xml",
+      "sha256": "3cfcc77e9ce69dedfcaa9f489423654288161180698b19213db8d21fb8de7384",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/r/globals.xml",
+      "sha256": "91d58c7772dfe1d8c358744bd14b86f0cd0003a39963b8e26e6dc0c640b60a7c",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/r/screens/screen_home.xml",
+      "sha256": "36c9ab8cae0e210730ec0b3e7f76d22987acbb13c728709900b46bc9913c2ed1",
+      "diagnostics": []
+    },
+    {
+      "file": ".agents/skills/principal-architect-workspace/pr-4r2-corrections/evidence/probes/r/u8g2gl.xml",
+      "sha256": "4c5be571a5d6d153495029be3ee7d7bb4020e060d344d6d1260b4338c887cc98",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/generator/fixtures/emit-project/globals.xml",
+      "sha256": "82ae6d15ff1cf0516b7ec3fc767c8e1ed7bd30679fcbcda834dd96eaf36f1d6c",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/generator/fixtures/emit-project/screens/screen_home.xml",
+      "sha256": "70c6d0c47db0b45e049954723b34090f0170008357fba861cc6cda8ddf6c282f",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/generator/fixtures/emit-project/u8g2gl.xml",
+      "sha256": "2963ddab7dcc7c18d954ab49251f982ac9ffe09e65aa33efa2f2f57d476f16a3",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/generator/fixtures/emit-project/widgets/wd_badge/wd_badge.xml",
+      "sha256": "2fb0113d58f035f5b53b31a82ab86d40aeb352f39a6b88c6ba5126a96356ebf5",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/broken-project/globals.xml",
+      "sha256": "865d2fb9544f0003a5d49b267c4de90a72dd0a68a75b864a9445ce495b2707e8",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/broken-project/screens/screen_home.xml",
+      "sha256": "8a07702e8356f0e2fdf592f91d44ac5207214542ea24be0daba29d51c7d54b10",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/broken-project/u8g2gl.xml",
+      "sha256": "e6b20bcaa9f54abebe3a50b59561703a670027b9ece04cf9584a32ebfaa5e897",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/broken-project/widgets/status_bar/status_bar.xml",
+      "sha256": "5611a58a762e33e0edb0855e2e5313bcc2204f3bc72bc2b41c467904137e990c",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/valid-project/globals.xml",
+      "sha256": "218a389092e47b3512b83fc57065aa3bfc9064eeeaf3a2357bce2fc85a685da7",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/valid-project/screens/screen_home.xml",
+      "sha256": "7742aabd633d7e2739a4d7f46958497e5c46f6bcf5b45793cc1681672346e844",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/valid-project/u8g2gl.xml",
+      "sha256": "6979ba369adc70978ea337cbe897908b2ff10e2cd53d9a30b33c225c855a2149",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/integration/fixtures/valid-project/widgets/status_bar/status_bar.xml",
+      "sha256": "da775e315ecfac7aad5dd166e859e493ff19cec15b3829562c5b4cba07c2a75c",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/malformed.xml",
+      "sha256": "bf46dd748a00635ca86b4ce3af07a6ba225ea060993b15e345411f45ba02f96f",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 6,
+          "column": 9,
+          "message": "Unexpected character '<' while parsing attributes in <u8g2gl_label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 6,
+          "column": 10,
+          "message": "Expected '=' after attribute name 'u8g2gl_button' in <u8g2gl_label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 6,
+          "column": 52,
+          "message": "Unclosed quote for attribute 'text' in <u8g2gl_label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 5,
+          "column": 9,
+          "message": "Expected '>' or '/>' to close opening tag <u8g2gl_label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 5,
+          "column": 9,
+          "message": "unclosed tag 'u8g2gl_label'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 4,
+          "column": 5,
+          "message": "unclosed tag 'view'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 3,
+          "column": 1,
+          "message": "unclosed tag 'screen'"
+        }
+      ]
+    },
+    {
+      "file": "cli/test/parser/fixtures/unknown-elements.xml",
+      "sha256": "38e85966cebc4c19bcfcb5b2a943728fe80430a57933e22178fe5d2f550b783a",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/valid-composite-widget.xml",
+      "sha256": "a9795c2402040eccd1d935c45f217d2432c3e54e77cb6ab8fa7d7e7a084d8d13",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/valid-globals.xml",
+      "sha256": "fedcb25817eb02cdcb06655d40417da1ced9fc2a8da33017c6331a5d508a1fba",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/valid-project.xml",
+      "sha256": "7d42b414e78306633d1be455ecb43b8af27c521c1dd47c207994b2d738c67ef6",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/valid-screen.xml",
+      "sha256": "38908bcbae97f010b2d86961634be2ea65efd6c18f696eb22e6c4a0ebff458c9",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/parser/fixtures/valid-widget-manifest.xml",
+      "sha256": "e6ccaaba7720a72db6dc5b9f5ddfd777f77c0df573e617782038d2e5d049e40f",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/bad-binding-type.xml",
+      "sha256": "d041ab6f4cbf61fd0282596004108e033f87e1fdf88be62767aba8a9426911ff",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/bad-schema-version.xml",
+      "sha256": "8f6e7ba157745bbd60df9537eaf7fd27699e7eab3581a8c0e205544cfeb44195",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/duplicate-name.xml",
+      "sha256": "e3b0832b4e726b6b192efd948a5d2104ce5300cc05e43914487a466b53c242a8",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/globals.xml",
+      "sha256": "bbd320f0e1c996c9c8b680befa173d5cce3fe59071b0bd4d0cf562c750508264",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/invalid-name.xml",
+      "sha256": "7056084d0d41acf8b27e596bf0a088c0b670b03546660e0dea528937e38ae460",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/missing-required.xml",
+      "sha256": "14c3ec7846ccd3cceb02f32906a9a830b31f5bb1f6fa0a63a341305f79a8e784",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/overconstrained.xml",
+      "sha256": "aa9611cdf970c5125b53bd7a4ede94b579121e3708cfc0a68d0dbf0da4feb653",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/page-mode-display.xml",
+      "sha256": "1218ba1063da83303032f2eeaa84cfbf9788a948d6a43b53363233a8980c4f8a",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/unknown-display.xml",
+      "sha256": "2e9c62cb81dbbd12922af019b1acc784e0f73918f6069d704e3bf3f5e5d6a5da",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/invalid/unknown-font.xml",
+      "sha256": "f4fe03ee2f654484e13964b0be5414613fcffc0609702e2892bb4e70e2c9746b",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/valid/globals.xml",
+      "sha256": "76171d8ae35969183c18a9a52f91b89ae52712233c448bcc24b173dc6c11d777",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/valid/screens/screen_home.xml",
+      "sha256": "cd109fd5f8fabb30c86f7cbd6a97949ff790424e3986d04e07bbbdff1ca08b7e",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/valid/u8g2gl.xml",
+      "sha256": "6979ba369adc70978ea337cbe897908b2ff10e2cd53d9a30b33c225c855a2149",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/valid/widgets/status_bar/status_bar.xml",
+      "sha256": "da775e315ecfac7aad5dd166e859e493ff19cec15b3829562c5b4cba07c2a75c",
+      "diagnostics": []
+    },
+    {
+      "file": "cli/test/validator/fixtures/valid/widgets/wd_badge/wd_badge.xml",
+      "sha256": "c00ebc4053e5038da5a823a5abbf145df6613c0497709c2514119a40e54e1c9c",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_box.xml",
+      "sha256": "c69de5aa61901b77cc2460b96aec999891a890537c815577a2b6d9a50894e086",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_button.xml",
+      "sha256": "1ec2cdf35967d8a20d5bd05b80eb66cbee2e05e786ad5bef83fdc3f05f6f0e5c",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_circle.xml",
+      "sha256": "9a246528bbe70e55c1400177802854d9a876634a33504f709e1752d15ada6eb8",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_clock.xml",
+      "sha256": "b96c2f8f4c3ca49f89a6179425155f68b66eefb1c3689295208b466a2c5ec0b0",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_ellipse.xml",
+      "sha256": "c753c3ad3d40f0d0c132aa3408885373e1f6d30cc24d8495726b3d2263c1d121",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_glyph.xml",
+      "sha256": "f87e4f43720d6343cbe8cc96850d1f9da3055d6bb14614eb05d9517a846ec18c",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_hline.xml",
+      "sha256": "2f1cbc3c6ae12539cde37ec669c6a6478d832c302ff5c6231a1842e5ec0c740c",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_label.xml",
+      "sha256": "2756c53d7582ae0072c64129ba4bdc7241c62ee086968b179df9d3b6c4b219c4",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_line.xml",
+      "sha256": "82d2ede684ed097ebd0873b6777b7aad8bf943c6c6fd18db3da93793aee448a4",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_obj.xml",
+      "sha256": "fc6855cfec4b17e4cb1e1bdb3896810798d674c94f7cc9dbd509892e56723515",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_pixel.xml",
+      "sha256": "4649bdb131e379be38a5c3ea6e8e996ebc944f2ccc1a85b6f7d357071180c3c8",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_progress_bar.xml",
+      "sha256": "3f476fc30d3e4a6ac8043fd1c9aebb6a9c8174eb8ad9f4a67d7612a580599336",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_switch.xml",
+      "sha256": "f2b47abdd6841368e8147bffa6f33d9a0a7832229616aa43edbe88ba47dda3c8",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_triangle.xml",
+      "sha256": "bf44b91ba6858095d080b2e569b661951696d037a2b810c15ffdb193bf108a90",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_vline.xml",
+      "sha256": "52b94d2f5084fa4859222888cad6cadb3ce15e58f8445d55c21c300db6193de5",
+      "diagnostics": []
+    },
+    {
+      "file": "include/u8g2gl/manifests/u8g2gl_xbm.xml",
+      "sha256": "37aafc283b62b3b6abdc30c664ad5308b029c1c00551bf1f899722e17747e76f",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/globals.xml",
+      "sha256": "3e6286b03f333a6b2b8141437ea031ca72ad1cb4320c03f571cb8a439bb395c7",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/screens/screen_bounds.xml",
+      "sha256": "12ec9456f8891dd3b2836311ae50f854c09d8d7a0d85d460c9f71cb127fcf8bd",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/screens/screen_gauges.xml",
+      "sha256": "9ab309ca89d2ac9bee9e27ef8b4e3328ab2abaa4198ca8b420a1721d826ddff1",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/screens/screen_home.xml",
+      "sha256": "f5dbf9084ec19b27b6e6de3fdb4166c76811241bedb111e6eca2863195353337",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/u8g2gl.xml",
+      "sha256": "6de297b913625149777075e78b1c42fabd8350bda866054f5de13ada99ce6169",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/widgets/panel/panel.xml",
+      "sha256": "a63f1d529b55eed6667e2c1a772a9ce53bb41d72f558dacf9ad7fc0bff88db3c",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/widgets/slider/slider.xml",
+      "sha256": "33c8cb9e65c58bc2a130299b189af951a3e97d4f03b9a0a657b052abff185812",
+      "diagnostics": []
+    },
+    {
+      "file": "test/generated_fixture/widgets/status_bar/status_bar.xml",
+      "sha256": "a124b926a2900e54b5dcc5d6238ac00fff5905bf889f6e97441736c970a02851",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_box.xml",
+      "sha256": "c69de5aa61901b77cc2460b96aec999891a890537c815577a2b6d9a50894e086",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_button.xml",
+      "sha256": "1ec2cdf35967d8a20d5bd05b80eb66cbee2e05e786ad5bef83fdc3f05f6f0e5c",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_circle.xml",
+      "sha256": "9a246528bbe70e55c1400177802854d9a876634a33504f709e1752d15ada6eb8",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_clock.xml",
+      "sha256": "b96c2f8f4c3ca49f89a6179425155f68b66eefb1c3689295208b466a2c5ec0b0",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_ellipse.xml",
+      "sha256": "c753c3ad3d40f0d0c132aa3408885373e1f6d30cc24d8495726b3d2263c1d121",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_glyph.xml",
+      "sha256": "f87e4f43720d6343cbe8cc96850d1f9da3055d6bb14614eb05d9517a846ec18c",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_hline.xml",
+      "sha256": "2f1cbc3c6ae12539cde37ec669c6a6478d832c302ff5c6231a1842e5ec0c740c",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_label.xml",
+      "sha256": "2756c53d7582ae0072c64129ba4bdc7241c62ee086968b179df9d3b6c4b219c4",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_line.xml",
+      "sha256": "82d2ede684ed097ebd0873b6777b7aad8bf943c6c6fd18db3da93793aee448a4",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_obj.xml",
+      "sha256": "fc6855cfec4b17e4cb1e1bdb3896810798d674c94f7cc9dbd509892e56723515",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_pixel.xml",
+      "sha256": "4649bdb131e379be38a5c3ea6e8e996ebc944f2ccc1a85b6f7d357071180c3c8",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_progress_bar.xml",
+      "sha256": "3f476fc30d3e4a6ac8043fd1c9aebb6a9c8174eb8ad9f4a67d7612a580599336",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_switch.xml",
+      "sha256": "f2b47abdd6841368e8147bffa6f33d9a0a7832229616aa43edbe88ba47dda3c8",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_triangle.xml",
+      "sha256": "bf44b91ba6858095d080b2e569b661951696d037a2b810c15ffdb193bf108a90",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_vline.xml",
+      "sha256": "52b94d2f5084fa4859222888cad6cadb3ce15e58f8445d55c21c300db6193de5",
+      "diagnostics": []
+    },
+    {
+      "file": "test/xtensa_control/pre_fix/include/u8g2gl/manifests/u8g2gl_xbm.xml",
+      "sha256": "37aafc283b62b3b6abdc30c664ad5308b029c1c00551bf1f899722e17747e76f",
+      "diagnostics": []
+    }
+  ],
+  "inlineCases": [
+    {
+      "group": "existing",
+      "name": "mismatched closing tags",
+      "file": "inline.xml",
+      "text": "<screen name=\"mismatch\">\n    <view>\n    </screen>\n</view>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 3,
+          "column": 5,
+          "message": "Mismatched closing tag: expected '</view>', found '</screen>'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 4,
+          "column": 1,
+          "message": "Mismatched closing tag: expected '</screen>', found '</view>'"
+        }
+      ]
+    },
+    {
+      "group": "existing",
+      "name": "unclosed tags at EOF",
+      "file": "inline.xml",
+      "text": "<globals>\n    <consts>\n        <int name=\"x\" value=\"1\" />",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 5,
+          "message": "unclosed tag 'consts'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'globals'"
+        }
+      ]
+    },
+    {
+      "group": "existing",
+      "name": "unclosed tag",
+      "file": "inline.xml",
+      "text": "<screen name=\"home\">\n    <view>\n</screen>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 3,
+          "column": 1,
+          "message": "Mismatched closing tag: expected '</view>', found '</screen>'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'screen'"
+        }
+      ]
+    },
+    {
+      "group": "existing",
+      "name": "unclosed attribute quote",
+      "file": "inline.xml",
+      "text": "<label text=\"unclosed />",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 14,
+          "message": "Unclosed quote for attribute 'text' in <label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected '>' or '/>' to close opening tag <label>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'label'"
+        }
+      ]
+    },
+    {
+      "group": "existing",
+      "name": "empty document",
+      "file": "inline.xml",
+      "text": "   \n  <!-- comment only -->  \n",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "XML document is empty or contains no root element"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "empty input",
+      "file": "branch.xml",
+      "text": "",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "XML document is empty or contains no root element"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "whitespace only",
+      "file": "branch.xml",
+      "text": " \r\n\t ",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "XML document is empty or contains no root element"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unclosed comment in the prolog",
+      "file": "branch.xml",
+      "text": "<!-- never closed\n<a/>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Unclosed XML comment"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "XML document is empty or contains no root element"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unclosed comment in content",
+      "file": "branch.xml",
+      "text": "<a>\n  <!-- never closed",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 3,
+          "message": "Unclosed XML comment"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unclosed PI in the prolog",
+      "file": "branch.xml",
+      "text": "<?xml version=\"1.0\"",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Unclosed XML processing instruction"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "XML document is empty or contains no root element"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unclosed PI in content",
+      "file": "branch.xml",
+      "text": "<a><?pi oops",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Unclosed XML processing instruction"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "missing tag name",
+      "file": "branch.xml",
+      "text": "<a>< >text</a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Expected element tag name after \"<\""
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "missing tag name at the root",
+      "file": "branch.xml",
+      "text": "<>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected element tag name after \"<\""
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "bare <",
+      "file": "branch.xml",
+      "text": "<",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected element tag name after \"<\""
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "text before the root",
+      "file": "branch.xml",
+      "text": "hello <root/>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 7,
+          "message": "Unexpected character '<' while parsing attributes in <ello>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 8,
+          "message": "Expected '=' after attribute name 'root' in <ello>"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unexpected character in attributes",
+      "file": "branch.xml",
+      "text": "<a x=\"1\" @ y=\"2\"/>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 10,
+          "message": "Unexpected character '@' while parsing attributes in <a>"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unexpected end inside a tag",
+      "file": "branch.xml",
+      "text": "<a x=\"1\"",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected '>' or '/>' to close opening tag <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "missing =",
+      "file": "branch.xml",
+      "text": "<a b></a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Expected '=' after attribute name 'b' in <a>"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "missing = then a value",
+      "file": "branch.xml",
+      "text": "<a b \"c\"></a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Expected '=' after attribute name 'b' in <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 6,
+          "message": "Unexpected character '\"' while parsing attributes in <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 7,
+          "message": "Expected '=' after attribute name 'c' in <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 8,
+          "message": "Unexpected character '\"' while parsing attributes in <a>"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unquoted value",
+      "file": "branch.xml",
+      "text": "<a b=c></a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 6,
+          "message": "Attribute value for 'b' in <a> must be enclosed in quotes"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unquoted value at end of input",
+      "file": "branch.xml",
+      "text": "<a b=",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 6,
+          "message": "Attribute value for 'b' in <a> must be enclosed in quotes"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected '>' or '/>' to close opening tag <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "unclosed quote, multi-line",
+      "file": "branch.xml",
+      "text": "<a b=\"one\ntwo\n",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 7,
+          "message": "Unclosed quote for attribute 'b' in <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected '>' or '/>' to close opening tag <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "open tag never closed",
+      "file": "branch.xml",
+      "text": "<a b=\"1\"",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected '>' or '/>' to close opening tag <a>"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "close tag missing >",
+      "file": "branch.xml",
+      "text": "<a></a",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Expected '>' after closing tag name '</a>'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "close tag missing > then text",
+      "file": "branch.xml",
+      "text": "<a></a x>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "Expected '>' after closing tag name '</a>'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 8,
+          "message": "Multiple root elements or unexpected trailing content"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "mismatched close",
+      "file": "branch.xml",
+      "text": "<a><b></a></b>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 7,
+          "message": "Mismatched closing tag: expected '</b>', found '</a>'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 11,
+          "message": "Mismatched closing tag: expected '</a>', found '</b>'"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "two roots",
+      "file": "branch.xml",
+      "text": "<a/><b/>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 5,
+          "message": "Multiple root elements or unexpected trailing content"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "trailing text",
+      "file": "branch.xml",
+      "text": "<a></a> trailing",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 9,
+          "message": "Multiple root elements or unexpected trailing content"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "trailing comment and PI are fine",
+      "file": "branch.xml",
+      "text": "<a/>\n<!-- c -->\n<?pi?>\n",
+      "diagnostics": []
+    },
+    {
+      "group": "branch",
+      "name": "CRLF locations",
+      "file": "branch.xml",
+      "text": "<a>\r\n  <b c=d/>\r\n</a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 8,
+          "message": "Attribute value for 'c' in <b> must be enclosed in quotes"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "lone CR locations",
+      "file": "branch.xml",
+      "text": "<a>\r  <b c=d/>\r</a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 8,
+          "message": "Attribute value for 'c' in <b> must be enclosed in quotes"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "tabs before the error",
+      "file": "branch.xml",
+      "text": "<a>\n\t\t<b c=d/>\n</a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 8,
+          "message": "Attribute value for 'c' in <b> must be enclosed in quotes"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "astral characters before the error",
+      "file": "branch.xml",
+      "text": "<a t=\"😀\">😀 <b c=d/></a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 19,
+          "message": "Attribute value for 'c' in <b> must be enclosed in quotes"
+        }
+      ]
+    },
+    {
+      "group": "branch",
+      "name": "deep unclosed nesting",
+      "file": "branch.xml",
+      "text": "<a><b><c><d>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 10,
+          "message": "unclosed tag 'd'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 7,
+          "message": "unclosed tag 'c'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 4,
+          "message": "unclosed tag 'b'"
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "unclosed tag 'a'"
+        }
+      ]
+    }
+  ],
+  "intentionalDifferences": [
+    {
+      "name": "leading BOM",
+      "file": "difference.xml",
+      "text": "﻿<screen name=\"bom\">\n    <view/>\n</screen>\n",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 1,
+          "message": "Expected element tag name after \"<\""
+        },
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 2,
+          "column": 5,
+          "message": "Multiple root elements or unexpected trailing content"
+        }
+      ]
+    },
+    {
+      "name": "CDATA in element content",
+      "file": "difference.xml",
+      "text": "<a>before <![CDATA[x < y && z]]> after</a>",
+      "diagnostics": [
+        {
+          "code": "U8G2GL_MALFORMED_XML",
+          "line": 1,
+          "column": 11,
+          "message": "Expected element tag name after \"<\""
+        }
+      ]
+    },
+    {
+      "name": "character reference beyond U+10FFFF",
+      "file": "difference.xml",
+      "text": "<a b=\"x&#99999999;y\"/>",
+      "threw": "RangeError: Invalid code point 99999999"
+    }
+  ]
+}
