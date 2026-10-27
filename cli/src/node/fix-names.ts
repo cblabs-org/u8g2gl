@@ -29,6 +29,7 @@ import { join, resolve } from 'node:path';
 import {
   applyTextEdits,
   parseScreenFile,
+  rootElementName,
   parseWidgetManifestFile,
   type SourceEdit,
 } from '../core/parser/index.js';
@@ -53,7 +54,7 @@ export interface NameFixRecord {
  * element-identity namespace, so it has nothing to fix.
  */
 function computeNameEdits(content: string, filename: string): readonly SourceEdit[] {
-  const rootTag = content.match(/<([a-zA-Z0-9_]+)/)?.[1] ?? '';
+  const rootTag = rootElementName(content, filename) ?? '';
   const options = { missingNamePolicy: 'generate' } as const;
 
   if (rootTag === 'screen') {

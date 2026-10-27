@@ -22,8 +22,9 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { applyTextEdits, parseScreenFile } from '../../src/core/parser/index.js';
+import { applyTextEdits, parseScreenFile, rootElementName } from '../../src/core/parser/index.js';
 import { fixMissingNames } from '../../src/node/fix-names.js';
+import { loadProject } from '../../src/node/load-project.js';
 
 const BOM = '﻿';
 const GENERATE = { missingNamePolicy: 'generate' } as const;
@@ -77,5 +78,35 @@ describe('name insertion after a BOM', () => {
       { file: 'screen_home.xml', names: ['box_0', 'box_1'] },
     ]);
     expect(readFileSync(path, 'utf-8')).toBe(BOM + NAMED(eol));
+  });
+});
+
+describe('a file is dispatched by its root element', () => {
+  const COMMENTED_GLOBALS = '<!-- copied from <screen name="x"> -->\n<globals>\n</globals>\n';
+
+  it('rootElementName skips a comment holding a tag, a declaration and a BOM', () => {
+    expect(rootElementName(COMMENTED_GLOBALS, 'globals.xml')).toBe('globals');
+    expect(rootElementName(`${BOM}<?xml version="1.0"?>\n<screen name="s" />`, 's.xml')).toBe('screen');
+    expect(rootElementName('<!-- only a comment -->', 'e.xml')).toBeUndefined();
+  });
+
+  it('loadProject reads a commented globals file as globals, not as a screen', () => {
+    const loaded = loadProject(tempFile('globals.xml', COMMENTED_GLOBALS), { label: 'globals.xml' });
+    expect(loaded.model.screens).toEqual([]);
+    expect(loaded.model.loadDiagnostics).toEqual([]);
+  });
+
+  it('loadProject reads a single BOM screen file as a screen', () => {
+    const path = tempFile('screen_home.xml', BOM + '<screen name="home">\n    <view />\n</screen>\n');
+    const loaded = loadProject(path, { label: 'screen_home.xml' });
+    expect(loaded.model.screens.map((screen) => screen.name)).toEqual(['home']);
+    expect(loaded.model.loadDiagnostics).toEqual([]);
+  });
+
+  it('fixMissingNames fixes a screen whose leading comment holds a <widget> tag', () => {
+    const before = '<!-- <widget name="old"> -->\n<screen name="home"><view><u8g2gl_box x="0" y="0" width="4" height="4" /></view></screen>\n';
+    const path = tempFile('screen_home.xml', before);
+    expect(fixMissingNames(path, 'screen_home.xml')).toEqual([{ file: 'screen_home.xml', names: ['box_0'] }]);
+    expect(readFileSync(path, 'utf-8')).toBe(before.replace('<u8g2gl_box ', '<u8g2gl_box name="box_0" '));
   });
 });

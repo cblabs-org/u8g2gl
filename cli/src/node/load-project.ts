@@ -50,6 +50,7 @@ import {
   parseGlobalsFile,
   parseScreenFile,
   parseWidgetManifestFile,
+  rootElementName,
 } from '../core/parser/index.js';
 import type { ProjectModel } from '../core/generator/index.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
@@ -202,7 +203,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     const label = options?.label ?? targetPath;
     const xml = readFileSync(targetPath, 'utf-8');
     fileContents.set(label, xml);
-    const rootTag = xml.match(/<([a-zA-Z0-9_]+)/)?.[1] ?? '';
+    const rootTag = rootElementName(xml, label) ?? '';
 
     if (rootTag === 'u8g2gl') {
       hasProjectManifest = true;

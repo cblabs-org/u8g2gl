@@ -31,6 +31,7 @@
  * Exports:
  * - tokenizeXml():        Parse XML text into a RawXmlDocument; never throws
  * - decodeXmlEntities():  Replace predefined and numeric entity references
+ * - rootElementName():    The tag of a document's root element
  */
 
 import { decodeEntities, parseCst, type CstAttribute, type CstElement, type LineIndex } from '../cst/index.js';
@@ -134,6 +135,19 @@ function toRawElement(ctx: AdapterContext, element: CstElement): RawXmlElement {
     ...(element.closeTag ? { endLoc: locate(ctx, element.closeTag.start) } : {}),
     range,
   };
+}
+
+/**
+ * The tag name of the document's root element, as the parser reads it, or
+ * undefined when there is none. For choosing which parser a file goes to:
+ * unlike a search for the first `<name`, it skips a BOM, the XML declaration,
+ * and comments — including a comment that itself contains a tag.
+ *
+ * @param xml       The file's contents, exactly as read.
+ * @param filename  Name the (discarded) diagnostics would be reported against.
+ */
+export function rootElementName(xml: string, filename: string): string | undefined {
+  return parseCst(xml, filename).cst.root?.name;
 }
 
 /**

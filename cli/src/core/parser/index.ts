@@ -22,6 +22,7 @@
  *   (plain widget or composite, per [D-18])
  * - tokenizeXml: Read XML text into the raw element tree (built from the CST)
  * - decodeXmlEntities: The entity rule applied to every attribute value and text
+ * - rootElementName: The root element's tag, for dispatching a file to its parser
  * - RawXmlAttribute, RawXmlElement, RawXmlDocument: Low-level untyped XML types
  * - MissingNamePolicy, ParseOptions, SourceEdit, applyTextEdits: [U-1] name policy and write-back
  */
@@ -45,7 +46,7 @@ export interface ParseResult<T> {
   readonly nameEdits?: readonly SourceEdit[];
 }
 
-export { tokenizeXml, decodeXmlEntities } from './cst-adapter.js';
+export { tokenizeXml, decodeXmlEntities, rootElementName } from './cst-adapter.js';
 export type {
   RawXmlAttribute,
   RawXmlElement,
