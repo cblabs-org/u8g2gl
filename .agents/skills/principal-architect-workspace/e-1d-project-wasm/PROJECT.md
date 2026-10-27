@@ -65,7 +65,36 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
    `cli/package.json` for the version, and the generated goldens the bump moves. Any other file:
    stop and report.
 
+7. **Amendments, 2026-10-27, on WO2's stop-and-report** (the worker stopped correctly at the
+   boundary; these are the PA's rulings on its four items):
+   1. **Boundary extension:** `cli/src/core/generator/emit/index.ts`, the `emitEditorFiles()` call
+      site only. Hoist the object it already builds for `emitSceneFile()` and pass `assets` to
+      `emitEditorRegistryUnit()`. Then `bridge.cpp` uses `ui_editor_asset()` and drops
+      `register_default_assets()` and its externs; the fixture registry and editor goldens
+      regenerate; the CLI goes 0.13.1 → 0.13.2. No firmware golden may move.
+   2. **Spec versus code, accepted:** `u8g2gl_generated_config.h` defines only four ceilings, so
+      subject string capacity and display size come from the **scene** at load. That meets F6's
+      intent. A comment at the point the bridge reads them says so.
+   3. **The runtime cache** is keyed by U8G2GL version **plus a hash of the project's
+      `u8g2gl_generated_config.h`**, because the binding pool in `src/u8g2gl_obj.cpp` is sized from
+      it. `u8g2gl_obj.cpp` is not compiled per project; projects with the same config share one
+      runtime build.
+   4. **The `draw_calls` defect is fixed in E-1d.** The bridge checks `realisation == "draw"` but
+      the scene emits `"draw_calls"`, so no drawing element has ever appeared in a bridge frame.
+      **Boundary extension:** the `U8G2GL_PARITY_SHA256` value in `test/CMakeLists.txt` and the
+      expected hash in `wasm/test/snapshot.test.mjs`, for this fix only. **Conditions:** the
+      native `editor_host` and the Wasm bridge produce the same new frame (both hashes shown,
+      equal); the home screen's `rule` line is shown present (lit-pixel delta and its pixels); the
+      C++ suite passes at 512 with its one known skip. The fix is its own commit, whose message
+      explains why the reference frame moved.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1c's tip, `extern/u8g2` checked out. emsdk 5.0.3 found
   at `departures-board/tools/layoutsim/emsdk` (tag `5.0.3`, `a620cf1d`). WO1 issued.
+- **2026-10-27. WO1 complete; WO2 stopped at the boundary** (worker report in WORKORDERS.md,
+  `e8d8965`). WO1: `toolchain install|status|path`, 22 tests against a fake host, the real
+  installer never run. WO2 partial: no capacity literal left in `bridge.cpp`, placeholders (d3)
+  pass, framework Wasm unchanged at `bca55545…`. Stopped on four items; the PA's rulings are
+  ruling 7 above. The worker then refused to act on the rulings while they existed only as a
+  message, as rule 00 requires; this commit is what authorises them.
