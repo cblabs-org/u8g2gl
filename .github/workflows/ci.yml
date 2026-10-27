@@ -42,13 +42,15 @@ jobs:
         run: cd cli && npm test
 
   wasm-tests:
-    # The editor Wasm, built and run in CI (the first job to do so). Emscripten
-    # is the pinned release, installed the way `u8g2gl toolchain install` does:
+    # The editor Wasm, built and run in CI. Emscripten is the pinned release, installed the way `u8g2gl toolchain install` does:
     # emsdk cloned at the pinned tag, its HEAD checked against the pinned
     # commit, then `emsdk install` / `activate` (emsdk verifies its own
     # archives). No third-party setup action. Cached by version and commit.
     runs-on: ubuntu-latest
     env:
+      # The same pin as cli/src/node/toolchain/toolchain-paths.ts
+      # (EMSCRIPTEN_VERSION, EMSDK_COMMIT): change both together, or CI builds
+      # with a compiler the toolchain code refuses.
       EMSDK_VERSION: '5.0.3'
       EMSDK_COMMIT: a620cf1d71c62dfdfbb0c01fe0a371e2af2dda6c
     steps:
@@ -90,6 +92,8 @@ jobs:
         run: node wasm/test/snapshot.test.mjs
       - name: Wasm placeholder test
         run: node wasm/test/placeholder.test.mjs
+      - name: Wasm last-error test
+        run: node wasm/test/last-error.test.mjs
       - name: Install CLI
         run: cd cli && npm ci
       - name: CLI tests that need Emscripten, with Emscripten present

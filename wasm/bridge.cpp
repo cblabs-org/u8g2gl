@@ -35,18 +35,37 @@
  *              built as a placeholder object at its rectangle, drawn in draw
  *              order like any object, and listed by `getPlaceholders()`.
  *
+ *              Memory: this is editor-host code, compiled only into the
+ *              editor's Wasm (and the native parity test), never into
+ *              firmware, so it uses the heap — std::vector, std::string,
+ *              std::unique_ptr — for its own bookkeeping. The no-heap rule
+ *              binds the runtime (`include/`, `src/`), which this file only
+ *              calls. The runtime's objects are still placement-constructed
+ *              into an arena sized for them, so their layout is firmware's.
+ *
+ *              Every entry point that can fail clears the last error first,
+ *              so getLastError() always describes the call that just failed.
+ *
  * Exported Functions (extern "C"):
- * - applyScene():       Parse scene JSON and build default/named screen
- * - applySampleData():  Set subject values from JSON object
- * - renderFrame():      Tick objects and render to virtual U8G2 buffer
- * - getDisplayWidth():  Width of virtual display in pixels
- * - getDisplayHeight(): Height of virtual display in pixels
- * - getBufferPtr():     Pointer to raw U8G2 display framebuffer
- * - getBufferSize():    Byte length of raw U8G2 display framebuffer
- * - teardown():         Destroy objects, clear subjects, reset arena
- * - selectScreen():     Switch active screen and rebuild objects
- * - getLastError():     Return last error message string
- * - getPlaceholders():  JSON list of the active screen's placeholder elements
+ *     Scene lifecycle:
+ *     - applyScene():       Parse scene JSON and build the default screen
+ *     - selectScreen():     Switch active screen and rebuild objects
+ *     - applySampleData():  Set subject values from a JSON object
+ *     - teardown():         Destroy objects, clear subjects, reset arena
+ *     Frame:
+ *     - renderFrame():      Tick objects and render to the virtual U8G2 buffer
+ *     Buffer:
+ *     - getDisplayWidth():  Width of the virtual display in pixels
+ *     - getDisplayHeight(): Height of the virtual display in pixels
+ *     - getBufferPtr():     Pointer to the raw U8G2 frame buffer
+ *     - getBufferSize():    Byte length of the raw U8G2 frame buffer
+ *     Diagnostics:
+ *     - getLastError():     The last error message
+ *     - getPlaceholders():  JSON list of the active screen's placeholder elements
+ *
+ *     A project editor Wasm also exports getBuildHash(). It is not defined
+ *     here: the design server's build compiles it from a generated unit and
+ *     adds it to the export list at link time.
  */
 
 #ifdef __EMSCRIPTEN__
@@ -139,6 +158,9 @@ public:
 // badge.
 class editor_placeholder : public u8g2gl_obj {
 public:
+    // `tag` points into s_scene's strings and is not copied, so a placeholder
+    // must not outlive the scene: teardown() destroys objects before it resets
+    // s_scene, which is what makes this safe.
     explicit editor_placeholder(const char* tag) : tag_(tag) {}
 
     void render(U8G2& display) override {
@@ -195,6 +217,10 @@ private:
     const char* tag_;
 };
 
+// The scene description version this bridge reads: `version` in ui_scene.json,
+// written by the CLI's scene emitter (emit/scene.ts). Bump both together.
+constexpr int32_t kSceneVersion = 3;
+
 // Virtual display, sized for each scene
 std::vector<uint8_t> s_display_buffer;
 u8x8_display_info_t s_display_info = {};
@@ -237,6 +263,10 @@ std::vector<uint8_t> s_parents;
 std::vector<placeholder_record> s_placeholders;
 std::string s_placeholders_json;
 
+// fail
+// Records an error and returns false. Only the first is kept, because the
+// first refusal is the cause and later ones are its consequences; each entry
+// point clears the error first, so it is always this call's.
 bool fail(const std::string& message) {
     if (s_last_error.empty()) {
         s_last_error = message;
@@ -251,6 +281,11 @@ size_t arena_bytes(size_t size, size_t align) {
     return size + align - 1;
 }
 
+// arena_allocate
+// Bumps the next aligned block out of s_arena, or nullptr when it does not fit.
+//   size  — the object's sizeof
+//   align — its alignof; above max_align_t the arena cannot honour it (an
+//           over-aligned class), which callers report as an allocation failure
 void* arena_allocate(size_t size, size_t align) {
     const size_t capacity = s_arena.size() * sizeof(std::max_align_t);
     if (align == 0 || align > alignof(std::max_align_t)) {
@@ -332,6 +367,10 @@ bool value_for(u8g2gl_editor_type_t type, const scene_json& json, const std::str
     return fail(what + ": scene value does not fit registry type");
 }
 
+// destroy_objects
+// Destroys the active screen's objects and empties the arena. In reverse
+// construction order, so children (always after their parent in the flat
+// array) go before the parents they may refer to.
 void destroy_objects() {
     for (size_t i = s_objects.size(); i > 0; --i) {
         u8g2gl_editor_destroy(s_objects[i - 1]);
@@ -380,6 +419,11 @@ bool build_object(const scene_json& element, const u8g2gl_editor_class* cls) {
     return true;
 }
 
+// configure_object
+// The "properties" init step: the rectangle, then each property through its
+// registry thunk. A placeholder takes only the rectangle.
+//   index   — the object's index in s_objects
+//   element — its scene element
 bool configure_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const scene_json& rect = element.get("rect");
@@ -418,6 +462,11 @@ bool configure_object(size_t index, const scene_json& element) {
     return true;
 }
 
+// apply_styles
+// The "styles" init step: each named style's properties, then the element's
+// own overrides, through the same thunks as properties. Skipped for a placeholder.
+//   index   — the object's index in s_objects
+//   element — its scene element
 bool apply_styles(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     if (s_classes[index] == nullptr) {
@@ -462,6 +511,11 @@ bool apply_styles(size_t index, const scene_json& element) {
     return true;
 }
 
+// bind_object
+// The "bindings" init step: each binding, then each flag directive, against
+// the host subjects. A placeholder keeps only its flag directives.
+//   index   — the object's index in s_objects
+//   element — its scene element
 bool bind_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_registry& reg = ui_editor_registry();
@@ -501,6 +555,10 @@ bool bind_object(size_t index, const scene_json& element) {
     return true;
 }
 
+// build_screen
+// Builds one screen: sizes the arena for its classes, constructs its objects,
+// then runs the scene's init steps in the scene's order.
+//   screen_name — a screen in s_scene
 bool build_screen(const std::string& screen_name) {
     // --- Step 1: Locate screen in parsed scene ---
     s_active_screen = find_screen_json(screen_name);
@@ -725,6 +783,8 @@ extern "C" {
  */
 EMSCRIPTEN_KEEPALIVE
 void teardown() {
+    // Objects first: placeholders point into s_scene, and bound objects
+    // unregister from subjects as they are destroyed.
     destroy_objects();
     s_subjects.clear();
     s_scene = scene_json{};
@@ -756,8 +816,8 @@ int applyScene(const char* json_str) {
         s_last_error = "scene json parse error: " + parse_error;
         return 0;
     }
-    if (s_scene.get("format").as_string() != "u8g2gl-scene" || s_scene.get("version").as_int() != 3) {
-        s_last_error = "not a version 3 u8g2gl scene description";
+    if (s_scene.get("format").as_string() != "u8g2gl-scene" || s_scene.get("version").as_int() != kSceneVersion) {
+        s_last_error = "not a version " + std::to_string(kSceneVersion) + " u8g2gl scene description";
         return 0;
     }
 
@@ -844,6 +904,7 @@ int applyScene(const char* json_str) {
  */
 EMSCRIPTEN_KEEPALIVE
 int selectScreen(const char* screen_name) {
+    s_last_error.clear();
     if (screen_name == nullptr) {
         s_last_error = "null screen name provided";
         return 0;
@@ -862,6 +923,7 @@ int selectScreen(const char* screen_name) {
  */
 EMSCRIPTEN_KEEPALIVE
 int applySampleData(const char* sample_data_json) {
+    s_last_error.clear();
     if (sample_data_json == nullptr) {
         s_last_error = "null sample data provided";
         return 0;
@@ -912,6 +974,7 @@ int applySampleData(const char* sample_data_json) {
  */
 EMSCRIPTEN_KEEPALIVE
 uint8_t* renderFrame(uint32_t current_ms) {
+    s_last_error.clear();
     if (s_active_screen == nullptr) {
         s_last_error = "cannot render: no screen active";
         return nullptr;
@@ -964,6 +1027,9 @@ int getDisplayHeight() {
 
 /**
  * @brief Get pointer to raw U8G2 framebuffer memory.
+ *
+ * Valid until the next applyScene() or teardown(), which reallocate or free
+ * the buffer: a caller must not keep it, or a view onto it, across those.
  */
 EMSCRIPTEN_KEEPALIVE
 uint8_t* getBufferPtr() {
@@ -979,7 +1045,9 @@ uint32_t getBufferSize() {
 }
 
 /**
- * @brief Get the last recorded error message.
+ * @brief Get the last recorded error message; empty if the last call succeeded.
+ *
+ * Valid until the next call into the bridge, which clears or replaces it.
  */
 EMSCRIPTEN_KEEPALIVE
 const char* getLastError() {
