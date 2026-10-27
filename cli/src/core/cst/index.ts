@@ -14,14 +14,27 @@
  * - parseCst(), CstParseResult:  Parse text into a lossless tree
  * - printCst():                  Reproduce the text from a tree
  * - LineIndex, LineColumn:       Offset → line/column lookup
- * - decodeEntities():            The CST's entity decoding rules
+ * - decodeEntities(), encodeAttributeValue():  The CST's entity rules
+ * - replaceAttributeValue(), insertAttribute(), removeAttribute(),
+ *   insertElement(), removeElement(), renameElementTag():
+ *                                Editing intents as minimal TextEdits
+ * - applyEdits():                Land TextEdits on a string
  * - Cst* node types, TextEdit:   The tree's shape (see cst-types.ts)
  */
 
 export { parseCst, type CstParseResult } from './parse-cst.js';
 export { printCst } from './print-cst.js';
 export { LineIndex, type LineColumn } from './line-index.js';
-export { decodeEntities } from './entities.js';
+export { decodeEntities, encodeAttributeValue } from './entities.js';
+export {
+  insertAttribute,
+  insertElement,
+  removeAttribute,
+  removeElement,
+  renameElementTag,
+  replaceAttributeValue,
+} from './edits.js';
+export { applyEdits } from './apply-edits.js';
 export type {
   CstAttribute,
   CstCdata,
