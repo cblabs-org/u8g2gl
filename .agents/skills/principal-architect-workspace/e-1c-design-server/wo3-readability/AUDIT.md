@@ -33,46 +33,46 @@ None.
 
 ### P2 — Workspace pointers (per instruction) and security checks with no why-comment at the line
 
-- [ ] **Acceptance-tag pointers in source comments.**
+- [x] **Resolved.** **Acceptance-tag pointers in source comments.**
   - `src/node/design/design-server.ts:50` `/** The only address the server binds (c3). */` -> `/** The only address the server binds: loopback, so no other machine can reach it. */`
   - `src/node/design/design-server.ts:133` `// --- Authorisation, before anything else (c1) ---` -> `// --- Authorisation: Host, then token, before anything is parsed or routed ---`
   - `src/node/design/project-watcher.ts:43-45` "short against c4's 200 ms budget from write to event" -> state the fact: "well inside the 200 ms the editor allows from an external write to its event".
-- [ ] **Test titles and purposes that use c1-c7.** Replace the tag with the behaviour it names: `test/node/design/design-server.test.ts:7-9` (c1-c4 in Purpose), `:69` `describe('c3 — loopback only'` -> `'loopback only'`, `:78` `'c1 — the token, on every route'` -> `'the token, on every route'`, `:141` `'c2 — no write escapes the project'` -> `'no write escapes the project'`, `:228` `'c4 — an external write yields a changed event within 200 ms (20 runs)'` -> drop `c4 — `, `:252` `c4 timings` -> `external-write timings`; `test/node/design/design-command.test.ts:7` "c7 and the command around the server" -> "The command around the server", `:77` `'c7 — one server per project'` -> `'one server per project'`; `test/project-fs/served.test.ts:7` "c5 — `ServedProjectFileSystem` against..." -> drop `c5 — `.
-- [ ] **"E-1e" pointer in served page text.** `src/node/design/placeholder-page.ts:39` "it arrives with E-1e" (also asserted at `test/node/design/design-server.test.ts:121`). Reword to "the editor itself is not here yet; until it is, this server only serves the project's files to the editor's file API" and change the assertion to the surviving text (e.g. `'not here yet'`). Text change in user-visible HTML is trivial but is not comment-only: confirm with the architect if "documentation and naming only" is read strictly.
-- [ ] **Pointers to a workspace document, `EDITOR-DESIGN §2.1/§2.3`** (lives under `.agents/skills/principal-architect-workspace/`, not shipped): `src/core/project-fs/content-version.ts:9`, `project-file-system.ts:11`, `src/node/design/lock-file.ts:7`, `design-command.ts:8`, `disk-project.ts:120`, `project-watcher.ts:8`, `session-token.ts:9`, `test/project-fs/contract.ts:16` and `:287`. Keep the fact each cites and drop the citation, e.g. `content-version.ts:9` -> `("the designer never silently overwrites")` stays as the stated principle; `session-token.ts:8-10` already explains itself; `disk-project.ts:120` -> `// --- Step 3: The version check — the editor must never silently overwrite ---`; `contract.ts:287` title -> drop `(EDITOR-DESIGN §2.3)`.
-- [ ] **"second amendment" dangling reference.** `src/core/project-fs/served-project-file-system.ts:7-8` ("served-first ruling ([UD-2], second amendment)") and `src/node/design/design-server.ts:7-8` ("ui_spec [UD-2], second amendment"). `docs/ui_spec.md` carries only the 2026-10-05 amendment (defer served mode), which says the opposite; the served-first reversal is not in the published spec on this branch. A reader following the pointer finds a contradiction. Rewrite as the fact: "the served mode of [UD-2]: the editor reaches the project on disk through `u8g2gl design`'s loopback server". Separately, the architect should land the amendment in `docs/ui_spec.md` (Observation O-3).
-- [ ] **Host check has no why-comment at the line** (security). `src/node/design/design-server.ts:134-138`. The reason (DNS rebinding: a rebound hostile name arrives as its own Host) is in the file header only. Add at the check: why Host is validated *as well as* the token, why the port is included, and why `localhost` is accepted alongside `127.0.0.1`.
-- [ ] **Token check has no why-comment at the line** (security). `design-server.ts:139-142`. Add: runs before routing so an unauthorised caller cannot learn which routes exist; every route including `/` is gated; the 403 body is identical for missing and wrong tokens.
-- [ ] **Path-boundary checks without the reason at the line** (security). `src/node/design/disk-project.ts:84-86` (read: why the real-path rule runs *after* the lexical rule and what it catches - a symlink out), `:110-112` (why an ignored path is reported as `outside-project` and not `invalid-path`: it maps to 403, "not yours to write", and why `.git/` matters - the header of `ignored-paths.ts` says a git hook; say it here in one line). `src/node/project-path.ts:53` `target.startsWith(root + sep)`: say that the `+ sep` is what stops `/proj-other` passing as inside `/proj`, and that the `catch` falls back to lexical comparison if *either* path fails to resolve.
+- [x] **Resolved.** **Test titles and purposes that use c1-c7.** Replace the tag with the behaviour it names: `test/node/design/design-server.test.ts:7-9` (c1-c4 in Purpose), `:69` `describe('c3 — loopback only'` -> `'loopback only'`, `:78` `'c1 — the token, on every route'` -> `'the token, on every route'`, `:141` `'c2 — no write escapes the project'` -> `'no write escapes the project'`, `:228` `'c4 — an external write yields a changed event within 200 ms (20 runs)'` -> drop `c4 — `, `:252` `c4 timings` -> `external-write timings`; `test/node/design/design-command.test.ts:7` "c7 and the command around the server" -> "The command around the server", `:77` `'c7 — one server per project'` -> `'one server per project'`; `test/project-fs/served.test.ts:7` "c5 — `ServedProjectFileSystem` against..." -> drop `c5 — `.
+- [x] **Resolved** (page text approved by PA: "The editor itself is not built yet."; assertion now `'not built yet'`). **"E-1e" pointer in served page text.** `src/node/design/placeholder-page.ts:39` "it arrives with E-1e" (also asserted at `test/node/design/design-server.test.ts:121`). Reword to "the editor itself is not here yet; until it is, this server only serves the project's files to the editor's file API" and change the assertion to the surviving text (e.g. `'not here yet'`). Text change in user-visible HTML is trivial but is not comment-only: confirm with the architect if "documentation and naming only" is read strictly.
+- [x] **Resolved.** **Pointers to a workspace document, `EDITOR-DESIGN §2.1/§2.3`** (lives under `.agents/skills/principal-architect-workspace/`, not shipped): `src/core/project-fs/content-version.ts:9`, `project-file-system.ts:11`, `src/node/design/lock-file.ts:7`, `design-command.ts:8`, `disk-project.ts:120`, `project-watcher.ts:8`, `session-token.ts:9`, `test/project-fs/contract.ts:16` and `:287`. Keep the fact each cites and drop the citation, e.g. `content-version.ts:9` -> `("the designer never silently overwrites")` stays as the stated principle; `session-token.ts:8-10` already explains itself; `disk-project.ts:120` -> `// --- Step 3: The version check — the editor must never silently overwrite ---`; `contract.ts:287` title -> drop `(EDITOR-DESIGN §2.3)`.
+- [x] **Resolved** per PA ruling: cited as "ui_spec [UD-2], amendment of 2026-10-26" (lands on main with PR #19). **"second amendment" dangling reference.** `src/core/project-fs/served-project-file-system.ts:7-8` ("served-first ruling ([UD-2], second amendment)") and `src/node/design/design-server.ts:7-8` ("ui_spec [UD-2], second amendment"). `docs/ui_spec.md` carries only the 2026-10-05 amendment (defer served mode), which says the opposite; the served-first reversal is not in the published spec on this branch. A reader following the pointer finds a contradiction. Rewrite as the fact: "the served mode of [UD-2]: the editor reaches the project on disk through `u8g2gl design`'s loopback server". Separately, the architect should land the amendment in `docs/ui_spec.md` (Observation O-3).
+- [x] **Resolved.** **Host check has no why-comment at the line** (security). `src/node/design/design-server.ts:134-138`. The reason (DNS rebinding: a rebound hostile name arrives as its own Host) is in the file header only. Add at the check: why Host is validated *as well as* the token, why the port is included, and why `localhost` is accepted alongside `127.0.0.1`.
+- [x] **Resolved.** **Token check has no why-comment at the line** (security). `design-server.ts:139-142`. Add: runs before routing so an unauthorised caller cannot learn which routes exist; every route including `/` is gated; the 403 body is identical for missing and wrong tokens.
+- [x] **Resolved** (the `isInsideProject` comment states the actual fallback: the target resolves first, so the root stays unresolved only when the project directory is gone — not "either path"). **Path-boundary checks without the reason at the line** (security). `src/node/design/disk-project.ts:84-86` (read: why the real-path rule runs *after* the lexical rule and what it catches - a symlink out), `:110-112` (why an ignored path is reported as `outside-project` and not `invalid-path`: it maps to 403, "not yours to write", and why `.git/` matters - the header of `ignored-paths.ts` says a git hook; say it here in one line). `src/node/project-path.ts:53` `target.startsWith(root + sep)`: say that the `+ sep` is what stops `/proj-other` passing as inside `/proj`, and that the `catch` falls back to lexical comparison if *either* path fails to resolve.
 
 ### P3 — Documentation gaps
 
-- [ ] **Security-adjacent behaviour with no why-comment.**
+- [x] **Resolved**, including O-1 (lock written `mode: 0o600`, tested on POSIX) and O-2 (malformed percent-encoding in `?path=` or a build route segment answers 400 `invalid-path`, tested), both approved by PA. **Security-adjacent behaviour with no why-comment.**
   - `src/node/design/lock-file.ts:104` `writeFileSync(... { flag: 'wx' })`: the lock holds the live session token and is written with the default mode; add a why-comment on the exposure (any local user able to read the project directory can read the token) - see O-1 for the behaviour question.
   - `lock-file.ts:85` `fetch(...Bearer ${lock.token})`: add why: the probe sends the token to whatever answers on `lock.port`, safe only because it is loopback and a stale token is worthless; also explains why only the real server can return 200.
   - `src/node/design/session-token.ts:41-46`: when an `Authorization` header is present but malformed, the `?token=` fallback is deliberately *not* tried (returns `undefined`). Say so, or a reader will "fix" it.
   - `src/node/design/design-server.ts:172,188` `decodeURIComponent(...)` on the job id can throw `URIError` on `%`-garbage; the outer `.catch` turns that into a 500. Note that this is relied on, or handle it (behaviour: O-2).
   - `src/node/design/placeholder-page.ts:24`: why-comment that the directory name is untrusted (a project folder may be named `<script>…`), hence the escape.
-- [ ] **`runDesignCommand` has distinct stages and no `// --- Step N ---` breakdown.** `src/node/design/design-command.ts:129-184` (about 55 lines: check project -> start or attach -> report -> open browser / attached exit -> signal handling). Add Step comments.
-- [ ] **`DesignServer` members undocumented.** `src/node/design/design-server.ts:72-73` `port` and `token` have no doc comment (their siblings do). One line each; note that `token` is the session secret and must not be logged.
-- [ ] **`handle()` is about 70 lines of route branches** with two labels (`Authorisation`, `Routing`) that are not in `Step N` form. `design-server.ts:133,144`: convert to `// --- Step 1: Authorise ---` / `// --- Step 2: Route ---`. (Extracting routes into functions is a design choice, not required.)
-- [ ] **`cli.ts` header edit is malformed.** `src/node/cli.ts:11-14`: the inserted sentence runs the line past the block's wrap, with `validate` text glued on mid-line. Re-wrap the Description paragraph. Also the `Purpose:` (line 8-10) still lists "validation, code generation, display queries, and display catalogue enumeration" with no mention of `design`; add it.
-- [ ] **`cli.ts` import placement.** `src/node/cli.ts:63` the `./design/design-command.js` import is appended after `write-generated.js`; place it with the other local imports in the file's existing order.
-- [ ] **Undocumented module constant.** `src/core/project-fs/served-project-file-system.ts:85` `ERROR_CODES` has no comment, and duplicates `ProjectFsErrorCode`; add a line saying it must list every member (and why a runtime copy is needed: to narrow an untrusted server reply).
-- [ ] **Public constructor undocumented.** `served-project-file-system.ts:99` `constructor(options)`; and `GuardedProjectFileSystem` overrides `read/readBytes/write/list/watch` (`project-file-system.ts:178-218`) with no comment - a one-line `{@inheritDoc ProjectFileSystem.read}` style note each.
-- [ ] **Citations of the skill's reference files in a shipped source file.** `project-file-system.ts:8,22` "typescript.md §1/§4" point at `.claude/skills/.../typescript.md`, which a consumer of the package will not have. Replace with the stated rule ("`src/core/` may not import `node:`", "user errors are returned, never thrown").
+- [x] **Resolved.** **`runDesignCommand` has distinct stages and no `// --- Step N ---` breakdown.** `src/node/design/design-command.ts:129-184` (about 55 lines: check project -> start or attach -> report -> open browser / attached exit -> signal handling). Add Step comments.
+- [x] **Resolved.** **`DesignServer` members undocumented.** `src/node/design/design-server.ts:72-73` `port` and `token` have no doc comment (their siblings do). One line each; note that `token` is the session secret and must not be logged.
+- [x] **Resolved** (Step 1 / Step 2; routes not extracted). **`handle()` is about 70 lines of route branches** with two labels (`Authorisation`, `Routing`) that are not in `Step N` form. `design-server.ts:133,144`: convert to `// --- Step 1: Authorise ---` / `// --- Step 2: Route ---`. (Extracting routes into functions is a design choice, not required.)
+- [x] **Resolved.** **`cli.ts` header edit is malformed.** `src/node/cli.ts:11-14`: the inserted sentence runs the line past the block's wrap, with `validate` text glued on mid-line. Re-wrap the Description paragraph. Also the `Purpose:` (line 8-10) still lists "validation, code generation, display queries, and display catalogue enumeration" with no mention of `design`; add it.
+- [x] **Resolved.** **`cli.ts` import placement.** `src/node/cli.ts:63` the `./design/design-command.js` import is appended after `write-generated.js`; place it with the other local imports in the file's existing order.
+- [x] **Resolved.** **Undocumented module constant.** `src/core/project-fs/served-project-file-system.ts:85` `ERROR_CODES` has no comment, and duplicates `ProjectFsErrorCode`; add a line saying it must list every member (and why a runtime copy is needed: to narrow an untrusted server reply).
+- [x] **Resolved.** **Public constructor undocumented.** `served-project-file-system.ts:99` `constructor(options)`; and `GuardedProjectFileSystem` overrides `read/readBytes/write/list/watch` (`project-file-system.ts:178-218`) with no comment - a one-line `{@inheritDoc ProjectFileSystem.read}` style note each.
+- [x] **Resolved.** **Citations of the skill's reference files in a shipped source file.** `project-file-system.ts:8,22` "typescript.md §1/§4" point at `.claude/skills/.../typescript.md`, which a consumer of the package will not have. Replace with the stated rule ("`src/core/` may not import `node:`", "user errors are returned, never thrown").
 
 ### P4 — Optional, only if the architect approves
 
-- [ ] `design-server.ts:50` and `lock-file.ts:85` each hard-code `127.0.0.1`; `lock-file.ts` could import one exported constant. Opinion only.
-- [ ] `disk-project.ts` repeats the `"'${path}' is not a project path: ${reason}."` message that `GuardedProjectFileSystem`'s `invalidPath` also builds (`project-file-system.ts:241`). One shared message helper would avoid drift. Opinion only.
+- [x] **Resolved (accepted):** `LOOPBACK` exported from `design-server.ts`, imported by `lock-file.ts`. `design-server.ts:50` and `lock-file.ts:85` each hard-code `127.0.0.1`; `lock-file.ts` could import one exported constant. Opinion only.
+- [x] **Resolved (accepted):** `refusedPathMessage()` added to `core/project-fs/project-path-rule.ts`, used by the base class, the in-memory seed check and `DiskProject`. `disk-project.ts` repeats the `"'${path}' is not a project path: ${reason}."` message that `GuardedProjectFileSystem`'s `invalidPath` also builds (`project-file-system.ts:241`). One shared message helper would avoid drift. Opinion only.
 
 ## Verification Requirement
 
-- [ ] `npm run build` in `cli/` - zero warnings
-- [ ] `npm test` in `cli/` - all pass, none weakened (run suites sequentially)
-- [ ] `git diff` shows only comments, header blocks, test titles and, if approved, the placeholder page sentence plus its one assertion
-- [ ] `grep -rnE "EDITOR-DESIGN|E-1[a-z]|\bc[1-7]\b|second amendment" cli/src cli/test` returns nothing in the files above
+- [x] `npm run build` in `cli/` - zero warnings
+- [x] `npm test` in `cli/` - all pass, none weakened (run suites sequentially)
+- [x] (with the two PA-approved behaviour changes) `git diff` shows only comments, header blocks, test titles and, if approved, the placeholder page sentence plus its one assertion
+- [x] `grep -rnE "EDITOR-DESIGN|E-1[a-z]|\bc[1-7]\b|second amendment" cli/src cli/test` returns nothing in the files above
 
 ## Issue Surfacing
 
@@ -97,3 +97,27 @@ Anything outside this list goes in your Completion Report. Do not fix it.
 ## Completion Report
 
 <!-- Written by the remediation worker at task completion -->
+
+**Worker, 2026-10-27.** Branch `u8g2gl-e1c/wo3-readability`, from `u8g2gl-e1c/wo2-server` @ `97c5a22`.
+
+**Commits:** `0aba44a` docs(e-1c): WO3 readability audit (this file, as received);
+`3dab1cb` docs(cli): E-1c readability fixes; lock mode 0600; 400 for bad encodings; plus this report.
+
+**Resolved:** every P2 and P3 item, both P4 items (none declined), and observations O-1, O-2 and O-4
+(the read-side sentence is in `isInsideProject`'s TSDoc). O-3, landing the amendment in `docs/ui_spec.md`, belongs to the
+architect (PR #19), so it is not addressed here.
+
+**Behaviour changes (PA-approved):**
+- `tryCreateLock` writes with `{ flag: 'wx', mode: 0o600 }`. The new test checks
+  `stat.mode & 0o777 === 0o600` and is skipped on win32.
+- `GET`/`PUT /api/file` decode `path` strictly, and so do the `POST`/`GET /api/build/<segment>`
+  segments. A malformed encoding now answers 400 `invalid-path`. `+` still decodes as a space,
+  and a test covers that. One consequence: until now `URLSearchParams` decoded `%zz` leniently, as the
+  literal name `%zz`, so such a path is now refused rather than read as that literal name. The browser half uses `encodeURIComponent` and
+  never sends one.
+
+**Counts (`extern/u8g2` now checked out):** before, 1538 passed with 0 failed. After, **1545 passed, 0 failed, 0
+skipped**: 7 new tests (1 lock-mode, 5 malformed-encoding, 1 well-formed decode). `npm run build` and
+`npm run lint` (eslint plus `tsc -p tsconfig.test.json`) are clean. The pointer grep over the audited files returns nothing.
+
+**Outside the list:** none found.
