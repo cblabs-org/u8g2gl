@@ -22,6 +22,8 @@
  * - EMSDK_COMMIT:            The commit the pinned tag must resolve to
  * - INSTALLED_SIZE:          The installed size, as told to the user
  * - INSTALL_MARKER:          File written last, on a complete install
+ * - USER_EMSDK_VARIABLES:    Environment a user's own emsdk exports, and why each is removed
+ * - withoutUserEmsdk():      An environment with those variables removed
  * - toolchainCacheRoot():    The per-user cache directory for this platform
  * - managedLayout():         Paths inside the managed emsdk checkout
  * - ManagedLayout:           What managedLayout() returns
@@ -29,7 +31,12 @@
 
 import { join, win32, posix } from 'node:path';
 
-/** The pinned Emscripten release. A widget compiled by any other is not the same renderer. */
+/**
+ * The pinned Emscripten release. A widget compiled by any other is not the same renderer.
+ * `.github/workflows/ci.yml`'s `wasm-tests` job pins the same version and commit
+ * (EMSDK_VERSION, EMSDK_COMMIT): change both together, or CI builds with a
+ * compiler this code refuses.
+ */
 export const EMSCRIPTEN_VERSION = '5.0.3';
 
 /** The emsdk repository the managed install clones. */
@@ -42,8 +49,13 @@ export const EMSDK_REPOSITORY = 'https://github.com/emscripten-core/emsdk.git';
  */
 export const EMSDK_COMMIT = 'a620cf1d71c62dfdfbb0c01fe0a371e2af2dda6c';
 
-/** The installed size, as quoted when asking for consent. */
-export const INSTALLED_SIZE = 'about 1.6 GB';
+/**
+ * The installed size, as quoted when asking for consent: measured on disk, not
+ * the download. emsdk 5.0.3 occupies about 1.3 GB once installed (upstream, its
+ * Node and Python), and Emscripten then caches the system libraries it builds
+ * on first use beside it, about 0.6 GB more (measured on macOS arm64).
+ */
+export const INSTALLED_SIZE = 'about 1.3 GB installed, about 2 GB once in use';
 
 /**
  * Written into the managed checkout only after every step succeeded. A
@@ -73,6 +85,33 @@ export function toolchainCacheRoot(platform: NodeJS.Platform, env: NodeJS.Proces
   const xdg = env.XDG_CACHE_HOME;
   // The XDG specification says a relative value is invalid and must be ignored.
   return posix.join(xdg !== undefined && xdg.startsWith('/') ? xdg : posix.join(home, '.cache'), 'u8g2gl');
+}
+
+/**
+ * The variables a user's own emsdk exports (`emsdk_env.sh`), each of which
+ * points emsdk or Emscripten's drivers at **that** installation. Removed from
+ * every process the managed toolchain starts — the install's git and emsdk
+ * runs, and every build — so a user's emsdk is never read or written.
+ */
+export const USER_EMSDK_VARIABLES: ReadonlyArray<{ readonly name: string; readonly reason: string }> = [
+  { name: 'EMSDK', reason: "emsdk's root: emsdk and its env script act on the installation it names" },
+  { name: 'EM_CONFIG', reason: "the drivers' configuration file, which names LLVM, Node and Python to use" },
+  { name: 'EMSDK_NODE', reason: 'the Node the drivers run JavaScript with' },
+  { name: 'EMSDK_PYTHON', reason: 'the Python emsdk and the drivers run under' },
+  { name: 'EM_CACHE', reason: 'where Emscripten writes the system libraries it builds: a build would fill the user\'s cache' },
+];
+
+/**
+ * @brief The environment without USER_EMSDK_VARIABLES.
+ *
+ * @param env The environment to copy; it is not modified.
+ */
+export function withoutUserEmsdk(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const clean: NodeJS.ProcessEnv = { ...env };
+  for (const { name } of USER_EMSDK_VARIABLES) {
+    delete clean[name];
+  }
+  return clean;
 }
 
 /** Paths inside a managed emsdk checkout. */

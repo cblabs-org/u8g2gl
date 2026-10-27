@@ -29,7 +29,7 @@
 
 import { dirname, join } from 'node:path';
 import type { ToolchainHost } from './toolchain-host.js';
-import { EMSCRIPTEN_VERSION, managedLayout, type ManagedLayout } from './toolchain-paths.js';
+import { EMSCRIPTEN_VERSION, managedLayout, withoutUserEmsdk, type ManagedLayout } from './toolchain-paths.js';
 
 /** Where a usable toolchain came from. */
 export type ToolchainSource = 'path' | 'managed';
@@ -172,14 +172,12 @@ function siblingDriver(emxx: string, driver: string): string {
 // managedEnv
 // The environment emsdk_env.sh would set up, without sourcing it: the checkout
 // and its Emscripten first on PATH, and EMSDK naming the checkout, so the
-// drivers find the configuration `emsdk activate` wrote there. Any EMSDK the
-// user's shell exported is overridden, so their install is never consulted.
+// drivers find the configuration `emsdk activate` wrote there. Every variable
+// a user's own emsdk exports is removed first (USER_EMSDK_VARIABLES, the same
+// list the installer strips), so their install, and their cache, are never
+// consulted or written by a managed build.
 function managedEnv(host: ToolchainHost, layout: ManagedLayout): NodeJS.ProcessEnv {
   const separator = host.platform === 'win32' ? ';' : ':';
   const path = [layout.root, layout.emscriptenDir, host.env.PATH ?? ''].filter((part) => part !== '').join(separator);
-  const env: NodeJS.ProcessEnv = { ...host.env, PATH: path, EMSDK: layout.root };
-  delete env.EM_CONFIG;
-  delete env.EMSDK_NODE;
-  delete env.EMSDK_PYTHON;
-  return env;
+  return { ...withoutUserEmsdk(host.env), PATH: path, EMSDK: layout.root };
 }

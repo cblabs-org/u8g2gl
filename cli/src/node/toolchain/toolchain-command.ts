@@ -26,7 +26,7 @@
 
 import { createInterface } from 'node:readline';
 import { detectToolchain, type SelectedToolchain, type ToolchainStatus } from './detect-toolchain.js';
-import { installToolchain } from './install-toolchain.js';
+import { installToolchain, type InstallOutcome } from './install-toolchain.js';
 import type { ToolchainHost } from './toolchain-host.js';
 import { EMSCRIPTEN_VERSION } from './toolchain-paths.js';
 
@@ -105,9 +105,7 @@ export async function runToolchainCommand(
       showProgress: !json,
     });
     if (json) {
-      io.out(JSON.stringify(outcome.kind === 'already' || outcome.kind === 'installed'
-        ? { outcome: outcome.kind, toolchain: describe(outcome.toolchain) }
-        : outcome.kind === 'failed' ? { outcome: 'failed', error: outcome.message } : { outcome: 'declined' }));
+      io.out(JSON.stringify(outcomeJson(outcome)));
     } else if (outcome.kind === 'already') {
       io.out(`Emscripten ${outcome.toolchain.version} is already available (${sourceText(outcome.toolchain)}); nothing to install.`);
     } else if (outcome.kind === 'installed') {
@@ -161,6 +159,20 @@ export function terminalConfirm(question: string): Promise<boolean> {
       resolve(/^\s*y(es)?\s*$/i.test(answer));
     });
   });
+}
+
+// outcomeJson
+// `install --json`'s object: the outcome, plus the toolchain or the error.
+function outcomeJson(outcome: InstallOutcome): Record<string, unknown> {
+  switch (outcome.kind) {
+    case 'already':
+    case 'installed':
+      return { outcome: outcome.kind, toolchain: describe(outcome.toolchain) };
+    case 'failed':
+      return { outcome: 'failed', error: outcome.message };
+    case 'declined':
+      return { outcome: 'declined' };
+  }
 }
 
 // describe

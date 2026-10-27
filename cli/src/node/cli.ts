@@ -1011,6 +1011,8 @@ export async function runCli(rawArgs: readonly string[]): Promise<void> {
     return;
   }
 
+  // The toolchain subcommand: status, path or install of the Emscripten the
+  // design server builds with (toolchain/toolchain-command.ts).
   if (subcommand === 'toolchain') {
     const parsed = parseToolchainArgs(subcommandArgs);
     if ('error' in parsed) {

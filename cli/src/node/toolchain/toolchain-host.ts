@@ -7,8 +7,8 @@
  * Purpose: Every external effect the toolchain code has — spawning a process
  *          (which is also how it reaches the network: `git clone`, `emsdk
  *          install`), touching the filesystem, reading the environment — goes
- *          through one injected interface. Installing Emscripten is a 1.6 GB
- *          download that must never happen by accident, so the code that
+ *          through one injected interface. Installing Emscripten is a large
+ *          download and install that must never happen by accident, so the code that
  *          decides *whether* and *how* to install is tested against a fake
  *          host that records commands, and only `nodeToolchainHost()` can
  *          touch the real machine.
@@ -82,7 +82,10 @@ export function nodeToolchainHost(): ToolchainHost {
           cwd: options.cwd,
           env: options.env ?? process.env,
           stdio: options.inherit === true ? 'inherit' : 'pipe',
-          // emsdk's Windows driver is a .bat, which only a shell can run.
+          // emsdk's Windows driver is a .bat, which only a shell can run. With
+          // a shell, cmd.exe interprets every argument unescaped, so callers
+          // pass only constants and paths beneath the toolchain cache root;
+          // a cache path containing cmd.exe metacharacters (& | ^) would break it.
           shell: process.platform === 'win32',
         });
         child.stdout?.on('data', (chunk: Buffer) => (stdout += chunk.toString()));

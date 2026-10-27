@@ -25,6 +25,7 @@ import {
   INSTALL_MARKER,
   managedLayout,
   toolchainCacheRoot,
+  USER_EMSDK_VARIABLES,
 } from '../../../src/node/toolchain/toolchain-paths.js';
 import { makeTempDir, removeTempDirs } from '../design/temp-project.js';
 import { fakeEmscripten, fakeHost } from './fake-host.js';
@@ -159,6 +160,41 @@ describe('detectToolchain', () => {
   });
 });
 
+describe('the user emsdk variables', () => {
+  // Every variable a user's emsdk exports, set to point at that installation.
+  const userEnv = Object.fromEntries(USER_EMSDK_VARIABLES.map(({ name }) => [name, `/user/emsdk/${name}`]));
+
+  it('names EMSDK, EM_CONFIG, EMSDK_NODE, EMSDK_PYTHON and EM_CACHE, each with a reason', () => {
+    expect(USER_EMSDK_VARIABLES.map(({ name }) => name)).toEqual(['EMSDK', 'EM_CONFIG', 'EMSDK_NODE', 'EMSDK_PYTHON', 'EM_CACHE']);
+    for (const { reason } of USER_EMSDK_VARIABLES) {
+      expect(reason.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('are all absent from a managed build\'s environment, EMSDK then naming the managed checkout', async () => {
+    const cache = makeTempDir('tc-cache');
+    const layout = managedLayout(cache, 'darwin');
+    fakeEmscripten(layout.emscriptenDir, EMSCRIPTEN_VERSION);
+    const { host } = fakeHost({ path: '/usr/bin', env: userEnv });
+    host.writeText(layout.marker, '{}\n');
+    const env = (await detectToolchain(host, cache)).selected?.env ?? {};
+    for (const { name } of USER_EMSDK_VARIABLES) {
+      expect(env[name], name).toBe(name === 'EMSDK' ? layout.root : undefined);
+    }
+  });
+
+  it('are all absent from every process the installer runs', async () => {
+    const { host, runs } = fakeHost({ path: '/usr/bin', env: userEnv });
+    await installToolchain(host, { cacheRoot: makeTempDir('tc-cache'), assumeYes: true, confirm: async () => true, log: () => undefined });
+    expect(runs.length).toBeGreaterThan(0);
+    for (const run of runs) {
+      for (const { name } of USER_EMSDK_VARIABLES) {
+        expect(run.env?.[name], `${run.command} ${name}`).toBeUndefined();
+      }
+    }
+  });
+});
+
 describe('installToolchain', () => {
   it('does nothing at all when consent is refused', async () => {
     const cache = join(makeTempDir('tc-cache'), 'u8g2gl');
@@ -175,7 +211,7 @@ describe('installToolchain', () => {
     });
     expect(outcome).toEqual({ kind: 'declined' });
     expect(asked).toHaveLength(1);
-    expect(asked[0]).toMatch(/Emscripten 5\.0\.3 \(about 1\.6 GB installed\)/);
+    expect(asked[0]).toMatch(/Emscripten 5\.0\.3 \(about 1\.3 GB installed, about 2 GB once in use\)/);
     expect(runs).toEqual([]);
     expect(host.exists(cache)).toBe(false);
   });

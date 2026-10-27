@@ -6,8 +6,8 @@
  * File: src/node/toolchain/install-toolchain.ts
  * Purpose: Installs the pinned Emscripten into U8G2GL's own cache directory,
  *          so a designer whose machine has no Emscripten, or the wrong one,
- *          can build the project editor Wasm. It is a 1.6 GB download, so it
- *          asks first and states the size; it pins by commit, not by tag, so a
+ *          can build the project editor Wasm. It is a large install (see
+ *          INSTALLED_SIZE), so it asks first and states the size; it pins by commit, not by tag, so a
  *          moved tag cannot change the compiler; and it only ever writes inside
  *          its own versioned directory, so an emsdk the user installed
  *          themselves is never modified, wherever it is.
@@ -33,6 +33,7 @@ import {
   EMSDK_COMMIT,
   EMSDK_REPOSITORY,
   INSTALLED_SIZE,
+  withoutUserEmsdk,
   type ManagedLayout,
 } from './toolchain-paths.js';
 
@@ -61,7 +62,7 @@ export type InstallOutcome =
  * @brief The consent question: what is installed, where, and how large it is.
  */
 export function consentQuestion(layout: ManagedLayout): string {
-  return `Install Emscripten ${EMSCRIPTEN_VERSION} (${INSTALLED_SIZE} installed) into ${layout.root}?`;
+  return `Install Emscripten ${EMSCRIPTEN_VERSION} (${INSTALLED_SIZE}) into ${layout.root}?`;
 }
 
 /**
@@ -82,6 +83,9 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
   const layout = status.managed.layout;
 
   // --- Step 2: Consent, before anything is written ---
+  // A download of this size into the user's cache must never happen as a side
+  // effect, so nothing is created until the user says yes. `--yes` is the only
+  // bypass, and with no terminal to ask on the answer is no (terminalConfirm).
   if (!options.assumeYes && !(await options.confirm(consentQuestion(layout)))) {
     return { kind: 'declined' };
   }
@@ -89,9 +93,11 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
   // --- Step 3: Clone emsdk at the pinned tag, into a clean directory ---
   // A checkout here without a marker is ours and interrupted (the directory
   // name is versioned and under U8G2GL's cache), so it is safe to replace.
+  // This and fail() are the installer's only recursive deletes, and both are
+  // confined to that one versioned directory beneath the cache root.
   host.remove(layout.root);
   host.makeDir(options.cacheRoot);
-  const env = childEnv(host.env);
+  const env = withoutUserEmsdk(host.env);
   const progress = options.showProgress === true;
   options.log(`Cloning emsdk ${EMSCRIPTEN_VERSION} from ${EMSDK_REPOSITORY}`);
   const clone = await host.run(
@@ -104,6 +110,9 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
   }
 
   // --- Step 4: The tag must resolve to the pinned commit ---
+  // HEAD is compared, not the tag name, because a tag can be force-moved: the
+  // clone is trusted only if it is the commit that was reviewed (EMSDK_COMMIT).
+  // This is the only integrity check on emsdk's own scripts, which run next.
   const head = await host.run('git', ['-C', layout.root, 'rev-parse', 'HEAD'], { env });
   const commit = head.stdout.trim();
   if (head.code !== 0 || commit !== EMSDK_COMMIT) {
@@ -116,6 +125,9 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
   }
 
   // --- Step 5: emsdk installs (verifying its archives) and activates ---
+  // Checking the downloaded archives' checksums is emsdk's job, against the
+  // manifest in the pinned commit; it is deliberately not repeated here, and
+  // it does not make Step 4 redundant: Step 4 is what makes that manifest trusted.
   for (const verb of ['install', 'activate'] as const) {
     options.log(`emsdk ${verb} ${EMSCRIPTEN_VERSION}`);
     const result = await host.run(layout.emsdk, [verb, EMSCRIPTEN_VERSION], { cwd: layout.root, env, inherit: progress });
@@ -123,6 +135,7 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
       return fail(host, layout, `emsdk ${verb} failed: ${lastLine(result.stderr || result.stdout)}`);
     }
   }
+  // Guards an emsdk run that exited 0 but installed nothing usable.
   if (!host.exists(layout.emxx)) {
     return fail(host, layout, `emsdk reported success, but ${layout.emxx} does not exist.`);
   }
@@ -141,18 +154,6 @@ export async function installToolchain(host: ToolchainHost, options: InstallOpti
 function fail(host: ToolchainHost, layout: ManagedLayout, message: string): InstallOutcome {
   host.remove(layout.root);
   return { kind: 'failed', message };
-}
-
-// childEnv
-// The environment for git and emsdk, without the variables a user's own emsdk
-// exports. emsdk reads EMSDK and EM_CONFIG to find "its" installation, so
-// leaving them set could make the managed emsdk act on the user's.
-function childEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const clean: NodeJS.ProcessEnv = { ...env };
-  for (const name of ['EMSDK', 'EM_CONFIG', 'EMSDK_NODE', 'EMSDK_PYTHON', 'EM_CACHE']) {
-    delete clean[name];
-  }
-  return clean;
 }
 
 // lastLine
