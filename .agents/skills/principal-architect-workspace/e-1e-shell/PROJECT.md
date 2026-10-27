@@ -84,6 +84,20 @@ One worker, WO1 to WO4 in order.
    is displayed. Ruling 5 stands for the new definition: if either half fails, report the
    breakdown, do not weaken it.
 
+9. **DOMPurify override, the owner's decision, 2026-10-27**, verbatim, answering whether E-1e
+   could override DOMPurify to 3.4.17 to clear the critical advisory:
+
+   > "Yes, override it"
+
+   An npm `overrides` entry in `designer/package.json` pins `dompurify` to exactly **3.4.17**
+   (published 2026-10-12, so it meets ruling 1's 14-day rule). The lockfile is updated, and
+   `npm audit` must then report no critical or high finding. Nothing else changes.
+10. **A self-test for e2's frame counter.** The project proves a check can fail before trusting
+    it passing (as PR-06 did for the xtensa check). One test forces a keystroke to miss its frame,
+    for example by blocking the main thread for longer than a frame inside the pipeline run,
+    using a test-only hook. It asserts that the counter reports 2 or more and that the gate fails.
+    The hook must not exist in a production build.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
@@ -110,3 +124,6 @@ One worker, WO1 to WO4 in order.
 - **2026-10-27. C3 decided by the owner: measure to the frame** (ruling 8). The design is unchanged;
   e2 is redefined. EDITOR-DESIGN §3.3's budget should say the wait for the frame is outside it;
   that note joins the PR description for the Chief Architect.
+- **2026-10-27. WO4b complete:** e2 passes under ruling 8. Three runs, both screens: 300/300
+  keystrokes in the first frame; run-to-blit p95 3.4–5.4 ms (gate 16). Key-to-blit (reported
+  only) p95 18.4–20.2 ms. Rulings 9 (DOMPurify) and 10 (counter self-test) issued.
