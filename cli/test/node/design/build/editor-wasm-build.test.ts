@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/design/build/editor-wasm-build.test.ts
- * Purpose: The project editor Wasm, really built: G-PROBE-2's departures
- *          project, unmodified, compiled with its own widgets' C++ and
- *          rendered (d1); a widget edit's rebuild, timed (d2, reported, not
- *          gated); the build hash read back from the Wasm; a compile error
+ * Purpose: The project editor Wasm, really built: the departures project (a
+ *          fixture with custom widgets), unmodified, compiled with its own
+ *          widgets' C++ and rendered; a widget edit's rebuild, timed (reported,
+ *          not gated); the build hash read back from the Wasm; a compile error
  *          located in the widget; and the job on the design server's queue.
  * Description: Needs Emscripten 5.0.3 (on PATH, or the managed install). Without
  *              one every case here is skipped with a message, so the suite
@@ -27,7 +27,7 @@ import { nodeToolchainHost } from '../../../../src/node/toolchain/toolchain-host
 import { toolchainCacheRoot } from '../../../../src/node/toolchain/toolchain-paths.js';
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
 import { fakeHost } from '../../toolchain/fake-host.js';
-import { FRAMEWORK_ROOT, PROBE_PROJECT } from './probe-project.js';
+import { FRAMEWORK_ROOT, DEPARTURES_PROJECT } from './departures-project.js';
 
 const host = nodeToolchainHost();
 // Detection only reads the real cache directory; nothing here writes it.
@@ -75,13 +75,13 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
     buildEditorWasm({ projectRoot: root, cacheRoot: cache, frameworkRoot: FRAMEWORK_ROOT, toolchain: toolchain!, host, optimisation });
 
   beforeAll(() => {
-    cache = makeTempDir('e1d-wasm-cache');
-    project = join(makeTempDir('e1d-wasm-probe'), 'project');
-    cpSync(PROBE_PROJECT, project, { recursive: true });
+    cache = makeTempDir('wasm-cache');
+    project = join(makeTempDir('wasm-departures'), 'project');
+    cpSync(DEPARTURES_PROJECT, project, { recursive: true });
   });
   afterAll(removeTempDirs);
 
-  it('d1: builds the departures project unmodified and renders it with its real widgets', async () => {
+  it('builds the departures project unmodified and renders it with its real widgets', async () => {
     const result = await build();
     expect(result.status, JSON.stringify(result.diagnostics)).toBe('built');
     if (result.status === 'failed') return;
@@ -97,7 +97,7 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
     const bare = litPixels(editor.renderFrame(0)!);
     expect(editor.applySampleData(JSON.stringify({ platform: '9', row0_dest: 'London Paddington', message_text: 'x'.repeat(256) }))).toBe(true);
     const sampled = litPixels(editor.renderFrame(0)!);
-    console.log(`d1: departures project rendered, ${bare} lit pixels bare, ${sampled} with sample subjects`);
+    console.log(`departures project rendered, ${bare} lit pixels bare, ${sampled} with sample subjects`);
     expect(bare).toBeGreaterThan(0);
   }, 300_000);
 
@@ -106,17 +106,17 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
     expect(result.status).toBe('current');
   }, 120_000);
 
-  it('d2: a widget edit recompiles that widget and the hash unit, then links at -O1 (timed)', async () => {
+  it('a widget edit recompiles that widget and the hash unit, then links at -O1 (timed)', async () => {
     const before = await build();
     const file = join(project, 'widgets', 'wd_train_formation', 'wd_train_formation.cpp');
-    writeFileSync(file, `${readFileSync(file, 'utf8')}\n// d2 edit\n`);
+    writeFileSync(file, `${readFileSync(file, 'utf8')}\n// edited\n`);
     const result = await build();
     expect(result.status).toBe('built');
     if (result.status === 'failed' || before.status === 'failed') return;
     expect([...result.compiled].sort()).toEqual(['ui_editor_build_hash.cpp', 'wd_train_formation.cpp']);
     expect(result.buildHash).not.toBe(before.buildHash);
     const { compileMs, linkMs, totalMs } = result.timings;
-    console.log(`d2: widget edit rebuilt in ${totalMs} ms (compile ${compileMs}, link ${linkMs}) against a 2000 ms target`);
+    console.log(`widget edit rebuilt in ${totalMs} ms (compile ${compileMs}, link ${linkMs}); the edit-loop budget is 2000 ms`);
   }, 120_000);
 
   it('links at -O3 for a test run, into its own output', async () => {
@@ -129,8 +129,8 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
   }, 120_000);
 
   it('locates a compile error in the widget source', async () => {
-    const broken = join(makeTempDir('e1d-wasm-broken'), 'project');
-    cpSync(PROBE_PROJECT, broken, { recursive: true });
+    const broken = join(makeTempDir('wasm-broken'), 'project');
+    cpSync(DEPARTURES_PROJECT, broken, { recursive: true });
     const file = join(broken, 'widgets', 'wd_probe_box', 'wd_probe_box.cpp');
     writeFileSync(file, `${readFileSync(file, 'utf8')}\nint broken( {\n`);
     const result = await build('O1', broken);
@@ -158,8 +158,8 @@ describe('the editor-wasm job without a toolchain', () => {
 
   it('fails with what to do, and runs no compiler', async () => {
     const { host: fake, runs } = fakeHost({ path: '' });
-    const queue = new BuildQueue(PROBE_PROJECT);
-    registerEditorWasmJob(queue, { host: fake, toolchainCacheRoot: makeTempDir('e1d-no-tc'), frameworkRoot: FRAMEWORK_ROOT });
+    const queue = new BuildQueue(DEPARTURES_PROJECT);
+    registerEditorWasmJob(queue, { host: fake, toolchainCacheRoot: makeTempDir('no-toolchain'), frameworkRoot: FRAMEWORK_ROOT });
     const record = queue.submit(EDITOR_WASM_JOB, {});
     await queue.idle();
     expect(queue.get(record!.id)).toMatchObject({ status: 'failed', error: expect.stringMatching(/u8g2gl toolchain install/) });

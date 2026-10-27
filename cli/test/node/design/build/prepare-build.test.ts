@@ -9,7 +9,8 @@
  *          anything compiles) and the build hash (it changes when, and only
  *          when, a widget source, a manifest, a font, an image or the generated
  *          configuration changes). Runs on every machine.
- * Description: Each case copies G-PROBE-2's departures project into a temp
+ * Description: Each case copies the departures project (a fixture with custom
+ *              widgets) into a temp
  *              directory, changes one thing, and prepares it again.
  */
 
@@ -21,19 +22,19 @@ import { checkPlatformHeaders, PLATFORM_HEADER_CODE, platformOf } from '../../..
 import { prepareBuild } from '../../../../src/node/design/build/prepare-build.js';
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
 import { fakeHost } from '../../toolchain/fake-host.js';
-import { FRAMEWORK_ROOT, PROBE_PROJECT } from './probe-project.js';
+import { FRAMEWORK_ROOT, DEPARTURES_PROJECT } from './departures-project.js';
 
 afterEach(removeTempDirs);
 
 
-/** The fixture's XBM, to give the probe an image. */
+/** The compile fixture's XBM, to give the departures project an image. */
 const FIXTURE_XBM = resolve(__dirname, '../../../../../test/generated_fixture/assets/icon_wifi.xbm');
 
-// probeCopy
-// An unmodified copy of the probe project in a fresh temp directory.
-function probeCopy(): string {
-  const dir = join(makeTempDir('e1d-probe'), 'project');
-  cpSync(PROBE_PROJECT, dir, { recursive: true });
+// departuresCopy
+// An unmodified copy of the departures project in a fresh temp directory.
+function departuresCopy(): string {
+  const dir = join(makeTempDir('departures'), 'project');
+  cpSync(DEPARTURES_PROJECT, dir, { recursive: true });
   return dir;
 }
 
@@ -83,14 +84,14 @@ describe('the platform-header rule', () => {
   });
 
   it('refuses the build with one diagnostic before anything is compiled', async () => {
-    const project = probeCopy();
+    const project = departuresCopy();
     edit(project, 'widgets/wd_probe_box/wd_probe_box.cpp', (text) =>
       text.replace('#include "wd_probe_box.hpp"', '#include "wd_probe_box.hpp"\n#include <Arduino.h>'),
     );
     const { host, runs } = fakeHost();
     const build = await buildEditorWasm({
       projectRoot: project,
-      cacheRoot: makeTempDir('e1d-cache'),
+      cacheRoot: makeTempDir('build-cache'),
       frameworkRoot: FRAMEWORK_ROOT,
       toolchain: { source: 'path', version: '5.0.3', emxx: '/fake/em++', emcc: '/fake/emcc', env: {} },
       host,
@@ -104,10 +105,10 @@ describe('the platform-header rule', () => {
   });
 });
 
-describe('the build hash (d4)', () => {
+describe('the build hash', () => {
   it('generates into the cache, never into the project, and is stable', async () => {
-    const project = probeCopy();
-    const cache = makeTempDir('e1d-cache');
+    const project = departuresCopy();
+    const cache = makeTempDir('build-cache');
     const before = readFileSync(join(project, 'generated', 'ui_fonts.cpp'), 'utf8');
     const first = await hashOf(project, cache);
     expect(await hashOf(project, cache)).toBe(first);
@@ -168,8 +169,8 @@ describe('the build hash (d4)', () => {
   ];
   for (const { what, moves, apply } of changes) {
     it(`${moves ? 'changes' : 'does not change'} when ${what} changes`, async () => {
-      const project = probeCopy();
-      const cache = makeTempDir('e1d-cache');
+      const project = departuresCopy();
+      const cache = makeTempDir('build-cache');
       const before = await hashOf(project, cache);
       apply(project);
       const after = await hashOf(project, cache);
