@@ -24,9 +24,9 @@ authorises starting it within that scope. Precedent: PR-06 (owner, 2026-10-15).
 
 | WO | Topic | Branch | ACs | Status |
 |---|---|---|---|---|
-| WO1 | `ProjectFileSystem` interface, in-memory implementation, contract suite, shared write-boundary function | `u8g2gl-e1c/wo1-project-fs` | c2 (shared rule), c5 (in-memory half), c6 | In progress |
-| WO2 | The `design` command: loopback server, token, file routes, watcher and events, lock file, build queue, served implementation | `u8g2gl-e1c/wo2-server` (from WO1's tip) | c1, c2, c3, c4, c5, c7 | Pending |
-| WO3 | Readability review and PA verification | — | all | Pending |
+| WO1 | `ProjectFileSystem` interface, in-memory implementation, contract suite, shared write-boundary function | `u8g2gl-e1c/wo1-project-fs` | c2 (shared rule), c5 (in-memory half), c6 | ✅ `fc1f991`..`fa4d569` |
+| WO2 | The `design` command: loopback server, token, file routes, watcher and events, lock file, build queue, served implementation | `u8g2gl-e1c/wo2-server` (from WO1's tip) | c1, c2, c3, c4, c5, c7 | ✅ `2ff8ce1`..`97c5a22` |
+| WO3 | Readability review and PA verification | `u8g2gl-e1c/wo3-readability` | all | ✅ `0aba44a`..`2ef1e68` |
 
 One worker, WO1 then WO2, sequentially in this worktree.
 
@@ -58,3 +58,22 @@ One worker, WO1 then WO2, sequentially in this worktree.
 ## Status log
 
 - **2026-10-27.** Worktree created from `origin/main` @ `019b103`. WO1 issued.
+- **2026-10-27. WO1 and WO2 complete** (one worker). Its 23 font-test failures were
+  environmental (`extern/u8g2` not checked out); with it checked out, all 1538 pass. c4: an
+  external edit's `changed` event in 31–59 ms over 120 timed runs on macOS (budget 200 ms).
+- **PA rulings on the worker's additions beyond the WO.** Accepted: a Host-header check
+  (`127.0.0.1:<port>` and `localhost:<port>` only, against DNS rebinding), and writes refused
+  under `generated/`, `.git/`, `node_modules/` and the lock file (a token holder could otherwise
+  plant a git hook). New files are checked against their nearest existing ancestor, closing a
+  gap in `isInsideProject`'s lexical fallback; that function itself is unchanged.
+- **2026-10-27. PA verification.** Suites one at a time with the submodule checked out. Through
+  the built CLI on a copy of the departures project: no token → 403, a stale-version save → 409,
+  `../` → 400, a second `design` attaches, an external edit arrives as one `changed` event, Ctrl-C
+  removes the lock. **Linux:** the draft PR's CI ran the CLI suite on ubuntu with Node 22 and it
+  passed, so recursive `fs.watch` works there (ruling 2's risk is cleared).
+- **2026-10-27. WO3 complete.** Readability audit: 0 P1, 8 P2, 10 P3, 2 P4, all resolved. Two
+  behaviour changes the PA approved: the lock file is written mode 0600 (it holds the token), and
+  a malformed percent-encoding is 400 `invalid-path`, not 500. Verified through the built CLI.
+  **Final: 1545 tests, lint and tsc clean.**
+- **Follow-up, not in E-1c:** projects should ignore `.u8g2gl-design.lock` in git. There is no
+  project template yet (no `init` command) to carry it.
