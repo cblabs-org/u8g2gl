@@ -10,6 +10,7 @@
 // file gets an empty translation unit and pays nothing.
 #ifdef U8G2GL_EDITOR
 
+#include <cstring>
 #include <new>
 
 #include "u8g2gl/u8g2gl_button.h"
@@ -1380,6 +1381,34 @@ static const u8g2gl_editor_param ui_editor_u8g2gl_vline_params[] = {
     {"y", U8G2GL_EDITOR_INT},
     {"height", U8G2GL_EDITOR_INT},
 };
+
+// --- Fonts and images, by name ---
+// The ui_font_* and ui_image_* symbols the firmware units define, so an
+// editor host resolves a scene's font or image name without spelling any.
+extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
+extern const uint8_t* const ui_font_u8g2_font_5x7_mr;
+extern const uint8_t* const ui_font_u8g2_font_helvR08_tr;
+extern const uint8_t* const ui_font_font_4x6;
+extern const uint8_t* const ui_font_font_arrow_mini;
+extern const uint8_t ui_image_icon_wifi[];
+extern const uint8_t ui_image_logo_mark[];
+const void* ui_editor_asset(u8g2gl_editor_type_t type, const char* name) {
+    if (name == nullptr) {
+        return nullptr;
+    }
+    if (type == U8G2GL_EDITOR_FONT) {
+        if (std::strcmp(name, "u8g2_font_6x10_mr") == 0) { return ui_font_u8g2_font_6x10_mr; }
+        if (std::strcmp(name, "u8g2_font_5x7_mr") == 0) { return ui_font_u8g2_font_5x7_mr; }
+        if (std::strcmp(name, "u8g2_font_helvR08_tr") == 0) { return ui_font_u8g2_font_helvR08_tr; }
+        if (std::strcmp(name, "font_4x6") == 0) { return ui_font_font_4x6; }
+        if (std::strcmp(name, "font_arrow_mini") == 0) { return ui_font_font_arrow_mini; }
+    }
+    if (type == U8G2GL_EDITOR_IMAGE) {
+        if (std::strcmp(name, "icon_wifi") == 0) { return ui_image_icon_wifi; }
+        if (std::strcmp(name, "logo_mark") == 0) { return ui_image_logo_mark; }
+    }
+    return nullptr;
+}
 
 // --- Registry ---
 static const u8g2gl_editor_class ui_editor_classes[] = {

@@ -55,7 +55,7 @@ import { emitScreenUnit, screenUnitPath } from './screen.js';
 import { emitUiHeader, UI_HEADER } from './ui-hpp.js';
 import { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
 import type { EmittedUnit, ProjectEmitInput } from './unit.js';
-import { EDITOR_REGISTRY_UNIT, emitEditorRegistryUnit } from './editor-registry.js';
+import { EDITOR_REGISTRY_UNIT, editorAssetsOf, emitEditorRegistryUnit } from './editor-registry.js';
 import { emitSceneFile, SCENE_FILE } from './scene.js';
 
 export { cppEnumerator, cppStringLiteral, cppValue } from './value.js';
@@ -274,22 +274,30 @@ export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
     target: input.target,
   };
 
-  // --- Step 1: The registry, from every loaded manifest ---
-  const registry = emitEditorRegistryUnit({ manifests: input.manifests, stamp: formatHeaderStamp(generated) });
+  // One project view for both units, so the registry's asset table and the
+  // scene's font and image lists are read from the same declarations.
+  const project = {
+    project: input.project,
+    globals: input.globals,
+    screens: input.screens,
+    capacities: input.capacities,
+    manifests: input.manifests,
+    images: input.images,
+    compiledFonts: input.compiledFonts,
+    bdfLicenceFiles: input.bdfLicenceFiles,
+    stamp: '',
+  };
+
+  // --- Step 1: The registry, from every loaded manifest, with the asset table ---
+  const registry = emitEditorRegistryUnit({
+    manifests: input.manifests,
+    assets: editorAssetsOf(project),
+    stamp: formatHeaderStamp(generated),
+  });
 
   // --- Step 2: The scene description, from the build's own model ---
   const scene = emitSceneFile({
-    project: {
-      project: input.project,
-      globals: input.globals,
-      screens: input.screens,
-      capacities: input.capacities,
-      manifests: input.manifests,
-      images: input.images,
-      compiledFonts: input.compiledFonts,
-      bdfLicenceFiles: input.bdfLicenceFiles,
-      stamp: '',
-    },
+    project,
     realised: input.realised,
     resolved: input.resolved,
     manifests: input.manifests,

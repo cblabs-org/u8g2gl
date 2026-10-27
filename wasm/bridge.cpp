@@ -75,19 +75,11 @@
 #include "u8g2gl/u8g2gl_subject.h"
 #include "u8g2gl/u8g2gl_types.h"
 
-// External declarations for U8G2 built-in and fixture fonts
-extern "C" const uint8_t u8g2_font_6x10_mr[];
-extern "C" const uint8_t u8g2_font_5x7_mr[];
-extern "C" const uint8_t u8g2_font_helvR08_tr[];
-extern const uint8_t* const ui_font_font_4x6;
-extern const uint8_t* const ui_font_font_arrow_mini;
-
-// External declarations for fixture compiled images
-extern const uint8_t ui_image_icon_wifi[];
-extern const uint8_t ui_image_logo_mark[];
-
-// External declaration for generated editor registry
+// The generated editor registry, and its font and image lookup: every font or
+// image a scene names is resolved through the project's own generated table,
+// so this bridge names none and links into any project's editor Wasm.
 extern const u8g2gl_editor_registry& ui_editor_registry();
+extern const void* ui_editor_asset(u8g2gl_editor_type_t type, const char* name);
 
 namespace {
 
@@ -237,8 +229,6 @@ struct placeholder_record {
 scene_json s_scene;
 std::string s_last_error;
 std::vector<std::unique_ptr<subject_slot>> s_subjects;
-std::vector<std::pair<std::string, const uint8_t*>> s_fonts;
-std::vector<std::pair<std::string, const uint8_t*>> s_images;
 
 const scene_json* s_active_screen = nullptr;
 std::vector<u8g2gl_obj*> s_objects;
@@ -328,14 +318,13 @@ bool value_for(u8g2gl_editor_type_t type, const scene_json& json, const std::str
         case U8G2GL_EDITOR_FONT:
         case U8G2GL_EDITOR_IMAGE: {
             if (!json.is_string()) break;
-            const auto& table = (type == U8G2GL_EDITOR_FONT) ? s_fonts : s_images;
-            for (const auto& entry : table) {
-                if (entry.first == json.as_string()) {
-                    *out = u8g2gl_editor_pointer(type, entry.second);
-                    return true;
-                }
+            const void* data = ui_editor_asset(type, json.as_string().c_str());
+            if (data == nullptr) {
+                return fail(what + ": the project declares no " + (type == U8G2GL_EDITOR_FONT ? "font" : "image") +
+                            " '" + json.as_string() + "'");
             }
-            return fail(what + ": no host data for '" + json.as_string() + "'");
+            *out = u8g2gl_editor_pointer(type, data);
+            return true;
         }
         default:
             break;
@@ -652,22 +641,6 @@ bool render_draw_call(U8G2& display, const scene_json& element) {
     return true;
 }
 
-// register_default_assets
-// The framework fixture's fonts and images, by name. Still fixed here: the
-// table the generator is to emit for each project is not yet wired through.
-void register_default_assets() {
-    s_fonts.clear();
-    s_fonts.emplace_back("u8g2_font_6x10_mr", u8g2_font_6x10_mr);
-    s_fonts.emplace_back("u8g2_font_5x7_mr", u8g2_font_5x7_mr);
-    s_fonts.emplace_back("u8g2_font_helvR08_tr", u8g2_font_helvR08_tr);
-    s_fonts.emplace_back("font_4x6", ui_font_font_4x6);
-    s_fonts.emplace_back("font_arrow_mini", ui_font_font_arrow_mini);
-
-    s_images.clear();
-    s_images.emplace_back("icon_wifi", ui_image_icon_wifi);
-    s_images.emplace_back("logo_mark", ui_image_logo_mark);
-}
-
 // memory_display_cb
 // A U8X8 display that is only memory: it reports the scene's geometry and
 // accepts every other message, because nothing is ever sent to hardware. The
@@ -754,8 +727,6 @@ EMSCRIPTEN_KEEPALIVE
 void teardown() {
     destroy_objects();
     s_subjects.clear();
-    s_fonts.clear();
-    s_images.clear();
     s_scene = scene_json{};
     s_last_error.clear();
     s_display_buffer.clear();
@@ -791,6 +762,11 @@ int applyScene(const char* json_str) {
     }
 
     // --- Step 3: Configure the virtual display at the scene's size ---
+    // The display size, like each string subject's max_len below, is read from
+    // the scene rather than the project's u8g2gl_generated_config.h: that header
+    // carries only the four object and binding ceilings ([D-21]), and the scene
+    // is generated from the same document, so the editor is still sized by the
+    // project and never by a constant of its own (LOOP-BUDGET F6).
     const scene_json& disp = s_scene.get("display");
     s_display_width = disp.get("width").as_int();
     s_display_height = disp.get("height").as_int();
@@ -801,7 +777,6 @@ int applyScene(const char* json_str) {
     if (!setup_virtual_display()) {
         return 0;
     }
-    register_default_assets();
 
     // --- Step 4: Create host subjects ---
     for (const scene_json& described : s_scene.get("subjects").items()) {
@@ -819,8 +794,10 @@ int applyScene(const char* json_str) {
             slot->base = static_cast<u8g2gl_subject_bool_base*>(slot->bool_subject.get());
         } else if (type == "string") {
             slot->type = U8G2GL_SUBJECT_STRING;
-            // No max_len declared means the runtime default, as the firmware
-            // subject's template argument would be (§8.2).
+            // From the scene, not the generated config, which carries no
+            // string capacity (see Step 3). No max_len declared means the
+            // runtime default, as the firmware subject's template argument
+            // would be (§8.2).
             const int32_t max_len = described.has("max_len") ? described.get("max_len").as_int() : U8G2GL_MAX_STRING_LEN;
             if (max_len < 0 || max_len >= std::numeric_limits<uint16_t>::max()) {
                 s_last_error = "subject '" + slot->name + "' has an invalid max_len";
