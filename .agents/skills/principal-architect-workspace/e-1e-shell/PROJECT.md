@@ -67,6 +67,23 @@ One worker, WO1 to WO4 in order.
    build output. Any other file: stop and report.
 7. **No version bump** for the CLI unless generator output changes (it should not).
 
+8. **Checkpoint C3, the owner's decision, 2026-10-27**, verbatim, choosing between "measure to
+   the frame" and "run immediately on the leading edge":
+
+   > "Measure to the frame"
+
+   The design stays: at most one pipeline run, on the next animation frame (EDITOR-DESIGN §3.2).
+   **e2 is redefined** to measure what the user can see:
+   1. **Frame latency:** for every keystroke, the change is on the canvas in the **first**
+      animation frame after the key event. No keystroke skips a frame. (Test: the frame counter
+      at blit minus the frame counter at the key event is 1, for all 300 keystrokes.)
+   2. **Work per frame:** from the start of the pipeline run in that frame to the end of the
+      blit, **p95 under 16 ms** under 4× CPU throttle, so the frame is never late.
+   Both on the departures project and the 20-element screen. The key-to-blit time is still
+   reported, not gated: it includes the wait for the frame, which no schedule removes from what
+   is displayed. Ruling 5 stands for the new definition: if either half fails, report the
+   breakdown, do not weaken it.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
@@ -90,3 +107,6 @@ One worker, WO1 to WO4 in order.
   invalid" state (§3.8) is not built; no-toolchain detection reads the build job's message text
   (E-1d's job should return a stable code); the npm package does not ship `designer/dist` (joins
   E-1d ruling 8.3).
+- **2026-10-27. C3 decided by the owner: measure to the frame** (ruling 8). The design is unchanged;
+  e2 is redefined. EDITOR-DESIGN §3.3's budget should say the wait for the frame is outside it;
+  that note joins the PR description for the Chief Architect.
