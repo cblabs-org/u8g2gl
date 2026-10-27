@@ -5,7 +5,7 @@
  *
  * File: src/node/design/design-command.ts
  * Purpose: `u8g2gl design [project-dir] [--port N] [--no-open]` — the
- *          served-first entry point to the designer (EDITOR-DESIGN §2.1). It
+ *          served-first entry point to the designer. It
  *          owns everything about the server's life that the server itself
  *          should not: finding an already-running server for the project and
  *          attaching to it, the lock file, printing and opening the URL, and a
@@ -127,6 +127,7 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
  * @param json Whether `--json` was given.
  */
 export async function runDesignCommand(args: DesignArgs, json: boolean): Promise<void> {
+  // --- Step 1: Refuse a directory that is not a project ---
   const projectRoot = resolve(args.projectDir);
   if (!existsSync(join(projectRoot, 'u8g2gl.xml'))) {
     const message = `'${args.projectDir}' is not a U8G2GL project: it has no u8g2gl.xml.`;
@@ -138,12 +139,14 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(1);
   }
 
+  // --- Step 2: Attach to the running server, or start one ---
   const session = await startOrAttach(projectRoot, args.port);
   if (session.kind === 'failed') {
     console.error(`u8g2gl design: ${session.message}`);
     process.exit(1);
   }
 
+  // --- Step 3: Report the URL, and open it ---
   const lock = session.kind === 'started'
     ? { url: session.server.url, port: session.server.port, pid: process.pid }
     : session.lock;
@@ -164,7 +167,7 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(0);
   }
 
-  // A started server keeps the process alive; a signal ends it cleanly.
+  // --- Step 4: A started server keeps the process alive; a signal ends it cleanly ---
   let stopping = false;
   const shutdown = (): void => {
     if (stopping) {

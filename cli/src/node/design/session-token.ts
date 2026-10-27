@@ -5,8 +5,8 @@
  *
  * File: src/node/design/session-token.ts
  * Purpose: The design server's only authentication. A loopback server is
- *          reachable from every page in every browser on the machine
- *          (EDITOR-DESIGN §2.1), so binding to 127.0.0.1 keeps other machines
+ *          reachable from every page in every browser on the machine,
+ *          so binding to 127.0.0.1 keeps other machines
  *          out but not other web pages; a random per-session token that only
  *          the URL the CLI printed carries is what keeps them out.
  * Description: 32 random bytes from `node:crypto`, as hex. A request presents it
@@ -40,6 +40,9 @@ export function generateSessionToken(): string {
 export function presentedToken(request: IncomingMessage, url: URL): string | undefined {
   const header = request.headers.authorization;
   if (header !== undefined) {
+    // A header that is present but malformed does not fall back to `?token=`:
+    // a request that sends a header has chosen it, and a wrong header must
+    // not be rescued by a query parameter left over from the page URL.
     const match = /^Bearer\s+(\S+)\s*$/i.exec(header);
     return match?.[1];
   }

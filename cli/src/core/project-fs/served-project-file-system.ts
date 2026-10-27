@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/project-fs/served-project-file-system.ts
- * Purpose: The browser half of the served-first ruling ([UD-2], second
- *          amendment): the editor reaches the project on disk through
+ * Purpose: The browser half of served mode (ui_spec [UD-2], amendment of
+ *          2026-10-26): the editor reaches the project on disk through
  *          `u8g2gl design`'s loopback server, using only `fetch` and
  *          `EventSource`, so the same code runs in any browser and in Node 22
  *          tests. It is the second `ProjectFileSystem` implementation, and the
@@ -82,6 +82,11 @@ export interface ServedProjectFsOptions {
   readonly createEventSource?: (url: string) => EventSourceLike;
 }
 
+/**
+ * Every `ProjectFsErrorCode`, as a runtime list. The type alone cannot narrow
+ * a server's reply, which is untrusted JSON; this must list every member of
+ * the union, or a code the server sends would be reported as `unavailable`.
+ */
 const ERROR_CODES: readonly ProjectFsErrorCode[] = ['invalid-path', 'outside-project', 'not-found', 'conflict', 'unavailable'];
 
 /**
@@ -96,6 +101,10 @@ export class ServedProjectFileSystem extends GuardedProjectFileSystem {
   private readonly createEventSource: (url: string) => EventSourceLike;
   private source: EventSourceLike | undefined;
 
+  /**
+   * @param options The server origin and session token, and optionally the
+   *                `fetch` and `EventSource` to use (tests inject both).
+   */
   constructor(options: ServedProjectFsOptions) {
     super();
     this.origin = options.origin.replace(/\/+$/, '');

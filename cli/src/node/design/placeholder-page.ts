@@ -21,6 +21,8 @@
  * @return A complete HTML document.
  */
 export function placeholderPage(projectName: string): string {
+  // The directory name is untrusted: a project folder may be named
+  // `<script>…`, and this page is served with the session token in its URL.
   const name = projectName.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
   return `<!doctype html>
 <html lang="en">
@@ -36,8 +38,8 @@ export function placeholderPage(projectName: string): string {
 <body>
 <h1>u8g2gl design</h1>
 <p>The design server is running for <code>${name}</code>.</p>
-<p>The editor itself is not here yet: it arrives with E-1e. Until then this server
-serves the project's files to the editor's file API, and nothing else.</p>
+<p>The editor itself is not built yet. Until it is, this server only serves the
+project's files to the editor's file API.</p>
 </body>
 </html>
 `;

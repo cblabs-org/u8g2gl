@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/project-fs/project-file-system.ts
- * Purpose: The one way isomorphic code reaches a project's files ([UD-2],
- *          typescript.md §1). The designer runs in a browser and the CLI in
- *          Node; `src/core/` serves both and may touch neither filesystem, so
- *          every read, write, listing and change notification crosses this
- *          interface. It is shaped by EDITOR-DESIGN §2.3, the editor as a
- *          co-author beside the user's IDE: every read carries a version, a save
+ * Purpose: The one way isomorphic code reaches a project's files ([UD-2]).
+ *          The designer runs in a browser and the CLI in Node; `src/core/`
+ *          serves both and may not import `node:` or touch either filesystem,
+ *          so every read, write, listing and change notification crosses this
+ *          interface. It is shaped by the editor being a co-author beside the
+ *          user's IDE: every read carries a version, a save
  *          names the version it was based on and is refused if the file moved,
  *          and external edits arrive as events so a clean buffer can reload.
  * Description: The interface, its result and event types, and
@@ -19,7 +19,8 @@
  *              the path rule nor event fan-out can differ between
  *              implementations. Failures a caller can cause — a bad path, a
  *              missing file, a conflict, an unreachable server — are returned
- *              as `ProjectFsError`, never thrown (typescript.md §4).
+ *              as `ProjectFsError`, never thrown: throwing is reserved for
+ *              programmer error.
  *
  * Exports:
  * - ProjectFileSystem:         read / readBytes / write / list / watch
@@ -43,7 +44,7 @@
  */
 
 import { compareCodeUnits } from '../order.js';
-import { checkProjectPath } from './project-path-rule.js';
+import { checkProjectPath, refusedPathMessage } from './project-path-rule.js';
 
 /**
  * Why an operation failed.
@@ -175,6 +176,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
   /** Lists every project file, in any order; the base sorts. */
   protected abstract listUnsorted(): Promise<ProjectFsResult<FileListing>>;
 
+  /** {@inheritDoc ProjectFileSystem.read} */
   async read(path: string): Promise<ProjectFsResult<TextFile>> {
     const result = await this.readBytes(path);
     if (!result.ok) {
@@ -183,6 +185,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     return { ok: true, path: result.path, text: new TextDecoder().decode(result.bytes), version: result.version };
   }
 
+  /** {@inheritDoc ProjectFileSystem.readBytes} */
   async readBytes(path: string): Promise<ProjectFsResult<BytesFile>> {
     const check = checkProjectPath(path);
     if (!check.ok) {
@@ -191,6 +194,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     return this.readBytesChecked(check.path);
   }
 
+  /** {@inheritDoc ProjectFileSystem.write} */
   async write(path: string, text: string, options: WriteOptions = {}): Promise<ProjectFsResult<WriteOutcome>> {
     const check = checkProjectPath(path);
     if (!check.ok) {
@@ -199,6 +203,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     return this.writeChecked(check.path, new TextEncoder().encode(text), options);
   }
 
+  /** {@inheritDoc ProjectFileSystem.list} */
   async list(): Promise<ProjectFsResult<FileListing>> {
     const result = await this.listUnsorted();
     if (!result.ok) {
@@ -207,6 +212,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     return { ok: true, files: [...result.files].sort(compareCodeUnits) };
   }
 
+  /** {@inheritDoc ProjectFileSystem.watch} */
   watch(listener: ProjectFsListener): () => void {
     // A wrapper, so the same function subscribed twice is two subscriptions
     // and each unsubscribe removes exactly its own.
@@ -239,5 +245,5 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
 //   path   — the path as supplied
 //   reason — checkProjectPath's reason
 function invalidPath(path: string, reason: string): ProjectFsError {
-  return { ok: false, code: 'invalid-path', message: `'${path}' is not a project path: ${reason}.` };
+  return { ok: false, code: 'invalid-path', message: refusedPathMessage(path, reason) };
 }

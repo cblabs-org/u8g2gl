@@ -13,8 +13,8 @@
  * Description: The factory seeds a project and returns the filesystem under
  *              test plus two hooks that change files *behind its back* — for
  *              the in-memory implementation its simulate* hooks, for the served
- *              one a write to the real directory — which is how EDITOR-DESIGN
- *              §2.3's IDE-beside-the-editor case is exercised. Events may
+ *              one a write to the real directory — which is how the case of an
+ *              IDE editing the same files beside the editor is exercised. Events may
  *              arrive synchronously or later; every event assertion waits up
  *              to `eventTimeoutMs`, and "no event" assertions wait `quietMs`.
  *
@@ -284,7 +284,7 @@ export function runProjectFsContract(name: string, factory: ProjectFsFactory, op
         expect(await fs.read('globals.xml')).toMatchObject({ ok: true, text: '<globals><consts /></globals>\n' });
       });
 
-      it('refuses a save over an external change made since the read (EDITOR-DESIGN §2.3)', async () => {
+      it('refuses a save over an external change made since the read', async () => {
         const { fs, externalWrite } = await setup();
         const read = await fs.read('screens/screen_a.xml');
         if (!read.ok) throw new Error('seed missing');

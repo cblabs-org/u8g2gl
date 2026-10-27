@@ -39,7 +39,7 @@ import { lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync
 import { dirname, join, resolve } from 'node:path';
 import { compareCodeUnits } from '../../core/order.js';
 import { contentVersion } from '../../core/project-fs/content-version.js';
-import { checkProjectPath } from '../../core/project-fs/project-path-rule.js';
+import { checkProjectPath, refusedPathMessage } from '../../core/project-fs/project-path-rule.js';
 import type {
   BytesFile,
   FileListing,
@@ -78,8 +78,11 @@ export class DiskProject {
   read(path: string): ProjectFsResult<BytesFile> {
     const check = checkProjectPath(path);
     if (!check.ok) {
-      return error('invalid-path', `'${path}' is not a project path: ${check.reason}.`);
+      return error('invalid-path', refusedPathMessage(path, check.reason));
     }
+    // The real-path rule runs after the lexical one: the lexical rule has
+    // already refused `..` and absolute paths, so what this catches is a
+    // symlink inside the project whose target lies outside it.
     const absolute = this.absolutePath(path);
     if (!isInsideProject(this.root, absolute)) {
       return error('outside-project', `'${path}' resolves outside the project directory.`);
@@ -105,8 +108,11 @@ export class DiskProject {
     // --- Step 1: The lexical rule, then this server's own no-go areas ---
     const check = checkProjectPath(path);
     if (!check.ok) {
-      return error('invalid-path', `'${path}' is not a project path: ${check.reason}.`);
+      return error('invalid-path', refusedPathMessage(path, check.reason));
     }
+    // Reported as `outside-project` (403, "not yours to write"), not
+    // `invalid-path`: the path is well formed, it is just not project source.
+    // `.git/` matters most — a write to `.git/hooks/` would run on the next commit.
     if (isIgnoredPath(path)) {
       return error('outside-project', `'${path}' is not project source; generated/, .git/, node_modules/ and the lock file are not written by the editor.`);
     }
@@ -117,7 +123,7 @@ export class DiskProject {
       return error('outside-project', `'${path}' resolves outside the project directory.`);
     }
 
-    // --- Step 3: The version check (EDITOR-DESIGN §2.3: never silently overwrite) ---
+    // --- Step 3: The version check — the editor must never silently overwrite ---
     const current = readFileOrUndefined(absolute);
     const currentVersion = current === undefined ? null : contentVersion(current);
     if (options.expectedVersion !== undefined && options.expectedVersion !== currentVersion) {

@@ -28,5 +28,5 @@ export {
   type EventSourceLike,
   type ServedProjectFsOptions,
 } from './served-project-file-system.js';
-export { checkProjectPath, type ProjectPathCheck } from './project-path-rule.js';
+export { checkProjectPath, refusedPathMessage, type ProjectPathCheck } from './project-path-rule.js';
 export { contentVersion } from './content-version.js';

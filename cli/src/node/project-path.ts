@@ -35,7 +35,8 @@ import { sep } from 'node:path';
  * lexical comparison of the two paths as given, and the caller's missing-file
  * handling takes over. A caller about to *create* a file must therefore check
  * the nearest ancestor that does exist, not the new file's own path, or a new
- * file under a symlinked directory pointing outside would pass.
+ * file under a symlinked directory pointing outside would pass. For a read the
+ * same case is harmless: the path passes and then fails as missing.
  *
  * @param projectRoot Absolute project directory.
  * @param absolute    Absolute path to test.
@@ -49,6 +50,10 @@ export function isInsideProject(projectRoot: string, absolute: string): boolean 
     root = realpathSync(projectRoot);
   } catch {
     // Not resolvable (absent): compare lexically, as for any missing file.
+    // The target is resolved first, so when it is absent neither path is
+    // resolved and both are compared as given; the root is left unresolved
+    // beside a resolved target only if the project directory itself is gone.
   }
+  // `+ sep` is what stops a sibling such as `/proj-other` passing as inside `/proj`.
   return target === root || target.startsWith(root + sep);
 }

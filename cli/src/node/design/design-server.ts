@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/node/design/design-server.ts
- * Purpose: The server behind `u8g2gl design` (ui_spec [UD-2], second
- *          amendment): it serves the editor and the project's files, pushes
+ * Purpose: The server behind `u8g2gl design` (ui_spec [UD-2], amendment of
+ *          2026-10-26): it serves the editor and the project's files, pushes
  *          file changes, and runs builds, and it is **never in the per-edit
  *          loop** — an edit is applied in the browser, and the server only sees
  *          a save. It is separate from the command so tests can start it on
@@ -27,6 +27,7 @@
  *              - `GET /api/build/<id>`     a build's record
  *
  * Exports:
+ * - LOOPBACK:              The one address the server binds
  * - DesignServerOptions:   Project, port, token
  * - DesignServer:          A running server
  * - startDesignServer():   Start one
@@ -47,8 +48,8 @@ import { placeholderPage } from './placeholder-page.js';
 import { ProjectWatcher } from './project-watcher.js';
 import { generateSessionToken, presentedToken, tokenMatches } from './session-token.js';
 
-/** The only address the server binds (c3). */
-const LOOPBACK = '127.0.0.1';
+/** The only address the server binds: loopback, so no other machine can reach it. */
+export const LOOPBACK = '127.0.0.1';
 
 /** Largest request body accepted — far above any project source file. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
@@ -70,7 +71,9 @@ export interface DesignServerOptions {
 export interface DesignServer {
   /** The URL to open: `http://127.0.0.1:<port>/?token=<token>`. */
   readonly url: string;
+  /** The port actually bound — the one chosen when 0 was asked for. */
   readonly port: number;
+  /** The session secret. Print it only inside the URL the user is given; never log it. */
   readonly token: string;
   /** The bound address, as `server.address()` reports it. */
   readonly address: AddressInfo;
@@ -130,18 +133,31 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
   async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? '/', `http://${LOOPBACK}:${port}`);
 
-    // --- Authorisation, before anything else (c1) ---
+    // --- Step 1: Authorise — Host, then token, before anything is parsed or routed ---
+    // Host is checked as well as the token because of DNS rebinding: a hostile
+    // page can rebind its own name to 127.0.0.1, and the browser then sends
+    // that name as Host. The token already refuses such a request; this is a
+    // second, independent barrier, so a token that leaks (a log, a screenshot,
+    // browser history) is still useless to a page on another origin.
+    // The port is part of the match because Host always carries it for a
+    // non-default port, and a Host naming another port is not addressed to
+    // this server. `localhost` is accepted beside 127.0.0.1 because a user may
+    // retype the printed URL with it, and it resolves only to this machine.
     const host = request.headers.host;
     if (host !== `${LOOPBACK}:${port}` && host !== `localhost:${port}`) {
       sendJson(response, 403, { code: 'forbidden', message: 'wrong Host' });
       return;
     }
+    // The token gate runs before routing, and on every route including `/`, so
+    // an unauthorised caller cannot learn which routes exist: a real route and
+    // a made-up one answer alike. The body is identical for a missing and a
+    // wrong token, so the response says nothing about what was presented.
     if (!tokenMatches(presentedToken(request, url), token)) {
       sendJson(response, 403, { code: 'forbidden', message: 'missing or wrong session token' });
       return;
     }
 
-    // --- Routing ---
+    // --- Step 2: Route ---
     const method = request.method ?? 'GET';
     const route = url.pathname;
     if (route === '/' && method === 'GET') {
@@ -149,7 +165,12 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     } else if (route === '/api/files' && method === 'GET') {
       sendResult(response, project.list(), (r) => ({ files: r.files }));
     } else if (route === '/api/file' && method === 'GET') {
-      const result = project.read(url.searchParams.get('path') ?? '');
+      const path = pathParam(url);
+      if (path === undefined) {
+        sendMalformed(response);
+        return;
+      }
+      const result = project.read(path);
       if (!result.ok) {
         sendError(response, result);
       } else {
@@ -164,12 +185,21 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       }
       const header = request.headers[EXPECTED_VERSION_HEADER.toLowerCase()];
       const expected = typeof header === 'string' ? (header === EXPECTED_ABSENT ? null : header) : undefined;
-      const result = project.write(url.searchParams.get('path') ?? '', body, { expectedVersion: expected });
+      const path = pathParam(url);
+      if (path === undefined) {
+        sendMalformed(response);
+        return;
+      }
+      const result = project.write(path, body, { expectedVersion: expected });
       sendResult(response, result, (r) => ({ path: r.path, version: r.version, created: r.created }));
     } else if (route === '/api/events' && method === 'GET') {
       openStream(response);
     } else if (route.startsWith('/api/build/') && method === 'POST') {
-      const job = decodeURIComponent(route.slice('/api/build/'.length));
+      const job = decodeStrict(route.slice('/api/build/'.length));
+      if (job === undefined) {
+        sendMalformed(response);
+        return;
+      }
       const body = await readBody(request);
       let params: unknown;
       try {
@@ -185,7 +215,12 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
         sendJson(response, 202, record);
       }
     } else if (route.startsWith('/api/build/') && method === 'GET') {
-      const record = builds.get(decodeURIComponent(route.slice('/api/build/'.length)));
+      const id = decodeStrict(route.slice('/api/build/'.length));
+      if (id === undefined) {
+        sendMalformed(response);
+        return;
+      }
+      const record = builds.get(id);
       if (record === undefined) {
         sendJson(response, 404, { code: 'unknown-build', message: 'no such build' });
       } else {
@@ -255,6 +290,43 @@ async function closeServer(server: Server, watcher: ProjectWatcher, streams: Set
     server.close(() => resolve());
     server.closeAllConnections();
   });
+}
+
+// decodeStrict
+// A percent-encoded URL component, decoded, or undefined if its encoding is
+// malformed (`%zz`, a truncated or invalid UTF-8 sequence). `decodeURIComponent`
+// throws on those, and `URLSearchParams` silently keeps or replaces them — so a
+// malformed path could otherwise either surface as a 500 or be read as a
+// different file name than the client meant. A `+` is a space, as in a form-
+// encoded query; the browser half encodes `+` itself as `%2B`.
+//   raw — the component as it appears in the URL
+function decodeStrict(raw: string): string | undefined {
+  try {
+    return decodeURIComponent(raw.replace(/\+/g, ' '));
+  } catch {
+    return undefined;
+  }
+}
+
+// pathParam
+// The `path` query parameter, strictly decoded: '' when absent (which the path
+// rule then refuses as empty), undefined when its encoding is malformed.
+//   url — the request URL
+function pathParam(url: URL): string | undefined {
+  for (const pair of url.search.slice(1).split('&')) {
+    const equals = pair.indexOf('=');
+    const name = equals < 0 ? pair : pair.slice(0, equals);
+    if (name === 'path') {
+      return decodeStrict(equals < 0 ? '' : pair.slice(equals + 1));
+    }
+  }
+  return '';
+}
+
+// sendMalformed
+// The 400 `invalid-path` answer to a malformed percent-encoding.
+function sendMalformed(response: ServerResponse): void {
+  sendJson(response, 400, { code: 'invalid-path', message: 'the request URL has a malformed percent-encoding' });
 }
 
 // readBody

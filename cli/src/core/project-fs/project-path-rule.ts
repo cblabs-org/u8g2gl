@@ -21,6 +21,7 @@
  * Exports:
  * - ProjectPathCheck:     Result of checking one path — the path, or why it was refused
  * - checkProjectPath():   Apply the lexical rule to a path
+ * - refusedPathMessage(): The message every implementation gives for a refused path
  */
 
 /**
@@ -84,4 +85,17 @@ export function checkProjectPath(path: string): ProjectPathCheck {
     }
   }
   return { ok: true, path };
+}
+
+/**
+ * @brief The message for a path {@link checkProjectPath} refused.
+ *
+ * One wording for every implementation and the server, so a refusal reads the
+ * same wherever it is reported.
+ *
+ * @param path   The path as supplied.
+ * @param reason `checkProjectPath`'s reason.
+ */
+export function refusedPathMessage(path: string, reason: string): string {
+  return `'${path}' is not a project path: ${reason}.`;
 }

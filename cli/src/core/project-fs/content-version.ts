@@ -6,7 +6,7 @@
  * File: src/core/project-fs/content-version.ts
  * Purpose: The version a `ProjectFileSystem` attaches to every read, so a save
  *          can refuse to overwrite a file that changed underneath the editor
- *          (EDITOR-DESIGN §2.3: "the designer never silently overwrites"). It is
+ *          — the designer never silently overwrites. It is
  *          derived from the content, not from a clock or a counter, so the
  *          server and the browser compute the same version for the same bytes
  *          without sharing any state, and a file rewritten with identical

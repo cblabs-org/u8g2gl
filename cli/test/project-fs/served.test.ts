@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/project-fs/served.test.ts
- * Purpose: c5 — `ServedProjectFileSystem` against a live design server passes
+ * Purpose: `ServedProjectFileSystem` against a live design server passes
  *          the same contract suite as the in-memory implementation. Every
  *          request crosses real HTTP, every event comes through the real
  *          watcher and a real server-sent-event stream, and every "external"

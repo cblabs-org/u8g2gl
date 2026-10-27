@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/design/design-command.test.ts
- * Purpose: c7 and the command around the server: argument parsing; one
+ * Purpose: The command around the server: argument parsing; one
  *          server per project — a second instance attaches and prints the
  *          running URL; a stale lock (dead pid, a live pid that is not the
  *          server, or a corrupt file) is replaced; and the built CLI end to end,
@@ -16,7 +16,7 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { parseDesignArgs, startOrAttach, type DesignSession } from '../../../src/node/design/design-command.js';
@@ -74,7 +74,7 @@ describe('parseDesignArgs()', () => {
   );
 });
 
-describe('c7 — one server per project', () => {
+describe('one server per project', () => {
   it('writes a lock holding pid, port and token, and removes it on stop', async () => {
     const root = project();
     const session = await startOrAttach(root, 0);
@@ -88,6 +88,12 @@ describe('c7 — one server per project', () => {
     });
     await session.stop();
     expect(existsSync(join(root, LOCK_FILE_NAME))).toBe(false);
+  });
+
+  it.skipIf(process.platform === 'win32')('writes the lock readable by its owner only (0600), since it holds the token', async () => {
+    const root = project();
+    track(await startOrAttach(root, 0));
+    expect(statSync(join(root, LOCK_FILE_NAME)).mode & 0o777).toBe(0o600);
   });
 
   it('a second instance attaches to the live server and gets its URL', async () => {

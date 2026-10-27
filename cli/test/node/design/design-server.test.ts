@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/design/design-server.test.ts
- * Purpose: The design server's security and behaviour over real HTTP: c1 (the
- *          token on every route), c2 (no write escapes the project, by path or
- *          by symlink), c3 (loopback only), c4 (an external edit becomes a
- *          `changed` event within 200 ms), the ignored paths, the build queue's
- *          routes, and a clean close with streams open.
+ * Purpose: The design server's security and behaviour over real HTTP: the
+ *          token on every route, no write escaping the project (by path or by
+ *          symlink), loopback only, an external edit becoming a `changed` event
+ *          within 200 ms, the ignored paths, malformed percent-encodings, the
+ *          build queue's routes, and a clean close with streams open.
  * Description: Each test starts a server on port 0 against a temporary project
  *              and closes it in afterEach. Requests use `fetch`, except the
  *              Host-header check, which needs `node:http` because `fetch` will
@@ -66,7 +66,7 @@ const ROUTES: ReadonlyArray<{ readonly method: string; readonly path: string; re
   { method: 'GET', path: '/no/such/route' },
 ];
 
-describe('c3 — loopback only', () => {
+describe('loopback only', () => {
   it('binds 127.0.0.1 and nothing else', async () => {
     const s = await start();
     expect(s.address).toMatchObject({ address: '127.0.0.1', family: 'IPv4' });
@@ -75,7 +75,7 @@ describe('c3 — loopback only', () => {
   });
 });
 
-describe('c1 — the token, on every route', () => {
+describe('the token, on every route', () => {
   const wrongTokens: ReadonlyArray<readonly [string, (token: string) => Record<string, string> | string]> = [
     ['no token', () => ({})],
     ['a wrong token of the right length', (t) => ({ Authorization: `Bearer ${t.slice(0, -1)}${t.endsWith('0') ? '1' : '0'}` })],
@@ -118,7 +118,7 @@ describe('c1 — the token, on every route', () => {
     expect((await api('/api/files')).status).toBe(200);
     const page = await fetch(s.url);
     expect(page.status).toBe(200);
-    expect(await page.text()).toContain('E-1e');
+    expect(await page.text()).toContain('not built yet');
   });
 
   it('refuses a request whose Host is not the loopback address (DNS rebinding)', async () => {
@@ -138,7 +138,7 @@ describe('c1 — the token, on every route', () => {
   });
 });
 
-describe('c2 — no write escapes the project', () => {
+describe('no write escapes the project', () => {
   it.each(INVALID_PATHS.map((p) => [JSON.stringify(p), p]))('refuses %s with 400 invalid-path', async (_l, path) => {
     await start();
     const response = await api(`/api/file?path=${encodeURIComponent(path)}`, { method: 'PUT', body: 'escaped\n' });
@@ -225,7 +225,7 @@ describe('files and events', () => {
     }
   });
 
-  it('c4 — an external write yields a changed event within 200 ms (20 runs)', async () => {
+  it('an external write yields a changed event within 200 ms (20 runs)', async () => {
     const s = await start();
     const fs = new ServedProjectFileSystem({ origin: `http://127.0.0.1:${s.port}`, token: s.token, createEventSource: createTestEventSource });
     await fs.connect();
@@ -249,7 +249,7 @@ describe('files and events', () => {
       fs.close();
     }
     const max = Math.max(...timings);
-    console.info(`c4 timings (ms): ${timings.map((t) => t.toFixed(1)).join(', ')} — max ${max.toFixed(1)}`);
+    console.info(`external-write timings (ms): ${timings.map((t) => t.toFixed(1)).join(', ')} — max ${max.toFixed(1)}`);
     expect(max).toBeLessThan(200);
   });
 
@@ -262,6 +262,27 @@ describe('files and events', () => {
     server = undefined;
     expect(performance.now() - startedAt).toBeLessThan(1000);
     fs.close();
+  });
+});
+
+describe('malformed percent-encodings', () => {
+  it.each([
+    ['GET', '/api/file?path=%zz'],
+    ['GET', '/api/file?path=screens%2F%E0%A4'],
+    ['PUT', '/api/file?path=%'],
+    ['POST', '/api/build/%zz'],
+    ['GET', '/api/build/%E0%A4'],
+  ])('answers %s %s with 400 invalid-path, not 500', async (method, path) => {
+    await start();
+    const response = await api(path, { method, body: method === 'GET' ? undefined : 'x' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid-path' });
+  });
+
+  it('still decodes a well-formed path, with + as a space', async () => {
+    await start({ 'screens/a b.xml': '<screen />\n' });
+    expect((await api('/api/file?path=screens%2Fa+b.xml')).status).toBe(200);
+    expect((await api('/api/file?path=screens/a%20b.xml')).status).toBe(200);
   });
 });
 

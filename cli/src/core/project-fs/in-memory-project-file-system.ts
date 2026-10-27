@@ -28,7 +28,7 @@
  */
 
 import { contentVersion } from './content-version.js';
-import { checkProjectPath } from './project-path-rule.js';
+import { checkProjectPath, refusedPathMessage } from './project-path-rule.js';
 import {
   GuardedProjectFileSystem,
   type BytesFile,
@@ -123,7 +123,7 @@ export class InMemoryProjectFileSystem extends GuardedProjectFileSystem {
 function requireProjectPath(path: string): string {
   const check = checkProjectPath(path);
   if (!check.ok) {
-    throw new Error(`'${path}' is not a project path: ${check.reason}.`);
+    throw new Error(refusedPathMessage(path, check.reason));
   }
   return check.path;
 }

@@ -5,8 +5,8 @@
  *
  * File: src/node/design/project-watcher.ts
  * Purpose: Turns raw filesystem notifications into the `changed` / `added` /
- *          `removed` events the editor acts on (EDITOR-DESIGN §2.3: an external
- *          change to a clean buffer reloads, to a dirty one asks). Raw
+ *          `removed` events the editor acts on: an external change to a clean
+ *          buffer reloads it, and to a dirty one asks the user. Raw
  *          notifications are not that: one save is often several (truncate,
  *          write, metadata, or an IDE's write-to-temp-then-rename), they do not
  *          say whether a file is new, and on macOS they can report changes made
@@ -40,8 +40,8 @@ import { isIgnoredPath } from './ignored-paths.js';
 
 /**
  * How long a path must be quiet before it is reported. Long enough to fold one
- * save's burst of notifications into one event; short against c4's 200 ms
- * budget from write to event.
+ * save's burst of notifications into one event; well inside the 200 ms the
+ * editor allows from an external write to its event.
  */
 export const WATCH_DEBOUNCE_MS = 30;
 

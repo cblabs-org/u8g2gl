@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/node/design/lock-file.ts
- * Purpose: One design server per project (EDITOR-DESIGN §2.1). Two servers on
+ * Purpose: One design server per project. Two servers on
  *          one project would run two watchers and two build queues racing over
  *          the same files, so a second `u8g2gl design` must find the first and
  *          attach to it — and a lock left by a server that crashed must not lock
@@ -15,8 +15,9 @@
  *              win. A lock is **live** only if its process exists and its
  *              server answers its own token; a dead pid, or a live pid that is
  *              now some other program (pids are reused), is stale and may be
- *              replaced. The lock holds the session token, so it is per-user
- *              state and belongs in the project's `.gitignore`.
+ *              replaced. The lock holds the session token, so it is written
+ *              readable by its owner only, and belongs in the project's
+ *              `.gitignore`.
  *
  * Exports:
  * - DesignLock:           The lock's content
@@ -29,6 +30,7 @@
 
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { LOOPBACK } from './design-server.js';
 import { LOCK_FILE_NAME } from './ignored-paths.js';
 
 /** The lock's content. */
@@ -82,7 +84,11 @@ export async function isLockLive(lock: DesignLock): Promise<boolean> {
     return false;
   }
   try {
-    const response = await fetch(`http://127.0.0.1:${lock.port}/api/files`, {
+    // The probe sends the lock's token to whatever answers on its port. That
+    // is safe because the address is loopback — only this machine can answer —
+    // and a stale lock's token opens nothing. It is also why only the real
+    // server can return 200: nothing else knows that token.
+    const response = await fetch(`http://${LOOPBACK}:${lock.port}/api/files`, {
       headers: { Authorization: `Bearer ${lock.token}` },
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
@@ -101,7 +107,11 @@ export async function isLockLive(lock: DesignLock): Promise<boolean> {
  */
 export function tryCreateLock(projectRoot: string, lock: DesignLock): boolean {
   try {
-    writeFileSync(lockPath(projectRoot), `${JSON.stringify(lock, null, 2)}\n`, { flag: 'wx' });
+    // `wx`: create exclusively, so two instances starting at once cannot both
+    // take the lock. Mode 0600: the lock holds the live session token, and any
+    // other local user who can read the project directory could otherwise read
+    // it and drive the server. (Windows ignores the mode; its ACLs apply.)
+    writeFileSync(lockPath(projectRoot), `${JSON.stringify(lock, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
     return true;
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code === 'EEXIST') {

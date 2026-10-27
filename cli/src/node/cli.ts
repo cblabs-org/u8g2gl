@@ -6,12 +6,13 @@
  *
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
- *          for XML validation, code generation, display queries, and display
- *          catalogue enumeration.
+ *          for XML validation, code generation, display queries, display
+ *          catalogue enumeration, and the design server.
  * Description: Command parser and subcommand router supporting global flags
  *              (--json, --no-color, --version, --help) and subcommands (validate,
  *              generate, find, catalogue, design). `design` lives in
- *              `design/design-command.ts`; this file only parses and dispatches it. `validate` and `generate` share one load
+ *              `design/design-command.ts`; this file only parses and dispatches
+ *              it. `validate` and `generate` share one load
  *              path (load-project.ts) and one validation (checkProject), differing
  *              only in the not-yet-supported severity: `validate` warns, `generate`
  *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
@@ -56,11 +57,11 @@ import {
   formatCompareResult,
   formatCatalogueSummary,
 } from './format-display.js';
+import { parseDesignArgs, runDesignCommand } from './design/design-command.js';
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
 import { getGeneratorVersion } from './generator-version.js';
 import { loadProject, type LoadedProject } from './load-project.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
-import { parseDesignArgs, runDesignCommand } from './design/design-command.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
 const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate', 'design'] as const;
