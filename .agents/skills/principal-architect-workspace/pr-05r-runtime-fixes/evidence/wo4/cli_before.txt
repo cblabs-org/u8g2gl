@@ -1,0 +1,26 @@
+
+ RUN  v2.1.9 /Users/mcneillm/Documents/Projects/U8G2GL-05r/cli
+
+ ❯ test/generator/emit-screen.test.ts (46 tests | 1 failed | 45 skipped) 6ms
+   × bindings are emitted from the overload realisation chose (WO5a finding 4) > never spells a bool subject’s comparison as an integer literal, on an object or a draw call’s guard 5ms
+     → expected [ …(8) ] to include '    ui_obj_a.bind_flag_if_eq(&ui_subj…'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/generator/emit-screen.test.ts > bindings are emitted from the overload realisation chose (WO5a finding 4) > never spells a bool subject’s comparison as an integer literal, on an object or a draw call’s guard
+AssertionError: expected [ …(8) ] to include '    ui_obj_a.bind_flag_if_eq(&ui_subj…'
+ ❯ test/generator/emit-screen.test.ts:434:18
+    432|     const unit = file(result, 'ui_screen_home.cpp');
+    433|     const init = body(unit, 'void ui_screen_home_init()');
+    434|     expect(init).toContain('    ui_obj_a.bind_flag_if_eq(&ui_subject_f…
+       |                  ^
+    435|     expect(init).toContain('    ui_obj_b.bind_flag_if_not_eq(&ui_subje…
+    436|     const render = renderCode(unit, 'home');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 45 skipped (46)
+   Start at  13:42:06
+   Duration  2.15s (transform 302ms, setup 0ms, collect 430ms, tests 6ms, environment 0ms, prepare 37ms)
+

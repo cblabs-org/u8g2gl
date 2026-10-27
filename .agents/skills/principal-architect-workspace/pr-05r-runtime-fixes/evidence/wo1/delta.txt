@@ -1,0 +1,9 @@
+colour only:            full 5.66 ns  delta 2.74 ns
+label, same font:       full 6.57 ns  delta 3.41 ns
+label, caller font 5x7: full 49.37 ns  delta 46.89 ns
+colour only:            full 5.89 ns  delta 2.88 ns
+label, same font:       full 7.01 ns  delta 3.72 ns
+label, caller font 5x7: full 50.61 ns  delta 48.47 ns
+colour only:            full 5.78 ns  delta 3.12 ns
+label, same font:       full 6.44 ns  delta 3.52 ns
+label, caller font 5x7: full 50.84 ns  delta 48.07 ns

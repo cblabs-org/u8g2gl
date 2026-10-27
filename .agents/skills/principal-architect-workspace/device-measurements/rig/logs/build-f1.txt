@@ -1,0 +1,37 @@
+Processing device_after (platform: espressif32; board: arduino_nano_esp32; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/arduino_nano_esp32.html
+PLATFORM: Espressif 32 (55.3.311+sha.5f39b6d) > Arduino Nano ESP32
+HARDWARE: ESP32S3 240MHz, 320KB RAM, 16MB Flash
+DEBUG: Current (cmsis-dap) External (cmsis-dap, dfu, esp-bridge, esp-builtin, esp-prog, esp-prog-2, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - contrib-piohome @ 3.4.4 
+ - framework-arduinoespressif32 @ 3.3.11 
+ - framework-arduinoespressif32-libs @ 5.5.5+sha.b774170ff46 
+ - tool-dfuutil-arduino @ 1.11.0 
+ - tool-esp-rom-elfs @ 2024.10.11 
+ - tool-esptoolpy @ 5.3.0 
+ - tool-openocd-esp32 @ 2.1200.20260424 (12.0) 
+ - tool-xtensa-esp-elf-gdb @ 17.1.0+20260402 
+ - toolchain-xtensa-esp-elf @ 14.2.0+20260121
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ deep+, Compatibility ~ soft
+Found 46 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- u8g2gl @ 0.8.0
+|-- U8g2 @ 2.36.18
+|-- SPI @ 3.3.11
+Building in release mode
+Retrieving maximum program size .pio/build/device_after/firmware.elf
+Checking size .pio/build/device_after/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=         ]   8.3% (used 27196 bytes from 327680 bytes)
+Flash: [=         ]   8.3% (used 349634 bytes from 4194304 bytes)
+========================= [SUCCESS] Took 2.97 seconds =========================
+
+Environment    Status    Duration
+-------------  --------  ------------
+device_after   SUCCESS   00:00:02.969
+========================= 1 succeeded in 00:00:02.969 =========================
