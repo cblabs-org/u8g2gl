@@ -21,6 +21,7 @@ import { parseProjectFile } from '@u8g2gl/core/parser/index.js';
 import { createRoot } from 'react-dom/client';
 import 'dockview-react/dist/styles/dockview.css';
 import './styles.css';
+import { installKeystrokeProbe } from './perf/keystroke-probe';
 import { readSession } from './session';
 import { App } from './ui/app';
 import { Workspace } from './workspace';
@@ -60,6 +61,7 @@ async function start(): Promise<void> {
   const root = document.getElementById('root');
   if (root === null) throw new Error('index.html has no #root');
   createRoot(root).render(<App workspace={workspace} />);
+  installKeystrokeProbe(workspace.loop, workspace.documents);
   workspace.start();
   // A handle for the end-to-end tests and for a developer's console; nothing
   // in the application reads it.

@@ -80,9 +80,12 @@ export interface FrameState {
 /** The stages after the text pipeline, in order. */
 const WASM_STAGES = ['apply', 'render', 'blit'] as const;
 
-/** One run's milliseconds per stage, and the run's start (the frame callback's time). */
+/** One run's milliseconds per stage, when it started, and whether it drew. */
 export type FrameTimings = Readonly<Record<TextStage | (typeof WASM_STAGES)[number], number>> & {
+  /** The animation frame's timestamp. */
   readonly frameStart: number;
+  /** `performance.now()` when the run began, after the frame's earlier callbacks. */
+  readonly runStart: number;
   readonly drawn: boolean;
 };
 
@@ -220,7 +223,7 @@ export class EditLoop {
 
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
     const module = this.wasm.module.get();
-    const timings = { ...result.timings, apply: 0, render: 0, blit: 0, frameStart, drawn: false };
+    const timings = { ...result.timings, apply: 0, render: 0, blit: 0, frameStart, runStart, drawn: false };
     if (result.scene === undefined || module === undefined || result.screen === undefined) {
       this.markStale(this.staleReason(result.diagnostics, module, result.screen));
     } else {

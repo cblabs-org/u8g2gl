@@ -8,7 +8,7 @@
  *          The model, not the editor, holds the text and its undo stack
  *          ([UD-3]), so closing and reopening a tab never forks the document.
  *          The tab is also where EDITOR-DESIGN §2.3 meets the user: the dirty
- *          marker, ⌘S, and the three-way choice when the file changed on disk
+ *          marker and the three-way choice when the file changed on disk
  *          under unsaved edits.
  * Description: Monaco is imperative, so the editor is created once per panel
  *              in an effect that owns its lifecycle; React renders only the
@@ -96,17 +96,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       editor = monaco.editor.create(element, { ...EDITOR_OPTIONS, model, theme: THEME });
     }
 
-    // --- Step 2: ⌘S / Ctrl-S saves this document ---
-    editor.addAction({
-      id: 'u8g2gl.save',
-      label: 'Save',
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
-      run: () => {
-        void documents.save(path);
-      },
-    });
-
-    // --- Step 3: Caret placement, now and on later open requests ---
+    // --- Step 2: Caret placement, now and on later open requests ---
     const reveal = (request: Pick<OpenRequest, 'line' | 'column'>): void => {
       if (request.line === undefined) return;
       const position = { lineNumber: request.line, column: request.column ?? 1 };
@@ -119,7 +109,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       if (request.path === path) reveal(request);
     });
 
-    // --- Step 4: The caret's element is the selection the canvas highlights ---
+    // --- Step 3: The caret's element is the selection the canvas highlights ---
     const select = (): void => {
       const position = editor.getPosition();
       if (position === null) return;
@@ -129,7 +119,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
     };
     const caretListener = editor.onDidChangeCursorPosition(select);
 
-    // --- Step 5: Activity: the active tab's file is the one the canvas shows ---
+    // --- Step 4: Activity: the active tab's file is the one the canvas shows ---
     const activate = (): void => {
       workspace.activeFile.set(path);
       select();

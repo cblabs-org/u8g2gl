@@ -185,7 +185,7 @@ export class EditorWasmController {
     if (record.status === 'failed') {
       const reason = record.error ?? 'the build failed';
       this.log(`editor Wasm: ${reason}`);
-      this.buildDiagnostics.set(parseBuildFailure(reason));
+      this.setBuildDiagnostics(parseBuildFailure(reason));
       // The job's message for a missing toolchain names the install command; it
       // is the one failure that is a normal state, not a defect, so the
       // indicator shows it differently (EDITOR-DESIGN §2.1).
@@ -198,7 +198,7 @@ export class EditorWasmController {
     }
 
     // --- Step 3: A success: swap the module in unless it is the one loaded ---
-    this.buildDiagnostics.set([]);
+    this.setBuildDiagnostics([]);
     const hash = record.result?.buildHash ?? '';
     const seconds = ((performance.now() - started) / 1000).toFixed(1);
     if (hash !== '' && hash === this.loadedHash) {
@@ -213,6 +213,14 @@ export class EditorWasmController {
     this.isFramework.set(false);
     this.status.set({ kind: 'current', hash: this.loadedHash });
     this.log(`editor Wasm: project renderer ${this.loadedHash.slice(0, 8)} loaded after ${seconds} s`);
+  }
+
+  // setBuildDiagnostics
+  // Replaces the build's diagnostics, but an empty list with an empty list is
+  // no change: each notification books a pipeline run.
+  private setBuildDiagnostics(diagnostics: readonly Diagnostic[]): void {
+    if (diagnostics.length === 0 && this.buildDiagnostics.get().length === 0) return;
+    this.buildDiagnostics.set(diagnostics);
   }
 
   // api

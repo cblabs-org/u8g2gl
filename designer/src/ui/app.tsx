@@ -69,19 +69,21 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     [workspace],
   );
 
-  // --- ⌘S anywhere in the shell saves the active document; never the browser's "Save page" ---
+  // --- ⌘S or Ctrl-S anywhere in the shell saves the active document ---
+  // One handler, in the capture phase, rather than a Monaco keybinding: Monaco
+  // binds its "CtrlCmd" by the user agent's platform, so a browser reporting
+  // another platform than the keyboard's would never save. Either modifier
+  // saves, and the browser's own "Save page" never opens.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        // Monaco runs its own ⌘S binding when an editor has focus.
-        if (!(event.target instanceof HTMLElement && event.target.closest('.monaco-editor') !== null)) {
-          void workspace.saveActive();
-        }
+        event.stopPropagation();
+        void workspace.saveActive();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [workspace]);
 
   // onReady

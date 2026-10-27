@@ -110,6 +110,78 @@ jobs:
           fi
           node dist/node/cli.js toolchain status
 
+  designer-e2e:
+    # The designer end to end (E1 e1-e8): the built CLI's `u8g2gl design`
+    # serving the built designer, driven by Playwright in Chromium, Firefox and
+    # WebKit, headless. The framework editor Wasm is built first because the
+    # designer bundles it. Emscripten is the same pinned emsdk as wasm-tests and
+    # is on PATH for the suite, so the project-renderer test runs too; the
+    # no-toolchain tests take it off PATH for their own server. The e2
+    # performance test reports here without gating (CI machines vary; the
+    # number is in the uploaded e2-performance.json) and gates locally.
+    runs-on: ubuntu-latest
+    env:
+      EMSDK_VERSION: '5.0.3'
+      EMSDK_COMMIT: a620cf1d71c62dfdfbb0c01fe0a371e2af2dda6c
+    steps:
+      - uses: actions/checkout@v4
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache Emscripten
+        id: emsdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}-${{ env.EMSDK_COMMIT }}
+      - name: Install Emscripten ${{ env.EMSDK_VERSION }} (pinned)
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
+        run: |
+          git -c advice.detachedHead=false clone --depth 1 --branch "$EMSDK_VERSION" \
+            https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+      - name: Verify the emsdk checkout is the pinned commit
+        run: |
+          HEAD_COMMIT=$(git -C "$HOME/emsdk" rev-parse HEAD)
+          if [ "$HEAD_COMMIT" != "$EMSDK_COMMIT" ]; then
+            echo "::error::emsdk is at $HEAD_COMMIT, not the pinned $EMSDK_COMMIT"
+            exit 1
+          fi
+      - name: Build the framework editor Wasm
+        run: |
+          source "$HOME/emsdk/emsdk_env.sh"
+          emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor
+      - name: Build the CLI
+        run: cd cli && npm ci && npm run build
+      - name: Build the designer
+        run: cd designer && npm ci && npm run build
+      - name: Install Playwright's browsers
+        run: cd designer && npx playwright install --with-deps chromium firefox webkit
+      - name: Designer unit tests
+        run: cd designer && npm run test:unit
+      - name: Designer end-to-end tests
+        # emsdk_env.sh puts emsdk's own Node first on PATH; the runner's Node 22
+        # is put back in front, so the suite runs on the Node every other job uses.
+        run: |
+          RUNNER_NODE_DIR=$(dirname "$(command -v node)")
+          source "$HOME/emsdk/emsdk_env.sh"
+          export PATH="$RUNNER_NODE_DIR:$PATH"
+          node --version
+          em++ --version | head -1
+          cd designer && npm run test:e2e
+      - name: Upload the end-to-end results (e2's numbers among them)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: designer-e2e-results
+          path: designer/test-results/
+          if-no-files-found: ignore
+
   determinism-check:
     # §13.9 determinism condition:
     # A generator change that alters output without an input change requires a CLI version bump.
