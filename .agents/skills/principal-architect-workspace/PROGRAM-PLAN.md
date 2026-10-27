@@ -20,7 +20,7 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 
 | ID | Question | Blocks |
 |---|---|---|
-| ~~CA-1~~ | ~~Shape of the editor track~~ | **CLOSED 2026-10-05** — track runs **after the gate**; browser-hosted, no server (`[UD-2]` static, served deferred); **E-D** design item added, E-1 not decomposed until it lands |
+| ~~CA-1~~ | ~~Shape of the editor track~~ | **CLOSED 2026-10-05** — track runs **after the gate**; browser-hosted, no server (`[UD-2]` static, served deferred); **E-D** design item added, E-1 not decomposed until it lands. *Sequencing reversed 2026-10-26 by the owner during E-D: served first, static deferred (ui_spec `[UD-2]`, second amendment)* |
 | ~~CA-2~~ | ~~The gate does not measure the editor~~ | **CLOSED 2026-10-05** — the four criteria stand, gate stays firmware-side; equivalency proven before designer effort. The unmeasured differentiator is recorded at `implementation_plan.md` §6 |
 | U-6 | Where sample data lives | E-3 |
 | Q-1 | Multi-target layout overrides — needs two real targets | — |
@@ -50,15 +50,25 @@ hierarchy · **PD-4** strangler-fig migration of the legacy display module.
 ## Editor track — the programme's destination (design_spec §20 Phase 3)
 
 **Sequenced by CA-1 (owner, 2026-10-05): the track runs after PR-07's gate.**
-The XML-to-firmware path is proven first. E-1 is explicitly *not* one PR; E-D
-breaks it up before any of it is built.
+The XML-to-firmware path is proven first. E-D (#17) split E-1 into E-1a to E-1e, approved by
+the owner on 2026-10-26 (`e-d-editor-design/E1-DECOMPOSITION.md`). Two streams; the critical
+path is **E-1a → E-1b → E-2**.
 
 | PR | Repo | Scope | Depends | Status |
 |---|---|---|---|---|
-| **E-D** | U8G2GL | **Editor design.** Interaction and UX design on the settled `[UD-1]`–`[UD-7]` architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Document, no code | **PR-07 GO** ✅ | **← NEXT. Unblocked 2026-10-22** |
-| E-1 | U8G2GL | Designer shell: Monaco + custom shell `[UD-1]`, `ProjectFileSystem` on the File System Access API (`[UD-2]` static mode), CST parse/serialize with lossless round-trip `[UD-3]`. **Split by E-D** | E-D | Placeholder |
-| E-2 | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests `[D-17]`; `[UD-4]` Wasm renderer | E-1, PR-06 | Placeholder |
-| E-3 | U8G2GL | Sample data for binding preview; screen navigation design | E-2 | Placeholder — blocked U-6 |
+| **E-D** | U8G2GL | **Editor design.** Interaction and UX design on the settled `[UD-1]`–`[UD-7]` architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Document, no code | **PR-07 GO** ✅ | ✅ **Done, #17** (2026-10-26) |
+| **E-1a** | U8G2GL | CST with lossless round-trip and minimal-edit functions `[UD-3]`, in `cli/src/core/cst/` | E-D ✅ | **← NEXT** (critical path) |
+| E-1b | U8G2GL | The parser on the CST; attribute ranges in every diagnostic, closing [Q-17]. Output byte-identical | E-1a | Decomposed |
+| **E-1c** | U8G2GL | `u8g2gl design`: loopback server with a token, `ProjectFileSystem` (served and in-memory), watcher | E-D ✅ | **← NEXT** (parallel stream) |
+| E-1d | U8G2GL | Project editor Wasm: managed pinned Emscripten, project-driven bridge, placeholders, build hash, Wasm CI | E-1c | Decomposed |
+| E-1e | U8G2GL | The shell: Vite, React, Dockview, Monaco; live diagnostics; save and conflicts; read-only canvas | E-1c, E-1d | Decomposed |
+| E-2 | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests `[D-17]`; `[UD-4]` Wasm renderer | E-1b, E-1e | Placeholder |
+| E-2T | U8G2GL | Test run: firmware-target harness in Wasm, parity verdict against the live frame | E-2 | Placeholder |
+| E-3 | U8G2GL | Sample data for binding preview; screen navigation design | E-2 | Placeholder — blocked U-6; collection data needs PR-08 (EDITOR-DESIGN §9) |
+
+*Superseded 2026-10-26 (E-D): served first. The paragraph below is the CA-1 position, kept as
+written; its claim that a pre-built Wasm renders arbitrary XML is wrong for any project with
+custom widgets (LOOP-BUDGET F1, G-PROBE-2). See `implementation_plan.md` §5.*
 
 **Browser-hosted, no server.** Generation runs client-side — `[D-10]`'s
 isomorphic CLI plus PR-04b's Wasm `bdfconv` means schema, validator, generator
@@ -120,7 +130,8 @@ Licence: code BSD-2-Clause, fonts per-group. A notices row in both repos.
 - **PR-04b** extends `generate`'s asset handling, so it follows PR-04 rather than
   running alongside it — two PAs editing the generator at once is the conflict to
   avoid.
-- **Editor track** after the PR-07 gate (CA-1, 2026-10-05). E-D first.
+- **Editor track** after the PR-07 gate (CA-1, 2026-10-05). E-D done (#17); E-1a and E-1c
+  can run in parallel.
 - **PR-08 ∥ PR-09** — both touch the runtime; serialise or split by directory.
 - **PR-10** strictly last in consolidation — it deletes the legacy module.
 

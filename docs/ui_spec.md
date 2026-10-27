@@ -16,7 +16,7 @@ Seven decisions, all settled. Full rationale in §3; this table is for orientati
 | | Decision | The reason it went this way |
 |---|---|---|
 | **[UD-1]** | Monaco + custom shell — TypeScript, React, Dockview, Vite. **Not Theia, not a VS Code fork** | Optionality. A Monaco surface can later be wrapped in Theia, Electron *or* a VS Code extension; starting in Theia forecloses the static path and the VS Code path permanently. Theia was evaluated properly and passes on licence — it is rejected on centre of gravity, not capability |
-| **[UD-2]** | Static-first, served fallback, behind one `ProjectFileSystem` interface | Static mode needs **no install at all** because the TypeScript CLI is isomorphic. The served mode costs nothing extra since Node is already required, and it covers Firefox and Safari |
+| **[UD-2]** | Static-first, served fallback, behind one `ProjectFileSystem` interface. *Sequencing amended 2026-10-26: served first, static deferred* | Static mode needs **no install at all** because the TypeScript CLI is isomorphic. The served mode costs nothing extra since Node is already required, and it covers Firefox and Safari |
 | **[UD-3]** | Text is the single source of truth; the document is a **CST, not an AST** | A canvas nudge must produce a one-line diff. A parse-and-reserialise cycle that normalises the file is forbidden. Undo unifies for free as a consequence |
 | **[UD-4]** | Two runtime build targets — `firmware` and `editor` | The editor must render arbitrary XML without a C++ compiler in the browser, so its Wasm build needs a class registry and property thunks. Both generate from the same `<api>` manifests; the registry compiles out under `#ifdef`, so firmware pays nothing |
 | **[UD-5]** | Property panel generated entirely from `<api>` manifests | A custom widget gets a full panel — descriptions, validation, grouping — with no editor release. Same property that lets the generator handle it |
@@ -78,6 +78,8 @@ The editor programs against a single `ProjectFileSystem` interface; the implemen
 Same frontend either way. Resolves the Chromium-only concern without imposing it on Firefox and Safari users.
 
 *Amendment, 2026-10-05 (owner, CA-1).* The decision stands as written; what changes is sequencing. The designer is to be **browser-hosted with no server component**, so **static mode is built and served mode is deferred** — not withdrawn. `ProjectFileSystem` keeps both implementations possible behind one interface, which is what makes deferral safe, and §1.5's rule applies: build the served mode when a Firefox or Safari user actually asks, not before. Until then the designer is Chromium-only, and that is a stated limitation rather than an oversight.
+
+*Amendment, 2026-10-26 (owner, E-D).* The decision stands as written. Its sequencing changes again: **served mode is built first, and static mode is deferred.** The premise is the owner's 2026-10-24 ruling that a designer has the full toolchain installed for building a U8G2 application, which is true of every user this release serves. Served mode is required because a real project's screens are custom widgets (G-PROBE-2), whose C++ must be compiled into the editor's Wasm, and a browser page cannot run a compiler. `npx u8g2gl design` builds that Wasm with a pinned Emscripten the CLI manages, and is never in the per-edit loop: rendering stays in-browser, per `[UD-4]`. One `ProjectFileSystem` keeps static mode possible. It is to be reassessed at the checkpoints E-D set ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §10), and built when a user without a toolchain asks.
 
 ### [UD-3] Text is the single source of truth; the canvas produces text edits
 
@@ -389,7 +391,7 @@ This matters more in monochrome than in colour UI because **layout is length-dep
 
 - A **sample set** supplies a value per subject. Multiple named sets per project.
 - Conventional sets, offered on project creation: **typical**, **empty**, **longest plausible**, **worst case**.
-- Collection subjects (§9) take sample rows, so tables and lists render realistically.
+- Collection widgets (§9) take sample rows, so tables and lists render realistically. *Corrected 2026-10-26 (E-D):* this said "collection subjects", but [D-8] makes collections **not** subjects. How rows reach a widget at design time is PR-08's to decide; E-D requires that a declared-capacity collection be fillable by name through the editor registry ([implementation_plan.md](implementation_plan.md) §5, PR-08).
 - Switchable from the canvas toolbar and cycleable by keyboard, so a layout can be swept against every set in seconds.
 - **Never compiled** ([UD-6]).
 
@@ -441,19 +443,21 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 ## 15. Schema Requirements — gates PR-02
 
+*Status, 2026-10-26 (E-D).* PR-02's deadline passed without most of this table. Schema 0.4 has `help=` and nothing else here that is schema surface; whether the rest was deferred or missed is not recorded. The status notes below say where each now stands. Adding schema surface is the owner's decision ([.agents/rules/03-versioning.md](../.agents/rules/03-versioning.md)), and E-D recommends taking it once, at checkpoint C4, with E-2's panel in front of the decision.
+
 **This section has a deadline.** PR-02 freezes schema 0.3. The schema must be an editor's document model first and a compiler input second ([design_spec.md §1.2](design_spec.md)): a compiler can ignore what it does not need, but an editor cannot invent what was never stored. Risk R-8 tracks this.
 
 | Requirement | Detail | Status |
 |---|---|---|
-| **`<previews>`** | Named preview configurations per element — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Must add** |
-| **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** |
-| **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Must add** |
-| **Palette metadata** | Display name, category, icon per element | **Must add** |
-| **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Must add** |
-| **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** |
-| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) |
+| **`<previews>`** | Named preview configurations per element — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Must add** — *2026-10-26: not in schema 0.4; to be decided together at checkpoint C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8)* |
+| **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** — *2026-10-26: done, schema 0.4* |
+| **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Must add** — *2026-10-26: not in schema 0.4; to be decided together at checkpoint C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8)* |
+| **Palette metadata** | Display name, category, icon per element | **Must add** — *2026-10-26: not in schema 0.4; to be decided together at checkpoint C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8)* |
+| **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Must add** — *2026-10-26: not in schema 0.4; to be decided together at checkpoint C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8)* |
+| **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** — *2026-10-26: done, fixture-bound; E-1d makes it project-driven* |
+| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`)* |
 | **Stable element identity** | The editor must address elements across edits | **Settled** ([U-1], PR-03). `name` is required. The CLI errors on a missing name; the editor generates one and persists it on save |
-| **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** |
+| **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** — *2026-10-26: no CST exists yet; E-1a delivers it* |
 | **Editor view state** | Zoom, selection, panel sizes, active sample set | **Sidecar** `.u8g2gl-editor.json`, *not* project XML — per-user, and would otherwise make every pan a source-control change |
 
 ---
@@ -463,7 +467,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | ID | Question | Blocks |
 |---|---|---|
 | **U-3** | Multi-target — one canvas per target, or a switcher on one canvas? Depends on [Q-1] | Phase 3 |
-| **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation | PR-02 |
+| **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation *E-D, 2026-10-26 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §7):* E-3's to decide. Leaning only: a project file outside the schema (`samples/*.json`), read by the designer and ignored by `generate`. Sample data for collections waits on PR-08 (EDITOR-DESIGN §9). | PR-02 |
 | **U-7** | Does the palette support user-authored categories, or is the taxonomy fixed? | Phase 3 |
 
 *(**U-1** closed in PR-03 — see §16.1.)*

@@ -288,11 +288,20 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-08** | both | **Re-scoped 2026-09-13:** custom elements via `extends` (§6.5), collection API (§9). Composites (§6.4) are no longer here — PR-3R made a composite a `WidgetManifest` with a `view`, and PR-04 expands them (§13.6) | PR-07 |
+| **PR-08** | both | **Re-scoped 2026-09-13:** custom elements via `extends` (§6.5), collection API (§9). Composites (§6.4) are no longer here — PR-3R made a composite a `WidgetManifest` with a `view`, and PR-04 expands them (§13.6). **Plus E-D's requirement, below:** a declared-capacity collection is fillable by name through the editor registry | PR-07 |
 | **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
 | **PR-08b** | U8G2GL | `<row>`/`<col>` stacking sugar (§7.2), *if real usage has shown the need* | PR-08 |
 
-### Editor track — design_spec §20 Phase 3 (not yet decomposed)
+**A requirement for PR-08's bridge, crossing tracks.**
+
+> **From E-D ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §9).** A declared-capacity collection (§9.2) must be **fillable by
+> name** through the editor registry: a generated thunk, as `[UD-4]` already generates for
+> construction and properties, that accepts rows for a named object. Without it, the designer
+> cannot show sample data in any collection widget. LOOP-BUDGET F7 measured both of the
+> departures board's service lists as blank. It is cheap to design in and expensive to add after
+> PR-08's API is fixed.
+
+### Editor track — design_spec §20 Phase 3
 
 **Added 2026-09-13 by the Chief Architect.** Until today this ledger had no PR for
 the editor, even though [design_spec.md §20](design_spec.md) Phase 3 calls it
@@ -308,29 +317,45 @@ no server component** — which is `[UD-2]`'s static mode, already specified —
 the served `npx u8g2gl design` fallback is **deferred** rather than dropped, on
 §1.5's rule that omission is the default until someone asks for Safari.
 
-**E-1 is not one PR and will not be decomposed until E-D lands.** It bundles a
-project filesystem layer, a CST parser and serializer, and an application shell:
-three different kinds of work, of which only the serializer is on anyone's
-critical path. `[UD-1]`–`[UD-7]` settle the architecture; what is missing is the
-interaction design and the breakdown.
+*Superseded in sequencing, 2026-10-26.* The owner reversed it during E-D: **served mode is built
+first, and static mode is deferred** (ui_spec `[UD-2]`, second amendment). The track still runs
+after the gate.
+
+**E-1 is decomposed into E-1a to E-1e** by E-D (PR #17), approved by the owner on 2026-10-26:
+[EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) is the interaction design and
+[E1-DECOMPOSITION.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/E1-DECOMPOSITION.md) gives each PR's boundary and acceptance criteria.
+Two streams run in parallel. **The critical path is E-1a → E-1b → E-2**: the CST, then the parser
+on it, then the canvas that edits through it. E-1c → E-1d → E-1e (the server, the project Wasm,
+the shell) joins it at E-2.
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **E-D** | U8G2GL | **Editor design.** Interaction and UX design against the settled architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Produces a design document, no code | **PR-07 (GO)** |
-| **E-1** | U8G2GL | Designer shell — Monaco plus a custom shell ([UD-1]), `ProjectFileSystem` over the File System Access API ([UD-2] static mode), CST parse and serialize with lossless round-trip ([UD-3]). **To be split by E-D** | E-D |
-| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) | E-1, PR-06 |
-| **E-3** | U8G2GL | Sample data for binding preview; screen navigation design | E-2 · blocked by [U-6] |
+| **E-D** | U8G2GL | **Editor design.** Interaction and UX design against the settled architecture; decompose E-1 into real PRs with boundaries and acceptance criteria. Produces a design document, no code. ✅ **Done, #17** | **PR-07 (GO)** |
+| **E-1a** | U8G2GL | CST with lossless round-trip and minimal-edit functions (`[UD-3]`), in `cli/src/core/cst/` | E-D |
+| **E-1b** | U8G2GL | The parser on the CST; attribute ranges in every diagnostic, closing [Q-17]. Output byte-identical | E-1a |
+| **E-1c** | U8G2GL | `u8g2gl design`: loopback server with a token, `ProjectFileSystem` (served and in-memory), watcher | E-D |
+| **E-1d** | U8G2GL | Project editor Wasm: managed pinned Emscripten, a project-driven bridge (fixes LOOP-BUDGET F6), placeholders, build hash, Wasm CI | E-1c |
+| **E-1e** | U8G2GL | The shell: Vite, React, Dockview, Monaco; live diagnostics; save and conflict handling; read-only canvas | E-1c, E-1d |
+| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) | E-1b, E-1e |
+| **E-2T** | U8G2GL | Test run: firmware-target harness in Wasm, parity verdict against the live frame | E-2 |
+| **E-3** | U8G2GL | Sample data for binding preview; screen navigation design | E-2 · blocked by [U-6] · collection data needs PR-08 to meet EDITOR-DESIGN §9 |
 
-**What "browser-hosted" does and does not include.** Generating C++ into the
-project tree runs in the browser: [D-10] made the CLI isomorphic, and PR-04b's
-`bdfconv` is Wasm, so schema, validator, generator and font compilation are all
-client-side. *Building firmware* from that C++ is not and will not be in the
-browser — it stays PlatformIO in the user's own toolchain. The canvas does not
-need it either: `[UD-4]`'s pre-built editor target renders arbitrary XML without
-a compiler. The loop is **edit → preview in-browser → generate → build locally**.
+**What runs where.** The per-edit loop runs in the browser: [D-10] made the CLI isomorphic, so
+parse, validate, realise and check run client-side, and the editor Wasm renders the frame. E-D
+measured it at 1.1 ms median and 1.9 ms worst on the departures screen in Chromium with Monaco
+([LOOP-BUDGET.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/LOOP-BUDGET.md)). *Building firmware* stays PlatformIO in the user's own
+toolchain.
 
-**No serializer or CST module exists today** (verified on `main`, 2026-10-05).
-That is E-1's first job and it is correctly post-gate: `[UD-3]` makes round-trip
+*Corrected 2026-10-26 (E-D).* This paragraph said `[UD-4]`'s pre-built editor target "renders
+arbitrary XML without a compiler". It does not: the prebuilt Wasm links the test fixture's
+registry, fonts and images (LOOP-BUDGET F1), and a project's custom widgets are C++ that must be
+compiled into it (G-PROBE-2). So `u8g2gl design` rebuilds a **per-project** editor Wasm when a
+widget's C++ changes (2.7 s, about 1.1 s with an `-O1` link), outside the per-edit loop. The loop
+is **edit → preview in-browser → generate → build locally**, with a widget rebuild only when
+widget C++ changes.
+
+**No serializer or CST module exists today** (verified on `main`, 2026-10-05, and again by E-D
+on 2026-10-22). That is E-1a's job and it is correctly post-gate: `[UD-3]` makes round-trip
 fidelity a parser contract rather than a schema property (ui_spec §15), so
 nothing about it constrains a decision that would be expensive to reverse later.
 

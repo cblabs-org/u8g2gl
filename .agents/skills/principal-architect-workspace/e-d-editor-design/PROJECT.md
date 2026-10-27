@@ -134,3 +134,20 @@ Each work order ends with a push.
   PR of its own, with its own Principal Architect and plan gate. That PA verifies provenance
   from this entry (rule 00), and the owner approves that PR's Work-Order breakdown in turn.
   The proposed Tier-1 text (E1-DECOMPOSITION.md §4) is still the Chief Architect's to land.
+- **2026-10-27. Tier-1 text landed** (PR #19, branch `u8g2gl-ca/e-d-tier1`). The owner approved the
+  Chief Architect's plan for it, verbatim:
+
+  > "approved - please proceed autonomously from this point on until you run out of quota.  Please spin up sub-agents as needed."
+
+  *Provenance note:* the plan offered two buttons, the full plan and a narrower §4.1–4.3-only
+  version. The owner typed this reply rather than choosing either; it was taken as approval of
+  the full plan, the one presented as the recommendation.
+
+  Landed: §4.1 verbatim as `[UD-2]`'s second amendment (ui_spec), and its summary row; §4.2's
+  ledger rows (implementation_plan §5 and PROGRAM-PLAN); §4.3 verbatim under PR-08; E-D's
+  rulings as dated notes on [Q-7], [Q-10], [Q-17], [Q-19] (design_spec §21) and [U-6]
+  (ui_spec). Of §11's corrections: item 1 (WIDGET-PATH, a note under the summary, headline kept),
+  item 5 (in the Q-10 note), item 6 (ui_spec §11), item 7 (ui_spec §15 statuses, recorded
+  without deciding: the missing schema features wait for checkpoint C4). Also corrected: the
+  ledger's claim that a pre-built Wasm renders arbitrary XML (F1). Not done: item 2 (stale
+  probe evidence, left as a record; E-1d supersedes it).
