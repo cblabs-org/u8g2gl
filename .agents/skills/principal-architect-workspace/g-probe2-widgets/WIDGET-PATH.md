@@ -18,6 +18,15 @@ G-PROBE-1 previously concluded that Schema 0.4 could not express a production de
 
 This probe built two custom widgets (`wd_service_list` and `wd_train_formation`), placed them in declarative screen XML alongside native labels, lines, boxes, and clocks, validated and generated the project via the CLI tooling, compiled the resulting C++ under `-Werror`, and rendered the complete 256×64 departures display to pixel-accurate completion in the Wasm display harness (4,810 lit pixels, 29.36% fill, SHA-256 `0b0e554ab9037e3c9d620001e3e80486a2e7633fc2198fdbe97d77d93f308156`).
 
+> **Correction, 2026-10-26 (Chief Architect, from E-D's LOOP-BUDGET F5).** The rendered display
+> above was produced by a **JavaScript imitation** of the two widgets (`render-full.mjs` lines
+> 113–508). Their own C++ was only syntax-checked (`-fsyntax-only`), never run. §1.3 item 3
+> records the harness gap; this headline, and "renders pixel-accurate monochrome bitmaps" in the
+> Gate Paragraph, did not. When E-D ran the real C++ in a project-built editor Wasm, both
+> `wd_service_list` instances lit **0 pixels**, because no rows can reach them there (F7). The text
+> is left as written because it is a record; this note is the correction. See
+> [LOOP-BUDGET.md](../e-d-editor-design/LOOP-BUDGET.md).
+
 The screen XML is **15 lines long** (13 code lines). The custom widgets require 808 lines of strict, zero-heap C++ (369 lines for `wd_service_list`, 439 lines for `wd_train_formation`). The path is fully functional today for shipping firmware.
 
 ---
