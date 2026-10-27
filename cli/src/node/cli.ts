@@ -7,12 +7,14 @@
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
  *          for XML validation, code generation, display queries, display
- *          catalogue enumeration, and the design server.
+ *          catalogue enumeration, the design server, and the Emscripten
+ *          toolchain the design server builds with.
  * Description: Command parser and subcommand router supporting global flags
  *              (--json, --no-color, --version, --help) and subcommands (validate,
- *              generate, find, catalogue, design). `design` lives in
- *              `design/design-command.ts`; this file only parses and dispatches
- *              it. `validate` and `generate` share one load
+ *              generate, find, catalogue, design, toolchain). `design` lives in
+ *              `design/design-command.ts` and `toolchain` in
+ *              `toolchain/toolchain-command.ts`; this file only parses and
+ *              dispatches them. `validate` and `generate` share one load
  *              path (load-project.ts) and one validation (checkProject), differing
  *              only in the not-yet-supported severity: `validate` warns, `generate`
  *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
@@ -58,13 +60,16 @@ import {
   formatCatalogueSummary,
 } from './format-display.js';
 import { parseDesignArgs, runDesignCommand } from './design/design-command.js';
+import { nodeToolchainHost } from './toolchain/toolchain-host.js';
+import { toolchainCacheRoot } from './toolchain/toolchain-paths.js';
+import { parseToolchainArgs, runToolchainCommand, terminalConfirm } from './toolchain/toolchain-command.js';
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
 import { getGeneratorVersion } from './generator-version.js';
 import { loadProject, type LoadedProject } from './load-project.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
-const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate', 'design'] as const;
+const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate', 'design', 'toolchain'] as const;
 
 /** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
 const DEFAULT_OUTPUT_DIR = 'generated';
@@ -147,6 +152,7 @@ Commands:
   find       Query the display catalogue for matching displays
   catalogue  Display summary from the display catalogue
   design     Serve the project to the designer in your browser
+  toolchain  Show, locate or install the Emscripten the designer builds with
 
 Global Options:
   --json      Format output as JSON
@@ -200,6 +206,18 @@ Design Options:
   requests without it are refused. A second 'design' in the same project
   attaches to the running server and prints its URL. Ctrl-C stops it.
   --json: one line { "url", "port", "pid", "attached" }
+
+Toolchain Options:
+  u8g2gl toolchain status                      Which Emscripten the designer would use, and why
+  u8g2gl toolchain path                        Print the env script (managed) or em++ (PATH) to use
+  u8g2gl toolchain install [--yes]             Install the pinned Emscripten into the user cache
+                                               (asks first: about 1.6 GB; --yes skips the question)
+  Only Emscripten at exactly the pinned version is used: an em++ on PATH at
+  that version, else the managed install. status and path exit 1 when there is
+  none. An emsdk you installed yourself is never modified.
+  --json: status { "required", "selected", "path", "managed", "notes" };
+          path { "source", "version", "emxx", "envScript"? };
+          install { "outcome": "already" | "installed" | "declined" | "failed", ... }
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -991,6 +1009,20 @@ export async function runCli(rawArgs: readonly string[]): Promise<void> {
     }
     await runDesignCommand(parsed, json);
     return;
+  }
+
+  if (subcommand === 'toolchain') {
+    const parsed = parseToolchainArgs(subcommandArgs);
+    if ('error' in parsed) {
+      exitWithUsageError(json, parsed.error);
+    }
+    const host = nodeToolchainHost();
+    const code = await runToolchainCommand(parsed, json, host, toolchainCacheRoot(host.platform, host.env, host.home), {
+      out: (line) => console.log(line),
+      err: (line) => console.error(line),
+      confirm: terminalConfirm,
+    });
+    process.exit(code);
   }
 
   // --- Step 5: Handle unknown subcommand ---
