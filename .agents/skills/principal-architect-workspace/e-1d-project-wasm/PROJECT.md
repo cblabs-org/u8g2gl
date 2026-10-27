@@ -30,7 +30,7 @@ authorises starting it within that scope. Precedent: PR-06 (owner, 2026-10-15).
 | WO2 | The bridge driven by the project: fonts and images from a generated table, capacities from the generated config, placeholders | `u8g2gl-e1d/wo2-bridge` | d1, d3, d5, d8 | ✅ `f506628`, `5e42acc`, `db70895` |
 | WO3 | The build job on E-1c's queue: build cache, `-O1`/`-O3`, build hash, the platform-header rule | `u8g2gl-e1d/wo3-build-job` | d1, d2, d4, d6 | ✅ `af9aa1e`, `1d306af` |
 | WO4 | A CI job that builds the framework editor Wasm and runs its snapshot test | `u8g2gl-e1d/wo4-ci` | d7 | ✅ `5803da5` (CI not yet run) |
-| WO5 | Readability review and PA verification | `u8g2gl-e1d/wo5-readability` | all | Pending |
+| WO5 | Readability fixes, ruling 8.1–8.2, ruling 9 | `u8g2gl-e1d/wo5-readability` | all | In progress |
 
 One worker, WO1 to WO4 in order, each branch from the previous tip.
 
@@ -102,6 +102,26 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
       C++ build on macOS (four targets), though the next incremental build passes 512. Fix with
       `DISCOVERY_MODE PRE_TEST` or a larger `DISCOVERY_TIMEOUT` in `test/CMakeLists.txt`, in its
       own small PR.
+
+9. **Rulings on the WO5 readability audit** (`wo5-readability/AUDIT.md`), 2026-10-27:
+   1. **A1, the test fixture:** **copy** (do not move) the probe project from
+      `g-probe2-widgets/evidence/probe-project` to `cli/test/fixtures/departures-project/`, and point
+      `probe-project.ts` at the copy. The workspace evidence stays where it is, unchanged, because
+      it is a record. Boundary extension: that new fixture directory. The copy must be
+      byte-identical to the evidence at this commit; a test asserts nothing about the evidence.
+   2. **A3, environment stripping:** `managedEnv()` strips the same variables as `childEnv()`,
+      `EM_CACHE` included, so a user's own cache can never feed a managed build. One shared list,
+      with a reason per variable. Test it.
+   3. **The stale error:** `fail()` keeps only the first error and `selectScreen()` never clears
+      it. Clear `s_last_error` at the start of every bridge entry point that can fail, so an error
+      always describes the call that just failed. Test it.
+   4. **The heap rule:** `wasm/` is editor-host code, not firmware, and may use the heap; the
+      no-heap rule binds `include/` and `src/`. Say so in `bridge.cpp`'s header.
+   5. **Everything else in the audit:** all P2 and P3 items fixed; P4 as the audit recommends,
+      declines recorded. Workspace pointers in test titles, log prefixes and temp-directory
+      prefixes go: keep the fact, drop the pointer.
+   6. **Ruling 8.1 and 8.2** (`.gitignore` negations; registering the job in `design-command.ts`)
+      are done in this WO too, with a test that `u8g2gl design`'s server has the `editor-wasm` job.
 
 ## Status log
 
