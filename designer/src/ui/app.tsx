@@ -69,6 +69,21 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     [workspace],
   );
 
+  // --- ⌘S anywhere in the shell saves the active document; never the browser's "Save page" ---
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        // Monaco runs its own ⌘S binding when an editor has focus.
+        if (!(event.target instanceof HTMLElement && event.target.closest('.monaco-editor') !== null)) {
+          void workspace.saveActive();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [workspace]);
+
   // onReady
   // The default layout: the canvas, with Problems and Output tabbed beneath.
   const onReady = (event: DockviewReadyEvent): void => {

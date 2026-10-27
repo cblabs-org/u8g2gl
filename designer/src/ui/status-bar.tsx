@@ -52,6 +52,7 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
   const problems = useObservable(workspace.problems);
   const errors = problems.filter((row) => row.severity === 'error').length;
   const warnings = problems.filter((row) => row.severity === 'warning').length;
+  const selection = useObservable(workspace.loop.selectionRect);
   const reason = status.kind === 'none' || status.kind === 'failed' ? status.reason : undefined;
   return (
     <footer className="status-bar">
@@ -62,6 +63,11 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
         ⛔ {errors} ⚠ {warnings}
       </span>
       <span className="status-spacer" />
+      {selection !== undefined && (
+        <span className="status-item selection-geometry">
+          sel {selection.x},{selection.y} {selection.width}×{selection.height}
+        </span>
+      )}
       {frame.display !== undefined && (
         <span className="status-item">
           {frame.screen} · {frame.display.width}×{frame.display.height}

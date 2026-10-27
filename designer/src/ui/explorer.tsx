@@ -55,6 +55,7 @@ export function Explorer(): React.JSX.Element {
   const files = useObservable(workspace.documents.files);
   const active = useObservable(workspace.activeFile);
   const name = useObservable(workspace.projectName);
+  const dirty = useObservable(workspace.documents.dirty);
   return (
     <aside className="sidebar" aria-label="Explorer">
       <header className="sidebar-title">Explorer{name !== '' ? ` · ${name}` : ''}</header>
@@ -68,7 +69,7 @@ export function Explorer(): React.JSX.Element {
                 <li key={path}>
                   <button
                     type="button"
-                    className={`file${path === active ? ' active' : ''}${openable ? '' : ' inert'}`}
+                    className={`file${path === active ? ' active' : ''}${openable ? '' : ' inert'}${dirty.has(path) ? ' dirty' : ''}`}
                     title={openable ? path : `${path} (not edited in the designer)`}
                     data-path={path}
                     disabled={!openable}

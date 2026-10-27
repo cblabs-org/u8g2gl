@@ -19,13 +19,14 @@
  * - Workspace:       The session
  *
  *     State:
- *     - documents, activeFile, problems, output, projectName
+ *     - documents, activeFile, selection, problems, output, projectName
  *     - wasm, loop:     The editor Wasm and the edit loop
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded
  *
  *     Requests:
+ *     - saveActive():   Save the active document
  *     - openFile():     Ask the layout to show a file
  *     - onOpenFile():   The layout's subscription to those requests
  *     - log():          Append a line to Output
@@ -59,6 +60,14 @@ export class Workspace {
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
   readonly output = new Observable<readonly string[]>([]);
+  /**
+   * The element the caret is in, by file and name: the canvas highlights it
+   * (EDITOR-DESIGN §3.7). Selection is never an edit.
+   */
+  readonly selection = new Observable<{ readonly file: string; readonly name: string } | undefined>(
+    undefined,
+    (a, b) => a?.file === b?.file && a?.name === b?.name,
+  );
   /** The project's name from `u8g2gl.xml`, once loaded, for the title and status bar. */
   readonly projectName = new Observable<string>('');
 
@@ -74,7 +83,7 @@ export class Workspace {
    * @param session The server and token, for builds and the Wasm route.
    */
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
-    this.documents = new ProjectDocuments(fs);
+    this.documents = new ProjectDocuments(fs, (line) => this.log(line));
     this.wasm = new EditorWasmController(session, (line) => this.log(line));
     this.loop = new EditLoop(this, this.wasm);
   }
@@ -87,6 +96,17 @@ export class Workspace {
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
     void this.wasm.start();
+  }
+
+  /**
+   * @brief Saves the active document (⌘S). Explicit only: there is no autosave
+   *        (EDITOR-DESIGN §2.3).
+   */
+  async saveActive(): Promise<void> {
+    const path = this.activeFile.get();
+    if (path !== undefined) {
+      await this.documents.save(path);
+    }
   }
 
   /** @brief Asks the layout to show a file, at a position if given. */

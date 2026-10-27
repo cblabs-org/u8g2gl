@@ -22,6 +22,9 @@
  *              each frame so widgets animate (ui_spec §4.2); frozen, every
  *              render is at t = 0 instead, so the frame is stable to compare.
  *
+ *              The element under the caret is outlined on the canvas from the
+ *              run's element rectangles (XML to canvas selection, §3.7).
+ *
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how the e2 measurement attributes a keystroke's cost.
  *
@@ -36,7 +39,7 @@
  *     - dispose():        Stop
  *
  *     State:
- *     - frameState, frozen, bounds
+ *     - frameState, frozen, bounds, selectionRect
  *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
@@ -91,6 +94,11 @@ export class EditLoop {
   readonly frozen = new Observable<boolean>(false);
   /** The element rectangles of the drawn screen, by name. */
   readonly bounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
+  /** The selected element's rectangle on the drawn screen, highlighted on the canvas. */
+  readonly selectionRect = new Observable<Rect | undefined>(
+    undefined,
+    (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height,
+  );
 
   private readonly workspace: Workspace;
   private readonly wasm: EditorWasmController;
@@ -139,8 +147,23 @@ export class EditLoop {
         request();
       }),
     );
+    this.subscriptions.push(
+      this.workspace.selection.subscribe(() => this.highlightSelection()),
+      this.bounds.subscribe(() => this.highlightSelection()),
+    );
     request();
     this.tick();
+  }
+
+  // highlightSelection
+  // XML to canvas (EDITOR-DESIGN §3.7): outline the element the caret is in,
+  // when it is on the screen being drawn. Highlight only; never an edit.
+  private highlightSelection(): void {
+    const selection = this.workspace.selection.get();
+    const drawn = selection !== undefined && selection.file === this.workspace.activeFile.get();
+    const rect = drawn ? this.bounds.get().get(selection.name) : undefined;
+    this.selectionRect.set(rect);
+    this.setOverlay(rect === undefined ? [] : [{ ...rect, kind: 'selection' }]);
   }
 
   /** @brief Draws into a canvas panel's view from now on (undefined detaches). */
