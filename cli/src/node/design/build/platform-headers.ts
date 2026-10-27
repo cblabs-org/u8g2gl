@@ -26,7 +26,17 @@ import type { Diagnostic } from '../../../core/schema/diagnostic.js';
 /** The diagnostic code. Public and stable, like every code (§15.4). */
 export const PLATFORM_HEADER_CODE = 'U8G2GL_WIDGET_PLATFORM_HEADER';
 
-/** The platforms the rule names, each by the header spellings that betray it. */
+/**
+ * The platforms the rule names, each by the header spellings that betray it.
+ *
+ * Best effort, deliberately: these are the commonest offenders, not every
+ * platform header. Arduino-core headers such as `Wire.h`, `SPI.h` or `WiFi.h`
+ * are not matched, and for those the compiler remains the backstop. The
+ * ESP-IDF directory prefixes (`driver/`, `soc/`, `hal/`, `rom/`) could also
+ * match a widget's own sub-folder of that name; that false positive is
+ * accepted, because the fix (renaming the folder) is cheap and the headers
+ * they catch are the ones whose missing-file errors are least readable.
+ */
 const PLATFORMS: ReadonlyArray<{ readonly platform: string; readonly matches: (header: string) => boolean }> = [
   { platform: 'Arduino', matches: (h) => /^arduino\.h$/i.test(h) },
   { platform: 'FreeRTOS', matches: (h) => /^freertos\.h$/i.test(h) || /^freertos\//i.test(h) },

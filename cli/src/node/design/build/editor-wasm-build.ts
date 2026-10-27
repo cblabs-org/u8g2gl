@@ -146,6 +146,17 @@ export async function buildEditorWasm(options: EditorWasmBuildOptions): Promise<
   if (readText(runtimeConfig) !== configText) {
     writeFileSync(runtimeConfig, configText);
   }
+  // The flags wasm/CMakeLists.txt compiles the framework editor Wasm with, so
+  // both builds render alike:
+  // - -O3 on every object: objects are compiled once and shared by the -O1 and
+  //   -O3 links, and the link is where the optimiser's time goes (header);
+  // - ARDUINO=10819 makes U8g2lib.h take its Arduino C++ wrapper (the U8G2
+  //   class), built against test/real_u8g2's minimal Arduino.h and Print.h;
+  // - -Wno-macro-redefined is carried over from wasm/CMakeLists.txt so the two
+  //   builds stay identical. It silences nothing today: no framework unit, and
+  //   none of the departures fixture's, warns without it (checked with em++
+  //   5.0.3). It costs a widget author the warning, so it is a candidate to drop
+  //   from both builds together.
   const cxxBase = (config: string, extraIncludes: readonly string[]): string[] => [
     '-std=c++17',
     '-O3',
@@ -164,6 +175,8 @@ export async function buildEditorWasm(options: EditorWasmBuildOptions): Promise<
     prepared.generatedDir,
     ...prepared.widgetDirs,
   ]);
+  // U8G2's C sources compile with -w: their warnings are upstream's, not ours,
+  // as the C++ units reach its headers through -isystem for the same reason.
   const cFlags = ['-O3', '-w', '-DARDUINO=10819', '-I', join(options.frameworkRoot, 'test', 'real_u8g2'), ...framework.systemIncludes.flatMap((dir) => ['-I', dir])];
 
   // --- Step 3: The build-hash unit, so the Wasm can say which inputs it is ---
@@ -227,6 +240,9 @@ export async function buildEditorWasm(options: EditorWasmBuildOptions): Promise<
       ...compiled.map((result) => result.object),
       '-o',
       join(wasmDir, 'u8g2gl_editor.js'),
+      // The framework's export list, plus the build hash: getBuildHash() is
+      // defined only by a project build's generated unit, so wasm/CMakeLists.txt
+      // cannot export it, and this build appends it to the list it parsed.
       ...framework.linkFlags.map((flag) => flag.replace(/^(-sEXPORTED_FUNCTIONS=\[.*)\]$/, "$1,'_getBuildHash']")),
     ],
     { env: toolchain.env },
