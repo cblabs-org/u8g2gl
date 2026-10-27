@@ -34,7 +34,7 @@
  * - loadProject():       Load a directory or single file
  */
 
-import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, extname, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
 import { compareCodeUnits } from '../core/order.js';
@@ -58,6 +58,7 @@ import type { Globals } from '../core/schema/globals.js';
 import type { Screen } from '../core/schema/screen.js';
 import type { WidgetManifest } from '../core/schema/widget-manifest.js';
 import { readProjectFiles, getProjectFileMap } from './read-project.js';
+import { isInsideProject } from './project-path.js';
 
 /**
  * Options for {@link loadProject}.
@@ -276,29 +277,6 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     assets: readAssets(projectRoot, globals),
     bdfLicenceFiles: readBdfLicenceFiles(projectRoot, globals),
   };
-}
-
-// isInsideProject
-// Whether a path lies inside the project directory, applying [D-11] and
-// §13.10's write-boundary in the other direction: an author who needs a file
-// from elsewhere can copy it in. Both paths are compared by their real
-// (symlink-free) location, so a symlink inside the project that points outside
-// it does not pass, and a project root reached through a symlink (macOS
-// `/tmp` -> `/private/tmp`) still works. A target that does not exist cannot be
-// resolved, so it falls back to the lexical comparison and the caller's
-// missing-file handling takes over.
-//   projectRoot — absolute project directory
-//   absolute    — absolute path to test
-function isInsideProject(projectRoot: string, absolute: string): boolean {
-  let root = projectRoot;
-  let target = absolute;
-  try {
-    target = realpathSync(absolute);
-    root = realpathSync(projectRoot);
-  } catch {
-    // Not resolvable (absent): compare lexically, as for any missing file.
-  }
-  return target === root || target.startsWith(root + sep);
 }
 
 // readAssets
