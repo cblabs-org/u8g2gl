@@ -10,7 +10,8 @@
  *          catalogue enumeration.
  * Description: Command parser and subcommand router supporting global flags
  *              (--json, --no-color, --version, --help) and subcommands (validate,
- *              generate, find, catalogue). `validate` and `generate` share one load
+ *              generate, find, catalogue, design). `design` lives in
+ *              `design/design-command.ts`; this file only parses and dispatches it. `validate` and `generate` share one load
  *              path (load-project.ts) and one validation (checkProject), differing
  *              only in the not-yet-supported severity: `validate` warns, `generate`
  *              refuses (PR-04 decision 1). `validate --fix-names` writes generated
@@ -59,9 +60,10 @@ import { fixMissingNames, type NameFixRecord } from './fix-names.js';
 import { getGeneratorVersion } from './generator-version.js';
 import { loadProject, type LoadedProject } from './load-project.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
+import { parseDesignArgs, runDesignCommand } from './design/design-command.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
-const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate'] as const;
+const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate', 'design'] as const;
 
 /** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
 const DEFAULT_OUTPUT_DIR = 'generated';
@@ -143,6 +145,7 @@ Commands:
   generate   Validate a project and write its generated C++ files
   find       Query the display catalogue for matching displays
   catalogue  Display summary from the display catalogue
+  design     Serve the project to the designer in your browser
 
 Global Options:
   --json      Format output as JSON
@@ -187,6 +190,15 @@ Generate Options:
           Diagnostic "code" values are a public, stable API: renaming one is a
           breaking change under section 15.4. A usage error under --json is JSON
           too, with code U8G2GL_USAGE and exit status 2.
+
+Design Options:
+  u8g2gl design [path]                         Start the design server for a project (default: .)
+    --port <n>    Port to listen on (default: any free port)
+    --no-open     Print the URL without opening a browser
+  Listens on 127.0.0.1 only. The printed URL carries a per-session token;
+  requests without it are refused. A second 'design' in the same project
+  attaches to the running server and prints its URL. Ctrl-C stops it.
+  --json: one line { "url", "port", "pid", "attached" }
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -968,6 +980,15 @@ export async function runCli(rawArgs: readonly string[]): Promise<void> {
 
   if (subcommand === 'generate') {
     await handleGenerateCommand(subcommandArgs, json, useColor);
+    return;
+  }
+
+  if (subcommand === 'design') {
+    const parsed = parseDesignArgs(subcommandArgs);
+    if ('error' in parsed) {
+      exitWithUsageError(json, parsed.error);
+    }
+    await runDesignCommand(parsed, json);
     return;
   }
 
