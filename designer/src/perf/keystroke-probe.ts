@@ -4,9 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/perf/keystroke-probe.ts
- * Purpose: Measures what EDITOR-DESIGN's 16 ms budget is about: the time from a
- *          key event to the canvas blit that shows its effect (E1 e2,
- *          checkpoint C3). It is always installed, because a budget measured
+ * Purpose: Measures E1 e2 as checkpoint C3 defines it (PA ruling 8): that every
+ *          key's edit is on the canvas in the first animation frame after the
+ *          key, and how long the work in that frame takes, from the start of
+ *          the pipeline run to the end of the blit. It also reports the time
+ *          from the key event to the blit, which includes the wait for the
+ *          frame. It is always installed, because a budget measured
  *          only in a special build measures that build, and it costs one
  *          timestamp per key and one record per drawn frame.
  * Description: A capturing `keydown` listener on the window stamps the first
@@ -14,7 +17,10 @@
  *              stage timings; the first run that draws after a stamped key
  *              closes the sample: key to blit, split into Monaco's handling of
  *              the key (key to the text changing), the wait for the frame
- *              (that change to the run's start), and each stage. Samples are kept
+ *              (that change to the run's start), and each stage. A frame
+ *              counter, advanced once per animation frame by its timestamp,
+ *              gives the frame the key arrived after and the frame the blit was
+ *              in. Samples are kept
  *              in memory, at most `LIMIT`, and read through
  *              `window.__u8g2glPerf` by the end-to-end test or a developer's
  *              console. Each sample is also a `performance.measure`, so it
@@ -38,6 +44,13 @@ export interface KeystrokeSample {
   readonly keyToEdit: number;
   /** And the part after: the edit waiting for the next animation frame. */
   readonly editToFrame: number;
+  /** From the start of the pipeline run to the end of its blit: the work in the frame. */
+  readonly runToBlit: number;
+  /**
+   * Animation frames from the key to the blit: 1 when the edit is drawn in the
+   * first frame after the key, more when a frame was skipped.
+   */
+  readonly frames: number;
   /** Each stage of that run. */
   readonly stages: Readonly<Record<string, number>>;
 }
@@ -55,6 +68,25 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
   const samples: KeystrokeSample[] = [];
   let pendingKey: number | undefined;
   let edited: number | undefined;
+  let keyFrame = 0;
+
+  // --- Step 0: A frame counter. Every callback of one animation frame shares
+  // its timestamp, so a new timestamp is a new frame, whichever callback of
+  // that frame runs first. ---
+  let frameCount = 0;
+  let lastFrameTime = -1;
+  const countFrame = (time: number): void => {
+    if (time !== lastFrameTime) {
+      lastFrameTime = time;
+      frameCount += 1;
+    }
+    requestAnimationFrame(countFrame);
+  };
+  requestAnimationFrame(countFrame);
+  // frameOf
+  // The number of the frame whose callbacks carry `time`: the counted one, or
+  // the next if this frame's counter callback has not run yet.
+  const frameOf = (time: number): number => (time === lastFrameTime ? frameCount : frameCount + 1);
 
   // --- Step 1: Stamp the first key since the last drawn frame ---
   window.addEventListener(
@@ -62,6 +94,7 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
     (event) => {
       if (pendingKey === undefined) {
         pendingKey = event.timeStamp > 0 ? event.timeStamp : performance.now();
+        keyFrame = frameCount;
         performance.mark('u8g2gl:key');
       }
     },
@@ -81,12 +114,16 @@ export function installKeystrokeProbe(loop: EditLoop, documents: ProjectDocument
     if (pendingKey === undefined || !timings.drawn) return;
     const end = performance.now();
     const { frameStart: _frame, runStart, drawn: _drawn, ...stages } = timings;
+    void _frame;
+    void _drawn;
     const edit = edited ?? runStart;
     samples.push({
       keyToBlit: end - pendingKey,
       wait: runStart - pendingKey,
       keyToEdit: edit - pendingKey,
       editToFrame: runStart - edit,
+      runToBlit: end - runStart,
+      frames: frameOf(timings.frameStart) - keyFrame,
       stages,
     });
     performance.measure('u8g2gl:key-to-blit', { start: pendingKey, end });

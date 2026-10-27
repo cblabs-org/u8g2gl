@@ -4,22 +4,31 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/performance.spec.ts
- * Purpose: E1 e2, checkpoint C3: keystroke to canvas, **p95 under 16 ms**, with
- *          Chromium's CPU throttled 4× as a stand-in for a modest laptop, on the
- *          departures screen and on a 20-element screen, over 300 keystrokes
- *          each. A budget measured only on the author's machine at full speed
- *          would prove nothing about the user's (EDITOR-DESIGN §3.4).
+ * Purpose: E1 e2 as checkpoint C3 defines it (PA ruling 8, "measure to the
+ *          frame"), with Chromium's CPU throttled 4× as a stand-in for a modest
+ *          laptop, on the departures screen and on a 20-element screen, over 300
+ *          keystrokes each:
+ *          1. **Frame latency:** every keystroke's edit is on the canvas in the
+ *             **first** animation frame after its key event — no keystroke
+ *             skips a frame.
+ *          2. **Work per frame:** from the start of the pipeline run in that
+ *             frame to the end of its blit, **p95 under 16 ms**.
+ *          Key to blit is reported, not gated: it includes the wait for the
+ *          frame, which no schedule removes from what is displayed. A budget
+ *          measured only at full speed would prove nothing about the user's
+ *          machine (EDITOR-DESIGN §3.4).
  * Description: Real key presses into Monaco, each changing the x of one element
  *              between two valid values, so every keystroke must reach the
- *              canvas. The page's keystroke probe (`src/perf/`) measures from
- *              the key event's timestamp to the end of the blit that shows it,
- *              and splits it into the wait for the frame and each stage. Keys
+ *              canvas. The page's keystroke probe (`src/perf/`) counts animation
+ *              frames from the key to the blit, times the run from its start to
+ *              the end of its blit, and times key to blit, split into Monaco's
+ *              handling, the wait for the frame and each stage. Keys
  *              are spaced by a random delay so they land at every phase of the
  *              frame, as a typist's do. The first 30 are warm-up.
  *
  *              The result is printed and written to
- *              `test-results/e2-performance.json`. Locally the 16 ms p95 gates;
- *              on CI it is reported, not gated, because CI machines vary
+ *              `test-results/e2-performance.json`. Locally both measures gate;
+ *              on CI they are reported, not gated, because CI machines vary
  *              (WORKORDERS WO4).
  */
 
@@ -53,11 +62,23 @@ function twentyElementScreen(): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<screen name="twenty">\n    <view>\n${elements.join('\n')}\n    </view>\n</screen>\n`;
 }
 
+/** Median, p95 and maximum of a set of milliseconds. */
+interface Spread {
+  readonly median: number;
+  readonly p95: number;
+  readonly max: number;
+}
+
 /** One screen's measurement. */
 interface ScreenResult {
   readonly screen: string;
   readonly samples: number;
-  readonly keyToBlit: { readonly median: number; readonly p95: number; readonly max: number };
+  /** Gated: how many keystrokes were drawn in the first frame after the key, and the worst. */
+  readonly frames: { readonly firstFrame: number; readonly worst: number; readonly histogram: Readonly<Record<string, number>> };
+  /** Gated: pipeline-run start to blit end. */
+  readonly runToBlit: Spread;
+  /** Reported only: key event to blit end. */
+  readonly keyToBlit: Spread;
   /** Medians of: Monaco's handling of the key, the wait for the frame, then each pipeline stage. */
   readonly stageMedians: Readonly<Record<string, number>>;
   /** p95 of the same, to show which stage the tail comes from. */
@@ -79,7 +100,7 @@ const round = (value: number): number => Math.round(value * 100) / 100;
 //   page   — the shell, with `path` open and the caret after the x value's first digit
 //   label  — the screen's name, for the report
 async function measure(page: Page, label: string, digit: string): Promise<ScreenResult> {
-  type Sample = { keyToBlit: number; wait: number; keyToEdit: number; editToFrame: number; stages: Record<string, number> };
+  type Sample = { keyToBlit: number; wait: number; keyToEdit: number; editToFrame: number; runToBlit: number; frames: number; stages: Record<string, number> };
   const count = (): Promise<number> => page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: unknown[] } }).__u8g2glPerf.samples.length);
   await page.evaluate(() => (window as unknown as { __u8g2glPerf: { reset(): void } }).__u8g2glPerf.reset());
   for (let i = 0; i < WARMUP + KEYSTROKES; i++) {
@@ -106,10 +127,23 @@ async function measure(page: Page, label: string, digit: string): Promise<Screen
     stages[stage] = round(percentile(samples.map((s) => s.stages[stage] ?? 0), 50));
     tails[stage] = round(percentile(samples.map((s) => s.stages[stage] ?? 0), 95));
   }
+  const spread = (values: readonly number[]): Spread => ({
+    median: round(percentile(values, 50)),
+    p95: round(percentile(values, 95)),
+    max: round(Math.max(...values)),
+  });
+  const histogram: Record<string, number> = {};
+  for (const sample of samples) histogram[String(sample.frames)] = (histogram[String(sample.frames)] ?? 0) + 1;
   return {
     screen: label,
     samples: samples.length,
-    keyToBlit: { median: round(percentile(totals, 50)), p95: round(percentile(totals, 95)), max: round(Math.max(...totals)) },
+    frames: {
+      firstFrame: samples.filter((s) => s.frames === 1).length,
+      worst: Math.max(...samples.map((s) => s.frames)),
+      histogram,
+    },
+    runToBlit: spread(samples.map((s) => s.runToBlit)),
+    keyToBlit: spread(totals),
     stageMedians: stages,
     stageP95s: tails,
   };
@@ -121,7 +155,7 @@ test.afterEach(async () => {
   session = undefined;
 });
 
-test('e2: keystroke to canvas, p95 under 16 ms with the CPU throttled 4×', async ({ page, browserName }) => {
+test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 under 16 ms, CPU throttled 4×', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
   test.setTimeout(600_000);
   session = await startDesign({ files: { 'screens/screen_twenty.xml': twentyElementScreen() } });
@@ -150,7 +184,10 @@ test('e2: keystroke to canvas, p95 under 16 ms with the CPU throttled 4×', asyn
   writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`e2 (CPU ${THROTTLE}x, ${KEYSTROKES} keystrokes per screen):`);
   for (const r of results) {
-    console.log(`  ${r.screen}: median ${r.keyToBlit.median} ms, p95 ${r.keyToBlit.p95} ms, max ${r.keyToBlit.max} ms (${r.samples} samples)`);
+    console.log(`  ${r.screen} (${r.samples} samples):`);
+    console.log(`    frames key->blit: ${r.frames.firstFrame}/${r.samples} in the first frame, worst ${r.frames.worst}, histogram ${JSON.stringify(r.frames.histogram)}`);
+    console.log(`    run->blit: median ${r.runToBlit.median} ms, p95 ${r.runToBlit.p95} ms, max ${r.runToBlit.max} ms`);
+    console.log(`    key->blit (reported): median ${r.keyToBlit.median} ms, p95 ${r.keyToBlit.p95} ms, max ${r.keyToBlit.max} ms`);
     console.log(`    stage medians (ms): ${Object.entries(r.stageMedians).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     console.log(`    stage p95s (ms):    ${Object.entries(r.stageP95s).map(([k, v]) => `${k} ${v}`).join(', ')}`);
   }
@@ -159,7 +196,8 @@ test('e2: keystroke to canvas, p95 under 16 ms with the CPU throttled 4×', asyn
   for (const r of results) {
     expect(r.samples).toBe(KEYSTROKES);
     if (process.env.CI === undefined) {
-      expect(r.keyToBlit.p95, `${r.screen}: keystroke-to-canvas p95`).toBeLessThan(BUDGET_MS);
+      expect.soft(r.frames.firstFrame, `${r.screen}: keystrokes drawn in the first frame after the key`).toBe(r.samples);
+      expect.soft(r.runToBlit.p95, `${r.screen}: run-to-blit p95`).toBeLessThan(BUDGET_MS);
     }
   }
 });

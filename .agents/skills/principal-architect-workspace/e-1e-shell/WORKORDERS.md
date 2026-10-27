@@ -137,7 +137,34 @@ devDependency) through `typeRoots` rather than adding it.
   PATH (the project-renderer test, which passes with it: 6.3 s), **e2 failing** as reported.
 - Framework editor Wasm rebuilt here; `wasm/test/snapshot.test.mjs` passes at `1c0c7bb2…`.
 
-### e2 (checkpoint C3) — STOP AND REPORT: p95 is over 16 ms
+### WO4b — e2 under PA ruling 8: PASSES
+
+Ruling 8 ("Measure to the frame") verified from PROJECT.md at `6685af9`. Branch
+`u8g2gl-e1e/wo4b-e2-frame`, cut from `6685af9`. The scheduler is unchanged. The probe now counts
+animation frames by their timestamps, so it knows the frame a key arrived after and the frame
+whose run blitted it, and it times each run from its start to the end of its blit. The test
+gates both of ruling 8's measures locally (on CI it reports them without gating). It still
+reports key-to-blit, ungated. 4× CPU throttle, 300 keystrokes per screen, three runs:
+
+| Run | Screen | Drawn in the first frame | run→blit median / p95 / max | key→blit median / p95 / max (reported) |
+|---|---|---|---|---|
+| 1 | departures | **300 / 300** (worst 1) | 3.0 / **3.8** / 6.6 | 11.3 / 18.5 / 23.2 |
+| 1 | 20 elements | **300 / 300** (worst 1) | 2.7 / **3.4** / 5.9 | 10.6 / 18.4 / 20.3 |
+| 2 | departures | **300 / 300** (worst 1) | 2.9 / **3.7** / 5.6 | 11.6 / 19.0 / 21.6 |
+| 2 | 20 elements | **300 / 300** (worst 1) | 3.2 / **5.4** / 15.8 | 12.2 / 20.2 / 119.4 |
+| 3 | departures | **300 / 300** (worst 1) | 3.2 / **5.0** / 10.7 | 11.9 / 19.4 / 26.2 |
+| 3 | 20 elements | **300 / 300** (worst 1) | 2.7 / **3.6** / 6.3 | 11.0 / 18.7 / 20.6 |
+
+Stage p95s stay at or under about 2 ms each: validate 1.4–2.1 ms is the largest; Monaco's
+handling of the key is 1.9–3.3 ms. The frame wait is 13.6–14.4 ms at p95, as before, and
+ruling 8 now excludes it. The two key-to-blit maxima (119.4 ms) and the run maximum (15.8 ms)
+in run 2 were single outliers. Both measures passed on both screens in all three runs.
+
+One caveat: no run in this test has skipped a frame, so it has never shown the frame counter
+reporting a delta above 1. The counter reads frames from rAF timestamps, which every callback
+of one frame shares, so a skipped frame would show as 2 or more.
+
+### e2 under the original definition (superseded by ruling 8): p95 was over 16 ms
 
 Chromium headless, CPU throttled 4×, 300 keystrokes per screen after 30 warm-up, keys spaced
 0–20 ms at random. From the key event's timestamp to the end of the blit:
