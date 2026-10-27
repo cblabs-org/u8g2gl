@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/edits.test.ts
- * Purpose: The minimal-edit functions (E-1a a3, a4): each turns one intent
+ * Purpose: The minimal-edit functions: each turns one intent
  *          into a change a reviewer would recognise as exactly that intent —
  *          its target's lines and nothing else, the author's quotes and
  *          indentation kept, comments untouched.
  * Description: Every function runs on five layouts — a compact one-line
  *              document, one attribute per line, the same with CRLF, tab
- *              indentation, and the probe project's departures screen — and
+ *              indentation, and a real departures screen
+ *              (`screen_departures.xml`) — and
  *              every case asserts, through `expectEdit`, that the result
  *              re-parses with no diagnostics and that its line diff stays
  *              inside the target's lines. Exact-output cases pin the layout
@@ -117,7 +118,7 @@ function attr(element: CstElement, name: string) {
 
 // expectEdit
 // Applies `edits` and checks the two properties every edit must have: the
-// result is well-formed, and its line diff lies within `target`'s lines (a3).
+// result is well-formed, and its line diff lies within `target`'s lines.
 // A pure insertion has no changed line of its own, so it must instead land
 // on a line boundary inside or immediately after the target.
 //   oneLine — additionally require exactly one line changed on each side
@@ -168,13 +169,13 @@ describe('replaceAttributeValue', () => {
     expect(rewritten.value).toBe(`say "hi" & 'bye' <b>`);
   });
 
-  it('a4: replacing `a &amp; b` with `a & c` writes `a &amp; c`', () => {
+  it('replacing `a &amp; b` with `a & c` writes `a &amp; c`', () => {
     const cst = parse('<u8g2gl_label text="a &amp; b" />');
     const edits = replaceAttributeValue(attr(cst.root!, 'text'), 'a & c');
     expect(applyEdits(cst.text, edits)).toBe('<u8g2gl_label text="a &amp; c" />');
   });
 
-  it('a4: single- and double-quoted values keep their quotes and escape only their own quote', () => {
+  it('single- and double-quoted values keep their quotes and escape only their own quote', () => {
     const cst = parse(`<x a='1' b="2" />`);
     const [a, b] = cst.root!.attributes;
     expect(applyEdits(cst.text, replaceAttributeValue(a!, `it's "x"`))).toBe(`<x a='it&apos;s "x"' b="2" />`);

@@ -126,7 +126,7 @@ describe('LineIndex', () => {
 
   it('counts a tab as one column and skips a BOM on line 1 only', () => {
     expect(new LineIndex('\t\tx').locate(2)).toEqual({ line: 1, column: 3 });
-    const bom = new LineIndex('﻿ab\ncd');
+    const bom = new LineIndex('\uFEFFab\ncd');
     expect(bom.locate(1)).toEqual({ line: 1, column: 1 });
     expect(bom.locate(2)).toEqual({ line: 1, column: 2 });
     expect(bom.locate(5)).toEqual({ line: 2, column: 2 });

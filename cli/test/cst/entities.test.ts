@@ -5,7 +5,7 @@
  *
  * File: test/cst/entities.test.ts
  * Purpose: Keeps the CST's copy of the entity rules identical to the
- *          tokeniser's until E-1b deletes the tokeniser. The copy exists so
+ *          tokeniser's until the tokeniser is deleted. The copy exists so
  *          cst/ does not depend on a module about to be removed; this test is
  *          what stops the two copies drifting in the meantime.
  * Description: Both decoders over the same inputs, plus the one documented

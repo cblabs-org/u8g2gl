@@ -9,7 +9,8 @@
  *          that is only safe if the tree it reasons over accounts for every byte
  *          of the file and knows where each part is. This file defines that
  *          tree; parse-cst.ts builds it and print-cst.ts proves it is lossless.
- * Description: Plain readonly data. Every node carries `[start, end)` UTF-16
+ * Description: Plain readonly data, apart from the document's LineIndex
+ *              (a class instance, itself immutable). Every node carries `[start, end)` UTF-16
  *              offsets into the source text, and the nodes of one parent tile
  *              its content with no gap and no overlap, which is what lets the
  *              printer rebuild the input from the tree alone. Line and column

@@ -20,13 +20,14 @@
  */
 
 import type { CstContent, CstDocument, CstElement } from './cst-types.js';
+import { BOM } from './line-index.js';
 
 /**
  * Reproduce the text a CST was parsed from.
  * `printCst(parseCst(t).cst) === t` for every string `t`, malformed or not.
  */
 export function printCst(cst: CstDocument): string {
-  const out: string[] = cst.bom ? ['﻿'] : [];
+  const out: string[] = cst.bom ? [BOM] : [];
   for (const child of cst.children) {
     printContent(cst.text, child, out);
   }

@@ -5,8 +5,8 @@
  *
  * File: test/cst/cst-test-helpers.ts
  * Purpose: Shared fixtures for the CST tests — the repository's XML corpus,
- *          a tree walker, and the stress100 screen — so each test file states
- *          its acceptance criterion rather than re-deriving its inputs.
+ *          a tree walker, and a 100-element stress screen — so each test file
+ *          states what it checks rather than re-deriving its inputs.
  * Description: The corpus is found with `git ls-files` at test time, so an XML
  *              file added anywhere in the repository joins the round-trip
  *              tests without anyone remembering to list it.
@@ -16,7 +16,7 @@
  * - repoXmlFiles():     Every tracked `.xml` file, repo-relative, sorted
  * - readRepoFile():     Read a repo-relative file as UTF-8
  * - allElements():      Every element of a tree, depth first, document order
- * - stressScreen():     The stress100 screen of the E-D bench, built in memory
+ * - stressScreen():     A large synthetic screen for the parse benchmark
  */
 
 import { execFileSync } from 'node:child_process';
@@ -58,9 +58,10 @@ export function allElements(cst: CstDocument): CstElement[] {
 }
 
 /**
- * The stress screen the E-D bench measured (LOOP-BUDGET §1): `count`
- * alternating labels and boxes inside one `<view>`. Mirrors that evidence's
- * generator line for line, so the numbers are comparable.
+ * A stress screen for the parse benchmark: `count` alternating `u8g2gl_label`
+ * and `u8g2gl_box` elements, one per line, inside one `<view>`. At the default
+ * of 100 it is the size the editor's 1 ms per-edit re-parse budget was set
+ * against. The layout is fixed so timings stay comparable across changes.
  */
 export function stressScreen(count = 100): string {
   const rows: string[] = [];

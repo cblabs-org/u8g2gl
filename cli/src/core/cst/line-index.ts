@@ -7,7 +7,8 @@
  * Purpose: Turns a CST offset into the 1-based line and column a diagnostic
  *          reports. The CST stores offsets only, so this is the single place
  *          the line/column convention lives — and it must be the tokeniser's
- *          convention exactly, or diagnostics move when E-1b switches parsers.
+ *          convention exactly, or diagnostics move when the parser switches
+ *          from the tokeniser to the CST.
  * Description: Records each line's starting offset once, then answers lookups
  *              by binary search. The convention, checked against
  *              xml-tokeniser.ts's `advance()`: LF, CRLF and a lone CR each end
@@ -17,9 +18,16 @@
  *              a file with a BOM reports the same coordinates as without.
  *
  * Exports:
+ * - BOM:         The byte-order mark, U+FEFF
  * - LineColumn:  A 1-based line and column pair
  * - LineIndex:   Offset → line/column lookup over one text
  */
+
+/**
+ * The byte-order mark, U+FEFF. Written as an escape everywhere it is needed,
+ * because the literal character is invisible and reads as an empty string.
+ */
+export const BOM = '\uFEFF';
 
 /** A 1-based line and column, as diagnostics report them. */
 export interface LineColumn {
@@ -53,7 +61,7 @@ export class LineIndex {
       }
     }
     this.lineStarts = starts;
-    this.bomWidth = text.charCodeAt(0) === 0xfeff ? 1 : 0;
+    this.bomWidth = text.startsWith(BOM) ? 1 : 0;
   }
 
   /** Number of lines in the text (a trailing newline opens one more, empty, line). */

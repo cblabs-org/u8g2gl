@@ -7,8 +7,8 @@
  * Purpose: Builds the lossless concrete syntax tree [UD-3] needs: the designer
  *          turns an editing intent into a minimal text edit, and it can only do
  *          that over a tree that accounts for every byte and knows exactly
- *          where each attribute value sits. Nothing consumes it yet; E-1b moves
- *          the existing parser onto it and deletes parser/xml-tokeniser.ts.
+ *          where each attribute value sits. The parser does not consume this
+ *          yet; when it does, parser/xml-tokeniser.ts can be deleted.
  * Description: A single-pass scanner whose control flow — including every
  *              error-recovery path — deliberately mirrors xml-tokeniser.ts's
  *              XmlScanner, so that on any input both report the same
@@ -42,7 +42,7 @@ import type {
   CstXmlDeclaration,
 } from './cst-types.js';
 import { decodeEntities } from './entities.js';
-import { LineIndex } from './line-index.js';
+import { BOM, LineIndex } from './line-index.js';
 
 /** The result of `parseCst`: a tree, always, and any diagnostics. */
 export interface CstParseResult {
@@ -424,7 +424,7 @@ class CstScanner {
   // Prolog, root, epilog — the tokeniser's scanDocument, step for step.
   document(): CstParseResult {
     // --- Step 1: BOM, then the prolog ---
-    const bom = this.text.charCodeAt(0) === 0xfeff;
+    const bom = this.text.startsWith(BOM);
     if (bom) {
       this.index = 1;
     }

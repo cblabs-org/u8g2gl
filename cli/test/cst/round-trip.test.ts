@@ -5,7 +5,7 @@
  *
  * File: test/cst/round-trip.test.ts
  * Purpose: The CST's losslessness and range exactness over every XML file the
- *          repository holds (E-1a a1 and a5). A designer edit is computed from
+ *          repository holds. A designer edit is computed from
  *          these ranges, so a range one byte off is an edit that corrupts the
  *          author's file.
  * Description: One test per tracked `.xml` file, found by `git ls-files` at
@@ -19,9 +19,9 @@ import { allElements, readRepoFile, repoXmlFiles } from './cst-test-helpers.js';
 
 const FILES = repoXmlFiles();
 
-describe('CST round-trip over the repository corpus (a1)', () => {
+describe('CST round-trip over the repository corpus', () => {
   it('finds the corpus', () => {
-    // 105 at the time E-1a was specified; a much smaller number means the glob broke.
+    // 105 when this test was written; a much smaller number means the glob broke.
     expect(FILES.length).toBeGreaterThanOrEqual(100);
   });
 
@@ -31,7 +31,7 @@ describe('CST round-trip over the repository corpus (a1)', () => {
   });
 });
 
-describe('CST ranges over the repository corpus (a5)', () => {
+describe('CST ranges over the repository corpus', () => {
   it.each(FILES)('every attribute range slices to its name and raw value in %s', (file) => {
     const text = readRepoFile(file);
     const { cst } = parseCst(text, file);

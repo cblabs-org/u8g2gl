@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/cst/index.ts
- * Purpose: The CST module's one entry point, so consumers (E-1b's parser, the
+ * Purpose: The CST module's one entry point, so consumers (the parser, the
  *          designer) import from `core/cst/` rather than from its files. It is
  *          deliberately not re-exported from core/index.ts yet: the public
  *          surface is settled when the first consumer lands, not before.
@@ -13,7 +13,7 @@
  * Exports:
  * - parseCst(), CstParseResult:  Parse text into a lossless tree
  * - printCst():                  Reproduce the text from a tree
- * - LineIndex, LineColumn:       Offset → line/column lookup
+ * - LineIndex, LineColumn, BOM:  Offset → line/column lookup
  * - decodeEntities(), encodeAttributeValue():  The CST's entity rules
  * - replaceAttributeValue(), insertAttribute(), removeAttribute(),
  *   insertElement(), removeElement(), renameElementTag():
@@ -24,7 +24,7 @@
 
 export { parseCst, type CstParseResult } from './parse-cst.js';
 export { printCst } from './print-cst.js';
-export { LineIndex, type LineColumn } from './line-index.js';
+export { BOM, LineIndex, type LineColumn } from './line-index.js';
 export { decodeEntities, encodeAttributeValue } from './entities.js';
 export {
   insertAttribute,

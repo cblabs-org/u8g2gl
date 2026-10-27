@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/line-diff.ts
- * Purpose: The measuring stick for E-1a a3: an edit must change only its
+ * Purpose: The measuring stick for the edit tests: an edit must change only its
  *          target's lines. A reviewer judges an edit by its diff, so the test
  *          judges it the same way — by which lines a line diff reports.
  * Description: Trims the longest common prefix and suffix of whole lines

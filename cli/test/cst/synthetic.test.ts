@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/synthetic.test.ts
- * Purpose: Round-trips the inputs the repository corpus lacks (E-1a a2). The
- *          corpus has no CRLF file and only one with entities, so losslessness
- *          on those is unproven by a1 alone — and they are exactly the files a
- *          Windows user or a hand-edited document will bring.
- * Description: One named case per item of a2. Each asserts the round-trip,
+ * Purpose: Round-trips the inputs the repository corpus lacks. The corpus
+ *          has no CRLF file and only one with entities, so losslessness on
+ *          those is unproven by the corpus test alone — and they are exactly
+ *          the files a Windows user or a hand-edited document will bring.
+ * Description: One named case per input shape. Each asserts the round-trip,
  *              that a well-formed case parses with no diagnostics, and a
  *              property of the tree that proves the case was parsed as
  *              intended rather than swallowed into one text node.
@@ -28,7 +28,7 @@ function roundTrip(text: string): CstDocument {
   return cst;
 }
 
-describe('CST round-trip on a synthetic corpus (a2)', () => {
+describe('CST round-trip on a synthetic corpus', () => {
   it('CRLF line endings', () => {
     const text = '<screen name="a">\r\n  <view>\r\n    <u8g2gl_box x="1" />\r\n  </view>\r\n</screen>\r\n';
     const cst = roundTrip(text);
@@ -44,7 +44,7 @@ describe('CST round-trip on a synthetic corpus (a2)', () => {
   });
 
   it('a byte-order mark', () => {
-    const text = '﻿<?xml version="1.0"?>\n<screen name="a"/>\n';
+    const text = '\uFEFF<?xml version="1.0"?>\n<screen name="a"/>\n';
     const cst = roundTrip(text);
     expect(cst.bom).toBe(true);
     expect(cst.root?.name).toBe('screen');

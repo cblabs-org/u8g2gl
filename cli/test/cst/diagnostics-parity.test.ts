@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/cst/diagnostics-parity.test.ts
- * Purpose: E-1a a6 — on malformed input the CST reports what today's
- *          tokeniser reports: the same diagnostic code at the same line and
- *          column, in the same order. E-1b replaces the tokeniser with the
- *          CST under the existing parser, and every location an author or a
- *          test relies on must survive that swap unmoved.
+ * Purpose: On malformed input the CST reports what today's tokeniser
+ *          reports: the same diagnostic code at the same line and column, in
+ *          the same order. The parser does not consume the CST yet; when it
+ *          replaces the tokeniser, every location an author or a test relies
+ *          on must survive that swap unmoved.
  * Description: Three corpora, each run through both `tokenizeXml` and
  *              `parseCst`: every tracked `.xml` file in the repository (which
  *              includes the malformed fixtures, and checks that well-formed
@@ -25,8 +25,8 @@ import type { Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { readRepoFile, repoXmlFiles } from './cst-test-helpers.js';
 
 // located
-// The part of a diagnostic parity is defined over (PA ruling 4): code, line
-// and column. Messages are prose and may be reworded independently.
+// Parity is defined over code, line and column; messages are prose and may
+// be reworded independently.
 function located(diagnostics: readonly Diagnostic[]): Array<Pick<Diagnostic, 'code' | 'line' | 'column'>> {
   return diagnostics.map(({ code, line, column }) => ({ code, line, column }));
 }
@@ -79,7 +79,7 @@ const BRANCH_CASES: ReadonlyArray<readonly [string, string]> = [
   ['deep unclosed nesting', '<a><b><c><d>'],
 ];
 
-describe('CST diagnostics parity with tokenizeXml (a6)', () => {
+describe('CST diagnostics parity with tokenizeXml', () => {
   const files = repoXmlFiles();
 
   it.each(files)('repository file %s', (file) => {

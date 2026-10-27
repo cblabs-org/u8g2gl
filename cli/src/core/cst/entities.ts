@@ -6,11 +6,11 @@
  * File: src/core/cst/entities.ts
  * Purpose: The CST's entity rules: how an attribute's or text's raw source
  *          becomes the value a consumer reads. They must be the same rules the
- *          generator sees today, or a value would change meaning when E-1b
- *          moves the parser onto the CST.
+ *          generator sees today, or a value would change meaning when the
+ *          parser moves onto the CST.
  * Description: A deliberate copy of `decodeXmlEntities` from
- *              parser/xml-tokeniser.ts, not an import of it. E-1b deletes the
- *              tokeniser once nothing imports it; an import from cst/ would
+ *              parser/xml-tokeniser.ts, not an import of it. The tokeniser is
+ *              to be deleted once nothing imports it; an import from cst/ would
  *              be exactly the thing that kept it alive. Until then the two must
  *              stay identical, and cli/test/cst/entities.test.ts checks that
  *              — apart from the one out-of-range case noted in the body.

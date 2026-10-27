@@ -216,6 +216,9 @@ export function insertAttribute(
   const previous = element.attributes.at(-2);
   const anchor = previous ? previous.start : element.nameRange.start;
   const sharesLine = cst.lines.locate(anchor).line === cst.lines.locate(last.start).line;
+  // Inline for a second reason too: if something other than whitespace
+  // precedes the last attribute on its line, it has no indentation of its own
+  // to copy, so a new line would have nothing correct to align to.
   if (sharesLine || !startsLine(cst, last.start)) {
     return [{ start: last.end, end: last.end, text: ` ${written}` }];
   }
@@ -230,8 +233,9 @@ export function insertAttribute(
 
 /**
  * Remove an attribute. When it was alone on its line, the whole line goes,
- * line break included; otherwise the attribute and the whitespace before it
- * go, leaving its neighbours as they were.
+ * line break included; otherwise the attribute and all the whitespace before
+ * it go — line breaks included, so an attribute that starts its line but
+ * shares it with a following `/>` pulls that `/>` up onto the previous line.
  *
  * @param cst   The tree `attr` belongs to.
  * @param attr  The attribute to remove.
@@ -244,6 +248,10 @@ export function removeAttribute(cst: CstDocument, attr: CstAttribute): TextEdit[
   }
 
   // --- Step 2: Otherwise the attribute and its leading whitespace ---
+  // The walk takes CR and LF as well as spaces and tabs (so a CRLF pair goes
+  // whole). That is deliberate: the whitespace between the previous token and
+  // this attribute belongs to it, and leaving a dangling line break behind
+  // would strand the rest of the tag on a line of its own.
   let start = attr.start;
   while (start > 0 && /[ \t\r\n]/.test(cst.text[start - 1] ?? '')) {
     start--;
@@ -338,7 +346,12 @@ export function insertElement(
     ];
   }
 
+  // Non-null: the guard at the top refuses a parent that is neither
+  // self-closing nor closed, and the self-closing case has returned above.
   const close = parent.closeTag!;
+  // The second clause rules out a close tag on the open tag's own line, as in
+  // `<view>  </view>`: that close tag "starts" nothing but the gap after the
+  // open tag, so inserting at its line start would land before `<view>`.
   if (startsLine(cst, close.start) && lineStartAt(cst, close.start) > parent.openTag.end) {
     const at = lineStartAt(cst, close.start);
     return [{ start: at, end: at, text: `${child}${eol}` }];
@@ -364,7 +377,14 @@ export function removeElement(cst: CstDocument, element: CstElement): TextEdit[]
     if (nextLine !== undefined) {
       return [{ start, end: nextLine, text: '' }];
     }
-    // The last line has no break of its own; take the one before it instead.
+    // The last line has no break of its own; take the one before it instead,
+    // so no empty last line is left behind. `start - 1` is the final
+    // character of that previous break (the LF of a CRLF), and lineEndAt maps
+    // it back to where the break begins. On line 1 there is no previous break
+    // (`start === 0`), so the edit runs from the line start: the element was
+    // the whole text. Known gap, left as is: with a BOM, line 1 starts at 1,
+    // so `start > 0` holds and lineEndAt(0) is the end of the text — removing
+    // the sole element of a one-line BOM file then removes nothing.
     const previousBreak = lineEndAt(cst, Math.max(start - 1, 0));
     return [{ start: start > 0 ? previousBreak : start, end: cst.text.length, text: '' }];
   }
