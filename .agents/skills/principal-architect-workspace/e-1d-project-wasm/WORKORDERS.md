@@ -96,9 +96,9 @@ Wasm is `evidence/wo1/build-probe-wasm.sh` beside them: read it, it is the prove
 
 # Completion report
 
-**Worker, 2026-10-27. Status: WO1 done; WO2 done except the font and image table; STOPPED
-before WO3 on a stop-and-report (a file outside PA ruling 6's boundary must change). WO3 and
-WO4 not started, and their branches not created.**
+**Worker, 2026-10-27. Final status: WO1–WO4 done.** The first pass stopped at WO2's boundary
+(record kept below as written); the PA's ruling 7 (`724865e`) was verified from PROJECT.md
+before resuming, and the resumption is reported at the end.
 
 Provenance checked (rule 00): this file names `e-1d-project-wasm`; its PROJECT.md records the
 owner's standing instruction of 2026-10-27, with its own note that the owner did not review this
@@ -229,3 +229,122 @@ Counts: CLI **1567 → 1568**; C++ **512**, one skip; the three `EditorSymbols.*
 - Wasm built locally with `emcmake cmake -B build-wasm` (the default directory
   `u8g2gl_editor.mjs` loads; git-ignored by `build-*/`). Both `wasm/test/*.test.mjs` pass.
 - Nothing pushed. Branches created: `u8g2gl-e1d/wo2-bridge` only (`wo1-toolchain` existed).
+
+### Resumption under PA ruling 7 (verified from PROJECT.md at `724865e`)
+
+A relayed message announcing the rulings was not acted on until they were committed (rule 00).
+
+**WO2, finished** — `u8g2gl-e1d/wo2-bridge`:
+- `5e42acc` **item 1**: `emitEditorFiles()` hoists the project view it built for the scene and
+  passes `assets: editorAssetsOf(project)`; the registry emits `ui_editor_asset()`. `bridge.cpp`
+  resolves every font and image through it; `register_default_assets()` and its externs are
+  gone. `bridge.cpp` now names no project font or image and has no capacity literal (d8); the
+  only font it names is its own placeholder label font, `u8g2_font_4x6_tr`. **Golden moved:**
+  `test/generated_fixture/generated_editor/ui_editor_registry.cpp`, which gains only the lookup.
+  **No firmware golden moved** (`git diff a95c1fb..HEAD -- cli/test/generator/fixtures
+  test/generated_fixture` shows that one file). CLI **0.13.1 → 0.13.2**. `cli/package-lock.json`
+  was left alone: it already read 0.13.0 at 0.13.1, so the precedent is that it does not track
+  the bump. **Item 2**: in the same commit, a comment where the bridge reads the display size
+  and each `max_len` says why they come from the scene.
+- `db70895` **item 4**, its own commit: `renderFrame()` now tests `"draw_calls"`. The new
+  reference frame is the same from all three renderers: `test/editor_host` (native reference
+  host, scratch harness), the native bridge (`test_wasm_parity`) and the Wasm bridge
+  (`snapshot.test.mjs`) all give **`1c0c7bb2019c564510e4f124ab8355cf44bde019b34c12d6044dc8d07d22c2e0`**.
+  Lit pixels go from **48 to 176 (+128)**. Row y=11 is lit at **128 of 128** pixels (the `rule`
+  hline, x 0–127). The fixed bridge with `rule` removed from the scene renders the old
+  `bca55545…`, so the line is the only difference. `U8G2GL_PARITY_SHA256` and the snapshot test's
+  expected hash are updated. C++ 512 passing, one skip.
+- `1d306af` (on the WO3 branch): three comments citing workspace documents rewritten to keep the
+  fact and drop the pointer.
+
+**WO3** — `u8g2gl-e1d/wo3-build-job`, `af9aa1e`:
+- `cli/src/node/design/build/`:
+  - `prepare-build.ts`: generate into the build cache, the platform-header rule, the build hash.
+  - `platform-headers.ts`: d6, one `U8G2GL_WIDGET_PLATFORM_HEADER` error at the `#include`
+    line, comments and strings ignored.
+  - `editor-wasm-build.ts`: the object caches, `-O1`/`-O3` links, the build-hash unit
+    exported as `getBuildHash()`, compiler diagnostics located in the project's files.
+  - `framework-sources.ts`: source lists and link flags parsed from the two CMake files, so they
+    are not listed twice.
+  - `editor-wasm-job.ts`: `registerEditorWasmJob(queue)` registers the `editor-wasm` job;
+    `{ "testRun": true }` links at `-O3`.
+  - `wasm/u8g2gl_editor.mjs` gains `getBuildHash()`.
+- **Item 3, the caches.** The U8G2 objects are keyed by runtime version, Emscripten version and
+  a hash of the framework's sources. Runtime, bridge and scene parser use the same key **plus
+  the first 16 hex of SHA-256 of the project's `u8g2gl_generated_config.h`**: one runtime build
+  per config, shared across projects. The runtime cache holds its own copy of the config, so
+  the path compiled in is the same for every project that shares it. Project objects are keyed
+  by source, flags and the project's headers. The framework-source hash is a superset of
+  "version": in a working tree, sources change without a version bump.
+- **d1**: the departures project, copied unmodified, builds with its three widgets. `max_len="256"`
+  is accepted, there are **no placeholders**, and `getBuildHash()` equals the job's hash.
+  **521 lit pixels** bare, **880** with sample subjects (platform, destination, a 256-character
+  message). The service lists draw nothing without rows (F7, PR-08's), as expected.
+- **d2**: a widget `.cpp` edit recompiles only that widget and the build-hash unit, then links
+  at `-O1`. Measured **1.27–1.85 s** (scratch, three runs) and **1.47–1.52 s** in the test
+  (compile ≈0.7 s, link ≈0.75 s), against **2 s**. The test reports and does not gate. The
+  `-O3` link is ≈2.4 s. A cold build is ≈4.9 s, the framework half included.
+- **d4**: 8 cases. The hash moves for a widget source, a widget header, a manifest, a font, an
+  image and a capacity change; it stays for a screen position and a subject value.
+- Wasm tests skip with a message when there is no Emscripten.
+- CLI counts: **1568 → 1581 passed + 6 skipped** without Emscripten; **1587 passed** with it.
+  C++ 512, one skip.
+
+**WO4** — `u8g2gl-e1d/wo4-ci`, `5803da5`. A `wasm-tests` job on ubuntu:
+1. Clones emsdk at tag 5.0.3, then checks HEAD against `a620cf1d…`. The check runs on a cache
+   hit too.
+2. Runs `emsdk install` and `activate`. `~/emsdk` is cached by OS, version and commit.
+3. Builds the framework editor Wasm and runs both `wasm/test/*.test.mjs`.
+4. Runs the build and toolchain CLI tests with Emscripten present. The step fails if they report
+   skipping for want of a toolchain.
+
+The YAML was validated with Ruby's YAML parser (Python has no `yaml` module here). **I cannot
+run CI.**
+
+**Further reports (none needs a file outside the boundary changed now):**
+- **`.gitignore`'s `build/` pattern** matches `cli/src/node/design/build/` and
+  `cli/test/node/design/build/`. I force-added them, so they are tracked. New files there will
+  not show in `git status` until a negation (`!cli/**/design/build/`) is added. `npm pack
+  --dry-run` does include `dist/node/design/build/`.
+- **Wiring**: nothing calls `registerEditorWasmJob(server.builds)` yet. That one line belongs in
+  `design-command.ts` (or `design-server.ts`), outside ruling 6, so it is left for the PR that
+  may touch it (E-1e).
+- **npm installs**: the job needs the U8G2GL source tree beside the CLI
+  (`locateFrameworkRoot()`). A CLI installed from npm carries no runtime sources, so the job
+  fails with a clear message until the package ships them.
+- **The `gtest_discover_tests` flake recurred** on a fresh fully parallel build (`cmake --build
+  build -j`), 4 targets. The exact output, e.g.:
+  ```
+  CMake Error at /opt/homebrew/share/cmake/Modules/GoogleTestAddTests.cmake:233 (message):
+    Error running test executable.
+      Path: '/Users/mcneillm/Documents/Projects/U8G2GL-e1d/build-flake/test/test_wasm_parity'
+      Working directory: '/Users/mcneillm/Documents/Projects/U8G2GL-e1d/build-flake/test'
+      Timeout: '5'
+      Result: Process terminated due to timeout
+      Output:
+  ```
+  The other targets were `test_container_edge_pixels`, `test_ambient_state` and
+  `test_clock_baseline`. On an earlier run, `test_bound_child_clip` failed the same way.
+  - **Cause**: gtest discovery's 5 s timeout. Under unbounded `-j`, freshly linked macOS
+    binaries take longer than that to start.
+  - **Not a test failure**: the next incremental build passes and the suite is 512 / one skip.
+  - **Possible fix, owner's call**: a `DISCOVERY_TIMEOUT` or `DISCOVERY_MODE PRE_TEST` in
+    `test/CMakeLists.txt`.
+
+**For the PA to check on the PR (CI):**
+1. `wasm-tests`: the emsdk clone and commit check pass, and "Verify the emsdk checkout" runs on
+   a second, cached run.
+2. `emcc --version` prints 5.0.3.
+3. `snapshot.test.mjs` prints `PASS` with `1c0c7bb2…` on Linux. This is D-9 across platforms,
+   newly in CI.
+4. `placeholder.test.mjs` passes.
+5. The CLI step shows `editor-wasm-build.test.ts (7 tests)` with none skipped, and the d1 and d2
+   lines. d2 on a CI runner is reported, not gated.
+6. `cpp-tests` is 512 with the new golden.
+7. `determinism-check` passes. It watches only `cli/test/generator/fixtures/*/expected`, which
+   did not change; the bump to 0.13.2 was taken anyway for the editor registry golden, which it
+   does not watch.
+8. The second run's cache-hit time.
+9. Nothing pushed. Branches created: `wo2-bridge`, `wo3-build-job`, `wo4-ci` (`wo1-toolchain`
+   existed).
+
