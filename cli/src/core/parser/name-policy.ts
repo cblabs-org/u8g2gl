@@ -29,6 +29,7 @@
  * - applyTextEdits():             Apply insertions to a source string, back-to-front
  */
 
+import { LineIndex } from '../cst/index.js';
 import type { SourceLocation } from '../schema/source-location.js';
 
 /**
@@ -117,32 +118,6 @@ export function createNameInsertion(
 }
 
 /**
- * Builds the absolute offset of the first character of every line.
- *
- * Newline handling matches the parser's LineIndex (core/cst/) — LF, CR and CRLF
- * all end a line — because an offset table that disagreed with the coordinates
- * `tokenizeXml` produces would place edits in the wrong place on CRLF files only,
- * which is the kind of defect that survives every test written on macOS.
- */
-function buildLineStartOffsets(source: string): readonly number[] {
-  const starts: number[] = [0];
-
-  for (let i = 0; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === '\r') {
-      if (source[i + 1] === '\n') {
-        i++;
-      }
-      starts.push(i + 1);
-    } else if (ch === '\n') {
-      starts.push(i + 1);
-    }
-  }
-
-  return starts;
-}
-
-/**
  * @brief Applies insertions to a source string.
  *
  * Pure: no file I/O, so the CLI and the designer run the identical code against
@@ -156,16 +131,16 @@ function buildLineStartOffsets(source: string): readonly number[] {
  */
 export function applyTextEdits(source: string, edits: readonly SourceEdit[]): string {
   // --- Step 1: Resolve each 1-based coordinate to an absolute offset ---
-  const lineStarts = buildLineStartOffsets(source);
+  // Through the parser's own LineIndex, the table every location was computed
+  // from. A second table is how this once went wrong: one that disagreed on a
+  // line ending misplaced edits on CRLF files only, and one without the BOM
+  // rule put line 1's edits one code unit early.
+  const lines = new LineIndex(source);
   const resolved: { offset: number; text: string }[] = [];
 
   for (const edit of edits) {
-    const lineStart = lineStarts[edit.loc.line - 1];
-    if (lineStart === undefined) {
-      continue;
-    }
-    const offset = lineStart + (edit.loc.column - 1);
-    if (offset < 0 || offset > source.length) {
+    const offset = lines.offsetOf(edit.loc.line, edit.loc.column);
+    if (offset === undefined || offset < 0 || offset > source.length) {
       continue;
     }
     resolved.push({ offset, text: edit.text });

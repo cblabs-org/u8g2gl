@@ -19,7 +19,7 @@
  * Exports:
  * - BOM:         The byte-order mark, U+FEFF
  * - LineColumn:  A 1-based line and column pair
- * - LineIndex:   Offset → line/column lookup over one text
+ * - LineIndex:   Offset ↔ line/column lookup over one text
  */
 
 /**
@@ -88,6 +88,22 @@ export class LineIndex {
     // Only line 1 can contain the BOM, and only offsets past it are shifted.
     const skip = lo === 0 && offset >= this.bomWidth ? this.bomWidth : 0;
     return { line: lo + 1, column: offset - lineStart - skip + 1 };
+  }
+
+  /**
+   * The offset of a 1-based line and column: the inverse of `locate`, under
+   * the same rules, so an edit placed by a diagnostic's coordinates lands
+   * where the diagnostic points — after the BOM on line 1, too.
+   *
+   * @return undefined when `line` is outside the text. The column is not
+   *         checked against the line's length; the caller bounds the offset.
+   */
+  offsetOf(line: number, column: number): number | undefined {
+    const lineStart = this.lineStarts[line - 1];
+    if (lineStart === undefined) {
+      return undefined;
+    }
+    return lineStart + (line === 1 ? this.bomWidth : 0) + column - 1;
   }
 
   /** Offset of the first code unit of 1-based `line`, clamped to the last line. */
