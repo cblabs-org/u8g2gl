@@ -26,9 +26,9 @@ is PR-06's (owner, 2026-10-15: "Approval to proceed autonomously on this workord
 
 | WO | Topic | Branch | ACs | Status |
 |---|---|---|---|---|
-| WO1 | CST parse and print, diagnostics parity, isomorphism test, bench | `u8g2gl-e1a/wo1-cst` | a1, a2, a5, a6, a7, a8 | In progress |
-| WO2 | Minimal-edit functions | `u8g2gl-e1a/wo2-edits` (from WO1's tip) | a3, a4 | Pending |
-| WO3 | Readability review and PA verification | — | all | Pending |
+| WO1 | CST parse and print, diagnostics parity, isomorphism test, bench | `u8g2gl-e1a/wo1-cst` | a1, a2, a5, a6, a7, a8 | ✅ `4bb89a1`..`4ea14ae` |
+| WO2 | Minimal-edit functions | `u8g2gl-e1a/wo2-edits` (from WO1's tip) | a3, a4 | ✅ `c023b3b`..`e28d388` |
+| WO3 | Readability review and PA verification | `u8g2gl-e1a/wo3-readability` | all | ✅ `f89857b`..`7995a35` |
 
 One worker, WO1 then WO2, sequentially in this worktree.
 
@@ -48,3 +48,20 @@ One worker, WO1 then WO2, sequentially in this worktree.
 ## Status log
 
 - **2026-10-27.** Worktree created from `origin/main` @ `019b103`. WO1 issued.
+- **2026-10-27. WO1 and WO2 complete** (one worker). 1809 CLI tests. Its 23 font-test failures
+  were environmental: the worktree's `extern/u8g2` submodule was not checked out. With it
+  checked out, all pass. a8: full parse of the 100-element stress screen 0.12–0.14 ms median.
+  **Intentional differences from the tokeniser** (a6 holds on every fixture): a leading BOM is
+  accepted; CDATA inside an element is a node, not an error; a character reference above
+  U+10FFFF is left as written instead of throwing. **Tokeniser locations the worker judged
+  wrong, kept for parity and left to E-1b:** text before the root read as a tag; "expected '>'"
+  and "unclosed tag" reported at the element's `<`; a missing `=` cascading; an empty document
+  at 1:1; `<!DOCTYPE>` giving two errors.
+- **2026-10-27. PA verification.** Suites run one at a time with the submodule checked out: 1809
+  passing, lint and tsc clean. Through the real departures screen: lossless round-trip, a nudge
+  to `x` changes exactly one line, an inserted attribute re-parses clean.
+- **2026-10-27. WO3 complete.** Readability audit: 0 P1, 0 P2, 5 P3, 5 P4. All P3 fixed; of the
+  P4s, a shared BOM constant and the `closeTag!` why-comment done, extracting the close-tag scan
+  deferred, the rest declined. The worker found a real defect while fixing: `removeElement` did
+  nothing on a one-line file after a BOM. Fixed (`7995a35`) with six tests; the other edit
+  functions were checked and were already right. **Final: 1815 tests, lint and tsc clean.**
