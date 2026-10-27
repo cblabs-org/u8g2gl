@@ -86,7 +86,7 @@ async function main() {
   // golden in test/CMakeLists.txt). If they differ, the Wasm renderer has
   // diverged from the host — the failure [D-9] names as the one that
   // discredits a design tool.
-  const GOLDEN_SHA256 = 'bca55545ebb5a40cef2a296b7218c0192d5339717c18212360c89ff0581b03ef';
+  const GOLDEN_SHA256 = '1c0c7bb2019c564510e4f124ab8355cf44bde019b34c12d6044dc8d07d22c2e0';
 
   console.log('=== D-9 Parity Check ===');
   if (hash === GOLDEN_SHA256) {

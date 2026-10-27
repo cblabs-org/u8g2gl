@@ -936,7 +936,7 @@ uint8_t* renderFrame(uint32_t current_ms) {
                 u8g2gl_render_object(s_display, s_objects.data(), s_parents.data(),
                                      static_cast<uint8_t>(obj_idx));
             }
-        } else if (realisation == "draw") {
+        } else if (realisation == "draw_calls") {
             if (!render_draw_call(s_display, element)) {
                 return nullptr;
             }
