@@ -101,6 +101,15 @@ export async function createEditor(wasmDir) {
     },
 
     /**
+     * The build hash a project editor Wasm was built with: a hash of every
+     * input it compiled. The framework editor Wasm has none.
+     * @returns {string|null}
+     */
+    getBuildHash() {
+      return typeof Module._getBuildHash === 'function' ? Module.UTF8ToString(Module._getBuildHash()) : null;
+    },
+
+    /**
      * The active screen's elements drawn as placeholders, because the loaded
      * Wasm has no class for them.
      * @returns {{name: string, tag: string, class: string, rect: number[]}[]}
