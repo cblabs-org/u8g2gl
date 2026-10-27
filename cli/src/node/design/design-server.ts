@@ -18,13 +18,18 @@
  *              name to 127.0.0.1 sends its own name as Host.
  *
  *              Routes, all token-checked:
- *              - `GET /`                   the placeholder page
+ *              - `GET /`                   the designer (a redirect to
+ *                                          `/app/<token>/`), or the
+ *                                          placeholder page if it is not built
+ *              - `GET /app/<token>/<file>` the designer's own files
  *              - `GET /api/files`          `{ files }`
  *              - `GET /api/file?path=`     bytes, version in `U8G2GL-Version`
  *              - `PUT /api/file?path=`     conditional write; 409 on conflict
  *              - `GET /api/events`         server-sent events of file changes
  *              - `POST /api/build/<job>`   queue a build; 202 with its record
  *              - `GET /api/build/<id>`     a build's record
+ *              - `GET /api/editor-wasm/<id>/<file>` the editor Wasm a
+ *                                          succeeded `editor-wasm` build made
  *
  * Exports:
  * - LOOPBACK:              The one address the server binds
@@ -42,17 +47,25 @@ import {
   EXPECTED_VERSION_HEADER,
   VERSION_HEADER,
 } from '../../core/project-fs/served-project-file-system.js';
-import { BuildQueue } from './build-queue.js';
+import { EDITOR_WASM_JOB } from './build/editor-wasm-build.js';
+import { BuildQueue, type BuildJobRecord } from './build-queue.js';
 import { DiskProject } from './disk-project.js';
 import { placeholderPage } from './placeholder-page.js';
 import { ProjectWatcher } from './project-watcher.js';
-import { generateSessionToken, presentedToken, tokenMatches } from './session-token.js';
+import { APP_PATH_PREFIX, generateSessionToken, presentedToken, tokenMatches } from './session-token.js';
+import { readStaticFile } from './static-files.js';
 
 /** The only address the server binds: loopback, so no other machine can reach it. */
 export const LOOPBACK = '127.0.0.1';
 
 /** Largest request body accepted — far above any project source file. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024;
+
+/** The editor Wasm route's prefix; the build id and file follow. */
+const EDITOR_WASM_ROUTE = '/api/editor-wasm/';
+
+/** The files an editor Wasm build serves: the Emscripten loader and its module. */
+const EDITOR_WASM_FILES: readonly string[] = ['u8g2gl_editor.js', 'u8g2gl_editor.wasm'];
 
 /** How often an idle event stream is sent a comment, so proxies and browsers keep it open. */
 const KEEPALIVE_MS = 15_000;
@@ -65,6 +78,11 @@ export interface DesignServerOptions {
   readonly port?: number;
   /** Session token; generated when omitted. Tests pass one to know it. */
   readonly token?: string;
+  /**
+   * The built designer (`designer/dist/`), served at `/`. Omitted, `/` serves
+   * the placeholder page.
+   */
+  readonly designerRoot?: string;
 }
 
 /** A running design server. */
@@ -161,7 +179,17 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     const method = request.method ?? 'GET';
     const route = url.pathname;
     if (route === '/' && method === 'GET') {
-      send(response, 200, 'text/html; charset=utf-8', placeholderPage(basename(project.root)));
+      if (options.designerRoot === undefined) {
+        send(response, 200, 'text/html; charset=utf-8', placeholderPage(basename(project.root)));
+      } else {
+        // The designer lives under its token-carrying path; see APP_PATH_PREFIX.
+        response.writeHead(302, { Location: `${APP_PATH_PREFIX}${token}/`, 'Cache-Control': 'no-store' });
+        response.end();
+      }
+    } else if (route.startsWith(APP_PATH_PREFIX) && method === 'GET') {
+      serveDesigner(response, route);
+    } else if (route.startsWith(EDITOR_WASM_ROUTE) && method === 'GET') {
+      serveEditorWasm(response, route);
     } else if (route === '/api/files' && method === 'GET') {
       sendResult(response, project.list(), (r) => ({ files: r.files }));
     } else if (route === '/api/file' && method === 'GET') {
@@ -231,6 +259,47 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     }
   }
 
+  // serveDesigner
+  // One of the designer's own files. The gate has already matched the token
+  // in the path, so what follows it is the file; '' is the index page.
+  //   route — the request path, `/app/<token>/<file>`
+  function serveDesigner(response: ServerResponse, route: string): void {
+    const raw = route.slice(`${APP_PATH_PREFIX}${token}/`.length);
+    const file = decodeStrict(raw === '' ? 'index.html' : raw);
+    const found = options.designerRoot === undefined || file === undefined ? undefined : readStaticFile(options.designerRoot, file);
+    if (found === undefined) {
+      sendJson(response, 404, { code: 'not-found', message: `no designer file '${raw}'` });
+      return;
+    }
+    // The page's URL holds the token, and a Referer would carry it to any
+    // origin the page links to; the index page also says so in a <meta>.
+    response.setHeader('Referrer-Policy', 'no-referrer');
+    send(response, 200, found.contentType, found.bytes);
+  }
+
+  // serveEditorWasm
+  // The loader or module a succeeded editor-wasm build wrote. Addressed by
+  // build id, not by hash or path, so the client can only ask for what a
+  // build it started produced, and the server never takes a directory from
+  // the URL.
+  //   route — the request path, `/api/editor-wasm/<id>/<file>`
+  function serveEditorWasm(response: ServerResponse, route: string): void {
+    const [rawId = '', rawFile = '', ...extra] = route.slice(EDITOR_WASM_ROUTE.length).split('/');
+    const id = decodeStrict(rawId);
+    const file = decodeStrict(rawFile);
+    const wasmDir = id === undefined ? undefined : editorWasmDir(builds.get(id));
+    if (extra.length > 0 || file === undefined || !EDITOR_WASM_FILES.includes(file) || wasmDir === undefined) {
+      sendJson(response, 404, { code: 'not-found', message: 'no such editor Wasm file' });
+      return;
+    }
+    const found = readStaticFile(wasmDir, file);
+    if (found === undefined) {
+      sendJson(response, 404, { code: 'not-found', message: `the build's ${file} is gone` });
+      return;
+    }
+    send(response, 200, found.contentType, found.bytes);
+  }
+
   // openStream
   // Holds a response open as a server-sent event stream until the client goes.
   // `ready` is sent first, so a client knows it is attached and that no event
@@ -274,6 +343,20 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     builds,
     close: () => closeServer(server, watcher, streams),
   };
+}
+
+// editorWasmDir
+// The output directory of a succeeded editor-wasm build, or undefined for any
+// other record. The result is the job's own JSON, so it is narrowed here
+// rather than trusted.
+//   record — a build record, or undefined
+function editorWasmDir(record: BuildJobRecord | undefined): string | undefined {
+  if (record === undefined || record.job !== EDITOR_WASM_JOB || record.status !== 'succeeded') {
+    return undefined;
+  }
+  const result = record.result;
+  const dir = typeof result === 'object' && result !== null ? (result as { wasmDir?: unknown }).wasmDir : undefined;
+  return typeof dir === 'string' ? dir : undefined;
 }
 
 // closeServer

@@ -1,0 +1,83 @@
+/**
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/workspace.ts
+ * Purpose: The designer session's state outside the document, and the one
+ *          object every panel is given: the project's documents, which file is
+ *          active, what the Problems and Output panels show, and the requests
+ *          that cross panels ("open this file at this line"). React renders
+ *          from it; it does not live in React, because the edit loop runs at
+ *          frame rate and must not wait on a render (EDITOR-DESIGN §3.3).
+ * Description: Observables per concern, so each panel subscribes to only what
+ *              it shows. Opening a file is a request the layout fulfils, since
+ *              only the layout knows where editor tabs go.
+ *
+ * Exports:
+ * - OpenRequest:     A file to show, and optionally where
+ * - Workspace:       The session
+ *
+ *     State:
+ *     - documents, activeFile, problems, output, projectName
+ *
+ *     Requests:
+ *     - openFile():     Ask the layout to show a file
+ *     - onOpenFile():   The layout's subscription to those requests
+ *     - log():          Append a line to Output
+ */
+
+import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
+import { ProjectDocuments } from './documents/project-documents';
+import type { ProblemRow } from './pipeline/diagnostics';
+import { Observable } from './state/observable';
+
+/** A file to show, and optionally the position to put the caret at. */
+export interface OpenRequest {
+  readonly path: string;
+  readonly line?: number;
+  readonly column?: number;
+}
+
+/** Lines kept in Output; older ones are dropped so a long session stays bounded. */
+const OUTPUT_LIMIT = 500;
+
+/** The designer session. */
+export class Workspace {
+  /** The project's documents. */
+  readonly documents: ProjectDocuments;
+  /** The project file the editor shows, if any; the canvas shows its screen. */
+  readonly activeFile = new Observable<string | undefined>(undefined);
+  /** The Problems panel's rows. */
+  readonly problems = new Observable<readonly ProblemRow[]>([]);
+  /** The Output panel's lines, oldest first. */
+  readonly output = new Observable<readonly string[]>([]);
+  /** The project's name from `u8g2gl.xml`, once loaded, for the title and status bar. */
+  readonly projectName = new Observable<string>('');
+
+  private readonly openListeners = new Set<(request: OpenRequest) => void>();
+
+  /** @param fs The served project file system, connected. */
+  constructor(fs: ServedProjectFileSystem) {
+    this.documents = new ProjectDocuments(fs);
+  }
+
+  /** @brief Asks the layout to show a file, at a position if given. */
+  openFile(request: OpenRequest): void {
+    for (const listener of [...this.openListeners]) listener(request);
+  }
+
+  /** @brief The layout's subscription to open requests; returns the unsubscribe. */
+  onOpenFile(listener: (request: OpenRequest) => void): () => void {
+    this.openListeners.add(listener);
+    return () => {
+      this.openListeners.delete(listener);
+    };
+  }
+
+  /** @brief Appends a line to Output, stamped with the time of day. */
+  log(line: string): void {
+    const stamp = new Date().toTimeString().slice(0, 8);
+    this.output.set([...this.output.get(), `${stamp}  ${line}`].slice(-OUTPUT_LIMIT));
+  }
+}

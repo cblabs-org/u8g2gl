@@ -1,0 +1,154 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/styles.css
+ * Purpose: The shell's chrome: the ui_spec §6 grid, dark throughout so the
+ *          canvas reads as a physical panel against it (ui_spec §8).
+ */
+
+:root {
+  --bg: #1b1d21;
+  --bg-raised: #23262b;
+  --bg-sunken: #15171a;
+  --border: #33363c;
+  --text: #d4d6da;
+  --text-dim: #8b9099;
+  --accent: #4f8cff;
+  --error: #f0676b;
+  --warning: #e6b450;
+  --info: #6cb6ff;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; }
+
+.fatal { display: grid; place-items: center; padding: 2rem; color: var(--error); font-size: 15px; }
+
+/* --- The ui_spec §6 grid: activity bar, sidebar, editor area; status bar below --- */
+.shell {
+  display: grid;
+  grid-template-columns: 44px 230px 1fr;
+  grid-template-rows: 1fr 24px;
+  height: 100%;
+}
+
+.activity-bar {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--border);
+}
+.activity {
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-size: 18px;
+  cursor: pointer;
+}
+.activity.active { color: var(--text); box-shadow: inset 2px 0 var(--accent); }
+.activity:disabled { opacity: 0.35; cursor: default; }
+
+.sidebar {
+  grid-row: 1;
+  overflow: auto;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+}
+.sidebar-title { padding: 8px 12px; text-transform: uppercase; font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); }
+.file-group h2 { margin: 6px 0 2px; padding: 0 12px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.file-group ul { list-style: none; margin: 0; padding: 0; }
+.file {
+  display: block;
+  width: 100%;
+  padding: 2px 12px 2px 22px;
+  border: 0;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.file:hover { background: #2c3036; }
+.file.active { background: #2f3a4d; }
+.file.inert { color: var(--text-dim); cursor: default; }
+.file.dirty::after { content: ' ●'; color: var(--text-dim); }
+
+.editor-area { grid-row: 1; min-width: 0; min-height: 0; }
+.editor-area > * { height: 100%; }
+
+.status-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 10px;
+  background: #2a2d33;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.status-item { overflow: hidden; text-overflow: ellipsis; }
+.status-item.wasm { cursor: pointer; border: 0; background: none; padding: 0; }
+.status-item.wasm[data-wasm='failed'] { color: var(--error); }
+.status-item.wasm[data-wasm='none'] { color: var(--warning); }
+.status-spacer { flex: 1; }
+
+/* --- Panels --- */
+.panel-empty { padding: 12px; color: var(--text-dim); }
+.editor-host { height: 100%; width: 100%; }
+
+.problems { list-style: none; margin: 0; padding: 0; overflow: auto; height: 100%; }
+.problem {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.problem:hover { background: #2c3036; }
+.problem .where { color: var(--text-dim); }
+.problem .suggest { color: var(--info); }
+.problem .code { margin-left: auto; color: var(--text-dim); font-size: 11px; }
+.problem.error .glyph { color: var(--error); }
+.problem.warning .glyph { color: var(--warning); }
+
+.output { margin: 0; padding: 8px 10px; height: 100%; overflow: auto; font: 12px/1.45 ui-monospace, Menlo, monospace; color: var(--text-dim); white-space: pre-wrap; }
+
+/* --- Canvas --- */
+.canvas-panel { display: flex; flex-direction: column; height: 100%; background: #101113; }
+.canvas-toolbar { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-raised); font-size: 12px; }
+.canvas-toolbar select, .canvas-toolbar button { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; }
+.canvas-toolbar .spacer { flex: 1; }
+.canvas-stage { flex: 1; overflow: auto; display: grid; place-items: center; position: relative; }
+.canvas-frame { position: relative; padding: 10px; background: #050505; border: 1px solid #2a2a2a; border-radius: 4px; box-shadow: 0 0 0 6px #0a0a0a; }
+.canvas-frame canvas { display: block; image-rendering: pixelated; }
+.canvas-frame canvas.overlay { position: absolute; left: 10px; top: 10px; pointer-events: none; }
+.canvas-frame.stale canvas.frame { opacity: 0.45; }
+.canvas-banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 3px; background: #4a2a2c; color: #ffd6d6; font-size: 12px; white-space: nowrap; }
+
+/* --- Conflicts: a file changed on disk while its buffer was dirty --- */
+.editor-panel { display: flex; flex-direction: column; height: 100%; }
+.editor-panel .editor-host { flex: 1; min-height: 0; }
+.conflict-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: #3d3320; border-bottom: 1px solid #6b5a2c; font-size: 12px; }
+.conflict-bar .text { flex: 1; }
+.conflict-bar button { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 8px; cursor: pointer; }
