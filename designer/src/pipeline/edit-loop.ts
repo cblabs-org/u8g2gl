@@ -23,14 +23,18 @@
  *              each frame so widgets animate (ui_spec §4.2); frozen, every
  *              render is at t = 0 instead, so the frame is stable to compare.
  *
- *              The element under the caret is outlined on the canvas from the
- *              run's element rectangles (XML-to-canvas selection, ui_spec §4.3).
+ *              After each run the selection's names are looked up in the new
+ *              text (`SelectionModel.reconcile`), and each selected element on
+ *              the drawn screen is outlined on the canvas from the run's
+ *              rectangles (ui_spec §4.3). The run's hit targets are published
+ *              for the canvas's selection gestures. Selection is never an edit.
  *
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how a keystroke measurement attributes a keystroke's cost.
  *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
+ * - DrawnTargets:     The drawn frame's hit targets
  * - FrameTimings:     One run's milliseconds per stage
  * - EditLoop:         The loop
  *
@@ -40,7 +44,7 @@
  *     - dispose():        Stop
  *
  *     State:
- *     - frameState, frozen, bounds, selectionRect
+ *     - frameState, frozen, bounds, hitTargets, selectionRect
  *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
@@ -56,6 +60,7 @@ import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
 import type { EditorModule, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
+import type { HitTarget } from '../selection/hit-test';
 import type { Workspace } from '../workspace';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
@@ -78,6 +83,12 @@ export interface FrameState {
   readonly lit: number;
 }
 
+/** The drawn frame's hit targets, and the file whose names they carry. */
+export interface DrawnTargets {
+  readonly file: string | undefined;
+  readonly targets: readonly HitTarget[];
+}
+
 /** The stages after the text pipeline, in order. */
 const WASM_STAGES = ['apply', 'render', 'blit'] as const;
 
@@ -96,9 +107,15 @@ export class EditLoop {
   readonly frameState = new Observable<FrameState>({ frame: 0, stale: true, placeholders: [], lit: 0 });
   /** Whether animation is pinned at t = 0 (ui_spec §4.2's freeze toggle). */
   readonly frozen = new Observable<boolean>(false);
-  /** The element rectangles of the drawn screen, by name. */
+  /** The selectable element rectangles of the drawn screen, by name. */
   readonly bounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
-  /** The selected element's rectangle on the drawn screen, highlighted on the canvas. */
+  /** What a click on the drawn frame can hit, and the file its names are in. */
+  readonly hitTargets = new Observable<DrawnTargets>({ file: undefined, targets: [] });
+  /**
+   * The selection's geometry on the drawn screen, for the status bar: one
+   * element's rectangle, or the box around several. Undefined when nothing
+   * selected is drawn.
+   */
   readonly selectionRect = new Observable<Rect | undefined>(
     undefined,
     (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height,
@@ -137,7 +154,10 @@ export class EditLoop {
   start(): void {
     const request = (): void => this.scheduler.request();
     this.subscriptions.push(
-      this.workspace.documents.onDidChangeContent(request),
+      this.workspace.documents.onDidChangeContent((path, changes) => {
+        this.workspace.selection.textChanged(path, changes);
+        request();
+      }),
       this.workspace.documents.onDidOpen(() => {
         this.publishMarkers(true);
         request();
@@ -152,7 +172,7 @@ export class EditLoop {
       }),
     );
     this.subscriptions.push(
-      this.workspace.selection.subscribe(() => this.highlightSelection()),
+      this.workspace.selection.current.subscribe(() => this.highlightSelection()),
       this.bounds.subscribe(() => this.highlightSelection()),
     );
     request();
@@ -160,14 +180,15 @@ export class EditLoop {
   }
 
   // highlightSelection
-  // XML to canvas (ui_spec §4.3): outline the element the caret is in,
-  // when it is on the screen being drawn. Highlight only; never an edit.
+  // Outline each selected element that is on the screen being drawn, and
+  // publish their geometry for the status bar. Highlight only; never an edit.
   private highlightSelection(): void {
-    const selection = this.workspace.selection.get();
-    const drawn = selection !== undefined && selection.file === this.workspace.activeFile.get();
-    const rect = drawn ? this.bounds.get().get(selection.name) : undefined;
-    this.selectionRect.set(rect);
-    this.setOverlay(rect === undefined ? [] : [{ ...rect, kind: 'selection' }]);
+    const selection = this.workspace.selection.current.get();
+    const drawn = selection.file !== undefined && selection.file === this.hitTargets.get().file;
+    const bounds = this.bounds.get();
+    const rects = drawn ? selection.names.map((name) => bounds.get(name)).filter((rect): rect is Rect => rect !== undefined) : [];
+    this.selectionRect.set(boundingBox(rects));
+    this.setOverlay(rects.map((rect) => ({ ...rect, kind: 'selection' })));
   }
 
   /** @brief Draws into a canvas panel's view from now on (undefined detaches). */
@@ -221,6 +242,7 @@ export class EditLoop {
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
     this.publishDiagnostics([...result.diagnostics, ...this.wasm.buildDiagnostics.get()]);
+    this.workspace.selection.reconcile();
 
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
     const module = this.wasm.module.get();
@@ -250,6 +272,7 @@ export class EditLoop {
         this.applied = module;
         this.drawn += 1;
         const placeholders = module.placeholders();
+        this.hitTargets.set({ file: result.screenFile, targets: result.targets });
         this.bounds.set(result.bounds);
         this.frameState.set({
           frame: this.drawn,
@@ -352,6 +375,24 @@ export class EditLoop {
     }
     this.diagnosticFiles = new Set(byFile.keys());
   }
+}
+
+// boundingBox
+// The smallest rectangle containing every one of `rects`; undefined for none.
+function boundingBox(rects: readonly Rect[]): Rect | undefined {
+  const [first, ...rest] = rects;
+  if (first === undefined) return undefined;
+  let left = first.x;
+  let top = first.y;
+  let right = first.x + first.width;
+  let bottom = first.y + first.height;
+  for (const rect of rest) {
+    left = Math.min(left, rect.x);
+    top = Math.min(top, rect.y);
+    right = Math.max(right, rect.x + rect.width);
+    bottom = Math.max(bottom, rect.y + rect.height);
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 export { TEXT_STAGES, WASM_STAGES };

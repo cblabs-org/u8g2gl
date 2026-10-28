@@ -6,11 +6,15 @@
  * File: designer/src/ui/canvas-panel.tsx
  * Purpose: The canvas (ui_spec §8): the active screen as the editor Wasm draws
  *          it, at a chosen zoom, on dark chrome so the display bounds read as a
- *          physical panel. Read-only in this release; editing on the canvas is
- *          a later step.
+ *          physical panel, and where elements are selected: click, click again
+ *          to cycle through overlaps, drag a marquee, Esc. Selecting never
+ *          edits; moving elements on the canvas is a later step.
  * Description: React renders the toolbar and the two canvases' container; the
  *              pixels are drawn by `CanvasView`, which the edit loop calls
- *              directly, so a frame never passes through React. The toolbar
+ *              directly, so a frame never passes through React; the selection
+ *              gestures are `CanvasGestures`, attached to the frame element for
+ *              the panel's life, and this component never reads the selection,
+ *              so selecting re-renders none of it. The toolbar
  *              sets the zoom (1× to 8×, or fit) and the animation freeze. The
  *              banner says why the frame is the last good one, or what the
  *              renderer cannot draw.
@@ -21,6 +25,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CanvasView } from '../canvas/canvas-view';
+import { CanvasGestures } from '../selection/canvas-gestures';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 
@@ -41,16 +46,18 @@ export function CanvasPanel(): React.JSX.Element {
   const overlay = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView | undefined>(undefined);
 
-  // --- The view: created once, attached to the loop for the panel's life ---
+  // --- The view and its gestures: created once, attached for the panel's life ---
   useEffect(() => {
     if (frame.current === null || overlay.current === null || container.current === null) return undefined;
     view.current = new CanvasView(frame.current, overlay.current, container.current);
     loop.attachCanvas(view.current);
+    const gestures = new CanvasGestures(container.current, frame.current, loop.hitTargets, workspace.selection, () => undefined);
     return () => {
+      gestures.dispose();
       loop.attachCanvas(undefined);
       view.current = undefined;
     };
-  }, [loop]);
+  }, [loop, workspace]);
 
   // --- Zoom: a fixed factor, or the largest integer that fits the panel ---
   const display = state.display;

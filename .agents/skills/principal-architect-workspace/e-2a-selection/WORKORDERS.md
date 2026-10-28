@@ -37,12 +37,12 @@ owner's approval (rule 00) and the programme rulings. The design is
 
 # WO2 — selection (`u8g2gl-e2a/wo2-selection`)
 
-- [ ] The selection model (ruling 2), with unit tests: survives an unrelated edit, an edit that
+- [x] The selection model (ruling 2), with unit tests: survives an unrelated edit, an edit that
       moves the element's text, a rename; drops a deleted element.
-- [ ] Hit-testing (ruling 3), with unit tests for overlap cycling, marquee and composites.
-- [ ] Canvas → XML (ruling 4): reveal and decorate, focus untouched. XML → canvas via
+- [x] Hit-testing (ruling 3), with unit tests for overlap cycling, marquee and composites.
+- [x] Canvas → XML (ruling 4): reveal and decorate, focus untouched. XML → canvas via
       `element-at.ts`.
-- [ ] e2e: click selects and reveals; caret selects; ruling 5's version-id check.
+- [x] e2e: click selects and reveals; caret selects; ruling 5's version-id check.
 
 # WO3 — overlays and the status bar (`u8g2gl-e2a/wo3-overlays`)
 

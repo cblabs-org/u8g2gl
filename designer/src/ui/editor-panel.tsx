@@ -14,10 +14,16 @@
  *              in an effect that owns its lifecycle; React renders only the
  *              container and the conflict bar. "Compare" swaps the editor for a
  *              diff editor — the disk's text on the left, the buffer on the
- *              right, still editable — until the user chooses. The caret's
- *              element becomes the workspace selection, which the canvas
- *              highlights (XML to canvas, ui_spec §4.3); a caret in text that does not
- *              parse keeps the previous selection.
+ *              right, still editable — until the user chooses.
+ *
+ *              Selection, both ways (ui_spec §4.3, EDITOR-DESIGN §3.7). The
+ *              caret's element becomes the selection, which the canvas outlines;
+ *              typing inside an element does not change it, and a caret in text
+ *              that does not parse keeps it. The selected elements are
+ *              decorated here, and one selected on the canvas is revealed —
+ *              scrolled into view only if it is outside it — **without taking
+ *              focus**, so the next key still goes to the canvas. Neither
+ *              direction edits the text.
  *
  * Exports:
  * - EditorPanelParams:  Which document the tab shows
@@ -49,6 +55,13 @@ const EDITOR_OPTIONS: monaco.editor.IEditorOptions = {
   // Format on demand only, never by itself (ui_spec §10, principle 5).
   formatOnPaste: false,
   formatOnType: false,
+};
+
+/** How a selected element's text is decorated: a tint, and a mark in the overview ruler. */
+const SELECTED_ELEMENT: monaco.editor.IModelDecorationOptions = {
+  className: 'selected-element',
+  stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+  overviewRuler: { color: '#4f8cff', position: monaco.editor.OverviewRulerLane.Left },
 };
 
 /** @brief An editor tab. */
@@ -109,20 +122,49 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       if (request.path === path) reveal(request);
     });
 
-    // --- Step 3: The caret's element is the selection the canvas highlights ---
-    const select = (): void => {
+    // --- Step 3: The caret's element is the selection the canvas outlines ---
+    const select = (explicit: boolean): void => {
       const position = editor.getPosition();
       if (position === null) return;
       const found = elementAt(model.getValue(), model.getOffsetAt(position));
       if (found === 'unparsed') return;
-      workspace.selection.set(found === undefined ? undefined : { file: path, name: found.name });
+      workspace.selection.caretMoved(path, found?.name, explicit);
     };
-    const caretListener = editor.onDidChangeCursorPosition(select);
+    const caretListener = editor.onDidChangeCursorPosition((event) =>
+      select(event.reason === monaco.editor.CursorChangeReason.Explicit),
+    );
 
-    // --- Step 4: Activity: the active tab's file is the one the canvas shows ---
+    // --- Step 4: The selection decorated, and revealed when the canvas chose it ---
+    const decorations = editor.createDecorationsCollection();
+    const showSelection = (): void => {
+      const selection = workspace.selection.current.get();
+      if (selection.file !== path) {
+        decorations.clear();
+        return;
+      }
+      const ranges = workspace.selection.spans().map((span) => {
+        const start = model.getPositionAt(span.start);
+        const end = model.getPositionAt(span.end);
+        return new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
+      });
+      decorations.set(ranges.map((range) => ({ range, options: SELECTED_ELEMENT })));
+      const first = ranges[0];
+      // Reveal only what the canvas selected: the caret's element is already
+      // where the user is looking. Never focus — the canvas keeps the keyboard.
+      if (selection.origin === 'canvas' && first !== undefined) {
+        editor.revealRangeInCenterIfOutsideViewport(first, monaco.editor.ScrollType.Smooth);
+      }
+    };
+    showSelection();
+    const unsubscribeSelection = workspace.selection.current.subscribe(showSelection);
+
+    // --- Step 5: Activity: the active tab's file is the one the canvas shows ---
+    // Activation selects the caret's element only when the selection is in
+    // another file: a tab brought forward to show a canvas selection must not
+    // replace it with wherever its caret happens to be.
     const activate = (): void => {
       workspace.activeFile.set(path);
-      select();
+      if (workspace.selection.current.get().file !== path) select(true);
     };
     if (props.api.isActive) activate();
     const activeListener = props.api.onDidActiveChange((event) => {
@@ -132,6 +174,8 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
 
     return () => {
       unsubscribeOpen();
+      unsubscribeSelection();
+      decorations.clear();
       caretListener.dispose();
       activeListener.dispose();
       focusListener.dispose();

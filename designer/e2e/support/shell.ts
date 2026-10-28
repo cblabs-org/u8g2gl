@@ -22,6 +22,10 @@
  * - frameInfo():        The current frame state
  * - canvasPixels():     A hash of the frame canvas's pixels
  * - nextFrames():       Resolve after the page has drawn N animation frames
+ * - devicePoint():      Where a device pixel's centre is on the page
+ * - clickCanvas():      Click a device pixel on the canvas
+ * - dragCanvas():       Drag between two device pixels on the canvas
+ * - selectedNames():    The selection's file and names
  */
 
 import { expect, type Page } from '@playwright/test';
@@ -111,4 +115,39 @@ export async function nextFrames(page: Page, count = 1): Promise<void> {
       }),
     count,
   );
+}
+
+/** @brief The page coordinates of device pixel (x, y)'s centre on the frame canvas. */
+export async function devicePoint(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
+  const canvas = page.locator('.canvas-frame canvas.frame');
+  const box = await canvas.boundingBox();
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
+  if (box === null || size.width === 0) throw new Error('the frame canvas is not laid out');
+  return { x: box.x + ((x + 0.5) * box.width) / size.width, y: box.y + ((y + 0.5) * box.height) / size.height };
+}
+
+/** @brief Clicks device pixel (x, y) on the canvas, as a user would. */
+export async function clickCanvas(page: Page, x: number, y: number, modifiers: ('Shift')[] = []): Promise<void> {
+  const point = await devicePoint(page, x, y);
+  for (const key of modifiers) await page.keyboard.down(key);
+  await page.mouse.click(point.x, point.y);
+  for (const key of modifiers) await page.keyboard.up(key);
+}
+
+/** @brief Drags from one device pixel to another on the canvas, in steps, as a hand does. */
+export async function dragCanvas(page: Page, from: readonly [number, number], to: readonly [number, number]): Promise<void> {
+  const start = await devicePoint(page, from[0], from[1]);
+  const end = await devicePoint(page, to[0], to[1]);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 8 });
+  await page.mouse.up();
+}
+
+/** @brief The selection: its file and names. */
+export async function selectedNames(page: Page): Promise<{ readonly file: string | undefined; readonly names: readonly string[] }> {
+  return page.evaluate(() => {
+    const { file, names } = (window as unknown as TestHandle).__u8g2gl.selection.current.get();
+    return { file, names: [...names] };
+  });
 }
