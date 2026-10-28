@@ -39,10 +39,10 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 
 # WO2 — CI and the C++ build (`u8g2gl-c1/wo2-ci`)
 
-- [ ] Every `uses:` pinned by full SHA with the tag in a comment (ruling 4); resolve each SHA from
+- [x] Every `uses:` pinned by full SHA with the tag in a comment (ruling 4); resolve each SHA from
       the action's repository, and record how in the commit message.
-- [ ] `.github/dependabot.yml`, `github-actions` only, weekly.
-- [ ] `DISCOVERY_TIMEOUT` set once for every `gtest_discover_tests` (ruling 5). Show the cold
+- [x] `.github/dependabot.yml`, `github-actions` only, weekly.
+- [x] `DISCOVERY_TIMEOUT` set once for every `gtest_discover_tests` (ruling 5). Show the cold
       parallel build passing that failed before (`rm -rf` the build dir, unbounded `-j`), or
       report that you could not reproduce the failure.
 
