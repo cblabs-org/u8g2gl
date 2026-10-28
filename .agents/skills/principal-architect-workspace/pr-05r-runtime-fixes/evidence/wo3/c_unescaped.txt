@@ -1,6 +1,6 @@
 Processing c_unescaped (platform: espressif32; board: esp32dev; framework: arduino)
 --------------------------------------------------------------------------------
-Library Manager: Installing symlink:///Users/mcneillm/Documents/Projects/U8G2GL-05r
+Library Manager: Installing symlink://.
 Library Manager: u8g2gl@0.7.0 has been installed!
 Library Manager: Resolving dependencies...
 Library Manager: Installing olikraus/U8g2 @ ^2.36.18
@@ -168,28 +168,28 @@ Compiling .pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl.cpp.o
 Compiling .pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl_button.cpp.o
 Compiling .pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl_clock.cpp.o
 Compiling .pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl_core.cpp.o
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/src/u8g2gl.cpp:19:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
+In file included from src/u8g2gl.cpp:19:
+include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
    68 | #include U8G2GL_GENERATED_CONFIG
       |          ^~~~~~~~~~~~~~~~~~~~~~~
 Compiling .pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl_draw.cpp.o
 *** [.pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl.cpp.o] Error 1
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_obj.h:67,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_button.h:40,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/src/u8g2gl_button.cpp:25:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
+In file included from include/u8g2gl/u8g2gl_obj.h:67,
+                 from include/u8g2gl/u8g2gl_button.h:40,
+                 from src/u8g2gl_button.cpp:25:
+include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
    68 | #include U8G2GL_GENERATED_CONFIG
       |          ^~~~~~~~~~~~~~~~~~~~~~~
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_obj.h:67,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_clock.h:54,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/src/u8g2gl_clock.cpp:23:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
+In file included from include/u8g2gl/u8g2gl_obj.h:67,
+                 from include/u8g2gl/u8g2gl_clock.h:54,
+                 from src/u8g2gl_clock.cpp:23:
+include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
    68 | #include U8G2GL_GENERATED_CONFIG
       |          ^~~~~~~~~~~~~~~~~~~~~~~
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_obj.h:67,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_core.h:47,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/src/u8g2gl_core.cpp:28:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
+In file included from include/u8g2gl/u8g2gl_obj.h:67,
+                 from include/u8g2gl/u8g2gl_core.h:47,
+                 from src/u8g2gl_core.cpp:28:
+include/u8g2gl/u8g2gl_config.h:68:10: error: #include expects "FILENAME" or <FILENAME>
    68 | #include U8G2GL_GENERATED_CONFIG
       |          ^~~~~~~~~~~~~~~~~~~~~~~
 *** [.pio/build/c_unescaped/lib97d/U8G2GL-05r/u8g2gl_button.cpp.o] Error 1

@@ -181,7 +181,7 @@ complete
 - **Wasm Scene Realisation**: Because the prebuilt Wasm binary `bridge.cpp` uses a static registry containing only framework classes, `render.mjs` probes the raw generator scene to verify and document the refusal, and translates `wd_service_list::render()`'s layout into scene JSON elements to generate pixel-accurate bitmaps.
 
 ### Dead Ends & Warnings
-- **Pre-tool Hook Protection on `cli/`**: Modifying or symlinking inside `cli/` in the probe worktree triggers pre-tool hook blocks. The CLI was executed cleanly using the global wrapper `/Users/mcneillm/.local/bin/u8g2gl` pointing to `cli/dist/node/cli.js`.
+- **Pre-tool Hook Protection on `cli/`**: Modifying or symlinking inside `cli/` in the probe worktree triggers pre-tool hook blocks. The CLI was executed cleanly using the global wrapper `~/.local/bin/u8g2gl` pointing to `cli/dist/node/cli.js`.
 - **`u8g2gl_state_saver` Font Position**: The framework establishes `setFontPosTop()` inside `u8g2gl_state_saver` before invoking widget render methods. Custom widget authors must treat `y` as the top of the glyph bounding box rather than the baseline.
 - **Scene Format Version in `bridge.cpp`**: `wasm/bridge.cpp` strictly requires `"version": 3` and `realisation == "draw"` for drawing elements. `u8g2gl generate --target-kind editor` currently writes `"version": 2` and `"draw_calls"`.
 

@@ -3,7 +3,7 @@
 **Work Order:** wo4-report
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo4-report`
-**Worktree:** `/Users/mcneillm/Documents/Projects/U8G2GL-probe2`
+**Worktree:** `.`
 **Predecessors:** [WO1](../wo1-widget-path/WORKORDER.md), [WO2](../wo2-formation-and-messages/WORKORDER.md), [WO3](../wo3-full-screen/WORKORDER.md) (all complete)
 **Complexity:** architect
 
@@ -13,7 +13,7 @@
 
 Write `WIDGET-PATH.md` — the four-part report for the PR-07 gate. This is the deliverable of G-PROBE-2.
 
-Place it at: `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/WIDGET-PATH.md`
+Place it at: `.agents/skills/principal-architect-workspace/g-probe2-widgets/WIDGET-PATH.md`
 
 ---
 
@@ -29,7 +29,7 @@ Place it at: `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/pr
 
 Everything else. This is a report WO — it reads evidence and writes one file.
 
-All paths relative to `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
+All paths relative to `.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
 
 ---
 
@@ -120,7 +120,7 @@ This is a yes/no with nuance. The evidence is now in your hands.
 
 ## Evidence Files to Read
 
-All relative to `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/`:
+All relative to `.agents/skills/principal-architect-workspace/g-probe2-widgets/`:
 
 | File | What it provides |
 |---|---|
@@ -141,7 +141,7 @@ Also read for methodology:
 | `.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md` | Line attribution methodology (§1.1 rules, §1.2 counts). Read §1 and §2 only — don't need the full §3. |
 | `.agents/skills/principal-architect-workspace/g-probe-departures/EXPRESSIVENESS.md` | G-PROBE-1 report — for contrast. Reference its conclusions but correct them where this probe disproves them. |
 
-**Both of these are in the PRIMARY checkout** (`/Users/mcneillm/Documents/Projects/U8G2GL/`), not the probe worktree.
+**Both of these are in the PRIMARY checkout** (``), not the probe worktree.
 
 ---
 

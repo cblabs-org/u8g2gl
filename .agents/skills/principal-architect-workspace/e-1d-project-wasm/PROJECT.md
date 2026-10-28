@@ -40,7 +40,7 @@ One worker, WO1 to WO4 in order, each branch from the previous tip.
    needs the owner's explicit permission each time. The installer is built and tested against a
    **fake** process runner and fake network (temp directories, recorded commands); it is never
    run for real here. For building and testing Wasm, use the emsdk already on this machine:
-   `source /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`,
+   `source ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`,
    which is **Emscripten 5.0.3**, the pinned version. That is also the "already on `PATH` at
    exactly 5.0.3" path the scope requires `toolchain` to detect and use.
 2. **How the installer pins and verifies.** It clones `emscripten-core/emsdk` at tag `5.0.3` and

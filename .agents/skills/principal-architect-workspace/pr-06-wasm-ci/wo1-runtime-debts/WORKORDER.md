@@ -31,7 +31,7 @@ debug assert. Bump the runtime from 0.9.0 to 0.10.0 (public API addition).
 # Tooling Constraints
 
 - Build and test C++ with CMake in the worktree at
-  `/Users/mcneillm/Documents/Projects/U8G2GL-06`.
+  `.`.
 - Run: `cmake -B build -DCMAKE_BUILD_TYPE=Debug` then `cmake --build build -j`
   then `cd build && ctest --output-on-failure`.
 - Zero warnings under `-Wall -Wextra -Wpedantic`.

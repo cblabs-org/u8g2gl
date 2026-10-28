@@ -12,7 +12,7 @@ recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo3-bdf-generate` (already created, base
 `u8g2gl-fonts/wo2-font-compiler`). **Working tree:**
-`/Users/mcneillm/Documents/Projects/U8G2GL-04b`. Work only there.
+`.`. Work only there.
 
 ## Role Definition
 
@@ -209,7 +209,7 @@ tests that build temporary projects, and through the built CLI.
 - [ ] **8. End to end, and report it.** `npm run build`, then run the **built**
   CLI (`node dist/node/cli.js generate …`) on a scratch project in `tmp/` that
   uses three of departures-board-v3's BDFs — read-only from
-  `/Users/mcneillm/Documents/Projects/departures-board-v3/src/fonts/source/`,
+  `~/Documents/Projects/departures-board-v3/src/fonts/source/`,
   copied into `tmp/`, with no `range` — and paste the budget output into the
   report. Do not modify anything in departures-board-v3.
 
@@ -376,7 +376,7 @@ alongside `compileProjectAssets()` if WO4 wants one, or an extension of it.
   project in `cli/tmp/` (not committed; departures-board-v3 itself untouched)
   with `<bdf>` declarations for `NatRailSmall9.bdf`, `NatRailTall12.bdf` and
   `UndergroundClock8.bdf`, no `range`, read-only from
-  `/Users/mcneillm/Documents/Projects/departures-board-v3/src/fonts/source/`,
+  `~/Documents/Projects/departures-board-v3/src/fonts/source/`,
   through `node dist/node/cli.js generate`:
 
   ```

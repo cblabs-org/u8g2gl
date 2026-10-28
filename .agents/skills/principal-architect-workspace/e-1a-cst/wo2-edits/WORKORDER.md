@@ -9,7 +9,7 @@ As WO1. **Parent project:** `e-1a-cst` ([PROJECT.md](../PROJECT.md)).
 
 # Where you work
 
-- Same worktree, `/Users/mcneillm/Documents/Projects/U8G2GL-e1a`. When WO1 is committed, create
+- Same worktree, `.`. When WO1 is committed, create
   **only** this branch from WO1's tip: `git checkout -b u8g2gl-e1a/wo2-edits`. That is the one
   branch this WO authorises. Verify with `git branch --show-current` before every commit.
 - Do not push. Commit trailer as WO1.

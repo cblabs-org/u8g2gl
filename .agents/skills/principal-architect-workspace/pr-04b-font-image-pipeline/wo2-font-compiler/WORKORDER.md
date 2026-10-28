@@ -12,7 +12,7 @@ recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo2-font-compiler` (already created, base
 `u8g2gl-fonts/wo1-bdfconv-wasm`). **Working tree:**
-`/Users/mcneillm/Documents/Projects/U8G2GL-04b`. Work only there.
+`.`. Work only there.
 
 ## Role Definition
 
@@ -85,7 +85,7 @@ It is not wired into `generate` here — that is WO3. The `<bdf>` refusal stays.
 - CLI, from `cli/`: `npm test`, `npm run lint`, `npm run build`. All green
   before every commit.
 - Emscripten 5.0.3 is at
-  `/Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk`
+  `~/Documents/Projects/departures-board/tools/layoutsim/emsdk`
   (read-only) if item 1 needs a rebuild. Download no toolchain.
 - `esbuild` is already in `cli/node_modules` (through Vite). Use it for the
   parity test; do not add it to `package.json`.

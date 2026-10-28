@@ -24,7 +24,7 @@ option (b). This WORKORDER's `status` must be `dispatched`. Otherwise **stop and
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-4r2`.** **Branch**:
+**Work only in `.`.** **Branch**:
 `u8g2gl-4r2/wo1-bound-child-clip` (already checked out, no upstream) · **Base**: `main` @ `86d3f89`.
 Run `git branch --show-current` **as its own command immediately before every commit**
 (`.agents/rules/04-branch-hygiene.md`). Do not touch the other checkouts.

@@ -1,5 +1,5 @@
 
- RUN  v2.1.9 /Users/mcneillm/Documents/Projects/U8G2GL-05r/cli
+ RUN  v2.1.9 cli
 
  ❯ test/generator/emit-screen.test.ts (46 tests | 1 failed | 45 skipped) 6ms
    × bindings are emitted from the overload realisation chose (WO5a finding 4) > never spells a bool subject’s comparison as an integer literal, on an object or a draw call’s guard 5ms

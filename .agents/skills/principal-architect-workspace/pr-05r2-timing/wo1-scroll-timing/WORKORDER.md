@@ -24,7 +24,7 @@ hardware: 37.9 px/s against 40 configured, and 4 343 wakes with nothing to do in
 
 ## Strict Boundary Box
 
-- **Work in** the worktree `/Users/mcneillm/Documents/Projects/U8G2GL-05r2`, on branch
+- **Work in** the worktree `.`, on branch
   `u8g2gl-05r2/wo1-scroll-timing` (already checked out). Do not create branches.
 - **Edit only:** `src/u8g2gl_label.cpp`, `include/u8g2gl/u8g2gl_label.h`, `test/test_label.cpp`, and
   the spec text in `docs/design_spec.md` **only** where it describes scroll stepping or the label's

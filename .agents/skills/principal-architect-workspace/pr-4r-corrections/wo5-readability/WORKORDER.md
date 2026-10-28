@@ -24,7 +24,7 @@ WORKORDER's `status` must be `dispatched`. Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-4r`.** **Branch**:
+**Work only in `.`.** **Branch**:
 `u8g2gl-4r/wo5-readability` (already checked out) · **Base**: `u8g2gl-4r/wo4-bound-arg-clamp`.
 Run `git branch --show-current` **as its own command immediately before every commit**.
 

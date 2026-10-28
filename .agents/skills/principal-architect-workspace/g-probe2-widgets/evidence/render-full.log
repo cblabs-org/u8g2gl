@@ -3,9 +3,9 @@
 ================================================================
 
 1. Loading Wasm Editor Module...
-   Module loaded successfully from: /Users/mcneillm/Documents/Projects/U8G2GL/build-wasm/wasm
+   Module loaded successfully from: build-wasm/wasm
 
-2. Probing Generator Scene JSON: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
+2. Probing Generator Scene JSON: .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
    [HARNESS GAP VERIFIED]: applyScene() refused with: "row0: no class 'wd_service_list' in registry"
    Explanation: Custom C++ classes (wd_service_list, wd_train_formation) are compiled
    into native firmware but not registered in the precompiled Wasm harness bridge.
@@ -30,9 +30,9 @@
    SHA-256 Digest:   0b0e554ab9037e3c9d620001e3e80486a2e7633fc2198fdbe97d77d93f308156
 
 6. Evidence Bitmaps Written:
-   - PBM Bitmap: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.pbm
-   - Amber PNG:  /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.png
-   - Log File:   /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.log
+   - PBM Bitmap: .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.pbm
+   - Amber PNG:  .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.png
+   - Log File:   .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render-full.log
 
 ================================================================
    Full Screen Render Completed Successfully                    

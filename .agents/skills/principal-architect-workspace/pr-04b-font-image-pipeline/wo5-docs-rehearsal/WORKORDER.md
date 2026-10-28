@@ -12,7 +12,7 @@ recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo5-docs-rehearsal` (already created, base
 `u8g2gl-fonts/wo4-png-convert`). **Working tree:**
-`/Users/mcneillm/Documents/Projects/U8G2GL-04b`. Work only there.
+`.`. Work only there.
 
 ## Role Definition
 
@@ -47,7 +47,7 @@ ones that project ships today.
 - `docs/**` — the specifications and the implementation plan are the Chief
   Architect's. If you find something there that is now wrong, list it under
   *Out-of-Scope Findings* with the exact line and suggested wording.
-- **`/Users/mcneillm/Documents/Projects/departures-board-v3` is read-only.**
+- **`~/Documents/Projects/departures-board-v3` is read-only.**
   Copy what you need into `tmp/`; never write, build, commit or run its
   scripts inside that tree. It has uncommitted files belonging to someone
   else's work — do not touch or report on them.

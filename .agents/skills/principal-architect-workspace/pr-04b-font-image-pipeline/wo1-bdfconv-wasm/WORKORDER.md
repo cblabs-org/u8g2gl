@@ -11,8 +11,8 @@ complexity: standard
 recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo1-bdfconv-wasm` (already created, base `main` @
-`453f9f3`). **Working tree:** `/Users/mcneillm/Documents/Projects/U8G2GL-04b` —
-a dedicated worktree. Work only there; never in `/Users/mcneillm/Documents/Projects/U8G2GL`.
+`453f9f3`). **Working tree:** `.` —
+a dedicated worktree. Work only there; never in `.`.
 
 ## Role Definition
 
@@ -41,7 +41,7 @@ API that uses it is WO2's; do not build that here.
 Read [PROJECT.md](../PROJECT.md) *Findings* 1–4 first. In short:
 
 - Emscripten **5.0.3** (`285c424dfa9e83b03cf8490c65ceadb7c45f28eb`) is installed at
-  `/Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk`.
+  `~/Documents/Projects/departures-board/tools/layoutsim/emsdk`.
   Activate it with `source <that>/emsdk_env.sh`. **Use it read-only; download no
   toolchain.** Do not modify anything in that directory.
 - This command, run against `extern/u8g2/tools/font/bdfconv/*.c`, produced a

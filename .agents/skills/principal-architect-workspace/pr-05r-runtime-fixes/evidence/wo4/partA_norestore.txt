@@ -1,4 +1,4 @@
-Running main() from /Users/mcneillm/Documents/Projects/U8G2GL-05r/build/_deps/googletest-src/googletest/src/gtest_main.cc
+Running main() from build/_deps/googletest-src/googletest/src/gtest_main.cc
 [==========] Running 8 tests from 1 test suite.
 [----------] Global test environment set-up.
 [----------] 8 tests from AmbientState
@@ -9,7 +9,7 @@ Running main() from /Users/mcneillm/Documents/Projects/U8G2GL-05r/build/_deps/go
 [ RUN      ] AmbientState.CallerReferenceHeightDrawsTheSamePixels
 [       OK ] AmbientState.CallerReferenceHeightDrawsTheSamePixels (0 ms)
 [ RUN      ] AmbientState.CallerReferenceHeightComesBackAfterRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)
@@ -17,9 +17,9 @@ Expected equality of these values:
     Which is: '\0'
 reference-height mode
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:289: text
+test/test_ambient_state.cpp:289: text
 
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:159: Failure
+test/test_ambient_state.cpp:159: Failure
 Expected equality of these values:
   actual.ref_ascent
     Which is: '\v' (11, 0xB)
@@ -27,9 +27,9 @@ Expected equality of these values:
     Which is: '\b' (8)
 reference ascent
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:289: text
+test/test_ambient_state.cpp:289: text
 
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)
@@ -37,9 +37,9 @@ Expected equality of these values:
     Which is: '\x1' (1)
 reference-height mode
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:289: extended text
+test/test_ambient_state.cpp:289: extended text
 
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:159: Failure
+test/test_ambient_state.cpp:159: Failure
 Expected equality of these values:
   actual.ref_ascent
     Which is: '\v' (11, 0xB)
@@ -47,11 +47,11 @@ Expected equality of these values:
     Which is: '\b' (8)
 reference ascent
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:289: extended text
+test/test_ambient_state.cpp:289: extended text
 
 [  FAILED  ] AmbientState.CallerReferenceHeightComesBackAfterRender (0 ms)
 [ RUN      ] AmbientState.NullFontKeepsTheCallerReferenceHeightMode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:316: Failure
+test/test_ambient_state.cpp:316: Failure
 Expected equality of these values:
   display.getU8g2()->font_height_mode
     Which is: '\x2' (2)
@@ -59,7 +59,7 @@ Expected equality of these values:
 
 [  FAILED  ] AmbientState.NullFontKeepsTheCallerReferenceHeightMode (0 ms)
 [ RUN      ] AmbientState.CallerStateComesBackAfterRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)
@@ -67,9 +67,9 @@ Expected equality of these values:
     Which is: '\0'
 reference-height mode
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:334: after a label
+test/test_ambient_state.cpp:334: after a label
 
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)
@@ -77,12 +77,12 @@ Expected equality of these values:
     Which is: '\0'
 reference-height mode
 Google Test trace:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:341: after an XBM
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:334: after a label
+test/test_ambient_state.cpp:341: after an XBM
+test/test_ambient_state.cpp:334: after a label
 
 [  FAILED  ] AmbientState.CallerStateComesBackAfterRender (0 ms)
 [ RUN      ] AmbientState.MarqueeRepaintKeepsCallerStateAndMatchesRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)
@@ -92,7 +92,7 @@ reference-height mode
 
 [  FAILED  ] AmbientState.MarqueeRepaintKeepsCallerStateAndMatchesRender (0 ms)
 [ RUN      ] AmbientState.ClockRepaintKeepsCallerStateAndMatchesRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:158: Failure
+test/test_ambient_state.cpp:158: Failure
 Expected equality of these values:
   actual.height_mode
     Which is: '\x2' (2)

@@ -3,7 +3,7 @@
 **Work Order:** wo3-full-screen
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo3-full-screen`
-**Worktree:** `/Users/mcneillm/Documents/Projects/U8G2GL-probe2`
+**Worktree:** `.`
 **Predecessors:** [WO1](../wo1-widget-path/WORKORDER.md) (complete), [WO2](../wo2-formation-and-messages/WORKORDER.md) (complete)
 **Complexity:** standard
 
@@ -37,7 +37,7 @@ Render the complete departures screen through the Wasm harness against the full 
 - The widget source files (`widgets/wd_service_list/`, `widgets/wd_train_formation/`) — those are from WO1 and WO2 and must not be modified
 - `screen_departures.xml` and `globals.xml` — these were finalized in WO2
 
-All paths relative to `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
+All paths relative to `.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
 
 ---
 

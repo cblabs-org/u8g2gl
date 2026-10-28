@@ -3,9 +3,9 @@
 ================================================================
 
 1. Loading Wasm Editor Module...
-   Module loaded successfully from: /Users/mcneillm/Documents/Projects/U8G2GL/build-wasm/wasm
+   Module loaded successfully from: build-wasm/wasm
 
-2. Probing Generator Scene JSON: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
+2. Probing Generator Scene JSON: .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/generated_editor/ui_scene.json...
    [HARNESS GAP VERIFIED]: applyScene() refused with: "row0: no class 'wd_service_list' in registry"
    Explanation: The precompiled Wasm harness bridge.cpp uses a static class registry
    (ui_editor_registry()) containing only framework classes. Custom C++ classes like
@@ -28,8 +28,8 @@
    SHA-256 Digest:   7e1e6c73e3b2610e3a51b88c5a8bb2102b0df2e08d997463f5c30b82ba6b6d14
 
 6. Evidence Bitmaps Written:
-   - PBM Bitmap: /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.pbm
-   - Amber PNG:  /Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.png
+   - PBM Bitmap: .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.pbm
+   - Amber PNG:  .agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/render.png
 
 ================================================================
    Custom Widget Probe Render Completed Successfully            

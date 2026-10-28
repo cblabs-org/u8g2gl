@@ -25,7 +25,7 @@ WORKORDER's `status` must be `dispatched`. Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-05r`.** **Branch**:
+**Work only in `.`.** **Branch**:
 `u8g2gl-05r/wo4-height-and-bool-refs` (already checked out, no upstream) · **Base**:
 `u8g2gl-05r/wo3-platformio`. Run `git branch --show-current` **as its own command immediately
 before every commit** (`.agents/rules/04-branch-hygiene.md`). Scratch in `tmp/`

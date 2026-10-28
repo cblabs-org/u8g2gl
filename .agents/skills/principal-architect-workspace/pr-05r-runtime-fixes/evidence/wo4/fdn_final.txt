@@ -1,4 +1,4 @@
-compare with /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/fdn/test/render/baseline/diagnostics_board
+compare with tmp/fdn/test/render/baseline/diagnostics_board
   connected     identical=yes differing_pixels=0
   ap_mode       identical=yes differing_pixels=0
   disconnected  identical=yes differing_pixels=0

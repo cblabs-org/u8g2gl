@@ -3,7 +3,7 @@
 **Work Order:** wo2-formation-and-messages
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo2-formation-and-messages`
-**Worktree:** `/Users/mcneillm/Documents/Projects/U8G2GL-probe2`
+**Worktree:** `.`
 **Predecessor:** [WO1 — Widget Path](../wo1-widget-path/WORKORDER.md) (complete — widget path proven, `wd_service_list` working)
 **Complexity:** standard
 
@@ -29,7 +29,7 @@ Build two things in the existing WO1 probe project fixture:
 | `evidence/probe-project/widgets/wd_train_formation/wd_train_formation.hpp` | Widget C++ header |
 | `evidence/probe-project/widgets/wd_train_formation/wd_train_formation.cpp` | Widget C++ implementation |
 
-All paths relative to `/Users/mcneillm/Documents/Projects/U8G2GL-probe2/.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
+All paths relative to `.agents/skills/principal-architect-workspace/g-probe2-widgets/`.
 
 ### Files you MUST update
 
@@ -202,9 +202,9 @@ Create `evidence/FINDINGS-WO2.md`:
 3. C++ syntax check: the new widget `.hpp` and `.cpp` must compile cleanly with `clang++ -Wall -Wextra -Wpedantic -Werror -std=c++17 -fsyntax-only` (include paths: `-I<project-root>/include`)
 4. All evidence files exist and are committed
 
-The CLI is available at `/Users/mcneillm/.local/bin/u8g2gl`. Use it with the full path or via `npx u8g2gl` from the project root.
+The CLI is available at `~/.local/bin/u8g2gl`. Use it with the full path or via `npx u8g2gl` from the project root.
 
-**Include paths for clang++ syntax check**: The project root for includes is `/Users/mcneillm/Documents/Projects/U8G2GL`. Use `-I/Users/mcneillm/Documents/Projects/U8G2GL/include` and also `-I` the probe project's widgets directory.
+**Include paths for clang++ syntax check**: The project root for includes is `.`. Use `-Iinclude` and also `-I` the probe project's widgets directory.
 
 ---
 

@@ -12,7 +12,7 @@ recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo6-readability` (already created, base
 `u8g2gl-fonts/wo5-docs-rehearsal`). **Working tree:**
-`/Users/mcneillm/Documents/Projects/U8G2GL-04b`. Work only there.
+`.`. Work only there.
 
 ## Role Definition
 

@@ -25,7 +25,7 @@ Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-4r3`.** **Branch**:
+**Work only in `.`.** **Branch**:
 `u8g2gl-4r3/wo1-runtime-floor` (already checked out, no upstream) · **Base**: `main` @ `783e189`.
 Run `git branch --show-current` **as its own command immediately before every commit**
 (`.agents/rules/04-branch-hygiene.md`). Scratch files go in `tmp/` in this worktree

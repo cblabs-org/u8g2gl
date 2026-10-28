@@ -1,9 +1,9 @@
-Processing native (platform: platformio/native@1.2.1; build_src_filter: -<*> +<../native/main.cpp> +<../generated/>; build_flags: -std=c++17, -I generated, -I native/shims, -D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"; lib_deps: symlink:///Users/mcneillm/Documents/Projects/U8G2GL-05r, olikraus/U8g2@^2.36.18)
+Processing native (platform: platformio/native@1.2.1; build_src_filter: -<*> +<../native/main.cpp> +<../generated/>; build_flags: -std=c++17, -I generated, -I native/shims, -D U8G2GL_GENERATED_CONFIG=\"u8g2gl_generated_config.h\"; lib_deps: symlink://., olikraus/U8g2@^2.36.18)
 --------------------------------------------------------------------------------
 LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
 LDF Modes: Finder ~ chain, Compatibility ~ soft
-Framework incompatible library /Users/mcneillm/Documents/Projects/U8G2GL-05r
-Framework incompatible library /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/pio/.pio/libdeps/native/U8g2
+Framework incompatible library .
+Framework incompatible library tmp/pio/.pio/libdeps/native/U8g2
 More details about "Library Compatibility Mode": https://docs.platformio.org/page/librarymanager/ldf.html#ldf-compat-mode
 Found 1 compatible libraries
 Scanning dependencies...

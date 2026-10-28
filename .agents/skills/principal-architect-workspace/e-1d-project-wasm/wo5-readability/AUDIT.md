@@ -6,7 +6,7 @@ complexity: standard   # A2/A3 need the author's judgement on wording; the rest 
 
 # AUDIT — E-1d readability & documentation
 
-**Scope reviewed:** worktree `/Users/mcneillm/Documents/Projects/U8G2GL-e1d`, branch `u8g2gl-e1d/wo4-ci`, `git diff a95c1fb..HEAD -- cli/ wasm/ test/CMakeLists.txt .github/`
+**Scope reviewed:** worktree `.`, branch `u8g2gl-e1d/wo4-ci`, `git diff a95c1fb..HEAD -- cli/ wasm/ test/CMakeLists.txt .github/`
 **Reviewed:** 2026-10-27
 **Standards:** `u8g2gl-standards` (SKILL.md, documentation.md, cpp.md, typescript.md). TypeScript judged against the TS naming table, `bridge.cpp` against the C++ one.
 

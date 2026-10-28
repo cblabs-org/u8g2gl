@@ -6,7 +6,7 @@ complexity: mechanical
 
 # AUDIT / WO — E-1b Readability & Documentation Remediation
 
-**Scope reviewed:** `git diff origin/u8g2gl-e1a/wo3-readability..HEAD -- cli/` on `u8g2gl-e1b/wo3-fixes` (worktree `/Users/mcneillm/Documents/Projects/U8G2GL-e1b`). Paths below are relative to `cli/`.
+**Scope reviewed:** `git diff origin/u8g2gl-e1a/wo3-readability..HEAD -- cli/` on `u8g2gl-e1b/wo3-fixes` (worktree `.`). Paths below are relative to `cli/`.
 **Reviewed:** 2026-10-27
 **Standards:** `u8g2gl-standards` skill (`documentation.md` §1-§5, `typescript.md`)
 

@@ -15,7 +15,7 @@ Unpacking 0% 10% 20% 30% 40% 50% 60% 70% 80% 90% 100%
 Library Manager: JsonStreamingParser@1.0.5 has been installed!
 Library Manager: Installing git+https://github.com/cblabs-org/u8g2gl.git#82ec83f2bbce02080c3dd1ab6618bcf6559bfde5
 git version 2.54.0 (Apple Git-157)
-Initialized empty Git repository in /Users/mcneillm/.platformio/.cache/tmp/pkg-installing-h7th5sxa/.git/
+Initialized empty Git repository in ~/.platformio/.cache/tmp/pkg-installing-h7th5sxa/.git/
 From https://github.com/cblabs-org/u8g2gl
  * branch            82ec83f2bbce02080c3dd1ab6618bcf6559bfde5 -> FETCH_HEAD
 HEAD is now at 82ec83f build(submodules): update = none, so a consumer clone fetches none of them
@@ -39,7 +39,7 @@ Web portal assets built successfully.
 [inject_version] Building version: 0.0.1 (channel=15)
 [inject_version] Board count from default_envs: 2 (esp32dev, esp32s3nano)
 [u8g2gl_generate] U8G2GL_CLI is not set and custom_u8g2gl_cli is empty: using the committed uidesign/ssd1322-256x64/u8g2gl/generated
-[u8g2gl_generate] capacities /Users/mcneillm/Documents/Projects/U8G2GL-device/tmp/m5/fdn-07/uidesign/ssd1322-256x64/u8g2gl/generated/u8g2gl_generated_config.h forced into the u8g2gl runtime sources only
+[u8g2gl_generate] capacities tmp/m5/fdn-07/uidesign/ssd1322-256x64/u8g2gl/generated/u8g2gl_generated_config.h forced into the u8g2gl runtime sources only
 CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32dev.html
 PLATFORM: Espressif 32 (55.3.311+sha.5f39b6d) > Espressif ESP32 Dev Module
 HARDWARE: ESP32 240MHz, 320KB RAM, 4MB Flash
@@ -56,7 +56,7 @@ PACKAGES:
  - tool-scons @ 4.40801.0 (4.8.1) 
  - tool-xtensa-esp-elf-gdb @ 17.1.0+20260402 
  - toolchain-xtensa-esp-elf @ 14.2.0+20260121
-Using Python 3.14.6 environment at: /Users/mcneillm/.platformio/penv/.espidf-5.5.5
+Using Python 3.14.6 environment at: ~/.platformio/penv/.espidf-5.5.5
 Reading CMake configuration...
 [ESP-IDF] Ignoring components based on lib_ignore: lvgldisplay
 [LVGLDisplay] SRC_FILTER (esp32dev): ['+<*>', '+<screens/*>', '+<assets/*.cpp>', '-<assets/*.c>']

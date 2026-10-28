@@ -25,8 +25,8 @@ and report**.
 
 ## Branch and working tree
 
-**Work only in the worktree `/Users/mcneillm/Documents/Projects/U8G2GL-4r`**, never in
-`/Users/mcneillm/Documents/Projects/U8G2GL` — another session may own that checkout.
+**Work only in the worktree `.`**, never in
+`.` — another session may own that checkout.
 
 **Branch**: `u8g2gl-4r/wo1-neutral-tables` (already created and checked out) · **Base**: `main` @ `92de668`
 
