@@ -37,7 +37,8 @@ E-1e's **scope** rests on the 2026-10-26 decomposition approval.
 | WO2 | The live pipeline: one run per animation frame, diagnostics as markers and Problems rows, the canvas, the Wasm indicator, placeholders without a toolchain | `u8g2gl-e1e/wo2-pipeline` | e1, e6, e8 | ✅ `8478d5a` |
 | WO3 | Saving and the IDE beside it: explicit save, reload, the three-way choice, generated names only on save; XML → canvas selection highlight | `u8g2gl-e1e/wo3-save` | e3, e4, e5 | ✅ `266f200` |
 | WO4 | Playwright: e1–e8 end to end, the 16 ms performance test under 4× CPU throttle, three engines, a CI job | `u8g2gl-e1e/wo4-playwright` | e2, e7 (and e1–e8 end to end) | ✅ except **e2** (`1992e7c`, `5c307aa`) |
-| WO5 | Readability review and PA verification | `u8g2gl-e1e/wo5-readability` | all | Pending |
+| WO4b | e2 redefined (ruling 8), DOMPurify (9), counter self-test (10), 1% gate (11) | `u8g2gl-e1e/wo4b-e2-frame` | e2 | ✅ `f03eb6a`..`fdb4057` |
+| WO5 | Readability fixes, ruling 12 | `u8g2gl-e1e/wo5-readability` | all | ✅ `fab66e6`..`4da89ef` |
 
 One worker, WO1 to WO4 in order.
 
@@ -162,3 +163,10 @@ One worker, WO1 to WO4 in order.
   handling, and runs starting late in a frame. Run-to-blit p95 3.9–5.2 ms. DOMPurify 3.4.17,
   `npm audit` 0 vulnerabilities.
 - **2026-10-28. C3 frame gate amended by the owner** (ruling 11): at most 1% may miss.
+- **2026-10-28. Ruling 11 applied:** e2 passes three runs, 0 of 300 missed on both screens; the
+  self-test still fails the gate. PA ran it independently: 300/300, run-to-blit p95 3.7–3.9 ms.
+- **2026-10-28. WO5 complete.** Readability audit: 0 P1, 4 P2, 6 P3, 4 P4; 13 resolved, 1 declined.
+  Test hooks and the keystroke probe are now in a test build only. **PA verification:** the
+  production `dist/` contains no hook, probe or test marker; the production-build editing test
+  passes in Chromium, Firefox and WebKit. CLI 1596 + 6 skipped; designer unit 17; e2e 12 + 1
+  skipped (passes with Emscripten).
