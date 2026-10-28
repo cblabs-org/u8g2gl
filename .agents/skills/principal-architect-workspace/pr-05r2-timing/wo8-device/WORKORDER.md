@@ -36,7 +36,7 @@ units and n.
 
 ## Strict Boundary Box
 
-- **Work in** `.`, only under `tmp/` (git-ignored),
+- **Work in** `../U8G2GL-05r2`, only under `tmp/` (git-ignored),
   plus your Completion Report. **No tracked file changes:** no runtime, CLI, test or spec edits. A
   defect is a finding with a reproduction.
 - **Never flash, upload or erase.** Never touch the serial port. **Never create or edit
@@ -52,7 +52,7 @@ units and n.
   approved direct `pio`; see the device-measurements PROJECT.md, branch
   `u8g2gl-device/measurements`). Use `~/.platformio/penv/bin/pio run -d <project> -e <env>`:
   **compile only**.
-- Point every rig's `lib_deps` at **this worktree** (`symlink://.`).
+- Point every rig's `lib_deps` at **this worktree** (`symlink://<this worktree, absolute>`).
   The build log's dependency graph must show `u8g2gl @ 0.9.0`; quote it.
 - Regenerate image V's scratch UI with **this worktree's CLI** (0.13.0):
   `cd cli && npm run build`, then `node cli/dist/node/cli.js generate ui --target ssd1322` in the rig.

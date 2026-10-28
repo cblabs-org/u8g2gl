@@ -24,7 +24,7 @@ WORKORDER's `status` must be `dispatched`. Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-4r3`.** **Branch**:
 `u8g2gl-4r3/wo4-readability` (already checked out, no upstream) · **Base**:
 `u8g2gl-4r3/wo3-binding-alias`. Run `git branch --show-current` **as its own command immediately
 before every commit** (`.agents/rules/04-branch-hygiene.md`). Scratch files in `tmp/` in this

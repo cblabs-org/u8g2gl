@@ -31,7 +31,7 @@ Following LVGL Pro's pattern, the decision is:
 
 These ship with U8G2GL. No user code required. The framework implements them.
 
-### `u8g2_label` ← [labelWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/labelWidget.cpp)
+### `u8g2_label` ← labelWidget (departures-board `modules/displayManager/widgets/labelWidget.cpp`)
 
 **Current complexity**: ~85 lines of C++. Simple — just `drawText()` with alignment and optional truncation.
 
@@ -60,7 +60,7 @@ render() → StateSaver → setFont → drawText(align, truncate)
 
 ---
 
-### `u8g2_xbm` ← [weatherWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/weatherWidget.cpp) (simplified)
+### `u8g2_xbm` ← weatherWidget (departures-board `modules/displayManager/widgets/weatherWidget.cpp`) (simplified)
 
 **Current complexity**: ~82 lines. Fetches an icon character from app state and draws a glyph.
 
@@ -92,7 +92,7 @@ These compile to direct U8G2 API calls — no widget struct, no tick, no state.
 
 These have `tick()` state machines and animation logic. They're too complex to express as XML composition, but they're generic enough to ship with the framework.
 
-### `u8g2_scrolling_label` ← [scrollingTextWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/scrollingTextWidget.cpp)
+### `u8g2_scrolling_label` ← scrollingTextWidget (departures-board `modules/displayManager/widgets/scrollingTextWidget.cpp`)
 
 **Current complexity**: ~195 lines. Substantial — marquee scroll math, layout invalidation, initial delay, loop detection, partial HW refresh.
 
@@ -133,7 +133,7 @@ renderAnimationUpdate():
 
 ---
 
-### `u8g2_progress_bar` ← [progressBarWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/progressBarWidget.cpp)
+### `u8g2_progress_bar` ← progressBarWidget (departures-board `modules/displayManager/widgets/progressBarWidget.cpp`)
 
 **Current complexity**: ~200 lines. Animation interpolation (lerp), stipple pattern rendering, deduplication, message+percentage text.
 
@@ -172,7 +172,7 @@ renderAnimationUpdate():
 
 ---
 
-### `u8g2_clock` ← [clockWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/clockWidget.cpp)
+### `u8g2_clock` ← clockWidget (departures-board `modules/displayManager/widgets/clockWidget.cpp`)
 
 **Current complexity**: ~214 lines. The most complex rendering logic of any widget — dual fonts, per-segment width alignment, colon blink animation, partial HW refresh for the colon area.
 
@@ -224,7 +224,7 @@ renderAnimationUpdate():
 
 These are compositions of built-in widgets. No C code. LVGL Pro's `<component>` pattern.
 
-### `status_bar` ← [layoutDefault.cpp lines 13-25](file://~/Documents/Projects/departures-board/modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp#L13-L25)
+### `status_bar` ← layoutDefault.cpp lines 13-25 (departures-board `modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp#L13-L25`)
 
 **Current implementation**: Not a widget at all — it's just 12 lines of coordinate setup in the layout constructor, placing `locationAndFilters`, `weather`, `wifiWarning`, and `sysClock` side by side.
 
@@ -280,7 +280,7 @@ These are compositions of built-in widgets. No C code. LVGL Pro's `<component>` 
 
 ---
 
-### `no_data_message` ← [labelWidget with conditional visibility](file://~/Documents/Projects/departures-board/modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp#L39-L43)
+### `no_data_message` ← labelWidget with conditional visibility (departures-board `modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp#L39-L43`)
 
 **Current implementation**: A `labelWidget` that's hidden by default and shown by the controller when there's no data.
 
@@ -297,7 +297,7 @@ The entire concept of "show this when there's no data" becomes **one XML attribu
 
 ---
 
-### `wifi_overlay` ← [wifiStatusWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/wifiStatusWidget.hpp)
+### `wifi_overlay` ← wifiStatusWidget (departures-board `modules/displayManager/widgets/wifiStatusWidget.hpp`)
 
 **Current complexity**: ~68 lines header + implementation. Monitors WiFi state, shows a blinking disconnection icon, tracks RSSI categories for signal strength bars.
 
@@ -321,7 +321,7 @@ For the full RSSI bars display with blinking, it would need a **custom widget** 
 
 These have custom rendering algorithms, state machines, or data structures that XML composition cannot express. They follow LVGL Pro's `<widget>` pattern: XML definition + C implementation + XML parser bridge.
 
-### `wd_service_list` ← [serviceListWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/serviceListWidget.cpp)
+### `wd_service_list` ← serviceListWidget (departures-board `modules/displayManager/widgets/serviceListWidget.cpp`)
 
 **Current complexity**: ~294 lines. The most substantial widget — columnar data rendering, paginated scrolling with dwell timers, page-reset sweep animation, row slicing (skip/max).
 
@@ -433,7 +433,7 @@ void wd_service_list_xml_apply(u8g2gl_parser_state_t* state, const char** attrs)
 
 ---
 
-### `wd_train_formation` ← [trainFormationWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/trainFormationWidget.cpp)
+### `wd_train_formation` ← trainFormationWidget (departures-board `modules/displayManager/widgets/trainFormationWidget.cpp`)
 
 **Current complexity**: ~173 lines. The most visually custom widget — draws train carriages as rounded rectangles with nose cones, dividers, and a tri-modal content display (number / facilities icons / loading bars).
 
@@ -501,7 +501,7 @@ The C implementation (`wd_train_formation.c`) contains the entire train-drawing 
 
 ---
 
-### `wd_scrolling_message_pool` ← [scrollingMessagePoolWidget](file://~/Documents/Projects/departures-board/modules/displayManager/widgets/scrollingMessagePoolWidget.hpp)
+### `wd_scrolling_message_pool` ← scrollingMessagePoolWidget (departures-board `modules/displayManager/widgets/scrollingMessagePoolWidget.hpp`)
 
 **Current complexity**: Extends `scrollingTextWidget` — adds multi-pool message rotation with interleaving.
 

@@ -29,7 +29,7 @@ Two defects found during this PR, each with a reproduction:
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo6-small-fixes` (checked out; it contains WO1–WO5). Do not create branches.
 - **May edit:** `include/u8g2gl/u8g2gl_obj.h`, `src/u8g2gl_obj.cpp` (the geometry setters and one
   hook), `include/u8g2gl/u8g2gl_label.h`, `src/u8g2gl_label.cpp`, `include/u8g2gl/u8g2gl_subject.h`

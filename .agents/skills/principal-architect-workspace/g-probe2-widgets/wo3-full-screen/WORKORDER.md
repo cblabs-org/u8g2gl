@@ -3,7 +3,7 @@
 **Work Order:** wo3-full-screen
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo3-full-screen`
-**Worktree:** `.`
+**Worktree:** `../U8G2GL-probe2`
 **Predecessors:** [WO1](../wo1-widget-path/WORKORDER.md) (complete), [WO2](../wo2-formation-and-messages/WORKORDER.md) (complete)
 **Complexity:** standard
 

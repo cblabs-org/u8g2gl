@@ -42,7 +42,7 @@ breaking change, and hosts must never call it.
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo7-readability` (checked out). Do not create branches.
 - **Edit only** the files AUDIT.md names, plus `src/u8g2gl_internal.h` (new), `u8g2gl_core.h` /
   `.cpp` and `u8g2gl_timer.cpp` for the move. `docs/design_spec.md` only if a finding requires it.

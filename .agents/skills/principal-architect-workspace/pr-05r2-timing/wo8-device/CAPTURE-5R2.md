@@ -3,7 +3,7 @@
 Interpreter (PlatformIO's own env, has pyserial):
 `PY=~/.platformio/penv/bin/python`
 Capture command: `$PY tmp/device-a/capture.py <port> <secs> <out>` (run from the worktree root
-.; start it BEFORE or right after the flash, it reopens the
+../U8G2GL-05r2; start it BEFORE or right after the flash, it reopens the
 port if the board re-enumerates). Flash `firmware.bin` at 0x10000 (not `firmware.factory.bin`).
 Both images link u8g2gl 0.9.0 (build log: `|-- u8g2gl @ 0.9.0`).
 

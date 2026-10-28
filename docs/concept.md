@@ -50,7 +50,7 @@ The addressable audience is still genuinely small: people who need monochrome sp
 
 ## 3. Prior Art: departures-board
 
-The [departures-board](file://~/Documents/Projects/departures-board) project contains a working prototype of parts of this concept, and it is the source of most of the design's grounding.
+The departures-board project contains a working prototype of parts of this concept, and it is the source of most of the design's grounding.
 
 ### 3.1 What exists and works
 

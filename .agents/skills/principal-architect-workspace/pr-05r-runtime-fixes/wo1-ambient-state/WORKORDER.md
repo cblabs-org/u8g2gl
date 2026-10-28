@@ -24,7 +24,7 @@ this WO's design. This WORKORDER's `status` must be `dispatched`. Otherwise **st
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-05r`.** **Branch**:
 `u8g2gl-05r/wo1-ambient-state` (already checked out, no upstream) · **Base**: `main` @ `9808423`.
 The U8G2 submodule is already checked out. Run `git branch --show-current` **as its own command
 immediately before every commit** (`.agents/rules/04-branch-hygiene.md`). Scratch files go in

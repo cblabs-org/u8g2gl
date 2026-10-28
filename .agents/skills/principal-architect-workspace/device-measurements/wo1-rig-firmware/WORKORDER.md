@@ -30,7 +30,7 @@ reader can tell exactly what was measured.
 
 ## Strict Boundary Box
 
-- **Work only in this worktree** (`.`), and only
+- **Work only in this worktree** (`../U8G2GL-device`), and only
   under `tmp/` (git-ignored) plus your Completion Report in this file.
 - **Do not edit** anything under `src/`, `include/`, `cli/`, `docs/`, tests, or any tracked file.
   No runtime or CLI change, no fix. A defect you find is a finding with a reproduction.

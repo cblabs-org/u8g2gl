@@ -12,7 +12,7 @@ recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo5-docs-rehearsal` (already created, base
 `u8g2gl-fonts/wo4-png-convert`). **Working tree:**
-`.`. Work only there.
+`../U8G2GL-04b`. Work only there.
 
 ## Role Definition
 

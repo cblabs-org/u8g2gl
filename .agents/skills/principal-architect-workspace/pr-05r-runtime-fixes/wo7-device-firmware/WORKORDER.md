@@ -24,7 +24,7 @@ flash tests". This WORKORDER's `status` must be `dispatched`. Otherwise **stop a
 
 ## Working tree and outputs
 
-`.`, branch `u8g2gl-05r/wo6-readability`. **Change no
+`../U8G2GL-05r`, branch `u8g2gl-05r/wo6-readability`. **Change no
 tracked file except this WORKORDER** (Completion Report). All firmware lives in `tmp/device/`
 (git-ignored). Read foundation only: `../esp32-app-foundation-u8g2gl` and the PA's archive
 `tmp/fdn/` (foundation's held tip, `499142f8`).

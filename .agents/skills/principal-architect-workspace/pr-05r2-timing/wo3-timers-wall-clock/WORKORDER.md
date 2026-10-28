@@ -35,7 +35,7 @@ time-dependent content updates through the library itself.** The approved mechan
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo3-timers-wall-clock` (checked out; it contains WO1 and WO2). Do not create branches.
 - **May create:** `include/u8g2gl/u8g2gl_timer.h`, `src/u8g2gl_timer.cpp`,
   `include/u8g2gl/u8g2gl_wall_clock.h`, `src/u8g2gl_wall_clock.cpp`, `test/test_timer.cpp`,

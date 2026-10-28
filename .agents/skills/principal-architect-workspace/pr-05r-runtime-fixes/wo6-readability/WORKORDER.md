@@ -24,7 +24,7 @@ WO. This WORKORDER's `status` must be `dispatched`. Otherwise **stop and report*
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-05r`.** **Branch**:
 `u8g2gl-05r/wo6-readability` (already checked out, no upstream). Run `git branch --show-current`
 **as its own command immediately before every commit** (`.agents/rules/04-branch-hygiene.md`).
 Scratch in `tmp/`, never `/tmp`.

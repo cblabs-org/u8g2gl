@@ -14,7 +14,7 @@ that file and in `../e-d-editor-design/PROJECT.md`. Read both before starting (r
 
 # Where you work
 
-- Worktree: `.`, branch `u8g2gl-e1a/wo1-cst`
+- Worktree: `../U8G2GL-e1a`, branch `u8g2gl-e1a/wo1-cst`
   (already created). Run `git branch --show-current` before every commit (rule 04).
 - Commit on this branch as you complete coherent steps. **Do not push.** Commit messages end
   with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.

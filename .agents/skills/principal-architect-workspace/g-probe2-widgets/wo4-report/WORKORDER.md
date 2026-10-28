@@ -3,7 +3,7 @@
 **Work Order:** wo4-report
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo4-report`
-**Worktree:** `.`
+**Worktree:** `../U8G2GL-probe2`
 **Predecessors:** [WO1](../wo1-widget-path/WORKORDER.md), [WO2](../wo2-formation-and-messages/WORKORDER.md), [WO3](../wo3-full-screen/WORKORDER.md) (all complete)
 **Complexity:** architect
 
@@ -141,7 +141,7 @@ Also read for methodology:
 | `.agents/skills/principal-architect-workspace/pr-05-integration/C2-ANALYSIS.md` | Line attribution methodology (§1.1 rules, §1.2 counts). Read §1 and §2 only — don't need the full §3. |
 | `.agents/skills/principal-architect-workspace/g-probe-departures/EXPRESSIVENESS.md` | G-PROBE-1 report — for contrast. Reference its conclusions but correct them where this probe disproves them. |
 
-**Both of these are in the PRIMARY checkout** (``), not the probe worktree.
+**Both of these are in the PRIMARY checkout** (`../U8G2GL`), not the probe worktree.
 
 ---
 

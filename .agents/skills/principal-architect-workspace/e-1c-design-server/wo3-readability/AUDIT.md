@@ -6,7 +6,7 @@ complexity: mechanical
 
 # AUDIT — E-1c readability and documentation
 
-**Scope reviewed:** `git diff origin/main..HEAD -- cli/` on `u8g2gl-e1c/wo2-server` (worktree `.`): `cli/src/core/project-fs/*`, `cli/src/node/design/*`, `cli/src/node/project-path.ts`, edits to `cli/src/node/cli.ts` and `load-project.ts`, and their tests.
+**Scope reviewed:** `git diff origin/main..HEAD -- cli/` on `u8g2gl-e1c/wo2-server` (worktree `../U8G2GL-e1c`): `cli/src/core/project-fs/*`, `cli/src/node/design/*`, `cli/src/node/project-path.ts`, edits to `cli/src/node/cli.ts` and `load-project.ts`, and their tests.
 **Reviewed:** 2026-10-27
 **Standards:** `u8g2gl-standards` skill (SKILL.md, documentation.md, typescript.md). TypeScript naming (PascalCase / camelCase / kebab-case files) was checked against the TS table; no naming defects.
 

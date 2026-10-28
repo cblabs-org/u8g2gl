@@ -24,7 +24,7 @@ panel.
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo2-clock-baseline` (already checked out; it contains WO1). Do not create branches.
 - **Edit only:** `src/u8g2gl_clock.cpp`, `test/test_clock.cpp`, a **new** real-U8G2 pixel test (a new
   file under `test/`, plus its `test/CMakeLists.txt` entry), and `docs/design_spec.md` only where it

@@ -19,7 +19,7 @@ Wasm is `evidence/wo1/build-probe-wasm.sh` beside them: read it, it is the prove
 
 # Where you work
 
-- Worktree `.`, starting on `u8g2gl-e1d/wo1-toolchain`.
+- Worktree `../U8G2GL-e1d`, starting on `u8g2gl-e1d/wo1-toolchain`.
   Each later WO: `git checkout -b u8g2gl-e1d/woN-<name>` from the previous WO's tip (names in
   PROJECT.md). `git branch --show-current` before every commit. Commit as you go; **do not
   push**. Trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Scratch in `tmp/`.

@@ -16,7 +16,7 @@ first, and the provenance it cites (rule 00). The specification is
 
 # Where you work
 
-- Worktree `.`, branch `u8g2gl-e1b/wo1-adapter`
+- Worktree `../U8G2GL-e1b`, branch `u8g2gl-e1b/wo1-adapter`
   (created). `extern/u8g2` is checked out: the baseline is **1815 passing, 0 failing**.
 - `git branch --show-current` before every commit (rule 04). Commit as you go; **do not push**.
   Trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Scratch in `tmp/`.

@@ -24,7 +24,7 @@ WORKORDER's `status` must be `dispatched`. Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-4r2`.** **Branch**:
 `u8g2gl-4r2/wo4-readability` (already checked out, no upstream) · **Base**:
 `u8g2gl-4r2/wo3-radius-build-time`. Run `git branch --show-current` **as its own command
 immediately before every commit**.

@@ -25,7 +25,7 @@ BST" quotes the owner setting the bound to `2r <= min(w,h)`. This WORKORDER's `s
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-4r`.** **Branch**:
 `u8g2gl-4r/wo3-radius-clamp` (already checked out) · **Base**: `u8g2gl-4r/wo2-style-overrides`.
 Run `git branch --show-current` **as its own command immediately before every commit**.
 

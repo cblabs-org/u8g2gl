@@ -3,7 +3,7 @@
 **Work Order:** wo2-formation-and-messages
 **Programme:** G-PROBE-2 (Custom Widget Path)
 **Branch:** `u8g2gl-probe2/wo2-formation-and-messages`
-**Worktree:** `.`
+**Worktree:** `../U8G2GL-probe2`
 **Predecessor:** [WO1 — Widget Path](../wo1-widget-path/WORKORDER.md) (complete — widget path proven, `wd_service_list` working)
 **Complexity:** standard
 
@@ -204,7 +204,7 @@ Create `evidence/FINDINGS-WO2.md`:
 
 The CLI is available at `~/.local/bin/u8g2gl`. Use it with the full path or via `npx u8g2gl` from the project root.
 
-**Include paths for clang++ syntax check**: The project root for includes is `.`. Use `-Iinclude` and also `-I` the probe project's widgets directory.
+**Include paths for clang++ syntax check**: The project root for includes is `../U8G2GL`. Use `-Iinclude` and also `-I` the probe project's widgets directory.
 
 ---
 

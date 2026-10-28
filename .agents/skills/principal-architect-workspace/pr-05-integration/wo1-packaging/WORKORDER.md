@@ -27,7 +27,7 @@ This WORKORDER's `status` must be `dispatched`. If any of this is missing, **sto
 
 ## Branch and working tree
 
-**Work only in `.`.**
+**Work only in `../U8G2GL-05`.**
 - **Branch:** `u8g2gl-05/wo1-packaging`, already checked out, no upstream.
 - **Base:** `main` @ `1254eb3`.
 - `extern/u8g2` is already initialised.

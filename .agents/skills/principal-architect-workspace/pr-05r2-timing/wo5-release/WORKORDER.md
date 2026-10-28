@@ -30,7 +30,7 @@ apply here.
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch `u8g2gl-05r2/wo5-release`
+- **Work in** `../U8G2GL-05r2`, on branch `u8g2gl-05r2/wo5-release`
   (checked out; it contains WO1–WO4). Do not create branches.
 - **In:**
   - `include/u8g2gl/u8g2gl_version.h`, root `CMakeLists.txt` `project(... VERSION)`, `library.json`

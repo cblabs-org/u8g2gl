@@ -24,7 +24,7 @@ design. This WORKORDER's `status` must be `dispatched`. Otherwise **stop and rep
 
 ## Branch and working tree
 
-**Work only in `.`.** **Branch**:
+**Work only in `../U8G2GL-05r`.** **Branch**:
 `u8g2gl-05r/wo3-platformio` (already checked out, no upstream) · **Base**:
 `u8g2gl-05r/wo2-screen-discovery`. Run `git branch --show-current` **as its own command immediately
 before every commit** (`.agents/rules/04-branch-hygiene.md`). Scratch files and the PlatformIO
@@ -275,7 +275,7 @@ framework = arduino
 build_src_filter = +<*> +<../generated/>
 build_flags = -I generated
 lib_deps =
-    symlink://.
+    symlink://<this worktree, absolute>
     olikraus/U8g2@^2.36.18
     mixed_c_cpp
 lib_ldf_mode = deep+

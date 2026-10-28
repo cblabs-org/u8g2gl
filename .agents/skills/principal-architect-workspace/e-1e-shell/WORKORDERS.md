@@ -21,7 +21,7 @@ layout is `docs/ui_spec.md` §6. The server you build on is E-1c's (`cli/src/nod
 
 # Where you work
 
-- Worktree `.`, starting on `u8g2gl-e1e/wo1-scaffold`.
+- Worktree `../U8G2GL-e1e`, starting on `u8g2gl-e1e/wo1-scaffold`.
   Each later WO: `git checkout -b u8g2gl-e1e/woN-<name>` from the previous tip. Verify the branch
   before every commit. Commit as you go; **do not push**. Trailer
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Scratch in `tmp/`.

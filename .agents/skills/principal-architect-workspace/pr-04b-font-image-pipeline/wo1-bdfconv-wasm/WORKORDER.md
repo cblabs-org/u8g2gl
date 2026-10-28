@@ -11,8 +11,8 @@ complexity: standard
 recorded verbatim in that file under *Human approval of this decomposition*.
 
 **Branch:** `u8g2gl-fonts/wo1-bdfconv-wasm` (already created, base `main` @
-`453f9f3`). **Working tree:** `.` —
-a dedicated worktree. Work only there; never in `.`.
+`453f9f3`). **Working tree:** `../U8G2GL-04b` â
+a dedicated worktree. Work only there; never in `../U8G2GL`.
 
 ## Role Definition
 

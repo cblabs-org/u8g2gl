@@ -28,7 +28,7 @@ delivers it in three parts:
 
 ## Strict Boundary Box
 
-- **Work in** `.`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo4-dirty-and-resume` (checked out; it contains WO1–WO3). Do not create branches.
 - **May edit:**
   - `src/u8g2gl_core.cpp` and `include/u8g2gl/u8g2gl_core.h`;
