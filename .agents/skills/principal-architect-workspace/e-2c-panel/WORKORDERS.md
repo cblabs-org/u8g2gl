@@ -32,11 +32,11 @@ from the same base. Do not touch canvas gesture code; keep shared shell files' c
 
 # WO1 — the panel model (`u8g2gl-e2c/wo1-panel-model`)
 
-- [ ] A pure model (no React) from the selection and the manifest registry to panel rows:
+- [x] A pure model (no React) from the selection and the manifest registry to panel rows:
       order and pinned geometry (ruling 2), the *From u8g2gl_obj* group, own vs inherited
       (ruling 1's additive field if needed). Unit tests on framework, project and drawing
       elements of the departures project.
-- [ ] The panel region in the shell (ui_spec §6, right side), showing the rows read-only.
+- [x] The panel region in the shell (ui_spec §6, right side), showing the rows read-only.
 
 # WO2 — editors and committing (`u8g2gl-e2c/wo2-editors`)
 

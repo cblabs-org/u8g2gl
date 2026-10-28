@@ -10,8 +10,9 @@
  *          selection's geometry — all drawn over the framebuffer, never into
  *          it, and crisp on a high-density screen at every zoom. And the
  *          per-frame rule (EDITOR-DESIGN §3.3): a selection change re-renders
- *          only the status bar's geometry readout; every other component of
- *          the shell renders not once.
+ *          only what shows the selection — the status bar's geometry readout
+ *          and the property panel; every other component of the shell
+ *          renders not once.
  * Description: The departures project, frozen, at a device pixel ratio of 2.
  *              The overlay is read back from its own canvas; the frame's pixels
  *              are hashed before and after selecting. Render counts come from
@@ -133,7 +134,7 @@ test('the status bar reads one element’s geometry, or the box around several',
   await expect(page.locator('.selection-geometry')).toHaveCount(0);
 });
 
-test('a selection change re-renders only the status bar’s geometry readout', async ({ page }) => {
+test('a selection change re-renders only what shows the selection: the status bar’s geometry readout and the property panel', async ({ page }) => {
   await open(page);
   const counts = (): Promise<Record<string, number>> => page.evaluate(() => (window as unknown as TestHandle).__u8g2glRenders());
   // Settle: the Wasm status and the first frames have rendered what they will.
@@ -168,7 +169,10 @@ test('a selection change re-renders only the status bar’s geometry readout', a
       .filter(([, n]) => n > 0),
   );
   console.log(`renders across five selection changes: ${JSON.stringify(rendered)}`);
-  expect(Object.keys(rendered)).toEqual(['SelectionGeometry']);
+  // The property panel shows the selection, so it re-renders for it; nothing
+  // else in the shell may.
+  const showsSelection = (name: string): boolean => name === 'SelectionGeometry' || name === 'PropertyPanel' || name.startsWith('Panel');
+  expect(Object.keys(rendered).filter((name) => !showsSelection(name))).toEqual([]);
   expect(rendered.SelectionGeometry).toBeGreaterThanOrEqual(5);
 });
 

@@ -6,8 +6,8 @@
  * File: designer/src/ui/app.tsx
  * Purpose: The designer's shell, laid out as ui_spec §6 draws it: the activity
  *          bar and explorer down the left, the editor area — canvas beside the
- *          XML — in the middle, Problems and Output below, and the status bar
- *          along the bottom. Dockview owns the editor area and bottom panel, so
+ *          XML — in the middle, the property panel on the right, Problems and
+ *          Output below, and the status bar along the bottom. Dockview owns the editor area and bottom panel, so
  *          tabs split, move and resize as in an IDE; the fixed chrome around it
  *          is plain React.
  * Description: On Dockview's ready event the default layout is built: canvas,
@@ -31,6 +31,7 @@ import { ProblemsPanel } from './problems-panel';
 import { StatusBar } from './status-bar';
 import { WorkspaceContext } from './workspace-context';
 import { countRender } from '../perf/render-count';
+import { PropertyPanel } from '../panel/property-panel';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -118,6 +119,7 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
         <main className="editor-area">
           <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
         </main>
+        <PropertyPanel />
         <StatusBar onShowOutput={() => dock.current?.getPanel('output')?.api.setActive()} />
       </div>
     </WorkspaceContext.Provider>

@@ -33,7 +33,8 @@
  *              — each drawn element's device-space rectangle, in draw order,
  *              from the same placement the scene emitter uses — and each
  *              selectable element's rectangle by name, for hit-testing and the
- *              selection overlay. A composite's children are targets of the
+ *              selection overlay, and each element's rectangle in its
+ *              container's coordinates, for the property panel's Detach. A composite's children are targets of the
  *              instance written in the screen, never of their own names.
  *
  *              It also returns the subjects' declared values, which the
@@ -110,6 +111,12 @@ export interface TextPipelineResult {
    * box around what it draws.
    */
   readonly bounds: ReadonlyMap<string, Rect>;
+  /**
+   * Each element written in `screen` with a rectangle of its own, in its
+   * container's coordinates: the literals its `x`, `y`, `width` and `height`
+   * evaluate to, which the property panel's Detach writes (EDITOR-DESIGN §3.5).
+   */
+  readonly placed: ReadonlyMap<string, Rect>;
   /** What a click on `screen` can hit, in draw order. */
   readonly targets: readonly HitTarget[];
   /**
@@ -177,6 +184,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   const wellFormed = !diagnostics.diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.MALFORMED_XML);
   let scene: string | undefined;
   let bounds: ReadonlyMap<string, Rect> = new Map();
+  let placed: ReadonlyMap<string, Rect> = new Map();
   let targets: readonly HitTarget[] = [];
   if (wellFormed && target !== undefined && input.assets !== undefined) {
     try {
@@ -203,7 +211,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       const realised = realisation.screens[screenIndex];
       const resolved = pipeline.resolution.screens[screenIndex];
       if (realised !== undefined && resolved !== undefined) {
-        ({ bounds, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+        ({ bounds, placed, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
       }
     } catch (error) {
       // Only a model with errors may be refused: the emitter refusing a valid
@@ -211,6 +219,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       if (diagnostics.errors === 0) throw error;
       scene = undefined;
       bounds = new Map();
+      placed = new Map();
       targets = [];
     }
   }
@@ -226,6 +235,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     screenFile: model.screens[screenIndex]?.loc?.file,
     display: display === undefined ? undefined : { width: display.width, height: display.height },
     bounds,
+    placed,
     targets,
     subjectValues: declaredValues(model.globals),
     timings,
@@ -266,7 +276,8 @@ function declaredValues(globals: Globals): string {
 }
 
 // selectable
-// The drawn screen's hit targets and selectable rectangles. Each drawn element
+// The drawn screen's hit targets, selectable rectangles, and each element's own
+// rectangle in its container's coordinates. Each drawn element
 // is a target of the element written in the screen it belongs to: itself, or
 // the outermost composite instance it was expanded through (ui_spec §8: a hit
 // on a composite's child selects the instance). An instance's rectangle is its
@@ -276,9 +287,10 @@ function declaredValues(globals: Globals): string {
 function selectable(
   realised: RealisedScreen,
   placements: ReadonlyMap<RealisedElement, Placement>,
-): { bounds: Map<string, Rect>; targets: HitTarget[] } {
+): { bounds: Map<string, Rect>; placed: Map<string, Rect>; targets: HitTarget[] } {
   const targets: HitTarget[] = [];
   const own = new Map<string, Rect>();
+  const placed = new Map<string, Rect>();
   const drawn = new Map<string, Rect>();
   for (const step of realised.drawOrder) {
     const placement = placements.get(step.element);
@@ -288,6 +300,8 @@ function selectable(
     targets.push({ name, rect });
     if (step.element.element.instantiation.length === 0) {
       own.set(name, rect);
+      // Relative to the container, as the attributes are written (§7.2).
+      if (placement !== undefined) placed.set(name, { ...rect, x: rect.x - placement.origin.x, y: rect.y - placement.origin.y });
     } else {
       const box = drawn.get(name);
       drawn.set(name, box === undefined ? rect : union(box, rect));
@@ -295,7 +309,7 @@ function selectable(
   }
   const bounds = new Map(drawn);
   for (const [name, rect] of own) bounds.set(name, rect);
-  return { bounds, targets };
+  return { bounds, placed, targets };
 }
 
 // union

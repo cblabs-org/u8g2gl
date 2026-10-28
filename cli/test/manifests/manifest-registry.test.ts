@@ -178,6 +178,44 @@ describe('buildManifestRegistry', () => {
       expect(bindings[1]?.setter).toBe('bind_y_child');
     });
 
+    it('records which manifest declared each prop and binding, an override being the child', () => {
+      const registry = registryOf([
+        widget('wd_child', {
+          extends: 'wd_mid',
+          props: [prop('c'), prop('b', { default: 'child' })],
+          bindings: [bind('bind_c')],
+        }),
+        widget('wd_mid', { extends: 'wd_root', props: [prop('b')], bindings: [bind('bind_b')] }),
+        widget('wd_root', { props: [prop('a')], bindings: [bind('bind_a')] }),
+      ]);
+      const child = registry.get('wd_child')!;
+      expect(child.api.props.map((p, i) => `${p.name}:${child.propSources[i]}`)).toEqual([
+        'a:wd_root',
+        'b:wd_child',
+        'c:wd_child',
+      ]);
+      expect(child.api.bindings.map((b, i) => `${b.name}:${child.bindingSources[i]}`)).toEqual([
+        'bind_a:wd_root',
+        'bind_b:wd_mid',
+        'bind_c:wd_child',
+      ]);
+      expect(registry.get('wd_root')!.propSources).toEqual(['wd_root']);
+    });
+
+    it('records the framework base as the source of what a project widget inherits from it', () => {
+      const registry = frameworkRegistry([
+        widget('wd_list', { extends: 'u8g2gl_obj', props: [prop('font', { type: 'font' }), prop('max_rows')] }),
+      ]);
+      const list = registry.get('wd_list')!;
+      const sourceOf = (name: string): string | undefined => list.propSources[list.api.props.findIndex((p) => p.name === name)];
+      expect(sourceOf('x')).toBe('u8g2gl_obj');
+      expect(sourceOf('font')).toBe('wd_list');
+      expect(sourceOf('max_rows')).toBe('wd_list');
+      expect(list.propSources).toHaveLength(list.api.props.length);
+      expect(list.bindingSources).toHaveLength(list.api.bindings.length);
+      expect(new Set(list.bindingSources)).toEqual(new Set(['u8g2gl_obj']));
+    });
+
     it('diagnoses an unknown extends target, naming it, with a suggestion', () => {
       const registry = registryOf([
         widget('wd_base'),

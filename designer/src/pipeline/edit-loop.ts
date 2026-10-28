@@ -42,6 +42,7 @@
  * - FrameState:       What the canvas panel and status bar show about the frame
  * - DrawnTargets:     The drawn frame's hit targets
  * - FrameTimings:     One run's milliseconds per stage
+ * - CompletedRun:     A run's result and the assets it ran with
  * - EditLoop:         The loop
  *
  *     Wiring:
@@ -52,6 +53,7 @@
  *     State:
  *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
+ *     - lastRun:          The latest run, for the property panel
  *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
@@ -72,7 +74,7 @@ import type { Workspace } from '../workspace';
 import { innermostAt, namedElements } from '../documents/element-at';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
-import { runTextPipeline, TEXT_STAGES, type Rect, type TextStage } from './live-pipeline';
+import { runTextPipeline, TEXT_STAGES, type CompiledAssets, type Rect, type TextPipelineResult, type TextStage } from './live-pipeline';
 
 /** What the canvas shows, and why. */
 export interface FrameState {
@@ -97,6 +99,12 @@ export interface FrameState {
 export interface DrawnTargets {
   readonly file: string | undefined;
   readonly targets: readonly HitTarget[];
+}
+
+/** A pipeline run's result and the compiled assets it ran with. */
+export interface CompletedRun {
+  readonly result: TextPipelineResult;
+  readonly assets: CompiledAssets | undefined;
 }
 
 /** The stages after the text pipeline, in order. */
@@ -138,6 +146,11 @@ export class EditLoop {
   readonly canvasEditing = new Observable<boolean>(true);
   /** How many selected elements are drawn, for the status bar beside {@link selectionRect}. */
   readonly selectionCount = new Observable<number>(0);
+  /**
+   * The latest run, published once it has finished, so the property panel
+   * reads the same text, diagnostics and geometry the frame was drawn from.
+   */
+  readonly lastRun = new Observable<CompletedRun | undefined>(undefined);
 
   private readonly workspace: Workspace;
   private readonly wasm: EditorWasmController;
@@ -315,6 +328,7 @@ export class EditLoop {
         this.view?.setStale(false);
       }
     }
+    this.lastRun.set({ result, assets: this.assets.current });
     performance.measure('u8g2gl:run', { start: runStart });
     // The marks and the measure are for a profile recorded meanwhile, which
     // keeps them; the page's own entry buffer would otherwise grow by a dozen

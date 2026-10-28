@@ -1,0 +1,86 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/panel/panel.css
+ * Purpose: The property panel's look (ui_spec §9): compact rows, help text
+ *          always visible beneath its control (§9.2: never only on hover),
+ *          defaults greyed, problems in the Problems panel's colours.
+ */
+
+.property-panel {
+  grid-row: 1;
+  overflow: auto;
+  background: var(--bg-raised);
+  border-left: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.panel-header { padding: 4px 12px 8px; border-bottom: 1px solid var(--border); }
+.panel-title { font-weight: 600; font-family: ui-monospace, Menlo, monospace; }
+.panel-subtitle { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-note { margin: 4px 0 0; color: var(--text-dim); font-style: italic; }
+
+.panel-section { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.panel-section h3,
+.panel-section > summary { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); cursor: default; }
+.panel-section > summary { cursor: pointer; }
+.panel-section.inherited[open] > summary { margin-bottom: 6px; }
+
+.field-row { margin-bottom: 8px; }
+.field-row.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.field { min-width: 0; }
+.field-label { display: block; font-family: ui-monospace, Menlo, monospace; color: var(--text); }
+.field-label .required { color: var(--warning); }
+.field-value { font-family: ui-monospace, Menlo, monospace; }
+.field-value.default,
+.field-control.default { color: var(--text-dim); }
+.field-help { margin: 2px 0 0; color: var(--text-dim); font-size: 11px; line-height: 1.35; }
+.field-reason { margin: 2px 0 0; color: var(--info); font-size: 11px; line-height: 1.35; }
+.field-problem { margin: 2px 0 0; font-size: 11px; line-height: 1.35; }
+.field-problem.error { color: var(--error); }
+.field-problem.warning { color: var(--warning); }
+.field-problem.info { color: var(--info); }
+
+.field-controls { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.field-controls input[type='text'],
+.field-controls select {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font: 12px ui-monospace, Menlo, monospace;
+}
+.field-controls input[type='text'].default::placeholder { color: var(--text-dim); }
+.field-controls input[aria-invalid='true'] { border-color: var(--error); }
+.field-controls button {
+  padding: 1px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.field-controls button:disabled { opacity: 0.4; cursor: default; }
+.field-controls .stepper { width: 22px; padding: 1px 0; }
+.field-controls .reset { color: var(--text-dim); }
+.field-controls .action { color: var(--info); }
+
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+.segmented button { border: 0; border-radius: 0; border-right: 1px solid var(--border); }
+.segmented button:last-child { border-right: 0; }
+.segmented button[aria-pressed='true'] { background: #2f3a4d; color: var(--text); }
+
+.toggle { width: 32px; height: 16px; padding: 0; border-radius: 8px; position: relative; }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--text-dim); }
+.toggle[aria-checked='true'] { background: #2f3a4d; }
+.toggle[aria-checked='true']::after { left: 18px; background: var(--accent); }
+
+.image-picker { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.image-picker button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+.image-picker button[aria-pressed='true'] { border-color: var(--accent); }
+.image-picker canvas { image-rendering: pixelated; background: #050505; }
