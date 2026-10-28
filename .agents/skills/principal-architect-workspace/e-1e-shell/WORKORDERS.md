@@ -262,6 +262,33 @@ against 0–3 per screen in the five runs before; the misses are tails that vary
 the machine, so a busier machine can still exceed 3. The E-2 follow-up in ruling 11 (cutting
 allocation spikes in resolve, validate and scene) is the fix for those inside U8G2GL's code.
 
+### WO5 — readability audit, ruling 12
+
+Branch `u8g2gl-e1e/wo5-readability`, cut from `19c7e36` (the audit was already committed
+there). Code commit `fab66e6`; every audit item is marked in `wo5-readability/AUDIT.md`:
+13 resolved, 1 declined (test `Exports:` blocks), 1 verification item superseded.
+
+- **12.1:** the test hooks and the probe are built only by `npm run build:e2e`
+  (`vite build --mode e2e`, `__U8G2GL_TEST_HOOKS__`, marker `E2E-TEST-BUILD`). The e2e support
+  refuses the wrong build. A `grep -rnoE '__u8g2gl|__u8g2glPerf|installTestHooks|installKeystrokeProbe|u8g2gl:key|u8g2gl:edit|u8g2gl:key-to-blit|E2E-TEST-BUILD|test-hooks'`
+  over the production `dist/` finds nothing (exit 1). `e2e-production/` drives the production
+  build with no hooks. CI builds and tests the test build, then builds production, greps it and
+  runs its editing test.
+- **12.2:** the probe's header states its real cost, and the probe and the edit loop clear their
+  `performance` entries.
+- **12.3, 12.4, 12.5:** the `new Function` trust statement; workspace pointers removed;
+  `keystroke-performance.json`; the P3 why-comments; `TestHandle`.
+
+**Runs:**
+- CLI: 1596 passed + 6 skipped; lint clean.
+- Designer unit tests: 17 passed.
+- Full e2e suite on the test build: 12 passed, 1 skipped (the project renderer, which passes
+  with Emscripten on PATH, 5.6 s). e1 passed in all three engines.
+- Keystroke latency: departures 300/300 keystrokes in their first frame, run→blit p95 3.7 ms;
+  20 elements 300/300, p95 3.3 ms.
+- Self-test: the forced keystrokes counted 4 frames each, and the gate failed as it must.
+- Production build: e1 passed in Chromium, Firefox and WebKit.
+
 ### e2 under the original definition (superseded by ruling 8): p95 was over 16 ms
 
 Chromium headless, CPU throttled 4×, 300 keystrokes per screen after 30 warm-up, keys spaced
