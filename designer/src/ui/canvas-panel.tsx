@@ -61,11 +61,14 @@ export function CanvasPanel(): React.JSX.Element {
       element: container.current,
       frame: frame.current,
       targets: loop.hitTargets,
+      bounds: loop.bounds,
       placements: () => loop.placements,
+      display: () => loop.frameState.get().display,
       canvasEditing: loop.canvasEditing,
       selection: workspace.selection,
       editor: new CanvasEditor((path) => workspace.documents.open(path)),
       showMarquee: (rect) => shown.setMarquee(rect),
+      showGuides: (lines) => shown.setGuides(lines),
     });
     return () => {
       gestures.dispose();

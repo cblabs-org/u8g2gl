@@ -5,35 +5,35 @@
  *
  * File: designer/src/selection/canvas-gestures.ts
  * Purpose: The canvas's gestures (ui_spec §8): which gesture a press starts,
- *          and what each one does. A press on an element moves it; on empty
- *          canvas it draws a marquee; a click selects, repeated clicks cycle
- *          down through overlaps, Esc clears, and the arrow keys nudge the
- *          selection. Pointer events arrive far faster than frames and must
- *          never pass through React, so this is a plain class the canvas panel
- *          attaches to its frame element.
+ *          and what each one does. A press on a handle resizes; on an element
+ *          it moves; on empty canvas it draws a marquee; a click selects,
+ *          repeated clicks cycle down through overlaps, Esc clears, and the
+ *          arrow keys nudge the selection. Pointer events arrive far faster
+ *          than frames and must never pass through React, so this is a plain
+ *          class the canvas panel attaches to its frame element.
  * Description: Gesture ownership (E-2b ruling 1), decided at pointer-down:
+ *              - on a selected element's handle: a **resize** by that handle
+ *                (Shift keeps the ratio);
+ *              - with Shift elsewhere: E-2a's toggle on click and add-marquee
+ *                on drag; Shift never moves;
  *              - on an element that is selected, or in a stack that holds a
  *                selected element: a **move** of the selection;
  *              - on an unselected element: it is selected (the click cycle's
  *                next element there), and the press moves it;
- *              - on empty canvas: E-2a's **marquee**;
- *              - with Shift: E-2a's toggle on click and add-marquee on drag;
- *                Shift never moves.
+ *              - on empty canvas: E-2a's **marquee**.
  *              A press is a click until it travels {@link MARQUEE_THRESHOLD}
  *              screen pixels; a click on a selected element cycles the
  *              selection down the stack, as E-2a's clicks do.
  *
- *              A move writes through the {@link CanvasEditor}: one undo stop
- *              from press to release, each pointer event's integer device
- *              delta rewritten into the current text by `placement-rules.ts`,
- *              which also says why an axis refuses (an expression, a binding);
- *              the reason is shown in a tip at the pointer while the element
- *              moves on its other axis.
- *              The pipeline runs once per frame on whatever the text then is.
- *              Arrow keys nudge (1 px, Shift 8 px), grouped by the editor.
- *              While the document is not well-formed (`canvasEditing` false,
- *              §3.8) nothing writes: the press still selects, and the cursor
- *              and a tip at the pointer say why.
+ *              A move or a resize is a {@link DragEdit}: snapped to guides,
+ *              rounded to integers and written through the edit path as one
+ *              undo stop. The guides it lies on are drawn on the overlay, and
+ *              an axis that refuses (an expression, a binding) says why in a
+ *              tip at the pointer while the other axis still follows. Arrow
+ *              keys nudge (1 px, Shift 8 px), grouped by the editor. While the
+ *              document is not well-formed (`canvasEditing` false, §3.8)
+ *              nothing writes: the press still selects, and the cursor and the
+ *              tip say why.
  *
  *              Pointer positions become device pixels through the frame
  *              canvas's on-screen box, so the answer is right at every zoom.
@@ -49,12 +49,15 @@
  */
 
 import { parseCst } from '@u8g2gl/core/cst/index.js';
-import type { CanvasEditor, EditGesture } from '../editing/canvas-editor';
-import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
+import { HANDLE_SIZE, type GuideLine } from '../canvas/canvas-view';
+import type { CanvasEditor } from '../editing/canvas-editor';
+import { DragEdit } from '../editing/drag-edit';
+import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
+import type { Handle } from '../editing/resize-rules';
 import type { DrawnTargets } from '../pipeline/edit-loop';
-import type { Observable } from '../state/observable';
 import type { Rect } from '../pipeline/live-pipeline';
+import type { Observable } from '../state/observable';
 import { ClickCycler, hitsAt, marqueeHits } from './hit-test';
 import type { SelectionModel } from './selection-model';
 
@@ -80,8 +83,12 @@ export interface GestureHost {
   readonly frame: HTMLCanvasElement;
   /** The drawn frame's hit targets. */
   readonly targets: Observable<DrawnTargets>;
+  /** The drawn elements' rectangles by name. */
+  readonly bounds: Observable<ReadonlyMap<string, Rect>>;
   /** The drawn elements' placements by name, as of the frame on the canvas. */
   readonly placements: () => ReadonlyMap<string, Placement>;
+  /** The display's size, for its guides. */
+  readonly display: () => { readonly width: number; readonly height: number } | undefined;
   /** Whether the canvas may write the text (false while it is not well-formed). */
   readonly canvasEditing: Observable<boolean>;
   /** The selection the gestures set and move. */
@@ -90,10 +97,12 @@ export interface GestureHost {
   readonly editor: CanvasEditor;
   /** Draws the marquee while it is dragged. */
   readonly showMarquee: MarqueeSink;
+  /** Draws the guides a drag lies on; empty hides them. */
+  readonly showGuides: (lines: readonly GuideLine[]) => void;
 }
 
-/** What a press will do if it becomes a drag, decided at pointer-down. */
-type Owner = 'move' | 'marquee';
+/** What a press does if it becomes a drag, decided at pointer-down. */
+type Owner = { readonly kind: 'move' } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
 
 /** A press in progress. */
 interface Press {
@@ -108,13 +117,8 @@ interface Press {
   readonly clickOnRelease: boolean;
   /** Past the threshold: a drag. */
   dragging: boolean;
-  /** The move's edit, once it has begun writing. */
-  gesture: EditGesture | undefined;
-  /** The move's plans, made from the text at its first frame. */
-  plans: readonly MovePlan[] | undefined;
-  /** The last delta written, so a pointer event that changes nothing writes nothing. */
-  dx: number;
-  dy: number;
+  /** The move or resize, once the drag has begun. */
+  drag: DragEdit | undefined;
 }
 
 /** Arrow keys and the delta each nudges by, in device pixels, before Shift's ×8. */
@@ -127,6 +131,21 @@ const NUDGES: Readonly<Record<string, readonly [number, number]>> = {
 
 /** Shift's nudge: one 8-pixel tile (ui_spec §8). */
 const SHIFT_NUDGE = 8;
+
+/** Screen pixels around a handle's square that still grab it. */
+const HANDLE_SLOP = 2;
+
+/** The eight handles: each one's place along the box (0, ½, 1) and the edges it moves. */
+const HANDLES: readonly { readonly fx: number; readonly fy: number; readonly handle: Handle; readonly cursor: string }[] = [
+  { fx: 0, fy: 0, handle: { horizontal: 'start', vertical: 'start' }, cursor: 'nwse-resize' },
+  { fx: 0.5, fy: 0, handle: { horizontal: undefined, vertical: 'start' }, cursor: 'ns-resize' },
+  { fx: 1, fy: 0, handle: { horizontal: 'end', vertical: 'start' }, cursor: 'nesw-resize' },
+  { fx: 1, fy: 0.5, handle: { horizontal: 'end', vertical: undefined }, cursor: 'ew-resize' },
+  { fx: 1, fy: 1, handle: { horizontal: 'end', vertical: 'end' }, cursor: 'nwse-resize' },
+  { fx: 0.5, fy: 1, handle: { horizontal: undefined, vertical: 'end' }, cursor: 'ns-resize' },
+  { fx: 0, fy: 1, handle: { horizontal: 'start', vertical: 'end' }, cursor: 'nesw-resize' },
+  { fx: 0, fy: 0.5, handle: { horizontal: 'start', vertical: undefined }, cursor: 'ew-resize' },
+];
 
 /** The gestures on one canvas. */
 export class CanvasGestures {
@@ -159,9 +178,7 @@ export class CanvasGestures {
   /** @brief Removes every listener and the tip, and ends any gesture. */
   dispose(): void {
     for (const [type, listener] of this.listeners) this.host.element.removeEventListener(type, listener as EventListener);
-    this.press?.gesture?.end();
-    this.press = undefined;
-    this.host.showMarquee(undefined);
+    this.cancel();
     this.tip.remove();
   }
 
@@ -173,23 +190,28 @@ export class CanvasGestures {
     const { file, targets } = this.host.targets.get();
     const { x, y } = this.toDevice(event.clientX, event.clientY);
 
-    // --- Step 1: What is under the pointer, and is any of it selected ---
-    const stack = hitsAt(targets, x, y);
-    const selected = file === undefined ? [] : this.current(file);
-    let owner: Owner = 'marquee';
+    // --- Step 1: A selected element's handle resizes, Shift or not ---
+    let owner: Owner = { kind: 'marquee' };
     let clickOnRelease = true;
-
-    // --- Step 2: An element moves; empty canvas, or Shift, draws a marquee ---
-    if (!event.shiftKey && stack.length > 0 && file !== undefined) {
-      owner = 'move';
-      if (!stack.some((name) => selected.includes(name))) {
-        // An unselected element: select it now, so the drag moves it.
-        const name = this.cycler.click(targets, x, y);
-        if (name !== undefined) this.host.selection.select(file, [name], 'canvas');
-        clickOnRelease = false;
+    const handle = file === undefined ? undefined : this.handleAt(file, event.clientX, event.clientY);
+    if (handle !== undefined) {
+      owner = { kind: 'resize', name: handle.name, handle: handle.handle };
+      clickOnRelease = false;
+    } else if (!event.shiftKey && file !== undefined) {
+      // --- Step 2: An element moves; an unselected one is selected first ---
+      const stack = hitsAt(targets, x, y);
+      if (stack.length > 0) {
+        owner = { kind: 'move' };
+        const selected = this.current(file);
+        if (!stack.some((name) => selected.includes(name))) {
+          const name = this.cycler.click(targets, x, y);
+          if (name !== undefined) this.host.selection.select(file, [name], 'canvas');
+          clickOnRelease = false;
+        }
       }
     }
 
+    // --- Step 3: Empty canvas, or Shift: a marquee or a toggle, on release ---
     this.press = {
       pointer: event.pointerId,
       clientX: event.clientX,
@@ -199,18 +221,15 @@ export class CanvasGestures {
       file,
       clickOnRelease,
       dragging: false,
-      gesture: undefined,
-      plans: undefined,
-      dx: 0,
-      dy: 0,
+      drag: undefined,
     };
     this.host.element.setPointerCapture?.(event.pointerId);
     this.host.element.focus({ preventScroll: true });
   }
 
   // move
-  // Past the threshold the press is a drag: a marquee is shown, a move writes.
-  // With no press, the cursor says what a press here would do.
+  // Past the threshold the press is a drag: a marquee is shown, a move or a
+  // resize writes. With no press, the cursor says what a press here would do.
   private move(event: PointerEvent): void {
     const press = this.press;
     if (press === undefined) {
@@ -222,7 +241,7 @@ export class CanvasGestures {
       press.dragging = true;
     }
     if (!press.dragging) return;
-    if (press.owner === 'marquee') {
+    if (press.owner.kind === 'marquee') {
       this.host.showMarquee(this.area(press, event));
       return;
     }
@@ -230,9 +249,9 @@ export class CanvasGestures {
   }
 
   // drag
-  // One pointer event of a move: the integer delta since the press, written
-  // into the current text when it differs from the last one written.
-  //   press — the move
+  // One pointer event of a move or a resize: written through its DragEdit,
+  // which writes only when the integer delta changes.
+  //   press — the drag
   //   event — the pointer now
   private drag(press: Press, event: PointerEvent): void {
     // --- Step 1: Editing off — nothing writes, and the tip says why ---
@@ -243,40 +262,27 @@ export class CanvasGestures {
       return;
     }
 
-    // --- Step 2: The delta, in whole device pixels ---
+    // --- Step 2: The drag begins with what is drawn now ---
+    const owner = press.owner;
+    if (press.drag === undefined) {
+      press.drag = new DragEdit(
+        this.host.editor,
+        { file, names: this.current(file), bounds: this.host.bounds.get(), placements: this.host.placements(), display: this.host.display() },
+        owner.kind === 'resize' ? owner : { kind: 'move' },
+      );
+    }
+
+    // --- Step 3: The pointer's delta, unrounded, in device pixels ---
     const scale = this.scale();
-    const dx = Math.round((event.clientX - press.clientX) / scale.x);
-    const dy = Math.round((event.clientY - press.clientY) / scale.y);
-    if (press.gesture !== undefined && dx === press.dx && dy === press.dy) return;
+    const frame = press.drag.to((event.clientX - press.clientX) / scale.x, (event.clientY - press.clientY) / scale.y, scale.x, event.shiftKey);
 
-    // --- Step 3: The first write opens the undo stop and plans the move ---
-    press.gesture ??= this.host.editor.begin(file);
-    press.gesture?.update((text) => {
-      const cst = parseCst(text, file).cst;
-      press.plans ??= this.plan(cst, file);
-      return moveEdits(cst, press.plans, dx, dy);
-    });
-    press.dx = dx;
-    press.dy = dy;
-
-    // --- Step 4: An axis that refuses says why, at the pointer (§3.5) ---
-    const reasons = refusals(press.plans ?? [], dx, dy);
-    this.showTip(reasons.length === 0 ? undefined : reasons.join('; '), event);
-  }
-
-  // plan
-  // The selection's moves, planned from the text a gesture starts from.
-  //   cst  — that text's CST
-  //   file — the document the selection is in
-  private plan(cst: ReturnType<typeof parseCst>['cst'], file: string): MovePlan[] {
-    const placements = this.host.placements();
-    return this.current(file)
-      .map((name) => planMove(cst, name, placements.get(name)))
-      .filter((plan): plan is MovePlan => plan !== undefined);
+    // --- Step 4: The guides it lies on, and why an axis does not follow ---
+    this.host.showGuides(frame.guides);
+    this.showTip(frame.refusals.length === 0 ? undefined : frame.refusals.join('; '), event);
   }
 
   // up
-  // The release ends the gesture: a move's undo stop closes; a marquee
+  // The release ends the gesture: a drag's undo stop closes; a marquee
   // selects what it touches; a click runs the click cycle.
   private up(event: PointerEvent): void {
     const press = this.press;
@@ -284,11 +290,12 @@ export class CanvasGestures {
     this.press = undefined;
     this.host.element.releasePointerCapture?.(event.pointerId);
     this.showTip(undefined, event);
+    this.host.showGuides([]);
     const { file, targets } = this.host.targets.get();
 
-    // --- Step 1: A move: close its one undo stop ---
-    if (press.owner === 'move' && press.dragging) {
-      press.gesture?.end();
+    // --- Step 1: A move or a resize: close its one undo stop ---
+    if (press.owner.kind !== 'marquee' && press.dragging) {
+      press.drag?.end();
       return;
     }
     if (file === undefined) return;
@@ -321,12 +328,13 @@ export class CanvasGestures {
   }
 
   // cancel
-  // The browser took the pointer (a touch scroll, say): a move keeps what it
+  // The browser took the pointer (a touch scroll, say): a drag keeps what it
   // wrote, as one stop the user can undo; a marquee is dropped.
   private cancel(): void {
-    this.press?.gesture?.end();
+    this.press?.drag?.end();
     this.press = undefined;
     this.host.showMarquee(undefined);
+    this.host.showGuides([]);
     this.tip.hidden = true;
   }
 
@@ -359,9 +367,10 @@ export class CanvasGestures {
       return;
     }
     let reasons: string[] = [];
+    const placements = this.host.placements();
     this.host.editor.nudge(file, names.join('\n'), (text) => {
       const cst = parseCst(text, file).cst;
-      const plans = this.plan(cst, file);
+      const plans = names.map((name) => planMove(cst, name, placements.get(name))).filter((plan): plan is MovePlan => plan !== undefined);
       reasons = refusals(plans, dx, dy);
       return moveEdits(cst, plans, dx, dy);
     });
@@ -370,22 +379,55 @@ export class CanvasGestures {
   }
 
   // hover
-  // With no press, the cursor says what a press here would do: move over an
-  // element, and not-allowed (with the reason as its title) while editing is off.
+  // With no press, the cursor says what a press here would do: resize over a
+  // handle, move over an element, and not-allowed (with the reason as its
+  // title) while editing is off.
   //   event — the pointer, or undefined when it left the canvas
   private hover(event: PointerEvent | undefined): void {
     let cursor = '';
     let title = '';
     if (event !== undefined) {
+      const { file, targets } = this.host.targets.get();
+      const handle = file === undefined ? undefined : this.handleAt(file, event.clientX, event.clientY);
       const { x, y } = this.toDevice(event.clientX, event.clientY);
-      if (hitsAt(this.host.targets.get().targets, x, y).length > 0) {
-        const editing = this.host.canvasEditing.get();
-        cursor = editing ? 'move' : 'not-allowed';
+      const editing = this.host.canvasEditing.get();
+      if (handle !== undefined || hitsAt(targets, x, y).length > 0) {
+        cursor = !editing ? 'not-allowed' : (handle?.cursor ?? 'move');
         title = editing ? '' : EDITING_OFF_REASON;
       }
     }
     if (this.host.element.style.cursor !== cursor) this.host.element.style.cursor = cursor;
     if (this.host.element.title !== title) this.host.element.title = title;
+  }
+
+  // handleAt
+  // The selected element's handle under a client position, if any: the
+  // squares the overlay draws, in screen pixels, with a little slop.
+  //   file             — the drawn screen's file
+  //   clientX, clientY — the pointer
+  private handleAt(file: string, clientX: number, clientY: number): { name: string; handle: Handle; cursor: string } | undefined {
+    const names = this.current(file);
+    if (names.length === 0) return undefined;
+    const box = this.host.frame.getBoundingClientRect();
+    const scale = this.scale();
+    const px = clientX - box.left;
+    const py = clientY - box.top;
+    const reach = HANDLE_SIZE / 2 + HANDLE_SLOP;
+    const bounds = this.host.bounds.get();
+    for (let i = names.length - 1; i >= 0; i--) {
+      const name = names[i];
+      const rect = name === undefined ? undefined : bounds.get(name);
+      if (name === undefined || rect === undefined) continue;
+      // The outline's box: one screen pixel outside the element (canvas-view.ts).
+      const left = rect.x * scale.x - 1;
+      const top = rect.y * scale.y - 1;
+      const width = rect.width * scale.x + 2;
+      const height = rect.height * scale.y + 2;
+      for (const { fx, fy, handle, cursor } of HANDLES) {
+        if (Math.abs(px - (left + fx * width)) <= reach && Math.abs(py - (top + fy * height)) <= reach) return { name, handle, cursor };
+      }
+    }
+    return undefined;
   }
 
   // showTip

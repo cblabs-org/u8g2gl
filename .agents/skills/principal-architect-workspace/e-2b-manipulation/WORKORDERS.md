@@ -44,9 +44,9 @@ from the same base. Do not touch panel code; keep shared shell files' changes sm
 
 # WO3 — resize, snapping, guides (`u8g2gl-e2b/wo3-resize-guides`)
 
-- [ ] Resize from the handles under ruling 4; Shift constrains the ratio.
-- [ ] Integer snapping before the edit; guides at 3 screen pixels at every zoom (ruling 5).
-- [ ] An overflowing drag is allowed and hatched (e2e).
+- [x] Resize from the handles under ruling 4; Shift constrains the ratio.
+- [x] Integer snapping before the edit; guides at 3 screen pixels at every zoom (ruling 5).
+- [x] An overflowing drag is allowed and hatched (e2e).
 
 # WO4 — the drag gate (`u8g2gl-e2b/wo4-drag-gate`)
 
