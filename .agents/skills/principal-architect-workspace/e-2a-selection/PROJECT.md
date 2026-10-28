@@ -14,11 +14,11 @@ anything writes to the text.
 
 | WO | Topic | Branch | Status |
 |---|---|---|---|
-| WO1 | Scene `source` gains a range; CLI 0.13.4 | `u8g2gl-e2a/wo1-scene-range` | ⏳ |
-| WO2 | The selection model; canvas → XML and XML → canvas | `u8g2gl-e2a/wo2-selection` | ⏳ |
-| WO3 | Canvas overlays: handles, badge, marquee; status-bar geometry | `u8g2gl-e2a/wo3-overlays` | ⏳ |
-| WO4 | §3.8 document states: hatching, the dimmed last good frame, editing-enabled | `u8g2gl-e2a/wo4-states` | ⏳ |
-| WO5 | Readability review and PA verification | `u8g2gl-e2a/wo5-readability` | ⏳ |
+| WO1 | Scene `source` gains a range; CLI 0.13.4 | `u8g2gl-e2a/wo1-scene-range` | ✅ `a1e0b6d` |
+| WO2 | The selection model; canvas → XML and XML → canvas | `u8g2gl-e2a/wo2-selection` | ✅ `73de8e8` |
+| WO3 | Canvas overlays: handles, badge, marquee; status-bar geometry | `u8g2gl-e2a/wo3-overlays` | ✅ `7b8ff8b` |
+| WO4 | §3.8 document states: hatching, the dimmed last good frame, editing-enabled | `u8g2gl-e2a/wo4-states` | ✅ `d574184` |
+| WO5 | Readability review and PA verification | `u8g2gl-e2a/wo5-readability` | ✅ `6e3714d` |
 
 ## PA rulings
 
@@ -59,3 +59,16 @@ anything writes to the text.
 
 - **2026-10-28.** Worktree created from `main` @ `fd717b1`, `extern/u8g2` checked out. WO1–WO5
   issued to one worker in order.
+- **2026-10-28. WO1–WO5 complete** (worker's report at the end of WORKORDERS.md). Accepted
+  deviations: ruling 8's boundary extended by two additive lines (`WidgetNode.range`, copied in
+  `parse-widget-tree.ts`), without which `scene.ts` has no offsets; the designer reads element
+  ranges from the current CST by name rather than the scene's `start`/`end` (§3.7; the scene is
+  stale while text is broken), leaving the scene's ranges for E-2b; Shift-click and
+  Shift-marquee beyond the minimum; a drag anywhere is a marquee until E-2b claims drags on a
+  selection; `canvasEditing` false while any project document is not well-formed. Declined P4
+  (renaming `Selection`, which shadows the DOM type) stays as is.
+- **2026-10-28. PA verification**, suites one at a time on `6e3714d`, Emscripten on PATH: guard
+  clean; CLI 2521 (the six Emscripten tests ran), lint and tsc clean; C++ 512/512; framework
+  editor Wasm built; designer unit 40; e2e 30 passed, keystroke gate passed and its self-test
+  failed the gate as it must; production 3/3, no test hook or render counter in `dist/`. Scene
+  golden: only `start`/`end` added, 24 elements.
