@@ -51,6 +51,7 @@
  *
  *     State:
  *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
+ *     - placements:       The drawn elements' placements, for canvas edits
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *
  *     Measurement:
@@ -68,6 +69,7 @@ import { Observable } from '../state/observable';
 import type { EditorModule, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
 import type { HitTarget } from '../selection/hit-test';
+import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import type { Workspace } from '../workspace';
 import { innermostAt, namedElements } from '../documents/element-at';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
@@ -151,6 +153,7 @@ export class EditLoop {
   /** The overlay's selection outlines and its hatching, kept apart so each can change alone. */
   private selectionRects: readonly OverlayRect[] = [];
   private problemRects: readonly OverlayRect[] = [];
+  private drawnPlacements: ReadonlyMap<string, Placement> = new Map();
   private applied: EditorModule | undefined;
   private tickHandle: number | undefined;
   private drawn = 0;
@@ -211,6 +214,15 @@ export class EditLoop {
     this.selectionCount.set(rects.length);
     this.selectionRects = rects.map((rect) => ({ ...rect, kind: 'selection' }));
     this.showOverlay();
+  }
+
+  /**
+   * The drawn screen's elements' placements by name, as of the frame on the
+   * canvas: what a canvas gesture reads to know which attributes place an
+   * element. Read when a gesture needs it, so not observable.
+   */
+  get placements(): ReadonlyMap<string, Placement> {
+    return this.drawnPlacements;
   }
 
   /** @brief Draws into a canvas panel's view from now on (undefined detaches). */
@@ -302,6 +314,7 @@ export class EditLoop {
         const hatched = result.errors > 0 ? this.problemElements(result.diagnostics, result.screenFile, result.bounds) : [];
         this.problemRects = hatched.map(({ rect }) => ({ ...rect, kind: 'problem' }));
         this.hitTargets.set({ file: result.screenFile, targets: result.targets });
+        this.drawnPlacements = result.placements;
         this.bounds.set(result.bounds);
         this.frameState.set({
           frame: this.drawn,

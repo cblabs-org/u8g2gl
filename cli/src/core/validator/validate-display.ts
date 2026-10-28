@@ -46,6 +46,26 @@ function createDisplayDiagnostic(
 }
 
 /**
+ * Each catalogue's setup names as a set, made once per catalogue. The catalogue
+ * holds thousands of records and is the same array on every run, so building
+ * the set per run was the largest single allocation in a designer pipeline run.
+ * Valid only while a catalogue is not mutated in place: the set is keyed by
+ * the array's identity.
+ */
+const SETUP_SETS = new WeakMap<object, ReadonlySet<string>>();
+
+// setupsOf
+// The setups of `catalogue`, as a set, from the cache when it has one.
+function setupsOf(catalogue: readonly { readonly setup: string }[]): ReadonlySet<string> {
+  let setups = SETUP_SETS.get(catalogue);
+  if (setups === undefined) {
+    setups = new Set(catalogue.map((d) => d.setup));
+    SETUP_SETS.set(catalogue, setups);
+  }
+  return setups;
+}
+
+/**
  * Validates hardware target display setups against the catalogue and page-mode map.
  */
 export function validateDisplay(input: ValidateInput): readonly Diagnostic[] {
@@ -56,8 +76,7 @@ export function validateDisplay(input: ValidateInput): readonly Diagnostic[] {
     return diagnostics;
   }
 
-  const catalogueSetups = (catalogue ?? []).map((d) => d.setup);
-  const catalogueSet = new Set(catalogueSetups);
+  const catalogueSet = setupsOf(catalogue ?? []);
 
   for (const target of project.targets) {
     if (!target.setup) {
@@ -101,7 +120,7 @@ export function validateDisplay(input: ValidateInput): readonly Diagnostic[] {
           `Unknown display setup constructor '${setup}'. Not found in U8G2 display catalogue.`,
           target.loc,
           setup,
-          findClosest(setup, catalogueSetups),
+          findClosest(setup, [...catalogueSet]),
         ),
       );
     }

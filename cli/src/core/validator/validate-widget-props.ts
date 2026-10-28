@@ -177,6 +177,35 @@ function walkNodes(
   }
 }
 
+/**
+ * Each manifest's accepted attribute names, made once per manifest: they depend
+ * on the manifest alone, and building them for every element on every run was
+ * steady garbage in the designer's per-frame validation. Valid only while a manifest is not
+ * mutated in place: the names are keyed by the manifest's identity.
+ */
+const DECLARED_NAMES = new WeakMap<EffectiveManifest, ReadonlySet<string>>();
+
+// declaredNamesOf
+// Every prop, binding and binding format companion (e.g. bind_text_fmt) a
+// manifest declares, in declaration order.
+function declaredNamesOf(manifest: EffectiveManifest): ReadonlySet<string> {
+  let names = DECLARED_NAMES.get(manifest);
+  if (names !== undefined) return names;
+  const declared = new Set<string>();
+  for (const prop of manifest.api.props) {
+    declared.add(prop.name);
+  }
+  for (const binding of manifest.api.bindings) {
+    declared.add(binding.name);
+    if (binding.fmt) {
+      declared.add(binding.fmt);
+    }
+  }
+  names = declared;
+  DECLARED_NAMES.set(manifest, names);
+  return names;
+}
+
 // checkInstanceProps
 // Checks one element instance against its tag's effective manifest: unknown
 // attributes, missing required props, out-of-range enum values — in that order.
@@ -192,21 +221,8 @@ function checkInstanceProps(
   styles: StyleScope,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const { props, bindings } = manifest.api;
-
-  // --- Step 1: Collect every attribute name the element accepts ---
-  const declaredNames = new Set<string>();
-  for (const prop of props) {
-    declaredNames.add(prop.name);
-  }
-  for (const binding of bindings) {
-    declaredNames.add(binding.name);
-    // A binding's format companion (e.g. bind_text_fmt) is an attribute too.
-    if (binding.fmt) {
-      declaredNames.add(binding.fmt);
-    }
-  }
-  const suggestionPool = [...COMMON_ATTRIBUTES, ...declaredNames];
+  // --- Step 1: Every attribute name the element accepts ---
+  const declaredNames = declaredNamesOf(manifest);
 
   // --- Step 2: Reject attributes nothing declares ---
   for (const [attrName, attrVal] of Object.entries(node.attributes)) {
@@ -225,7 +241,7 @@ function checkInstanceProps(
         `Unknown attribute '${attrName}' on <${node.tag}>.`,
         node.attributeLocs?.[attrName] ?? node.loc,
         attrName,
-        findClosest(attrName, suggestionPool),
+        findClosest(attrName, [...COMMON_ATTRIBUTES, ...declaredNames]),
       ),
     );
   }
@@ -241,7 +257,7 @@ function checkInstanceProps(
   // --- Step 4: Check enum values against the declared set ---
   // A `$`-prefixed value is a composite template parameter, resolved at
   // expansion time; its value is not knowable here (see checkSubstitutedValues).
-  for (const prop of props) {
+  for (const prop of manifest.api.props) {
     const diagnostic = checkEnumValue(node, prop.name, manifest);
     if (diagnostic !== undefined) {
       diagnostics.push(diagnostic);

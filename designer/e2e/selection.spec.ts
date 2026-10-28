@@ -121,8 +121,10 @@ test('repeated clicks at one point cycle down through a stack of overlaps; a cli
 test('a marquee selects every element it touches; Shift adds; Esc clears', async ({ page }) => {
   await open(page);
   const version = await versionId(page);
-  // Across the bottom row: services (0..189) and sys_clock (190..255), below header_sep (y 50).
-  await dragCanvas(page, [180, 52], [200, 60]);
+  // Across the bottom row: services (0..189) and sys_clock (190..255), below
+  // header_sep (y 50). It starts in the frame's margin below the display: a
+  // press on an element would move it.
+  await dragCanvas(page, [200, 64.25], [180, 52]);
   expect(await selectedNames(page)).toEqual({ file: SCREEN, names: ['services', 'sys_clock'] });
   await clickCanvas(page, 4, 2, ['Shift']); // plat_box, added
   expect((await selectedNames(page)).names).toEqual(['services', 'sys_clock', 'plat_box']);

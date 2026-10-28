@@ -15,7 +15,8 @@
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
  *              outline, eight handles and an `x, y, w×h` badge, the marquee
- *              while one is dragged, the outlines of placeholder widgets, and
+ *              while one is dragged, the alignment guides a drag has
+ *              snapped to, the outlines of placeholder widgets, and
  *              the hatching over an element an error is in (§3.8: the frame
  *              stays live, and the problem is marked over it, not in it).
  *              It is never part of the framebuffer, so nothing it draws can be
@@ -31,12 +32,14 @@
  * - OVERLAY_MARGIN: CSS pixels the overlay extends past the frame
  * - HANDLE_SIZE:   A selection handle's side, in CSS pixels
  * - OverlayRect:  A rectangle to draw on the overlay, and how
+ * - GuideLine:    An alignment guide to draw
  * - CanvasView:   The two canvases
  *
  *     - draw():        Blit a frame
  *     - setZoom():     Change the scale
  *     - setOverlay():  Replace what the overlay shows
  *     - setMarquee():  Show or hide the marquee being dragged
+ *     - setGuides():   Show the alignment guides a drag lies on
  *     - setStale():    Dim the frame while the document has an error
  */
 
@@ -72,6 +75,15 @@ const OVERLAY_COLOUR: Readonly<Record<OverlayRect['kind'], string>> = {
 /** The order kinds are drawn in: hatching and placeholders under, selection on top. */
 const OVERLAY_ORDER: Readonly<Record<OverlayRect['kind'], number>> = { problem: 0, placeholder: 1, selection: 2 };
 
+/** An alignment guide: a vertical line at device x, or a horizontal one at device y. */
+export interface GuideLine {
+  readonly axis: 'vertical' | 'horizontal';
+  readonly at: number;
+}
+
+/** The guides' colour: apart from the selection's blue and the hatch's red. */
+const GUIDE_COLOUR = '#ff4fd8';
+
 /** The hatch's line spacing, in CSS pixels, whatever the zoom. */
 const HATCH_SPACING = 6;
 
@@ -102,6 +114,7 @@ export class CanvasView {
   private ratio = 1;
   private overlayRects: readonly OverlayRect[] = [];
   private marquee: Box | undefined;
+  private guides: readonly GuideLine[] = [];
 
   /**
    * @param frame     The frame canvas.
@@ -157,6 +170,17 @@ export class CanvasView {
   setMarquee(rect: Box | undefined): void {
     if (rect === undefined && this.marquee === undefined) return;
     this.marquee = rect;
+    this.drawOverlay();
+  }
+
+  /**
+   * @brief Shows the alignment guides a drag lies on, in device pixels; an
+   *        empty list hides them. Drawn across the whole frame, on the overlay.
+   */
+  setGuides(lines: readonly GuideLine[]): void {
+    if (lines.length === 0 && this.guides.length === 0) return;
+    if (lines.length === this.guides.length && lines.every((line, i) => line.axis === this.guides[i]?.axis && line.at === this.guides[i]?.at)) return;
+    this.guides = lines;
     this.drawOverlay();
   }
 
@@ -216,7 +240,28 @@ export class CanvasView {
       }
     }
 
-    // --- Step 3: The marquee, while one is dragged ---
+    // --- Step 3: The guides a drag lies on, across the frame, on the pixel boundary ---
+    if (this.guides.length > 0) {
+      const width = this.frame.width * this.zoom;
+      const height = this.frame.height * this.zoom;
+      context.setLineDash([]);
+      context.lineWidth = 1;
+      context.strokeStyle = GUIDE_COLOUR;
+      context.beginPath();
+      for (const guide of this.guides) {
+        const at = Math.round(guide.at * this.zoom) - 0.5;
+        if (guide.axis === 'vertical') {
+          context.moveTo(at, -OVERLAY_MARGIN);
+          context.lineTo(at, height + OVERLAY_MARGIN);
+        } else {
+          context.moveTo(-OVERLAY_MARGIN, at);
+          context.lineTo(width + OVERLAY_MARGIN, at);
+        }
+      }
+      context.stroke();
+    }
+
+    // --- Step 4: The marquee, while one is dragged ---
     if (this.marquee !== undefined) {
       const box = this.screenBox(this.marquee);
       context.setLineDash([4, 3]);
