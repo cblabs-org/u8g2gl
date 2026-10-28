@@ -1,0 +1,22 @@
+<!doctype html>
+<!--
+  U8G2GL — declarative UI for U8G2 monochrome displays
+  Copyright (c) 2026 Matt McNeill (CB Labs)
+  SPDX-License-Identifier: MIT
+
+  File: designer/index.html
+  Purpose: The page `u8g2gl design` serves under /app/<token>/. The URL holds
+           the session token, so the page sends no Referer anywhere.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>u8g2gl design</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

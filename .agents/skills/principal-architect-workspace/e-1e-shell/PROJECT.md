@@ -1,0 +1,172 @@
+# E-1e: The Shell
+
+**Parent:** the editor track, `implementation_plan.md` §5. **Scope and acceptance criteria:**
+[E1-DECOMPOSITION.md §1, E-1e](../e-d-editor-design/E1-DECOMPOSITION.md), approved by the owner
+on 2026-10-26 (recorded in [e-d-editor-design/PROJECT.md](../e-d-editor-design/PROJECT.md)). The
+interaction design is [EDITOR-DESIGN.md](../e-d-editor-design/EDITOR-DESIGN.md) §2 and §3.
+**Base:** stacked on E-1d, `u8g2gl-e1d/wo5-readability` @ `51482b0` (PR #26, itself on E-1c #23).
+**Worktree:** `../U8G2GL-e1e`.
+
+## Purpose
+
+The application: the shell `[UD-1]` specifies, served by `u8g2gl design` (E-1c), rendering with
+the project editor Wasm (E-1d). Text editing in Monaco and a **read-only** canvas. Canvas editing,
+the property panel and the palette are E-2's.
+
+## Owner approval
+
+Two instructions, verbatim:
+
+> "approved - please proceed autonomously from this point on until you run out of quota.  Please spin up sub-agents as needed."
+
+(2026-10-27, the standing instruction to continue the programme.) And, specifically for this PR's
+dependencies and downloads, answering the PA's question whether E-1e could add its npm
+dependencies and download Playwright's browsers:
+
+> "Yes — E-1e may add Vite, React, Dockview and Monaco as dependencies and download Playwright's Chromium, Firefox and WebKit for its tests."
+
+*Provenance note:* the second was sent through a reply button whose text the PA drafted; the
+owner chose to send it. The owner did not review this Work-Order breakdown before it started;
+E-1e's **scope** rests on the 2026-10-26 decomposition approval.
+
+## Decomposition
+
+| WO | Topic | Branch | ACs | Status |
+|---|---|---|---|---|
+| WO1 | `designer/` package: Vite, React, Dockview, Monaco; the ui_spec §6 layout; served by `u8g2gl design` | `u8g2gl-e1e/wo1-scaffold` | (structure) | ✅ `bb88c11` |
+| WO2 | The live pipeline: one run per animation frame, diagnostics as markers and Problems rows, the canvas, the Wasm indicator, placeholders without a toolchain | `u8g2gl-e1e/wo2-pipeline` | e1, e6, e8 | ✅ `8478d5a` |
+| WO3 | Saving and the IDE beside it: explicit save, reload, the three-way choice, generated names only on save; XML → canvas selection highlight | `u8g2gl-e1e/wo3-save` | e3, e4, e5 | ✅ `266f200` |
+| WO4 | Playwright: e1–e8 end to end, the 16 ms performance test under 4× CPU throttle, three engines, a CI job | `u8g2gl-e1e/wo4-playwright` | e2, e7 (and e1–e8 end to end) | ✅ except **e2** (`1992e7c`, `5c307aa`) |
+| WO4b | e2 redefined (ruling 8), DOMPurify (9), counter self-test (10), 1% gate (11) | `u8g2gl-e1e/wo4b-e2-frame` | e2 | ✅ `f03eb6a`..`fdb4057` |
+| WO5 | Readability fixes, ruling 12 | `u8g2gl-e1e/wo5-readability` | all | ✅ `fab66e6`..`4da89ef` |
+
+One worker, WO1 to WO4 in order.
+
+## PA rulings
+
+1. **Dependencies, exactly these** (owner-approved), in `designer/package.json` only, never in
+   `cli/package.json`: `vite`, `@vitejs/plugin-react`, `react`, `react-dom`, `dockview` (or
+   `dockview-react`, whichever is the React binding), `monaco-editor`, `typescript`,
+   `@types/react`, `@types/react-dom`, `@playwright/test`. Any other package, including a Monaco
+   React wrapper, a state library or a CSS framework: **stop and report**. Exact versions, no
+   ranges, and the lockfile committed. **Each version must have been published at least 14 days
+   before it is added** (check with `npm view <pkg> time`): for example `vite` 8.3.4
+   (2026-10-08), not 8.3.5 (2026-10-21).
+2. **Playwright browsers** may be downloaded (owner-approved): Chromium, Firefox and WebKit, to
+   Playwright's default cache. Nothing else is downloaded.
+3. **`core/` as a library, not a copy.** The designer imports the CLI's isomorphic
+   `cli/src/core/` through a Vite alias (or the built `cli/dist/core`), never a copy of its
+   files. E-1a's architecture test keeps `core/` browser-safe.
+4. **Serving.** `u8g2gl design` serves `designer/dist/` at `/` when it exists beside the CLI's
+   source tree, replacing the placeholder page, and serves the project's built editor Wasm from
+   E-1d's build cache at a token-checked route. The npm package shipping `designer/dist` is a
+   packaging decision recorded as a follow-up (it joins E-1d's ruling 8.3), not E-1e's.
+5. **The 16 ms target (e2) is measured, not assumed.** If keystroke-to-canvas p95 exceeds 16 ms
+   under 4× throttle, report the stage breakdown; do not weaken the test. This is checkpoint C3.
+6. **Boundary:** `designer/**`; `cli/src/node/design/**` for the static route and the Wasm route
+   only; `.github/workflows/ci.yml` for one new job; the root `.gitignore` for `designer/`'s
+   build output. Any other file: stop and report.
+7. **No version bump** for the CLI unless generator output changes (it should not).
+
+8. **Checkpoint C3, the owner's decision, 2026-10-27**, verbatim, choosing between "measure to
+   the frame" and "run immediately on the leading edge":
+
+   > "Measure to the frame"
+
+   The design stays: at most one pipeline run, on the next animation frame (EDITOR-DESIGN §3.2).
+   **e2 is redefined** to measure what the user can see:
+   1. **Frame latency:** for every keystroke, the change is on the canvas in the **first**
+      animation frame after the key event. No keystroke skips a frame. (Test: the frame counter
+      at blit minus the frame counter at the key event is 1, for all 300 keystrokes.)
+   2. **Work per frame:** from the start of the pipeline run in that frame to the end of the
+      blit, **p95 under 16 ms** under 4× CPU throttle, so the frame is never late.
+   Both on the departures project and the 20-element screen. The key-to-blit time is still
+   reported, not gated: it includes the wait for the frame, which no schedule removes from what
+   is displayed. Ruling 5 stands for the new definition: if either half fails, report the
+   breakdown, do not weaken it.
+
+9. **DOMPurify override, the owner's decision, 2026-10-27**, verbatim, answering whether E-1e
+   could override DOMPurify to 3.4.17 to clear the critical advisory:
+
+   > "Yes, override it"
+
+   An npm `overrides` entry in `designer/package.json` pins `dompurify` to exactly **3.4.17**
+   (published 2026-10-12, so it meets ruling 1's 14-day rule). The lockfile is updated, and
+   `npm audit` must then report no critical or high finding. Nothing else changes.
+10. **A self-test for e2's frame counter.** The project proves a check can fail before trusting
+    it passing (as PR-06 did for the xtensa check). One test forces a keystroke to miss its frame,
+    for example by blocking the main thread for longer than a frame inside the pipeline run,
+    using a test-only hook. It asserts that the counter reports 2 or more and that the gate fails.
+    The hook must not exist in a production build.
+
+11. **C3's frame gate amended by the owner, 2026-10-28**, verbatim, choosing between "at most 1%"
+    and keeping the all-300 rule:
+
+    > "At most 1%"
+
+    Ruling 8.1 now reads: under 4× CPU throttle, **at most 1% of keystrokes (3 of 300) per screen**
+    may miss their first frame (a frame count of 2 or more); every other keystroke is drawn in its
+    first frame. Ruling 8.2 (run-to-blit p95 under 16 ms) is unchanged. The self-test (ruling 10)
+    stays and must still fail the gate. **Follow-up for E-2:** reduce allocation spikes in the
+    resolve, validate and scene stages, the one cause of missed frames inside U8G2GL's own code.
+
+12. **Rulings on the WO5 readability audit** (`wo5-readability/AUDIT.md`), 2026-10-28:
+    1. **Test hooks leave production.** `window.__u8g2gl` (which reaches the session token) and
+       `window.__u8g2glPerf`, with the keystroke probe and its animation-frame loop, exist only in a
+       **test build**: a Vite mode (for example `--mode e2e`) whose define is dead-code-eliminated
+       from `npm run build`. The e2e suite builds and serves the test mode. Show it with a `grep`
+       over the production `dist/` for `__u8g2gl`, `__u8g2glPerf` and the probe, all absent, and
+       the production build's own e1 test still passing.
+    2. **The probe's header** states its real cost; it clears its `performance` entries per key so
+       the buffer is bounded.
+    3. **`new Function` on the loader** gets a why-comment at the line: the source is the
+       token-gated server's own build of the user's project, never a third party's.
+    4. **Workspace pointers go**, everywhere the audit lists, including test titles, assertion
+       messages, CI step names and the artifact file, renamed to `keystroke-performance.json`.
+       The rules each gate enforces are stated inline instead.
+    5. All other P2 and P3 items fixed; P4s as the audit recommends, declines recorded.
+
+## Status log
+
+- **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
+  issued.
+- **2026-10-27. WO1–WO4 complete** (one worker; interrupted once by a usage limit and resumed as
+  the same agent). Dependencies exactly ruling 1's, all published by 2026-10-13, installed with
+  `--before=2026-10-13` so transitive ones are too; Playwright's three browsers downloaded.
+- **2026-10-27. PA verification.** CLI 1596 + 6 skipped, lint clean; designer build clean; unit
+  17 passed; end-to-end 10 passed and 1 skipped (needs Emscripten) excluding e2. The shell
+  renders the departures project from its project-built editor Wasm (screenshot
+  `tmp/wo2-project.png`, not committed).
+- **Checkpoint C3: e2 fails, owner's decision.** Keystroke to blit under 4× CPU throttle, 300
+  keystrokes: departures p95 **19.5 ms** (median 12.4), 20 elements p95 **20.2 ms** (median 12.8).
+  The pipeline itself is about 3 ms; the miss is entirely the wait for the next animation frame
+  (median 7.5, p95 13.8), which EDITOR-DESIGN §3.2 prescribes and §3.3's budget omits. Ruling 5
+  held: the test was not weakened. Put to the owner as C3 asks.
+- **Open, owner's decision:** `npm audit` critical, from DOMPurify 3.4.15 pinned by
+  monaco-editor 0.57.0 (3.4.17 fixes it); an override adds a version ruling 1 does not list.
+- **Follow-ups:** saving drops a BOM and normalises mixed line endings; with no toolchain, a
+  project font or image the framework Wasm lacks makes it refuse the scene; the hatched "live but
+  invalid" state (§3.8) is not built; no-toolchain detection reads the build job's message text
+  (E-1d's job should return a stable code); the npm package does not ship `designer/dist` (joins
+  E-1d ruling 8.3).
+- **2026-10-27. C3 decided by the owner: measure to the frame** (ruling 8). The design is unchanged;
+  e2 is redefined. EDITOR-DESIGN §3.3's budget should say the wait for the frame is outside it;
+  that note joins the PR description for the Chief Architect.
+- **2026-10-27. WO4b complete:** e2 passes under ruling 8. Three runs, both screens: 300/300
+  keystrokes in the first frame; run-to-blit p95 3.4–5.4 ms (gate 16). Key-to-blit (reported
+  only) p95 18.4–20.2 ms. Rulings 9 (DOMPurify) and 10 (counter self-test) issued.
+- **2026-10-27. Rulings 9 and 10 done; the self-test exposed the counter.** The WO4b counter
+  counted animation-frame callbacks and could never report a miss, so its 300/300 was void. The
+  PA reported it to the owner as a pass before the self-test ran; that was wrong and is corrected
+  here. With a counter on the display's frame grid, 0–3 of 300 keystrokes per screen missed their
+  frame across five runs (about 0.4% overall): stage spikes (likely GC or JIT), Monaco's key
+  handling, and runs starting late in a frame. Run-to-blit p95 3.9–5.2 ms. DOMPurify 3.4.17,
+  `npm audit` 0 vulnerabilities.
+- **2026-10-28. C3 frame gate amended by the owner** (ruling 11): at most 1% may miss.
+- **2026-10-28. Ruling 11 applied:** e2 passes three runs, 0 of 300 missed on both screens; the
+  self-test still fails the gate. PA ran it independently: 300/300, run-to-blit p95 3.7–3.9 ms.
+- **2026-10-28. WO5 complete.** Readability audit: 0 P1, 4 P2, 6 P3, 4 P4; 13 resolved, 1 declined.
+  Test hooks and the keystroke probe are now in a test build only. **PA verification:** the
+  production `dist/` contains no hook, probe or test marker; the production-build editing test
+  passes in Chromium, Firefox and WebKit. CLI 1596 + 6 skipped; designer unit 17; e2e 12 + 1
+  skipped (passes with Emscripten).

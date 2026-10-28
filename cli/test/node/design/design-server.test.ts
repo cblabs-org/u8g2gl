@@ -8,7 +8,8 @@
  *          token on every route, no write escaping the project (by path or by
  *          symlink), loopback only, an external edit becoming a `changed` event
  *          within 200 ms, the ignored paths, malformed percent-encodings, the
- *          build queue's routes, and a clean close with streams open.
+ *          build queue's routes, the designer's files and the editor Wasm
+ *          route, and a clean close with streams open.
  * Description: Each test starts a server on port 0 against a temporary project
  *              and closes it in afterEach. Requests use `fetch`, except the
  *              Host-header check, which needs `node:http` because `fetch` will
@@ -20,7 +21,8 @@ import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { ServedProjectFileSystem, type ProjectFsEvent } from '../../../src/core/project-fs/index.js';
-import { startDesignServer, type DesignServer } from '../../../src/node/design/design-server.js';
+import { startDesignServer, type DesignServer, type DesignServerOptions } from '../../../src/node/design/design-server.js';
+import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
 import { INVALID_PATHS } from '../../project-fs/contract.js';
 import { createTestEventSource } from '../../project-fs/test-event-source.js';
@@ -31,10 +33,13 @@ let root = '';
 
 // start
 // A server on port 0 for a fresh project seeded with MINIMAL_PROJECT plus `extra`.
-async function start(extra: Readonly<Record<string, string>> = {}): Promise<DesignServer> {
+async function start(
+  extra: Readonly<Record<string, string>> = {},
+  options: Omit<DesignServerOptions, 'projectRoot'> = {},
+): Promise<DesignServer> {
   root = makeTempDir('design-server');
   writeFiles(root, { ...MINIMAL_PROJECT, ...extra });
-  server = await startDesignServer({ projectRoot: root });
+  server = await startDesignServer({ projectRoot: root, ...options });
   return server;
 }
 
@@ -63,6 +68,8 @@ const ROUTES: ReadonlyArray<{ readonly method: string; readonly path: string; re
   { method: 'GET', path: '/api/events' },
   { method: 'POST', path: '/api/build/editor-wasm' },
   { method: 'GET', path: '/api/build/1' },
+  { method: 'GET', path: '/app/not-the-token/index.html' },
+  { method: 'GET', path: '/api/editor-wasm/1/u8g2gl_editor.js' },
   { method: 'GET', path: '/no/such/route' },
 ];
 
@@ -322,6 +329,126 @@ describe('the build routes', () => {
     const s = await start();
     s.builds.register('echo', async () => null);
     expect((await api('/api/build/echo', { method: 'POST', body: '{nope' })).status).toBe(400);
+  });
+});
+
+describe('the designer route', () => {
+  // designer
+  // A stand-in designer build: an index page, a script, and a symlink that
+  // points out of it at a project file.
+  function designer(): string {
+    const dir = makeTempDir('designer-dist');
+    writeFiles(dir, { 'index.html': '<!doctype html><title>designer</title>\n', 'assets/main.js': 'export {};\n' });
+    return dir;
+  }
+
+  it('redirects / to the token-carrying app path, and serves the app from it', async () => {
+    const dist = designer();
+    const s = await start({}, { designerRoot: dist });
+    const page = await fetch(s.url, { redirect: 'manual' });
+    expect(page.status).toBe(302);
+    expect(page.headers.get('location')).toBe(`/app/${s.token}/`);
+
+    const index = await fetch(`http://127.0.0.1:${s.port}/app/${s.token}/`);
+    expect(index.status).toBe(200);
+    expect(index.headers.get('content-type')).toBe('text/html; charset=utf-8');
+    expect(index.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(await index.text()).toContain('<title>designer</title>');
+
+    const script = await fetch(`http://127.0.0.1:${s.port}/app/${s.token}/assets/main.js`);
+    expect(script.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+    expect(await script.text()).toBe('export {};\n');
+  });
+
+  it('refuses the app path without the right token in it', async () => {
+    const s = await start({}, { designerRoot: designer() });
+    const base = `http://127.0.0.1:${s.port}`;
+    for (const path of [`/app/${'0'.repeat(64)}/`, `/app/${s.token}`, '/app/', `/app//${s.token}/`]) {
+      const response = await fetch(`${base}${path}`);
+      expect(response.status, path).toBe(403);
+      await response.body?.cancel();
+    }
+  });
+
+  it('serves nothing outside the designer build: traversal, symlinks and missing files are refused', async () => {
+    const dist = designer();
+    const s = await start({}, { designerRoot: dist });
+    symlinkSync(join(root, 'u8g2gl.xml'), join(dist, 'escape.xml'));
+    const app = `http://127.0.0.1:${s.port}/app/${s.token}/`;
+    for (const path of ['%2e%2e/u8g2gl.xml', 'assets/%2e%2e/%2e%2e/u8g2gl.xml', 'escape.xml', 'nope.js', 'assets', '%zz']) {
+      const response = await fetch(`${app}${path}`);
+      // 403 where URL parsing collapses an encoded `..` and so climbs out of
+      // the token's segment too; 404 where the path rule refuses it.
+      expect([403, 404], path).toContain(response.status);
+      expect(await response.text(), path).not.toContain('<u8g2gl');
+    }
+  });
+
+  it('without a designer build, / is the placeholder page and the app path is 404', async () => {
+    const s = await start();
+    expect(await (await fetch(s.url)).text()).toContain('not built yet');
+    expect((await fetch(`http://127.0.0.1:${s.port}/app/${s.token}/`)).status).toBe(404);
+  });
+});
+
+describe('the editor Wasm route', () => {
+  // wasmOutput
+  // A stand-in editor Wasm build's output directory.
+  function wasmOutput(): string {
+    const dir = makeTempDir('editor-wasm');
+    writeFiles(dir, { 'u8g2gl_editor.js': 'var createU8g2glEditor;\n', 'u8g2gl_editor.wasm': new Uint8Array([0, 0x61, 0x73, 0x6d]) });
+    return dir;
+  }
+
+  it("serves a succeeded editor-wasm build's loader and module, by build id", async () => {
+    const s = await start();
+    const wasmDir = wasmOutput();
+    s.builds.register(EDITOR_WASM_JOB, async () => ({ status: 'built', wasmDir }));
+    const record = (await (await api(`/api/build/${EDITOR_WASM_JOB}`, { method: 'POST' })).json()) as { id: string };
+    await s.builds.idle();
+
+    const loader = await api(`/api/editor-wasm/${record.id}/u8g2gl_editor.js`);
+    expect(loader.status).toBe(200);
+    expect(loader.headers.get('content-type')).toBe('text/javascript; charset=utf-8');
+    expect(await loader.text()).toBe('var createU8g2glEditor;\n');
+
+    // A <script> tag cannot send a header, so the query token is accepted too.
+    const module = await fetch(`http://127.0.0.1:${s.port}/api/editor-wasm/${record.id}/u8g2gl_editor.wasm?token=${s.token}`);
+    expect(module.headers.get('content-type')).toBe('application/wasm');
+    expect(new Uint8Array(await module.arrayBuffer())).toEqual(new Uint8Array([0, 0x61, 0x73, 0x6d]));
+  });
+
+  it('serves nothing for another job, a failed or unknown build, or a file it did not write', async () => {
+    const s = await start();
+    const wasmDir = wasmOutput();
+    writeFiles(wasmDir, { 'build-hash.txt': 'abc\n' });
+    s.builds.register('other', async () => ({ wasmDir }));
+    const other = (await (await api('/api/build/other', { method: 'POST' })).json()) as { id: string };
+    let fail = false;
+    s.builds.register(EDITOR_WASM_JOB, async () => {
+      if (fail) throw new Error('no Emscripten');
+      return { wasmDir };
+    });
+    const good = (await (await api(`/api/build/${EDITOR_WASM_JOB}`, { method: 'POST' })).json()) as { id: string };
+    await s.builds.idle();
+    fail = true;
+    const failed = (await (await api(`/api/build/${EDITOR_WASM_JOB}`, { method: 'POST' })).json()) as { id: string };
+    await s.builds.idle();
+
+    for (const path of [
+      `/api/editor-wasm/${other.id}/u8g2gl_editor.js`,
+      `/api/editor-wasm/${failed.id}/u8g2gl_editor.js`,
+      '/api/editor-wasm/999/u8g2gl_editor.js',
+      `/api/editor-wasm/${good.id}/build-hash.txt`,
+      `/api/editor-wasm/${good.id}/%2e%2e/u8g2gl_editor.js`,
+      `/api/editor-wasm/${good.id}/u8g2gl_editor.js/x`,
+      `/api/editor-wasm/${good.id}`,
+    ]) {
+      const response = await api(path);
+      expect(response.status, path).toBe(404);
+      await response.body?.cancel();
+    }
+    expect((await api(`/api/editor-wasm/${good.id}/u8g2gl_editor.wasm`)).status).toBe(200);
   });
 });
 

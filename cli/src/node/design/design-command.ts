@@ -14,8 +14,10 @@
  *              reports its errors as usage errors). `startOrAttach` is the
  *              testable core: it either attaches to a live server named by the
  *              project's lock, or replaces a stale lock, starts a server with
- *              the `editor-wasm` build job registered, and takes the lock. `runDesignCommand` wraps it with output, the
- *              browser and signal handling.
+ *              the `editor-wasm` build job registered and the built designer
+ *              (if there is one) at `/`, and takes the lock.
+ *              `runDesignCommand` wraps it with output, the browser and
+ *              signal handling.
  *
  * Exports:
  * - DesignArgs:            The parsed command line
@@ -31,6 +33,7 @@ import { registerEditorWasmJob } from './build/editor-wasm-job.js';
 import { startDesignServer, type DesignServer } from './design-server.js';
 import { isLockLive, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
 import { openBrowser } from './open-browser.js';
+import { locateDesignerDist } from './static-files.js';
 
 /** The parsed `design` command line. */
 export interface DesignArgs {
@@ -99,7 +102,10 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
   }
 
   // --- Step 2: Start a server with its build jobs, then take the lock exclusively ---
-  const server = await startDesignServer({ projectRoot, port });
+  // The designer is served when this CLI sits in a source tree that built it;
+  // otherwise `/` is the placeholder page (static-files.ts).
+  const designerRoot = locateDesignerDist();
+  const server = await startDesignServer({ projectRoot, port, ...(designerRoot !== undefined ? { designerRoot } : {}) });
   registerEditorWasmJob(server.builds);
   const lock: DesignLock = { pid: process.pid, port: server.port, token: server.token, url: server.url };
   if (!tryCreateLock(projectRoot, lock)) {
