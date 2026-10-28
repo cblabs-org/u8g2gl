@@ -199,7 +199,8 @@ interface Choice {
  */
 function ChoiceEditor({ spec, field, commit, disabled, choices }: EditorProps & { readonly choices: readonly Choice[] }): React.JSX.Element {
   const value = field.mixed ? MIXED : (field.value ?? '');
-  const unset = spec.default !== undefined ? `not set (${spec.default})` : spec.kind === 'binding' ? 'not bound' : 'not set';
+  let unset = spec.kind === 'binding' ? 'not bound' : 'not set';
+  if (spec.default !== undefined) unset = `not set (${spec.default})`;
   const extra = field.value !== undefined && !choices.some((choice) => choice.value === field.value) ? [{ value: field.value, label: `${field.value} (not declared)` }] : [];
   return (
     <div className="field-controls">
@@ -264,6 +265,13 @@ function ImageEditor({ spec, field, commit, disabled, options }: EditorProps & {
   );
 }
 
+/**
+ * A thumbnail's lit and unlit pixels, RGBA: light on near-black, as the canvas
+ * presents a monochrome panel (ui_spec §8), so an image reads as it will look.
+ */
+const LIT_PIXEL = [230, 230, 230, 255];
+const UNLIT_PIXEL = [5, 5, 5, 255];
+
 /** @brief An XBM image drawn 1:1, one canvas pixel per image pixel (ui_spec §9.1). */
 function Thumbnail({ image }: { readonly image: ImageOption }): React.JSX.Element {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -277,7 +285,7 @@ function Thumbnail({ image }: { readonly image: ImageOption }): React.JSX.Elemen
       for (let x = 0; x < image.width; x++) {
         const lit = ((image.bytes[y * stride + (x >> 3)] ?? 0) >> (x & 7)) & 1;
         const i = (y * image.width + x) * 4;
-        pixels.data.set(lit ? [230, 230, 230, 255] : [5, 5, 5, 255], i);
+        pixels.data.set(lit ? LIT_PIXEL : UNLIT_PIXEL, i);
       }
     }
     context.putImageData(pixels, 0, 0);

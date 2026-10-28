@@ -13,8 +13,8 @@
  * Description: `namedCstElements()` finds a document's named elements below
  *              its root, which is also how a commit finds what it edits.
  *              `elementFacts()` then gathers, per selected name, its written
- *              attributes and its diagnostics: E-1b gives each diagnostic the
- *              position of the attribute at fault, so a diagnostic inside an
+ *              attributes and its diagnostics: a diagnostic about an attribute
+ *              carries that attribute's position (§15.1), so a diagnostic inside an
  *              attribute's range is that attribute's, and one elsewhere in the
  *              element's open tag (a missing required prop, say) is the
  *              element's own. Pure: no React, no Monaco.

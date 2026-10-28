@@ -8,9 +8,9 @@
  *          in what order, from its effective manifest and nothing else
  *          ([UD-5]). There is no per-widget code: a custom widget gets the same
  *          panel a framework one does, because both are only manifests
- *          ([D-17]). It is the one place the panel's order is decided, so the
- *          schema decision at checkpoint C4 (EDITOR-DESIGN §8) has one thing to
- *          change.
+ *          ([D-17]). It is the one place the panel's order is decided, so a
+ *          schema `group=` or a way to hide inherited props (EDITOR-DESIGN §8)
+ *          would have one thing to change.
  * Description: EDITOR-DESIGN §8's order without the schema's `group=`:
  *              geometry first, in pairs (`x`/`y`, `width`/`height`,
  *              `right`/`bottom`, whichever the manifest declares); then the
@@ -200,8 +200,9 @@ function optionsOf(type: PropType, values: string | undefined): readonly string[
 // bindingSpecs
 // One field per binding attribute. `bind_text` is declared once per subject
 // type it accepts (§8.4); the panel offers one dropdown for it, filtered to
-// any of those types. The field's source is the nearest manifest that
-// declared any of its overloads, so a widget that redeclares it owns it.
+// any of those types. The field's source is the nearest manifest in the
+// `extends` chain that declared any of its overloads, so a widget that
+// redeclares one owns it.
 //   manifest — the effective manifest
 function bindingSpecs(manifest: EffectiveManifest): FieldSpec[] {
   const specs = new Map<string, { types: string[]; sources: string[] }>();
@@ -219,7 +220,15 @@ function bindingSpecs(manifest: EffectiveManifest): FieldSpec[] {
     options: [],
     default: undefined,
     required: false,
-    help: `Binds to a ${types.join(' or ')} subject; its value replaces the literal while bound (§8.4).`,
-    source: sources.includes(manifest.name) ? manifest.name : (sources[0] ?? manifest.name),
+    help: `Binds to ${/^[aeiou]/.test(types[0] ?? '') ? 'an' : 'a'} ${types.join(' or ')} subject; its value replaces the literal while bound (§8.4).`,
+    source: nearest(manifest.chain, sources) ?? manifest.name,
   }));
+}
+
+// nearest
+// Of some declaring tags, the one nearest the element in its `extends` chain.
+//   chain   — the element's tag, then each ancestor's, nearest first
+//   sources — tags that declared one of a field's overloads
+function nearest(chain: readonly string[], sources: readonly string[]): string | undefined {
+  return chain.find((tag) => sources.includes(tag)) ?? sources[0];
 }

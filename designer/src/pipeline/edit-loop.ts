@@ -74,7 +74,14 @@ import type { Workspace } from '../workspace';
 import { innermostAt, namedElements } from '../documents/element-at';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
-import { runTextPipeline, TEXT_STAGES, type CompiledAssets, type Rect, type TextPipelineResult, type TextStage } from './live-pipeline';
+import {
+  runTextPipeline,
+  TEXT_STAGES,
+  type CompiledAssets,
+  type Rect,
+  type TextPipelineResult,
+  type TextStage,
+} from './live-pipeline';
 
 /** What the canvas shows, and why. */
 export interface FrameState {

@@ -171,7 +171,8 @@ test('a selection change re-renders only what shows the selection: the status ba
   console.log(`renders across five selection changes: ${JSON.stringify(rendered)}`);
   // The property panel shows the selection, so it re-renders for it; nothing
   // else in the shell may.
-  const showsSelection = (name: string): boolean => name === 'SelectionGeometry' || name === 'PropertyPanel' || name.startsWith('Panel');
+  const showsSelection = (name: string): boolean =>
+    name === 'SelectionGeometry' || name === 'PropertyPanel' || name === 'PanelHeader' || name.startsWith('PanelField:');
   expect(Object.keys(rendered).filter((name) => !showsSelection(name))).toEqual([]);
   expect(rendered.SelectionGeometry).toBeGreaterThanOrEqual(5);
 });

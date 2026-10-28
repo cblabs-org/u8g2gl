@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
+import { buildManifestRegistry } from '@u8g2gl/core/manifest/index.js';
 import { ProjectModelCache } from '../../src/project/project-model';
 import { panelLayout, sharedLayout, type PanelLayout } from '../../src/panel/panel-layout';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements } from '../../src/panel/element-facts';
@@ -162,4 +163,20 @@ test('the facts: attributes as written, by name, and each diagnostic on the attr
   expect(row0?.placed).toEqual({ x: 32, y: 0, width: 224, height: 16 });
   // A name not in the text is left out, in selection order otherwise.
   expect(elementFacts(cst, ['sys_clock', 'gone', 'plat_box'], [], new Map()).map((f) => f.name)).toEqual(['sys_clock', 'plat_box']);
+});
+
+test('a binding overloaded down a chain belongs to the nearest manifest that declared an overload', () => {
+  const widget = (name: string, extendsTag: string | undefined, type: string) => ({
+    name,
+    ...(extendsTag !== undefined ? { extends: extendsTag } : {}),
+    api: { props: [], bindings: [{ name: 'bind_t', type, setter: 'bind_t' }], elements: [] },
+  });
+  const registry = buildManifestRegistry({
+    framework: [],
+    project: [widget('wd_root', undefined, 'string'), widget('wd_mid', 'wd_root', 'int'), { name: 'wd_leaf', extends: 'wd_mid', api: { props: [], bindings: [], elements: [] } }],
+  });
+  const leaf = registry.get('wd_leaf');
+  if (leaf === undefined) throw new Error('no wd_leaf');
+  const spec = panelLayout(leaf).sections.flatMap((s) => s.rows.flat()).find((f) => f.key === 'bind_t');
+  expect(spec).toMatchObject({ source: 'wd_mid', subjectTypes: ['string', 'int'] });
 });

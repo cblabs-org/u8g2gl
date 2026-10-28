@@ -7,9 +7,9 @@
  * Purpose: The designer's shell, laid out as ui_spec §6 draws it: the activity
  *          bar and explorer down the left, the editor area — canvas beside the
  *          XML — in the middle, the property panel on the right, Problems and
- *          Output below, and the status bar along the bottom. Dockview owns the editor area and bottom panel, so
- *          tabs split, move and resize as in an IDE; the fixed chrome around it
- *          is plain React.
+ *          Output below, and the status bar along the bottom. Dockview owns
+ *          the editor area and bottom panel, so tabs split, move and resize as
+ *          in an IDE; the fixed chrome around it is plain React.
  * Description: On Dockview's ready event the default layout is built: canvas,
  *              then Problems and Output beneath it. Editor tabs open to the
  *              canvas's right, all in one group, when the workspace is asked to

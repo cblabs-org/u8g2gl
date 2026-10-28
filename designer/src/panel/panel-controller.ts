@@ -229,9 +229,10 @@ export class PanelController {
     if (view.kind === 'empty' || attribute === undefined) return;
     const cst = this.cstOf(view.file);
     const name = view.names[0];
-    const element = cst === undefined || name === undefined ? undefined : name === ROOT_TARGET ? cst.root : namedCstElements(cst).get(name);
+    if (cst === undefined || name === undefined) return;
+    const element = name === ROOT_TARGET ? cst.root : namedCstElements(cst).get(name);
     const target = element?.attributes.find((a) => a.name === attribute);
-    if (cst === undefined || target === undefined) return;
+    if (target === undefined) return;
     const { line, column } = cst.lines.locate(target.valueRange.start);
     this.workspace.openFile({ path: view.file, line, column });
   }

@@ -122,15 +122,16 @@ export function fieldState(spec: FieldSpec, elements: readonly ElementFacts[], c
   let disabled: string | undefined;
   let shown: string | undefined;
   let reveal: string | undefined;
+  const subject = spec.kind === 'prop' ? boundBy(spec.key, elements) : undefined;
+  const anchor = ANCHORS[spec.key];
+  const anchorValue = anchoredBy(spec.key, elements);
   if (!context.wellFormed) {
     disabled = 'The XML is not well-formed, so no edit can be placed in it; the panel edits again once it parses.';
-  } else if (spec.kind === 'prop' && boundBy(spec.key, elements) !== undefined) {
-    const subject = boundBy(spec.key, elements);
+  } else if (subject !== undefined) {
     disabled = `${spec.key} is bound to '${subject}' by bind_${spec.key}: the subject's value replaces it, so edit the binding or the sample data instead (§8.4).`;
     reveal = `bind_${spec.key}`;
-  } else if (ANCHORS[spec.key] !== undefined && anchoredBy(spec.key, elements) !== undefined) {
-    const anchor = ANCHORS[spec.key] ?? '';
-    disabled = `${spec.key} is set by ${anchor}="${anchoredBy(spec.key, elements)}": the element is anchored to its container's ${anchor} edge, and setting both would over-constrain it (§7.2).`;
+  } else if (anchor !== undefined && anchorValue !== undefined) {
+    disabled = `${spec.key} is set by ${anchor}="${anchorValue}": the element is anchored to its container's ${anchor} edge, and setting both would over-constrain it (§7.2).`;
     reveal = anchor;
   } else if (several && geometry) {
     disabled = `The bounding box of ${elements.length} elements, read-only here: move or align them on the canvas.`;
@@ -138,14 +139,15 @@ export function fieldState(spec: FieldSpec, elements: readonly ElementFacts[], c
   }
 
   // --- Step 3: Detach, for one element's geometry written as an expression ---
+  // Only when nothing disabled it: a bound value is live data, not a
+  // computation, so it offers Edit in XML and never Detach (EDITOR-DESIGN §3.5).
   let detach: string | undefined;
   const placed = elements[0]?.placed;
   if (!several && geometry && disabled === undefined && first !== undefined && !isIntegerLiteral(first) && placed !== undefined) {
     detach = String(placed[spec.key as keyof Rect]);
     reveal = spec.key;
   }
-  // Bound values offer only Edit in XML (EDITOR-DESIGN §3.5): a binding is
-  // never detached, because its value is live data, not a computation.
+  // A multi-selection has no single attribute to reveal.
   if (several) reveal = undefined;
 
   return { value: mixed ? undefined : first, mixed, written, problems, disabled, detach, shown, reveal };

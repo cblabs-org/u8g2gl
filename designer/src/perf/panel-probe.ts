@@ -50,8 +50,9 @@ interface OpenSample {
   committed: number | undefined;
 }
 
-/** Samples kept; a session that runs long keeps only the latest. */
+/** How many samples are kept; a session that runs long keeps only the latest. */
 const LIMIT = 5000;
+/** Samples, oldest first; the last is the update being measured. */
 const samples: OpenSample[] = [];
 
 /** @brief The controller begins an update: a new sample. */

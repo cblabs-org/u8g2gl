@@ -33,9 +33,10 @@
  *              — each drawn element's device-space rectangle, in draw order,
  *              from the same placement the scene emitter uses — and each
  *              selectable element's rectangle by name, for hit-testing and the
- *              selection overlay, and each element's rectangle in its
- *              container's coordinates, for the property panel's Detach. A composite's children are targets of the
- *              instance written in the screen, never of their own names.
+ *              selection overlay; and each element's rectangle in its
+ *              container's coordinates, for the property panel's Detach. A
+ *              composite's children are targets of the instance written in
+ *              the screen, never of their own names.
  *
  *              It also returns the subjects' declared values, which the
  *              caller applies after every scene, since a rebuild clears them.
@@ -276,12 +277,13 @@ function declaredValues(globals: Globals): string {
 }
 
 // selectable
-// The drawn screen's hit targets, selectable rectangles, and each element's own
-// rectangle in its container's coordinates. Each drawn element
+// The drawn screen's hit targets, selectable rectangles, and each element's
+// own rectangle in its container's coordinates (`placed`). Each drawn element
 // is a target of the element written in the screen it belongs to: itself, or
 // the outermost composite instance it was expanded through (ui_spec §8: a hit
 // on a composite's child selects the instance). An instance's rectangle is its
-// own when it has one, else the box around its children's.
+// own when it has one, else the box around its children's; an instance has no
+// `placed` rectangle, having no geometry attributes of its own to detach.
 //   realised   — the active screen's realisation, whose draw order is the targets' order
 //   placements — placeScreen()'s placements for it
 function selectable(
