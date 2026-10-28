@@ -12,9 +12,19 @@
  *          what the canvas shows is what the firmware would be generated from.
  *          There is no fast path: every run takes every step.
  * Description: `runTextPipeline` is synchronous and pure apart from the timer.
- *              It refuses to describe a scene while any error stands, because
- *              the scene emitter's contract is a validated model; the caller
- *              then keeps the last good frame, dimmed.
+ *              The scene follows EDITOR-DESIGN §3.8's states:
+ *              - **Valid:** the scene.
+ *              - **Well-formed but invalid:** the scene too, *if it can still
+ *                be described* — an overflow, say, leaves a model the emitter
+ *                can describe, so the canvas stays live and the caller hatches
+ *                the elements the errors are in. The emitter's contract is a
+ *                validated model, and it throws for one it cannot describe;
+ *                that is caught here and means no scene (unbuildable), never a
+ *                failed run.
+ *              - **Not well-formed:** no scene is attempted: a document that
+ *                does not parse leaves a partial model, and a scene of it
+ *                would draw a screen the text does not hold.
+ *              With no scene the caller keeps the last good frame, dimmed.
  *              Each stage is timed with `performance.now()` and recorded as a
  *              `performance.mark`, so a keystroke measurement can attribute a slow
  *              keystroke to the stage that spent it.
@@ -45,7 +55,7 @@ import { describeScenes } from '@u8g2gl/core/generator/emit/scene.js';
 import { placeScreen, type Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { computeCapacities, realiseScreens, type RealisedElement, type RealisedScreen } from '@u8g2gl/core/realise/index.js';
 import { createScreenPipeline, findTargetDisplay } from '@u8g2gl/core/resolver/index.js';
-import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
 import type { ProjectModelCache } from '../project/project-model';
@@ -81,8 +91,13 @@ export interface TextPipelineResult {
   /** Every diagnostic, deduplicated and sorted (`checkProject`'s order). */
   readonly diagnostics: readonly Diagnostic[];
   readonly errors: number;
-  /** The scene as JSON text, or undefined while an error stands. */
+  /**
+   * The scene as JSON text; undefined when a document is not well-formed or
+   * the errors standing leave a model the emitter cannot describe.
+   */
   readonly scene: string | undefined;
+  /** False while any project document is not well-formed XML (§3.8). */
+  readonly wellFormed: boolean;
   /** The screen to show; undefined if the project has none. */
   readonly screen: string | undefined;
   /** The file `screen` is written in, where its elements' names are. */
@@ -156,37 +171,47 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   const diagnostics = finaliseDiagnostics([...checked.diagnostics, ...(input.assets?.diagnostics ?? [])]);
   lap('validate');
 
-  // --- Step 5: The scene, only for a model with no error ---
+  // --- Step 5: The scene, for any well-formed model the emitter can describe ---
   const screen = activeScreenName(model, input.activeFile);
   const screenIndex = model.screens.findIndex((s) => s.name === screen);
+  const wellFormed = !diagnostics.diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.MALFORMED_XML);
   let scene: string | undefined;
   let bounds: ReadonlyMap<string, Rect> = new Map();
   let targets: readonly HitTarget[] = [];
-  if (diagnostics.errors === 0 && target !== undefined && input.assets !== undefined) {
-    const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
-    scene = JSON.stringify(
-      describeScenes({
-        project: {
-          project: model.project,
-          globals: model.globals,
-          screens: model.screens,
-          capacities,
+  if (wellFormed && target !== undefined && input.assets !== undefined) {
+    try {
+      const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
+      scene = JSON.stringify(
+        describeScenes({
+          project: {
+            project: model.project,
+            globals: model.globals,
+            screens: model.screens,
+            capacities,
+            manifests: model.manifests,
+            images: input.assets.images,
+            compiledFonts: input.assets.fonts,
+            bdfLicenceFiles: new Map(),
+            stamp: '',
+          },
+          realised: realisation.screens,
+          resolved: pipeline.resolution.screens,
           manifests: model.manifests,
-          images: input.assets.images,
-          compiledFonts: input.assets.fonts,
-          bdfLicenceFiles: new Map(),
-          stamp: '',
-        },
-        realised: realisation.screens,
-        resolved: pipeline.resolution.screens,
-        manifests: model.manifests,
-        generated: { source: 'u8g2gl.xml', schema: model.project.schema, generator: 'designer', target: target.name },
-      }),
-    );
-    const realised = realisation.screens[screenIndex];
-    const resolved = pipeline.resolution.screens[screenIndex];
-    if (realised !== undefined && resolved !== undefined) {
-      ({ bounds, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+          generated: { source: 'u8g2gl.xml', schema: model.project.schema, generator: 'designer', target: target.name },
+        }),
+      );
+      const realised = realisation.screens[screenIndex];
+      const resolved = pipeline.resolution.screens[screenIndex];
+      if (realised !== undefined && resolved !== undefined) {
+        ({ bounds, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+      }
+    } catch (error) {
+      // Only a model with errors may be refused: the emitter refusing a valid
+      // one is a defect, which must not pass for the "unbuildable" state.
+      if (diagnostics.errors === 0) throw error;
+      scene = undefined;
+      bounds = new Map();
+      targets = [];
     }
   }
   lap('scene');
@@ -196,6 +221,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     diagnostics: diagnostics.diagnostics,
     errors: diagnostics.errors,
     scene,
+    wellFormed,
     screen,
     screenFile: model.screens[screenIndex]?.loc?.file,
     display: display === undefined ? undefined : { width: display.width, height: display.height },

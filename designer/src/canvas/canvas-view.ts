@@ -15,7 +15,9 @@
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
  *              outline, eight handles and an `x, y, w×h` badge, the marquee
- *              while one is dragged, and the outlines of placeholder widgets.
+ *              while one is dragged, the outlines of placeholder widgets, and
+ *              the hatching over an element an error is in (§3.8: the frame
+ *              stays live, and the problem is marked over it, not in it).
  *              It is never part of the framebuffer, so nothing it draws can be
  *              mistaken for a pixel the display would light.
  *
@@ -46,15 +48,25 @@ export interface OverlayRect {
   readonly y: number;
   readonly width: number;
   readonly height: number;
-  /** `selection` is the element under the caret; `placeholder` a widget the Wasm cannot draw. */
-  readonly kind: 'selection' | 'placeholder';
+  /**
+   * `selection` a selected element; `placeholder` a widget the Wasm cannot
+   * draw; `problem` an element an error is in, hatched (EDITOR-DESIGN §3.8).
+   */
+  readonly kind: 'selection' | 'placeholder' | 'problem';
 }
 
 /** The overlay's colour for each kind. */
 const OVERLAY_COLOUR: Readonly<Record<OverlayRect['kind'], string>> = {
   selection: '#4f8cff',
   placeholder: 'rgba(230, 180, 80, 0.7)',
+  problem: '#ff5a5f',
 };
+
+/** The order kinds are drawn in: hatching and placeholders under, selection on top. */
+const OVERLAY_ORDER: Readonly<Record<OverlayRect['kind'], number>> = { problem: 0, placeholder: 1, selection: 2 };
+
+/** The hatch's line spacing, in CSS pixels, whatever the zoom. */
+const HATCH_SPACING = 6;
 
 /**
  * CSS pixels the overlay extends past the frame on each side: room for an edge
@@ -179,10 +191,14 @@ export class CanvasView {
     context.clearRect(0, 0, this.overlay.width, this.overlay.height);
     context.setTransform(ratio, 0, 0, ratio, OVERLAY_MARGIN * ratio, OVERLAY_MARGIN * ratio);
 
-    // --- Step 2: Placeholder outlines under, selections over ---
-    const order = [...this.overlayRects].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'placeholder' ? -1 : 1));
+    // --- Step 2: Hatching and placeholder outlines under, selections over ---
+    const order = [...this.overlayRects].sort((a, b) => OVERLAY_ORDER[a.kind] - OVERLAY_ORDER[b.kind]);
     for (const rect of order) {
       const box = this.screenBox(rect);
+      if (rect.kind === 'problem') {
+        this.drawHatch(context, box);
+        continue;
+      }
       context.strokeStyle = OVERLAY_COLOUR[rect.kind];
       context.lineWidth = rect.kind === 'selection' ? 2 : 1;
       context.setLineDash(rect.kind === 'placeholder' ? [3, 3] : []);
@@ -216,6 +232,28 @@ export class CanvasView {
     height: number;
   } {
     return { x: rect.x * this.zoom - 1, y: rect.y * this.zoom - 1, width: rect.width * this.zoom + 2, height: rect.height * this.zoom + 2 };
+  }
+
+  // drawHatch
+  // Diagonal lines across the element's box, clipped to it, and its outline:
+  // the frame's pixels show through between the lines.
+  private drawHatch(context: CanvasRenderingContext2D, box: { x: number; y: number; width: number; height: number }): void {
+    context.save();
+    context.beginPath();
+    context.rect(box.x, box.y, box.width, box.height);
+    context.clip();
+    context.setLineDash([]);
+    context.lineWidth = 1;
+    context.strokeStyle = 'rgba(255, 90, 95, 0.75)';
+    context.beginPath();
+    for (let offset = -box.height; offset < box.width; offset += HATCH_SPACING) {
+      context.moveTo(box.x + offset, box.y + box.height);
+      context.lineTo(box.x + offset + box.height, box.y);
+    }
+    context.stroke();
+    context.restore();
+    context.strokeStyle = OVERLAY_COLOUR.problem;
+    context.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
   }
 
   // drawHandles

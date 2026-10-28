@@ -20,6 +20,7 @@
  * Exports:
  * - ElementSpan:      A named element's offsets
  * - namedElements():  Every named element below the root, with its span
+ * - innermostAt():    The innermost of some spans containing an offset
  * - elementAt():      The innermost one containing an offset
  */
 
@@ -77,7 +78,18 @@ export function namedElements(text: string): ElementSpan[] | undefined {
  */
 export function elementAt(text: string, offset: number): ElementSpan | undefined | 'unparsed' {
   const spans = namedElements(text);
-  if (spans === undefined) return 'unparsed';
+  return spans === undefined ? 'unparsed' : innermostAt(spans, offset);
+}
+
+/**
+ * @brief The innermost of `spans` containing `offset`, for a caller asking
+ *        about several offsets in one text, which tokenises it once.
+ *
+ * @param spans  `namedElements()` of the text.
+ * @param offset An offset (0-based, between characters).
+ * @return The span; undefined if no named element contains the offset.
+ */
+export function innermostAt(spans: readonly ElementSpan[], offset: number): ElementSpan | undefined {
   let best: ElementSpan | undefined;
   for (const span of spans) {
     if (span.start <= offset && offset <= span.end && (best === undefined || span.depth >= best.depth)) {

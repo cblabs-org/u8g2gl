@@ -55,10 +55,10 @@ owner's approval (rule 00) and the programme rulings. The design is
 
 # WO4 — §3.8's states (`u8g2gl-e2a/wo4-states`)
 
-- [ ] Hatching for invalid-but-buildable elements (ruling 7), with an e2e case (an overflow).
-- [ ] The dimmed last good frame for unbuildable or not well-formed text; the banner for not
+- [x] Hatching for invalid-but-buildable elements (ruling 7), with an e2e case (an overflow).
+- [x] The dimmed last good frame for unbuildable or not well-formed text; the banner for not
       well-formed, with its line and column.
-- [ ] `canvasEditing` exposed and tested (false only when not well-formed).
+- [x] `canvasEditing` exposed and tested (false only when not well-formed).
 
 # WO5 — review (`u8g2gl-e2a/wo5-readability`)
 
