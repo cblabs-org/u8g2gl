@@ -32,7 +32,9 @@
 .field-row.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 .field { min-width: 0; }
-.field-label { display: block; font-family: ui-monospace, Menlo, monospace; color: var(--text); }
+.field-label { display: flex; align-items: center; justify-content: space-between; font-family: ui-monospace, Menlo, monospace; color: var(--text); }
+.field-label .reset { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
+.field-label .reset:hover { color: var(--text); }
 .field-label .required { color: var(--warning); }
 .field-value { font-family: ui-monospace, Menlo, monospace; }
 .field-value.default,
@@ -67,7 +69,6 @@
 }
 .field-controls button:disabled { opacity: 0.4; cursor: default; }
 .field-controls .stepper { width: 22px; padding: 1px 0; }
-.field-controls .reset { color: var(--text-dim); }
 .field-controls .action { color: var(--info); }
 
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }

@@ -25,6 +25,7 @@ import { useObservable } from '../ui/use-observable';
 import { useWorkspace } from '../ui/workspace-context';
 import type { Observable } from '../state/observable';
 import { PanelController, type PanelSummary } from './panel-controller';
+import { FieldEditor } from './editors';
 import type { FieldState } from './field-state';
 import type { FieldSpec, PanelSection } from './panel-layout';
 import './panel.css';
@@ -49,7 +50,7 @@ export function PropertyPanel(): React.JSX.Element {
         <>
           <PanelHeader summary={view.summary} />
           {view.layout.sections.map((section) => (
-            <Section key={`${view.file}:${view.names.join(',')}:${section.id}`} section={section} fields={view.fields} />
+            <Section key={`${view.file}:${view.names.join(',')}:${section.id}`} section={section} fields={view.fields} controller={controller} />
           ))}
         </>
       )}
@@ -83,15 +84,17 @@ function PanelHeader({ summary }: { readonly summary: Observable<PanelSummary> }
 function Section({
   section,
   fields,
+  controller,
 }: {
   readonly section: PanelSection;
   readonly fields: ReadonlyMap<string, Observable<FieldState>>;
+  readonly controller: PanelController;
 }): React.JSX.Element {
   const rows = section.rows.map((row) => (
     <div key={row.map((spec) => spec.key).join('+')} className={`field-row${row.length > 1 ? ' pair' : ''}`}>
       {row.map((spec) => {
         const state = fields.get(spec.key);
-        return state === undefined ? null : <FieldRow key={spec.key} spec={spec} state={state} />;
+        return state === undefined ? null : <FieldRow key={spec.key} spec={spec} state={state} controller={controller} />;
       })}
     </div>
   ));
@@ -111,24 +114,44 @@ function Section({
   );
 }
 
-/** @brief One field: its label, its value, its help beneath (ui_spec §9.2). */
-function FieldRow({ spec, state }: { readonly spec: FieldSpec; readonly state: Observable<FieldState> }): React.JSX.Element {
+/**
+ * @brief One field: its label, its control, its help beneath (ui_spec §9.2),
+ *        and *reset* once it is written.
+ */
+function FieldRow({
+  spec,
+  state,
+  controller,
+}: {
+  readonly spec: FieldSpec;
+  readonly state: Observable<FieldState>;
+  readonly controller: PanelController;
+}): React.JSX.Element {
   countRender(`PanelField:${spec.key}`);
   const field = useObservable(state);
-  const shown = field.shown ?? (field.mixed ? 'mixed' : (field.value ?? spec.default ?? ''));
+  const disabled = field.disabled !== undefined;
+  const commit = (value: string | undefined): boolean => controller.commit(spec.key, value);
   return (
-    <div className="field" data-field={spec.key} data-written={field.written} data-mixed={field.mixed}>
-      <label className="field-label">
-        {spec.key}
-        {spec.required ? <span className="required"> *</span> : null}
-      </label>
-      <span className={`field-value${field.written ? '' : ' default'}`}>{shown}</span>
-      {spec.help !== undefined && <p className="field-help">{spec.help}</p>}
+    <div className="field" data-field={spec.key} data-written={field.written} data-mixed={field.mixed} data-disabled={disabled}>
+      <div className="field-label">
+        <label>
+          {spec.key}
+          {spec.required ? <span className="required" title="Required"> *</span> : null}
+        </label>
+        {field.written && !disabled && (
+          <button type="button" className="reset" aria-label={`Reset ${spec.key}`} title="Reset: remove the attribute, so the default applies" onClick={() => commit(undefined)}>
+            ↺
+          </button>
+        )}
+      </div>
+      <FieldEditor spec={spec} field={field} commit={commit} disabled={disabled} options={controller.options} />
+      {field.disabled !== undefined && <p className="field-reason">{field.disabled}</p>}
       {field.problems.map((problem) => (
         <p key={problem.message} className={`field-problem ${problem.severity}`}>
           {problem.message}
         </p>
       ))}
+      {spec.help !== undefined && <p className="field-help">{spec.help}</p>}
     </div>
   );
 }

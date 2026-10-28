@@ -21,6 +21,12 @@
  *              (`field-state.ts`). With nothing selected it shows the drawn
  *              screen's own properties (ui_spec §6).
  *
+ *              A committed field is written by `commit()`: the edits
+ *              (`commit-edits.ts`) are computed from the document's text at
+ *              that moment and land on its Monaco model as **one undo stop**
+ *              (EDITOR-DESIGN §3.6), on every selected element at once.
+ *              Nothing is written until a field commits.
+ *
  * Exports:
  * - PanelSummary:     The header's lines: tag, names, notes and element problems
  * - PanelOptions:     The choices the dropdowns and pickers offer
@@ -31,6 +37,7 @@
  *     - view:          The panel's structure, observable
  *     - options:       The dropdowns' choices, observable
  *     - start(), dispose()
+ *     - commit():      Write a field's value, or remove it (reset), as one undo stop
  */
 
 import { parseCst, type CstDocument } from '@u8g2gl/core/cst/index.js';
@@ -39,7 +46,8 @@ import type { Rect } from '../pipeline/live-pipeline';
 import type { CompletedRun } from '../pipeline/edit-loop';
 import { Observable } from '../state/observable';
 import type { Workspace } from '../workspace';
-import { ROOT_TARGET } from './commit-edits';
+import { monaco } from '../monaco/monaco';
+import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
 import { panelLayout, sharedLayout, type FieldSpec, type PanelLayout } from './panel-layout';
@@ -118,6 +126,13 @@ const SCREEN_NAME_FIELD: FieldSpec = {
 /** The [Q-19] rule's line: no figure for a cost §18 cannot compute. */
 const PROJECT_COST_NOTE = 'RAM cost not reported for project widgets ([Q-19])';
 
+/**
+ * Said once when a font field's choices include a font whose height the page
+ * cannot know: a `<builtin>` font's glyph data is compiled into the editor
+ * Wasm, and the page has no copy of it to measure.
+ */
+const FONT_HEIGHT_NOTE = 'Font heights are shown for <bdf> fonts; a built-in font’s glyphs are in the renderer, not the page.';
+
 /** Nothing to show yet. */
 const WAITING: PanelView = { kind: 'empty', message: 'Waiting for the first frame…' };
 
@@ -150,6 +165,38 @@ export class PanelController {
   /** @brief Stops following. */
   dispose(): void {
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
+  }
+
+  /**
+   * @brief Writes a field on every element the panel shows, as one undo stop.
+   *
+   * The edits are computed from the document's current text, with each
+   * element found by name, so a commit made while the canvas edits the same
+   * element lands in the text as it is now. A commit that changes nothing
+   * makes no edit and no undo stop.
+   *
+   * @param key   The field's attribute.
+   * @param value The decoded value to write, or undefined to remove the
+   *              attribute and fall back to the manifest's default (reset).
+   * @return True if the text changed.
+   */
+  commit(key: string, value: string | undefined): boolean {
+    const view = this.view.get();
+    if (view.kind === 'empty' || this.workspace.loop.lastRun.get()?.result.wellFormed === false) return false;
+    const model = this.workspace.documents.open(view.file);
+    if (model === undefined) return false;
+    const edits = attributeEdits(model.getValue(), view.file, view.names, key, value);
+    if (edits.length === 0) return false;
+    // One stop on each side, so neither the edit before nor the one after
+    // joins it: undo takes back exactly this commit.
+    model.pushStackElement();
+    model.pushEditOperations(
+      [],
+      edits.map((edit) => ({ range: monaco.Range.fromPositions(model.getPositionAt(edit.start), model.getPositionAt(edit.end)), text: edit.text })),
+      () => null,
+    );
+    model.pushStackElement();
+    return true;
   }
 
   // update
@@ -204,10 +251,12 @@ export class PanelController {
 
     // --- Step 3: The header and each field's state ---
     const project = manifests.some((manifest) => manifest.origin === 'project');
+    const hasFont = layout.sections.some((section) => section.rows.flat().some((spec) => spec.type === 'font'));
+    const heightUnknown = hasFont && this.options.get().fonts.some((font) => font.height === undefined);
     view.summary.set({
       title: facts.length === 1 ? layout.tag : `${facts.length} elements`,
       subtitle: facts.map((fact) => fact.name).join(', '),
-      notes: project && !layout.drawing ? [PROJECT_COST_NOTE] : [],
+      notes: [...(project && !layout.drawing ? [PROJECT_COST_NOTE] : []), ...(heightUnknown ? [FONT_HEIGHT_NOTE] : [])],
       problems: facts.flatMap((fact) => fact.problems.get(ELEMENT_PROBLEMS) ?? []),
     });
     const context = { wellFormed: run.result.wellFormed, box: boxOf(facts.map((fact) => run.result.bounds.get(fact.name))) };

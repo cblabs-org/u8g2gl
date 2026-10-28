@@ -40,8 +40,8 @@ from the same base. Do not touch canvas gesture code; keep shared shell files' c
 
 # WO2 — editors and committing (`u8g2gl-e2c/wo2-editors`)
 
-- [ ] One editor per type (ruling 3); report on font faces.
-- [ ] Committing (ruling 4), with tests: each commit one undo stop, reset removes the attribute,
+- [x] One editor per type (ruling 3); report on font faces.
+- [x] Committing (ruling 4), with tests: each commit one undo stop, reset removes the attribute,
       typing alone writes nothing.
 
 # WO3 — guidance (`u8g2gl-e2c/wo3-guidance`)

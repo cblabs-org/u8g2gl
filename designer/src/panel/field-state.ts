@@ -32,8 +32,10 @@
  * - fieldState():      A field's state for the selected elements
  * - sameFieldState():  Whether two states would render the same
  * - isIntegerLiteral(): Whether a written value is a plain integer
+ * - intDraftError():   Why an int field's draft would be refused, as typed
  */
 
+import { INT32_MAX, INT32_MIN } from '@u8g2gl/core/resolver/expression.js';
 import type { ElementFacts, FieldProblem } from './element-facts';
 import type { FieldSpec } from './panel-layout';
 import type { Rect } from '../pipeline/live-pipeline';
@@ -73,6 +75,23 @@ const ANCHORS: Readonly<Record<string, string>> = { x: 'right', y: 'bottom' };
 /** @brief Whether a written value is a plain integer literal, `-?[0-9]+`. */
 export function isIntegerLiteral(value: string): boolean {
   return /^\s*-?[0-9]+\s*$/.test(value);
+}
+
+/**
+ * @brief Why an `int` draft would be refused, as typed (ui_spec §9.2's live
+ *        validation); undefined when it is acceptable.
+ *
+ * An integer within `int32_t`, or an expression over integers and
+ * `#constants` (§7.2), which the validator evaluates once committed.
+ */
+export function intDraftError(draft: string): string | undefined {
+  const text = draft.trim();
+  if (/^-?[0-9]+$/.test(text)) {
+    const value = Number(text);
+    return value >= INT32_MIN && value <= INT32_MAX ? undefined : 'Outside int32_t, which an int property is (§13.2).';
+  }
+  if (/^[#$A-Za-z0-9_+\-*/()\s]+$/.test(text) && /[#$]/.test(text)) return undefined;
+  return 'An int is an integer, or an expression of integers and #constants such as #margin + 4 (§7.2).';
 }
 
 /**
