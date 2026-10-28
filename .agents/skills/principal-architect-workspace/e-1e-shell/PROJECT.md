@@ -109,6 +109,22 @@ One worker, WO1 to WO4 in order.
     stays and must still fail the gate. **Follow-up for E-2:** reduce allocation spikes in the
     resolve, validate and scene stages, the one cause of missed frames inside U8G2GL's own code.
 
+12. **Rulings on the WO5 readability audit** (`wo5-readability/AUDIT.md`), 2026-10-28:
+    1. **Test hooks leave production.** `window.__u8g2gl` (which reaches the session token) and
+       `window.__u8g2glPerf`, with the keystroke probe and its animation-frame loop, exist only in a
+       **test build**: a Vite mode (for example `--mode e2e`) whose define is dead-code-eliminated
+       from `npm run build`. The e2e suite builds and serves the test mode. Show it with a `grep`
+       over the production `dist/` for `__u8g2gl`, `__u8g2glPerf` and the probe, all absent, and
+       the production build's own e1 test still passing.
+    2. **The probe's header** states its real cost; it clears its `performance` entries per key so
+       the buffer is bounded.
+    3. **`new Function` on the loader** gets a why-comment at the line: the source is the
+       token-gated server's own build of the user's project, never a third party's.
+    4. **Workspace pointers go**, everywhere the audit lists, including test titles, assertion
+       messages, CI step names and the artifact file, renamed to `keystroke-performance.json`.
+       The rules each gate enforces are stated inline instead.
+    5. All other P2 and P3 items fixed; P4s as the audit recommends, declines recorded.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
