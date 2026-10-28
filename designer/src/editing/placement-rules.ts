@@ -18,7 +18,7 @@
  *              finding the element again by name, so the text after any frame
  *              is exactly what that frame's pointer says.
  *
- *              The rules, per axis (E-2b ruling 3), first match wins:
+ *              The rules, per axis, first match wins:
  *              - bound (`bind_x`): refused, *x is bound to `…`*; the value is
  *                live data, and sample data moves it, not the mouse;
  *              - centred (`hcenter`): refused, the position is derived;
@@ -80,7 +80,7 @@ export const AXIS_ATTRIBUTES: Readonly<
   vertical: { start: 'y', size: 'height', end: 'bottom', centre: 'vcenter' },
 };
 
-/** An integer literal, the only value the canvas rewrites (ruling 3). */
+/** An integer literal, the only value the canvas rewrites (§3.5). */
 export const INTEGER_LITERAL = /^-?[0-9]+$/;
 
 /** One attribute a move rewrites, and the value it had when the move began. */
@@ -129,7 +129,7 @@ export function findElement(cst: CstDocument, name: string): CstElement | undefi
 }
 
 // planAxis
-// One axis of one element, by ruling 3's table (see the file header).
+// One axis of one element, by the table in the file header.
 //   element   — the element, in the text the gesture starts from
 //   axis      — the axis
 //   placement — where the pipeline placed it, for its manifest, its endpoints

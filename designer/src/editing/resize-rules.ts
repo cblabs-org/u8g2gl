@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/editing/resize-rules.ts
- * Purpose: What dragging a handle writes (EDITOR-DESIGN §3.5, E-2b ruling 4):
+ * Purpose: What dragging a handle writes (EDITOR-DESIGN §3.5):
  *          the same rule as a move — rewrite the attributes that place the
  *          edge, refuse an axis they do not place by literals — applied to
  *          the edge the handle is on. A handle moves one edge per axis and
  *          leaves the opposite edge where it is.
  * Description: Which attributes an edge's position is written in depends on
- *              how the axis is laid out (§7.2), with `C` the container's extent:
+ *              how the axis is laid out (§7.2):
  *              | Written            | Start edge (left) by d | End edge (right) by d       |
  *              |--------------------|------------------------|-----------------------------|
  *              | `x`, `width`       | `x` + d, `width` − d   | `width` + d                 |
@@ -30,13 +30,11 @@
  * - Handle:          A handle: its edge on each axis
  * - planResize():    Plan one element's resize from its attributes
  * - clampResize():   Keep a resize's delta from collapsing the element
- * - sizeOn():        A rectangle's size on an axis
  */
 
 import type { CstDocument, CstElement } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { geometryBindingFor, isCentringOn, isRectangular } from '@u8g2gl/core/resolver/index.js';
-import type { Rect } from '../pipeline/live-pipeline';
 import { AXIS_ATTRIBUTES, findElement, INTEGER_LITERAL, type Axis, type AxisPlan, type AxisTerm, type MovePlan } from './placement-rules';
 
 /** The edge of an axis a handle moves: its start (left, top), its end, or neither. */
@@ -135,9 +133,4 @@ export function clampResize(delta: number, edge: Edge, size: number): number {
   if (edge === 'start') return Math.min(delta, size - 1);
   if (edge === 'end') return Math.max(delta, 1 - size);
   return 0;
-}
-
-/** @brief The size of `rect` on an axis. */
-export function sizeOn(rect: Rect, axis: Axis): number {
-  return axis === 'horizontal' ? rect.width : rect.height;
 }

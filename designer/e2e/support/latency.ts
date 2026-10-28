@@ -5,7 +5,7 @@
  *
  * File: designer/e2e/support/latency.ts
  * Purpose: What the two latency gates share, said once so they cannot drift
- *          apart: the keystroke gate (E-1e) and the drag gate (EDITOR-DESIGN
+ *          apart: the keystroke gate and the drag gate (EDITOR-DESIGN
  *          §3.4) measure the same 300 inputs per screen after the same warm-up,
  *          on the same two screens, under the same 4× throttle, against the same
  *          16 ms budget and the same 1% allowance for a missed frame.

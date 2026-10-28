@@ -26,7 +26,7 @@
  *
  *              Two builds, by Vite mode:
  *              - `vite build` (production): `__U8G2GL_TEST_HOOKS__` is `false`,
- *                so the test hooks and the keystroke probe are removed.
+ *                so the test hooks and the input probes are removed.
  *              - `vite build --mode e2e` (the end-to-end test build): it is
  *                `true`, and the build writes `E2E-TEST-BUILD` beside the page,
  *                so the tests can refuse to run against the wrong build.

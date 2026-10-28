@@ -31,7 +31,7 @@
  *     - end():        Close its undo stop
  */
 
-import { parseCst } from '@u8g2gl/core/cst/index.js';
+import { parseCst, type CstDocument } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import type { GuideLine } from '../canvas/canvas-view';
 import type { Rect } from '../pipeline/live-pipeline';
@@ -164,24 +164,26 @@ export class DragEdit {
     if (box === undefined) return { dx: Math.round(rawX), dy: Math.round(rawY), guides: [] };
     const kind = this.kind;
 
-    // --- Step 1: Each axis snapped on its own; a move is then done ---
+    // --- Step 1: A move: each axis snapped on its own, and that is all ---
     if (kind.kind === 'move') {
       const x = snapAxis(edgeLines(box.x, box.width, 'move'), rawX, this.guides.vertical, zoom);
       const y = snapAxis(edgeLines(box.y, box.height, 'move'), rawY, this.guides.horizontal, zoom);
       return { dx: x.delta, dy: y.delta, guides: lines(x.lines, y.lines) };
     }
+
+    // --- Step 2: A resize: the moving edges snapped, then kept at least a pixel ---
     const edgeX = kind.handle.horizontal;
     const edgeY = kind.handle.vertical;
     const x = snapAxis(edgeLines(box.x, box.width, edgeX), rawX, this.guides.vertical, zoom);
     const y = snapAxis(edgeLines(box.y, box.height, edgeY), rawY, this.guides.horizontal, zoom);
     let dx = edgeX === undefined ? 0 : x.delta;
     let dy = edgeY === undefined ? 0 : y.delta;
-
-    // --- Step 2: A resize keeps at least a pixel, and with Shift its ratio ---
     dx = clampResize(dx, edgeX, box.width);
     dy = clampResize(dy, edgeY, box.height);
     // A clamped edge no longer lies on the guide it snapped to.
     if (!shift) return { dx, dy, guides: lines(edgeX !== undefined && dx === x.delta ? x.lines : [], edgeY !== undefined && dy === y.delta ? y.lines : []) };
+
+    // --- Step 3: With Shift, the axis that changed more leads and the other follows ---
     const grow = (delta: number, edge: Edge): number => (edge === 'start' ? -delta : edge === 'end' ? delta : 0);
     let width = box.width + grow(dx, edgeX);
     let height = box.height + grow(dy, edgeY);
@@ -199,7 +201,7 @@ export class DragEdit {
   // plan
   // The drag's plans from the text it starts from. A side handle also plans the
   // other axis's end edge, which only Shift's ratio moves.
-  private plan(cst: ReturnType<typeof parseCst>['cst']): MovePlan[] {
+  private plan(cst: CstDocument): MovePlan[] {
     const placements = this.start.placements;
     const kind = this.kind;
     if (kind.kind === 'move') {

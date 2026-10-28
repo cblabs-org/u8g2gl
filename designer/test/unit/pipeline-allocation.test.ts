@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/pipeline-allocation.test.ts
- * Purpose: E-2b ruling 8's measurement: how much the text pipeline allocates
+ * Purpose: How much the text pipeline allocates
  *          per run in each stage during a drag, and how often the collector
- *          runs, so a change meant to cut the GC spikes E-1e saw in resolve,
+ *          runs, so a change meant to cut the GC spikes seen in resolve,
  *          validate and scene can be shown to have done so. Reported, not
  *          gated: allocation varies with the engine version, and the drag
  *          gate is what the user feels.

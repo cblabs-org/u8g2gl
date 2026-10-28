@@ -231,7 +231,7 @@ function tokenise(text: string): Parsed<Token[]> {
  * its tree is only ever read, so one is reused across runs: the designer
  * resolves every coordinate of the project on every frame of a drag, and
  * re-parsing the same few dozen expressions each time was a steady source of
- * garbage (E-2b ruling 8). Bounded, so a long session cannot grow it without
+ * garbage. Bounded, so a long session cannot grow it without
  * limit: when full it is emptied and refills with what is in use.
  */
 const PARSE_CACHE = new Map<string, Parsed<ExpressionNode>>();

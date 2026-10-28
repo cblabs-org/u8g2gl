@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/placement-rules.test.ts
- * Purpose: What a move writes (EDITOR-DESIGN §3.5, E-2b rulings 3 and 6): a
+ * Purpose: What a move writes (EDITOR-DESIGN §3.5): a
  *          literal is rewritten, a far anchor rewritten inverted, a stretched
  *          element's two edges together, a line's endpoints together; an
  *          expression, a binding or centring refuses that axis only, with the
@@ -162,7 +162,7 @@ test('minimal diffs: a nudge changes one attribute value on one line and nothing
   expect(changedLines(before, after)).toEqual([["                x='10'  y='20'", "                x='11'  y='20'"]]);
 });
 
-test('minimal diffs: a drag touches only the attributes ruling 3 names', () => {
+test('minimal diffs: a drag touches only the attributes that place the element', () => {
   const elements = '    <u8g2gl_box name="b" x="10" y="20" width="8" height="8" filled="false" />';
   const { before, after } = move(elements, 'b', -7, 12);
   const [[, line] = ['', '']] = changedLines(before, after);

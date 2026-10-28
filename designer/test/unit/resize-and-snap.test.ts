@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/resize-and-snap.test.ts
- * Purpose: Resizing and snapping (E-2b rulings 4 and 5, ui_spec §8): a handle
+ * Purpose: Resizing and snapping (EDITOR-DESIGN §3.5, ui_spec §8): a handle
  *          rewrites the attributes that place its edge — width, or x and
  *          width, or a far anchor — and refuses an axis they do not place by
  *          literals; Shift keeps the ratio; a resize never collapses its

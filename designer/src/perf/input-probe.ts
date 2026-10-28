@@ -6,7 +6,7 @@
  * File: designer/src/perf/input-probe.ts
  * Purpose: Measures input latency the way the user sees it, for the two
  *          inputs that edit the text at frame rate: a key typed in the editor
- *          (E-1e's keystroke gate) and a pointer dragging on the canvas (E-2's
+ *          (the keystroke gate) and a pointer dragging on the canvas (the
  *          drag gate, EDITOR-DESIGN §3.4). For each input it measures whether
  *          its edit is on the canvas in the first animation frame after it, how
  *          long the work in that frame takes from the start of the pipeline

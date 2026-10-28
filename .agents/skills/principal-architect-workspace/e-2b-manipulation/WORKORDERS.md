@@ -57,7 +57,77 @@ from the same base. Do not touch panel code; keep shared shell files' changes sm
 
 # WO5 — review (`u8g2gl-e2b/wo5-readability`)
 
-- [ ] Spawn the `readability-reviewer` on E-2b's diff (against `e2bbb4f`); resolve P1–P3,
+- [x] Spawn the `readability-reviewer` on E-2b's diff (against `e2bbb4f`); resolve P1–P3,
       decide P4 with reasons.
-- [ ] Final run of every suite, one at a time (CLI, C++, designer unit, e2e, production build
+- [x] Final run of every suite, one at a time (CLI, C++, designer unit, e2e, production build
       and its no-test-hook check); a completion report at the end of this file.
+
+# Completion report (worker)
+
+**Commits** (one per WO, each on its own branch stacked on the last; base `e2bbb4f`):
+WO1 `b1b4c77`, WO2 `1cd61d6`, WO3 `1f77e6b`, WO4 `40026d3`, WO5 the commit that adds this report.
+
+**Suites, before (at `e2bbb4f`) and after (final run, one at a time, Emscripten on PATH):**
+
+| Suite | Before | After |
+|---|---:|---:|
+| Home-path guard | clean | clean |
+| CLI (`npm test`), lint, tsc | 2521 | 2521, lint clean |
+| C++ (ctest) | 512/512 | 512/512 |
+| Designer unit | 40 | 71 |
+| Designer e2e (Chromium all, Firefox/WebKit `@cross-browser`) | 30 | 42 |
+| Production build: no test hook in `dist/`; production e2e | 3/3 | 3/3 |
+
+**Drag gate** (ruling 7; 4× throttle, 300 drawn moves per screen, input to end of blit). Final run:
+departures 300/300 in the first frame, p95 14.1 ms (median 9.0); 20 elements 299/300 (one
+3-frame miss, within the 3 allowed), p95 15.2 ms (median 9.3). Run to blit p95 5.4 / 3.9 ms.
+Earlier WO4 runs: 300/300 and 300/300, p95 13.0–13.4 / 14.5–15.1 ms. The E-2c worker was running
+in parallel throughout. **Self-test:** passes; four forced moves of twenty counted 3–4 frames
+and the gate fails (`4 pointer move(s) missed their frame`, p95 62 ms).
+
+**Keystroke gate:** passes, both screens 300/300 in the first frame; run to blit p95 4.1 / 3.8
+ms; key to blit (reported) p95 18.8 / 18.9 ms. Self-test passes and fails the gate as it must.
+
+**Allocation and GC** (ruling 8; `test/unit/pipeline-allocation.test.ts`, departures, 2000 runs
+of a drag in Node; median KiB per run):
+
+| Stage | Before | After |
+|---|---:|---:|
+| parse | 63 | 63 |
+| resolve | 100 | 60 |
+| realise | 38 | 38 |
+| validate | 291 | 172 |
+| scene | 57 | 57 |
+| **run** | **550** | **390** |
+| collections per 2200 runs | 40 | 29–30 |
+
+Changes: the display catalogue's setup `Set` built once per catalogue (was every run, ~93 KiB);
+each manifest's accepted attribute names built once per manifest; coordinate expressions parsed
+once per text (bounded cache). Every generator golden passes unchanged. Scene was not reduced: its
+allocation is the scene JSON itself.
+
+**Deviations, for the PA:**
+1. *The drag gate's input model.* DevTools-injected mouse events are not frame-aligned in
+   headless Chromium (measured: 3–4 `pointermove` dispatches per frame from a 250 Hz stream), and a
+   single event sent at a random phase waits up to a frame before any run can draw it: driven that
+   way input→blit p95 was 22 ms, as key→blit is ~19 ms for the keystroke gate, which reports it
+   rather than gating it. The gate therefore drives a continuous 250 Hz pointer and measures the
+   **latest move that edited the text before the run** — the position the frame actually shows,
+   since the pipeline draws only the latest text (§3.2). The gate itself (p95 < 16 ms, ≤ 1%
+   missed) is as ruled. Please confirm this reading of "input event to paint".
+2. E-2a's two marquee tests now start their press off the display, since ruling 1 makes a press
+   on an element a move.
+3. Additions beyond the rule text: centring (`hcenter`/`vcenter`) refuses an axis like an
+   expression; an over-constrained axis refuses a resize; a resize stops at one pixel of size.
+   Nudge refusals are shown in the canvas's title (no pointer to put a tip at).
+4. The insert-a-missing-start branch of ruling 3 is implemented and unit-tested with a synthetic
+   placement, but the resolver never draws an element with no start, so it is not reachable from
+   the canvas today; such an element refuses with a reason.
+5. CI's production hook grep does not list `u8g2gl:drag-to-blit` (`.github/` is outside ruling 9's
+   boundary); the hooks module is excluded from production as before, and the check above included it.
+
+**Readability review (WO5):** P1 0, P2 0, P3 5 (all resolved: workspace citations replaced by
+the durable fact, a dangling table definition, the unused `sizeOn`, stale probe names, cache
+preconditions stated), P4 4 (all taken: step labels in `DragEdit.deltas` and `down`, the
+`CstDocument` type, a banner reflow). Observations not acted on: `EDITOR-DESIGN §n` pointers
+(an existing convention), and module-level caches in core (deterministic, bounded or weakly keyed).

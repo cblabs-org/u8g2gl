@@ -48,8 +48,9 @@ function createDisplayDiagnostic(
 /**
  * Each catalogue's setup names as a set, made once per catalogue. The catalogue
  * holds thousands of records and is the same array on every run, so building
- * the set per run was the largest single allocation in a designer pipeline run
- * (E-2b ruling 8).
+ * the set per run was the largest single allocation in a designer pipeline run.
+ * Valid only while a catalogue is not mutated in place: the set is keyed by
+ * the array's identity.
  */
 const SETUP_SETS = new WeakMap<object, ReadonlySet<string>>();
 

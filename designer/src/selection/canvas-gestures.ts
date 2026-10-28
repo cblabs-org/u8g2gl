@@ -11,19 +11,19 @@
  *          arrow keys nudge the selection. Pointer events arrive far faster
  *          than frames and must never pass through React, so this is a plain
  *          class the canvas panel attaches to its frame element.
- * Description: Gesture ownership (E-2b ruling 1), decided at pointer-down:
+ * Description: Gesture ownership, decided at pointer-down:
  *              - on a selected element's handle: a **resize** by that handle
  *                (Shift keeps the ratio);
- *              - with Shift elsewhere: E-2a's toggle on click and add-marquee
+ *              - with Shift elsewhere: a toggle on click and an adding marquee
  *                on drag; Shift never moves;
  *              - on an element that is selected, or in a stack that holds a
  *                selected element: a **move** of the selection;
  *              - on an unselected element: it is selected (the click cycle's
  *                next element there), and the press moves it;
- *              - on empty canvas: E-2a's **marquee**.
+ *              - on empty canvas: a **marquee**.
  *              A press is a click until it travels {@link MARQUEE_THRESHOLD}
  *              screen pixels; a click on a selected element cycles the
- *              selection down the stack, as E-2a's clicks do.
+ *              selection down the stack, as plain clicks do.
  *
  *              A move or a resize is a {@link DragEdit}: snapped to guides,
  *              rounded to integers and written through the edit path as one
@@ -183,7 +183,7 @@ export class CanvasGestures {
   }
 
   // down
-  // A press with the primary button: decide which gesture it owns (ruling 1).
+  // A press with the primary button: decide which gesture it owns.
   // The pointer is captured so a drag off the canvas still ends here.
   private down(event: PointerEvent): void {
     if (event.button !== 0) return;
@@ -211,7 +211,7 @@ export class CanvasGestures {
       }
     }
 
-    // --- Step 3: Empty canvas, or Shift: a marquee or a toggle, on release ---
+    // --- Step 3: Record the press (a marquee or a toggle is decided on release) and capture the pointer ---
     this.press = {
       pointer: event.pointerId,
       clientX: event.clientX,

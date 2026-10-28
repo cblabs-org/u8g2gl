@@ -180,7 +180,8 @@ function walkNodes(
 /**
  * Each manifest's accepted attribute names, made once per manifest: they depend
  * on the manifest alone, and building them for every element on every run was
- * steady garbage in the designer's per-frame validation (E-2b ruling 8).
+ * steady garbage in the designer's per-frame validation. Valid only while a manifest is not
+ * mutated in place: the names are keyed by the manifest's identity.
  */
 const DECLARED_NAMES = new WeakMap<EffectiveManifest, ReadonlySet<string>>();
 

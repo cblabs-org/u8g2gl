@@ -21,7 +21,7 @@
  *          that the frame gate then fails, so its passing means something.
  * Description: Real key presses into Monaco, each changing the x of one element
  *              between two valid values, so every keystroke must reach the
- *              canvas. The page's keystroke probe (`src/perf/`) counts animation
+ *              canvas. The page's key probe (`src/perf/input-probe.ts`) counts animation
  *              frames from the key to the blit, times the run from its start to
  *              the end of its blit, and times key to blit, split into Monaco's
  *              handling, the wait for the frame and each stage. Keys

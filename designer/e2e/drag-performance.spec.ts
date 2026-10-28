@@ -7,8 +7,7 @@
  * Purpose: EDITOR-DESIGN §3.4's acceptance test for direct manipulation: a
  *          scripted drag of 300 frames on the departures screen and on a
  *          20-element screen, with the whole shell running and Chromium's CPU
- *          throttled 4× as a stand-in for a modest laptop. Two gates (E-2b
- *          ruling 7):
+ *          throttled 4× as a stand-in for a modest laptop. Two gates:
  *          1. **Input to paint:** from each pointer event to the end of the
  *             blit that shows its edit, **p95 under 16 ms**.
  *          2. **No dropped frame at 60 Hz:** each pointer event's edit is on
@@ -27,8 +26,8 @@
  *
  *              The result is printed and written to
  *              `test-results/chromium/drag-performance.json`. Locally both
- *              gates apply; on CI they are reported, not gated (programme
- *              ruling 1), because CI machines vary.
+ *              gates apply; on CI they are reported, not gated, because CI
+ *              machines vary.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -65,7 +64,7 @@ interface DragResult {
 }
 
 // gateFailures
-// Ruling 7's two gates for one screen, as the reasons they fail; empty when
+// The two gates for one screen, as the reasons they fail; empty when
 // both pass. The drag test and its self-test judge with this one function.
 //   result — one screen's drag
 function gateFailures(result: DragResult): string[] {

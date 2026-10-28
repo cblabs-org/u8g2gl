@@ -277,8 +277,8 @@ function declaredValues(globals: Globals): string {
 
 // selectable
 // The drawn screen's hit targets, selectable rectangles and the placements of
-// the elements written in it. Each drawn element
-// is a target of the element written in the screen it belongs to: itself, or
+// the elements written in it. Each drawn element is a target of the element
+// written in the screen it belongs to: itself, or
 // the outermost composite instance it was expanded through (ui_spec §8: a hit
 // on a composite's child selects the instance). An instance's rectangle is its
 // own when it has one, else the box around its children's.
