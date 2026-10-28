@@ -33,7 +33,7 @@ jobs:
       - name: Init U8G2 submodule
         # CLI tests need BDF font files from extern/u8g2
         run: git submodule update --init --checkout extern/u8g2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: No home-folder paths in tracked files
@@ -64,7 +64,7 @@ jobs:
       - name: Init U8G2 submodule
         # .gitmodules sets update = none; override with --checkout
         run: git submodule update --init --checkout extern/u8g2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: Cache Emscripten
@@ -140,7 +140,7 @@ jobs:
       - name: Init U8G2 submodule
         # .gitmodules sets update = none; override with --checkout
         run: git submodule update --init --checkout extern/u8g2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: Cache Emscripten
