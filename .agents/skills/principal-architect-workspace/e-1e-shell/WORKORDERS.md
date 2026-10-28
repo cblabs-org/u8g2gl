@@ -21,13 +21,13 @@ layout is `docs/ui_spec.md` §6. The server you build on is E-1c's (`cli/src/nod
 
 # Where you work
 
-- Worktree `/Users/mcneillm/Documents/Projects/U8G2GL-e1e`, starting on `u8g2gl-e1e/wo1-scaffold`.
+- Worktree `../U8G2GL-e1e`, starting on `u8g2gl-e1e/wo1-scaffold`.
   Each later WO: `git checkout -b u8g2gl-e1e/woN-<name>` from the previous tip. Verify the branch
   before every commit. Commit as you go; **do not push**. Trailer
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Scratch in `tmp/`.
 - `extern/u8g2` is checked out. Baselines: CLI 1585 + 6 skipped (without Emscripten), C++ 512
   with one skip. Emscripten 5.0.3 for the project Wasm:
-  `source /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`.
+  `source ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`.
 - The test project is `cli/test/fixtures/departures-project/` (copy it to `tmp/` before editing).
 - Load `u8g2gl-standards` before writing code (TypeScript sections; it covers the designer). No
   workspace pointers in source comments or test titles.
@@ -383,6 +383,10 @@ placeholders), `wo2-project.png` (project renderer, hash `f68f4842`), `wo3-confl
 - A BOM is lost and mixed line endings are normalised on save: `ServedProjectFileSystem.read`
   decodes with a BOM-stripping `TextDecoder`, and Monaco normalises EOLs. Consistent LF or CRLF
   files round-trip byte for byte (e3).
+  - *C-1, 2026-10-28:* the BOM is now kept: a read reports `bom`, and the designer's save
+    passes it back. **Mixed line endings remain a known limitation**, by ruling (C-1 ruling 6):
+    Monaco normalises a model to one EOL on load, so a file mixing LF and CRLF is saved with
+    one of them. Consistent LF or CRLF still round-trips byte for byte.
 - A project font or image the framework Wasm lacks makes the no-toolchain canvas refuse the
   scene (the banner says which); the departures project uses only built-ins it has.
 - The npm package does not ship `designer/dist` (ruling 4's follow-up, beside E-1d's 8.3).

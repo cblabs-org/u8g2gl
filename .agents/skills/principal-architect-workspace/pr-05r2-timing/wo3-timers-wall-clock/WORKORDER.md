@@ -35,7 +35,7 @@ time-dependent content updates through the library itself.** The approved mechan
 
 ## Strict Boundary Box
 
-- **Work in** `/Users/mcneillm/Documents/Projects/U8G2GL-05r2`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo3-timers-wall-clock` (checked out; it contains WO1 and WO2). Do not create branches.
 - **May create:** `include/u8g2gl/u8g2gl_timer.h`, `src/u8g2gl_timer.cpp`,
   `include/u8g2gl/u8g2gl_wall_clock.h`, `src/u8g2gl_wall_clock.cpp`, `test/test_timer.cpp`,
@@ -69,7 +69,7 @@ time-dependent content updates through the library itself.** The approved mechan
 
 LVGL is MIT-licensed, but we reimplement, because its timers use a heap linked list and drift. Its
 source is at
-`/Users/mcneillm/Documents/Projects/repo-memory-plugin/evaluation/eval-v2/template/.pio/libdeps/crowpanel-128-rotary/lvgl/src/misc/lv_timer.{h,c}`.
+`~/Documents/Projects/repo-memory-plugin/evaluation/eval-v2/template/.pio/libdeps/crowpanel-128-rotary/lvgl/src/misc/lv_timer.{h,c}`.
 Read it for semantics: what repeat count, pause, ready and reset mean, and how a timer deleted
 inside its own callback is handled (`state.timer_deleted`, `timer_created`). Two of its behaviours
 are deliberately **not** copied:

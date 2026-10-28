@@ -19,14 +19,14 @@ Wasm is `evidence/wo1/build-probe-wasm.sh` beside them: read it, it is the prove
 
 # Where you work
 
-- Worktree `/Users/mcneillm/Documents/Projects/U8G2GL-e1d`, starting on `u8g2gl-e1d/wo1-toolchain`.
+- Worktree `../U8G2GL-e1d`, starting on `u8g2gl-e1d/wo1-toolchain`.
   Each later WO: `git checkout -b u8g2gl-e1d/woN-<name>` from the previous WO's tip (names in
   PROJECT.md). `git branch --show-current` before every commit. Commit as you go; **do not
   push**. Trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Scratch in `tmp/`.
 - `extern/u8g2` is checked out. Baseline: CLI **1545** passing; C++ via
   `cmake -B build && cmake --build build -j && (cd build && ctest)`, expected **512** with one
   known skip. Record both before starting.
-- Emscripten: `source /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`
+- Emscripten: `source ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/emsdk_env.sh`
   in the same shell command as any `em++`/`emcmake` call.
 - Load `u8g2gl-standards` before writing code (C++ and TypeScript sections). No workspace
   pointers in source comments: keep the fact, drop the pointer.
@@ -135,17 +135,17 @@ that did not recur on the next build; recorded in case CI sees the same flake.
 - Manual check (read-only), departures-board emsdk sourced:
   ```
   $ node cli/dist/node/cli.js toolchain status
-  Emscripten 5.0.3: using em++ on PATH, /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++
-    PATH:    /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++ (5.0.3)
-    managed: not installed (/Users/mcneillm/Library/Caches/u8g2gl/emsdk-5.0.3)
+  Emscripten 5.0.3: using em++ on PATH, ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++
+    PATH:    ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++ (5.0.3)
+    managed: not installed (~/Library/Caches/u8g2gl/emsdk-5.0.3)
   $ node cli/dist/node/cli.js toolchain path
-  /Users/mcneillm/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++
+  ~/Documents/Projects/departures-board/tools/layoutsim/emsdk/upstream/emscripten/em++
   ```
   And with only the lvgl-editor emsdk's `upstream/emscripten` prepended to `PATH` (exit 1):
   ```
   Emscripten 5.0.3: none available. Run 'u8g2gl toolchain install', or put Emscripten 5.0.3's em++ on PATH.
-    PATH:    /Users/mcneillm/Library/Application Support/lvgl-editor/emsdk/upstream/emscripten/em++ (4.0.6)
-    managed: not installed (/Users/mcneillm/Library/Caches/u8g2gl/emsdk-5.0.3)
+    PATH:    ~/Library/Application Support/lvgl-editor/emsdk/upstream/emscripten/em++ (4.0.6)
+    managed: not installed (~/Library/Caches/u8g2gl/emsdk-5.0.3)
     note: em++ on PATH (…/lvgl-editor/emsdk/upstream/emscripten/em++) is 4.0.6, not 5.0.3; it is not used, because the designer must compile with exactly the pinned version.
   ```
 
@@ -317,8 +317,8 @@ run CI.**
   ```
   CMake Error at /opt/homebrew/share/cmake/Modules/GoogleTestAddTests.cmake:233 (message):
     Error running test executable.
-      Path: '/Users/mcneillm/Documents/Projects/U8G2GL-e1d/build-flake/test/test_wasm_parity'
-      Working directory: '/Users/mcneillm/Documents/Projects/U8G2GL-e1d/build-flake/test'
+      Path: 'build-flake/test/test_wasm_parity'
+      Working directory: 'build-flake/test'
       Timeout: '5'
       Result: Process terminated due to timeout
       Output:

@@ -603,7 +603,7 @@ Mapping the departures-board widgets and U8G2 primitives to LVGL Pro-style XML t
 
 ## Example: Departures Board Reimagined in U8G2GL XML
 
-The [layoutDefault.json](file:///Users/mcneillm/Documents/Projects/departures-board/modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.json) rewritten in LVGL Pro-aligned U8G2GL XML:
+The layoutDefault.json (departures-board `modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.json`) rewritten in LVGL Pro-aligned U8G2GL XML:
 
 ```xml
 <!-- screens/screen_departures.xml -->
@@ -676,4 +676,4 @@ The [layoutDefault.json](file:///Users/mcneillm/Documents/Projects/departures-bo
 </screen>
 ```
 
-Compare this to the [original 184-line JSON](file:///Users/mcneillm/Documents/Projects/departures-board/modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.json) + [120-line generated C++](file:///Users/mcneillm/Documents/Projects/departures-board/modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp) — the XML is **more expressive, more readable, and self-contained**.
+Compare this to the original 184-line JSON (departures-board `modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.json`) + 120-line generated C++ (departures-board `modules/displayManager/boards/nationalRailBoard/layouts/layoutDefault.cpp`) — the XML is **more expressive, more readable, and self-contained**.

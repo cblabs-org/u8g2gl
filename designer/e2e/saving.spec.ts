@@ -6,10 +6,11 @@
  * File: designer/e2e/saving.spec.ts
  * Purpose: Saving end to end — the designer as a co-author beside the user's
  *          IDE, which has the same files open: a save changes only what was
- *          edited; a file changed on disk reloads when its buffer is clean and
- *          offers the three-way choice when it is dirty, overwriting nothing;
- *          and a file opened and closed without an edit is never rewritten,
- *          even when names were generated into its buffer.
+ *          edited, and keeps a byte-order mark the file had; a file changed
+ *          on disk reloads when its buffer is clean and offers the three-way
+ *          choice when it is dirty, overwriting nothing; and a file opened and
+ *          closed without an edit is never rewritten, even when names were
+ *          generated into its buffer.
  * Description: The "IDE" is the test writing the project copy directly, as an
  *              editor beside the designer would; the server's watcher reports
  *              it. Bytes and modification times are read from disk.
@@ -59,6 +60,19 @@ test('saving after one edit changes only that edit\'s bytes on disk', async ({ p
   expect(after.subarray(at, at + 1).toString()).toBe('4');
   expect(after.subarray(at + 1).equals(before.subarray(at + 2))).toBe(true);
   expect(after.length).toBe(before.length - 1);
+});
+
+test('a file with a byte-order mark keeps it through open, edit and save', async ({ page }) => {
+  session = await startDesign({ files: { [SCREEN]: `\uFEFF${ORIGINAL}` } });
+  await openShell(page, session.url);
+  await openFile(page, SCREEN);
+  await replaceRow0X(page, '4');
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect(host(page)).toHaveAttribute('data-dirty', 'false');
+
+  const after = readFileSync(session.file(SCREEN));
+  expect([...after.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  expect(after.subarray(3).toString('utf8')).toBe(ORIGINAL.replace('name="row0" x="32"', 'name="row0" x="4"'));
 });
 
 test('a file changed on disk while its buffer is clean reloads silently', async ({ page }) => {

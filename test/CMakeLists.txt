@@ -1,5 +1,22 @@
 include(GoogleTest)
 
+# gtest_discover_tests runs each test binary at build time to list its tests,
+# and fails the build if that takes longer than its default 5 s. A cold,
+# unbounded `cmake --build -j` links every test binary at once, and freshly
+# linked binaries can take longer than that to start on macOS: the build then
+# fails although every test passes. DISCOVERY_MODE PRE_TEST would move
+# discovery to ctest time, but needs CMake 3.18 and the floor is 3.16, so the
+# timeout is raised instead. Set once here; every test target registers
+# through u8g2gl_discover_tests().
+set(U8G2GL_GTEST_DISCOVERY_TIMEOUT 60 CACHE STRING
+    "Seconds gtest_discover_tests may wait for a test binary to list its tests")
+
+# Registers a test target's tests with ctest, as gtest_discover_tests does,
+# with the timeout above.
+function(u8g2gl_discover_tests target)
+  gtest_discover_tests(${target} DISCOVERY_TIMEOUT ${U8G2GL_GTEST_DISCOVERY_TIMEOUT})
+endfunction()
+
 add_executable(test_smoke
     test_smoke.cpp
 )
@@ -17,7 +34,7 @@ target_compile_options(test_smoke PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_smoke)
+u8g2gl_discover_tests(test_smoke)
 
 add_executable(test_obj
     test_obj.cpp
@@ -36,7 +53,7 @@ target_compile_options(test_obj PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_obj)
+u8g2gl_discover_tests(test_obj)
 
 add_executable(test_subject
     test_subject.cpp
@@ -55,7 +72,7 @@ target_compile_options(test_subject PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_subject)
+u8g2gl_discover_tests(test_subject)
 
 add_executable(test_style
     test_style.cpp
@@ -74,7 +91,7 @@ target_compile_options(test_style PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_style)
+u8g2gl_discover_tests(test_style)
 
 add_executable(test_core
     test_core.cpp
@@ -93,7 +110,7 @@ target_compile_options(test_core PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_core)
+u8g2gl_discover_tests(test_core)
 
 add_executable(test_label
     test_label.cpp
@@ -112,7 +129,7 @@ target_compile_options(test_label PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_label)
+u8g2gl_discover_tests(test_label)
 
 add_executable(test_xbm
     test_xbm.cpp
@@ -131,7 +148,7 @@ target_compile_options(test_xbm PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_xbm)
+u8g2gl_discover_tests(test_xbm)
 
 add_executable(test_glyph
     test_glyph.cpp
@@ -150,7 +167,7 @@ target_compile_options(test_glyph PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_glyph)
+u8g2gl_discover_tests(test_glyph)
 
 add_executable(test_progress_bar
     test_progress_bar.cpp
@@ -169,7 +186,7 @@ target_compile_options(test_progress_bar PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_progress_bar)
+u8g2gl_discover_tests(test_progress_bar)
 
 add_executable(test_clock
     test_clock.cpp
@@ -188,7 +205,7 @@ target_compile_options(test_clock PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_clock)
+u8g2gl_discover_tests(test_clock)
 
 add_executable(test_timer
     test_timer.cpp
@@ -207,7 +224,7 @@ target_compile_options(test_timer PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_timer)
+u8g2gl_discover_tests(test_timer)
 
 add_executable(test_resume
     test_resume.cpp
@@ -226,7 +243,7 @@ target_compile_options(test_resume PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_resume)
+u8g2gl_discover_tests(test_resume)
 
 add_executable(test_wall_clock
     test_wall_clock.cpp
@@ -245,7 +262,7 @@ target_compile_options(test_wall_clock PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_wall_clock)
+u8g2gl_discover_tests(test_wall_clock)
 
 add_executable(test_switch
     test_switch.cpp
@@ -264,7 +281,7 @@ target_compile_options(test_switch PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_switch)
+u8g2gl_discover_tests(test_switch)
 
 add_executable(test_button
     test_button.cpp
@@ -283,7 +300,7 @@ target_compile_options(test_button PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_button)
+u8g2gl_discover_tests(test_button)
 
 add_executable(test_radius_honoured
     test_radius_honoured.cpp
@@ -302,7 +319,7 @@ target_compile_options(test_radius_honoured PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_radius_honoured)
+u8g2gl_discover_tests(test_radius_honoured)
 
 add_executable(test_sizeof_report
     test_sizeof_report.cpp
@@ -321,7 +338,7 @@ target_compile_options(test_sizeof_report PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_sizeof_report)
+u8g2gl_discover_tests(test_sizeof_report)
 
 add_executable(test_draw
     test_draw.cpp
@@ -340,7 +357,7 @@ target_compile_options(test_draw PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_draw)
+u8g2gl_discover_tests(test_draw)
 
 
 add_executable(test_binding
@@ -360,7 +377,7 @@ target_compile_options(test_binding PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_binding)
+u8g2gl_discover_tests(test_binding)
 
 # --- Runtime version (u8g2gl_version.h, §16) ---
 
@@ -389,7 +406,7 @@ target_compile_definitions(test_version PRIVATE
     U8G2GL_CMAKE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
-gtest_discover_tests(test_version)
+u8g2gl_discover_tests(test_version)
 
 # --- Schema version guard: proven by real compiles ---
 # A refusal to compile cannot be tested from inside a program that compiled. So
@@ -603,7 +620,7 @@ target_link_libraries(test_rbox_bound PRIVATE
 target_compile_options(test_rbox_bound PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_rbox_bound)
+u8g2gl_discover_tests(test_rbox_bound)
 
 # --- Real U8G2: a bound draw-call child is clipped to its container (§13.5) ---
 # A drawing element inside a container is drawn inside the container's
@@ -649,7 +666,7 @@ target_link_libraries(test_bound_child_clip PRIVATE
 target_compile_options(test_bound_child_clip PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_bound_child_clip)
+u8g2gl_discover_tests(test_bound_child_clip)
 
 # --- Real U8G2: container-edge pixel tests (§11.3, [D-18]) ---
 # Guards the exclusive far-corner convention of u8g2gl_apply_clip(), wrapped
@@ -672,7 +689,7 @@ target_link_libraries(test_container_edge_pixels PRIVATE
 target_compile_options(test_container_edge_pixels PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_container_edge_pixels)
+u8g2gl_discover_tests(test_container_edge_pixels)
 
 # --- Real U8G2: ambient state established inside a render, restored after (§11.3) ---
 # The state saver's faults are U8G2's to show, not the stub's: restoring a null
@@ -698,7 +715,7 @@ target_link_libraries(test_ambient_state PRIVATE
 target_compile_options(test_ambient_state PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_ambient_state)
+u8g2gl_discover_tests(test_ambient_state)
 
 # --- Real U8G2: the clock's seconds share its HH:MM baseline ---
 # The panel is an SSD1322 256x64, so the test draws through that driver, which
@@ -731,7 +748,7 @@ target_link_libraries(test_clock_baseline PRIVATE
 target_compile_options(test_clock_baseline PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_clock_baseline)
+u8g2gl_discover_tests(test_clock_baseline)
 
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is
@@ -826,7 +843,7 @@ target_compile_options(test_generated_fixture PRIVATE
     -Wall -Wextra -Wpedantic
 )
 
-gtest_discover_tests(test_generated_fixture)
+u8g2gl_discover_tests(test_generated_fixture)
 
 # --- <bdf> against real U8G2 ---
 # Every other build of ui_fonts.cpp compiles against test/stubs/U8g2lib.h. This
@@ -891,7 +908,7 @@ target_link_libraries(test_bdf_real_u8g2 PRIVATE
 target_compile_options(test_bdf_real_u8g2 PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_bdf_real_u8g2)
+u8g2gl_discover_tests(test_bdf_real_u8g2)
 
 # --- The editor target ([UD-4], PR-04 WO11) ---
 # The runtime compiled a third time, with U8G2GL_EDITOR defined: the build the
@@ -950,7 +967,7 @@ target_link_libraries(test_editor PRIVATE
 target_compile_options(test_editor PRIVATE
     -Wall -Wextra -Wpedantic
 )
-gtest_discover_tests(test_editor)
+u8g2gl_discover_tests(test_editor)
 
 # --- D-9 parity proof: native bridge renders the same pixels as Wasm ---
 # Compiles bridge.cpp natively (it guards Emscripten-only code behind
@@ -1029,7 +1046,7 @@ target_link_libraries(test_wasm_parity PRIVATE
 target_compile_options(test_wasm_parity PRIVATE
     -Wall -Wextra -Wpedantic -Wno-macro-redefined
 )
-gtest_discover_tests(test_wasm_parity)
+u8g2gl_discover_tests(test_wasm_parity)
 
 
 # --- Firmware pays nothing for the editor ([UD-4]) ---

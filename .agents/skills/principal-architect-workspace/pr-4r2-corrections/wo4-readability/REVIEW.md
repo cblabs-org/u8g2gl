@@ -61,7 +61,7 @@ No behaviour changes. Comments, doc text and one dead-code expression only. Do n
 
 **Observations (standards silent):**
 - `validate-geometry.ts:733-735`: for a `draw=` radius the diagnostic says "U8G2 draws outside the box (u8g2_box.c)", which is accurate for raw U8G2, while `u8g2gl_draw_box` itself clamps the radius (draw.h:131). That wording is pre-existing in the message and the validator's test pins it; it is not a defect of this change, but an author reading it may think the runtime would draw outside.
-- documentation.md §4.1 is not yet reflected in the copy of the skill loaded from the main checkout (`/Users/mcneillm/Documents/Projects/U8G2GL/.claude/skills/u8g2gl-standards`), only in this worktree's `.agents/skills`. Worth syncing.
+- documentation.md §4.1 is not yet reflected in the copy of the skill loaded from the main checkout (`.claude/skills/u8g2gl-standards`), only in this worktree's `.agents/skills`. Worth syncing.
 
 **Files reviewed:** CMakeLists.txt; cli/package.json; cli/src/core/generator/emit/{draw-args,scene,screen}.ts; cli/src/core/schema/{diagnostic,globals}.ts; cli/src/core/validator/{configured-radius,validate-geometry,validate-schema,validate-widget-props}.ts; cli/test/generator/{emit-editor,emit-screen}.test.ts; cli/test/integration/generate.test.ts; cli/test/validator/{bind-type-paths,radius-build-time}.test.ts; include/u8g2gl/manifests/{u8g2gl_box,u8g2gl_obj}.xml; include/u8g2gl/{u8g2gl_core,u8g2gl_version,u8g2gl_state_saver,u8g2gl_draw}.h; src/u8g2gl_core.cpp; test/CMakeLists.txt; test/editor_host/editor_host.{h,cpp}; test/test_{bound_child_clip,core,editor_parity,radius_honoured}.cpp.
 

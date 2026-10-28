@@ -31,6 +31,9 @@
  * Exports:
  * - WasmStatus:              The indicator's state
  * - BUILD_JOB:               The server's job name
+ * - BuildRecord:             A build record, as the server serves it
+ * - NO_TOOLCHAIN_CODES:      The failure codes that mean "cannot build here"
+ * - isNoToolchain():         Whether a record is that failure
  * - affectsEditorBuild():    Whether a changed file can change the build
  * - EditorWasmController:    The controller
  *
@@ -80,11 +83,27 @@ export function affectsEditorBuild(path: string): boolean {
 }
 
 /** A build record as `GET /api/build/<id>` serves it. */
-interface BuildRecord {
+export interface BuildRecord {
   readonly id: string;
   readonly status: 'queued' | 'running' | 'succeeded' | 'failed';
   readonly result?: { readonly buildHash?: string };
+  /** A failure's message: prose, shown to the user, never matched. */
   readonly error?: string;
+  /** A failure's stable code, when the server gives one. */
+  readonly code?: string;
+}
+
+/**
+ * The failure codes that mean this machine cannot build the project's editor
+ * Wasm — no Emscripten, or no runtime sources beside the CLI — as the server's
+ * `editor-wasm` job sets them (`EDITOR_WASM_FAILURE` in the CLI). Either is a
+ * normal state, not a defect: the project still opens on the framework module.
+ */
+export const NO_TOOLCHAIN_CODES: ReadonlySet<string> = new Set(['no-emscripten', 'no-source-tree']);
+
+/** @brief Whether a finished record is the "cannot build here" failure, decided by its code alone. */
+export function isNoToolchain(record: BuildRecord): boolean {
+  return record.status === 'failed' && record.code !== undefined && NO_TOOLCHAIN_CODES.has(record.code);
 }
 
 /** Chooses and loads the editor Wasm, and keeps the project's current. */
@@ -187,10 +206,10 @@ export class EditorWasmController {
       const reason = record.error ?? 'the build failed';
       this.log(`editor Wasm: ${reason}`);
       this.setBuildDiagnostics(parseBuildFailure(reason));
-      // The job's message for a missing toolchain names the install command; it
-      // is the one failure that is a normal state, not a defect, so the
-      // indicator shows it differently: the project still opens without one.
-      if (/no Emscripten|no U8G2GL source tree/.test(reason) && this.loadedHash === undefined) {
+      // A missing toolchain is the one failure that is a normal state, not a
+      // defect, so the indicator shows it differently: the project still opens
+      // without one. The record's code says so; its message is only shown.
+      if (isNoToolchain(record) && this.loadedHash === undefined) {
         this.status.set({ kind: 'none', reason });
       } else {
         this.status.set({ kind: 'failed', reason, ...(this.loadedHash !== undefined ? { hash: this.loadedHash } : {}) });

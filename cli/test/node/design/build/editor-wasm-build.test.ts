@@ -162,7 +162,25 @@ describe('the editor-wasm job without a toolchain', () => {
     registerEditorWasmJob(queue, { host: fake, toolchainCacheRoot: makeTempDir('no-toolchain'), frameworkRoot: FRAMEWORK_ROOT });
     const record = queue.submit(EDITOR_WASM_JOB, {});
     await queue.idle();
-    expect(queue.get(record!.id)).toMatchObject({ status: 'failed', error: expect.stringMatching(/u8g2gl toolchain install/) });
+    expect(queue.get(record!.id)).toMatchObject({
+      status: 'failed',
+      code: 'no-emscripten',
+      error: expect.stringMatching(/u8g2gl toolchain install/),
+    });
+    expect(runs).toEqual([]);
+  });
+
+  it('without the runtime sources beside the CLI, fails with its own code, and runs no compiler', async () => {
+    const { host: fake, runs } = fakeHost({ path: '' });
+    const queue = new BuildQueue(DEPARTURES_PROJECT);
+    registerEditorWasmJob(queue, { host: fake, toolchainCacheRoot: makeTempDir('no-source'), frameworkRoot: null });
+    const record = queue.submit(EDITOR_WASM_JOB, {});
+    await queue.idle();
+    expect(queue.get(record!.id)).toMatchObject({
+      status: 'failed',
+      code: 'no-source-tree',
+      error: expect.stringMatching(/no U8G2GL source tree/),
+    });
     expect(runs).toEqual([]);
   });
 });

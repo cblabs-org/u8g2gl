@@ -24,7 +24,7 @@ severity. This WORKORDER's `status` must be `dispatched`. Otherwise **stop and r
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-05r-wo2`.** **Branch**:
+**Work only in `../U8G2GL-05r-wo2`.** **Branch**:
 `u8g2gl-05r/wo2-screen-discovery` (already checked out, no upstream). Run
 `git branch --show-current` **as its own command immediately before every commit**
 (`.agents/rules/04-branch-hygiene.md`). Scratch files go in `tmp/` in this worktree

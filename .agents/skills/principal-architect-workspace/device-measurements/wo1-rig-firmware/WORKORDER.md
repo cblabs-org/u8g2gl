@@ -30,7 +30,7 @@ reader can tell exactly what was measured.
 
 ## Strict Boundary Box
 
-- **Work only in this worktree** (`/Users/mcneillm/Documents/Projects/U8G2GL-device`), and only
+- **Work only in this worktree** (`../U8G2GL-device`), and only
   under `tmp/` (git-ignored) plus your Completion Report in this file.
 - **Do not edit** anything under `src/`, `include/`, `cli/`, `docs/`, tests, or any tracked file.
   No runtime or CLI change, no fix. A defect you find is a finding with a reproduction.
@@ -185,7 +185,7 @@ Provenance checked first: `PROJECT.md` Status Log, 2026-10-12, records the owner
 "approve" of the decomposition; the 2026-10-13 entry (direct `pio` for compiling and flashing,
 PA flashes) is in the working tree and was relayed by the PA.
 
-### Images (all under /Users/mcneillm/Documents/Projects/U8G2GL-device/tmp/)
+### Images (all under tmp/)
 Flash `firmware.bin` (0x10000). The `firmware.factory.bin` beside each also embeds
 `nora_recovery.ino.bin` at 0xf70000 and is not needed.
 

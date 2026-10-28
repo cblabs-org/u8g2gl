@@ -456,7 +456,7 @@ async function main() {
 
   console.log('1. Loading Wasm Editor Module...');
   const localWasmDir = join(projectRoot, 'build-wasm', 'wasm');
-  const mainWasmDir = '/Users/mcneillm/Documents/Projects/U8G2GL/build-wasm/wasm';
+  const mainWasmDir = 'build-wasm/wasm';
   const wasmDir = existsSync(join(localWasmDir, 'u8g2gl_editor.js')) ? localWasmDir : mainWasmDir;
   const editor = await createEditor(wasmDir);
   console.log(`   Module loaded successfully from: ${wasmDir}\n`);

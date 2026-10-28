@@ -29,7 +29,7 @@ plain `u8g2gl_u8g2_csrc` (struct layout mismatch under ARDUINO).
 
 # Tooling Constraints
 
-- Build and test with CMake in `/Users/mcneillm/Documents/Projects/U8G2GL-06`.
+- Build and test with CMake in `../U8G2GL-06`.
 - `cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j`
 - `cd build && ctest --output-on-failure`
 - Zero warnings under `-Wall -Wextra -Wpedantic`.

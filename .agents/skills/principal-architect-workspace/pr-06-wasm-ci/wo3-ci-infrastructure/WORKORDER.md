@@ -36,7 +36,7 @@ explicitly (F-STD) with two matrix entries.
 - PlatformIO goes through the **MCP**. Do not call `pio` directly.
 - Use `call_mcp_tool` with `ServerName: platformio-mcp_platformio` and the
   relevant tool (e.g., `build_project`, `clean_project`, `project_envs`).
-- Read the MCP tool schemas at `/Users/mcneillm/.gemini/antigravity/mcp/platformio-mcp_platformio/`
+- Read the MCP tool schemas at `~/.gemini/antigravity/mcp/platformio-mcp_platformio/`
   before using any MCP tool.
 - For the xtensa cross-compile: use the MCP `build_project` tool with the
   standalone PlatformIO project you create.

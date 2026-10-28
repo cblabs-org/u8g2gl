@@ -1,6 +1,6 @@
 Processing device_after (platform: espressif32; board: arduino_nano_esp32; framework: arduino)
 --------------------------------------------------------------------------------
-Library Manager: Installing symlink:///Users/mcneillm/Documents/Projects/U8G2GL-05r2
+Library Manager: Installing symlink://.
 Library Manager: u8g2gl@0.9.0 has been installed!
 Library Manager: Resolving dependencies...
 Library Manager: Installing olikraus/U8g2 @ ^2.36.18
@@ -34,7 +34,7 @@ Compiling .pio/build/device_after/FrameworkArduinoVariant/dfu_callbacks.cpp.o
 Compiling .pio/build/device_after/FrameworkArduinoVariant/double_tap.c.o
 Compiling .pio/build/device_after/FrameworkArduinoVariant/io_pin_remap.cpp.o
 Compiling .pio/build/device_after/FrameworkArduinoVariant/variant.cpp.o
-/Users/mcneillm/.platformio/packages/framework-arduinoespressif32/variants/arduino_nano_nora/io_pin_remap.cpp:11:2: warning: #warning The build system forces the Arduino API to use GPIO numbers on a board that has custom pin mapping. [-Wcpp]
+~/.platformio/packages/framework-arduinoespressif32/variants/arduino_nano_nora/io_pin_remap.cpp:11:2: warning: #warning The build system forces the Arduino API to use GPIO numbers on a board that has custom pin mapping. [-Wcpp]
    11 | #warning The build system forces the Arduino API to use GPIO numbers on a board that has custom pin mapping.
       |  ^~~~~~~
 Compiling .pio/build/device_after/lib1fa/SPI/SPI.cpp.o

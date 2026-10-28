@@ -74,26 +74,26 @@ fixture/main.cpp: In function 'void setup()':
 fixture/main.cpp:18:33: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<2>*, int, const uint8_t&)' is ambiguous
    18 |     hand_written.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
       |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
+In file included from tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
+                 from tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
                  from fixture/main.cpp:5:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
+tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
   369 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
       |          ^~~~~~~~~~~~~~~
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
+tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
   370 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
       |          ^~~~~~~~~~~~~~~
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp: In function 'void ui_screen_home_init()':
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:75:41: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<2>*, int, const uint8_t&)' is ambiguous
+tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp: In function 'void ui_screen_home_init()':
+tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:75:41: error: call of overloaded 'bind_flag_if_eq(u8g2gl_subject_bool_n<2>*, int, const uint8_t&)' is ambiguous
    75 |     ui_obj_bar_wifi_icon.bind_flag_if_eq(&ui_subject_wifi_connected, 0, U8G2GL_FLAG_HIDDEN);
       |     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In file included from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
-                 from /Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:7:
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
+In file included from tmp/wo3tip/include/u8g2gl/u8g2gl_core.h:47,
+                 from tmp/wo3tip/test/generated_fixture/generated/ui.hpp:19,
+                 from tmp/wo3tip/test/generated_fixture/generated/ui_screen_home.cpp:7:
+tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:369:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, int32_t, uint8_t)'
   369 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, int32_t ref_value, uint8_t flag);
       |          ^~~~~~~~~~~~~~~
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
+tmp/wo3tip/include/u8g2gl/u8g2gl_obj.h:370:10: note: candidate: 'bool u8g2gl_obj::bind_flag_if_eq(u8g2gl_subject_bool_base*, bool, uint8_t)'
   370 |     bool bind_flag_if_eq(u8g2gl_subject_bool_base* subject, bool ref_value, uint8_t flag);
       |          ^~~~~~~~~~~~~~~
 *** [.pio/build/fixture_before/fixture/main.cpp.o] Error 1

@@ -1,0 +1,11 @@
+# U8G2GL — Dependabot, for the CI workflow's actions only.
+# Every action in .github/workflows/ is pinned to a commit SHA with its tag in
+# a trailing comment; Dependabot proposes the next release's SHA and tag
+# together, so a pin is never updated silently and never left to rot.
+# npm dependencies are deliberately not covered here.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

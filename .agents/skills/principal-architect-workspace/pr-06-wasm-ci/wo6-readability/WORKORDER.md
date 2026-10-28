@@ -42,11 +42,11 @@ produce evidence that the CI checks can fail.
 
 ## 2. Verify test counts
 
-- [ ] Run the C++ suite: `cd /Users/mcneillm/Documents/Projects/U8G2GL-06/build && ctest --output-on-failure`
+- [ ] Run the C++ suite: `cd build && ctest --output-on-failure`
   Report total tests, passed, failed, skipped. Baseline: **501** (1 known skip).
   The count must be ≥ 501 (new tests add to it).
 
-- [ ] Run the CLI suite: `cd /Users/mcneillm/Documents/Projects/U8G2GL-06/cli && npm test`
+- [ ] Run the CLI suite: `cd cli && npm test`
   Report total tests, passed, failed. Baseline: **1353**.
 
 - [ ] Report zero warnings from the C++ build.

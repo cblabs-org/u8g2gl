@@ -113,6 +113,61 @@ describe('parseCst — tree shape', () => {
   });
 });
 
+describe('parseCst — each malformed input reported once, where it broke', () => {
+  // located
+  // Line, column and message of each diagnostic, in order.
+  function located(text: string): Array<[number, number, string]> {
+    return parseCst(text, 'bad.xml').diagnostics.map((d) => [d.line, d.column, d.message]);
+  }
+
+  it('text before the root: one diagnostic at the text, and the root still parses', () => {
+    const text = 'hello <root a="1"/>';
+    expect(located(text)).toEqual([[1, 1, 'Unexpected text before the root element']]);
+    const { cst } = parseCst(text, 'bad.xml');
+    expect(cst.root?.name).toBe('root');
+    expect(cst.root?.attributes.map((a) => a.name)).toEqual(['a']);
+    expect(printCst(cst)).toBe(text);
+  });
+
+  it('text and no root at all: one diagnostic, at the text', () => {
+    expect(located('\n  just text')).toEqual([[2, 3, 'XML document contains text but no root element']]);
+  });
+
+  it("an open tag the input ends inside: one 'expected >' where it broke off, not two at its '<'", () => {
+    expect(located('<a x="1"')).toEqual([[1, 9, "Expected '>' or '/>' to close opening tag <a>"]]);
+    expect(located('<a>\n  <b x="1"\n')).toEqual([
+      [3, 1, "Expected '>' or '/>' to close opening tag <b>"],
+      [1, 1, "unclosed tag 'a'"],
+    ]);
+  });
+
+  it("an unclosed quote that runs to the end is the one diagnostic for that end of input", () => {
+    expect(located('<label text="unclosed />')).toEqual([[1, 14, "Unclosed quote for attribute 'text' in <label>"]]);
+  });
+
+  it("a missing '=' before a quoted value is one diagnostic; the value is skipped, not re-read", () => {
+    const text = '<a b "c" d="1"></a>';
+    expect(located(text)).toEqual([[1, 4, "Expected '=' after attribute name 'b' in <a>"]]);
+    const { cst } = parseCst(text, 'bad.xml');
+    expect(cst.root?.attributes.map((a) => [a.name, a.value])).toEqual([['d', '1']]);
+    expect(printCst(cst)).toBe(text);
+  });
+
+  it('an empty document is reported at the end of input; 1:1 only when it is truly empty', () => {
+    expect(located('')).toEqual([[1, 1, 'XML document is empty or contains no root element']]);
+    expect(located('  \n  <!-- only a comment -->\n')).toEqual([[3, 1, 'XML document is empty or contains no root element']]);
+  });
+
+  it('a DOCTYPE is one diagnostic, internal subset and all, and the root after it parses', () => {
+    const text = '<!DOCTYPE screen [\n  <!ENTITY e "x">\n]>\n<screen name="s"/>';
+    expect(located(text)).toEqual([[1, 1, 'DOCTYPE declarations are not supported in U8G2GL documents']]);
+    const { cst } = parseCst(text, 'bad.xml');
+    expect(cst.root?.name).toBe('screen');
+    expect(printCst(cst)).toBe(text);
+    expect(located('<!DOCTYPE screen>\n<screen/>')).toEqual([[1, 1, 'DOCTYPE declarations are not supported in U8G2GL documents']]);
+  });
+});
+
 describe('LineIndex', () => {
   it('counts LF, CRLF and lone CR as one line break each', () => {
     const index = new LineIndex('a\nb\r\nc\rd');

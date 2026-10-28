@@ -12,8 +12,10 @@
  * Description: Compares against the two goldens recorded from the tokeniser
  *              (tokeniser-golden.ts): the full tree for every tracked `.xml`
  *              file and inline case, and every diagnostic including its
- *              message. A repository file edited since the recording fails as a
- *              stale entry, by hash, before its tree is compared. Then the three
+ *              message. Where an entry has a `corrected` block, the CST is
+ *              held to that instead of the record. A repository file edited
+ *              since the recording fails as a stale entry, by hash, before its
+ *              tree is compared. Then the three
  *              inputs the recorded tokeniser rejected and the CST accepts, each
  *              checked against its recorded failure; and the offset ranges of
  *              every element and attribute, checked against the text.
@@ -25,6 +27,8 @@ import { decodeXmlEntities, tokenizeXml } from '../../src/core/parser/index.js';
 import type { RawXmlElement } from '../../src/core/parser/index.js';
 import { readRepoFile, repoXmlFiles } from './cst-test-helpers.js';
 import {
+  expectedDiagnostics,
+  expectedRoot,
   freezeDiagnostics,
   freezeTree,
   loadDiagnosticsGolden,
@@ -42,16 +46,22 @@ describe('tokenizeXml matches the recorded tokeniser', () => {
     expect(freezeTree(tokenizeXml(text, file), file)).toEqual(root);
   });
 
-  it.each(trees.inlineCases)('tree of inline case: $name', ({ file, text, root }) => {
-    expect(freezeTree(tokenizeXml(text, file), file)).toEqual(root);
+  it.each(trees.inlineCases)('tree of inline case: $name', (entry) => {
+    expect(freezeTree(tokenizeXml(entry.text, entry.file), entry.file)).toEqual(expectedRoot(entry));
   });
 
-  it.each(diagnostics.repositoryFiles)('diagnostics of repository file $file', ({ file, diagnostics: recorded }) => {
-    expect(freezeDiagnostics(tokenizeXml(readRepoFile(file), file).diagnostics)).toEqual(recorded);
+  it('has one corrected tree, and it differs from its record', () => {
+    const corrected = trees.inlineCases.filter((entry) => entry.corrected !== undefined);
+    expect(corrected.map((entry) => entry.name)).toEqual(['text before the root']);
+    expect(corrected[0]?.corrected?.root).not.toEqual(corrected[0]?.root);
   });
 
-  it.each(diagnostics.inlineCases)('diagnostics of $group case: $name', ({ file, text, diagnostics: recorded }) => {
-    expect(freezeDiagnostics(tokenizeXml(text, file).diagnostics)).toEqual(recorded);
+  it.each(diagnostics.repositoryFiles)('diagnostics of repository file $file', (entry) => {
+    expect(freezeDiagnostics(tokenizeXml(readRepoFile(entry.file), entry.file).diagnostics)).toEqual(expectedDiagnostics(entry));
+  });
+
+  it.each(diagnostics.inlineCases)('diagnostics of $group case: $name', (entry) => {
+    expect(freezeDiagnostics(tokenizeXml(entry.text, entry.file).diagnostics)).toEqual(expectedDiagnostics(entry));
   });
 });
 

@@ -25,11 +25,19 @@
  *                names, values and locations, text content, comments) for
  *                every tracked `.xml` file and every inline case.
  *
+ *              Where the recorded location was wrong, the entry keeps its
+ *              record and gains `corrected`: what the CST reports instead, and
+ *              why. The tests hold the CST to the correction where there is
+ *              one, and check that each correction still differs from its
+ *              record, so a correction is never a silent no-op.
+ *
  * Exports:
  *   Golden shapes:
  *   - FrozenDiagnostic:       One diagnostic as recorded
  *   - FrozenInlineDiagnostics: An inline input and its recorded diagnostics
  *   - FrozenDifference:       An input the CST deliberately parses differently
+ *   - DiagnosticsCorrection:  What the CST reports where the record was wrong, and why
+ *   - TreeCorrection:         The same for a tree
  *   - DiagnosticsGolden:      The shape of tokeniser-diagnostics.json
  *   - FrozenElement:          One element as recorded
  *   - TreesGolden:            The shape of tokeniser-trees.json
@@ -39,6 +47,7 @@
  *   - freezeDiagnostics():    A diagnostic list in the recorded shape
  *   - freezeTree():           A RawXmlDocument's root in the recorded shape
  *   - sha256():               The hash each repository entry is keyed by
+ *   - expectedDiagnostics(), expectedRoot():  An entry's correction, else its record
  */
 
 import { createHash } from 'node:crypto';
@@ -59,6 +68,18 @@ export interface FrozenDiagnostic {
   readonly message: string;
 }
 
+/** Where a recorded entry was wrong: what the CST reports instead, and why. */
+export interface DiagnosticsCorrection {
+  readonly reason: string;
+  readonly diagnostics: readonly FrozenDiagnostic[];
+}
+
+/** Where a recorded tree was wrong: the tree now produced (absent: no root), and why. */
+export interface TreeCorrection {
+  readonly reason: string;
+  readonly root?: FrozenElement;
+}
+
 /** An inline input and what the recorded tokeniser reported for it. */
 export interface FrozenInlineDiagnostics {
   /** Which corpus it came from: `existing` test cases or `branch` (one per recovery branch). */
@@ -67,6 +88,7 @@ export interface FrozenInlineDiagnostics {
   readonly file: string;
   readonly text: string;
   readonly diagnostics: readonly FrozenDiagnostic[];
+  readonly corrected?: DiagnosticsCorrection;
 }
 
 /**
@@ -87,6 +109,7 @@ export interface DiagnosticsGolden {
     readonly file: string;
     readonly sha256: string;
     readonly diagnostics: readonly FrozenDiagnostic[];
+    readonly corrected?: DiagnosticsCorrection;
   }>;
   readonly inlineCases: readonly FrozenInlineDiagnostics[];
   readonly intentionalDifferences: readonly FrozenDifference[];
@@ -119,6 +142,7 @@ export interface TreesGolden {
     readonly file: string;
     readonly text: string;
     readonly root?: FrozenElement;
+    readonly corrected?: TreeCorrection;
   }>;
 }
 
@@ -159,6 +183,22 @@ function freezeElement(element: RawXmlElement, file: string): FrozenElement {
 /** The document's root in the recorded shape, or undefined when it has none. */
 export function freezeTree(doc: RawXmlDocument, file: string): FrozenElement | undefined {
   return doc.root ? freezeElement(doc.root, file) : undefined;
+}
+
+/** The diagnostics an entry expects: its correction's, else the record's. */
+export function expectedDiagnostics(entry: {
+  readonly diagnostics: readonly FrozenDiagnostic[];
+  readonly corrected?: DiagnosticsCorrection;
+}): readonly FrozenDiagnostic[] {
+  return entry.corrected?.diagnostics ?? entry.diagnostics;
+}
+
+/** The tree an entry expects: its correction's, else the record's. */
+export function expectedRoot(entry: {
+  readonly root?: FrozenElement;
+  readonly corrected?: TreeCorrection;
+}): FrozenElement | undefined {
+  return entry.corrected !== undefined ? entry.corrected.root : entry.root;
 }
 
 /** Read the committed tokeniser-diagnostics.json. */

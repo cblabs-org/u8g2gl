@@ -69,15 +69,45 @@ from, and this rule exists only because the first incident was written down.
 ## A downstream pin makes merge strategy load-bearing
 
 `esp32-app-foundation`'s held integration branch pins the U8G2GL runtime by
-**git commit** — an intermediate work-order commit, reachable from `main` only
-through its PR's merge commit. A squash merge would make it unreachable and
-eventually collectable, breaking a branch nobody is currently looking at.
+**git commit** — an intermediate work-order commit, not a release. A commit no
+ref reaches is eventually collected, and a squash merge leaves a PR's
+intermediate commits reachable from no ref at all, breaking a branch nobody is
+currently looking at.
 
 **So: merge U8G2GL PRs with merge commits, not squash, while any downstream
 branch pins a bare commit.**
 
 That is a policy, and a policy is a weak guarantee for something a build depends
 on. **The robust fix is a tag**, which is a ref and is never collected. Tagging
-is an owner action (`.agents/rules/03-versioning.md`), so the sequence is: the
-owner tags the pinned commit, the downstream branch pins the tag, and this
-constraint stops mattering. Until then, treat it as real.
+is an owner action (`.agents/rules/03-versioning.md`).
+
+### Where that stands: the pinned commit is tagged
+
+The owner tagged foundation's pinned commit **`v0.7.0-integration`** (→
+`82ec83f`). That tag is now what keeps the commit alive, and it would be even
+if every PR were squashed. Check it rather than trust this paragraph:
+
+```bash
+git rev-parse 'v0.7.0-integration^{commit}'      # 82ec83f…
+git ls-remote --tags origin v0.7.0-integration   # the tag is on the remote
+git merge-base --is-ancestor 82ec83f origin/main # exits 1 as of 2026-10-28
+```
+
+The last line matters: as of 2026-10-28 `82ec83f` is **not** an ancestor of
+`main` at all. The merge-commit policy was never what protected this pin; the
+tag is, and nothing else.
+
+**What that changes:** this one pin no longer depends on how PRs are merged.
+**What it does not:** the policy stays, because it is about *any* bare-commit
+pin, and two remain possible:
+
+1. Foundation still names the bare SHA, not the tag, so nothing on its side
+   says which ref keeps that commit alive: moving or deleting the tag would
+   break it silently. Until it pins `v0.7.0-integration` by name, treat the tag
+   as untouchable.
+2. The next pin — the cut-over on a newer runtime — will be another bare
+   commit until it, too, is tagged.
+
+So the order is unchanged: the owner tags a commit before anything downstream
+pins it, and the downstream pins the tag. When no downstream branch pins a bare
+commit, this section can go.

@@ -7,23 +7,25 @@
  * Purpose: The command around the server: argument parsing; one
  *          server per project — a second instance attaches and prints the
  *          running URL; a stale lock (dead pid, a live pid that is not the
- *          server, or a corrupt file) is replaced; and the built CLI end to end,
- *          including Ctrl-C removing the lock.
+ *          server, or a corrupt file) is replaced; the warning when git would
+ *          track the lock; and the built CLI end to end, including Ctrl-C
+ *          removing the lock, even when the signal arrives the moment the
+ *          URL is printed.
  * Description: `startOrAttach` is tested in-process. The end-to-end tests spawn
  *              the built `dist/node/cli.js` (built by the global setup) with
  *              `--no-open --json`, so no browser opens and the URL is read as
  *              one JSON line. Every spawned server is signalled and awaited.
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync, statSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { parseDesignArgs, startOrAttach, type DesignSession } from '../../../src/node/design/design-command.js';
 import { startDesignServer } from '../../../src/node/design/design-server.js';
 import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
-import { readLock } from '../../../src/node/design/lock-file.js';
+import { lockIgnoreWarning, readLock } from '../../../src/node/design/lock-file.js';
 import { MINIMAL_PROJECT, makeTempDir, removeTempDirs, writeFiles } from './temp-project.js';
 
 const CLI = resolve(__dirname, '../../../dist/node/cli.js');
@@ -151,6 +153,48 @@ describe('one server per project', () => {
   });
 });
 
+describe('lockIgnoreWarning()', () => {
+  // gitInit
+  // Makes `root` its own git work tree, with `ignore` as its .gitignore if given.
+  function gitInit(root: string, ignore?: string): void {
+    expect(spawnSync('git', ['init', '--quiet'], { cwd: root }).status).toBe(0);
+    if (ignore !== undefined) writeFileSync(join(root, '.gitignore'), ignore);
+  }
+
+  it('is silent when the work tree ignores the lock file', () => {
+    const root = project();
+    gitInit(root, `${LOCK_FILE_NAME}\n`);
+    expect(lockIgnoreWarning(root)).toBeUndefined();
+  });
+
+  it('warns, naming the file and .gitignore, when the work tree does not ignore it, and edits nothing', () => {
+    const root = project();
+    gitInit(root);
+    const warning = lockIgnoreWarning(root);
+    expect(warning).toContain(`${LOCK_FILE_NAME} is not ignored by git`);
+    expect(warning).toContain('.gitignore');
+    expect(existsSync(join(root, '.gitignore'))).toBe(false);
+  });
+
+  it('is silent outside any work tree', () => {
+    // A project one level inside a repository that would track the lock: it
+    // warns as found, and is silent once git may not look above the project,
+    // which is how git sees a project that is in no repository.
+    const outer = project();
+    gitInit(outer);
+    const root = join(outer, 'project');
+    writeFiles(root, MINIMAL_PROJECT);
+    expect(lockIgnoreWarning(root)).toBeDefined();
+    expect(lockIgnoreWarning(root, { env: { ...process.env, GIT_CEILING_DIRECTORIES: dirname(root) } })).toBeUndefined();
+  });
+
+  it('is silent when there is no git', () => {
+    const root = project();
+    gitInit(root);
+    expect(lockIgnoreWarning(root, { git: join(root, 'no-such-git') })).toBeUndefined();
+  });
+});
+
 describe('u8g2gl design — the built CLI', () => {
   it('starts, serves with its token, lets a second instance attach, and removes the lock on SIGINT', async () => {
     const root = project();
@@ -179,6 +223,35 @@ describe('u8g2gl design — the built CLI', () => {
     expect(output).toMatch(/→ http:\/\/127\.0\.0\.1:\d+\/\?token=[0-9a-f]{64}/);
     child.kill('SIGTERM');
     expect(await exitCode(child)).toBe(0);
+  });
+
+  it('warns once on stderr when git would track the lock, and --json stdout stays one JSON line', async () => {
+    const root = project();
+    expect(spawnSync('git', ['init', '--quiet'], { cwd: root }).status).toBe(0);
+    const child = spawnCli(['design', root, '--no-open', '--json']);
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
+    expect(JSON.parse(await firstLine(child))).toMatchObject({ attached: false });
+    child.kill('SIGTERM');
+    expect(await exitCode(child)).toBe(0);
+    expect(stderr.match(/warning: /g)).toHaveLength(1);
+    expect(stderr).toContain(`${LOCK_FILE_NAME} is not ignored by git`);
+  });
+
+  // The signal arrives the moment the URL line does: a handler installed only
+  // after printing would leave the default action (death by signal) in place.
+  it.each([
+    ['SIGINT', ['--json']],
+    ['SIGTERM', ['--json']],
+    ['SIGINT', []],
+    ['SIGTERM', []],
+  ] as const)('a %s sent as soon as the URL is printed (%j) stops it cleanly: exit 0, no lock', async (signal, flags) => {
+    const root = project();
+    const child = spawnCli(['design', root, '--no-open', ...flags]);
+    await linesUntil(child, /http:\/\/127\.0\.0\.1:\d+/);
+    child.kill(signal);
+    expect(await exitCode(child)).toBe(0);
+    expect(existsSync(join(root, LOCK_FILE_NAME))).toBe(false);
   });
 
   it('exits 1 for a directory that is not a project, and 2 for a bad option', async () => {

@@ -25,7 +25,7 @@ gives the §6.5 clause this WO lands. This WORKORDER's `status` must be `dispatc
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-4r3`.** **Branch**:
+**Work only in `../U8G2GL-4r3`.** **Branch**:
 `u8g2gl-4r3/wo2-extends-class` (already checked out, no upstream) · **Base**:
 `u8g2gl-4r3/wo1-runtime-floor`. Run `git branch --show-current` **as its own command immediately
 before every commit** (`.agents/rules/04-branch-hygiene.md`). Scratch files in `tmp/` in this

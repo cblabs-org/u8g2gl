@@ -24,8 +24,8 @@ WORKORDER's `status` must be `dispatched`. Otherwise **stop and report**.
 
 ## Branch and working tree
 
-**Work only in the worktree `/Users/mcneillm/Documents/Projects/U8G2GL-4r`**, never in
-`/Users/mcneillm/Documents/Projects/U8G2GL`. PR-04b may be running in parallel in another tree.
+**Work only in the worktree `../U8G2GL-4r`**, never in
+`../U8G2GL`. PR-04b may be running in parallel in another tree.
 
 **Branch**: `u8g2gl-4r/wo2-style-overrides` (already checked out) · **Base**: `main` @ `ca398ac`
 

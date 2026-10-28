@@ -219,6 +219,14 @@ export function runProjectFsContract(name: string, factory: ProjectFsFactory, op
         expect(result.ok && result.text).toBe(text);
       });
 
+      it('reports a byte-order mark as bom, without it in the text; a file without one has bom false', async () => {
+        const { fs, externalWrite } = await setup();
+        const body = new TextEncoder().encode('<screen name="m" />\n');
+        await externalWrite('screens/screen_m.xml', new Uint8Array([0xef, 0xbb, 0xbf, ...body]));
+        expect(await fs.read('screens/screen_m.xml')).toMatchObject({ ok: true, text: '<screen name="m" />\n', bom: true });
+        expect(await fs.read('screens/screen_a.xml')).toMatchObject({ ok: true, bom: false });
+      });
+
       it('reports a missing file as not-found', async () => {
         const { fs } = await setup();
         const result = await fs.read('screens/screen_missing.xml');
@@ -295,6 +303,23 @@ export function runProjectFsContract(name: string, factory: ProjectFsFactory, op
         });
         expect(save).toMatchObject({ ok: false, code: 'conflict' });
         expect(await fs.read('screens/screen_a.xml')).toMatchObject({ ok: true, text: '<screen name="a" from="ide" />\n' });
+      });
+
+      it('keeps a byte-order mark when the write passes the bom it read, and writes none otherwise', async () => {
+        const { fs, externalWrite } = await setup();
+        const BOM = [0xef, 0xbb, 0xbf];
+        await externalWrite('screens/screen_m.xml', new Uint8Array([...BOM, ...new TextEncoder().encode('<screen />\n')]));
+        const read = await fs.read('screens/screen_m.xml');
+        if (!read.ok) throw new Error('seed missing');
+
+        const kept = await fs.write('screens/screen_m.xml', '<screen name="m" />\n', { expectedVersion: read.version, bom: read.bom });
+        expect(kept.ok).toBe(true);
+        const keptBytes = await fs.readBytes('screens/screen_m.xml');
+        expect(keptBytes.ok && [...keptBytes.bytes.slice(0, 4)]).toEqual([...BOM, 0x3c]);
+        expect(await fs.read('screens/screen_m.xml')).toMatchObject({ ok: true, text: '<screen name="m" />\n', bom: true });
+
+        expect((await fs.write('screens/screen_m.xml', '<screen />\n')).ok).toBe(true);
+        expect(await fs.read('screens/screen_m.xml')).toMatchObject({ ok: true, text: '<screen />\n', bom: false });
       });
 
       it('with expectedVersion null, creates an absent file but refuses to replace an existing one', async () => {

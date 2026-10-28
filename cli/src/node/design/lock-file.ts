@@ -17,7 +17,8 @@
  *              now some other program (pids are reused), is stale and may be
  *              replaced. The lock holds the session token, so it is written
  *              readable by its owner only, and belongs in the project's
- *              `.gitignore`.
+ *              `.gitignore`. `lockIgnoreWarning` says so when git would
+ *              otherwise offer it for commit; nothing here edits `.gitignore`.
  *
  * Exports:
  * - DesignLock:           The lock's content
@@ -26,8 +27,11 @@
  * - isLockLive():         Whether the server a lock names is still running
  * - tryCreateLock():      Create the lock exclusively
  * - removeLockIfOwned():  Delete the lock, only if it is still this server's
+ * - LockIgnoreOptions:    How lockIgnoreWarning() runs git (tests vary it)
+ * - lockIgnoreWarning():  A warning if the project's git would track the lock
  */
 
+import { spawnSync } from 'node:child_process';
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LOOPBACK } from './design-server.js';
@@ -141,6 +145,47 @@ export function removeLockIfOwned(projectRoot: string, token: string | undefined
   } catch {
     // Already gone.
   }
+}
+
+/** How {@link lockIgnoreWarning} runs git. */
+export interface LockIgnoreOptions {
+  /** The git executable; default `git` on PATH. */
+  readonly git?: string;
+  /** git's environment; default this process's. */
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+/**
+ * @brief A warning to print when the project is in a git work tree that does
+ *        not ignore the lock file, or undefined.
+ *
+ * The lock holds the live session token; committed, it would publish it. This
+ * only warns: editing the user's `.gitignore` is theirs to do. No git on PATH,
+ * or a project outside any work tree, is silent — there is nothing to commit
+ * the lock to.
+ *
+ * @param projectRoot Absolute project directory.
+ * @param options     The git executable and environment; tests vary them.
+ * @return The warning's text, or undefined when there is nothing to warn about.
+ */
+export function lockIgnoreWarning(projectRoot: string, options: LockIgnoreOptions = {}): string | undefined {
+  // --- Step 1: Only a project inside a git work tree can commit the lock ---
+  const git = (args: readonly string[]): ReturnType<typeof spawnSync> =>
+    spawnSync(options.git ?? 'git', ['-C', projectRoot, ...args], { env: options.env ?? process.env, stdio: 'pipe' });
+  const inside = git(['rev-parse', '--is-inside-work-tree']);
+  if (inside.error !== undefined || inside.status !== 0 || String(inside.stdout).trim() !== 'true') {
+    return undefined;
+  }
+
+  // --- Step 2: check-ignore exits 0 when ignored, 1 when not; anything else is not an answer ---
+  const ignored = git(['check-ignore', '--quiet', '--', LOCK_FILE_NAME]);
+  if (ignored.status !== 1) {
+    return undefined;
+  }
+  return (
+    `${LOCK_FILE_NAME} is not ignored by git here. It holds this session's token: ` +
+    `add '${LOCK_FILE_NAME}' to the project's .gitignore so it is never committed.`
+  );
 }
 
 // processExists

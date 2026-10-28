@@ -261,7 +261,42 @@
           "column": 1,
           "message": "unclosed tag 'screen'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The unclosed quote already says the input ran out inside <u8g2gl_label>; its 'Expected >' and 'unclosed tag' were the same end of input reported twice more.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 6,
+            "column": 9,
+            "message": "Unexpected character '<' while parsing attributes in <u8g2gl_label>"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 6,
+            "column": 10,
+            "message": "Expected '=' after attribute name 'u8g2gl_button' in <u8g2gl_label>"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 6,
+            "column": 52,
+            "message": "Unclosed quote for attribute 'text' in <u8g2gl_label>"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 4,
+            "column": 5,
+            "message": "unclosed tag 'view'"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 3,
+            "column": 1,
+            "message": "unclosed tag 'screen'"
+          }
+        ]
+      }
     },
     {
       "file": "cli/test/parser/fixtures/unknown-elements.xml",
@@ -654,7 +689,18 @@
           "column": 1,
           "message": "unclosed tag 'label'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The unclosed quote already says the input ran out inside the tag; 'Expected >' and 'unclosed tag' at its '<' repeated it.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 14,
+            "message": "Unclosed quote for attribute 'text' in <label>"
+          }
+        ]
+      }
     },
     {
       "group": "existing",
@@ -668,7 +714,18 @@
           "column": 1,
           "message": "XML document is empty or contains no root element"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "Reported at the end of input, where the root was looked for, not at a literal 1:1.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 3,
+            "column": 1,
+            "message": "XML document is empty or contains no root element"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -696,7 +753,18 @@
           "column": 1,
           "message": "XML document is empty or contains no root element"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "Reported at the end of input, where the root was looked for, not at a literal 1:1.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 2,
+            "column": 3,
+            "message": "XML document is empty or contains no root element"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -716,7 +784,24 @@
           "column": 1,
           "message": "XML document is empty or contains no root element"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The no-root diagnostic is at the end of input, not a literal 1:1.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 1,
+            "message": "Unclosed XML comment"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 2,
+            "column": 5,
+            "message": "XML document is empty or contains no root element"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -756,7 +841,24 @@
           "column": 1,
           "message": "XML document is empty or contains no root element"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The no-root diagnostic is at the end of input, not a literal 1:1.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 1,
+            "message": "Unclosed XML processing instruction"
+          },
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 20,
+            "message": "XML document is empty or contains no root element"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -838,7 +940,18 @@
           "column": 8,
           "message": "Expected '=' after attribute name 'root' in <ello>"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "One diagnostic at the text, which is skipped; the root then parses. Previously 'h' was read as the root's '<', giving an element 'ello' and two misleading errors.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 1,
+            "message": "Unexpected text before the root element"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -872,7 +985,18 @@
           "column": 1,
           "message": "unclosed tag 'a'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "One diagnostic where the open tag broke off (end of input), not 'Expected >' and 'unclosed tag' both at its '<'.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 9,
+            "message": "Expected '>' or '/>' to close opening tag <a>"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -918,7 +1042,18 @@
           "column": 8,
           "message": "Unexpected character '\"' while parsing attributes in <a>"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The quoted value after the name is skipped with the missing '=', instead of cascading into three more diagnostics.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 4,
+            "message": "Expected '=' after attribute name 'b' in <a>"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -958,7 +1093,18 @@
           "column": 1,
           "message": "unclosed tag 'a'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The unquoted-value diagnostic is already at the end of input; 'Expected >' and 'unclosed tag' at the '<' repeated it.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 6,
+            "message": "Attribute value for 'b' in <a> must be enclosed in quotes"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -984,7 +1130,18 @@
           "column": 1,
           "message": "unclosed tag 'a'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "The unclosed quote already says the input ran out inside the tag; 'Expected >' and 'unclosed tag' at its '<' repeated it.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 7,
+            "message": "Unclosed quote for attribute 'b' in <a>"
+          }
+        ]
+      }
     },
     {
       "group": "branch",
@@ -1004,7 +1161,18 @@
           "column": 1,
           "message": "unclosed tag 'a'"
         }
-      ]
+      ],
+      "corrected": {
+        "reason": "One diagnostic where the open tag broke off (end of input), not 'Expected >' and 'unclosed tag' both at its '<'.",
+        "diagnostics": [
+          {
+            "code": "U8G2GL_MALFORMED_XML",
+            "line": 1,
+            "column": 9,
+            "message": "Expected '>' or '/>' to close opening tag <a>"
+          }
+        ]
+      }
     },
     {
       "group": "branch",

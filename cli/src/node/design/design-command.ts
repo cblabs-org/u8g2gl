@@ -8,8 +8,8 @@
  *          served-first entry point to the designer. It
  *          owns everything about the server's life that the server itself
  *          should not: finding an already-running server for the project and
- *          attaching to it, the lock file, printing and opening the URL, and a
- *          clean Ctrl-C.
+ *          attaching to it, the lock file (and a warning when git would commit
+ *          it), printing and opening the URL, and a clean Ctrl-C.
  * Description: `parseDesignArgs` turns the command line into options (the CLI
  *              reports its errors as usage errors). `startOrAttach` is the
  *              testable core: it either attaches to a live server named by the
@@ -31,7 +31,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { registerEditorWasmJob } from './build/editor-wasm-job.js';
 import { startDesignServer, type DesignServer } from './design-server.js';
-import { isLockLive, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
+import { isLockLive, lockIgnoreWarning, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
 import { openBrowser } from './open-browser.js';
 import { locateDesignerDist } from './static-files.js';
 
@@ -130,6 +130,8 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
  * attached }`), opens the browser unless `--no-open`, and for a started server
  * stays running until SIGINT or SIGTERM, then closes, removes the lock and
  * exits 0. Attaching exits 0 at once. A directory without u8g2gl.xml exits 1.
+ * A project in a git work tree that does not ignore the lock gets one warning
+ * on stderr first.
  *
  * @param args Parsed arguments.
  * @param json Whether `--json` was given.
@@ -147,14 +149,29 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(1);
   }
 
-  // --- Step 2: Attach to the running server, or start one ---
+  // --- Step 2: Warn, once, if git would offer the lock (and its token) for commit ---
+  // stderr, so `--json`'s stdout stays one JSON line.
+  const warning = lockIgnoreWarning(projectRoot);
+  if (warning !== undefined) {
+    console.error(`u8g2gl design: warning: ${warning}`);
+  }
+
+  // --- Step 3: Attach to the running server, or start one ---
   const session = await startOrAttach(projectRoot, args.port);
   if (session.kind === 'failed') {
     console.error(`u8g2gl design: ${session.message}`);
     process.exit(1);
   }
 
-  // --- Step 3: Report the URL, and open it ---
+  // --- Step 4: A started server's signal handlers, before anything is printed ---
+  // Whoever reads the URL may signal the moment it arrives; a handler
+  // installed after printing leaves a window in which SIGINT or SIGTERM takes
+  // its default action, killing the process with the lock still on disk.
+  if (session.kind === 'started') {
+    installShutdown(projectRoot, session);
+  }
+
+  // --- Step 5: Report the URL, and open it; an attaching run is done ---
   const lock = session.kind === 'started'
     ? { url: session.server.url, port: session.server.port, pid: process.pid }
     : session.lock;
@@ -174,8 +191,17 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
   if (session.kind === 'attached') {
     process.exit(0);
   }
+  // A started server keeps the process alive until a signal ends it.
+}
 
-  // --- Step 4: A started server keeps the process alive; a signal ends it cleanly ---
+// installShutdown
+// SIGINT and SIGTERM close the server, remove the lock and exit 0 (1 if the
+// close fails); a second signal while stopping is ignored. An `exit` hook
+// removes the lock on any exit no signal handler saw (an uncaught error), so
+// the lock never outlives the process that wrote it.
+//   projectRoot — absolute project directory
+//   session     — the started session
+function installShutdown(projectRoot: string, session: Extract<DesignSession, { kind: 'started' }>): void {
   let stopping = false;
   const shutdown = (): void => {
     if (stopping) {
@@ -189,8 +215,6 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
-  // Last resort for an exit no signal handler saw (an uncaught error): the
-  // lock must not outlive the process that wrote it.
   process.on('exit', () => removeLockIfOwned(projectRoot, session.server.token));
 }
 

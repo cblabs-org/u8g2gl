@@ -24,7 +24,7 @@ this WO's rule. This WORKORDER's `status` must be `dispatched`. Otherwise **stop
 
 ## Branch and working tree
 
-**Work only in `/Users/mcneillm/Documents/Projects/U8G2GL-4r2`.** **Branch**:
+**Work only in `../U8G2GL-4r2`.** **Branch**:
 `u8g2gl-4r2/wo3-radius-build-time` (already checked out, no upstream) · **Base**:
 `u8g2gl-4r2/wo2-bind-type-paths`. Run `git branch --show-current` **as its own command immediately
 before every commit** (`.agents/rules/04-branch-hygiene.md`).

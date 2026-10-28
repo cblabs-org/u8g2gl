@@ -1,9 +1,9 @@
 # Capture plan - device-measurements WO1 images (build only; the PA flashes)
 
 Interpreter for capture.py (PlatformIO's own env, has pyserial 3.5):
-`/Users/mcneillm/.platformio/penv/bin/python`
+`~/.platformio/penv/bin/python`
 
-    PY=/Users/mcneillm/.platformio/penv/bin/python
+    PY=~/.platformio/penv/bin/python
     $PY tmp/device/capture.py <port> <secs> <out>
 
 capture.py reopens the port if the board re-enumerates after a reset, so start it BEFORE or

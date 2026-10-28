@@ -1,6 +1,6 @@
 Processing c_relpath (platform: espressif32; board: esp32dev; framework: arduino)
 --------------------------------------------------------------------------------
-Library Manager: Installing symlink:///Users/mcneillm/Documents/Projects/U8G2GL-05r
+Library Manager: Installing symlink://.
 Library Manager: u8g2gl@0.7.0 has been installed!
 Library Manager: Resolving dependencies...
 Library Manager: Installing olikraus/U8g2 @ ^2.36.18

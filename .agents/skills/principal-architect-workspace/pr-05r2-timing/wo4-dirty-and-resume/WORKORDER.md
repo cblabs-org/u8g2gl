@@ -28,7 +28,7 @@ delivers it in three parts:
 
 ## Strict Boundary Box
 
-- **Work in** `/Users/mcneillm/Documents/Projects/U8G2GL-05r2`, on branch
+- **Work in** `../U8G2GL-05r2`, on branch
   `u8g2gl-05r2/wo4-dirty-and-resume` (checked out; it contains WO1–WO3). Do not create branches.
 - **May edit:**
   - `src/u8g2gl_core.cpp` and `include/u8g2gl/u8g2gl_core.h`;
@@ -52,7 +52,7 @@ delivers it in three parts:
 
 ## Reference: LVGL 9.5.0
 
-`/Users/mcneillm/Documents/Projects/repo-memory-plugin/evaluation/eval-v2/template/.pio/libdeps/crowpanel-128-rotary/lvgl/src/misc/lv_timer.c`.
+`~/Documents/Projects/repo-memory-plugin/evaluation/eval-v2/template/.pio/libdeps/crowpanel-128-rotary/lvgl/src/misc/lv_timer.c`.
 
 - **`lv_timer_handler_resume()`** (around line 401) sets `timer_time_until_next = 0` and calls
   `state.resume_cb(state.resume_data)`. It is called from `lv_timer_create`, `_resume`,

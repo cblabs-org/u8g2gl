@@ -27,7 +27,7 @@ You are the **Principal Architect for PR-04** (the U8G2GL generator, XML → C++
 independently, triage findings, and keep the record. You do not write production code
 yourself — workers do. Spec edits are yours **only** when the Chief Architect delegates them.
 
-Repository: `/Users/mcneillm/Documents/Projects/U8G2GL`.
+Repository: `../U8G2GL`.
 
 ## Read these, in this order
 

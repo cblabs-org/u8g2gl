@@ -54,7 +54,8 @@ describe('validate on a single file whose root no parser takes', () => {
     const res = await validateFile('screen_home.xml', 'hello <screen name="s"><view/></screen>\n');
     expect(res.code).not.toBe(0);
     expect(res.errors).toBeGreaterThan(0);
-    expect(res.diagnostics[0]).toMatchObject({ code: 'U8G2GL_MALFORMED_XML', line: 1, column: 7 });
+    // Located at the text itself, not at a '<' it was misread through.
+    expect(res.diagnostics[0]).toMatchObject({ code: 'U8G2GL_MALFORMED_XML', line: 1, column: 1 });
   });
 
   it('fails on a well-formed unknown root, naming it and the accepted roots', async () => {

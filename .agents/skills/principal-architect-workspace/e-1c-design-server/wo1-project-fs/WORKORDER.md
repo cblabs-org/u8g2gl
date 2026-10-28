@@ -17,7 +17,7 @@ before starting (rule 00). The specification is
 
 # Where you work
 
-- Worktree: `/Users/mcneillm/Documents/Projects/U8G2GL-e1c`, branch `u8g2gl-e1c/wo1-project-fs`
+- Worktree: `../U8G2GL-e1c`, branch `u8g2gl-e1c/wo1-project-fs`
   (already created). `git branch --show-current` before every commit (rule 04).
 - Commit as you complete coherent steps. **Do not push.** Commit trailer:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.

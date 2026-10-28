@@ -1,13 +1,13 @@
 === NullFontIsRestoredAndASecondRenderWorks
 exit=139
 === BaselineCallerDrawsTheSamePixelsAsTopCaller
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:216: Failure
+test/test_ambient_state.cpp:216: Failure
 Expected equality of these values:
   baseline_lit
     Which is: 50
   top_lit
     Which is: 93
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:217: Failure
+test/test_ambient_state.cpp:217: Failure
 Expected equality of these values:
   std::memcmp(top, baseline, kBufferBytes)
     Which is: -112
@@ -23,32 +23,32 @@ lit pixels: top 93, baseline 50
  1 FAILED TEST
 exit=1
 === CallerStateComesBackAfterRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:143: Failure
+test/test_ambient_state.cpp:143: Failure
 Expected equality of these values:
   actual.font_mode
     Which is: '\0'
   expected.font_mode
     Which is: '\x1' (1)
 font mode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:235: after a label
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:143: Failure
+test/test_ambient_state.cpp:235: after a label
+test/test_ambient_state.cpp:143: Failure
 Expected equality of these values:
   actual.font_mode
     Which is: '\0'
   expected.font_mode
     Which is: '\x1' (1)
 font mode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:242: after an XBM
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:235: after a label
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:144: Failure
+test/test_ambient_state.cpp:242: after an XBM
+test/test_ambient_state.cpp:235: after a label
+test/test_ambient_state.cpp:144: Failure
 Expected equality of these values:
   actual.bitmap_mode
     Which is: '\0'
   expected.bitmap_mode
     Which is: '\x1' (1)
 bitmap mode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:242: after an XBM
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:235: after a label
+test/test_ambient_state.cpp:242: after an XBM
+test/test_ambient_state.cpp:235: after a label
 [  FAILED  ] AmbientState.CallerStateComesBackAfterRender (0 ms)
 [----------] 1 test from AmbientState (0 ms total)
 [----------] Global test environment tear-down
@@ -59,21 +59,21 @@ bitmap mode
  1 FAILED TEST
 exit=1
 === MarqueeRepaintKeepsCallerStateAndMatchesRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:142: Failure
+test/test_ambient_state.cpp:142: Failure
 Expected equality of these values:
   actual.font
     Which is: 0x104be6f56
   expected.font
     Which is: 0x104be32c1
 font
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:143: Failure
+test/test_ambient_state.cpp:143: Failure
 Expected equality of these values:
   actual.font_mode
     Which is: '\0'
   expected.font_mode
     Which is: '\x1' (1)
 font mode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:283: Failure
+test/test_ambient_state.cpp:283: Failure
 Expected equality of these values:
   std::memcmp(repainted, rendered, kBufferBytes)
     Which is: 112
@@ -89,21 +89,21 @@ lit pixels: repaint 29, render 51
  1 FAILED TEST
 exit=1
 === ClockRepaintKeepsCallerStateAndMatchesRender
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:142: Failure
+test/test_ambient_state.cpp:142: Failure
 Expected equality of these values:
   actual.font
     Which is: 0x100312f56
   expected.font
     Which is: 0x10030f2c1
 font
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:143: Failure
+test/test_ambient_state.cpp:143: Failure
 Expected equality of these values:
   actual.font_mode
     Which is: '\0'
   expected.font_mode
     Which is: '\x1' (1)
 font mode
-/Users/mcneillm/Documents/Projects/U8G2GL-05r/test/test_ambient_state.cpp:317: Failure
+test/test_ambient_state.cpp:317: Failure
 Expected equality of these values:
   std::memcmp(repainted, rendered, kBufferBytes)
     Which is: 64

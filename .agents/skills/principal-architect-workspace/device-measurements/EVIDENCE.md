@@ -4,6 +4,8 @@ Measurements on real hardware and the xtensa toolchain, for the PR-07 gate and P
 only:** no runtime or CLI code was changed. Defects found here are reported with a reproduction,
 not fixed. Plan, rulings and the owner's approvals are in [PROJECT.md](PROJECT.md).
 
+**Paths rewritten 2026-10-28** by `scripts/rewrite-home-paths.mjs` (C-1): absolute home-folder paths in `evidence/` and `rig/logs/` were made repo-relative (under a checkout of this repository) or `~/…` (elsewhere). Nothing else in them changed. No hash recorded here is of a rewritten file.
+
 ## Common method
 
 - **Runtime under test:** branch `u8g2gl-05r/wo6-readability` @ `81e533f` (PR #13, unmerged),
