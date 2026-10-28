@@ -72,6 +72,15 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 - [x] Spawn the `readability-reviewer` on C-1's diff; resolve P1–P3, decide P4 with reasons.
 - [x] Final run of every suite, one at a time; a completion report at the end of this file.
 
+# WO6 — the signal race (on `u8g2gl-c1/wo5-readability`, ruling 12)
+
+- [ ] Handlers installed before the URL is printed, for a started server; attach unchanged.
+- [ ] The test signals as soon as the URL line arrives: SIGINT and SIGTERM, human and `--json`
+      forms, each exits 0 and leaves no lock. Show it fails before the fix (on Linux the race is
+      deterministic; on macOS, report whether you could make it fail, e.g. with a delay injected
+      only in a scratch copy).
+- [ ] CLI suite, lint, tsc; a short addendum to the completion report.
+
 # Completion report (worker, 2026-10-28)
 
 Five branches, each from the previous tip, nothing pushed. Suites run one at a time.

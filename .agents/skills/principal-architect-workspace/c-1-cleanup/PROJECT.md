@@ -16,7 +16,12 @@ and then, on the plan itself:
 
 > "Approved, proceed"
 
-Both given 2026-10-28.
+Both given 2026-10-28. On the signal-handler race found by main's first public CI run, asked
+whether it goes into C-1 or its own PR, the owner answered:
+
+> "Add it to C-1"
+
+Given 2026-10-28; it is WO6 and ruling 12.
 
 ## Decomposition
 
@@ -27,6 +32,7 @@ Both given 2026-10-28.
 | WO3 | Designer and server: BOM kept on save, a failure code for no-toolchain, the lock-file warning | `u8g2gl-c1/wo3-designer` | ✅ `0a21152`..`fb4f3b2` |
 | WO4 | The five tokeniser error locations E-1a judged wrong | `u8g2gl-c1/wo4-locations` | ✅ `e2be0f2`..`87a03ca` |
 | WO5 | Rule 04's wording, Q-17's row, CLI 0.13.3; readability review and PA verification | `u8g2gl-c1/wo5-readability` | ✅ `d4c084d`..`da2c794` |
+| WO6 | `u8g2gl design`'s signal handlers installed before the URL is printed | `u8g2gl-c1/wo5-readability` (ruling 12) | ⏳ |
 
 ## PA rulings
 
@@ -61,6 +67,11 @@ Both given 2026-10-28.
 11. **Boundary:** the files the items above need, their tests, the records named here, rule 04,
     design_spec §21's Q-17 row, `package.json`/lockfile versions. Nothing in E-2's scope
     (hatched invalid state, allocation spikes, bundle size), no packaging change.
+12. **The signal race (WO6).** `runDesignCommand` installs its SIGINT/SIGTERM handlers before it
+    prints the URL, for a started server; an attaching run still exits 0 at once. The test signals
+    the moment the URL line arrives and requires exit 0 and the lock removed, for both signals. It
+    is committed on `u8g2gl-c1/wo5-readability` itself, because that branch is #29's head; the
+    readability check covers the changed lines. Boundary: `design-command.ts` and its test.
 
 ## Status log
 
@@ -80,3 +91,4 @@ Both given 2026-10-28.
   its URL before installing its SIGINT/SIGTERM handlers. On Linux the pipe write is synchronous,
   so `design-command.test.ts`'s "human form" test signals before the handler exists and the
   process dies with no exit code. Awaiting the owner: into C-1 or its own PR.
+- **2026-10-28.** Owner put the signal race into C-1: ruling 12, WO6.
