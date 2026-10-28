@@ -98,6 +98,17 @@ One worker, WO1 to WO4 in order.
     using a test-only hook. It asserts that the counter reports 2 or more and that the gate fails.
     The hook must not exist in a production build.
 
+11. **C3's frame gate amended by the owner, 2026-10-28**, verbatim, choosing between "at most 1%"
+    and keeping the all-300 rule:
+
+    > "At most 1%"
+
+    Ruling 8.1 now reads: under 4× CPU throttle, **at most 1% of keystrokes (3 of 300) per screen**
+    may miss their first frame (a frame count of 2 or more); every other keystroke is drawn in its
+    first frame. Ruling 8.2 (run-to-blit p95 under 16 ms) is unchanged. The self-test (ruling 10)
+    stays and must still fail the gate. **Follow-up for E-2:** reduce allocation spikes in the
+    resolve, validate and scene stages, the one cause of missed frames inside U8G2GL's own code.
+
 ## Status log
 
 - **2026-10-27.** Worktree created from E-1d's tip `51482b0`, `extern/u8g2` checked out. WO1
@@ -127,3 +138,11 @@ One worker, WO1 to WO4 in order.
 - **2026-10-27. WO4b complete:** e2 passes under ruling 8. Three runs, both screens: 300/300
   keystrokes in the first frame; run-to-blit p95 3.4–5.4 ms (gate 16). Key-to-blit (reported
   only) p95 18.4–20.2 ms. Rulings 9 (DOMPurify) and 10 (counter self-test) issued.
+- **2026-10-27. Rulings 9 and 10 done; the self-test exposed the counter.** The WO4b counter
+  counted animation-frame callbacks and could never report a miss, so its 300/300 was void. The
+  PA reported it to the owner as a pass before the self-test ran; that was wrong and is corrected
+  here. With a counter on the display's frame grid, 0–3 of 300 keystrokes per screen missed their
+  frame across five runs (about 0.4% overall): stage spikes (likely GC or JIT), Monaco's key
+  handling, and runs starting late in a frame. Run-to-blit p95 3.9–5.2 ms. DOMPurify 3.4.17,
+  `npm audit` 0 vulnerabilities.
+- **2026-10-28. C3 frame gate amended by the owner** (ruling 11): at most 1% may miss.
