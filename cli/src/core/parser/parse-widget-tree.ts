@@ -351,6 +351,7 @@ export function parseWidgetNode(
     styleOverrides,
     children,
     loc: el.loc,
+    range: el.range,
     attributeLocs,
   };
 }

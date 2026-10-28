@@ -398,6 +398,37 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     expect(element(byName('gauges'), 'level_bar')).not.toHaveProperty('clip');
   });
 
+  it('gives every element its whole range in its file as offsets, beside the line and column', () => {
+    const texts = new Map<string, string>();
+    const textOf = (file: string): string => {
+      let text = texts.get(file);
+      if (text === undefined) {
+        text = readFileSync(join(fixtureDir, file), 'utf-8');
+        texts.set(file, text);
+      }
+      return text;
+    };
+    for (const screen of screens) {
+      for (const e of screen.elements) {
+        const source = e.source as { file: string; line: number; column: number; start: number; end: number };
+        const text = textOf(source.file);
+        const written = text.slice(source.start, source.end);
+        expect(written.startsWith(`<${e.tag as string}`), e.name).toBe(true);
+        expect(written.endsWith('/>') || written.endsWith(`</${e.tag as string}>`), e.name).toBe(true);
+        // The offsets and the line and column name the same '<'.
+        const before = text.slice(0, source.start).split('\n');
+        expect([before.length, before[before.length - 1]!.length + 1], e.name).toEqual([source.line, source.column]);
+      }
+    }
+    // A multi-line element, with a directive child: the range runs to its
+    // closing tag, not to the end of the opening one.
+    const panel = element(byName('gauges'), 'panel').source as { file: string; start: number; end: number };
+    const written = textOf(panel.file).slice(panel.start, panel.end);
+    expect(written.split('\n').length).toBeGreaterThan(2);
+    expect(written).toContain('<bind_flag_if_');
+    expect(written.endsWith('</panel>')).toBe(true);
+  });
+
   it('is emitted as ui_scene.json beside the registry, deterministically', async () => {
     const loaded = loadProject(fixtureDir);
     const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });

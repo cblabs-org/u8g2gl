@@ -30,10 +30,10 @@ owner's approval (rule 00) and the programme rulings. The design is
 
 # WO1 — the scene's range (`u8g2gl-e2a/wo1-scene-range`)
 
-- [ ] `source` gains `start` and `end` (ruling 1). Unit test on a multi-line element.
-- [ ] Regenerate the goldens; check that the only change in each is the two new fields.
-- [ ] CLI 0.13.3 → 0.13.4 wherever stamped or asserted; CI's determinism script passes locally.
-- [ ] Confirm the bridge and runtime ignore `source` (ruling 1).
+- [x] `source` gains `start` and `end` (ruling 1). Unit test on a multi-line element.
+- [x] Regenerate the goldens; check that the only change in each is the two new fields.
+- [x] CLI 0.13.3 → 0.13.4 wherever stamped or asserted; CI's determinism script passes locally.
+- [x] Confirm the bridge and runtime ignore `source` (ruling 1).
 
 # WO2 — selection (`u8g2gl-e2a/wo2-selection`)
 
