@@ -15,11 +15,11 @@ element**, and never draws a position the text does not hold — at 16 ms, under
 
 | WO | Topic | Branch | Status |
 |---|---|---|---|
-| WO1 | Gesture ownership; the edit path (intent → CST edit → Monaco); undo grouping | `u8g2gl-e2b/wo1-gestures` | ⏳ |
-| WO2 | Move: drag and nudge under §3.5's placement rules, with refusals | `u8g2gl-e2b/wo2-move` | ⏳ |
-| WO3 | Resize; integer snapping; edge and centre guides | `u8g2gl-e2b/wo3-resize-guides` | ⏳ |
-| WO4 | §3.4's drag gate and its self-test; the allocation spikes | `u8g2gl-e2b/wo4-drag-gate` | ⏳ |
-| WO5 | Readability review and PA verification | `u8g2gl-e2b/wo5-readability` | ⏳ |
+| WO1 | Gesture ownership; the edit path (intent → CST edit → Monaco); undo grouping | `u8g2gl-e2b/wo1-gestures` | ✅ `b1b4c77` |
+| WO2 | Move: drag and nudge under §3.5's placement rules, with refusals | `u8g2gl-e2b/wo2-move` | ✅ `1cd61d6` |
+| WO3 | Resize; integer snapping; edge and centre guides | `u8g2gl-e2b/wo3-resize-guides` | ✅ `1f77e6b` |
+| WO4 | §3.4's drag gate and its self-test; the allocation spikes | `u8g2gl-e2b/wo4-drag-gate` | ✅ `40026d3` |
+| WO5 | Readability review and PA verification | `u8g2gl-e2b/wo5-readability` | ✅ `d2e28e8` |
 
 ## PA rulings
 
@@ -66,7 +66,32 @@ element**, and never draws a position the text does not hold — at 16 ms, under
    (`ui/app.tsx`, `workspace.ts`, `ui/status-bar.tsx`) small:** E-2c edits them in parallel. No
    panel work, no new dependency.
 
+10. **The drag gate's input model** (PA, 2026-10-28, ruling on the worker's deviation 1).
+    Headless Chromium delivers injected moves 3–4 per frame at random phase, so a single move's
+    wait for the next frame is not the loop's latency. The gate drives a continuous 250 Hz pointer
+    and measures, for each run, **the latest move that edited the text → its blit** — the position
+    the frame shows (§3.2: only the latest text is drawn) — and still requires **each move to
+    reach the canvas in its first frame** (at most 1% missing). This is the reading the owner
+    chose for keystrokes at C3 ("Measure to the frame"); thresholds unchanged. Flagged to the
+    owner at C4.
+
 ## Status log
 
 - **2026-10-28.** Worktree created from E-2a's tip `e2bbb4f`, `extern/u8g2` checked out. WO1–WO5
   issued to one worker in order.
+
+- **2026-10-28.** Both workers stopped at the usage limit during WO4; resumed by message, trees
+  untouched in between.
+- **2026-10-28. WO1–WO5 complete** (report at the end of WORKORDERS.md). Accepted: ruling 10;
+  E-2a's marquee tests start below the display (a press on an element now moves); rules beyond
+  ruling 3's table (centring refuses its axis, an over-constrained axis refuses resize, resize
+  stops at 1 px, a refused nudge explains itself in the canvas title); ruling 3's insert path
+  built and tested but unreachable from the canvas (the resolver draws no element without a start
+  position); the latency constants shared in `e2e/support/latency.ts`. The PA added
+  `u8g2gl:drag-to-blit` to CI's production no-hook check (outside the worker's boundary).
+- **2026-10-28. PA verification** on `d2e28e8`, suites one at a time, Emscripten on PATH, no other
+  worker running: guard clean; CLI 2521, lint and tsc clean; no generator golden changed; C++
+  512/512; designer unit 71; e2e 42 passed. **Drag gate:** departures 300/300 in the first frame,
+  input→blit p95 13.0 ms; 20 elements 300/300, p95 14.6 ms; self-test fails the gate (4 missed,
+  p95 61.3 ms). Keystroke gate 300/300 on both, run→blit p95 3.8/3.7 ms. Production 3/3, no hook.
+  Allocation per drag run 550 → 390 KiB (resolve 100 → 60, validate 291 → 172).
