@@ -1,6 +1,11 @@
 # ─── C++ / CMake (runtime library, PR-01/PR-03) ───────────────────────────
 build/
 build-*/
+# Source directories that happen to be called build/: the design server's
+# build job and its tests. Without these, a new file there never shows in
+# `git status`.
+!cli/src/node/design/build/
+!cli/test/node/design/build/
 cmake-build-*/
 CMakeCache.txt
 CMakeFiles/

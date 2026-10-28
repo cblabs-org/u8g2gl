@@ -30,6 +30,7 @@ import {
   SCENE_FILE,
 } from '../../src/core/generator/emit/index.js';
 import { drawFunctionOf } from '../../src/core/generator/emit/draw-args.js';
+import { EDITOR_ASSET_FUNCTION, editorAssetsOf } from '../../src/core/generator/emit/editor-registry.js';
 import { INIT_STEPS } from '../../src/core/generator/emit/screen-model.js';
 import { FLAG_COMPARISONS } from '../../src/core/schema/widget-node.js';
 import { cppValue } from '../../src/core/generator/emit/value.js';
@@ -418,5 +419,47 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     expect(files.map((f) => f.path)).toEqual([EDITOR_REGISTRY_UNIT, SCENE_FILE]);
     expect(JSON.parse(files[1]!.content)).toEqual({ ...scene });
     expect(emitEditorFiles(input).files).toEqual(files);
+  });
+});
+
+describe('the asset lookup (ui_editor_asset)', () => {
+  it('maps each declared font and image to the symbol the firmware units define, only when given assets', async () => {
+    const loaded = loadProject(fixtureDir);
+    const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
+    const { scene, result } = await fixtureScene();
+    const assets = editorAssetsOf({
+      project: loaded.model.project,
+      globals: loaded.model.globals,
+      screens: loaded.model.screens,
+      manifests: loaded.model.manifests,
+      capacities: result.capacities!,
+      images: compiledAssets.images,
+      compiledFonts: compiledAssets.fonts,
+      bdfLicenceFiles: loaded.bdfLicenceFiles,
+      stamp: '',
+    });
+
+    // The same names, in the same order, as the scene asks the host for.
+    expect(assets.fonts.map((font) => font.name)).toEqual(scene.fonts);
+    expect(assets.images.map((image) => image.name)).toEqual(scene.images);
+
+    // Every symbol is one the firmware header declares.
+    const header = readFileSync(join(fixtureDir, 'generated', 'ui.hpp'), 'utf-8');
+    for (const symbol of [...assets.fonts, ...assets.images]) {
+      expect(header).toContain(` ${symbol.identifier}`);
+    }
+
+    const manifests = registryWithProject();
+    const without = emitEditorRegistryUnit({ manifests, stamp: '// stamp\n' }).content;
+    const withAssets = emitEditorRegistryUnit({ manifests, stamp: '// stamp\n', assets }).content;
+    expect(without).not.toContain(EDITOR_ASSET_FUNCTION);
+    expect(withAssets).toContain(`const void* ${EDITOR_ASSET_FUNCTION}(u8g2gl_editor_type_t type, const char* name) {`);
+    expect(withAssets).toContain('extern const uint8_t* const ui_font_font_4x6;');
+    expect(withAssets).toContain('extern const uint8_t ui_image_logo_mark[];');
+    expect(withAssets).toContain('if (std::strcmp(name, "u8g2_font_6x10_mr") == 0) { return ui_font_u8g2_font_6x10_mr; }');
+    expect(withAssets).toContain('if (std::strcmp(name, "icon_wifi") == 0) { return ui_image_icon_wifi; }');
+    // Fonts and images are looked up apart: a font name never resolves to an image.
+    const fontBlock = withAssets.slice(withAssets.indexOf('U8G2GL_EDITOR_FONT) {'), withAssets.indexOf('U8G2GL_EDITOR_IMAGE) {'));
+    expect(fontBlock).not.toContain('ui_image_');
   });
 });

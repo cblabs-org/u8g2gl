@@ -960,7 +960,7 @@ gtest_discover_tests(test_editor)
 #
 # The golden hash lives here as a compile definition so it's in one place
 # for the native side; the Wasm test asserts the same string literal.
-set(U8G2GL_PARITY_SHA256 "bca55545ebb5a40cef2a296b7218c0192d5339717c18212360c89ff0581b03ef" CACHE STRING "D-9 parity golden SHA-256" FORCE)
+set(U8G2GL_PARITY_SHA256 "1c0c7bb2019c564510e4f124ab8355cf44bde019b34c12d6044dc8d07d22c2e0" CACHE STRING "D-9 parity golden SHA-256" FORCE)
 
 # Real U8G2 C sources needed by the bridge (same list as wasm/CMakeLists.txt)
 set(PARITY_U8G2_C_SOURCES

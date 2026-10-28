@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="wd_service_list" extends="u8g2gl_obj">
+    <api>
+        <prop name="font" type="font" required="true" help="Font used to render table cells." />
+        <prop name="max_rows" type="int" default="16" help="Row capacity. Determines allocated RAM." />
+        <prop name="max_cols" type="int" default="6" help="Maximum columns per row. Determines allocated RAM." />
+        <prop name="max_cell_chars" type="int" default="24" help="Per-cell string capacity including terminator." />
+        <prop name="scroll_dwell_ms" type="int" default="5000" help="Time in ms to hold each page before scrolling." />
+        <prop name="scroll_duration_ms" type="int" default="1000" help="Duration of page scroll animation in ms." />
+    </api>
+</widget>

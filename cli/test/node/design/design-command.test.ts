@@ -21,6 +21,7 @@ import { join, resolve } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { parseDesignArgs, startOrAttach, type DesignSession } from '../../../src/node/design/design-command.js';
 import { startDesignServer } from '../../../src/node/design/design-server.js';
+import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
 import { readLock } from '../../../src/node/design/lock-file.js';
 import { MINIMAL_PROJECT, makeTempDir, removeTempDirs, writeFiles } from './temp-project.js';
@@ -88,6 +89,13 @@ describe('one server per project', () => {
     });
     await session.stop();
     expect(existsSync(join(root, LOCK_FILE_NAME))).toBe(false);
+  });
+
+  it('starts a server whose build queue has the editor-wasm job', async () => {
+    const session = track(await startOrAttach(project(), 0));
+    expect(session.kind).toBe('started');
+    if (session.kind !== 'started') return;
+    expect(session.server.builds.has(EDITOR_WASM_JOB)).toBe(true);
   });
 
   it.skipIf(process.platform === 'win32')('writes the lock readable by its owner only (0600), since it holds the token', async () => {

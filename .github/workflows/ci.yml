@@ -41,6 +41,75 @@ jobs:
       - name: Test
         run: cd cli && npm test
 
+  wasm-tests:
+    # The editor Wasm, built and run in CI. Emscripten is the pinned release, installed the way `u8g2gl toolchain install` does:
+    # emsdk cloned at the pinned tag, its HEAD checked against the pinned
+    # commit, then `emsdk install` / `activate` (emsdk verifies its own
+    # archives). No third-party setup action. Cached by version and commit.
+    runs-on: ubuntu-latest
+    env:
+      # The same pin as cli/src/node/toolchain/toolchain-paths.ts
+      # (EMSCRIPTEN_VERSION, EMSDK_COMMIT): change both together, or CI builds
+      # with a compiler the toolchain code refuses.
+      EMSDK_VERSION: '5.0.3'
+      EMSDK_COMMIT: a620cf1d71c62dfdfbb0c01fe0a371e2af2dda6c
+    steps:
+      - uses: actions/checkout@v4
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Cache Emscripten
+        id: emsdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}-${{ env.EMSDK_COMMIT }}
+      - name: Install Emscripten ${{ env.EMSDK_VERSION }} (pinned)
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
+        run: |
+          git -c advice.detachedHead=false clone --depth 1 --branch "$EMSDK_VERSION" \
+            https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+      - name: Verify the emsdk checkout is the pinned commit
+        # On a cache hit too: a cache is only as trustworthy as its key.
+        run: |
+          HEAD_COMMIT=$(git -C "$HOME/emsdk" rev-parse HEAD)
+          if [ "$HEAD_COMMIT" != "$EMSDK_COMMIT" ]; then
+            echo "::error::emsdk is at $HEAD_COMMIT, not the pinned $EMSDK_COMMIT"
+            exit 1
+          fi
+      - name: Build the framework editor Wasm
+        run: |
+          source "$HOME/emsdk/emsdk_env.sh"
+          emcc --version | head -1
+          emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor
+      - name: Wasm snapshot test (D-9 parity golden)
+        run: node wasm/test/snapshot.test.mjs
+      - name: Wasm placeholder test
+        run: node wasm/test/placeholder.test.mjs
+      - name: Wasm last-error test
+        run: node wasm/test/last-error.test.mjs
+      - name: Install CLI
+        run: cd cli && npm ci
+      - name: CLI tests that need Emscripten, with Emscripten present
+        # They skip with a message when no toolchain is found; here that would
+        # hide a broken job, so the message fails the step.
+        run: |
+          set -o pipefail
+          source "$HOME/emsdk/emsdk_env.sh"
+          cd cli
+          npx vitest run test/node/design/build test/node/toolchain 2>&1 | tee "$RUNNER_TEMP/wasm-cli-tests.txt"
+          if grep -q "skipped, no Emscripten" "$RUNNER_TEMP/wasm-cli-tests.txt"; then
+            echo "::error::the Emscripten-dependent CLI tests were skipped: no toolchain detected"
+            exit 1
+          fi
+          node dist/node/cli.js toolchain status
+
   determinism-check:
     # §13.9 determinism condition:
     # A generator change that alters output without an input change requires a CLI version bump.

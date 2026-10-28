@@ -34,6 +34,13 @@
  *              Plus the `bind_flag_if_*` directives per subject type and the flag
  *              bits, from the tables firmware emission uses.
  *
+ *              Given the project's fonts and images (`assets`), it also emits
+ *              `ui_editor_asset()`: each scene font or image name mapped to the
+ *              `ui_font_*` / `ui_image_*` symbol the firmware units define, so
+ *              an editor host resolves names without spelling any itself. The
+ *              firmware fonts unit already aliases every U8G2 built-in the
+ *              project declares, so built-ins need no separate table.
+ *
  *              The whole unit sits under `#ifdef U8G2GL_EDITOR`, so a firmware
  *              build that compiles it gets an empty translation unit. Every
  *              thunk is a captureless lambda in a `const` table: no heap, no
@@ -43,6 +50,9 @@
  *
  * Exports:
  * - EDITOR_REGISTRY_UNIT:    The unit's file name
+ * - EDITOR_ASSET_FUNCTION:   The name-to-data lookup it defines, given assets
+ * - EditorAssets:            The project's font and image symbols, by name
+ * - editorAssetsOf():        Read them from the emission input
  * - EditorRegistryInput:     What emitting it needs
  * - editorTypeEnumerator():  A manifest type's `U8G2GL_EDITOR_*` enumerator
  * - emitEditorRegistryUnit(): Emit `ui_editor_registry.cpp`
@@ -56,11 +66,47 @@ import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
 import { POSITION_BINDINGS } from './placement.js';
 import { classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
-import { includeBlock, section, type EmittedUnit } from './unit.js';
+import { fontDeclarations } from './fonts.js';
+import { imageDeclarations } from './images.js';
+import { includeBlock, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 import { cppEnumerator, cppStringLiteral, cppValue } from './value.js';
 
 /** The editor registry unit (§13.7's file set does not name it; [UD-4] does). */
 export const EDITOR_REGISTRY_UNIT = 'ui_editor_registry.cpp';
+
+/**
+ * The lookup an editor host calls to turn a scene's font or image name into
+ * data: `const void* ui_editor_asset(u8g2gl_editor_type_t type, const char* name)`,
+ * returning nullptr for a name the project does not declare.
+ */
+export const EDITOR_ASSET_FUNCTION = 'ui_editor_asset';
+
+/** A declared font or image: its scene name and the generated symbol holding it. */
+export interface AssetSymbol {
+  readonly name: string;
+  readonly identifier: string;
+}
+
+/** The project's fonts and images, in declaration order (§13.9). */
+export interface EditorAssets {
+  readonly fonts: readonly AssetSymbol[];
+  readonly images: readonly AssetSymbol[];
+}
+
+/**
+ * @brief The fonts and images the firmware units define, as the asset table needs them.
+ *
+ * Read through the firmware emitters' own declaration lists, so the table can
+ * only name a symbol `ui_fonts.cpp` or `ui_images.cpp` defines.
+ *
+ * @param input The emission input; its globals and produced images are read.
+ */
+export function editorAssetsOf(input: ProjectEmitInput): EditorAssets {
+  return {
+    fonts: fontDeclarations(input).map((font) => ({ name: font.font.name, identifier: font.identifier })),
+    images: imageDeclarations(input).map((image) => ({ name: image.image.name, identifier: image.identifier })),
+  };
+}
 
 /** Everything emitting the registry needs. */
 export interface EditorRegistryInput {
@@ -68,6 +114,8 @@ export interface EditorRegistryInput {
   readonly manifests: ManifestRegistry;
   /** This file's header stamp, already rendered. */
   readonly stamp: string;
+  /** The project's fonts and images. Absent, no asset lookup is emitted. */
+  readonly assets?: EditorAssets;
 }
 
 /**
@@ -412,6 +460,37 @@ function directiveEntries(): string[] {
   return entries;
 }
 
+// assetLookup
+// The `ui_editor_asset()` definition and the declarations it needs: each font
+// (a `const uint8_t* const` alias) and image (a `const uint8_t[]`) declared
+// extern as `ui.hpp` declares it, then one strcmp per name, fonts and images
+// apart so a font name never resolves to an image. Linear, because it runs
+// once per property set while a scene is applied, never per frame.
+function assetLookup(assets: EditorAssets): string[] {
+  const branch = (symbol: AssetSymbol, pointer: string): string =>
+    `        if (std::strcmp(name, ${cppStringLiteral(symbol.name)}) == 0) { return ${pointer}; }`;
+  return [
+    section('Fonts and images, by name'),
+    '// The ui_font_* and ui_image_* symbols the firmware units define, so an',
+    '// editor host resolves a scene\'s font or image name without spelling any.',
+    ...assets.fonts.map((font) => `extern const uint8_t* const ${font.identifier};`),
+    ...assets.images.map((image) => `extern const uint8_t ${image.identifier}[];`),
+    `const void* ${EDITOR_ASSET_FUNCTION}(u8g2gl_editor_type_t type, const char* name) {`,
+    '    if (name == nullptr) {',
+    '        return nullptr;',
+    '    }',
+    ...(assets.fonts.length > 0
+      ? ['    if (type == U8G2GL_EDITOR_FONT) {', ...assets.fonts.map((font) => branch(font, font.identifier)), '    }']
+      : []),
+    ...(assets.images.length > 0
+      ? ['    if (type == U8G2GL_EDITOR_IMAGE) {', ...assets.images.map((image) => branch(image, image.identifier)), '    }']
+      : []),
+    '    return nullptr;',
+    '}',
+    '',
+  ];
+}
+
 // table
 // A `static const` table and its element count, or `nullptr`/0 when empty —
 // a zero-length array is ill-formed.
@@ -496,7 +575,7 @@ export function emitEditorRegistryUnit(input: EditorRegistryInput): EmittedUnit 
     '// file gets an empty translation unit and pays nothing.',
     '#ifdef U8G2GL_EDITOR',
     '',
-    '#include <new>',
+    ...(input.assets === undefined ? ['#include <new>'] : ['#include <cstring>', '#include <new>']),
     '',
     includeBlock(includes),
     '',
@@ -516,6 +595,9 @@ export function emitEditorRegistryUnit(input: EditorRegistryInput): EmittedUnit 
   }
   for (const entry of drawings) {
     lines.push(...entry.lines, '');
+  }
+  if (input.assets !== undefined) {
+    lines.push(...assetLookup(input.assets));
   }
   lines.push(section('Registry'));
   lines.push(...classTable.lines, ...drawingTable.lines, ...directiveTable.lines, ...flagTable.lines);
