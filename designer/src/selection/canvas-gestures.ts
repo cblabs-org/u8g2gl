@@ -25,7 +25,10 @@
  *
  *              A move writes through the {@link CanvasEditor}: one undo stop
  *              from press to release, each pointer event's integer device
- *              delta rewritten into the current text by `placement-rules.ts`.
+ *              delta rewritten into the current text by `placement-rules.ts`,
+ *              which also says why an axis refuses (an expression, a binding);
+ *              the reason is shown in a tip at the pointer while the element
+ *              moves on its other axis.
  *              The pipeline runs once per frame on whatever the text then is.
  *              Arrow keys nudge (1 px, Shift 8 px), grouped by the editor.
  *              While the document is not well-formed (`canvasEditing` false,
@@ -47,7 +50,8 @@
 
 import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { CanvasEditor, EditGesture } from '../editing/canvas-editor';
-import { moveEdits, planMove, type MovePlan } from '../editing/placement-rules';
+import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
+import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import type { DrawnTargets } from '../pipeline/edit-loop';
 import type { Observable } from '../state/observable';
 import type { Rect } from '../pipeline/live-pipeline';
@@ -76,6 +80,8 @@ export interface GestureHost {
   readonly frame: HTMLCanvasElement;
   /** The drawn frame's hit targets. */
   readonly targets: Observable<DrawnTargets>;
+  /** The drawn elements' placements by name, as of the frame on the canvas. */
+  readonly placements: () => ReadonlyMap<string, Placement>;
   /** Whether the canvas may write the text (false while it is not well-formed). */
   readonly canvasEditing: Observable<boolean>;
   /** The selection the gestures set and move. */
@@ -232,10 +238,10 @@ export class CanvasGestures {
     // --- Step 1: Editing off — nothing writes, and the tip says why ---
     const file = press.file;
     if (!this.host.canvasEditing.get() || file === undefined) {
+      this.host.element.style.cursor = 'not-allowed';
       this.showTip(EDITING_OFF_REASON, event);
       return;
     }
-    this.showTip(undefined, event);
 
     // --- Step 2: The delta, in whole device pixels ---
     const scale = this.scale();
@@ -245,14 +251,28 @@ export class CanvasGestures {
 
     // --- Step 3: The first write opens the undo stop and plans the move ---
     press.gesture ??= this.host.editor.begin(file);
-    const names = this.current(file);
     press.gesture?.update((text) => {
       const cst = parseCst(text, file).cst;
-      press.plans ??= names.map((name) => planMove(cst, name)).filter((plan): plan is MovePlan => plan !== undefined);
+      press.plans ??= this.plan(cst, file);
       return moveEdits(cst, press.plans, dx, dy);
     });
     press.dx = dx;
     press.dy = dy;
+
+    // --- Step 4: An axis that refuses says why, at the pointer (§3.5) ---
+    const reasons = refusals(press.plans ?? [], dx, dy);
+    this.showTip(reasons.length === 0 ? undefined : reasons.join('; '), event);
+  }
+
+  // plan
+  // The selection's moves, planned from the text a gesture starts from.
+  //   cst  — that text's CST
+  //   file — the document the selection is in
+  private plan(cst: ReturnType<typeof parseCst>['cst'], file: string): MovePlan[] {
+    const placements = this.host.placements();
+    return this.current(file)
+      .map((name) => planMove(cst, name, placements.get(name)))
+      .filter((plan): plan is MovePlan => plan !== undefined);
   }
 
   // up
@@ -338,11 +358,15 @@ export class CanvasGestures {
       this.host.element.title = EDITING_OFF_REASON;
       return;
     }
+    let reasons: string[] = [];
     this.host.editor.nudge(file, names.join('\n'), (text) => {
       const cst = parseCst(text, file).cst;
-      const plans = names.map((name) => planMove(cst, name)).filter((plan): plan is MovePlan => plan !== undefined);
+      const plans = this.plan(cst, file);
+      reasons = refusals(plans, dx, dy);
       return moveEdits(cst, plans, dx, dy);
     });
+    // No pointer to put a tip at: the canvas's title says why an axis did not move.
+    this.host.element.title = reasons.join('; ');
   }
 
   // hover
@@ -365,8 +389,7 @@ export class CanvasGestures {
   }
 
   // showTip
-  // Shows a sentence beside the pointer, with the not-allowed cursor, or hides
-  // it (undefined).
+  // Shows a sentence beside the pointer, or hides it (undefined).
   //   text  — what to say
   //   event — where the pointer is
   private showTip(text: string | undefined, event: PointerEvent): void {
@@ -379,7 +402,6 @@ export class CanvasGestures {
     this.tip.style.left = `${Math.round(event.clientX - box.left + 14)}px`;
     this.tip.style.top = `${Math.round(event.clientY - box.top + 14)}px`;
     this.tip.hidden = false;
-    this.host.element.style.cursor = 'not-allowed';
   }
 
   // current

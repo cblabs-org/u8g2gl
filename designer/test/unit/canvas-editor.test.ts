@@ -134,7 +134,7 @@ function setup(): { model: FakeModel; editor: CanvasEditor; advance(ms: number):
 
 /** The edits moving `names` by (dx, dy) from their start values, against `text`. */
 function moving(names: readonly string[], dx: number, dy: number, start = SCREEN): (text: string) => ReturnType<typeof moveEdits> {
-  const plans = names.map((name) => planMove(parseCst(start, FILE).cst, name)!);
+  const plans = names.map((name) => planMove(parseCst(start, FILE).cst, name, undefined)!);
   return (text) => moveEdits(parseCst(text, FILE).cst, plans, dx, dy);
 }
 

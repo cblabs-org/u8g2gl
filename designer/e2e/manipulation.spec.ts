@@ -21,6 +21,19 @@ import type { TestHandle } from '../src/test-hooks';
 
 const SCREEN = 'screens/screen_departures.xml';
 
+/** A screen whose elements refuse an axis: one placed by an expression, one bound. */
+const REFUSING = 'screens/screen_moves.xml';
+const REFUSING_TEXT = [
+  '<?xml version="1.0" encoding="UTF-8"?>',
+  '<screen name="moves">',
+  '    <view>',
+  '        <u8g2gl_box name="calc" x="30 + 2" y="10" width="20" height="10" filled="true" />',
+  '        <u8g2gl_box name="tied" x="80" y="0" bind_y="box_fill" width="20" height="10" filled="true" />',
+  '    </view>',
+  '</screen>',
+  '',
+].join('\n');
+
 let session: DesignSession | undefined;
 test.afterEach(async () => {
   await session?.stop();
@@ -41,8 +54,15 @@ async function undo(page: Page): Promise<void> {
 }
 
 /** The line of the buffer that names `name`. */
-async function lineOf(page: Page, name: string): Promise<string> {
-  return (await bufferText(page, SCREEN)).split('\n').find((line) => line.includes(`name="${name}"`)) ?? '';
+async function lineOf(page: Page, name: string, file = SCREEN): Promise<string> {
+  return (await bufferText(page, file)).split('\n').find((line) => line.includes(`name="${name}"`)) ?? '';
+}
+
+/** The lines that differ between two texts of the same line count. */
+function changedLines(before: string, after: string): string[] {
+  const lines = after.split('\n');
+  expect(lines.length).toBe(before.split('\n').length);
+  return before.split('\n').filter((line, i) => line !== lines[i]);
 }
 
 test('dragging an element rewrites its x and y in the text, as one undo stop', async ({ page }) => {
@@ -114,4 +134,39 @@ test('while the XML is not well-formed no gesture writes, and the cursor and its
   await expect(page.locator('.canvas-frame')).toHaveAttribute('data-stale', 'false');
   await dragCanvas(page, [100, 8], [104, 8]);
   expect(await lineOf(page, 'row0')).toContain('name="row0" x="36" y="0"');
+});
+
+test('a nudge is a one-line diff of one attribute value', async ({ page }) => {
+  await open(page);
+  const before = await bufferText(page, SCREEN);
+  await clickCanvas(page, 100, 8);
+  await page.keyboard.press('ArrowLeft');
+  const after = await bufferText(page, SCREEN);
+  const row0 = before.split('\n').find((line) => line.includes('name="row0"'));
+  expect(changedLines(before, after)).toEqual([row0]);
+  expect(after).toBe(before.replace('name="row0" x="32"', 'name="row0" x="31"'));
+});
+
+test('an axis placed by an expression refuses with a tip at the pointer, and the element still moves on the other', async ({ page }) => {
+  session = await startDesign({ files: { [REFUSING]: REFUSING_TEXT } });
+  await openShell(page, session.url);
+  await openFile(page, REFUSING);
+  await expect(page.locator('.canvas-toolbar .screen-name')).toHaveText('moves');
+  await page.getByRole('button', { name: /live/ }).click();
+
+  // calc: x="30 + 2", y="10". Dragged 8 right and 4 down.
+  const start = await devicePoint(page, 40, 15);
+  const end = await devicePoint(page, 48, 19);
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(end.x, end.y, { steps: 8 });
+  await expect(page.locator('.canvas-tip')).toBeVisible();
+  await expect(page.locator('.canvas-tip')).toHaveText('x is computed from `30 + 2`');
+  await page.mouse.up();
+  await expect(page.locator('.canvas-tip')).toBeHidden();
+  expect(await lineOf(page, 'calc', REFUSING)).toContain('name="calc" x="30 + 2" y="14"');
+
+  // tied: y bound to a subject. Dragged 4 right and 6 down: only x moves.
+  await dragCanvas(page, [85, 5], [89, 11]);
+  expect(await lineOf(page, 'tied', REFUSING)).toContain('name="tied" x="84" y="0" bind_y="box_fill"');
 });

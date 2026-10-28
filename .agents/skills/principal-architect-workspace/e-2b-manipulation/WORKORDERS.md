@@ -38,9 +38,9 @@ from the same base. Do not touch panel code; keep shared shell files' changes sm
 
 # WO2 — move (`u8g2gl-e2b/wo2-move`)
 
-- [ ] Drag and nudge under ruling 3, each case with a unit test and the refusals with an e2e
+- [x] Drag and nudge under ruling 3, each case with a unit test and the refusals with an e2e
       case showing the tooltip and the free axis still moving.
-- [ ] Ruling 6's minimal diffs, tested: a nudge is a one-line diff.
+- [x] Ruling 6's minimal diffs, tested: a nudge is a one-line diff.
 
 # WO3 — resize, snapping, guides (`u8g2gl-e2b/wo3-resize-guides`)
 
