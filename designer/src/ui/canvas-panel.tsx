@@ -28,12 +28,14 @@ import { CanvasView } from '../canvas/canvas-view';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** Zoom choices; 0 means fit to the panel. */
 const ZOOMS = [0, 1, 2, 3, 4, 6, 8] as const;
 
 /** @brief The canvas panel. */
 export function CanvasPanel(): React.JSX.Element {
+  countRender('CanvasPanel');
   const workspace = useWorkspace();
   const loop = workspace.loop;
   const state = useObservable(loop.frameState);
@@ -51,7 +53,8 @@ export function CanvasPanel(): React.JSX.Element {
     if (frame.current === null || overlay.current === null || container.current === null) return undefined;
     view.current = new CanvasView(frame.current, overlay.current, container.current);
     loop.attachCanvas(view.current);
-    const gestures = new CanvasGestures(container.current, frame.current, loop.hitTargets, workspace.selection, () => undefined);
+    const shown = view.current;
+    const gestures = new CanvasGestures(container.current, frame.current, loop.hitTargets, workspace.selection, (rect) => shown.setMarquee(rect));
     return () => {
       gestures.dispose();
       loop.attachCanvas(undefined);

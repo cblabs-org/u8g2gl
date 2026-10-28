@@ -18,12 +18,14 @@
 
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** The glyph for each severity, as the CLI's own output marks them. */
 const GLYPH = { error: '⛔', warning: '⚠', info: 'ⓘ' } as const;
 
 /** @brief The Problems panel. */
 export function ProblemsPanel(): React.JSX.Element {
+  countRender('ProblemsPanel');
   const workspace = useWorkspace();
   const rows = useObservable(workspace.problems);
   if (rows.length === 0) {

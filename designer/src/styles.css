@@ -142,7 +142,9 @@ button { font: inherit; color: inherit; }
 .canvas-stage { flex: 1; overflow: auto; display: grid; place-items: center; position: relative; }
 .canvas-frame { position: relative; padding: 10px; background: #050505; border: 1px solid #2a2a2a; border-radius: 4px; box-shadow: 0 0 0 6px #0a0a0a; }
 .canvas-frame canvas { display: block; image-rendering: pixelated; }
-.canvas-frame canvas.overlay { position: absolute; left: 10px; top: 10px; pointer-events: none; }
+/* The overlay starts at the frame's padding edge: its margin (canvas-view.ts's
+   OVERLAY_MARGIN) equals the padding, so its inner area lies exactly on the frame. */
+.canvas-frame canvas.overlay { position: absolute; left: 0; top: 0; pointer-events: none; }
 .canvas-frame.stale canvas.frame { opacity: 0.45; }
 .canvas-banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 3px; background: #4a2a2c; color: #ffd6d6; font-size: 12px; white-space: nowrap; }
 /* The selected elements' text in the XML editor (selection, ui_spec §4.3). */

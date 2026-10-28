@@ -17,9 +17,11 @@
 import { useEffect, useRef } from 'react';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** @brief The Output panel. */
 export function OutputPanel(): React.JSX.Element {
+  countRender('OutputPanel');
   const workspace = useWorkspace();
   const lines = useObservable(workspace.output);
   const end = useRef<HTMLDivElement>(null);

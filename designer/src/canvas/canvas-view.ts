@@ -12,17 +12,29 @@
  * Description: Two stacked canvases. The frame canvas is the display's own
  *              size, filled by `putImageData` — the blit — and scaled by CSS
  *              with `image-rendering: pixelated`, so a zoom costs the browser
- *              nothing per frame. The overlay canvas is the zoomed size and
- *              carries what is drawn *about* the frame rather than in it: the
- *              selection highlight and the outlines of placeholder widgets.
+ *              nothing per frame. The overlay canvas carries what is drawn
+ *              *about* the frame rather than in it: each selected element's
+ *              outline, eight handles and an `x, y, w×h` badge, the marquee
+ *              while one is dragged, and the outlines of placeholder widgets.
+ *              It is never part of the framebuffer, so nothing it draws can be
+ *              mistaken for a pixel the display would light.
+ *
+ *              The overlay extends {@link OVERLAY_MARGIN} CSS pixels past the
+ *              frame on every side, so an element at the display's edge still
+ *              shows its outline, handles and badge; and its backing store is
+ *              the CSS size times the device pixel ratio, so lines and text are
+ *              crisp on a high-density screen at every zoom.
  *
  * Exports:
+ * - OVERLAY_MARGIN: CSS pixels the overlay extends past the frame
+ * - HANDLE_SIZE:   A selection handle's side, in CSS pixels
  * - OverlayRect:  A rectangle to draw on the overlay, and how
  * - CanvasView:   The two canvases
  *
  *     - draw():        Blit a frame
  *     - setZoom():     Change the scale
  *     - setOverlay():  Replace what the overlay shows
+ *     - setMarquee():  Show or hide the marquee being dragged
  *     - setStale():    Dim the frame while the document has an error
  */
 
@@ -44,6 +56,20 @@ const OVERLAY_COLOUR: Readonly<Record<OverlayRect['kind'], string>> = {
   placeholder: 'rgba(230, 180, 80, 0.7)',
 };
 
+/**
+ * CSS pixels the overlay extends past the frame on each side: room for an edge
+ * element's handles and badge. It matches the frame's padding (styles.css), so
+ * the overlay never reaches past the frame's own box.
+ */
+export const OVERLAY_MARGIN = 10;
+
+/** A selection handle's side, in CSS pixels, whatever the zoom. */
+export const HANDLE_SIZE = 6;
+
+/** The badge's font and height, in CSS pixels. */
+const BADGE_FONT = '10px ui-monospace, Menlo, monospace';
+const BADGE_HEIGHT = 14;
+
 /** The frame and overlay canvases of one canvas panel. */
 export class CanvasView {
   private readonly frame: HTMLCanvasElement;
@@ -53,7 +79,10 @@ export class CanvasView {
   private image: ImageData | undefined;
   private pixels: Uint32Array | undefined;
   private zoom = 4;
+  /** Backing-store pixels per CSS pixel on the overlay, as last sized. */
+  private ratio = 1;
   private overlayRects: readonly OverlayRect[] = [];
+  private marquee: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined;
 
   /**
    * @param frame     The frame canvas.
@@ -102,37 +131,133 @@ export class CanvasView {
     this.drawOverlay();
   }
 
+  /**
+   * @brief Shows the marquee being dragged, in device pixels; undefined hides it.
+   *        Drawn on the overlay only: a marquee selects, it never draws.
+   */
+  setMarquee(rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined): void {
+    if (rect === undefined && this.marquee === undefined) return;
+    this.marquee = rect;
+    this.drawOverlay();
+  }
+
   /** @brief Dims the frame: the last good one, shown while the document cannot render. */
   setStale(stale: boolean): void {
     this.container.classList.toggle('stale', stale);
   }
 
   // applyZoom
-  // Scales the frame by CSS and resizes the overlay to match.
+  // Scales the frame by CSS and resizes the overlay to match: the frame's size
+  // plus the margin on each side, its backing store at the device pixel ratio.
   private applyZoom(): void {
     const width = this.frame.width * this.zoom;
     const height = this.frame.height * this.zoom;
     this.frame.style.width = `${width}px`;
     this.frame.style.height = `${height}px`;
-    this.overlay.width = width;
-    this.overlay.height = height;
-    this.overlay.style.width = `${width}px`;
-    this.overlay.style.height = `${height}px`;
+    const ratio = window.devicePixelRatio || 1;
+    this.ratio = ratio;
+    const cssWidth = width + 2 * OVERLAY_MARGIN;
+    const cssHeight = height + 2 * OVERLAY_MARGIN;
+    this.overlay.width = Math.round(cssWidth * ratio);
+    this.overlay.height = Math.round(cssHeight * ratio);
+    this.overlay.style.width = `${cssWidth}px`;
+    this.overlay.style.height = `${cssHeight}px`;
     this.drawOverlay();
   }
 
   // drawOverlay
-  // Each rectangle outlined on the zoomed overlay. Lines sit on the pixel
-  // boundary outside the element, so the outline never covers its pixels.
+  // Everything drawn about the frame, in CSS pixels with the frame's top left
+  // at (OVERLAY_MARGIN, OVERLAY_MARGIN). Outlines sit on the pixel boundary
+  // outside the element, so they never cover one of its pixels.
   private drawOverlay(): void {
     const context = this.overlay.getContext('2d');
     if (context === null) return;
+
+    // --- Step 1: Clear, and draw in CSS pixels from the frame's corner ---
+    const ratio = this.ratio;
+    context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, this.overlay.width, this.overlay.height);
-    for (const rect of this.overlayRects) {
+    context.setTransform(ratio, 0, 0, ratio, OVERLAY_MARGIN * ratio, OVERLAY_MARGIN * ratio);
+
+    // --- Step 2: Placeholder outlines under, selections over ---
+    const order = [...this.overlayRects].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'placeholder' ? -1 : 1));
+    for (const rect of order) {
+      const box = this.screenBox(rect);
       context.strokeStyle = OVERLAY_COLOUR[rect.kind];
       context.lineWidth = rect.kind === 'selection' ? 2 : 1;
       context.setLineDash(rect.kind === 'placeholder' ? [3, 3] : []);
-      context.strokeRect(rect.x * this.zoom - 1, rect.y * this.zoom - 1, rect.width * this.zoom + 2, rect.height * this.zoom + 2);
+      context.strokeRect(box.x, box.y, box.width, box.height);
+      if (rect.kind === 'selection') {
+        this.drawHandles(context, box);
+        this.drawBadge(context, rect, box);
+      }
     }
+
+    // --- Step 3: The marquee, while one is dragged ---
+    if (this.marquee !== undefined) {
+      const box = this.screenBox(this.marquee);
+      context.setLineDash([4, 3]);
+      context.lineWidth = 1;
+      context.strokeStyle = OVERLAY_COLOUR.selection;
+      context.fillStyle = 'rgba(79, 140, 255, 0.12)';
+      context.fillRect(box.x, box.y, box.width, box.height);
+      context.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
+    }
+    context.setLineDash([]);
+  }
+
+  // screenBox
+  // A device-pixel rectangle as the CSS-pixel box just outside it: one CSS
+  // pixel past each edge, so a 2-pixel stroke centred on it clears the element.
+  private screenBox(rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
+    return { x: rect.x * this.zoom - 1, y: rect.y * this.zoom - 1, width: rect.width * this.zoom + 2, height: rect.height * this.zoom + 2 };
+  }
+
+  // drawHandles
+  // Eight handles — the corners and the edges' midpoints — the same size at
+  // every zoom, so they stay grabbable at 1× and small at 8×.
+  private drawHandles(context: CanvasRenderingContext2D, box: { x: number; y: number; width: number; height: number }): void {
+    const half = HANDLE_SIZE / 2;
+    context.setLineDash([]);
+    context.lineWidth = 1;
+    context.fillStyle = '#ffffff';
+    context.strokeStyle = OVERLAY_COLOUR.selection;
+    for (const fx of [0, 0.5, 1]) {
+      for (const fy of [0, 0.5, 1]) {
+        if (fx === 0.5 && fy === 0.5) continue;
+        const x = Math.round(box.x + fx * box.width - half);
+        const y = Math.round(box.y + fy * box.height - half);
+        context.fillRect(x, y, HANDLE_SIZE, HANDLE_SIZE);
+        context.strokeRect(x + 0.5, y + 0.5, HANDLE_SIZE - 1, HANDLE_SIZE - 1);
+      }
+    }
+  }
+
+  // drawBadge
+  // The element's `x, y, w×h` in device pixels, above its top-left corner, or
+  // below its bottom edge when there is no room above, kept inside the overlay.
+  private drawBadge(
+    context: CanvasRenderingContext2D,
+    rect: OverlayRect,
+    box: { x: number; y: number; width: number; height: number },
+  ): void {
+    const text = `${rect.x}, ${rect.y}, ${rect.width}×${rect.height}`;
+    context.font = BADGE_FONT;
+    const width = Math.ceil(context.measureText(text).width) + 8;
+    const limitX = this.frame.width * this.zoom + OVERLAY_MARGIN - width;
+    const limitY = this.frame.height * this.zoom + OVERLAY_MARGIN - BADGE_HEIGHT;
+    const x = Math.max(-OVERLAY_MARGIN, Math.min(limitX, Math.round(box.x)));
+    const above = Math.round(box.y) - BADGE_HEIGHT - HANDLE_SIZE / 2;
+    const y = above >= -OVERLAY_MARGIN ? above : Math.min(limitY, Math.round(box.y + box.height + HANDLE_SIZE / 2));
+    context.fillStyle = OVERLAY_COLOUR.selection;
+    context.fillRect(x, y, width, BADGE_HEIGHT);
+    context.fillStyle = '#ffffff';
+    context.textBaseline = 'middle';
+    context.fillText(text, x + 4, y + BADGE_HEIGHT / 2 + 0.5);
   }
 }

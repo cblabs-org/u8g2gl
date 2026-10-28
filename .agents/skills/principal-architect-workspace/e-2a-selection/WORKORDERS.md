@@ -46,11 +46,11 @@ owner's approval (rule 00) and the programme rulings. The design is
 
 # WO3 — overlays and the status bar (`u8g2gl-e2a/wo3-overlays`)
 
-- [ ] Handles and a live `x, y, w, h` badge on each selected element; marquee rectangle while
+- [x] Handles and a live `x, y, w, h` badge on each selected element; marquee rectangle while
       dragging one. Drawn over the framebuffer, never into it, crisp at every zoom.
-- [ ] The status bar's selection geometry (ui_spec §6): one element's rectangle, or the bounding
+- [x] The status bar's selection geometry (ui_spec §6): one element's rectangle, or the bounding
       box of several.
-- [ ] Ruling 6: show with a test or a render count that a selection change re-renders only the
+- [x] Ruling 6: show with a test or a render count that a selection change re-renders only the
       overlay and the status bar; E-1e's keystroke gate and its self-test still pass locally.
 
 # WO4 — §3.8's states (`u8g2gl-e2a/wo4-states`)

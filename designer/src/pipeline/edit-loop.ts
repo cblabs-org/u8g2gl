@@ -44,7 +44,7 @@
  *     - dispose():        Stop
  *
  *     State:
- *     - frameState, frozen, bounds, hitTargets, selectionRect
+ *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
  *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
@@ -120,6 +120,8 @@ export class EditLoop {
     undefined,
     (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height,
   );
+  /** How many selected elements are drawn, for the status bar beside {@link selectionRect}. */
+  readonly selectionCount = new Observable<number>(0);
 
   private readonly workspace: Workspace;
   private readonly wasm: EditorWasmController;
@@ -188,6 +190,7 @@ export class EditLoop {
     const bounds = this.bounds.get();
     const rects = drawn ? selection.names.map((name) => bounds.get(name)).filter((rect): rect is Rect => rect !== undefined) : [];
     this.selectionRect.set(boundingBox(rects));
+    this.selectionCount.set(rects.length);
     this.setOverlay(rects.map((rect) => ({ ...rect, kind: 'selection' })));
   }
 

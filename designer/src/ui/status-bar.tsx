@@ -9,16 +9,22 @@
  *          with this project's own widgets — and, when it is not, why and what
  *          to do. Clicking it opens Output, where the builds are logged.
  * Description: Each item reads its own observable, so a change to one does not
- *              re-render the others.
+ *              re-render the others. The selection geometry is its own
+ *              component for that reason: a selection change, or a drag that
+ *              moves the selection, re-renders it and nothing else here
+ *              (EDITOR-DESIGN §3.3). It shows one element's `x,y w×h`, or for
+ *              several the box around them with how many there are.
  *
  * Exports:
- * - StatusBar:      The component
+ * - StatusBar:          The component
+ * - SelectionGeometry:  Its selection readout
  * - describeWasm(): The indicator's text for a state
  */
 
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /**
  * @brief The indicator's text: a glyph, the state, and the hash or reason.
@@ -46,13 +52,13 @@ export function describeWasm(status: WasmStatus, placeholders: number): string {
 
 /** @brief The status bar. */
 export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void }): React.JSX.Element {
+  countRender('StatusBar');
   const workspace = useWorkspace();
   const status = useObservable(workspace.wasm.status);
   const frame = useObservable(workspace.loop.frameState);
   const problems = useObservable(workspace.problems);
   const errors = problems.filter((row) => row.severity === 'error').length;
   const warnings = problems.filter((row) => row.severity === 'warning').length;
-  const selection = useObservable(workspace.loop.selectionRect);
   const reason = status.kind === 'none' || status.kind === 'failed' ? status.reason : undefined;
   return (
     <footer className="status-bar">
@@ -63,16 +69,31 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
         ⛔ {errors} ⚠ {warnings}
       </span>
       <span className="status-spacer" />
-      {selection !== undefined && (
-        <span className="status-item selection-geometry">
-          sel {selection.x},{selection.y} {selection.width}×{selection.height}
-        </span>
-      )}
+      <SelectionGeometry />
       {frame.display !== undefined && (
         <span className="status-item">
           {frame.screen} · {frame.display.width}×{frame.display.height}
         </span>
       )}
     </footer>
+  );
+}
+
+/**
+ * @brief The selection's geometry (ui_spec §6): one element's rectangle, or the
+ *        box around several, in device pixels. Nothing while nothing drawn is
+ *        selected.
+ */
+export function SelectionGeometry(): React.JSX.Element | null {
+  countRender('SelectionGeometry');
+  const workspace = useWorkspace();
+  const rect = useObservable(workspace.loop.selectionRect);
+  const count = useObservable(workspace.loop.selectionCount);
+  if (rect === undefined) return null;
+  return (
+    <span className="status-item selection-geometry" data-count={count}>
+      sel {count > 1 ? `${count} · ` : ''}
+      {rect.x},{rect.y} {rect.width}×{rect.height}
+    </span>
   );
 }

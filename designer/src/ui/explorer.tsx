@@ -20,6 +20,7 @@
 
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** One explorer group: a heading and its files. */
 interface FileGroup {
@@ -51,6 +52,7 @@ export function groupFiles(files: readonly string[]): FileGroup[] {
 
 /** @brief The explorer sidebar. */
 export function Explorer(): React.JSX.Element {
+  countRender('Explorer');
   const workspace = useWorkspace();
   const files = useObservable(workspace.documents.files);
   const active = useObservable(workspace.activeFile);

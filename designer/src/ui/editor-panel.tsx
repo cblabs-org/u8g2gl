@@ -37,6 +37,7 @@ import { monaco, THEME } from '../monaco/monaco';
 import type { OpenRequest } from '../workspace';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** The panel's parameters: the document it shows. */
 export interface EditorPanelParams {
@@ -66,6 +67,7 @@ const SELECTED_ELEMENT: monaco.editor.IModelDecorationOptions = {
 
 /** @brief An editor tab. */
 export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): React.JSX.Element {
+  countRender('EditorPanel');
   const workspace = useWorkspace();
   const documents = workspace.documents;
   const host = useRef<HTMLDivElement>(null);
@@ -151,8 +153,11 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       const first = ranges[0];
       // Reveal only what the canvas selected: the caret's element is already
       // where the user is looking. Never focus — the canvas keeps the keyboard.
+      // The element's lines from column 1, so a long line does not scroll the
+      // view sideways to its end.
       if (selection.origin === 'canvas' && first !== undefined) {
-        editor.revealRangeInCenterIfOutsideViewport(first, monaco.editor.ScrollType.Smooth);
+        const lines = new monaco.Range(first.startLineNumber, 1, first.endLineNumber, 1);
+        editor.revealRangeInCenterIfOutsideViewport(lines, monaco.editor.ScrollType.Smooth);
       }
     };
     showSelection();
