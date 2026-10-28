@@ -46,10 +46,10 @@ from the same base. Do not touch canvas gesture code; keep shared shell files' c
 
 # WO3 — guidance (`u8g2gl-e2c/wo3-guidance`)
 
-- [ ] Inline help, live validation, defaults greyed with reset (ruling 5).
-- [ ] The two generic constraints (ruling 5), with their reasons.
-- [ ] [Q-19]'s cost rule (ruling 6).
-- [ ] Detach and Edit in XML (ruling 7), with e2e cases.
+- [x] Inline help, live validation, defaults greyed with reset (ruling 5).
+- [x] The two generic constraints (ruling 5), with their reasons.
+- [x] [Q-19]'s cost rule (ruling 6).
+- [x] Detach and Edit in XML (ruling 7), with e2e cases.
 
 # WO4 — multi-selection and the budget (`u8g2gl-e2c/wo4-multi-budget`)
 

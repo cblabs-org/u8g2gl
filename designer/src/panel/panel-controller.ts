@@ -38,6 +38,8 @@
  *     - options:       The dropdowns' choices, observable
  *     - start(), dispose()
  *     - commit():      Write a field's value, or remove it (reset), as one undo stop
+ *     - detach():      Replace an expression with the literal the scene computed
+ *     - editInXml():   Show the attribute behind a field in the XML editor
  */
 
 import { parseCst, type CstDocument } from '@u8g2gl/core/cst/index.js';
@@ -199,6 +201,47 @@ export class PanelController {
     return true;
   }
 
+  /**
+   * @brief Detach (EDITOR-DESIGN §3.5): replaces a geometry value written as an
+   *        expression or constant with the literal the scene computed for it,
+   *        as one undo stop. Explicit, because the author's expression is a
+   *        decision the panel cannot see the reason for.
+   *
+   * @param key The geometry field.
+   * @return True if the text changed.
+   */
+  detach(key: string): boolean {
+    const literal = this.fieldOf(key)?.detach;
+    return literal !== undefined && this.commit(key, literal);
+  }
+
+  /**
+   * @brief Edit in XML: shows the attribute a field's state names in the
+   *        editor, caret on its value, for an edit the panel does not make
+   *        itself — a binding, an anchor, an expression.
+   *
+   * @param key The field whose `reveal` attribute to show.
+   */
+  editInXml(key: string): void {
+    const view = this.view.get();
+    const attribute = this.fieldOf(key)?.reveal;
+    if (view.kind === 'empty' || attribute === undefined) return;
+    const cst = this.cstOf(view.file);
+    const name = view.names[0];
+    const element = cst === undefined || name === undefined ? undefined : name === ROOT_TARGET ? cst.root : namedCstElements(cst).get(name);
+    const target = element?.attributes.find((a) => a.name === attribute);
+    if (cst === undefined || target === undefined) return;
+    const { line, column } = cst.lines.locate(target.valueRange.start);
+    this.workspace.openFile({ path: view.file, line, column });
+  }
+
+  // fieldOf
+  // A field's current state in the current view.
+  private fieldOf(key: string): FieldState | undefined {
+    const view = this.view.get();
+    return view.kind === 'empty' ? undefined : view.fields.get(key)?.get();
+  }
+
   // update
   // Recomputes the view from the selection, the current text and the last run.
   private update(): void {
@@ -351,7 +394,16 @@ export class PanelController {
 }
 
 /** A field before its first state. */
-const EMPTY_FIELD: FieldState = { value: undefined, mixed: false, written: false, problems: [], disabled: undefined, detach: undefined, shown: undefined };
+const EMPTY_FIELD: FieldState = {
+  value: undefined,
+  mixed: false,
+  written: false,
+  problems: [],
+  disabled: undefined,
+  detach: undefined,
+  shown: undefined,
+  reveal: undefined,
+};
 
 /** A header before its first summary. */
 const EMPTY_SUMMARY: PanelSummary = { title: '', subtitle: '', notes: [], problems: [] };

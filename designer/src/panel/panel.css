@@ -69,7 +69,9 @@
 }
 .field-controls button:disabled { opacity: 0.4; cursor: default; }
 .field-controls .stepper { width: 22px; padding: 1px 0; }
-.field-controls .action { color: var(--info); }
+.field-actions { display: flex; gap: 6px; margin-top: 3px; }
+.field-actions .action { padding: 1px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.field-reason code { font: 11px ui-monospace, Menlo, monospace; color: var(--text); }
 
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
 .segmented button { border: 0; border-radius: 0; border-right: 1px solid var(--border); }

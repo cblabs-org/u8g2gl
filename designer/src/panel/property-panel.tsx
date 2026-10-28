@@ -146,6 +146,24 @@ function FieldRow({
       </div>
       <FieldEditor spec={spec} field={field} commit={commit} disabled={disabled} options={controller.options} />
       {field.disabled !== undefined && <p className="field-reason">{field.disabled}</p>}
+      {field.detach !== undefined && (
+        <p className="field-reason">
+          {spec.key} is computed from <code>{field.value}</code>, which the canvas will not rewrite. Detach replaces it with the {field.detach} it
+          computes to.
+        </p>
+      )}
+      {field.reveal !== undefined && (
+        <div className="field-actions">
+          {field.detach !== undefined && (
+            <button type="button" className="action" onClick={() => controller.detach(spec.key)}>
+              Detach
+            </button>
+          )}
+          <button type="button" className="action" onClick={() => controller.editInXml(spec.key)}>
+            Edit in XML
+          </button>
+        </div>
+      )}
       {field.problems.map((problem) => (
         <p key={problem.message} className={`field-problem ${problem.severity}`}>
           {problem.message}

@@ -54,6 +54,12 @@ export interface FieldState {
   readonly disabled: string | undefined;
   /** The literal Detach would write, when the value is an expression or constant. */
   readonly detach: string | undefined;
+  /**
+   * The attribute *Edit in XML* reveals, when the panel cannot or should not
+   * edit this field itself: the binding or anchor that disables it, or the
+   * field's own expression. Undefined when the field edits normally.
+   */
+  readonly reveal: string | undefined;
   /** A read-only value shown instead of the written one (a multi-selection's bounding box). */
   readonly shown: string | undefined;
 }
@@ -115,14 +121,17 @@ export function fieldState(spec: FieldSpec, elements: readonly ElementFacts[], c
   const box = context.box;
   let disabled: string | undefined;
   let shown: string | undefined;
+  let reveal: string | undefined;
   if (!context.wellFormed) {
-    disabled = 'The XML is not well-formed, so no edit can be placed in it; the panel edits again once it parses (EDITOR-DESIGN §3.8).';
+    disabled = 'The XML is not well-formed, so no edit can be placed in it; the panel edits again once it parses.';
   } else if (spec.kind === 'prop' && boundBy(spec.key, elements) !== undefined) {
     const subject = boundBy(spec.key, elements);
     disabled = `${spec.key} is bound to '${subject}' by bind_${spec.key}: the subject's value replaces it, so edit the binding or the sample data instead (§8.4).`;
+    reveal = `bind_${spec.key}`;
   } else if (ANCHORS[spec.key] !== undefined && anchoredBy(spec.key, elements) !== undefined) {
     const anchor = ANCHORS[spec.key] ?? '';
     disabled = `${spec.key} is set by ${anchor}="${anchoredBy(spec.key, elements)}": the element is anchored to its container's ${anchor} edge, and setting both would over-constrain it (§7.2).`;
+    reveal = anchor;
   } else if (several && geometry) {
     disabled = `The bounding box of ${elements.length} elements, read-only here: move or align them on the canvas.`;
     shown = box === undefined ? undefined : String(box[spec.key as keyof Rect]);
@@ -133,9 +142,13 @@ export function fieldState(spec: FieldSpec, elements: readonly ElementFacts[], c
   const placed = elements[0]?.placed;
   if (!several && geometry && disabled === undefined && first !== undefined && !isIntegerLiteral(first) && placed !== undefined) {
     detach = String(placed[spec.key as keyof Rect]);
+    reveal = spec.key;
   }
+  // Bound values offer only Edit in XML (EDITOR-DESIGN §3.5): a binding is
+  // never detached, because its value is live data, not a computation.
+  if (several) reveal = undefined;
 
-  return { value: mixed ? undefined : first, mixed, written, problems, disabled, detach, shown };
+  return { value: mixed ? undefined : first, mixed, written, problems, disabled, detach, shown, reveal };
 }
 
 /**
@@ -149,6 +162,7 @@ export function sameFieldState(a: FieldState, b: FieldState): boolean {
     a.written === b.written &&
     a.disabled === b.disabled &&
     a.detach === b.detach &&
+    a.reveal === b.reveal &&
     a.shown === b.shown &&
     a.problems.length === b.problems.length &&
     a.problems.every((p, i) => p.message === b.problems[i]?.message && p.severity === b.problems[i]?.severity)

@@ -194,3 +194,98 @@ test('a binding’s dropdown offers only subjects of a type it accepts, and choo
   await bindText.selectOption('row0_dest');
   await expect.poll(async () => (await changedLines(page))[0]).toContain('bind_text="row0_dest"');
 });
+
+/** The fixture's globals with one constant, and its screen with an expression and an anchor. */
+function guidanceProject(): Record<string, string> {
+  const globals = readFileSync(join(PROJECT_FIXTURE, 'globals.xml'), 'utf8').replace('<globals>', '<globals>\n    <consts>\n        <int name="margin" value="4" />\n    </consts>');
+  const screen = PROJECT_TEXT.replace('name="sys_clock" x="190"', 'name="sys_clock" x="#margin + 186"').replace('name="plat_label" x="5"', 'name="plat_label" right="233"');
+  return { 'globals.xml': globals, [SCREEN]: screen };
+}
+
+/** Opens the shell on the guidance project's screen, frozen. */
+async function openGuidance(page: Page): Promise<string> {
+  const files = guidanceProject();
+  session = await startDesign({ files });
+  await openShell(page, session.url);
+  await openFile(page, SCREEN);
+  await page.getByRole('button', { name: /live/ }).click();
+  return files[SCREEN] ?? '';
+}
+
+test('an expression offers Detach, which writes the literal the scene computed as one undo stop, and Edit in XML', async ({ page }) => {
+  const original = await openGuidance(page);
+  await clickCanvas(page, 220, 57); // sys_clock, at #margin + 186 = 190
+  const x = field(page, 'x');
+  await expect(x.locator('.field-reason')).toContainText('x is computed from #margin + 186');
+  await x.getByRole('button', { name: 'Detach' }).click();
+  await expect.poll(() => bufferText(page, SCREEN)).toBe(original.replace('x="#margin + 186"', 'x="190"'));
+  await expect(x.getByRole('button', { name: 'Detach' })).toHaveCount(0);
+  await undo(page);
+  await expect.poll(() => bufferText(page, SCREEN)).toBe(original);
+
+  // Edit in XML: the editor takes the keyboard, its caret at the start of the
+  // expression, so what is typed next lands there.
+  await clickCanvas(page, 220, 57);
+  await x.getByRole('button', { name: 'Edit in XML' }).click();
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest('.monaco-editor') != null)).toBe(true);
+  await page.keyboard.type('(');
+  await expect.poll(() => bufferText(page, SCREEN)).toBe(original.replace('x="#margin + 186"', 'x="(#margin + 186"'));
+});
+
+test('right disables x and bind_text disables text, each with its reason, and Edit in XML shows what disabled it', async ({ page }) => {
+  const original = await openGuidance(page);
+  await clickCanvas(page, 12, 12); // plat_label, anchored by right="233"
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('plat_label');
+  const x = field(page, 'x');
+  await expect(x).toHaveAttribute('data-disabled', 'true');
+  await expect(x.getByRole('textbox', { name: 'x' })).toBeDisabled();
+  await expect(x.locator('.field-reason')).toHaveText(
+    `x is set by right="233": the element is anchored to its container's right edge, and setting both would over-constrain it (§7.2).`,
+  );
+  await expect(field(page, 'y')).toHaveAttribute('data-disabled', 'false');
+  await x.getByRole('button', { name: 'Edit in XML' }).click();
+  await page.keyboard.type('1');
+  await expect.poll(() => bufferText(page, SCREEN)).toBe(original.replace('right="233"', 'right="1233"'));
+
+  // message_bar, under formation: the second click at that point.
+  await clickCanvas(page, 100, 22);
+  await clickCanvas(page, 100, 22);
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('message_bar');
+  const text = field(page, 'text');
+  await expect(text).toHaveAttribute('data-disabled', 'true');
+  await expect(text.locator('.field-reason')).toHaveText(
+    "text is bound to 'message_text' by bind_text: the subject's value replaces it, so edit the binding or the sample data instead (§8.4).",
+  );
+  await expect(text.getByRole('button', { name: 'Detach' })).toHaveCount(0);
+  await expect(text.getByRole('button', { name: 'Edit in XML' })).toBeVisible();
+});
+
+test('a value the validator rejects is flagged at its field, with the validator’s reason', async ({ page }) => {
+  await open(page);
+  await clickCanvas(page, 220, 57); // sys_clock, x 190: 66 wide fits the 256-pixel display exactly
+  const width = field(page, 'width');
+  await width.getByRole('textbox', { name: 'width' }).fill('80');
+  await width.getByRole('textbox', { name: 'width' }).press('Enter');
+  await expect(width.locator('.field-problem.error')).toHaveCount(1);
+  await expect(width.locator('.field-problem.error')).toContainText('display is 256px wide');
+  await expect(field(page, 'height').locator('.field-problem')).toHaveCount(0);
+});
+
+test('a prop at its default is greyed with no reset; a project widget says its RAM cost is not reported ([Q-19]); a framework one does not', async ({ page }) => {
+  await open(page);
+  await clickCanvas(page, 100, 5); // row0, a wd_service_list: max_rows written, max_cols not
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('row0');
+  const maxCols = field(page, 'max_cols');
+  await expect(maxCols).toHaveAttribute('data-written', 'false');
+  await expect(maxCols.getByRole('textbox', { name: 'max_cols' })).toHaveAttribute('placeholder', '6');
+  await expect(maxCols.getByRole('textbox', { name: 'max_cols' })).toHaveClass(/default/);
+  await expect(maxCols.getByRole('button', { name: 'Reset max_cols' })).toHaveCount(0);
+  await expect(field(page, 'max_rows').getByRole('button', { name: 'Reset max_rows' })).toBeVisible();
+  // The author's help as written; the panel's own line never puts a figure on it.
+  await expect(field(page, 'max_rows').locator('.field-help')).toHaveText('Row capacity. Determines allocated RAM.');
+  await expect(panel(page).locator('.panel-note', { hasText: 'RAM cost not reported for project widgets ([Q-19])' })).toBeVisible();
+  await expect(panel(page).getByText(/\d+(\.\d+)? ?(KB|B)\b/)).toHaveCount(0);
+
+  await clickCanvas(page, 220, 57); // sys_clock, a framework widget
+  await expect(panel(page).locator('.panel-note', { hasText: '[Q-19]' })).toHaveCount(0);
+});
