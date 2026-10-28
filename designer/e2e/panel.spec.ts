@@ -21,7 +21,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
-import { bufferText, clickCanvas, openFile, openShell } from './support/shell';
+import { bufferText, clickCanvas, openFile, openShell, placeCaret } from './support/shell';
 
 const SCREEN = 'screens/screen_departures.xml';
 /** The departures screen as the fixture has it. */
@@ -288,4 +288,157 @@ test('a prop at its default is greyed with no reset; a project widget says its R
 
   await clickCanvas(page, 220, 57); // sys_clock, a framework widget
   await expect(panel(page).locator('.panel-note', { hasText: '[Q-19]' })).toHaveCount(0);
+});
+
+test('several selected: shared fields show a common value or mixed, geometry their box read-only, and a commit to all is one undo stop', async ({ page }) => {
+  await open(page);
+  await clickCanvas(page, 12, 12); // plat_label: helvR08
+  await clickCanvas(page, 100, 5, ['Shift']); // row0: 6x10
+  await expect(panel(page).locator('.panel-title')).toHaveText('2 elements');
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('plat_label, row0');
+  // Geometry: the box around both, read-only.
+  await expect(field(page, 'x').getByRole('textbox', { name: 'x' })).toHaveValue('5');
+  await expect(field(page, 'width').getByRole('textbox', { name: 'width' })).toHaveValue('251');
+  await expect(field(page, 'x').getByRole('textbox', { name: 'x' })).toBeDisabled();
+  // Only what both have: a label's text is not a list's.
+  await expect(field(page, 'text')).toHaveCount(0);
+  await expect(field(page, 'max_rows')).toHaveCount(0);
+  const font = field(page, 'font').getByRole('combobox', { name: 'font' });
+  await expect(font).toHaveValue('\n(mixed)');
+  await expect(field(page, 'font')).toHaveAttribute('data-mixed', 'true');
+  await font.selectOption('u8g2_font_6x10_mr');
+  await expect.poll(() => changedLines(page)).toEqual([
+    '        <u8g2gl_label name="plat_label" x="5" y="6" width="18" height="13" font="u8g2_font_6x10_mr" text="Plat" align="center" />',
+  ]);
+  await expect(font).toHaveValue('u8g2_font_6x10_mr');
+  await font.selectOption('u8g2_font_helvR08_tr');
+  await expect.poll(async () => (await changedLines(page)).length).toBe(1);
+  expect((await changedLines(page))[0]).toContain('name="row0" x="32" y="0" width="224" height="16" font="u8g2_font_helvR08_tr"');
+  await undo(page);
+  await expect.poll(() => changedLines(page)).toEqual([
+    '        <u8g2gl_label name="plat_label" x="5" y="6" width="18" height="13" font="u8g2_font_6x10_mr" text="Plat" align="center" />',
+  ]);
+});
+
+test('every manifest prop of the departures project is editable from the panel', async ({ page }) => {
+  test.setTimeout(240_000);
+  await open(page);
+  const names = ['plat_box', 'plat_label', 'plat_num', 'header_sep', 'row0', 'message_bar', 'formation', 'services', 'sys_clock'];
+  const edited: string[] = [];
+  for (const name of names) {
+    // --- Select it through the XML, as the caret does ---
+    await placeCaret(page, SCREEN, `name="${name}"`);
+    await expect(panel(page).locator('.panel-subtitle')).toHaveText(name);
+    const inherited = panel(page).locator('details.inherited');
+    if ((await inherited.count()) > 0) await inherited.locator('summary').click();
+
+    // --- Every field, in panel order; one held by a binding after it is unbound ---
+    const keys = await panel(page).locator('.field').evaluateAll((fields) => fields.map((f) => f.getAttribute('data-field') ?? ''));
+    const held: string[] = [];
+    for (const key of keys) {
+      if ((await field(page, key).getAttribute('data-disabled')) === 'true') {
+        held.push(key);
+        continue;
+      }
+      await editField(page, name, key);
+      edited.push(`${name}.${key}`);
+    }
+    for (const key of held) {
+      if ((await field(page, `bind_${key}`).getAttribute('data-written')) === 'true') {
+        await field(page, `bind_${key}`).getByRole('button', { name: `Reset bind_${key}` }).click();
+      }
+      await expect(field(page, key)).toHaveAttribute('data-disabled', 'false');
+      await editField(page, name, key);
+      edited.push(`${name}.${key}`);
+    }
+    expect(keys.length, `${name} has fields`).toBeGreaterThan(0);
+  }
+  console.log(`edited ${edited.length} fields from the panel across ${names.length} elements`);
+  expect(new Set(edited).size).toBe(edited.length);
+});
+
+// editField
+// Commits a new value to one field through its control, and waits for the
+// element's line to carry it.
+//   name — the selected element
+//   key  — the field
+async function editField(page: Page, name: string, key: string): Promise<void> {
+  const control = field(page, key);
+  let expected: string;
+  if ((await control.getByRole('switch').count()) > 0) {
+    const on = (await control.getByRole('switch').getAttribute('aria-checked')) === 'true';
+    await control.getByRole('switch').click();
+    expected = `${key}="${on ? 'false' : 'true'}"`;
+  } else if ((await control.locator('.segmented').count()) > 0) {
+    const choice = control.locator('.segmented button[aria-pressed="false"]').first();
+    expected = `${key}="${await choice.textContent()}"`;
+    await choice.click();
+  } else if ((await control.getByRole('combobox').count()) > 0) {
+    const select = control.getByRole('combobox');
+    const current = await select.inputValue();
+    const values = await select.locator('option').evaluateAll((options) => options.map((o) => (o as HTMLOptionElement).value));
+    const choice = values.find((value) => value !== '' && value !== current && !value.startsWith('\n'));
+    if (choice === undefined) {
+      // The only choice is already made (one time subject, bound): the other
+      // edit a dropdown makes is to unset it.
+      await select.selectOption('');
+      await expect.poll(async () => elementLine(page, name), { message: `${name}.${key}` }).not.toContain(`${key}="`);
+      return;
+    }
+    await select.selectOption(choice);
+    expected = `${key}="${choice}"`;
+  } else {
+    const input = control.getByRole('textbox', { name: key });
+    const type = (await input.locator('xpath=ancestor::*[@data-field][1]').locator('.stepper').count()) > 0 ? 'int' : 'string';
+    const value = type === 'int' ? String(3 + (key.length % 5)) : `edited ${key}`;
+    await input.fill(value);
+    await input.press('Enter');
+    expected = `${key}="${value}"`;
+  }
+  await expect.poll(async () => elementLine(page, name), { message: `${name}.${key}` }).toContain(expected);
+}
+
+/** The buffer's line that writes the named element. */
+async function elementLine(page: Page, name: string): Promise<string> {
+  return (await bufferText(page, SCREEN)).split('\n').find((line) => line.includes(`name="${name}"`)) ?? '';
+}
+
+test('an image field is a picker of the project’s images, each drawn at 1:1, and choosing one commits it', async ({ page }) => {
+  const xbm = (name: string, bits: string): string => `#define ${name}_width 8\n#define ${name}_height 8\nstatic unsigned char ${name}_bits[] = {\n   ${bits} };\n`;
+  const globals = readFileSync(join(PROJECT_FIXTURE, 'globals.xml'), 'utf8').replace(
+    '</globals>',
+    '    <images>\n        <xbm name="icon_a" src="images/a.xbm" />\n        <xbm name="icon_b" src="images/b.xbm" />\n    </images>\n</globals>',
+  );
+  const screen = PROJECT_TEXT.replace('    </view>', '        <u8g2gl_xbm name="icon" x="240" y="0" width="8" height="8" src="icon_a" />\n    </view>');
+  session = await startDesign({
+    files: {
+      'globals.xml': globals,
+      [SCREEN]: screen,
+      'images/a.xbm': xbm('a', '0x00, 0x18, 0x24, 0x42, 0x00, 0x18, 0x00, 0x00'),
+      'images/b.xbm': xbm('b', '0xff, 0x81, 0x81, 0x81, 0x81, 0x81, 0x81, 0xff'),
+    },
+  });
+  // Not openShell: a project's images are compiled into its own editor Wasm,
+  // and this session has no toolchain to build one, so the framework Wasm
+  // refuses the scene and there is no live frame to wait for. The panel does
+  // not need one: it reads the text and the page's compiled assets.
+  await page.goto(session.url);
+  await openFile(page, SCREEN);
+  await placeCaret(page, SCREEN, 'name="icon"');
+  const src = field(page, 'src');
+  await expect(src.locator('.image-picker button')).toHaveCount(2);
+  await expect(src.getByRole('button', { name: /icon_a/ })).toHaveAttribute('aria-pressed', 'true');
+  // 1:1: one canvas pixel per image pixel, laid out at that size.
+  const thumbnail = src.locator('canvas[data-image="icon_b"]');
+  await expect(thumbnail).toHaveJSProperty('width', 8);
+  expect((await thumbnail.boundingBox())?.width).toBe(8);
+  const lit = await thumbnail.evaluate((canvas: HTMLCanvasElement) => {
+    const data = canvas.getContext('2d')?.getImageData(0, 0, 8, 8).data ?? new Uint8ClampedArray();
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if ((data[i] ?? 0) > 128) count++;
+    return count;
+  });
+  expect(lit).toBe(28); // b's frame: 8 + 8 + 2 × 6
+  await src.getByRole('button', { name: /icon_b/ }).click();
+  await expect.poll(async () => (await changedLines(page)).find((line) => line.includes('name="icon"')) ?? '').toContain('src="icon_b"');
 });

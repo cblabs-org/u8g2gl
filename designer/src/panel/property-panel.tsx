@@ -19,7 +19,8 @@
  * - PropertyPanel:  The region
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { panelCommitted, panelRenderStarted } from '../perf/panel-probe';
 import { countRender } from '../perf/render-count';
 import { useObservable } from '../ui/use-observable';
 import { useWorkspace } from '../ui/workspace-context';
@@ -33,6 +34,8 @@ import './panel.css';
 /** @brief The property panel region. */
 export function PropertyPanel(): React.JSX.Element {
   countRender('PropertyPanel');
+  panelRenderStarted();
+  useLayoutEffect(panelCommitted);
   const workspace = useWorkspace();
   const [controller] = useState(() => new PanelController(workspace));
   useEffect(() => {
@@ -61,6 +64,8 @@ export function PropertyPanel(): React.JSX.Element {
 /** @brief The header: the tag and names, notes about the whole element, and its own problems. */
 function PanelHeader({ summary }: { readonly summary: Observable<PanelSummary> }): React.JSX.Element {
   countRender('PanelHeader');
+  panelRenderStarted();
+  useLayoutEffect(panelCommitted);
   const { title, subtitle, notes, problems } = useObservable(summary);
   return (
     <div className="panel-header">
@@ -128,6 +133,8 @@ function FieldRow({
   readonly controller: PanelController;
 }): React.JSX.Element {
   countRender(`PanelField:${spec.key}`);
+  panelRenderStarted();
+  useLayoutEffect(panelCommitted);
   const field = useObservable(state);
   const disabled = field.disabled !== undefined;
   const commit = (value: string | undefined): boolean => controller.commit(spec.key, value);

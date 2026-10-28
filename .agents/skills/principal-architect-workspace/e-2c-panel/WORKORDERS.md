@@ -53,10 +53,10 @@ from the same base. Do not touch canvas gesture code; keep shared shell files' c
 
 # WO4 — multi-selection and the budget (`u8g2gl-e2c/wo4-multi-budget`)
 
-- [ ] Multi-selection and the screen's properties (ruling 8).
-- [ ] Ruling 9: the scripted 300-frame stand-in, the panel's share of the frame, and the render
+- [x] Multi-selection and the screen's properties (ruling 8).
+- [x] Ruling 9: the scripted 300-frame stand-in, the panel's share of the frame, and the render
       count showing only the changed field re-renders. Report the numbers.
-- [ ] Every manifest prop of the departures project is editable from the panel (an e2e walk).
+- [x] Every manifest prop of the departures project is editable from the panel (an e2e walk).
 
 # WO5 — review and C4's evidence (`u8g2gl-e2c/wo5-readability`)
 

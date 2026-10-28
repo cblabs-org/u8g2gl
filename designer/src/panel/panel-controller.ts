@@ -49,6 +49,7 @@ import type { CompletedRun } from '../pipeline/edit-loop';
 import { Observable } from '../state/observable';
 import type { Workspace } from '../workspace';
 import { monaco } from '../monaco/monaco';
+import { panelUpdateEnded, panelUpdateStarted } from '../perf/panel-probe';
 import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
@@ -243,8 +244,16 @@ export class PanelController {
   }
 
   // update
-  // Recomputes the view from the selection, the current text and the last run.
+  // Recomputes the view, measured by the test build's panel probe.
   private update(): void {
+    panelUpdateStarted();
+    this.recompute();
+    panelUpdateEnded();
+  }
+
+  // recompute
+  // The view for the selection, the current text and the last run.
+  private recompute(): void {
     // --- Step 1: Nothing to read before the first run ---
     const run = this.workspace.loop.lastRun.get();
     if (run === undefined) {
