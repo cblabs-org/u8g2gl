@@ -23400,6 +23400,17 @@
     "attributes": [],
     "comments": [],
     "children": []
+   },
+   "corrected": {
+    "reason": "One diagnostic at the text, which is skipped; the root then parses. Previously 'h' was read as the root's '<', giving an element 'ello' and two misleading errors.",
+    "root": {
+     "name": "root",
+     "loc": "1:7",
+     "endLoc": "1:12",
+     "attributes": [],
+     "comments": [],
+     "children": []
+    }
    }
   },
   {

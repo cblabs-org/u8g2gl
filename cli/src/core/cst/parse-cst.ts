@@ -15,12 +15,19 @@
  *              cli/test/cst/tokeniser-diagnostics.json records them for the
  *              parity test to hold every path to. The recovery comments below
  *              describe those rules; they are deliberate, not accidents of the
- *              implementation. Beyond that record, it accepts two well-formed
- *              constructs:
+ *              implementation. Each fault is reported once, where the input
+ *              broke: text before the root at the text, an open tag the input
+ *              ends inside at the end, an empty document at the end of input,
+ *              a missing `=` without re-reading the value after it as more
+ *              attributes. Where the record put one of these elsewhere, its
+ *              entry carries the correction. Beyond the record, it accepts two
+ *              well-formed constructs:
  *              - a leading BOM, recorded and skipped;
- *              - `<![CDATA[ ... ]]>` in element content, as a CDATA node.
- *              Recovery paths produce `invalid` nodes for the bytes they skip,
- *              so the tree stays lossless even on malformed input.
+ *              - `<![CDATA[ ... ]]>` in element content, as a CDATA node;
+ *              and reports a `<!DOCTYPE>` in the prolog once, then parses the
+ *              root after it. Recovery paths produce `invalid` nodes for the
+ *              bytes they skip, so the tree stays lossless even on malformed
+ *              input.
  *
  * Exports:
  * - CstParseResult:  The tree plus its well-formedness diagnostics
@@ -65,6 +72,12 @@ class CstScanner {
   private index = 0;
   private readonly length: number;
   private readonly diagnostics: Diagnostic[] = [];
+  /**
+   * Set when an attribute's diagnostic already says the input ran out inside
+   * it (an unclosed quote, an unquoted value at the end), so the open tag
+   * does not report the same end of input a second time.
+   */
+  private endOfInputReported = false;
 
   constructor(
     private readonly text: string,
@@ -137,6 +150,18 @@ class CstScanner {
     while (this.index < this.length && CstScanner.isWhitespace(this.peek())) {
       this.index++;
     }
+  }
+
+  // skipQuotedValue
+  // At a quote, skips through its matching quote (or to end of input);
+  // anywhere else, does nothing.
+  private skipQuotedValue(): void {
+    const quote = this.peek();
+    if (quote !== '"' && quote !== "'") {
+      return;
+    }
+    const close = this.text.indexOf(quote, this.index + 1);
+    this.index = close < 0 ? this.length : close + 1;
   }
 
   // A name is any run of name characters; the start-char rule is not enforced
@@ -250,6 +275,10 @@ class CstScanner {
     this.skipWhitespace();
     if (this.peek() !== '=') {
       this.report(nameStart, `Expected '=' after attribute name '${name}' in <${tagName}>`, name);
+      // A quoted value straight after the name (`b "c"`) is the value the
+      // missing `=` belonged to: skip it, so it is not read as more broken
+      // attributes. Anything else is left for the next attribute.
+      this.skipQuotedValue();
       return undefined;
     }
     this.index++;
@@ -271,6 +300,7 @@ class CstScanner {
       ) {
         this.index++;
       }
+      this.endOfInputReported ||= this.atEnd();
       return undefined;
     }
     this.index++;
@@ -282,6 +312,7 @@ class CstScanner {
     this.index = close < 0 ? this.length : close + 1;
     if (close < 0) {
       this.report(valueStart, `Unclosed quote for attribute '${name}' in <${tagName}>`, name);
+      this.endOfInputReported = true;
     }
     const rawValue = this.text.slice(valueStart, valueEnd);
     return {
@@ -324,18 +355,18 @@ class CstScanner {
     const attributes: CstAttribute[] = [];
     while (this.index < this.length) {
       this.skipWhitespace();
-      if (this.peek() === '>' || this.at('/>')) {
+      // The end of input after trailing whitespace is the unterminated open
+      // tag, reported once below; it is not also an unexpected character.
+      if (this.atEnd() || this.peek() === '>' || this.at('/>')) {
         break;
       }
       if (!CstScanner.isNameChar(this.peek())) {
-        // At end of input peek() is '' and is reported the same way; the
-        // cursor must not advance past the end.
         this.report(
           this.index,
           `Unexpected character '${this.peek()}' while parsing attributes in <${name}>`,
           this.peek(),
         );
-        this.index = Math.min(this.index + 1, this.length);
+        this.index++;
         continue;
       }
       const attribute = this.attribute(name);
@@ -351,11 +382,19 @@ class CstScanner {
       const openTag = { start, end: this.index };
       return { kind: 'element', start, end: this.index, name, nameRange, openTag, attributes, selfClosing: true, children: [] };
     }
-    if (this.peek() === '>') {
-      this.index++;
-    } else {
-      this.report(start, `Expected '>' or '/>' to close opening tag <${name}>`, name);
+    if (this.peek() !== '>') {
+      // The attribute loop stops only at `>`, `/>` or the end of input, so the
+      // input ended inside the open tag. That is one fault, reported once,
+      // where the tag broke off — unless an attribute already said the input
+      // ran out inside it. It is not also an unclosed element.
+      if (!this.endOfInputReported) {
+        this.report(this.index, `Expected '>' or '/>' to close opening tag <${name}>`, name);
+        this.endOfInputReported = true;
+      }
+      const openTag = { start, end: this.index };
+      return { kind: 'element', start, end: this.index, name, nameRange, openTag, attributes, selfClosing: false, children: [] };
     }
+    this.index++;
     const openTag = { start, end: this.index };
 
     // --- Step 4: Content, until the close tag or end of input ---
@@ -403,8 +442,10 @@ class CstScanner {
 
   // misc
   // Whitespace, comments and PIs at the cursor, as they may appear before and
-  // after the root. Returns when anything else is next.
-  private misc(out: CstContent[]): void {
+  // after the root — and, before it only, a DOCTYPE. Returns when anything
+  // else is next.
+  //   prolog — true before the root, where a DOCTYPE may appear
+  private misc(out: CstContent[], prolog: boolean): void {
     for (;;) {
       const ws = this.whitespaceNode();
       if (ws) {
@@ -414,10 +455,49 @@ class CstScanner {
         out.push(this.comment());
       } else if (this.at('<?')) {
         out.push(this.processingInstruction());
+      } else if (prolog && this.at('<!DOCTYPE')) {
+        out.push(this.doctype());
       } else {
         return;
       }
     }
+  }
+
+  // doctype
+  // `<!DOCTYPE ...>`, cursor on `<`. Well-formed XML, but U8G2GL documents
+  // have no use for one: one diagnostic, and the declaration (with any
+  // `[...]` internal subset) is skipped as an invalid node, so the root after
+  // it still parses.
+  private doctype(): CstInvalid {
+    const start = this.index;
+    this.report(start, 'DOCTYPE declarations are not supported in U8G2GL documents');
+    const subset = this.text.indexOf('[', start);
+    const close = this.text.indexOf('>', start);
+    let end = close;
+    if (subset >= 0 && (close < 0 || subset < close)) {
+      const subsetEnd = this.text.indexOf(']', subset);
+      end = subsetEnd < 0 ? -1 : this.text.indexOf('>', subsetEnd);
+    }
+    this.index = end < 0 ? this.length : end + 1;
+    return { kind: 'invalid', start, end: this.index, raw: this.text.slice(start, this.index) };
+  }
+
+  // textBeforeRoot
+  // Character data where the root should start, cursor on it. One diagnostic
+  // at its start, and the text skipped as an invalid node up to the next `<`,
+  // so a root that follows still parses. Text with no `<` after it is a
+  // document with no root, reported as that, once.
+  // Returns whether a `<` follows, where a root may start.
+  private textBeforeRoot(out: CstContent[]): boolean {
+    const start = this.index;
+    const next = this.text.indexOf('<', start);
+    this.report(
+      start,
+      next < 0 ? 'XML document contains text but no root element' : 'Unexpected text before the root element',
+    );
+    this.index = next < 0 ? this.length : next;
+    out.push({ kind: 'invalid', start, end: this.index, raw: this.text.slice(start, this.index) });
+    return next >= 0;
   }
 
   // document
@@ -429,21 +509,28 @@ class CstScanner {
       this.index = 1;
     }
     const children: CstContent[] = [];
-    this.misc(children);
+    this.misc(children, true);
+    let rootlessReported = false;
+    if (!this.atEnd() && this.peek() !== '<') {
+      rootlessReported = !this.textBeforeRoot(children);
+      this.misc(children, true);
+    }
 
-    // --- Step 2: The root, or the original empty-document diagnostic ---
+    // --- Step 2: The root, or the empty-document diagnostic ---
     let root: CstElement | undefined;
     if (this.atEnd()) {
-      // Reported at 1:1 literally, not at an offset: an empty document has no
-      // position worth pointing at, and the recorded diagnostics fix it there.
-      this.pushDiagnostic(1, 1, 'XML document is empty or contains no root element');
+      // At the end of input, where the root was looked for; 1:1 only when the
+      // document is empty. Text with no root has already been reported.
+      if (!rootlessReported) {
+        this.report(this.index, 'XML document is empty or contains no root element');
+      }
     } else {
       const node = this.element();
       children.push(node);
       root = node.kind === 'element' ? node : undefined;
 
       // --- Step 3: Epilog; anything but trivia is one diagnostic and the rest is invalid ---
-      this.misc(children);
+      this.misc(children, false);
       if (!this.atEnd()) {
         this.report(this.index, 'Multiple root elements or unexpected trailing content');
         children.push({ kind: 'invalid', start: this.index, end: this.length, raw: this.text.slice(this.index) });

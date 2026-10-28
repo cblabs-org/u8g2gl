@@ -17,14 +17,16 @@
  *              parser/xml-tokeniser.test.ts; and one case per recovery branch of
  *              the tokeniser, so every branch is compared at least once.
  *              Messages were recorded too, but parity is defined over code, line
- *              and column: messages are prose and may be reworded.
+ *              and column: messages are prose and may be reworded. Where an
+ *              entry carries a correction (a location the record got wrong),
+ *              the CST is held to the correction instead.
  */
 
 import { describe, expect, it } from 'vitest';
 import { parseCst } from '../../src/core/cst/index.js';
 import type { Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { readRepoFile } from './cst-test-helpers.js';
-import { loadDiagnosticsGolden, sha256 } from './tokeniser-golden.js';
+import { expectedDiagnostics, loadDiagnosticsGolden, sha256 } from './tokeniser-golden.js';
 
 // located
 // Parity is defined over code, line and column; messages are prose and may
@@ -38,11 +40,11 @@ function located(
 const golden = loadDiagnosticsGolden();
 
 describe('CST diagnostics parity with the recorded tokeniser', () => {
-  it.each(golden.repositoryFiles)('repository file $file', ({ file, sha256: recorded, diagnostics }) => {
-    const text = readRepoFile(file);
+  it.each(golden.repositoryFiles)('repository file $file', (entry) => {
+    const text = readRepoFile(entry.file);
     // A changed file is a stale golden entry, not a parser regression.
-    expect(sha256(text), `${file} changed since the tokeniser was recorded`).toBe(recorded);
-    expect(located(parseCst(text, file).diagnostics)).toEqual(located(diagnostics));
+    expect(sha256(text), `${entry.file} changed since the tokeniser was recorded`).toBe(entry.sha256);
+    expect(located(parseCst(text, entry.file).diagnostics)).toEqual(located(expectedDiagnostics(entry)));
   });
 
   it('includes the malformed fixture, and it is malformed', () => {
@@ -51,8 +53,16 @@ describe('CST diagnostics parity with the recorded tokeniser', () => {
     expect(parseCst(readRepoFile(file), file).diagnostics.length).toBeGreaterThan(0);
   });
 
-  it.each(golden.inlineCases)('$group case: $name', ({ file, text, diagnostics }) => {
-    expect(located(parseCst(text, file).diagnostics)).toEqual(located(diagnostics));
+  it.each(golden.inlineCases)('$group case: $name', (entry) => {
+    expect(located(parseCst(entry.text, entry.file).diagnostics)).toEqual(located(expectedDiagnostics(entry)));
+  });
+
+  it('holds each correction to a real change of location, and has the twelve it should', () => {
+    const corrected = [...golden.repositoryFiles, ...golden.inlineCases].filter((entry) => entry.corrected !== undefined);
+    expect(corrected).toHaveLength(12);
+    for (const entry of corrected) {
+      expect(located(entry.corrected?.diagnostics ?? []), entry.corrected?.reason).not.toEqual(located(entry.diagnostics));
+    }
   });
 
   it('covers every inline and recovery-branch case', () => {
