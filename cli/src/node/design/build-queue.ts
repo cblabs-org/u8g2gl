@@ -15,7 +15,9 @@
  *              submitted jobs. Each submission gets an id and a status record
  *              — queued, running, succeeded or failed — which the server
  *              returns as JSON. A runner that throws fails its job; it never
- *              stops the queue. Finished records beyond the most recent
+ *              stops the queue. A runner that throws a `BuildJobFailure` also
+ *              gives the failed record a stable `code`, for the failures a
+ *              client must tell apart without reading the message. Finished records beyond the most recent
  *              `MAX_FINISHED` are forgotten, so a long session's memory stays
  *              bounded.
  *
@@ -24,6 +26,7 @@
  * - BuildJobRunner:   A job kind's implementation
  * - BuildJobStatus:   'queued' | 'running' | 'succeeded' | 'failed'
  * - BuildJobRecord:   One submission's state, as served
+ * - BuildJobFailure:  An error whose code the failed record carries
  * - BuildQueue:       The registry and queue
  *
  *     Registry:
@@ -60,8 +63,32 @@ export interface BuildJobRecord {
   readonly status: BuildJobStatus;
   /** The runner's result, once succeeded. */
   readonly result?: unknown;
-  /** The failure message, once failed. */
+  /** The failure message, once failed. Prose: may be reworded freely. */
   readonly error?: string;
+  /**
+   * Once failed, and only when the runner threw a `BuildJobFailure`: a stable
+   * code for the failure. Clients branch on this, never on `error`.
+   */
+  readonly code?: string;
+}
+
+/**
+ * An error a runner throws when its failure is one a client must recognise.
+ * The record carries `code` beside the unchanged message.
+ */
+export class BuildJobFailure extends Error {
+  /** The record's `code`. */
+  readonly code: string;
+
+  /**
+   * @param code    Stable, kebab-case; part of the server's protocol.
+   * @param message The record's `error`, as for any other failure.
+   */
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'BuildJobFailure';
+    this.code = code;
+  }
 }
 
 /** Finished records kept for polling; older ones are forgotten. */
@@ -159,7 +186,8 @@ export class BuildQueue {
         this.records.set(next.id, { id: next.id, job: queued.job, status: 'succeeded', result });
       } catch (cause) {
         const error = cause instanceof Error ? cause.message : String(cause);
-        this.records.set(next.id, { id: next.id, job: queued.job, status: 'failed', error });
+        const code = cause instanceof BuildJobFailure ? { code: cause.code } : {};
+        this.records.set(next.id, { id: next.id, job: queued.job, status: 'failed', error, ...code });
       }
       this.retire(next.id);
     }

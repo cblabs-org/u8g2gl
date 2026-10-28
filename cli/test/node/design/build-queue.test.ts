@@ -6,13 +6,14 @@
  * File: test/node/design/build-queue.test.ts
  * Purpose: `BuildQueue`'s guarantees, without HTTP: it starts empty, a job
  *          name registers once, jobs run strictly one at a time in submission
- *          order, and a failing job fails only itself.
+ *          order, a failing job fails only itself, and a coded failure's code
+ *          reaches the record.
  * Description: Runners record when they start and finish, and are released by
  *              hand, so ordering is asserted rather than inferred from timing.
  */
 
 import { describe, expect, it } from 'vitest';
-import { BuildQueue } from '../../../src/node/design/build-queue.js';
+import { BuildJobFailure, BuildQueue } from '../../../src/node/design/build-queue.js';
 
 describe('BuildQueue', () => {
   it('starts with no jobs, and refuses to submit an unknown one', () => {
@@ -55,6 +56,21 @@ describe('BuildQueue', () => {
     expect(queue.get(a?.id ?? '')).toMatchObject({ status: 'succeeded', result: 'a' });
     expect(queue.get(b?.id ?? '')).toMatchObject({ status: 'failed', error: 'b failed' });
     expect(queue.get(c?.id ?? '')).toMatchObject({ status: 'succeeded', result: 'c' });
+  });
+
+  it('gives a failed record the code of a BuildJobFailure, and no code for any other error', async () => {
+    const queue = new BuildQueue('/project');
+    queue.register('coded', async () => {
+      throw new BuildJobFailure('no-widget', 'there is no widget');
+    });
+    queue.register('plain', async () => {
+      throw new Error('it broke');
+    });
+    const coded = queue.submit('coded', undefined);
+    const plain = queue.submit('plain', undefined);
+    await queue.idle();
+    expect(queue.get(coded?.id ?? '')).toEqual({ id: coded?.id, job: 'coded', status: 'failed', error: 'there is no widget', code: 'no-widget' });
+    expect(queue.get(plain?.id ?? '')).toEqual({ id: plain?.id, job: 'plain', status: 'failed', error: 'it broke' });
   });
 
   it('forgets the oldest finished records beyond 100', async () => {

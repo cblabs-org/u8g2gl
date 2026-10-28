@@ -23,6 +23,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { ServedProjectFileSystem, type ProjectFsEvent } from '../../../src/core/project-fs/index.js';
 import { startDesignServer, type DesignServer, type DesignServerOptions } from '../../../src/node/design/design-server.js';
 import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
+import { BuildJobFailure } from '../../../src/node/design/build-queue.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
 import { INVALID_PATHS } from '../../project-fs/contract.js';
 import { createTestEventSource } from '../../project-fs/test-event-source.js';
@@ -323,6 +324,22 @@ describe('the build routes', () => {
       result: { params: { a: 1 }, projectRoot: root },
     });
     expect(await (await api(`/api/build/${failed.id}`)).json()).toMatchObject({ status: 'failed', error: 'toolchain missing' });
+  });
+
+  it("serves a coded failure's code beside its message", async () => {
+    const s = await start();
+    s.builds.register('coded', async () => {
+      throw new BuildJobFailure('no-emscripten', 'no Emscripten 5.0.3');
+    });
+    const failed = (await (await api('/api/build/coded', { method: 'POST' })).json()) as { id: string };
+    await s.builds.idle();
+    expect(await (await api(`/api/build/${failed.id}`)).json()).toEqual({
+      id: failed.id,
+      job: 'coded',
+      status: 'failed',
+      error: 'no Emscripten 5.0.3',
+      code: 'no-emscripten',
+    });
   });
 
   it('refuses build parameters that are not JSON', async () => {
