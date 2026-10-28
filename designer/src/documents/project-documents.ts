@@ -20,6 +20,8 @@
  *              Saving, with the user's IDE open on the same files:
  *              - Save is explicit, and conditional on the version last read,
  *                so a file that moved underneath is never overwritten.
+ *              - A file read with a byte-order mark is saved with one. Mixed
+ *                line endings are not kept: Monaco normalises them on load.
  *              - A model is dirty when its undo position differs from the one
  *                it was saved or loaded at (Monaco's alternative version id),
  *                so undoing back to the saved text is clean again, and names
@@ -71,10 +73,12 @@ import { Observable } from '../state/observable';
 import { elementAt, namedElements } from './element-at';
 import { withGeneratedNames } from './generated-names';
 
-/** A document's text on disk and the version the server gave it. */
+/** A document's text on disk, the version the server gave it, and whether it has a BOM. */
 export interface DiskText {
   readonly text: string;
   readonly version: string;
+  /** The file starts with a byte-order mark; `text` does not hold it, and a save writes it back. */
+  readonly bom: boolean;
 }
 
 /** What a save did. */
@@ -135,7 +139,7 @@ export class ProjectDocuments {
       if (!read.ok) {
         throw new Error(`could not read the project: ${read.message}`);
       }
-      this.disk.set(read.path, { text: read.text, version: read.version });
+      this.disk.set(read.path, { text: read.text, version: read.version, bom: read.bom });
     }
     this.files.set(listing.files);
     this.fs.watch((event) => {
@@ -241,9 +245,10 @@ export class ProjectDocuments {
     }
 
     // --- Step 2: The conditional write ---
-    const result = await this.fs.write(path, text, { expectedVersion: disk.version });
+    // A file read with a byte-order mark is written back with one; Monaco never holds it.
+    const result = await this.fs.write(path, text, { expectedVersion: disk.version, bom: disk.bom });
     if (result.ok) {
-      this.disk.set(path, { text, version: result.version });
+      this.disk.set(path, { text, version: result.version, bom: disk.bom });
       this.markSaved(path, at);
       this.log(`saved ${path}`);
       return 'saved';
@@ -253,7 +258,7 @@ export class ProjectDocuments {
     if (result.code === 'conflict') {
       const theirs = await this.fs.read(path);
       if (theirs.ok) {
-        this.setConflict(path, { text: theirs.text, version: theirs.version });
+        this.setConflict(path, { text: theirs.text, version: theirs.version, bom: theirs.bom });
       }
       this.log(`${path} changed on disk since it was opened: not saved. Keep yours, take theirs, or compare.`);
       return 'conflict';
@@ -319,7 +324,7 @@ export class ProjectDocuments {
       const read = await this.fs.read(path);
       const known = this.disk.get(path);
       if (read.ok && (known === undefined || read.text !== known.text || read.version !== known.version)) {
-        const theirs = { text: read.text, version: read.version };
+        const theirs = { text: read.text, version: read.version, bom: read.bom };
         const document = this.open_.get(path);
         if (document === undefined) {
           this.disk.set(path, theirs);

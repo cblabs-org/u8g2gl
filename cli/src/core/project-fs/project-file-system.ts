@@ -29,10 +29,10 @@
  *     - ProjectFsErrorCode:    Why an operation failed
  *     - ProjectFsError:        A failed operation
  *     - ProjectFsResult<T>:    Success payload or ProjectFsError
- *     - TextFile, BytesFile:   A read: content plus version
+ *     - TextFile, BytesFile:   A read: content plus version (text: and whether it had a BOM)
  *     - WriteOutcome:          A write: the new version, and whether it created the file
  *     - FileListing:           A list: sorted project-relative paths
- *     - WriteOptions:          The version a write expects to replace
+ *     - WriteOptions:          The version a write expects to replace; whether to write a BOM
  *
  *     Events:
  *     - ProjectFsEventKind:    'changed' | 'added' | 'removed'
@@ -78,8 +78,13 @@ export type ProjectFsResult<T> = ({ readonly ok: true } & T) | ProjectFsError;
 /** A text read. */
 export interface TextFile {
   readonly path: string;
-  /** The content decoded as UTF-8. */
+  /** The content decoded as UTF-8, without a leading byte-order mark. */
   readonly text: string;
+  /**
+   * True when the file starts with a UTF-8 byte-order mark. `text` never
+   * contains it; pass this back as `WriteOptions.bom` so a save keeps it.
+   */
+  readonly bom: boolean;
   /** Opaque; pass it back as `WriteOptions.expectedVersion` when saving. */
   readonly version: string;
 }
@@ -115,6 +120,11 @@ export interface WriteOptions {
    * only if the file does not exist (create, never replace).
    */
   readonly expectedVersion?: string | null;
+  /**
+   * True: write a UTF-8 byte-order mark before the text. A file read with
+   * one is written back with one only if the caller passes its `bom` here.
+   */
+  readonly bom?: boolean;
 }
 
 /** What happened to a file. */
@@ -182,7 +192,10 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     if (!result.ok) {
       return result;
     }
-    return { ok: true, path: result.path, text: new TextDecoder().decode(result.bytes), version: result.version };
+    const bom = startsWithBom(result.bytes);
+    // The default decoder strips a leading BOM, so `text` never carries it.
+    const text = new TextDecoder().decode(result.bytes);
+    return { ok: true, path: result.path, text, bom, version: result.version };
   }
 
   /** {@inheritDoc ProjectFileSystem.readBytes} */
@@ -200,7 +213,7 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
     if (!check.ok) {
       return invalidPath(path, check.reason);
     }
-    return this.writeChecked(check.path, new TextEncoder().encode(text), options);
+    return this.writeChecked(check.path, encodeText(text, options.bom === true), options);
   }
 
   /** {@inheritDoc ProjectFileSystem.list} */
@@ -246,4 +259,29 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
 //   reason — checkProjectPath's reason
 function invalidPath(path: string, reason: string): ProjectFsError {
   return { ok: false, code: 'invalid-path', message: refusedPathMessage(path, reason) };
+}
+
+/** The UTF-8 encoding of U+FEFF, the byte-order mark. */
+const UTF8_BOM = [0xef, 0xbb, 0xbf] as const;
+
+// startsWithBom
+// Whether `bytes` open with the UTF-8 byte-order mark.
+function startsWithBom(bytes: Uint8Array): boolean {
+  return bytes.length >= 3 && bytes[0] === UTF8_BOM[0] && bytes[1] === UTF8_BOM[1] && bytes[2] === UTF8_BOM[2];
+}
+
+// encodeText
+// `text` as UTF-8, after a byte-order mark when `bom` is set. A text that
+// already starts with U+FEFF is not given a second one.
+//   text — what to write
+//   bom  — whether the file should start with a byte-order mark
+function encodeText(text: string, bom: boolean): Uint8Array {
+  const body = new TextEncoder().encode(text);
+  if (!bom || startsWithBom(body)) {
+    return body;
+  }
+  const bytes = new Uint8Array(body.length + UTF8_BOM.length);
+  bytes.set(UTF8_BOM, 0);
+  bytes.set(body, UTF8_BOM.length);
+  return bytes;
 }

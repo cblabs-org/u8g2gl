@@ -383,6 +383,10 @@ placeholders), `wo2-project.png` (project renderer, hash `f68f4842`), `wo3-confl
 - A BOM is lost and mixed line endings are normalised on save: `ServedProjectFileSystem.read`
   decodes with a BOM-stripping `TextDecoder`, and Monaco normalises EOLs. Consistent LF or CRLF
   files round-trip byte for byte (e3).
+  - *C-1, 2026-10-28:* the BOM is now kept: a read reports `bom`, and the designer's save
+    passes it back. **Mixed line endings remain a known limitation**, by ruling (C-1 ruling 6):
+    Monaco normalises a model to one EOL on load, so a file mixing LF and CRLF is saved with
+    one of them. Consistent LF or CRLF still round-trips byte for byte.
 - A project font or image the framework Wasm lacks makes the no-toolchain canvas refuse the
   scene (the banner says which); the departures project uses only built-ins it has.
 - The npm package does not ship `designer/dist` (ruling 4's follow-up, beside E-1d's 8.3).
