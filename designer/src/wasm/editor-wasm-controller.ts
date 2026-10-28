@@ -5,12 +5,12 @@
  *
  * File: designer/src/wasm/editor-wasm-controller.ts
  * Purpose: Decides which editor Wasm the canvas draws with, and keeps the
- *          project's own one current (EDITOR-DESIGN §5.1–§5.2). The canvas
+ *          project's own one current. The canvas
  *          starts at once with the framework editor Wasm bundled in the
  *          designer — framework elements render, project widgets are
  *          placeholders — and swaps to the project's own build when the design
  *          server has one. Without a toolchain the project still opens, and
- *          the status bar says why its widgets are placeholders (E1 e8).
+ *          the status bar says why its widgets are placeholders.
  * Description: Builds run on the server's queue (`POST /api/build/editor-wasm`),
  *              never in the edit loop. A build is requested on load and when a
  *              file that can change the build changes; a request while one is
@@ -18,7 +18,7 @@
  *              gets a build. The record is polled until it finishes. A succeeded
  *              build whose hash differs from the loaded module's is fetched from
  *              the Wasm route and swapped in; a failed one leaves the last good
- *              module loaded (§5.2) and reports why.
+ *              module loaded and reports why.
  *
  *              The indicator's states:
  *              - `loading`   the framework module is starting
@@ -48,7 +48,7 @@ import type { DesignSession } from '../session';
 import { Observable } from '../state/observable';
 import { loadEditorModule, type EditorModule } from './editor-module';
 
-/** The editor Wasm indicator's state (EDITOR-DESIGN §2.2). */
+/** The editor Wasm indicator's state, as the status bar shows it. */
 export type WasmStatus =
   | { readonly kind: 'loading' }
   | { readonly kind: 'building' }
@@ -71,8 +71,9 @@ const FRAMEWORK_DIR = './framework-wasm';
  *
  * Widget sources and manifests, the project and globals files (fonts, images
  * and the target's capacities), and any asset outside `screens/`. A screen
- * never does: drawing it is live mode's job (§5.2). A request that turns out
- * not to change the build hash costs the server one `generate`, no compile.
+ * never does: drawing a screen is the live edit loop's job. A request that
+ * turns out not to change the build hash costs the server one `generate`, no
+ * compile.
  */
 export function affectsEditorBuild(path: string): boolean {
   return !path.startsWith('screens/');
@@ -94,7 +95,7 @@ export class EditorWasmController {
   readonly module = new Observable<EditorModule | undefined>(undefined);
   /** Whether that module is the framework's (true) or the project's own. */
   readonly isFramework = new Observable<boolean>(true);
-  /** The last failed build's diagnostics, located in the project's files (§2.2). */
+  /** The last failed build's diagnostics, located in the project's files, for Problems. */
   readonly buildDiagnostics = new Observable<readonly Diagnostic[]>([]);
 
   private readonly session: DesignSession;
@@ -188,7 +189,7 @@ export class EditorWasmController {
       this.setBuildDiagnostics(parseBuildFailure(reason));
       // The job's message for a missing toolchain names the install command; it
       // is the one failure that is a normal state, not a defect, so the
-      // indicator shows it differently (EDITOR-DESIGN §2.1).
+      // indicator shows it differently: the project still opens without one.
       if (/no Emscripten|no U8G2GL source tree/.test(reason) && this.loadedHash === undefined) {
         this.status.set({ kind: 'none', reason });
       } else {

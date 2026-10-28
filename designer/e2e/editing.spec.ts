@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/editing.spec.ts
- * Purpose: E1 e1, e6 and e8 end to end: an edit in Monaco reaches the canvas in
- *          the next frame — in Chromium, Firefox and WebKit (e7) — a Problems
+ * Purpose: Editing end to end: an edit in Monaco reaches the canvas in the
+ *          next frame — in Chromium, Firefox and WebKit, because served mode
+ *          must need nothing Chromium-only — a Problems
  *          row lands the caret on the fault, and with no toolchain the project
  *          still opens with framework elements drawn, project widgets as
  *          placeholders, and the status bar saying why. With Emscripten on the
@@ -21,12 +22,14 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { emscriptenOnPath, PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
 import { bufferText, canvasPixels, frameInfo, nextFrames, openFile, openShell, placeCaret } from './support/shell';
+import type { TestHandle } from '../src/test-hooks';
+import type { Placeholder } from '../src/wasm/editor-module';
 
 const SCREEN = 'screens/screen_departures.xml';
 
 /** The placeholders the canvas drew, as the page reports them. */
-async function placeholders(page: import('@playwright/test').Page): Promise<{ name: string; tag: string; rect: number[] }[]> {
-  return page.evaluate(() => (window as unknown as { __u8g2gl: { loop: { frameState: { get(): { placeholders: { name: string; tag: string; rect: number[] }[] } } } } }).__u8g2gl.loop.frameState.get().placeholders);
+async function placeholders(page: import('@playwright/test').Page): Promise<readonly Placeholder[]> {
+  return page.evaluate(() => (window as unknown as TestHandle).__u8g2gl.loop.frameState.get().placeholders);
 }
 
 let session: DesignSession | undefined;
@@ -35,7 +38,7 @@ test.afterEach(async () => {
   session = undefined;
 });
 
-test('e1: editing x on row0 in Monaco moves it on the canvas in the next frame @cross-browser', async ({ page }) => {
+test('editing x on row0 in Monaco moves it on the canvas in the next frame @cross-browser', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, SCREEN);
@@ -64,7 +67,7 @@ test('e1: editing x on row0 in Monaco moves it on the canvas in the next frame @
   expect(await canvasPixels(page)).not.toBe(pixelsBefore);
 });
 
-test('e6: a Problems row opens the file with the caret at its line and column', async ({ page }) => {
+test('a Problems row opens the file with the caret at its line and column', async ({ page }) => {
   const original = readFileSync(join(PROJECT_FIXTURE, SCREEN), 'utf8');
   session = await startDesign({ files: { [SCREEN]: original.replace('name="plat_label" x="5" y="6" width="18" height="13" font="u8g2_font_helvR08_tr"', 'name="plat_label" x="5" y="6" width="18" height="13" font="no_such_font"') } });
   await page.goto(session.url);
@@ -83,7 +86,7 @@ test('e6: a Problems row opens the file with the caret at its line and column', 
   expect(lines[Number(line) - 1]?.slice(Number(column))).toMatch(/^no_such_font"/);
 });
 
-test('e8: with no toolchain the project opens, framework elements render, project widgets are placeholders, and the status bar says why', async ({ page }) => {
+test('with no toolchain the project opens, framework elements render, project widgets are placeholders, and the status bar says why', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   const status = page.locator('.status-item.wasm');

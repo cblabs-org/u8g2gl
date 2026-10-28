@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023", "DOM"],
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -9,12 +12,30 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "typeRoots": ["../cli/node_modules/@types"],
-    "types": ["node"],
+    "typeRoots": [
+      "../cli/node_modules/@types",
+      "./node_modules"
+    ],
+    "types": [
+      "node",
+      "vite/client"
+    ],
     "paths": {
-      "@u8g2gl/core/*": ["../cli/src/core/*"],
-      "@u8g2gl/data/*": ["../cli/src/data/*"]
+      "@u8g2gl/core/*": [
+        "../cli/src/core/*"
+      ],
+      "@u8g2gl/data/*": [
+        "../cli/src/data/*"
+      ]
     }
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "playwright.unit.config.ts", "e2e", "test"]
+  "include": [
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.unit.config.ts",
+    "e2e",
+    "test",
+    "playwright.production.config.ts",
+    "e2e-production"
+  ]
 }

@@ -39,7 +39,10 @@
  * - loadEditorModule():   Fetch and instantiate one
  */
 
-/** An element the loaded Wasm drew as a placeholder (EDITOR-DESIGN §5.4). */
+/**
+ * An element the loaded Wasm has no class for, drawn as a placeholder at its
+ * real rectangle, so one missing widget costs one rectangle, not the canvas.
+ */
 export interface Placeholder {
   readonly name: string;
   readonly tag: string;
@@ -124,6 +127,11 @@ export async function loadEditorModule(
   // As a function rather than a <script>: a script defines the factory as a
   // page global, so loading a project build would silently replace the
   // framework's, and a script URL would need the token in its query.
+  // Evaluating fetched source is acceptable here because of where it comes
+  // from: this session's own token-gated server, which serves either the
+  // framework build bundled with the designer or its own build of the user's
+  // project (`/api/editor-wasm/<build id>/`). It is the user's code on the
+  // user's machine; nothing from a third party is ever evaluated.
   const factory = new Function(`${source}\n;return ${EXPORT_NAME};`)() as ModuleFactory;
   const module = await factory({ wasmBinary: bytes });
   return wrap(module);

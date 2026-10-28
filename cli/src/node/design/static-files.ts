@@ -72,6 +72,10 @@ export function readStaticFile(root: string, path: string): StaticFile | undefin
     return undefined;
   }
   const absolute = join(root, ...check.path.split('/'));
+  // The real-path rule follows the lexical one because a lexically clean path
+  // can still leave through a symlink inside the served directory (in dist/
+  // or a build directory) that points out of it. `isFile()` because a
+  // directory is not a file to serve: asking for one is a 404, not a read.
   if (!isInsideProject(root, absolute) || !existsSync(absolute) || !statSync(absolute).isFile()) {
     return undefined;
   }

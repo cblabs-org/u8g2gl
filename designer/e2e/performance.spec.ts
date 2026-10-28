@@ -4,19 +4,21 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/performance.spec.ts
- * Purpose: E1 e2 as checkpoint C3 defines it (PA ruling 8, "measure to the
- *          frame"), with Chromium's CPU throttled 4× as a stand-in for a modest
- *          laptop, on the departures screen and on a 20-element screen, over 300
- *          keystrokes each:
+ * Purpose: Keystroke latency, measured to the frame the user sees, with
+ *          Chromium's CPU throttled 4× as a stand-in for a modest laptop, on
+ *          the departures screen and on a 20-element screen, over 300
+ *          keystrokes each. Two gates:
  *          1. **Frame latency:** each keystroke's edit is on the canvas in the
  *             **first** animation frame after its key event; at most 1% (3 of
- *             300) may miss it (ruling 11).
+ *             300) may miss it, which allows for the garbage collector and the
+ *             JIT, not for a slow pipeline.
  *          2. **Work per frame:** from the start of the pipeline run in that
  *             frame to the end of its blit, **p95 under 16 ms**.
  *          Key to blit is reported, not gated: it includes the wait for the
  *          frame, which no schedule removes from what is displayed. A budget
  *          measured only at full speed would prove nothing about the user's
- *          machine (EDITOR-DESIGN §3.4).
+ *          machine. A self-test forces keystrokes to miss their frame and checks
+ *          that the frame gate then fails, so its passing means something.
  * Description: Real key presses into Monaco, each changing the x of one element
  *              between two valid values, so every keystroke must reach the
  *              canvas. The page's keystroke probe (`src/perf/`) counts animation
@@ -27,9 +29,9 @@
  *              frame, as a typist's do. The first 30 are warm-up.
  *
  *              The result is printed and written to
- *              `test-results/e2-performance.json`. Locally both measures gate;
- *              on CI they are reported, not gated, because CI machines vary
- *              (WORKORDERS WO4).
+ *              `test-results/chromium/keystroke-performance.json`. Locally both
+ *              measures gate; on CI they are reported, not gated, because CI
+ *              machines vary.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -37,6 +39,7 @@ import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { startDesign, type DesignSession } from './support/design-session';
 import { openFile, openShell, placeCaret } from './support/shell';
+import type { TestHandle } from '../src/test-hooks';
 
 /** Keystrokes measured per screen, after the warm-up. */
 const KEYSTROKES = 300;
@@ -44,7 +47,7 @@ const KEYSTROKES = 300;
 const WARMUP = 30;
 /**
  * The share of keystrokes per screen that may miss their first frame: 1%, so 3
- * of 300 (PA ruling 11). Rounded down, so a smaller sample allows fewer.
+ * of 300. Rounded down, so a smaller sample allows fewer.
  */
 const MAX_MISSED_SHARE = 0.01;
 /** The budget, p95, in milliseconds. */
@@ -106,8 +109,8 @@ const round = (value: number): number => Math.round(value * 100) / 100;
 
 // gateFailures
 // Ruling 8's two gates for one screen, as the reasons they fail; empty when
-// both pass. The e2 test and its self-test judge with this one function, so
-// the self-test proves the gate the e2 test actually applies.
+// both pass. The latency test and its self-test judge with this one function,
+// so the self-test proves the gate the latency test actually applies.
 //   result — one screen's measurement
 function gateFailures(result: ScreenResult): string[] {
   const failures: string[] = [];
@@ -139,20 +142,20 @@ async function measure(
   beforeKey: (i: number) => Promise<void> = async () => undefined,
 ): Promise<ScreenResult> {
   type Sample = { keyToBlit: number; wait: number; keyToEdit: number; editToFrame: number; runToBlit: number; frames: number; stages: Record<string, number> };
-  const count = (): Promise<number> => page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: unknown[] } }).__u8g2glPerf.samples.length);
-  await page.evaluate(() => (window as unknown as { __u8g2glPerf: { reset(): void } }).__u8g2glPerf.reset());
+  const count = (): Promise<number> => page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.samples.length);
+  await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.reset());
   for (let i = 0; i < WARMUP + keystrokes; i++) {
     if (i === WARMUP) {
-      await page.evaluate(() => (window as unknown as { __u8g2glPerf: { reset(): void } }).__u8g2glPerf.reset());
+      await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.reset());
     }
     if (i >= WARMUP) await beforeKey(i - WARMUP);
     const before = await count();
     await page.keyboard.press(i % 2 === 0 ? digit : 'Backspace');
-    await page.waitForFunction((n) => (window as unknown as { __u8g2glPerf: { samples: unknown[] } }).__u8g2glPerf.samples.length > n, before);
+    await page.waitForFunction((n) => (window as unknown as TestHandle).__u8g2glPerf.samples.length > n, before);
     // A random gap, so keys arrive at every phase of the display's frame.
     await page.waitForTimeout(Math.random() * 20);
   }
-  const samples = await page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: Sample[] } }).__u8g2glPerf.samples);
+  const samples = await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.samples);
   const totals = samples.map((s) => s.keyToBlit);
   const stages: Record<string, number> = {
     keyToEdit: round(percentile(samples.map((s) => s.keyToEdit), 50)),
@@ -200,7 +203,7 @@ test.afterEach(async () => {
   session = undefined;
 });
 
-test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 under 16 ms, CPU throttled 4×', async ({ page, browserName }) => {
+test('keystrokes reach the canvas in their first frame (at most 1% miss) and the work per frame has p95 under 16 ms, CPU throttled 4×', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
   test.setTimeout(600_000);
   session = await startDesign({ files: { 'screens/screen_twenty.xml': twentyElementScreen() } });
@@ -225,9 +228,9 @@ test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 und
   // --- Report, then gate locally ---
   const report = { throttle: THROTTLE, keystrokes: KEYSTROKES, budgetMs: BUDGET_MS, ci: process.env.CI !== undefined, results };
   mkdirSync(test.info().project.outputDir, { recursive: true });
-  const out = join(test.info().project.outputDir, 'e2-performance.json');
+  const out = join(test.info().project.outputDir, 'keystroke-performance.json');
   writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`e2 (CPU ${THROTTLE}x, ${KEYSTROKES} keystrokes per screen):`);
+  console.log(`keystroke latency (CPU ${THROTTLE}x, ${KEYSTROKES} keystrokes per screen):`);
   for (const r of results) {
     console.log(`  ${r.screen} (${r.samples} samples):`);
     console.log(`    frames key->blit: ${r.frames.firstFrame}/${r.samples} in the first frame, worst ${r.frames.worst}, histogram ${JSON.stringify(r.frames.histogram)}`);
@@ -237,26 +240,26 @@ test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 und
     console.log(`    stage medians (ms): ${Object.entries(r.stageMedians).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     console.log(`    stage p95s (ms):    ${Object.entries(r.stageP95s).map(([k, v]) => `${k} ${v}`).join(', ')}`);
   }
-  test.info().annotations.push({ type: 'e2', description: JSON.stringify(results) });
+  test.info().annotations.push({ type: 'keystroke-latency', description: JSON.stringify(results) });
 
   for (const r of results) {
     expect(r.samples).toBe(KEYSTROKES);
     if (process.env.CI === undefined) {
-      expect(gateFailures(r), `${r.screen}: ruling 8's gates`).toEqual([]);
+      expect(gateFailures(r), `${r.screen}: frame-latency and work-per-frame gates`).toEqual([]);
     }
   }
 });
 
-// The self-test of ruling 10: before trusting the frame gate passing, show it
-// can fail. Four keystrokes of ten — more than ruling 11's 1% — are each forced
+// The gate's self-test: before trusting the frame gate passing, show it can
+// fail. Four keystrokes of ten — more than the 1% allowed — are each forced
 // to miss its frame by a hook the test
 // injects into the page through the existing `window.__u8g2gl` handle: the
 // loaded editor Wasm's `renderFrame` is wrapped to block the main thread for
 // three frame periods inside the pipeline run that draws that keystroke,
 // before its blit, and then unwrapped.
-// The hook exists only in this file; the built designer contains no such code
-// (checked by grep over `designer/dist` in the completion report).
-test('e2 self-test: keystrokes forced to miss their frame are each counted 2 or more, and over 1% the gate fails', async ({ page, browserName }) => {
+// The hook exists only in this file. It needs the `window.__u8g2gl` handle,
+// which only the end-to-end test build has (`src/test-hooks.ts`).
+test('self-test of the frame gate: keystrokes forced to miss their frame are each counted 2 or more, and over 1% the gate fails', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
   session = await startDesign();
   await openShell(page, session.url);
@@ -271,9 +274,7 @@ test('e2 self-test: keystrokes forced to miss their frame are each counted 2 or 
     if (!FORCED.includes(i)) return;
     await page.evaluate(() => {
       type Module = { renderFrame(ms: number): Uint8Array | undefined };
-      const workspace = (window as unknown as {
-        __u8g2gl: { wasm: { module: { get(): Module | undefined } }; documents: { onDidChangeContent(listener: () => void): () => void } };
-      }).__u8g2gl;
+      const workspace = (window as unknown as TestHandle).__u8g2gl;
       const module = workspace.wasm.module.get();
       if (module === undefined) throw new Error('no editor Wasm loaded');
       const original = module.renderFrame.bind(module);
@@ -298,9 +299,9 @@ test('e2 self-test: keystrokes forced to miss their frame are each counted 2 or 
     });
   });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-  console.log(`e2 self-test: frames per keystroke ${JSON.stringify(result.frames.histogram)}, worst ${result.frames.worst}; gate: ${JSON.stringify(gateFailures(result))}`);
+  console.log(`frame gate self-test: frames per keystroke ${JSON.stringify(result.frames.histogram)}, worst ${result.frames.worst}; gate: ${JSON.stringify(gateFailures(result))}`);
 
-  const samples = await page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: { frames: number }[] } }).__u8g2glPerf.samples.map((s) => s.frames));
+  const samples = await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.samples.map((s) => s.frames));
   for (const i of FORCED) {
     expect(samples[i], `forced keystroke ${i}`).toBeGreaterThanOrEqual(2);
   }

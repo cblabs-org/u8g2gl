@@ -25,6 +25,7 @@
  */
 
 import { expect, type Page } from '@playwright/test';
+import type { TestHandle } from '../../src/test-hooks';
 
 /** The canvas panel's frame state, as its data attributes publish it. */
 export interface FrameInfo {
@@ -53,7 +54,7 @@ export async function openFile(page: Page, path: string): Promise<void> {
 export async function placeCaret(page: Page, path: string, needle: string, after = 0): Promise<void> {
   await page.evaluate(
     ({ path, needle, after }) => {
-      const workspace = (window as unknown as { __u8g2gl: { documents: { modelOf(p: string): { getValue(): string; getPositionAt(o: number): { lineNumber: number; column: number } } | undefined }; openFile(r: object): void } }).__u8g2gl;
+      const workspace = (window as unknown as TestHandle).__u8g2gl;
       const model = workspace.documents.modelOf(path);
       if (model === undefined) throw new Error(`${path} is not open`);
       const offset = model.getValue().indexOf(needle);
@@ -68,7 +69,7 @@ export async function placeCaret(page: Page, path: string, needle: string, after
 /** @brief An open file's buffer. */
 export async function bufferText(page: Page, path: string): Promise<string> {
   return page.evaluate(
-    (path) => (window as unknown as { __u8g2gl: { documents: { modelOf(p: string): { getValue(): string } | undefined } } }).__u8g2gl.documents.modelOf(path)?.getValue() ?? '',
+    (path) => (window as unknown as TestHandle).__u8g2gl.documents.modelOf(path)?.getValue() ?? '',
     path,
   );
 }

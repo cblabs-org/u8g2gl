@@ -8,8 +8,9 @@
  *          The document itself lives in Monaco's models ([UD-3]); what is left —
  *          diagnostics, the Wasm status, the selection, the zoom — is held in
  *          small observables that each panel subscribes to separately, so a
- *          keystroke re-renders only the components whose data changed
- *          (EDITOR-DESIGN §3.3's rule) and never the whole shell.
+ *          keystroke re-renders only the components whose data changed and
+ *          never the whole shell: the edit loop's 16 ms frame has no room for
+ *          a full render.
  * Description: A value, a setter that notifies only on change (by `Object.is`,
  *              or a supplied equality), and a subscription. No dependency;
  *              `useObservable` in `ui/` adapts it to React's

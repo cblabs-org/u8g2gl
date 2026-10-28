@@ -5,10 +5,10 @@
  *
  * File: designer/src/documents/element-at.ts
  * Purpose: Answers "which element is the caret in?" for selection from XML to
- *          canvas (EDITOR-DESIGN §3.7): the innermost named element whose text
+ *          canvas (ui_spec §4.3): the innermost named element whose text
  *          contains the caret. Selection is by `name` ([U-1] makes it stable),
  *          so it survives edits that move the element's text, and the same
- *          lookup finds an element again after a reload (§2.3).
+ *          lookup finds an element again after a reload.
  * Description: Uses the CLI's own XML tokeniser, so the editor and the
  *              generator agree on where an element starts. An element spans
  *              from its `<` to the `>` that ends its closing tag (or its `/>`).

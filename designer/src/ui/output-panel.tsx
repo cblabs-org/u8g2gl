@@ -7,7 +7,7 @@
  * Purpose: The bottom panel's Output log: what the designer and the design
  *          server did — the editor Wasm builds, saves, reloads — in the order it
  *          happened, so the status bar's one-word state always has its story
- *          one click away (EDITOR-DESIGN §2.2).
+ *          one click away.
  * Description: Renders `Workspace.output`, newest last, keeping the end in view.
  *
  * Exports:

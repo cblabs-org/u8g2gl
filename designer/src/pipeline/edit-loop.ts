@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/pipeline/edit-loop.ts
- * Purpose: The live edit loop of EDITOR-DESIGN §3.2, end to end: a change to
+ * Purpose: The live edit loop, end to end: a change to
  *          any open document schedules one run on the next animation frame,
  *          and that run takes the text all the way to pixels — parse, resolve,
  *          realise, validate, scene, the editor Wasm's `applyScene`, the
@@ -14,19 +14,20 @@
  * Description: Owns the scheduler, the parse cache and the frame state the
  *              canvas panel shows. Diagnostics go to Monaco markers and to the
  *              Problems rows, and are replaced only when the set changes, so a
- *              keystroke that changes no diagnostic re-renders no list
- *              (EDITOR-DESIGN §3.3). While any error stands the canvas keeps the
- *              last good frame, dimmed, with a banner saying why (§3.8).
+ *              keystroke that changes no diagnostic re-renders no list. While
+ *              any error stands the canvas keeps the last good frame, dimmed,
+ *              with a banner saying why: losing the picture mid-edit is
+ *              disorienting (ui_spec §4.1).
  *
  *              Between edits an animation ticker re-renders the applied scene
  *              each frame so widgets animate (ui_spec §4.2); frozen, every
  *              render is at t = 0 instead, so the frame is stable to compare.
  *
  *              The element under the caret is outlined on the canvas from the
- *              run's element rectangles (XML to canvas selection, §3.7).
+ *              run's element rectangles (XML-to-canvas selection, ui_spec §4.3).
  *
  *              Each run's stage timings are handed to `onFrame` listeners, which
- *              is how the e2 measurement attributes a keystroke's cost.
+ *              is how a keystroke measurement attributes a keystroke's cost.
  *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
@@ -159,7 +160,7 @@ export class EditLoop {
   }
 
   // highlightSelection
-  // XML to canvas (EDITOR-DESIGN §3.7): outline the element the caret is in,
+  // XML to canvas (ui_spec §4.3): outline the element the caret is in,
   // when it is on the screen being drawn. Highlight only; never an edit.
   private highlightSelection(): void {
     const selection = this.workspace.selection.get();
@@ -262,6 +263,11 @@ export class EditLoop {
       }
     }
     performance.measure('u8g2gl:run', { start: runStart });
+    // The marks and the measure are for a profile recorded meanwhile, which
+    // keeps them; the page's own entry buffer would otherwise grow by a dozen
+    // entries per run for the life of the session.
+    for (const stage of ['frame', ...TEXT_STAGES, ...WASM_STAGES]) performance.clearMarks(`u8g2gl:${stage}`);
+    performance.clearMeasures('u8g2gl:run');
     for (const listener of [...this.frameListeners]) listener(timings);
   }
 

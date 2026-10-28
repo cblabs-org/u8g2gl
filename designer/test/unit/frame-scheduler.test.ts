@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/frame-scheduler.test.ts
- * Purpose: The edit loop's one scheduling rule (EDITOR-DESIGN §3.2): however
+ * Purpose: The edit loop's one scheduling rule: however
  *          many requests arrive, at most one run per animation frame, on the
  *          next frame, and none lost.
  * Description: A hand-cranked frame source stands in for requestAnimationFrame.

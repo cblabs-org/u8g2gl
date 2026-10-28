@@ -17,7 +17,7 @@
  *              `texts()` is what the pipeline runs on: an open model's text
  *              where there is one, the disk text otherwise.
  *
- *              Saving and the IDE beside it follow EDITOR-DESIGN §2.3 exactly:
+ *              Saving, with the user's IDE open on the same files:
  *              - Save is explicit, and conditional on the version last read,
  *                so a file that moved underneath is never overwritten.
  *              - A model is dirty when its undo position differs from the one
@@ -153,7 +153,8 @@ export class ProjectDocuments {
    *        any missing element names written in.
    *
    * The generated names are the model's starting text, not an edit, so the
-   * document opens clean: closing it unedited writes nothing (§2.3, E1 e5).
+   * document opens clean: closing it unedited writes nothing, because opening
+   * a file to look at it must not rewrite it (ui_spec §16.1).
    *
    * @return The model, or undefined for a path that is not a loaded document.
    */
@@ -301,7 +302,7 @@ export class ProjectDocuments {
 
   // diskChanged
   // A watcher event. The listing for an added or removed file; for a changed
-  // document, §2.3's rules: a buffer equal to the new text is simply saved
+  // document, the save rules above: a buffer equal to the new text is simply saved
   // (this is the echo of our own save), a clean buffer reloads, a dirty one
   // becomes a conflict.
   //   path — project-relative
@@ -343,7 +344,7 @@ export class ProjectDocuments {
 
   // reload
   // Replaces a buffer with the disk's text, clean, keeping the caret on the
-  // element of the same name in every editor showing it (§2.3). One edit, so
+  // element of the same name in every editor showing it. One edit, so
   // the user can still undo back to what was there.
   //   path   — the document
   //   theirs — the disk's text and version

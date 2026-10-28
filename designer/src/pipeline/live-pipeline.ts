@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/pipeline/live-pipeline.ts
- * Purpose: The text-to-scene half of the edit loop (EDITOR-DESIGN §3.2): from
+ * Purpose: The text-to-scene half of the live edit loop: from
  *          the project's current texts to diagnostics and the scene the editor
  *          Wasm builds. It is the same sequence `generate` runs — parse,
  *          expand and resolve once, realise, validate that very model, count
@@ -14,9 +14,9 @@
  * Description: `runTextPipeline` is synchronous and pure apart from the timer.
  *              It refuses to describe a scene while any error stands, because
  *              the scene emitter's contract is a validated model; the caller
- *              then keeps the last good frame, dimmed (EDITOR-DESIGN §3.8).
+ *              then keeps the last good frame, dimmed.
  *              Each stage is timed with `performance.now()` and recorded as a
- *              `performance.mark`, so the e2 measurement can attribute a slow
+ *              `performance.mark`, so a keystroke measurement can attribute a slow
  *              keystroke to the stage that spent it.
  *
  *              Alongside the scene it returns each element's device-space
@@ -24,8 +24,7 @@
  *              scene emitter uses, for the canvas's selection highlight.
  *
  *              It also returns the subjects' declared values, which the
- *              caller applies after every scene (EDITOR-DESIGN §3.2), since a
- *              rebuild clears them.
+ *              caller applies after every scene, since a rebuild clears them.
  *
  * Exports:
  * - Rect:                  A device-space rectangle

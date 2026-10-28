@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/saving.spec.ts
- * Purpose: E1 e3, e4 and e5 end to end — the designer as a co-author beside the
- *          user's IDE (EDITOR-DESIGN §2.3): a save changes only what was
+ * Purpose: Saving end to end — the designer as a co-author beside the user's
+ *          IDE, which has the same files open: a save changes only what was
  *          edited; a file changed on disk reloads when its buffer is clean and
  *          offers the three-way choice when it is dirty, overwriting nothing;
  *          and a file opened and closed without an edit is never rewritten,
@@ -42,7 +42,7 @@ async function replaceRow0X(page: Page, value: string): Promise<void> {
 /** The editor host of the screen, which carries the dirty flag. */
 const host = (page: Page) => page.locator(`.editor-host[data-editor-path="${SCREEN}"]`);
 
-test('e3: saving after one edit changes only that edit\'s bytes on disk', async ({ page }) => {
+test('saving after one edit changes only that edit\'s bytes on disk', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, SCREEN);
@@ -61,7 +61,7 @@ test('e3: saving after one edit changes only that edit\'s bytes on disk', async 
   expect(after.length).toBe(before.length - 1);
 });
 
-test('e4: a file changed on disk while its buffer is clean reloads silently', async ({ page }) => {
+test('a file changed on disk while its buffer is clean reloads silently', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, SCREEN);
@@ -73,7 +73,7 @@ test('e4: a file changed on disk while its buffer is clean reloads silently', as
   expect(session.read(SCREEN)).toBe(theirs);
 });
 
-test('e4: a file changed on disk while its buffer is dirty offers keep, take or compare, and overwrites nothing', async ({ page }) => {
+test('a file changed on disk while its buffer is dirty offers keep, take or compare, and overwrites nothing', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, SCREEN);
@@ -106,7 +106,7 @@ test('e4: a file changed on disk while its buffer is dirty offers keep, take or 
   await expect.poll(() => session?.read(SCREEN)).toBe(mine);
 });
 
-test('e4: take theirs replaces the buffer with the disk, clean', async ({ page }) => {
+test('take theirs replaces the buffer with the disk, clean', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, SCREEN);
@@ -121,7 +121,7 @@ test('e4: take theirs replaces the buffer with the disk, clean', async ({ page }
   expect(session.read(SCREEN)).toBe(theirs);
 });
 
-test('e5: a file opened and closed without an edit is not rewritten, even with names generated in its buffer', async ({ page }) => {
+test('a file opened and closed without an edit is not rewritten, even with names generated in its buffer', async ({ page }) => {
   const unnamed = ORIGINAL.replace('<u8g2gl_box name="plat_box" ', '<u8g2gl_box ');
   session = await startDesign({ files: { [SCREEN]: unnamed } });
   await page.goto(session.url);

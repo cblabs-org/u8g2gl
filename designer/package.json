@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
+    "build:e2e": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build --mode e2e",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "test:unit": "playwright test --config playwright.unit.config.ts",
-    "test:e2e": "playwright test --config playwright.config.ts"
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:production": "playwright test --config playwright.production.config.ts"
   },
   "engines": {
     "node": ">=22.12.0"

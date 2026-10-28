@@ -5,14 +5,16 @@
  *
  * File: designer/vite.config.ts
  * Purpose: How the designer is built into `designer/dist/`, which
- *          `u8g2gl design` serves. Three choices here are load-bearing:
+ *          `u8g2gl design` serves. Four choices here are load-bearing:
  *          the CLI's isomorphic `cli/src/core/` is consumed through an alias,
  *          as a library and never a copy, so the designer validates and
  *          renders with exactly the code `generate` uses; the bundle is built
  *          with a relative base, because the server mounts it under a
  *          token-carrying path it only knows at run time; and the framework
  *          editor Wasm is copied in, so a project with no toolchain still
- *          renders its framework elements (E1 acceptance e8).
+ *          opens and renders its framework elements; and the end-to-end test
+ *          hooks exist only in a separate test build, never in the one users
+ *          are served.
  * Description: React through `@vitejs/plugin-react`. Monaco's editor worker is
  *              bundled by Vite's `?worker` import in `src/monaco/`, so nothing
  *              loads from a CDN. The framework editor Wasm is read from
@@ -21,6 +23,13 @@
  *              emitted as `framework-wasm/u8g2gl_editor.{js,wasm}`. Without it
  *              the build warns and the designer reports that it has no
  *              framework renderer.
+ *
+ *              Two builds, by Vite mode:
+ *              - `vite build` (production): `__U8G2GL_TEST_HOOKS__` is `false`,
+ *                so the test hooks and the keystroke probe are removed.
+ *              - `vite build --mode e2e` (the end-to-end test build): it is
+ *                `true`, and the build writes `E2E-TEST-BUILD` beside the page,
+ *                so the tests can refuse to run against the wrong build.
  *
  * Exports:
  * - default: The Vite configuration
@@ -64,10 +73,33 @@ function frameworkWasm(dir: string): Plugin {
   };
 }
 
-export default defineConfig({
+/** The marker file the end-to-end test build writes beside its page. */
+const E2E_MARKER = 'E2E-TEST-BUILD';
+
+// e2eMarker
+// Writes the test build's marker, which `e2e/support/design-session.ts` checks
+// for, and whose absence marks a production build.
+function e2eMarker(): Plugin {
+  return {
+    name: 'u8g2gl-e2e-marker',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: E2E_MARKER, source: 'The end-to-end test build: it carries test hooks. Never serve it to users.\n' });
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   // Relative, so the bundle works under /app/<token>/ (see the file header).
   base: './',
-  plugins: [react(), frameworkWasm(resolve(process.env.U8G2GL_FRAMEWORK_WASM_DIR ?? join(here, '..', 'build-wasm', 'wasm')))],
+  define: {
+    __U8G2GL_TEST_HOOKS__: JSON.stringify(mode === 'e2e'),
+  },
+  plugins: [
+    react(),
+    frameworkWasm(resolve(process.env.U8G2GL_FRAMEWORK_WASM_DIR ?? join(here, '..', 'build-wasm', 'wasm'))),
+    ...(mode === 'e2e' ? [e2eMarker()] : []),
+  ],
   resolve: {
     alias: {
       '@u8g2gl/core': resolve(here, '..', 'cli', 'src', 'core'),
@@ -85,4 +117,4 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
-});
+}));

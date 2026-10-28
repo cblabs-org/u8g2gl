@@ -111,14 +111,20 @@ jobs:
           node dist/node/cli.js toolchain status
 
   designer-e2e:
-    # The designer end to end (E1 e1-e8): the built CLI's `u8g2gl design`
-    # serving the built designer, driven by Playwright in Chromium, Firefox and
-    # WebKit, headless. The framework editor Wasm is built first because the
-    # designer bundles it. Emscripten is the same pinned emsdk as wasm-tests and
-    # is on PATH for the suite, so the project-renderer test runs too; the
-    # no-toolchain tests take it off PATH for their own server. The e2
-    # performance test reports here without gating (CI machines vary; the
-    # number is in the uploaded e2-performance.json) and gates locally.
+    # The designer end to end: the built CLI's `u8g2gl design` serving the
+    # built designer, driven by Playwright in Chromium, Firefox and WebKit,
+    # headless. It checks editing reaches the canvas, Problems rows, saving
+    # beside an IDE, the no-toolchain fallback and keystroke latency. The
+    # framework editor Wasm is built first because the designer bundles it.
+    # Emscripten is the same pinned emsdk as wasm-tests and is on PATH for the
+    # suite, so the project-renderer test runs too; the no-toolchain tests take
+    # it off PATH for their own server. The keystroke latency gates report here
+    # without failing the job (CI machines vary; the numbers are in the uploaded
+    # keystroke-performance.json) and gate locally.
+    #
+    # The suite runs against the end-to-end test build, which carries test
+    # hooks. The production build is then built, checked by grep to contain no
+    # hook, and its own editing test run in all three engines.
     runs-on: ubuntu-latest
     env:
       EMSDK_VERSION: '5.0.3'
@@ -158,8 +164,8 @@ jobs:
           cmake --build build-wasm -j$(nproc) --target u8g2gl_editor
       - name: Build the CLI
         run: cd cli && npm ci && npm run build
-      - name: Build the designer
-        run: cd designer && npm ci && npm run build
+      - name: Build the designer (end-to-end test build)
+        run: cd designer && npm ci && npm run build:e2e
       - name: Install Playwright's browsers
         run: cd designer && npx playwright install --with-deps chromium firefox webkit
       - name: Designer unit tests
@@ -174,7 +180,16 @@ jobs:
           node --version
           em++ --version | head -1
           cd designer && npm run test:e2e
-      - name: Upload the end-to-end results (e2's numbers among them)
+      - name: Build the designer (production) and check it carries no test hook
+        run: |
+          cd designer && npm run build
+          if grep -rlE '__u8g2gl|installTestHooks|u8g2gl:key-to-blit|E2E-TEST-BUILD' dist; then
+            echo "::error::the production designer build contains a test hook"
+            exit 1
+          fi
+      - name: Designer editing test against the production build
+        run: cd designer && npm run test:e2e:production
+      - name: Upload the end-to-end results (keystroke timings included)
         if: always()
         uses: actions/upload-artifact@v4
         with:

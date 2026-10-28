@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/pipeline/frame-scheduler.ts
- * Purpose: The edit loop's only scheduling rule (EDITOR-DESIGN §3.2): however
+ * Purpose: The edit loop's only scheduling rule: however
  *          many edits arrive, **at most one pipeline run per animation frame**,
  *          on the latest text. A keyboard repeats and a mouse reports at up to
  *          1000 Hz; rendering each intermediate text would spend the frame on

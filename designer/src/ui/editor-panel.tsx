@@ -7,7 +7,7 @@
  * Purpose: One editor tab: a Monaco editor on one project document's model.
  *          The model, not the editor, holds the text and its undo stack
  *          ([UD-3]), so closing and reopening a tab never forks the document.
- *          The tab is also where EDITOR-DESIGN §2.3 meets the user: the dirty
+ *          The tab is also where the save rules meet the user: the dirty
  *          marker and the three-way choice when the file changed on disk
  *          under unsaved edits.
  * Description: Monaco is imperative, so the editor is created once per panel
@@ -16,7 +16,7 @@
  *              diff editor — the disk's text on the left, the buffer on the
  *              right, still editable — until the user chooses. The caret's
  *              element becomes the workspace selection, which the canvas
- *              highlights (XML to canvas, §3.7); a caret in text that does not
+ *              highlights (XML to canvas, ui_spec §4.3); a caret in text that does not
  *              parse keeps the previous selection.
  *
  * Exports:

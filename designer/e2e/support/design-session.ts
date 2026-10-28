@@ -15,8 +15,11 @@
  *              own HOME, so the toolchain cache, the editor build cache and the
  *              lock never touch the user's, and — unless the test asks for the
  *              toolchain — a PATH with no Emscripten on it, which is the
- *              "no toolchain" state of E1 e8. `stop` sends SIGINT and waits for
- *              the exit, which removes the lock.
+ *              state in which a project with no toolchain must still open.
+ *              It refuses to run against the wrong designer build: most tests
+ *              need the test build's hooks, and the production check must not
+ *              have them. `stop` sends SIGINT and waits for the exit, which
+ *              removes the lock.
  *
  * Exports:
  * - REPO, PROJECT_FIXTURE:   Where things are
@@ -61,6 +64,12 @@ export interface StartOptions {
   readonly files?: Readonly<Record<string, string>>;
   /** Whether the server may find Emscripten (on the runner's PATH). */
   readonly toolchain?: boolean;
+  /**
+   * Which designer build `designer/dist/` must be: the end-to-end test build
+   * (`npm run build:e2e`, with the test hooks) by default, or the production
+   * build (`npm run build`, without them).
+   */
+  readonly build?: 'e2e' | 'production';
 }
 
 /**
@@ -75,6 +84,14 @@ export async function startDesign(options: StartOptions = {}): Promise<DesignSes
     ['the designer (cd designer && npm run build)', join(REPO, 'designer', 'dist', 'index.html')],
   ] as const) {
     if (!existsSync(path)) throw new Error(`Build ${what} before the end-to-end tests: ${path} is missing.`);
+  }
+  const isTestBuild = existsSync(join(REPO, 'designer', 'dist', 'E2E-TEST-BUILD'));
+  const wanted = options.build ?? 'e2e';
+  if (wanted === 'e2e' && !isTestBuild) {
+    throw new Error('designer/dist is the production build; these tests need the test build: cd designer && npm run build:e2e');
+  }
+  if (wanted === 'production' && isTestBuild) {
+    throw new Error('designer/dist is the end-to-end test build; this test needs the production build: cd designer && npm run build');
   }
 
   // --- Step 2: A project copy and a home of its own ---

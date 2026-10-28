@@ -9,7 +9,7 @@
  *          active, what the Problems and Output panels show, and the requests
  *          that cross panels ("open this file at this line"). React renders
  *          from it; it does not live in React, because the edit loop runs at
- *          frame rate and must not wait on a render (EDITOR-DESIGN §3.3).
+ *          frame rate and must not wait on a render.
  * Description: Observables per concern, so each panel subscribes to only what
  *              it shows. Opening a file is a request the layout fulfils, since
  *              only the layout knows where editor tabs go.
@@ -61,8 +61,8 @@ export class Workspace {
   /** The Output panel's lines, oldest first. */
   readonly output = new Observable<readonly string[]>([]);
   /**
-   * The element the caret is in, by file and name: the canvas highlights it
-   * (EDITOR-DESIGN §3.7). Selection is never an edit.
+   * The element the caret is in, by file and name: the canvas highlights it.
+   * Selection is never an edit.
    */
   readonly selection = new Observable<{ readonly file: string; readonly name: string } | undefined>(
     undefined,
@@ -99,8 +99,9 @@ export class Workspace {
   }
 
   /**
-   * @brief Saves the active document (⌘S). Explicit only: there is no autosave
-   *        (EDITOR-DESIGN §2.3).
+   * @brief Saves the active document (⌘S). Explicit only: there is no
+   *        autosave, because a write the author did not ask for, into a file
+   *        their IDE also holds, makes a conflict out of nothing.
    */
   async saveActive(): Promise<void> {
     const path = this.activeFile.get();

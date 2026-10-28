@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/ui/status-bar.tsx
- * Purpose: The status bar of ui_spec §6, with EDITOR-DESIGN §2.2's addition:
+ * Purpose: The status bar of ui_spec §6, with one addition for served mode:
  *          the editor Wasm indicator, which says whether the canvas is drawing
  *          with this project's own widgets — and, when it is not, why and what
  *          to do. Clicking it opens Output, where the builds are logged.

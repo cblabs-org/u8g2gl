@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/playwright.config.ts
- * Purpose: The designer's end-to-end suite: E1 e1–e8 against the real
- *          `u8g2gl design`, the built designer and a real browser. Served mode
- *          must need nothing Chromium-only (e7), so the editing test also runs
- *          in Firefox and WebKit, Safari's engine.
+ * Purpose: The designer's end-to-end suite against the real `u8g2gl design`,
+ *          the end-to-end test build of the designer (`npm run build:e2e`) and
+ *          a real browser. Served mode must need nothing Chromium-only, so the
+ *          editing test also runs in Firefox and WebKit, Safari's engine.
  * Description: Headless always: no window opens on the desktop. One worker,
- *              because the e2 performance test measures milliseconds and must
+ *              because the keystroke latency test measures milliseconds and must
  *              not share the machine with another test's browser. Chromium runs
  *              every test; Firefox and WebKit run those tagged `@cross-browser`.
  *              Each test starts and stops its own server (`e2e/support/`).

@@ -272,7 +272,11 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       return;
     }
     // The page's URL holds the token, and a Referer would carry it to any
-    // origin the page links to; the index page also says so in a <meta>.
+    // origin the page links to. Only the designer's own files need this: the
+    // 302 and the 404s are not pages that link anywhere, and the Wasm route is
+    // fetched by the page, never navigated to. The index page also carries
+    // <meta name="referrer">, which covers it however it is served (the Vite
+    // dev server, say), where this header would be absent.
     response.setHeader('Referrer-Policy', 'no-referrer');
     send(response, 200, found.contentType, found.bytes);
   }
@@ -288,6 +292,10 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     const id = decodeStrict(rawId);
     const file = decodeStrict(rawFile);
     const wasmDir = id === undefined ? undefined : editorWasmDir(builds.get(id));
+    // Refused, each as a 404: a sub-path (`extra`), a malformed encoding, any
+    // file but the two a build emits (an allowlist, so nothing else in a build
+    // directory is ever reachable), and an unknown, queued, failed or
+    // non-editor-wasm build (`wasmDir` undefined).
     if (extra.length > 0 || file === undefined || !EDITOR_WASM_FILES.includes(file) || wasmDir === undefined) {
       sendJson(response, 404, { code: 'not-found', message: 'no such editor Wasm file' });
       return;
@@ -347,8 +355,10 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
 
 // editorWasmDir
 // The output directory of a succeeded editor-wasm build, or undefined for any
-// other record. The result is the job's own JSON, so it is narrowed here
-// rather than trusted.
+// other record. The result is the job's own JSON, typed `unknown`, so the cast
+// below is the narrowing, not a trust: the value is checked to be a string.
+// `wasmDir` is written by the server's own build job; nothing in the request
+// reaches it.
 //   record — a build record, or undefined
 function editorWasmDir(record: BuildJobRecord | undefined): string | undefined {
   if (record === undefined || record.job !== EDITOR_WASM_JOB || record.status !== 'succeeded') {
