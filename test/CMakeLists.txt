@@ -11,6 +11,8 @@ include(GoogleTest)
 set(U8G2GL_GTEST_DISCOVERY_TIMEOUT 60 CACHE STRING
     "Seconds gtest_discover_tests may wait for a test binary to list its tests")
 
+# Registers a test target's tests with ctest, as gtest_discover_tests does,
+# with the timeout above.
 function(u8g2gl_discover_tests target)
   gtest_discover_tests(${target} DISCOVERY_TIMEOUT ${U8G2GL_GTEST_DISCOVERY_TIMEOUT})
 endfunction()

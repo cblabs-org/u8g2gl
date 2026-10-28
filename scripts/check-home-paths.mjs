@@ -16,6 +16,9 @@
  *              `--self-test` checks the matcher against planted text instead,
  *              including that it fails on a planted path; CI runs both.
  *              Usage: node scripts/check-home-paths.mjs [--self-test]
+ *
+ * Exports:
+ * - scanText():  Every offending line of one file's text, with the reason
  */
 
 import { execFileSync } from 'node:child_process';
@@ -37,7 +40,7 @@ import {
 export function scanText(text, usernameDigest = OWNER_USERNAME_SHA256) {
   const findings = [];
 
-  // Step 1: absolute home paths, line by line so each finding has a location.
+  // --- Step 1: Absolute home paths, line by line so each finding has a location ---
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {
     for (const match of lines[i].matchAll(HOME_PATH_PATTERN)) {
@@ -47,7 +50,7 @@ export function scanText(text, usernameDigest = OWNER_USERNAME_SHA256) {
     }
   }
 
-  // Step 2: the owner's username anywhere else, such as in a relative path.
+  // --- Step 2: The owner's username anywhere else, such as in a relative path ---
   for (const line of findOwnerUsername(text, usernameDigest)) {
     if (!findings.some((f) => f.line === line)) {
       findings.push({ line, reason: "the owner's username" });
@@ -102,6 +105,9 @@ function selfTest() {
   return failures === 0;
 }
 
+// main
+// The guard (exit 0 clean, 1 with each finding printed as file:line) or, with
+// --self-test, the matcher's own check (exit 0 when every case behaves).
 function main() {
   if (process.argv.includes('--self-test')) {
     process.exit(selfTest() ? 0 : 1);

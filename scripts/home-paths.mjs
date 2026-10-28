@@ -49,9 +49,15 @@ export function isExemptHomeName(name) {
   return EXEMPT_HOME_NAMES.has(name);
 }
 
+/** Room for `git ls-files` over a large tree; Node's 1 MiB default is too small for this one. */
+const LISTING_MAX_BYTES = 256 * 1024 * 1024;
+
 /** Digests already computed, so each distinct word is hashed once per run. */
 const digestCache = new Map();
 
+// digestOf
+// SHA-256 of `word`, lower-cased, hex; memoised in digestCache.
+//   word — one run of letters and digits
 function digestOf(word) {
   const lower = word.toLowerCase();
   let digest = digestCache.get(lower);
@@ -93,14 +99,15 @@ export function findOwnerUsername(text, digest = OWNER_USERNAME_SHA256) {
  * @returns {{ path: string, text: string }[]}
  */
 export function listTrackedTextFiles(root) {
-  // Step 1: `ls-files -s` gives each entry's mode, which separates regular files
+  // --- Step 1: The listing ---
+  // `ls-files -s` gives each entry's mode, which separates regular files
   // (100644/100755) from gitlinks (160000) and symlinks (120000).
-  const listing = execFileSync('git', ['ls-files', '-s', '-z'], { cwd: root, maxBuffer: 1 << 28 })
+  const listing = execFileSync('git', ['ls-files', '-s', '-z'], { cwd: root, maxBuffer: LISTING_MAX_BYTES })
     .toString('utf8')
     .split('\0')
     .filter(Boolean);
 
-  // Step 2: read each regular file and drop the binary ones.
+  // --- Step 2: Read each regular file and drop the binary ones ---
   const files = [];
   for (const entry of listing) {
     const tab = entry.indexOf('\t');

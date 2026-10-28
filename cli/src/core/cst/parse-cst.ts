@@ -15,19 +15,24 @@
  *              cli/test/cst/tokeniser-diagnostics.json records them for the
  *              parity test to hold every path to. The recovery comments below
  *              describe those rules; they are deliberate, not accidents of the
- *              implementation. Each fault is reported once, where the input
- *              broke: text before the root at the text, an open tag the input
- *              ends inside at the end, an empty document at the end of input,
- *              a missing `=` without re-reading the value after it as more
- *              attributes. Where the record put one of these elsewhere, its
- *              entry carries the correction. Beyond the record, it accepts two
- *              well-formed constructs:
+ *              implementation. Where the record put a fault somewhere else,
+ *              its entry carries the correction.
+ *
+ *              Each fault is reported once, where the input broke:
+ *              - text before the root: at the text, which is skipped;
+ *              - an open tag the input ends inside: at the end of input;
+ *              - an empty document: at the end of input;
+ *              - a missing `=`: at the name, the quoted value after it
+ *                skipped rather than re-read as more attributes;
+ *              - a `<!DOCTYPE>` in the prolog: at its `<`, the root after it
+ *                still parsed.
+ *
+ *              Accepted beyond the record, as well-formed:
  *              - a leading BOM, recorded and skipped;
- *              - `<![CDATA[ ... ]]>` in element content, as a CDATA node;
- *              and reports a `<!DOCTYPE>` in the prolog once, then parses the
- *              root after it. Recovery paths produce `invalid` nodes for the
- *              bytes they skip, so the tree stays lossless even on malformed
- *              input.
+ *              - `<![CDATA[ ... ]]>` in element content, as a CDATA node.
+ *
+ *              Recovery paths produce `invalid` nodes for the bytes they skip,
+ *              so the tree stays lossless even on malformed input.
  *
  * Exports:
  * - CstParseResult:  The tree plus its well-formedness diagnostics
@@ -510,9 +515,12 @@ class CstScanner {
     }
     const children: CstContent[] = [];
     this.misc(children, true);
+    // Text with nothing after it has already been reported as a document
+    // with no root; the empty-document check below must not say so again.
     let rootlessReported = false;
     if (!this.atEnd() && this.peek() !== '<') {
-      rootlessReported = !this.textBeforeRoot(children);
+      const rootMayFollow = this.textBeforeRoot(children);
+      rootlessReported = !rootMayFollow;
       this.misc(children, true);
     }
 

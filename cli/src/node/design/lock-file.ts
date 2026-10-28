@@ -165,6 +165,8 @@ export interface LockIgnoreOptions {
  * the lock to.
  *
  * @param projectRoot Absolute project directory.
+ * @param options     The git executable and environment; tests vary them.
+ * @return The warning's text, or undefined when there is nothing to warn about.
  */
 export function lockIgnoreWarning(projectRoot: string, options: LockIgnoreOptions = {}): string | undefined {
   // --- Step 1: Only a project inside a git work tree can commit the lock ---

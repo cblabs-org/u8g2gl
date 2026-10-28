@@ -8,8 +8,8 @@
  *          served-first entry point to the designer. It
  *          owns everything about the server's life that the server itself
  *          should not: finding an already-running server for the project and
- *          attaching to it, the lock file, printing and opening the URL, and a
- *          clean Ctrl-C.
+ *          attaching to it, the lock file (and a warning when git would commit
+ *          it), printing and opening the URL, and a clean Ctrl-C.
  * Description: `parseDesignArgs` turns the command line into options (the CLI
  *              reports its errors as usage errors). `startOrAttach` is the
  *              testable core: it either attaches to a live server named by the

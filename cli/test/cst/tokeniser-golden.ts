@@ -17,13 +17,6 @@
  *              the text it was recorded from, so a later edit to that file is
  *              reported as a stale entry rather than as a parser regression.
  *
- *              Where the recorded location was wrong, the entry keeps its
- *              record and gains `corrected`: what the CST reports instead, and
- *              why. The tests hold the CST to the correction where there is
- *              one, and check that each correction still differs from its
- *              record, so a correction is never a silent no-op. Twelve
- *              diagnostics entries and one tree are corrected.
- *
  *              - `tokeniser-diagnostics.json`: code, line, column and message
  *                of every diagnostic, for every tracked `.xml` file, the inline
  *                malformed cases and one case per recovery branch, plus the
@@ -31,6 +24,12 @@
  *              - `tokeniser-trees.json`: the raw tree (element and attribute
  *                names, values and locations, text content, comments) for
  *                every tracked `.xml` file and every inline case.
+ *
+ *              Where the recorded location was wrong, the entry keeps its
+ *              record and gains `corrected`: what the CST reports instead, and
+ *              why. The tests hold the CST to the correction where there is
+ *              one, and check that each correction still differs from its
+ *              record, so a correction is never a silent no-op.
  *
  * Exports:
  *   Golden shapes:

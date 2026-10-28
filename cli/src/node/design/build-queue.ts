@@ -17,9 +17,9 @@
  *              returns as JSON. A runner that throws fails its job; it never
  *              stops the queue. A runner that throws a `BuildJobFailure` also
  *              gives the failed record a stable `code`, for the failures a
- *              client must tell apart without reading the message. Finished records beyond the most recent
- *              `MAX_FINISHED` are forgotten, so a long session's memory stays
- *              bounded.
+ *              client must tell apart without reading the message. Finished
+ *              records beyond the most recent `MAX_FINISHED` are forgotten, so
+ *              a long session's memory stays bounded.
  *
  * Exports:
  * - BuildJobContext:  What a runner is given

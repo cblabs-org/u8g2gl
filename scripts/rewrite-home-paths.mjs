@@ -21,6 +21,9 @@
  *              script is idempotent: a second run changes nothing.
  *              Usage: node scripts/rewrite-home-paths.mjs [--dry-run]
  *              (run from anywhere inside the work tree)
+ *
+ * Exports:
+ * - rewriteText():  One file's text with its home paths rewritten, and how many
  */
 
 import { execFileSync } from 'node:child_process';
@@ -63,7 +66,7 @@ const HOME_PATTERN = /\/(?:Users|home)\/([A-Za-z0-9_][A-Za-z0-9._-]*?)(?=\/|[^A-
 export function rewriteText(text) {
   let count = 0;
 
-  // Step 1: checkouts of this repository become repo-relative.
+  // --- Step 1: Checkouts of this repository become repo-relative ---
   let out = text.replace(CHECKOUT_PATTERN, (match, name, slash, offset, whole) => {
     if (isExemptHomeName(name)) return match;
     count++;
@@ -72,7 +75,7 @@ export function rewriteText(text) {
     return embedded ? '/.' : '.';
   });
 
-  // Step 2: every other home path becomes `~`.
+  // --- Step 2: Every other home path becomes `~` ---
   out = out.replace(HOME_PATTERN, (match, name, offset, whole) => {
     if (isExemptHomeName(name)) return match;
     count++;
@@ -83,6 +86,9 @@ export function rewriteText(text) {
   return { text: out, count };
 }
 
+// main
+// Rewrites every tracked text file in place (or, with --dry-run, only lists
+// them) and prints a count. Exits 0; a git failure throws, exiting non-zero.
 function main() {
   const dryRun = process.argv.includes('--dry-run');
   const root = execFileSync('git', ['rev-parse', '--show-toplevel']).toString().trim();
