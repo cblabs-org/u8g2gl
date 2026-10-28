@@ -74,12 +74,12 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 
 # WO6 — the signal race (on `u8g2gl-c1/wo5-readability`, ruling 12)
 
-- [ ] Handlers installed before the URL is printed, for a started server; attach unchanged.
-- [ ] The test signals as soon as the URL line arrives: SIGINT and SIGTERM, human and `--json`
+- [x] Handlers installed before the URL is printed, for a started server; attach unchanged.
+- [x] The test signals as soon as the URL line arrives: SIGINT and SIGTERM, human and `--json`
       forms, each exits 0 and leaves no lock. Show it fails before the fix (on Linux the race is
       deterministic; on macOS, report whether you could make it fail, e.g. with a delay injected
       only in a scratch copy).
-- [ ] CLI suite, lint, tsc; a short addendum to the completion report.
+- [x] CLI suite, lint, tsc; a short addendum to the completion report.
 
 # Completion report (worker, 2026-10-28)
 
@@ -132,4 +132,15 @@ block; the records themselves are unchanged. No generator golden moved.
 4. Beyond the five listed locations, one more end-of-input cascade went with them: trailing
    whitespace at the end of an open tag was also reported as `Unexpected character ''`.
 5. `cli/package-lock.json` had been left at 0.13.0 by earlier bumps; it now reads 0.13.3.
+
+**Addendum, WO6 (signal race, ruling 12).** Fix `b9bd591` on `u8g2gl-c1/wo5-readability`:
+`runDesignCommand` installs SIGINT/SIGTERM handlers and the lock-removing exit hook
+(`installShutdown()`) before printing, for a started server; attach is unchanged. New test:
+both signals × `--json` and human form, sent as soon as the URL line arrives, each exits 0
+with no lock. **Before the fix, macOS:** the test failed intermittently, SIGTERM only (1 of 4
+cases in 1 of 4 runs, 2 cases in another). With a 300 ms delay injected after printing, in a
+scratch copy of the built CLI only, all four cases died by their signal and left the lock.
+**After:** the same scratch copy with the same delay passes all four, and the test passes in
+five consecutive runs. CLI 2510 → **2514 passing**, 6 skipped; lint and tsc clean. The new
+function has its banner; no other line outside `design-command.ts` and its test changed.
 
