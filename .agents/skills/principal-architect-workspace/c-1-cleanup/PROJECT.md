@@ -22,11 +22,11 @@ Both given 2026-10-28.
 
 | WO | Topic | Branch | Status |
 |---|---|---|---|
-| WO1 | Home-folder paths out of the tree, and a CI guard that keeps them out | `u8g2gl-c1/wo1-paths` | ⏳ |
-| WO2 | CI actions pinned by SHA, Dependabot for actions; gtest discovery timeout | `u8g2gl-c1/wo2-ci` (from WO1's tip) | ⏳ |
-| WO3 | Designer and server: BOM kept on save, a failure code for no-toolchain, the lock-file warning | `u8g2gl-c1/wo3-designer` | ⏳ |
-| WO4 | The five tokeniser error locations E-1a judged wrong | `u8g2gl-c1/wo4-locations` | ⏳ |
-| WO5 | Rule 04's wording, Q-17's row, CLI 0.13.3; readability review and PA verification | `u8g2gl-c1/wo5-readability` | ⏳ |
+| WO1 | Home-folder paths out of the tree, and a CI guard that keeps them out | `u8g2gl-c1/wo1-paths` | ✅ `6b75954`..`83ed0f7` |
+| WO2 | CI actions pinned by SHA, Dependabot for actions; gtest discovery timeout | `u8g2gl-c1/wo2-ci` (from WO1's tip) | ✅ `565c697`..`6e5f606` |
+| WO3 | Designer and server: BOM kept on save, a failure code for no-toolchain, the lock-file warning | `u8g2gl-c1/wo3-designer` | ✅ `0a21152`..`fb4f3b2` |
+| WO4 | The five tokeniser error locations E-1a judged wrong | `u8g2gl-c1/wo4-locations` | ✅ `e2be0f2`..`87a03ca` |
+| WO5 | Rule 04's wording, Q-17's row, CLI 0.13.3; readability review and PA verification | `u8g2gl-c1/wo5-readability` | ✅ `d4c084d`..`da2c794` |
 
 ## PA rulings
 
@@ -66,3 +66,17 @@ Both given 2026-10-28.
 
 - **2026-10-28.** Worktree created from `main` @ `ec4cd01`, `extern/u8g2` checked out. WO1–WO5
   issued to one worker in order.
+- **2026-10-28. WO1–WO5 complete** (worker's report at the end of WORKORDERS.md). Accepted
+  deviations: the guard runs in `cli-tests`, as CI has no lint job (ruling 3); the failure code is
+  on the build record only, as builds are polled and no build SSE event exists (ruling 7); rule
+  04's premise corrected (`82ec83f` is not an ancestor of `main`; only the tag holds it); one
+  further end-of-input cascade fixed with WO4's five; `cli/package-lock.json` brought to 0.13.3.
+- **2026-10-28. PA verification**, suites one at a time on `da2c794`: guard self-test 11/11 and
+  clean tree; CLI 2510 + 6 skipped, lint and tsc clean; C++ 512/512 with the one skip; designer
+  unit 20; e2e (test build) 13 passed + 1 skipped; production build 3/3 with no test hook. Every
+  action pin re-resolved against its tag with `git ls-remote`; no home path in the tree; no
+  generator golden moved.
+- **Found by main's first public CI run (2026-10-28), not yet in C-1:** `u8g2gl design` prints
+  its URL before installing its SIGINT/SIGTERM handlers. On Linux the pipe write is synchronous,
+  so `design-command.test.ts`'s "human form" test signals before the handler exists and the
+  process dies with no exit code. Awaiting the owner: into C-1 or its own PR.
