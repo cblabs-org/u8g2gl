@@ -9,10 +9,15 @@
  *          can pinpoint the exact file, line, and column of offending text.
  * Description: Defines 1-based source coordinate, range span, and a generic
  *              Located<T> container wrapping arbitrary values with source locations.
+ *              An OffsetRange is the same span as offsets into the text, which is
+ *              what an editor needs to replace it; line and column are derived
+ *              from offsets, never the reverse.
  *
  * Exports:
  * - SourceLocation: 1-based line and column coordinates within a source file
  * - SourceRange: Start and end source location span
+ * - OffsetRange: Half-open `[start, end)` span of UTF-16 offsets into a source text
+ * - AttributeLocation: Where one attribute's name and value start
  * - Located: Wrapper attaching source location metadata to any value
  */
 
@@ -37,6 +42,31 @@ export interface SourceRange {
   readonly start: SourceLocation;
   /** Ending location of the span (inclusive). */
   readonly end: SourceLocation;
+}
+
+/**
+ * A half-open span `[start, end)` of UTF-16 offsets into one source text — the
+ * convention of the CST's own ranges, so a range read from a parsed document can
+ * be handed to an edit unchanged.
+ */
+export interface OffsetRange {
+  /** Offset of the first code unit in the span. */
+  readonly start: number;
+  /** Offset one past the last code unit in the span. */
+  readonly end: number;
+}
+
+/**
+ * Where one attribute was written: the start of its name and of its value.
+ * A diagnostic about an attribute reports at one of these (§15.1) — the value
+ * when the value is at fault, the name when the attribute should not be there
+ * at all.
+ */
+export interface AttributeLocation {
+  /** First character of the attribute name. */
+  readonly name: SourceLocation;
+  /** First character of the value, inside the quotes. */
+  readonly value: SourceLocation;
 }
 
 /**

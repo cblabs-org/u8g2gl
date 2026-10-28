@@ -50,9 +50,11 @@ import {
   parseGlobalsFile,
   parseScreenFile,
   parseWidgetManifestFile,
+  tokenizeXml,
+  type RawXmlElement,
 } from '../core/parser/index.js';
 import type { ProjectModel } from '../core/generator/index.js';
-import type { Diagnostic } from '../core/schema/diagnostic.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '../core/schema/diagnostic.js';
 import type { U8g2glProject } from '../core/schema/project.js';
 import type { Globals } from '../core/schema/globals.js';
 import type { Screen } from '../core/schema/screen.js';
@@ -131,12 +133,43 @@ function bundledFrameworkFilename(filePath: string, bundle: readonly ManifestTex
 }
 
 /**
+ * The root tags a single file is dispatched on, as an author would write them.
+ * `<component>` is dispatched too, but only to report its removal, so it is
+ * not offered here.
+ */
+const SINGLE_FILE_ROOTS: readonly string[] = ['u8g2gl', 'globals', 'screen', 'widget'];
+
+// unrecognisedRootDiagnostic
+// The error for a well-formed single file whose root no parser takes, at the
+// root's tag, naming it and the roots that are accepted.
+//   root  — the document's root; always present when the parse was clean
+//   label — the file name diagnostics are reported against
+function unrecognisedRootDiagnostic(root: RawXmlElement | undefined, label: string): Diagnostic {
+  const found = root?.name ?? '';
+  const accepted = SINGLE_FILE_ROOTS.map((tag) => `<${tag}>`).join(', ');
+  return {
+    code: DIAGNOSTIC_CODES.MALFORMED_XML,
+    severity: 'error',
+    file: label,
+    line: root?.loc.line ?? 1,
+    column: root?.loc.column ?? 1,
+    message: `Unrecognised root element <${found}>: a U8G2GL file's root is one of ${accepted}.`,
+    offendingText: found,
+  };
+}
+
+/**
  * @brief Loads a project directory or a single XML file into a project model.
  *
  * Every document is parsed under the default `'error'` missing-name policy: an
  * unnamed element is an error, and no name is synthesised. `validate
  * --fix-names` writes names to disk *before* calling this, so what is loaded is
  * always what is on disk.
+ *
+ * A single file is dispatched to a parser by its root element. One whose root
+ * no parser takes yields `U8G2GL_MALFORMED_XML` diagnostics in the returned
+ * model's `loadDiagnostics`: its own well-formedness errors if it has any, else
+ * one "Unrecognised root element" error naming the roots that are accepted.
  *
  * @param targetPath Absolute path to a project directory or an XML file.
  * @param options    Label for a single file, and the framework bundle.
@@ -203,7 +236,8 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     const label = options?.label ?? targetPath;
     const xml = readFileSync(targetPath, 'utf-8');
     fileContents.set(label, xml);
-    const rootTag = xml.match(/<([a-zA-Z0-9_]+)/)?.[1] ?? '';
+    const document = tokenizeXml(xml, label);
+    const rootTag = document.root?.name ?? '';
 
     if (rootTag === 'u8g2gl') {
       hasProjectManifest = true;
@@ -232,6 +266,16 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
         frameworkStandIn = { filename: frameworkFilename, manifest: res.value };
       } else if (res.value) {
         projectManifests.push(res.value);
+      }
+    } else {
+      // No parser takes this root. Saying nothing would let a file pass
+      // validation unread, so the file's own well-formedness errors are
+      // reported — text before the root, for one, is read as a misnamed
+      // root — or, for a well-formed file, the root itself.
+      if (document.diagnostics.length > 0) {
+        loadDiagnostics.push(...document.diagnostics);
+      } else {
+        loadDiagnostics.push(unrecognisedRootDiagnostic(document.root, label));
       }
     }
   }

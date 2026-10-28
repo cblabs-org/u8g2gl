@@ -30,7 +30,7 @@ import {
   requireAttribute,
   type RawXmlElement,
 } from './raw-xml.js';
-import { tokenizeXml } from './xml-tokeniser.js';
+import { tokenizeXml } from './cst-adapter.js';
 import type { ParseResult } from './index.js';
 
 /**

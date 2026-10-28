@@ -5,15 +5,17 @@
  *
  * File: src/core/cst/index.ts
  * Purpose: The CST module's one entry point, so consumers (the parser, the
- *          designer) import from `core/cst/` rather than from its files. It is
- *          deliberately not re-exported from core/index.ts yet: the public
- *          surface is settled when the first consumer lands, not before.
+ *          designer) import from `core/cst/` rather than from its files. Its
+ *          one consumer today, parser/cst-adapter.ts, is internal to the CLI,
+ *          so it is not re-exported from core/index.ts: the CST becomes public
+ *          API when a consumer outside the CLI's own parser needs it, which is
+ *          the designer's canvas editing.
  * Description: Re-exports only.
  *
  * Exports:
  * - parseCst(), CstParseResult:  Parse text into a lossless tree
  * - printCst():                  Reproduce the text from a tree
- * - LineIndex, LineColumn, BOM:  Offset → line/column lookup
+ * - LineIndex, LineColumn, BOM:  Offset ↔ line/column lookup
  * - decodeEntities(), encodeAttributeValue():  The CST's entity rules
  * - replaceAttributeValue(), insertAttribute(), removeAttribute(),
  *   insertElement(), removeElement(), renameElementTag():

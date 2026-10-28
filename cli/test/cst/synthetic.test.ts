@@ -56,7 +56,7 @@ describe('CST round-trip on a synthetic corpus', () => {
     const text = '<screen name="a">\n\t<view>\n\t\t<u8g2gl_box x="1" />\n\t</view>\n</screen>\n';
     const cst = roundTrip(text);
     const box = allElements(cst).find((e) => e.name === 'u8g2gl_box');
-    // A tab is one column, as in the tokeniser.
+    // A tab is one column, like every other UTF-16 code unit (line-index.ts).
     expect(cst.lines.locate(box!.start)).toEqual({ line: 3, column: 3 });
   });
 

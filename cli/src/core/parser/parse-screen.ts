@@ -27,7 +27,7 @@ import {
 import { parseStyleDeclarations } from './parse-globals.js';
 import { parseWidgetTree } from './parse-widget-tree.js';
 import type { ParseOptions, SourceEdit } from './name-policy.js';
-import { tokenizeXml } from './xml-tokeniser.js';
+import { tokenizeXml } from './cst-adapter.js';
 import type { ParseResult } from './index.js';
 
 /**

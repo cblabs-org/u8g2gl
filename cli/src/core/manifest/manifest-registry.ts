@@ -28,6 +28,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import type { SourceLocation } from '../schema/source-location.js';
 import type { BindDef, PropDef, WidgetManifest } from '../schema/widget-manifest.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 
@@ -228,19 +229,26 @@ function parentTagOf(
   return manifest.extends;
 }
 
+// manifestDiagnostic
+// One registry diagnostic about `manifest`, at `options.at` when given, else
+// at its `<widget>` tag.
+//   options.suggestions — machine-applicable replacements for offendingText
+//   options.at          — the attribute at fault, when there is one to point at (§15.1)
 function manifestDiagnostic(
   code: string,
   message: string,
   manifest: WidgetManifest,
   offendingText: string,
-  suggestions: readonly string[] = [],
+  options: { readonly suggestions?: readonly string[]; readonly at?: SourceLocation } = {},
 ): Diagnostic {
+  const { suggestions = [], at } = options;
+  const loc = at ?? manifest.loc;
   return {
     code,
     severity: 'error',
-    file: manifest.loc?.file ?? '',
-    line: manifest.loc?.line ?? 1,
-    column: manifest.loc?.column ?? 1,
+    file: loc?.file ?? '',
+    line: loc?.line ?? 1,
+    column: loc?.column ?? 1,
     message,
     offendingText,
     ...(suggestions.length > 0 ? { suggestions } : {}),
@@ -328,6 +336,10 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
     const { manifest, origin } = registration;
     const path = [...inProgress, tag];
     const parentTag = parentTagOf(manifest, (candidate) => registrations.has(candidate));
+    // Each diagnostic below is about the parent, so it reports at the `extends`
+    // value that named it. A composite's implicit u8g2gl_obj base was written
+    // nowhere; that one falls back to the `<widget>` tag.
+    const extendsAt = manifest.extendsLoc?.value;
 
     let parent: EffectiveManifest | undefined;
     if (parentTag !== undefined) {
@@ -344,6 +356,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
               `Manifest 'extends' cycle: ${cycle.join(' -> ')}.`,
               manifest,
               parentTag,
+              { at: extendsAt },
             ),
           );
         }
@@ -360,7 +373,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
               `manifest — an <api> with no new props is enough.`,
             manifest,
             parentTag,
-            findClosest(parentTag, tags),
+            { suggestions: findClosest(parentTag, tags), at: extendsAt },
           ),
         );
       } else {
@@ -383,6 +396,7 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
                 `'extends'), or use extends="u8g2gl_obj" and draw from your own class.`,
               manifest,
               parentTag,
+              { at: extendsAt },
             ),
           );
           // The result keeps the parent's props deliberately: dropping them would add an

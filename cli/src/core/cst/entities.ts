@@ -5,15 +5,11 @@
  *
  * File: src/core/cst/entities.ts
  * Purpose: The CST's entity rules: how an attribute's or text's raw source
- *          becomes the value a consumer reads. They must be the same rules the
- *          generator sees today, or a value would change meaning when the
- *          parser moves onto the CST.
- * Description: A deliberate copy of `decodeXmlEntities` from
- *              parser/xml-tokeniser.ts, not an import of it. The tokeniser is
- *              to be deleted once nothing imports it; an import from cst/ would
- *              be exactly the thing that kept it alive. Until then the two must
- *              stay identical, and cli/test/cst/entities.test.ts checks that
- *              — apart from the one out-of-range case noted in the body.
+ *          becomes the value a consumer reads. The parser and the designer
+ *          read values through these rules alone, so a value means the same
+ *          thing to both.
+ * Description: The one entity decoder in core: the parser's public
+ *              `decodeXmlEntities` is this function, re-exported.
  *
  *              The encoder is the CST's own: it writes the fewest references
  *              that make a value safe inside a given quote character, so an
@@ -29,7 +25,8 @@ import type { CstQuote } from './cst-types.js';
 /**
  * Decode the five predefined XML entities and decimal/hex character
  * references. An unrecognised reference such as `&nbsp;` is left as written,
- * which is the tokeniser's behaviour.
+ * because XML predefines only these five and a U8G2GL file declares no
+ * others.
  */
 export function decodeEntities(raw: string): string {
   return raw.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (match, entity: string) => {
@@ -48,10 +45,8 @@ export function decodeEntities(raw: string): string {
         const code = entity.startsWith('#x')
           ? parseInt(entity.slice(2), 16)
           : parseInt(entity.slice(1), 10);
-        // One deliberate difference from the tokeniser: a reference beyond
-        // U+10FFFF is left as written. String.fromCodePoint throws a
-        // RangeError there, and the tokeniser lets it escape, so `&#9999999;`
-        // crashes today's parser instead of producing a diagnostic.
+        // A reference beyond U+10FFFF is left as written, because
+        // String.fromCodePoint throws a RangeError there and a parse never throws.
         return Number.isNaN(code) || code > 0x10ffff ? match : String.fromCodePoint(code);
       }
     }

@@ -16,6 +16,7 @@
  * - RawXmlDocument: Complete parse tree containing root element and any diagnostics
  * - getAttribute: Find raw attribute by name
  * - getAttributeValue: Read attribute string value or undefined
+ * - getAttributeLocation: Where an attribute's name and value start, if present
  * - getChild: Find first child element matching tag name
  * - getChildren: Find all child elements matching tag name
  * - hasAttribute: Check whether an attribute is declared
@@ -24,13 +25,14 @@
  * - getNumberAttribute: Parse attribute value as integer or record a diagnostic
  */
 
-import type { SourceLocation } from '../schema/source-location.js';
+import type { AttributeLocation, OffsetRange, SourceLocation } from '../schema/source-location.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 
 /**
  * An XML attribute with its decoded string value and source coordinates.
  * `loc` points to the start of the attribute value content.
  * `nameLoc` points to the start of the attribute name.
+ * Both are derived from the offset ranges, which are what an edit replaces.
  */
 export interface RawXmlAttribute {
   /** The attribute identifier (e.g. "name", "width", "bind_text"). */
@@ -41,6 +43,10 @@ export interface RawXmlAttribute {
   readonly loc: SourceLocation;
   /** Source coordinates pointing to the start of the attribute name. */
   readonly nameLoc: SourceLocation;
+  /** Offsets of the name as written. */
+  readonly nameRange: OffsetRange;
+  /** Offsets of the value inside the quotes, entity references undecoded. */
+  readonly valueRange: OffsetRange;
 }
 
 /**
@@ -61,15 +67,20 @@ export interface RawXmlElement {
   readonly loc: SourceLocation;
   /** Source coordinate of the closing tag or self-closing '/>'. */
   readonly endLoc?: SourceLocation;
+  /**
+   * Offsets of the whole element, opening '<' through the end of its closing
+   * tag or '/>' (or to end of input when it was never closed).
+   */
+  readonly range: OffsetRange;
 }
 
 /**
- * Result of low-level XML tokenisation and tree assembly.
+ * Result of reading an XML text into the raw element tree.
  */
 export interface RawXmlDocument {
   /** The single root element of the XML document, if parsed. */
   readonly root?: RawXmlElement;
-  /** Syntax and structural diagnostics emitted during tokenisation. */
+  /** Well-formedness diagnostics found while reading the text. */
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -85,6 +96,15 @@ export function getAttribute(element: RawXmlElement, name: string): RawXmlAttrib
  */
 export function getAttributeValue(element: RawXmlElement, name: string): string | undefined {
   return getAttribute(element, name)?.value;
+}
+
+/**
+ * Returns where the named attribute's name and value start, or undefined if it
+ * is absent. For a model field that a later diagnostic must locate.
+ */
+export function getAttributeLocation(element: RawXmlElement, name: string): AttributeLocation | undefined {
+  const attr = getAttribute(element, name);
+  return attr ? { name: attr.nameLoc, value: attr.loc } : undefined;
 }
 
 /**

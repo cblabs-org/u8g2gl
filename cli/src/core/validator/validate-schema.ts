@@ -411,7 +411,7 @@ function checkBindDeclarations(
               `setter="${bind.setter}">, but the setter '${bind.setter}' it inherits accepts only ` +
               `${accepted.map((type) => `'${type}'`).join(', ')} (§13.2). Declare type="${accepted[0]}", ` +
               `or point setter= at a new method on your own class.`,
-            bind.loc,
+            bind.attributeLocs?.type?.value ?? bind.loc,
             bind.type,
             accepted,
           ),
@@ -439,7 +439,7 @@ function checkBindDeclarations(
           `Widget '${manifest.name}' declares <bind name="${bind.name}" type="${bind.type}" ` +
             `setter="${bind.setter}">, but prop '${prop.name}' is of type '${prop.type}' and takes a ` +
             `'${subjectType}' subject (§13.2). Declare type="${subjectType}".`,
-          bind.loc,
+          bind.attributeLocs?.type?.value ?? bind.loc,
           bind.type,
           [subjectType],
         ),
@@ -481,7 +481,8 @@ function bindingAliasDiagnostic(
     DIAGNOSTIC_CODES.BINDING_ALIAS,
     `Widget '${manifest.name}' declares <bind name="${bind.name}" setter="${bind.setter}">, which ` +
       `${cause}. Write ${names}: ${consequence} (${citation}).`,
-    bind.loc,
+    // The name is what must change, so the diagnostic points at it.
+    bind.attributeLocs?.name?.value ?? bind.loc,
     bind.name,
     expected,
   );
@@ -1010,7 +1011,9 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
           DIAGNOSTIC_CODES.DRAWING_ELEMENT_EXTENDS,
           `Drawing element '${manifest.name}' declares extends="${manifest.extends}", but a ` +
             `drawing element (draw= props only) has no class to inherit from; remove 'extends'.`,
-          manifest.loc,
+          // The fix is to delete the attribute, not to change its value, so
+          // this points at the attribute's name.
+          manifest.extendsLoc?.name ?? manifest.loc,
           'extends',
         ),
       );
