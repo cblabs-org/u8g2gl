@@ -32,7 +32,7 @@ Given 2026-10-28; it is WO6 and ruling 12.
 | WO3 | Designer and server: BOM kept on save, a failure code for no-toolchain, the lock-file warning | `u8g2gl-c1/wo3-designer` | ✅ `0a21152`..`fb4f3b2` |
 | WO4 | The five tokeniser error locations E-1a judged wrong | `u8g2gl-c1/wo4-locations` | ✅ `e2be0f2`..`87a03ca` |
 | WO5 | Rule 04's wording, Q-17's row, CLI 0.13.3; readability review and PA verification | `u8g2gl-c1/wo5-readability` | ✅ `d4c084d`..`da2c794` |
-| WO6 | `u8g2gl design`'s signal handlers installed before the URL is printed | `u8g2gl-c1/wo5-readability` (ruling 12) | ⏳ |
+| WO6 | `u8g2gl design`'s signal handlers installed before the URL is printed | `u8g2gl-c1/wo5-readability` (ruling 12) | ✅ `b9bd591`..`b127eee` |
 
 ## PA rulings
 
@@ -92,3 +92,7 @@ Given 2026-10-28; it is WO6 and ruling 12.
   so `design-command.test.ts`'s "human form" test signals before the handler exists and the
   process dies with no exit code. Awaiting the owner: into C-1 or its own PR.
 - **2026-10-28.** Owner put the signal race into C-1: ruling 12, WO6.
+- **2026-10-28. WO6 complete and PA-verified.** Handlers installed before printing; the race
+  reproduced on macOS before the fix (SIGTERM, intermittently; deterministically with a delay in a
+  scratch copy of the built CLI) and not after. PA: CLI 2514 + 6 skipped, lint and tsc clean,
+  guard clean, `design-command.test.ts` 29/29 three runs in a row.
