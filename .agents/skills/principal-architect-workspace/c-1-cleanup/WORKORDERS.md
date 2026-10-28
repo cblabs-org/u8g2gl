@@ -29,12 +29,12 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 
 # WO1 — paths (`u8g2gl-c1/wo1-paths`)
 
-- [ ] `scripts/` gains the rewrite script (ruling 1) and the guard (ruling 3). Run the rewrite;
+- [x] `scripts/` gains the rewrite script (ruling 1) and the guard (ruling 3). Run the rewrite;
       commit the script and its result as separate commits, so the result's diff is reviewable on
       its own.
-- [ ] Read every non-evidence change and reword prose where the mechanical result reads badly.
-- [ ] Ruling 2's note in each evidence folder touched; the hash check.
-- [ ] The guard runs in CI's lint job and passes on the tree; a test or a self-check shows it
+- [x] Read every non-evidence change and reword prose where the mechanical result reads badly.
+- [x] Ruling 2's note in each evidence folder touched; the hash check.
+- [x] The guard runs in CI's lint job and passes on the tree; a test or a self-check shows it
       fails on a planted path.
 
 # WO2 — CI and the C++ build (`u8g2gl-c1/wo2-ci`)

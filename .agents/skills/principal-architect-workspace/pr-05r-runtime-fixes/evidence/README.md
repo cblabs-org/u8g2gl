@@ -5,6 +5,8 @@ These files were written to the git-ignored `tmp/` of the `U8G2GL-05r` worktree 
 committed. They were recovered when that worktree was removed on 2026-10-26 and filed here
 unedited. `.log` files are renamed `.txt` because `*.log` is git-ignored.
 
+The one exception to "unedited": **paths rewritten 2026-10-28** by `scripts/rewrite-home-paths.mjs` (C-1): absolute home-folder paths in these logs were made repo-relative (under a checkout of this repository) or `~/…` (elsewhere). Nothing else in them changed. No hash recorded here is of a rewritten file.
+
 | Folder | Original `tmp/` path | What it is |
 |---|---|---|
 | `wo1/` | `bench/*.txt`, `repro_{before,after}.txt` | State-saver cost benchmark (WO1, re-run in WO4 as `wo4_*`) and the ambient-state failure reproduction |

@@ -36,6 +36,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: No home-folder paths in tracked files
+        # The guard's self-test first: a guard that has stopped detecting
+        # planted paths would otherwise pass every tree.
+        run: |
+          node scripts/check-home-paths.mjs --self-test
+          node scripts/check-home-paths.mjs
       - name: Install
         run: cd cli && npm ci
       - name: Test
