@@ -57,10 +57,10 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 
 # WO4 — tokeniser locations (`u8g2gl-c1/wo4-locations`)
 
-- [ ] The five cases: text before the root read as a tag; "expected '>'" reported at the element's
+- [x] The five cases: text before the root read as a tag; "expected '>'" reported at the element's
       `<`; a missing `=` cascading; an empty document at 1:1; `<!DOCTYPE>` giving two errors. Each
       reports once, at the right place, with a test.
-- [ ] Only diagnostics goldens move, each move explained in the commit; generator goldens and
+- [x] Only diagnostics goldens move, each move explained in the commit; generator goldens and
       CI's determinism script unchanged (ruling 9).
 
 # WO5 — docs and review (`u8g2gl-c1/wo5-readability`)
