@@ -31,7 +31,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { registerEditorWasmJob } from './build/editor-wasm-job.js';
 import { startDesignServer, type DesignServer } from './design-server.js';
-import { isLockLive, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
+import { isLockLive, lockIgnoreWarning, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
 import { openBrowser } from './open-browser.js';
 import { locateDesignerDist } from './static-files.js';
 
@@ -130,6 +130,8 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
  * attached }`), opens the browser unless `--no-open`, and for a started server
  * stays running until SIGINT or SIGTERM, then closes, removes the lock and
  * exits 0. Attaching exits 0 at once. A directory without u8g2gl.xml exits 1.
+ * A project in a git work tree that does not ignore the lock gets one warning
+ * on stderr first.
  *
  * @param args Parsed arguments.
  * @param json Whether `--json` was given.
@@ -147,14 +149,21 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(1);
   }
 
-  // --- Step 2: Attach to the running server, or start one ---
+  // --- Step 2: Warn, once, if git would offer the lock (and its token) for commit ---
+  // stderr, so `--json`'s stdout stays one JSON line.
+  const warning = lockIgnoreWarning(projectRoot);
+  if (warning !== undefined) {
+    console.error(`u8g2gl design: warning: ${warning}`);
+  }
+
+  // --- Step 3: Attach to the running server, or start one ---
   const session = await startOrAttach(projectRoot, args.port);
   if (session.kind === 'failed') {
     console.error(`u8g2gl design: ${session.message}`);
     process.exit(1);
   }
 
-  // --- Step 3: Report the URL, and open it ---
+  // --- Step 4: Report the URL, and open it ---
   const lock = session.kind === 'started'
     ? { url: session.server.url, port: session.server.port, pid: process.pid }
     : session.lock;
@@ -175,7 +184,7 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(0);
   }
 
-  // --- Step 4: A started server keeps the process alive; a signal ends it cleanly ---
+  // --- Step 5: A started server keeps the process alive; a signal ends it cleanly ---
   let stopping = false;
   const shutdown = (): void => {
     if (stopping) {
