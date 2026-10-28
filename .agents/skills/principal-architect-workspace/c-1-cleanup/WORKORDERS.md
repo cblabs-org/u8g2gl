@@ -48,12 +48,12 @@ in the status logs and follow-up notes of `e-1b-parser-on-cst/PROJECT.md`,
 
 # WO3 — designer and server (`u8g2gl-c1/wo3-designer`)
 
-- [ ] A BOM survives open → edit → save (ruling 6). Unit test and an e2e check.
-- [ ] The build job's record and its SSE event carry a failure code (ruling 7): at least
+- [x] A BOM survives open → edit → save (ruling 6). Unit test and an e2e check.
+- [x] The build job's record and its SSE event carry a failure code (ruling 7): at least
       no-Emscripten and no-source-tree. The designer's "none" state reads the code; the regex goes.
       Tests on both sides.
-- [ ] The lock-file warning (ruling 8), with tests for: ignored, not ignored, not a work tree.
-- [ ] Record mixed line endings as a known limitation where E-1e's limitations are documented.
+- [x] The lock-file warning (ruling 8), with tests for: ignored, not ignored, not a work tree.
+- [x] Record mixed line endings as a known limitation where E-1e's limitations are documented.
 
 # WO4 — tokeniser locations (`u8g2gl-c1/wo4-locations`)
 
