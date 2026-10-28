@@ -43,7 +43,7 @@
  * - Rect:                  A device-space rectangle
  * - CompiledAssets:        The fonts and images compileProjectAssets() produced
  * - TextPipelineInput:     Texts, cache, assets and the active screen
- * - TextPipelineResult:    Diagnostics, scene, hit targets and stage timings
+ * - TextPipelineResult:    Diagnostics, scene, hit targets, placements and stage timings
  * - TEXT_STAGES:           The stages, in order
  * - runTextPipeline():     One run
  * - activeScreenName():    The screen a file shows, or the project's first
@@ -113,6 +113,13 @@ export interface TextPipelineResult {
   /** What a click on `screen` can hit, in draw order. */
   readonly targets: readonly HitTarget[];
   /**
+   * Each element written in `screen`'s placement — its manifest, its model in
+   * device coordinates and its container's corner — by name: what the canvas
+   * reads to know which attributes place an element and where a default puts
+   * it. A composite instance drawn only through its children has none.
+   */
+  readonly placements: ReadonlyMap<string, Placement>;
+  /**
    * Each subject's declared initial value, as the `{ name: value }` JSON
    * `applySampleData` takes: the frame the firmware draws at boot, until sample
    * data (a later step) supplies others.
@@ -178,6 +185,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   let scene: string | undefined;
   let bounds: ReadonlyMap<string, Rect> = new Map();
   let targets: readonly HitTarget[] = [];
+  let placements: ReadonlyMap<string, Placement> = new Map();
   if (wellFormed && target !== undefined && input.assets !== undefined) {
     try {
       const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
@@ -203,7 +211,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       const realised = realisation.screens[screenIndex];
       const resolved = pipeline.resolution.screens[screenIndex];
       if (realised !== undefined && resolved !== undefined) {
-        ({ bounds, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+        ({ bounds, targets, placements } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
       }
     } catch (error) {
       // Only a model with errors may be refused: the emitter refusing a valid
@@ -212,6 +220,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       scene = undefined;
       bounds = new Map();
       targets = [];
+      placements = new Map();
     }
   }
   lap('scene');
@@ -227,6 +236,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     display: display === undefined ? undefined : { width: display.width, height: display.height },
     bounds,
     targets,
+    placements,
     subjectValues: declaredValues(model.globals),
     timings,
   };
@@ -266,7 +276,8 @@ function declaredValues(globals: Globals): string {
 }
 
 // selectable
-// The drawn screen's hit targets and selectable rectangles. Each drawn element
+// The drawn screen's hit targets, selectable rectangles and the placements of
+// the elements written in it. Each drawn element
 // is a target of the element written in the screen it belongs to: itself, or
 // the outermost composite instance it was expanded through (ui_spec §8: a hit
 // on a composite's child selects the instance). An instance's rectangle is its
@@ -276,9 +287,10 @@ function declaredValues(globals: Globals): string {
 function selectable(
   realised: RealisedScreen,
   placements: ReadonlyMap<RealisedElement, Placement>,
-): { bounds: Map<string, Rect>; targets: HitTarget[] } {
+): { bounds: Map<string, Rect>; targets: HitTarget[]; placements: Map<string, Placement> } {
   const targets: HitTarget[] = [];
   const own = new Map<string, Rect>();
+  const placed = new Map<string, Placement>();
   const drawn = new Map<string, Rect>();
   for (const step of realised.drawOrder) {
     const placement = placements.get(step.element);
@@ -288,6 +300,7 @@ function selectable(
     targets.push({ name, rect });
     if (step.element.element.instantiation.length === 0) {
       own.set(name, rect);
+      if (placement !== undefined) placed.set(name, placement);
     } else {
       const box = drawn.get(name);
       drawn.set(name, box === undefined ? rect : union(box, rect));
@@ -295,7 +308,7 @@ function selectable(
   }
   const bounds = new Map(drawn);
   for (const [name, rect] of own) bounds.set(name, rect);
-  return { bounds, targets };
+  return { bounds, targets, placements: placed };
 }
 
 // union

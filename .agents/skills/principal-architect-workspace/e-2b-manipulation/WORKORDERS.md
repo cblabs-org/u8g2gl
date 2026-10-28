@@ -31,10 +31,10 @@ from the same base. Do not touch panel code; keep shared shell files' changes sm
 
 # WO1 — gestures and the edit path (`u8g2gl-e2b/wo1-gestures`)
 
-- [ ] Gesture ownership (ruling 1), replacing E-2a's "every drag is a marquee".
-- [ ] The edit path and undo grouping (ruling 2), with unit tests: a gesture of many frames is
+- [x] Gesture ownership (ruling 1), replacing E-2a's "every drag is a marquee".
+- [x] The edit path and undo grouping (ruling 2), with unit tests: a gesture of many frames is
       one undo stop; nudges within 750 ms share one; undo restores the text exactly.
-- [ ] `canvasEditing` false: no gesture writes (e2e).
+- [x] `canvasEditing` false: no gesture writes (e2e).
 
 # WO2 — move (`u8g2gl-e2b/wo2-move`)
 

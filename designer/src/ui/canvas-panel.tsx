@@ -7,14 +7,16 @@
  * Purpose: The canvas (ui_spec §8): the active screen as the editor Wasm draws
  *          it, at a chosen zoom, on dark chrome so the display bounds read as a
  *          physical panel, and where elements are selected: click, click again
- *          to cycle through overlaps, drag a marquee, Esc. Selecting never
- *          edits; moving elements on the canvas is a later step.
+ *          to cycle through overlaps, drag a marquee, Esc, and where they are
+ *          moved: drag one, or nudge the selection with the arrow keys. Every
+ *          move is an edit to the text, never a position the text does not hold.
  * Description: React renders the toolbar and the two canvases' container; the
  *              pixels are drawn by `CanvasView`, which the edit loop calls
  *              directly, so a frame never passes through React; the selection
  *              gestures are `CanvasGestures`, attached to the frame element for
- *              the panel's life, and this component never reads the selection,
- *              so selecting re-renders none of it. The toolbar
+ *              the panel's life with the edit path they write through
+ *              (`CanvasEditor`), and this component never reads the
+ *              selection, so selecting or dragging re-renders none of it. The toolbar
  *              sets the zoom (1× to 8×, or fit) and the animation freeze. The
  *              banner says why the frame is the last good one, or what the
  *              renderer cannot draw.
@@ -25,6 +27,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CanvasView } from '../canvas/canvas-view';
+import { CanvasEditor } from '../editing/canvas-editor';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -54,7 +57,15 @@ export function CanvasPanel(): React.JSX.Element {
     view.current = new CanvasView(frame.current, overlay.current, container.current);
     loop.attachCanvas(view.current);
     const shown = view.current;
-    const gestures = new CanvasGestures(container.current, frame.current, loop.hitTargets, workspace.selection, (rect) => shown.setMarquee(rect));
+    const gestures = new CanvasGestures({
+      element: container.current,
+      frame: frame.current,
+      targets: loop.hitTargets,
+      canvasEditing: loop.canvasEditing,
+      selection: workspace.selection,
+      editor: new CanvasEditor((path) => workspace.documents.open(path)),
+      showMarquee: (rect) => shown.setMarquee(rect),
+    });
     return () => {
       gestures.dispose();
       loop.attachCanvas(undefined);
