@@ -133,6 +133,8 @@ export class CanvasGestures {
     this.element.releasePointerCapture?.(event.pointerId);
     const { file, targets } = this.targets.get();
     if (file === undefined) return;
+
+    // --- Step 1: A marquee selects what it touches; Shift adds it ---
     if (press.marquee) {
       this.showMarquee(undefined);
       this.cycler.reset();
@@ -140,8 +142,11 @@ export class CanvasGestures {
       this.selection.select(file, press.shift ? [...this.current(file), ...names] : names, 'canvas');
       return;
     }
+    // --- Step 2: A click names the next element down at its pixel ---
     const { x, y } = this.toDevice(event.clientX, event.clientY);
     const name = this.cycler.click(targets, x, y);
+
+    // --- Step 3: Shift toggles it in the selection; a plain click replaces it ---
     if (press.shift) {
       const current = this.current(file);
       if (name !== undefined) {

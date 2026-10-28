@@ -42,6 +42,13 @@
 
 import { blitFrame } from './framebuffer';
 
+/**
+ * A rectangle, in whichever pixels its use says: device pixels for what is
+ * drawn about, CSS pixels for where on the overlay it is drawn. A local alias
+ * rather than the pipeline's `Rect`, so the canvas does not depend on the pipeline.
+ */
+type Box = { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+
 /** A rectangle on the overlay, in device pixels. */
 export interface OverlayRect {
   readonly x: number;
@@ -94,7 +101,7 @@ export class CanvasView {
   /** Backing-store pixels per CSS pixel on the overlay, as last sized. */
   private ratio = 1;
   private overlayRects: readonly OverlayRect[] = [];
-  private marquee: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined;
+  private marquee: Box | undefined;
 
   /**
    * @param frame     The frame canvas.
@@ -147,7 +154,7 @@ export class CanvasView {
    * @brief Shows the marquee being dragged, in device pixels; undefined hides it.
    *        Drawn on the overlay only: a marquee selects, it never draws.
    */
-  setMarquee(rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number } | undefined): void {
+  setMarquee(rect: Box | undefined): void {
     if (rect === undefined && this.marquee === undefined) return;
     this.marquee = rect;
     this.drawOverlay();
@@ -225,19 +232,14 @@ export class CanvasView {
   // screenBox
   // A device-pixel rectangle as the CSS-pixel box just outside it: one CSS
   // pixel past each edge, so a 2-pixel stroke centred on it clears the element.
-  private screenBox(rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } {
+  private screenBox(rect: Box): Box {
     return { x: rect.x * this.zoom - 1, y: rect.y * this.zoom - 1, width: rect.width * this.zoom + 2, height: rect.height * this.zoom + 2 };
   }
 
   // drawHatch
   // Diagonal lines across the element's box, clipped to it, and its outline:
   // the frame's pixels show through between the lines.
-  private drawHatch(context: CanvasRenderingContext2D, box: { x: number; y: number; width: number; height: number }): void {
+  private drawHatch(context: CanvasRenderingContext2D, box: Box): void {
     context.save();
     context.beginPath();
     context.rect(box.x, box.y, box.width, box.height);
@@ -259,7 +261,7 @@ export class CanvasView {
   // drawHandles
   // Eight handles — the corners and the edges' midpoints — the same size at
   // every zoom, so they stay grabbable at 1× and small at 8×.
-  private drawHandles(context: CanvasRenderingContext2D, box: { x: number; y: number; width: number; height: number }): void {
+  private drawHandles(context: CanvasRenderingContext2D, box: Box): void {
     const half = HANDLE_SIZE / 2;
     context.setLineDash([]);
     context.lineWidth = 1;
@@ -282,7 +284,7 @@ export class CanvasView {
   private drawBadge(
     context: CanvasRenderingContext2D,
     rect: OverlayRect,
-    box: { x: number; y: number; width: number; height: number },
+    box: Box,
   ): void {
     const text = `${rect.x}, ${rect.y}, ${rect.width}×${rect.height}`;
     context.font = BADGE_FONT;

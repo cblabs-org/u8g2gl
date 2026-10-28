@@ -12,8 +12,9 @@
  *          `__U8G2GL_TEST_HOOKS__`, which a production build sets to `false`,
  *          so neither this module nor the keystroke probe reaches its bundle.
  * Description: Installs the keystroke probe and publishes the workspace as
- *              `window.__u8g2gl`, and the shell's render counts. `TestHandle` is the handle's one typed
- *              description, which the tests import rather than restating it.
+ *              `window.__u8g2gl`, and the shell's render counts.
+ *              `TestHandle` is the handle's one typed description, which the
+ *              tests import rather than restating it.
  *
  * Exports:
  * - TestHandle:          The window properties the test build adds

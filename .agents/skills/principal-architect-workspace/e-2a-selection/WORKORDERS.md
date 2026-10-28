@@ -62,6 +62,76 @@ owner's approval (rule 00) and the programme rulings. The design is
 
 # WO5 — review (`u8g2gl-e2a/wo5-readability`)
 
-- [ ] Spawn the `readability-reviewer` on E-2a's diff; resolve P1–P3, decide P4 with reasons.
-- [ ] Final run of every suite, one at a time (CLI, C++, designer unit, e2e, production build
+- [x] Spawn the `readability-reviewer` on E-2a's diff; resolve P1–P3, decide P4 with reasons.
+- [x] Final run of every suite, one at a time (CLI, C++, designer unit, e2e, production build
       and its no-test-hook check); a completion report at the end of this file.
+
+# Completion report (worker, 2026-10-28)
+
+**Commits** (branches stacked, each from the previous tip; nothing pushed):
+
+| WO | Branch | Commits |
+|---|---|---|
+| WO1 | `u8g2gl-e2a/wo1-scene-range` | `a1e0b6d` |
+| WO2 | `u8g2gl-e2a/wo2-selection` | `73de8e8` |
+| WO3 | `u8g2gl-e2a/wo3-overlays` | `7b8ff8b` |
+| WO4 | `u8g2gl-e2a/wo4-states` | `d574184` |
+| WO5 | `u8g2gl-e2a/wo5-readability` | the review fixes and this report |
+
+**Suites, before → after** (run one at a time, locally):
+
+| Suite | Before (`fd717b1`) | After |
+|---|---|---|
+| CLI (vitest) | 2514 passed, 6 skipped | 2515 passed, 6 skipped; lint clean |
+| C++ (ctest) | 512 (1 skipped) | 512 (1 skipped), zero warnings |
+| Wasm tests (snapshot, placeholder, last-error) | pass | pass, against the regenerated scene golden |
+| Designer unit | 20 | 40 |
+| Designer e2e | 14 | 30 (Chromium 26, Firefox 2, WebKit 2) |
+| Production build + hook grep + production e2e | pass, 3 | pass (no hook string), 3 |
+
+**Keystroke gate** (Chromium, 4× CPU, 300 keys per screen, local, final run): departures
+300/300 in the first frame, run→blit p95 3.9 ms (baseline 4.0); 20 elements 300/300,
+p95 3.8 ms (baseline 299/300, 3.8). Key→blit p95 18.6 / 19.1 ms (reported only). Self-test:
+the four forced keys counted 4 frames each and the gate failed, as it must.
+
+**Ruling 6:** five selection changes (click, cycle, another element, marquee, Esc) render
+`SelectionGeometry` five times and no other shell component; a self-test shows a canvas
+panel change is counted.
+
+**Deviations and decisions, with reasons:**
+
+1. *WO1 touches the parser and schema, outside ruling 8's file list.* `scene.ts` cannot
+   reach offsets without them: `WidgetNode` gains an optional `range`, copied from the raw
+   element in `parse-widget-tree.ts` (two lines, additive). Only the editor scene golden
+   moved, by exactly `start`/`end` per element; the C++ goldens do not carry `source`. The
+   scene format stays at version 3 (hosts ignore keys they do not read; the bridge reads no
+   `source`). CI's determinism condition watches only `cli/test/generator/fixtures/*/expected/`,
+   so it passes trivially here; the bump is still made, as ruling 1 requires.
+2. *The designer reads element ranges from the current CST, not the scene's `start`/`end`.*
+   EDITOR-DESIGN §3.7 maps a hit by name, and the scene is withheld or stale while the text
+   is broken; the current text's spans are always right. The scene's ranges are there for
+   E-2b.
+3. *A name drops out when it is gone from the CST;* the scene supplies only geometry, so an
+   element with nothing drawn can still be selected from the caret.
+4. *A canvas selection opens (or brings forward) its file's editor tab* so it can be
+   revealed; the request carries no position, so it neither moves the caret nor takes focus.
+5. *A drag anywhere is a marquee* until E-2b claims drags that start on a selection.
+   Shift-click toggles and Shift-marquee adds, beyond the ruling's minimum.
+6. *§3.8:* the pipeline now describes a scene despite errors when the emitter can; a throw
+   on a model with errors means unbuildable, a throw with none is re-thrown. The
+   unbuildable state keeps its error-count banner from E-1e; only not-well-formed gets the
+   *XML not well-formed at L:C* banner. `canvasEditing` is false while **any** project
+   document is not well-formed (the frame is stale then anyway).
+7. *Render counting* is a test-build-only counter (`perf/render-count.ts`), compiled away in
+   production, since React's Profiler is inert in a production bundle.
+
+**Readability review:** P1 0, P2 0, P3 2 (both fixed: element-at's Purpose, hit-test's export
+list), P4 9. Done: step comments in `problemElements` and `up`, the needless optional
+chaining, a local `Box` alias in `canvas-view.ts`, the status-bar export list and the
+test-hooks wrap. Declined: renaming `Selection` (it shadows the DOM type but ripples through
+imports; the architect's call); moving `TextChange` to `documents/` (it is defined beside
+`mapOffset`, which gives it its meaning); one constant per colour (the CSS cannot share a TS
+constant, so it would still be written twice); sharing the specs' `open()` and the overlay
+margin (each spec's `open` differs slightly, and importing `canvas-view.ts` into Node specs
+would load DOM code for one number).
+

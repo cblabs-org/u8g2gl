@@ -27,6 +27,9 @@
  * - hitsAt():       The names under a point, topmost first
  * - marqueeHits():  The names a rectangle intersects, in document order
  * - ClickCycler:    Repeated clicks at one point, cycling through overlaps
+ *
+ *     - click():       The name a click at a device pixel selects, cycling on repeats
+ *     - reset():       Forget the point; the next click starts at the top
  */
 
 import type { Rect } from '../pipeline/live-pipeline';

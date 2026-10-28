@@ -372,14 +372,20 @@ export class EditLoop {
     file: string | undefined,
     bounds: ReadonlyMap<string, Rect>,
   ): { name: string; rect: Rect }[] {
+    // --- Step 1: The errors in the drawn screen's file, and its elements ---
     const errors = diagnostics.filter((d) => d.severity === 'error' && d.file === file);
     const text = file === undefined ? undefined : this.workspace.documents.textOf(file);
-    const spans = errors.length === 0 || text === undefined ? undefined : namedElements(text);
+    if (errors.length === 0 || text === undefined) return [];
+    const spans = namedElements(text);
     if (spans === undefined) return [];
+
+    // --- Step 2: Where each line starts, to turn a line and column into an offset ---
     const lineStarts = [0];
-    for (let i = 0; i < (text?.length ?? 0); i++) {
-      if (text?.charCodeAt(i) === 10) lineStarts.push(i + 1);
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) lineStarts.push(i + 1);
     }
+
+    // --- Step 3: Each error to the innermost element holding it, once each ---
     const found: { name: string; rect: Rect }[] = [];
     for (const error of errors) {
       const offset = (lineStarts[error.line - 1] ?? 0) + error.column - 1;

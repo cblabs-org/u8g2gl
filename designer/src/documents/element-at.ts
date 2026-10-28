@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/documents/element-at.ts
- * Purpose: Answers "which element is the caret in?" for selection from XML to
- *          canvas (ui_spec §4.3): the innermost named element whose text
- *          contains the caret. Selection is by `name` ([U-1] makes it stable),
- *          so it survives edits that move the element's text, and the same
- *          lookup finds an element again after a reload.
+ * Purpose: Answers "which element is this offset in?": the innermost named
+ *          element whose text contains it. The caret's offset makes it
+ *          selection from XML to canvas (ui_spec §4.3); a diagnostic's position
+ *          makes it the element hatched for an error (EDITOR-DESIGN §3.8); and
+ *          the named elements before and after an edit are how the selection
+ *          follows a renamed element's `<`. Selection is by `name` ([U-1] makes
+ *          it stable), so it survives edits that move the element's text, and
+ *          the same lookup finds an element again after a reload.
  * Description: Uses the CLI's own XML tokeniser, so the editor and the
  *              generator agree on where an element starts. An element spans
  *              from its `<` to the `>` that ends its closing tag (or its `/>`).

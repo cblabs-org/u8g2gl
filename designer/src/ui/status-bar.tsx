@@ -17,8 +17,8 @@
  *
  * Exports:
  * - StatusBar:          The component
+ * - describeWasm():     The indicator's text for a state
  * - SelectionGeometry:  Its selection readout
- * - describeWasm(): The indicator's text for a state
  */
 
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
