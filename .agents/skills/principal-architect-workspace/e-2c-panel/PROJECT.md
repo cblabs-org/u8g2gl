@@ -21,6 +21,7 @@ the panel needs by looking at it.
 | WO3 | Guidance (§9.2), constraints, Q-19's cost rule, Detach | `u8g2gl-e2c/wo3-guidance` | ✅ `c8f445c` |
 | WO4 | Multi-selection (§9.4); screen properties; the render rule and the shell budget | `u8g2gl-e2c/wo4-multi-budget` | ✅ `4a0f92f` |
 | WO5 | Readability review, C4 screenshots, PA verification | `u8g2gl-e2c/wo5-readability` | ✅ `e174c99` |
+| WO6 | The drag gate with the panel present (ruling 11) | `u8g2gl-e2c/wo5-readability` (#38's head) | ⏳ |
 
 ## PA rulings
 
@@ -71,6 +72,18 @@ the panel needs by looking at it.
     `ui/status-bar.tsx`) small:** E-2b edits them in parallel. No canvas gesture work, no new
     dependency.
 
+11. **The drag gate with the panel present** (PA, 2026-10-28). With E-2b merged into this branch
+    (`8d6a952`), E-2b's §3.4 drag gate fails: input→blit p95 15.1–16.5 ms on departures and
+    16.7–19.0 ms on 20 elements (E-2b alone: 13.0 / 14.6), every move still in its first frame.
+    The panel costs 2–4 ms per drag frame, against ruling 9's stand-in figure of 1.3 ms. WO6
+    finds where the time goes (a profile of one drag frame with the panel open: React commits,
+    the panel controller's update, anything run per frame that the stand-in did not exercise)
+    and brings **both screens under 16 ms p95 with the panel open on the dragged element**,
+    without loosening the gate or its self-test. EDITOR-DESIGN §3.3's rule is the guide: during
+    a drag only the dragged element's geometry fields, the status bar's readout and the canvas
+    re-render. Commits go on `u8g2gl-e2c/wo5-readability` (PR #38's head). Boundary: designer
+    code, both PRs' specs, and nothing in `cli/` without a report first.
+
 ## Status log
 
 - **2026-10-28.** Worktree created from E-2a's tip `e2bbb4f`, `extern/u8g2` checked out. WO1–WO5
@@ -95,3 +108,11 @@ the panel needs by looking at it.
   1.3 ms (8 ms slice); its self-test fails the gate at 11.2 ms; only the changed field
   re-renders. Keystroke gate 300/300 and 298/300 in the first frame (within 1%). Production 3/3,
   no hook. C4 screenshots reviewed.
+- **2026-10-28. C4** (EDITOR-DESIGN §10): the owner accepted the PA's three recommendations —
+  no schema features now (palette metadata and `<previews>` judged at E-2d's end), a generated
+  built-in font height table in E-2d, and E-2b's ruling 10. Recorded in
+  `e-2-canvas-editing/PROJECT.md`.
+- **2026-10-28.** #36 and #37 merged; E-2b merged into this branch (`8d6a952`, conflicts in
+  `live-pipeline.ts` and `test-hooks.ts`, both sides kept). On the combined tree the drag gate
+  fails (ruling 11); WO6 issued. Owner told not to merge #38 until it passes. A CLI test failed
+  once and did not reproduce.
