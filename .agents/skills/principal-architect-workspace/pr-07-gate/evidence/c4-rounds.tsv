@@ -1,0 +1,26 @@
+warm-legacy	[SUCCESS] Took 78.02	regen=0	compiled=2023	load=8.24	build-2026-10-21T23-31-28-493Z-4e8c9424.log
+warm-mig	[SUCCESS] Took 100.64	regen=1	compiled=2049	load=9.45	build-2026-10-21T23-32-55-831Z-6614222c.log
+warm2-legacy(discarded: full recompile)	[SUCCESS] Took 82.65	regen=0	compiled=2023	load=9.69	build-2026-10-21T23-34-58-081Z-7804da1a.log
+warm3-legacy	[SUCCESS] Took 26.69	regen=0	compiled=0	load=2.28	build-2026-10-22T18-53-02-104Z-6fa8ac40.log
+warm2-mig(discarded: full recompile)	[SUCCESS] Took 88.67	regen=1	compiled=2049	load=7.46	build-2026-10-22T18-53-40-123Z-fb851921.log
+warm3-mig	[SUCCESS] Took 30.79	regen=1	compiled=0	load=4.08	build-2026-10-22T18-55-31-644Z-deae3ada.log
+R1-L-noop	[SUCCESS] Took 19.07	regen=0	compiled=0	load=3.28	build-2026-10-22T18-56-11-818Z-b12cdba3.log
+R1-M-noop	[SUCCESS] Took 24.28	regen=1	compiled=0	load=2.50	build-2026-10-22T18-56-36-226Z-f6e2eeca.log
+R1-L-edit	[SUCCESS] Took 22.71	regen=0	compiled=1	load=2.00	build-2026-10-22T18-57-05-799Z-62e35913.log
+R1-M-edit	[SUCCESS] Took 27.45	regen=1	compiled=1	load=1.61	build-2026-10-22T18-57-36-591Z-2c336abd.log
+R2-L-noop	[SUCCESS] Took 18.75	regen=0	compiled=0	load=1.38	build-2026-10-22T18-58-13-530Z-1652754d.log
+R2-M-noop	[SUCCESS] Took 24.23	regen=1	compiled=0	load=1.37	build-2026-10-22T18-58-37-958Z-17dbb17a.log
+R2-L-edit	[SUCCESS] Took 22.63	regen=0	compiled=1	load=1.69	build-2026-10-22T18-59-07-414Z-8f4558d1.log
+R2-M-edit	[SUCCESS] Took 27.53	regen=1	compiled=1	load=1.60	build-2026-10-22T18-59-36-597Z-ce7e7dda.log
+R3-L-noop	[SUCCESS] Took 18.72	regen=0	compiled=0	load=1.47	build-2026-10-22T19-00-10-924Z-96033e29.log
+R3-M-noop	[SUCCESS] Took 24.45	regen=1	compiled=0	load=1.35	build-2026-10-22T19-00-35-304Z-1a057f6c.log
+R3-L-edit	[SUCCESS] Took 22.73	regen=0	compiled=1	load=1.58	build-2026-10-22T19-01-05-505Z-661c8b71.log
+R3-M-edit	[SUCCESS] Took 27.61	regen=1	compiled=1	load=1.49	build-2026-10-22T19-01-34-804Z-75853200.log
+R4-L-noop	[SUCCESS] Took 18.87	regen=0	compiled=0	load=1.49	build-2026-10-22T19-02-09-143Z-8ddd881b.log
+R4-M-noop	[SUCCESS] Took 24.30	regen=1	compiled=0	load=1.28	build-2026-10-22T19-02-33-655Z-f170ca1a.log
+R4-L-edit	[SUCCESS] Took 22.65	regen=0	compiled=1	load=1.63	build-2026-10-22T19-03-02-920Z-fcd7b3cd.log
+R4-M-edit	[SUCCESS] Took 27.65	regen=1	compiled=1	load=2.03	build-2026-10-22T19-03-32-182Z-17fe2f18.log
+R5-L-noop	[SUCCESS] Took 18.79	regen=0	compiled=0	load=1.92	build-2026-10-22T19-04-06-982Z-96f61624.log
+R5-M-noop	[SUCCESS] Took 24.50	regen=1	compiled=0	load=2.01	build-2026-10-22T19-04-31-487Z-44b310d6.log
+R5-L-edit	[SUCCESS] Took 22.73	regen=0	compiled=1	load=2.18	build-2026-10-22T19-05-00-926Z-6577655b.log
+R5-M-edit	[SUCCESS] Took 27.65	regen=1	compiled=1	load=1.82	build-2026-10-22T19-05-33-572Z-db846664.log
