@@ -37,6 +37,7 @@ import { ProjectDocuments } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
 import { EditLoop } from './pipeline/edit-loop';
 import type { DesignSession } from './session';
+import { SelectionModel } from './selection/selection-model';
 import { Observable } from './state/observable';
 import { EditorWasmController } from './wasm/editor-wasm-controller';
 
@@ -61,13 +62,10 @@ export class Workspace {
   /** The Output panel's lines, oldest first. */
   readonly output = new Observable<readonly string[]>([]);
   /**
-   * The element the caret is in, by file and name: the canvas highlights it.
-   * Selection is never an edit.
+   * The selected elements, by file and name: the canvas outlines them and the
+   * XML editor decorates them. Selection is never an edit.
    */
-  readonly selection = new Observable<{ readonly file: string; readonly name: string } | undefined>(
-    undefined,
-    (a, b) => a?.file === b?.file && a?.name === b?.name,
-  );
+  readonly selection: SelectionModel;
   /** The project's name from `u8g2gl.xml`, once loaded, for the title and status bar. */
   readonly projectName = new Observable<string>('');
 
@@ -84,6 +82,14 @@ export class Workspace {
    */
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
     this.documents = new ProjectDocuments(fs, (line) => this.log(line));
+    this.selection = new SelectionModel((path) => this.documents.textOf(path));
+    // Canvas to XML: a selection made on the canvas shows its file, so the
+    // editor can reveal it. An open request without a position never moves
+    // the caret or takes focus.
+    this.selection.current.subscribe(() => {
+      const selection = this.selection.current.get();
+      if (selection.origin === 'canvas' && selection.file !== undefined) this.openFile({ path: selection.file });
+    });
     this.wasm = new EditorWasmController(session, (line) => this.log(line));
     this.loop = new EditLoop(this, this.wasm);
   }

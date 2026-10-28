@@ -14,6 +14,8 @@
  * - ActivityBar:  The component
  */
 
+import { countRender } from '../perf/render-count';
+
 /** The views ui_spec §6 lists, with whether this release has them. */
 const VIEWS: readonly { readonly id: string; readonly label: string; readonly glyph: string; readonly ready: boolean }[] = [
   { id: 'explorer', label: 'Explorer', glyph: '▤', ready: true },
@@ -27,6 +29,7 @@ const VIEWS: readonly { readonly id: string; readonly label: string; readonly gl
 
 /** @brief The activity bar. */
 export function ActivityBar(): React.JSX.Element {
+  countRender('ActivityBar');
   return (
     <nav className="activity-bar" aria-label="Views">
       {VIEWS.map((view) => (

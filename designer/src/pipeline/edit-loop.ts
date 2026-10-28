@@ -14,23 +14,33 @@
  * Description: Owns the scheduler, the parse cache and the frame state the
  *              canvas panel shows. Diagnostics go to Monaco markers and to the
  *              Problems rows, and are replaced only when the set changes, so a
- *              keystroke that changes no diagnostic re-renders no list. While
- *              any error stands the canvas keeps the last good frame, dimmed,
- *              with a banner saying why: losing the picture mid-edit is
- *              disorienting (ui_spec §4.1).
+ *              keystroke that changes no diagnostic re-renders no list.
+ *
+ *              The document's states (EDITOR-DESIGN §3.8): valid, the frame is
+ *              live. Well-formed but invalid, it stays live while the scene can
+ *              still be built, with each element an error is in hatched on the
+ *              overlay; when it cannot, the last good frame is kept, dimmed,
+ *              with a banner counting the errors. Not well-formed, the last
+ *              good frame, dimmed, with *XML not well-formed at L:C*, and
+ *              `canvasEditing` false until the text parses again. Losing the
+ *              picture mid-edit is disorienting (ui_spec §4.1).
  *
  *              Between edits an animation ticker re-renders the applied scene
  *              each frame so widgets animate (ui_spec §4.2); frozen, every
  *              render is at t = 0 instead, so the frame is stable to compare.
  *
- *              The element under the caret is outlined on the canvas from the
- *              run's element rectangles (XML-to-canvas selection, ui_spec §4.3).
+ *              After each run the selection's names are looked up in the new
+ *              text (`SelectionModel.reconcile`), and each selected element on
+ *              the drawn screen is outlined on the canvas from the run's
+ *              rectangles (ui_spec §4.3). The run's hit targets are published
+ *              for the canvas's selection gestures. Selection is never an edit.
  *
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how a keystroke measurement attributes a keystroke's cost.
  *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
+ * - DrawnTargets:     The drawn frame's hit targets
  * - FrameTimings:     One run's milliseconds per stage
  * - EditLoop:         The loop
  *
@@ -40,7 +50,8 @@
  *     - dispose():        Stop
  *
  *     State:
- *     - frameState, frozen, bounds, selectionRect
+ *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
+ *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
@@ -56,7 +67,9 @@ import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
 import type { EditorModule, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
+import type { HitTarget } from '../selection/hit-test';
 import type { Workspace } from '../workspace';
+import { innermostAt, namedElements } from '../documents/element-at';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
 import { runTextPipeline, TEXT_STAGES, type Rect, type TextStage } from './live-pipeline';
@@ -74,8 +87,16 @@ export interface FrameState {
   readonly display?: { readonly width: number; readonly height: number };
   /** Elements the loaded Wasm drew as placeholders. */
   readonly placeholders: readonly Placeholder[];
+  /** Elements hatched because an error is in them, by name; empty on a stale frame. */
+  readonly hatched?: readonly string[];
   /** Lit pixels in the frame, for tests and the curious. */
   readonly lit: number;
+}
+
+/** The drawn frame's hit targets, and the file whose names they carry. */
+export interface DrawnTargets {
+  readonly file: string | undefined;
+  readonly targets: readonly HitTarget[];
 }
 
 /** The stages after the text pipeline, in order. */
@@ -96,13 +117,27 @@ export class EditLoop {
   readonly frameState = new Observable<FrameState>({ frame: 0, stale: true, placeholders: [], lit: 0 });
   /** Whether animation is pinned at t = 0 (ui_spec §4.2's freeze toggle). */
   readonly frozen = new Observable<boolean>(false);
-  /** The element rectangles of the drawn screen, by name. */
+  /** The selectable element rectangles of the drawn screen, by name. */
   readonly bounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
-  /** The selected element's rectangle on the drawn screen, highlighted on the canvas. */
+  /** What a click on the drawn frame can hit, and the file its names are in. */
+  readonly hitTargets = new Observable<DrawnTargets>({ file: undefined, targets: [] });
+  /**
+   * The selection's geometry on the drawn screen, for the status bar: one
+   * element's rectangle, or the box around several. Undefined when nothing
+   * selected is drawn.
+   */
   readonly selectionRect = new Observable<Rect | undefined>(
     undefined,
     (a, b) => a?.x === b?.x && a?.y === b?.y && a?.width === b?.width && a?.height === b?.height,
   );
+  /**
+   * Whether the canvas may edit the text: false only while a project document
+   * is not well-formed, when an edit computed from the text could land
+   * anywhere (EDITOR-DESIGN §3.8). Selection is unaffected; it never edits.
+   */
+  readonly canvasEditing = new Observable<boolean>(true);
+  /** How many selected elements are drawn, for the status bar beside {@link selectionRect}. */
+  readonly selectionCount = new Observable<number>(0);
 
   private readonly workspace: Workspace;
   private readonly wasm: EditorWasmController;
@@ -113,7 +148,9 @@ export class EditLoop {
   private readonly frameListeners = new Set<(timings: FrameTimings) => void>();
   private readonly subscriptions: Array<() => void> = [];
   private view: CanvasView | undefined;
-  private overlay: readonly OverlayRect[] = [];
+  /** The overlay's selection outlines and its hatching, kept apart so each can change alone. */
+  private selectionRects: readonly OverlayRect[] = [];
+  private problemRects: readonly OverlayRect[] = [];
   private applied: EditorModule | undefined;
   private tickHandle: number | undefined;
   private drawn = 0;
@@ -137,7 +174,10 @@ export class EditLoop {
   start(): void {
     const request = (): void => this.scheduler.request();
     this.subscriptions.push(
-      this.workspace.documents.onDidChangeContent(request),
+      this.workspace.documents.onDidChangeContent((path, changes) => {
+        this.workspace.selection.textChanged(path, changes);
+        request();
+      }),
       this.workspace.documents.onDidOpen(() => {
         this.publishMarkers(true);
         request();
@@ -152,7 +192,7 @@ export class EditLoop {
       }),
     );
     this.subscriptions.push(
-      this.workspace.selection.subscribe(() => this.highlightSelection()),
+      this.workspace.selection.current.subscribe(() => this.highlightSelection()),
       this.bounds.subscribe(() => this.highlightSelection()),
     );
     request();
@@ -160,29 +200,32 @@ export class EditLoop {
   }
 
   // highlightSelection
-  // XML to canvas (ui_spec §4.3): outline the element the caret is in,
-  // when it is on the screen being drawn. Highlight only; never an edit.
+  // Outline each selected element that is on the screen being drawn, and
+  // publish their geometry for the status bar. Highlight only; never an edit.
   private highlightSelection(): void {
-    const selection = this.workspace.selection.get();
-    const drawn = selection !== undefined && selection.file === this.workspace.activeFile.get();
-    const rect = drawn ? this.bounds.get().get(selection.name) : undefined;
-    this.selectionRect.set(rect);
-    this.setOverlay(rect === undefined ? [] : [{ ...rect, kind: 'selection' }]);
+    const selection = this.workspace.selection.current.get();
+    const drawn = selection.file !== undefined && selection.file === this.hitTargets.get().file;
+    const bounds = this.bounds.get();
+    const rects = drawn ? selection.names.map((name) => bounds.get(name)).filter((rect): rect is Rect => rect !== undefined) : [];
+    this.selectionRect.set(boundingBox(rects));
+    this.selectionCount.set(rects.length);
+    this.selectionRects = rects.map((rect) => ({ ...rect, kind: 'selection' }));
+    this.showOverlay();
   }
 
   /** @brief Draws into a canvas panel's view from now on (undefined detaches). */
   attachCanvas(view: CanvasView | undefined): void {
     this.view = view;
     if (view !== undefined) {
-      view.setOverlay(this.overlay);
+      this.showOverlay();
       this.scheduler.request();
     }
   }
 
-  /** @brief Replaces the overlay's rectangles (the selection highlight, say). */
-  setOverlay(rects: readonly OverlayRect[]): void {
-    this.overlay = rects;
-    this.view?.setOverlay(rects);
+  // showOverlay
+  // The overlay's hatching and selection outlines, to the view if attached.
+  private showOverlay(): void {
+    this.view?.setOverlay([...this.problemRects, ...this.selectionRects]);
   }
 
   /**
@@ -221,6 +264,8 @@ export class EditLoop {
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
     this.publishDiagnostics([...result.diagnostics, ...this.wasm.buildDiagnostics.get()]);
+    this.workspace.selection.reconcile();
+    this.canvasEditing.set(result.wellFormed);
 
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
     const module = this.wasm.module.get();
@@ -239,7 +284,11 @@ export class EditLoop {
       performance.mark('u8g2gl:render');
       if (buffer === undefined) {
         this.applied = undefined;
-        this.markStale(`The editor Wasm refused the scene: ${module.lastError()}`);
+        // With errors standing, a refusal is the unbuildable state, said as such;
+        // without, it is the Wasm's own complaint.
+        this.markStale(
+          result.errors > 0 ? this.staleReason(result.diagnostics, module, result.screen) : `The editor Wasm refused the scene: ${module.lastError()}`,
+        );
       } else {
         lap = performance.now();
         const { width, height } = module.displaySize();
@@ -250,6 +299,9 @@ export class EditLoop {
         this.applied = module;
         this.drawn += 1;
         const placeholders = module.placeholders();
+        const hatched = result.errors > 0 ? this.problemElements(result.diagnostics, result.screenFile, result.bounds) : [];
+        this.problemRects = hatched.map(({ rect }) => ({ ...rect, kind: 'problem' }));
+        this.hitTargets.set({ file: result.screenFile, targets: result.targets });
         this.bounds.set(result.bounds);
         this.frameState.set({
           frame: this.drawn,
@@ -257,6 +309,7 @@ export class EditLoop {
           screen: result.screen,
           display: { width, height },
           placeholders,
+          hatched: hatched.map(({ name }) => name),
           lit: countLit(buffer),
         });
         this.view?.setStale(false);
@@ -296,11 +349,51 @@ export class EditLoop {
   }
 
   // markStale
-  // Keeps the last good frame, dimmed, and says why.
+  // Keeps the last good frame, dimmed, and says why. Nothing is hatched on it:
+  // the errors are about the text, and the frame is from older text.
   //   banner — the reason
   private markStale(banner: string): void {
-    this.frameState.set({ ...this.frameState.get(), stale: true, banner });
+    this.problemRects = [];
+    this.showOverlay();
+    this.frameState.set({ ...this.frameState.get(), stale: true, banner, hatched: [] });
     this.view?.setStale(true);
+  }
+
+  // problemElements
+  // The elements an error is in, by CST range (EDITOR-DESIGN §3.8): for each
+  // error in the drawn screen's file, the innermost named element whose text
+  // contains its position, with that element's rectangle. An error in another
+  // file, or outside every element, hatches nothing.
+  //   diagnostics — the run's
+  //   file        — the drawn screen's file
+  //   bounds      — the run's rectangles by name
+  private problemElements(
+    diagnostics: readonly Diagnostic[],
+    file: string | undefined,
+    bounds: ReadonlyMap<string, Rect>,
+  ): { name: string; rect: Rect }[] {
+    // --- Step 1: The errors in the drawn screen's file, and its elements ---
+    const errors = diagnostics.filter((d) => d.severity === 'error' && d.file === file);
+    const text = file === undefined ? undefined : this.workspace.documents.textOf(file);
+    if (errors.length === 0 || text === undefined) return [];
+    const spans = namedElements(text);
+    if (spans === undefined) return [];
+
+    // --- Step 2: Where each line starts, to turn a line and column into an offset ---
+    const lineStarts = [0];
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) lineStarts.push(i + 1);
+    }
+
+    // --- Step 3: Each error to the innermost element holding it, once each ---
+    const found: { name: string; rect: Rect }[] = [];
+    for (const error of errors) {
+      const offset = (lineStarts[error.line - 1] ?? 0) + error.column - 1;
+      const name = innermostAt(spans, offset)?.name;
+      const rect = name === undefined ? undefined : bounds.get(name);
+      if (name !== undefined && rect !== undefined && !found.some((f) => f.name === name)) found.push({ name, rect });
+    }
+    return found;
   }
 
   // staleReason
@@ -308,7 +401,10 @@ export class EditLoop {
   private staleReason(diagnostics: readonly Diagnostic[], module: EditorModule | undefined, screen: string | undefined): string {
     const malformed = diagnostics.find((d) => d.code === DIAGNOSTIC_CODES.MALFORMED_XML);
     if (malformed !== undefined) {
-      return `XML not well-formed at ${malformed.file}:${malformed.line}:${malformed.column}`;
+      // Line and column, as the editor's own status reads them; the file only
+      // when it is not the screen on the canvas.
+      const elsewhere = malformed.file === this.hitTargets.get().file ? '' : ` in ${malformed.file}`;
+      return `XML not well-formed at ${malformed.line}:${malformed.column}${elsewhere}`;
     }
     const errors = diagnostics.filter((d) => d.severity === 'error').length;
     if (errors > 0) {
@@ -352,6 +448,24 @@ export class EditLoop {
     }
     this.diagnosticFiles = new Set(byFile.keys());
   }
+}
+
+// boundingBox
+// The smallest rectangle containing every one of `rects`; undefined for none.
+function boundingBox(rects: readonly Rect[]): Rect | undefined {
+  const [first, ...rest] = rects;
+  if (first === undefined) return undefined;
+  let left = first.x;
+  let top = first.y;
+  let right = first.x + first.width;
+  let bottom = first.y + first.height;
+  for (const rect of rest) {
+    left = Math.min(left, rect.x);
+    top = Math.min(top, rect.y);
+    right = Math.max(right, rect.x + rect.width);
+    bottom = Math.max(bottom, rect.y + rect.height);
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
 export { TEXT_STAGES, WASM_STAGES };

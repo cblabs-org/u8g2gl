@@ -12,8 +12,9 @@
  *          `__U8G2GL_TEST_HOOKS__`, which a production build sets to `false`,
  *          so neither this module nor the keystroke probe reaches its bundle.
  * Description: Installs the keystroke probe and publishes the workspace as
- *              `window.__u8g2gl`. `TestHandle` is the handle's one typed
- *              description, which the tests import rather than restating it.
+ *              `window.__u8g2gl`, and the shell's render counts.
+ *              `TestHandle` is the handle's one typed description, which the
+ *              tests import rather than restating it.
  *
  * Exports:
  * - TestHandle:          The window properties the test build adds
@@ -21,6 +22,7 @@
  */
 
 import { installKeystrokeProbe, type KeystrokeProbe } from './perf/keystroke-probe';
+import { renderCounts } from './perf/render-count';
 import type { Workspace } from './workspace';
 
 /** The window properties the test build adds. */
@@ -29,6 +31,8 @@ export interface TestHandle {
   readonly __u8g2gl: Workspace;
   /** The keystroke probe's samples. */
   readonly __u8g2glPerf: KeystrokeProbe;
+  /** Each shell component's render count so far (`perf/render-count.ts`). */
+  readonly __u8g2glRenders: () => Record<string, number>;
 }
 
 /**
@@ -39,5 +43,5 @@ export interface TestHandle {
  */
 export function installTestHooks(workspace: Workspace): void {
   const probe = installKeystrokeProbe(workspace.loop, workspace.documents);
-  Object.assign(window, { __u8g2gl: workspace, __u8g2glPerf: probe } satisfies TestHandle);
+  Object.assign(window, { __u8g2gl: workspace, __u8g2glPerf: probe, __u8g2glRenders: renderCounts } satisfies TestHandle);
 }

@@ -12,16 +12,29 @@
  *          what the canvas shows is what the firmware would be generated from.
  *          There is no fast path: every run takes every step.
  * Description: `runTextPipeline` is synchronous and pure apart from the timer.
- *              It refuses to describe a scene while any error stands, because
- *              the scene emitter's contract is a validated model; the caller
- *              then keeps the last good frame, dimmed.
+ *              The scene follows EDITOR-DESIGN §3.8's states:
+ *              - **Valid:** the scene.
+ *              - **Well-formed but invalid:** the scene too, *if it can still
+ *                be described* — an overflow, say, leaves a model the emitter
+ *                can describe, so the canvas stays live and the caller hatches
+ *                the elements the errors are in. The emitter's contract is a
+ *                validated model, and it throws for one it cannot describe;
+ *                that is caught here and means no scene (unbuildable), never a
+ *                failed run.
+ *              - **Not well-formed:** no scene is attempted: a document that
+ *                does not parse leaves a partial model, and a scene of it
+ *                would draw a screen the text does not hold.
+ *              With no scene the caller keeps the last good frame, dimmed.
  *              Each stage is timed with `performance.now()` and recorded as a
  *              `performance.mark`, so a keystroke measurement can attribute a slow
  *              keystroke to the stage that spent it.
  *
- *              Alongside the scene it returns each element's device-space
- *              rectangle on the active screen, from the same placement the
- *              scene emitter uses, for the canvas's selection highlight.
+ *              Alongside the scene it returns the active screen's hit targets
+ *              — each drawn element's device-space rectangle, in draw order,
+ *              from the same placement the scene emitter uses — and each
+ *              selectable element's rectangle by name, for hit-testing and the
+ *              selection overlay. A composite's children are targets of the
+ *              instance written in the screen, never of their own names.
  *
  *              It also returns the subjects' declared values, which the
  *              caller applies after every scene, since a rebuild clears them.
@@ -30,7 +43,7 @@
  * - Rect:                  A device-space rectangle
  * - CompiledAssets:        The fonts and images compileProjectAssets() produced
  * - TextPipelineInput:     Texts, cache, assets and the active screen
- * - TextPipelineResult:    Diagnostics, scene, rectangles and stage timings
+ * - TextPipelineResult:    Diagnostics, scene, hit targets and stage timings
  * - TEXT_STAGES:           The stages, in order
  * - runTextPipeline():     One run
  * - activeScreenName():    The screen a file shows, or the project's first
@@ -40,12 +53,13 @@ import type { CompileProjectAssetsResult } from '@u8g2gl/core/assets/index.js';
 import { checkProject, finaliseDiagnostics, GENERATE_REFUSAL_POLICY } from '@u8g2gl/core/generator/index.js';
 import { describeScenes } from '@u8g2gl/core/generator/emit/scene.js';
 import { placeScreen, type Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
-import { computeCapacities, realiseScreens } from '@u8g2gl/core/realise/index.js';
+import { computeCapacities, realiseScreens, type RealisedElement, type RealisedScreen } from '@u8g2gl/core/realise/index.js';
 import { createScreenPipeline, findTargetDisplay } from '@u8g2gl/core/resolver/index.js';
-import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
+import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
 import type { ProjectModelCache } from '../project/project-model';
+import type { HitTarget } from '../selection/hit-test';
 
 /** A device-space rectangle. */
 export interface Rect {
@@ -77,14 +91,27 @@ export interface TextPipelineResult {
   /** Every diagnostic, deduplicated and sorted (`checkProject`'s order). */
   readonly diagnostics: readonly Diagnostic[];
   readonly errors: number;
-  /** The scene as JSON text, or undefined while an error stands. */
+  /**
+   * The scene as JSON text; undefined when a document is not well-formed or
+   * the errors standing leave a model the emitter cannot describe.
+   */
   readonly scene: string | undefined;
+  /** False while any project document is not well-formed XML (§3.8). */
+  readonly wellFormed: boolean;
   /** The screen to show; undefined if the project has none. */
   readonly screen: string | undefined;
+  /** The file `screen` is written in, where its elements' names are. */
+  readonly screenFile: string | undefined;
   /** The target display's size, if the catalogue knows it. */
   readonly display: { readonly width: number; readonly height: number } | undefined;
-  /** Each named element's rectangle on `screen`, by name. */
+  /**
+   * Each selectable element's rectangle on `screen`, by the name written in
+   * the screen: an element's own, or for a composite instance with none, the
+   * box around what it draws.
+   */
   readonly bounds: ReadonlyMap<string, Rect>;
+  /** What a click on `screen` can hit, in draw order. */
+  readonly targets: readonly HitTarget[];
   /**
    * Each subject's declared initial value, as the `{ name: value }` JSON
    * `applySampleData` takes: the frame the firmware draws at boot, until sample
@@ -144,36 +171,47 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   const diagnostics = finaliseDiagnostics([...checked.diagnostics, ...(input.assets?.diagnostics ?? [])]);
   lap('validate');
 
-  // --- Step 5: The scene, only for a model with no error ---
+  // --- Step 5: The scene, for any well-formed model the emitter can describe ---
   const screen = activeScreenName(model, input.activeFile);
   const screenIndex = model.screens.findIndex((s) => s.name === screen);
+  const wellFormed = !diagnostics.diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.MALFORMED_XML);
   let scene: string | undefined;
   let bounds: ReadonlyMap<string, Rect> = new Map();
-  if (diagnostics.errors === 0 && target !== undefined && input.assets !== undefined) {
-    const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
-    scene = JSON.stringify(
-      describeScenes({
-        project: {
-          project: model.project,
-          globals: model.globals,
-          screens: model.screens,
-          capacities,
+  let targets: readonly HitTarget[] = [];
+  if (wellFormed && target !== undefined && input.assets !== undefined) {
+    try {
+      const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
+      scene = JSON.stringify(
+        describeScenes({
+          project: {
+            project: model.project,
+            globals: model.globals,
+            screens: model.screens,
+            capacities,
+            manifests: model.manifests,
+            images: input.assets.images,
+            compiledFonts: input.assets.fonts,
+            bdfLicenceFiles: new Map(),
+            stamp: '',
+          },
+          realised: realisation.screens,
+          resolved: pipeline.resolution.screens,
           manifests: model.manifests,
-          images: input.assets.images,
-          compiledFonts: input.assets.fonts,
-          bdfLicenceFiles: new Map(),
-          stamp: '',
-        },
-        realised: realisation.screens,
-        resolved: pipeline.resolution.screens,
-        manifests: model.manifests,
-        generated: { source: 'u8g2gl.xml', schema: model.project.schema, generator: 'designer', target: target.name },
-      }),
-    );
-    const realised = realisation.screens[screenIndex];
-    const resolved = pipeline.resolution.screens[screenIndex];
-    if (realised !== undefined && resolved !== undefined) {
-      bounds = elementBounds(placeScreen(realised, resolved, model.manifests).placements.values());
+          generated: { source: 'u8g2gl.xml', schema: model.project.schema, generator: 'designer', target: target.name },
+        }),
+      );
+      const realised = realisation.screens[screenIndex];
+      const resolved = pipeline.resolution.screens[screenIndex];
+      if (realised !== undefined && resolved !== undefined) {
+        ({ bounds, targets } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+      }
+    } catch (error) {
+      // Only a model with errors may be refused: the emitter refusing a valid
+      // one is a defect, which must not pass for the "unbuildable" state.
+      if (diagnostics.errors === 0) throw error;
+      scene = undefined;
+      bounds = new Map();
+      targets = [];
     }
   }
   lap('scene');
@@ -183,9 +221,12 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     diagnostics: diagnostics.diagnostics,
     errors: diagnostics.errors,
     scene,
+    wellFormed,
     screen,
+    screenFile: model.screens[screenIndex]?.loc?.file,
     display: display === undefined ? undefined : { width: display.width, height: display.height },
     bounds,
+    targets,
     subjectValues: declaredValues(model.globals),
     timings,
   };
@@ -224,36 +265,66 @@ function declaredValues(globals: Globals): string {
   return JSON.stringify(values);
 }
 
-// elementBounds
-// Each named element's device-space rectangle. A rectangle element has x, y,
-// width and height once placed; a line or triangle has only endpoints, so its
-// bounds are their box, one pixel wide where the points share an axis.
-//   placements — placeScreen()'s placements for the active screen
-function elementBounds(
-  placements: Iterable<Placement>,
-): Map<string, Rect> {
-  const bounds = new Map<string, Rect>();
-  for (const placement of placements) {
-    const { node, geometry, extras } = placement.absolute;
-    const name = node.attributes.name;
-    if (name === '') {
-      continue;
-    }
-    const x = geometry.x?.value;
-    const y = geometry.y?.value;
-    const width = geometry.width?.value;
-    const height = geometry.height?.value;
-    if (x !== undefined && y !== undefined && width !== undefined && height !== undefined) {
-      bounds.set(name, { x, y, width, height });
-      continue;
-    }
-    const xs = extras.filter((e) => e.axis === 'horizontal' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
-    const ys = extras.filter((e) => e.axis === 'vertical' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
-    if (xs.length > 0 && ys.length > 0) {
-      const left = Math.min(...xs);
-      const top = Math.min(...ys);
-      bounds.set(name, { x: left, y: top, width: Math.max(...xs) - left + 1, height: Math.max(...ys) - top + 1 });
+// selectable
+// The drawn screen's hit targets and selectable rectangles. Each drawn element
+// is a target of the element written in the screen it belongs to: itself, or
+// the outermost composite instance it was expanded through (ui_spec §8: a hit
+// on a composite's child selects the instance). An instance's rectangle is its
+// own when it has one, else the box around its children's.
+//   realised   — the active screen's realisation, whose draw order is the targets' order
+//   placements — placeScreen()'s placements for it
+function selectable(
+  realised: RealisedScreen,
+  placements: ReadonlyMap<RealisedElement, Placement>,
+): { bounds: Map<string, Rect>; targets: HitTarget[] } {
+  const targets: HitTarget[] = [];
+  const own = new Map<string, Rect>();
+  const drawn = new Map<string, Rect>();
+  for (const step of realised.drawOrder) {
+    const placement = placements.get(step.element);
+    const rect = placement === undefined ? undefined : rectangleOf(placement);
+    const name = step.element.element.instantiation[0]?.identifier ?? step.element.identifier;
+    if (rect === undefined || name === '') continue;
+    targets.push({ name, rect });
+    if (step.element.element.instantiation.length === 0) {
+      own.set(name, rect);
+    } else {
+      const box = drawn.get(name);
+      drawn.set(name, box === undefined ? rect : union(box, rect));
     }
   }
-  return bounds;
+  const bounds = new Map(drawn);
+  for (const [name, rect] of own) bounds.set(name, rect);
+  return { bounds, targets };
+}
+
+// union
+// The smallest rectangle containing both.
+function union(a: Rect, b: Rect): Rect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, width: Math.max(a.x + a.width, b.x + b.width) - x, height: Math.max(a.y + a.height, b.y + b.height) - y };
+}
+
+// rectangleOf
+// One placed element's device-space rectangle. A rectangle element has x, y,
+// width and height once placed; a line or triangle has only endpoints, so its
+// rectangle is their box, one pixel wide where the points share an axis.
+// Undefined for an element with neither, which nothing can hit.
+//   placement — the element's placement
+function rectangleOf(placement: Placement): Rect | undefined {
+  const { geometry, extras } = placement.absolute;
+  const x = geometry.x?.value;
+  const y = geometry.y?.value;
+  const width = geometry.width?.value;
+  const height = geometry.height?.value;
+  if (x !== undefined && y !== undefined && width !== undefined && height !== undefined) {
+    return { x, y, width, height };
+  }
+  const xs = extras.filter((e) => e.axis === 'horizontal' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
+  const ys = extras.filter((e) => e.axis === 'vertical' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
+  if (xs.length === 0 || ys.length === 0) return undefined;
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  return { x: left, y: top, width: Math.max(...xs) - left + 1, height: Math.max(...ys) - top + 1 };
 }

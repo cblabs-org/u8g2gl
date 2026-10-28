@@ -51,6 +51,7 @@
  *     - modelOf():         The path's model, if open
  *     - openPaths():       Every open document
  *     - close():           Dispose a clean model; keep a dirty one
+ *     - textOf():          One document's current text
  *     - texts():           Every document's current text
  *
  *     Saving and conflicts:
@@ -70,6 +71,7 @@ import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-pro
 import { monaco } from '../monaco/monaco';
 import { classifyProjectFile } from '../project/project-model';
 import { Observable } from '../state/observable';
+import type { TextChange } from '../selection/selection-model';
 import { elementAt, namedElements } from './element-at';
 import { withGeneratedNames } from './generated-names';
 
@@ -103,7 +105,7 @@ export class ProjectDocuments {
   private readonly log: (line: string) => void;
   private readonly disk = new Map<string, DiskText>();
   private readonly open_ = new Map<string, OpenDocument>();
-  private readonly contentListeners = new Set<(path: string) => void>();
+  private readonly contentListeners = new Set<(path: string, changes: readonly TextChange[]) => void>();
   private readonly openListeners = new Set<(path: string) => void>();
   private readonly diskListeners = new Set<(path: string) => void>();
 
@@ -178,9 +180,16 @@ export class ProjectDocuments {
       monaco.Uri.from({ scheme: 'u8g2gl', path: `/${path}` }),
     );
     const document: OpenDocument = { model, savedAt: model.getAlternativeVersionId() };
-    model.onDidChangeContent(() => {
+    model.onDidChangeContent((event) => {
       this.updateDirty(path);
-      for (const listener of [...this.contentListeners]) listener(path);
+      // Monaco reports each change in the coordinates of the text before the
+      // event, as the CST's TextEdits are, so a listener can map an offset.
+      const changes = event.changes.map((change) => ({
+        start: change.rangeOffset,
+        end: change.rangeOffset + change.rangeLength,
+        text: change.text,
+      }));
+      for (const listener of [...this.contentListeners]) listener(path, changes);
     });
     this.open_.set(path, document);
     for (const listener of [...this.openListeners]) listener(path);
@@ -210,6 +219,11 @@ export class ProjectDocuments {
     }
     document.model.dispose();
     this.open_.delete(path);
+  }
+
+  /** @brief One document's current text: the open model's, else the disk's; undefined for a non-document. */
+  textOf(path: string): string | undefined {
+    return this.open_.get(path)?.model.getValue() ?? this.disk.get(path)?.text;
   }
 
   /** @brief Every document's current text: the open model's, else the disk's. */
@@ -292,8 +306,11 @@ export class ProjectDocuments {
     return subscribe(this.openListeners, listener);
   }
 
-  /** @brief Calls `listener` with the path of any open model whose content changes. */
-  onDidChangeContent(listener: (path: string) => void): () => void {
+  /**
+   * @brief Calls `listener` with the path of any open model whose content
+   *        changes, and the change's spans in the text before it.
+   */
+  onDidChangeContent(listener: (path: string, changes: readonly TextChange[]) => void): () => void {
     return subscribe(this.contentListeners, listener);
   }
 
@@ -408,8 +425,8 @@ export class ProjectDocuments {
 // subscribe
 // Adds a wrapped listener to a set, returning its unsubscribe: the same
 // function subscribed twice is two subscriptions.
-function subscribe(listeners: Set<(path: string) => void>, listener: (path: string) => void): () => void {
-  const entry = (path: string): void => listener(path);
+function subscribe<A extends unknown[]>(listeners: Set<(...args: A) => void>, listener: (...args: A) => void): () => void {
+  const entry = (...args: A): void => listener(...args);
   listeners.add(entry);
   return () => {
     listeners.delete(entry);

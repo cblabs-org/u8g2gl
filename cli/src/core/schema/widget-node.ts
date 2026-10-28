@@ -23,7 +23,7 @@
  */
 
 import type { SubjectType } from './globals.js';
-import type { SourceLocation } from './source-location.js';
+import type { OffsetRange, SourceLocation } from './source-location.js';
 
 /**
  * Identity, anchor and style attributes every element accepts (§7.2, §10, [U-1]).
@@ -76,6 +76,13 @@ export interface WidgetNode {
   readonly children: readonly WidgetNodeChild[];
   /** Source location where this widget node began. */
   readonly loc?: SourceLocation;
+  /**
+   * Offsets of the whole element in its file's text, opening '<' through the
+   * end of its closing tag or '/>', as the CST reports them. The scene carries
+   * it so the editor can map a canvas hit to the text without re-deriving
+   * offsets from a line and column.
+   */
+  readonly range?: OffsetRange;
   /** Source locations for individual XML attributes on this element. */
   readonly attributeLocs?: Readonly<Record<string, SourceLocation>>;
 }

@@ -30,6 +30,7 @@ import { OutputPanel } from './output-panel';
 import { ProblemsPanel } from './problems-panel';
 import { StatusBar } from './status-bar';
 import { WorkspaceContext } from './workspace-context';
+import { countRender } from '../perf/render-count';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -44,6 +45,7 @@ const editorId = (path: string): string => `file:${path}`;
 
 /** @brief The designer shell. */
 export function App({ workspace }: { readonly workspace: Workspace }): React.JSX.Element {
+  countRender('App');
   const dock = useRef<DockviewApi | undefined>(undefined);
 
   // --- Opening files: a tab per document, in one group right of the canvas ---

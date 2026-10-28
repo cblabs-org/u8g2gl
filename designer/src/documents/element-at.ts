@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/documents/element-at.ts
- * Purpose: Answers "which element is the caret in?" for selection from XML to
- *          canvas (ui_spec §4.3): the innermost named element whose text
- *          contains the caret. Selection is by `name` ([U-1] makes it stable),
- *          so it survives edits that move the element's text, and the same
- *          lookup finds an element again after a reload.
+ * Purpose: Answers "which element is this offset in?": the innermost named
+ *          element whose text contains it. The caret's offset makes it
+ *          selection from XML to canvas (ui_spec §4.3); a diagnostic's position
+ *          makes it the element hatched for an error (EDITOR-DESIGN §3.8); and
+ *          the named elements before and after an edit are how the selection
+ *          follows a renamed element's `<`. Selection is by `name` ([U-1] makes
+ *          it stable), so it survives edits that move the element's text, and
+ *          the same lookup finds an element again after a reload.
  * Description: Uses the CLI's own XML tokeniser, so the editor and the
  *              generator agree on where an element starts. An element spans
  *              from its `<` to the `>` that ends its closing tag (or its `/>`).
@@ -20,6 +23,7 @@
  * Exports:
  * - ElementSpan:      A named element's offsets
  * - namedElements():  Every named element below the root, with its span
+ * - innermostAt():    The innermost of some spans containing an offset
  * - elementAt():      The innermost one containing an offset
  */
 
@@ -77,7 +81,18 @@ export function namedElements(text: string): ElementSpan[] | undefined {
  */
 export function elementAt(text: string, offset: number): ElementSpan | undefined | 'unparsed' {
   const spans = namedElements(text);
-  if (spans === undefined) return 'unparsed';
+  return spans === undefined ? 'unparsed' : innermostAt(spans, offset);
+}
+
+/**
+ * @brief The innermost of `spans` containing `offset`, for a caller asking
+ *        about several offsets in one text, which tokenises it once.
+ *
+ * @param spans  `namedElements()` of the text.
+ * @param offset An offset (0-based, between characters).
+ * @return The span; undefined if no named element contains the offset.
+ */
+export function innermostAt(spans: readonly ElementSpan[], offset: number): ElementSpan | undefined {
   let best: ElementSpan | undefined;
   for (const span of spans) {
     if (span.start <= offset && offset <= span.end && (best === undefined || span.depth >= best.depth)) {

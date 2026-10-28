@@ -54,6 +54,12 @@
  *                `bind_y`) carries `origin`: its container's absolute corner on
  *                that axis, which the host adds to the subject's value as
  *                firmware does (§7.2).
+ *              - Every element carries `source`: `{ file, line, column, start,
+ *                end }`, where it is written, or null. `start` and `end` are the
+ *                element's whole range as text offsets; they were added to
+ *                version 3 without a bump, as the marker was, because only the
+ *                editor's shell reads `source` and every host ignores keys it
+ *                does not read.
  *
  * Exports:
  * - SCENE_FILE:            `ui_scene.json`
@@ -163,10 +169,22 @@ function understood(binding: RealisedBinding, element: RealisedElement): FlagCom
 
 // source
 // Where an element came from, so the editor can map a canvas hit back to the
-// text (ui_spec §4.3).
+// text (ui_spec §4.3): the file, the line and column of its opening '<', and
+// `start`/`end`, the half-open offsets of the whole element in that file's text
+// as the CST reports them, so the editor selects and reveals the element
+// without re-deriving offsets from a line and column. A host that only places
+// errors reads `line` and `column`; the offsets are additive.
 function source(element: RealisedElement): Json {
-  const loc = element.element.node.loc;
-  return loc === undefined ? null : { file: loc.file, line: loc.line, column: loc.column };
+  const { loc, range } = element.element.node;
+  if (loc === undefined) {
+    return null;
+  }
+  return {
+    file: loc.file,
+    line: loc.line,
+    column: loc.column,
+    ...(range === undefined ? {} : { start: range.start, end: range.end }),
+  };
 }
 
 // objectJson
