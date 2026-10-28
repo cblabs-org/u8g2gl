@@ -8,9 +8,9 @@
  *          frame"), with Chromium's CPU throttled 4× as a stand-in for a modest
  *          laptop, on the departures screen and on a 20-element screen, over 300
  *          keystrokes each:
- *          1. **Frame latency:** every keystroke's edit is on the canvas in the
- *             **first** animation frame after its key event — no keystroke
- *             skips a frame.
+ *          1. **Frame latency:** each keystroke's edit is on the canvas in the
+ *             **first** animation frame after its key event; at most 1% (3 of
+ *             300) may miss it (ruling 11).
  *          2. **Work per frame:** from the start of the pipeline run in that
  *             frame to the end of its blit, **p95 under 16 ms**.
  *          Key to blit is reported, not gated: it includes the wait for the
@@ -42,6 +42,11 @@ import { openFile, openShell, placeCaret } from './support/shell';
 const KEYSTROKES = 300;
 /** Keystrokes typed first and discarded: the JIT, Monaco's first layouts. */
 const WARMUP = 30;
+/**
+ * The share of keystrokes per screen that may miss their first frame: 1%, so 3
+ * of 300 (PA ruling 11). Rounded down, so a smaller sample allows fewer.
+ */
+const MAX_MISSED_SHARE = 0.01;
 /** The budget, p95, in milliseconds. */
 const BUDGET_MS = 16;
 /** DevTools' CPU throttling factor. */
@@ -106,8 +111,10 @@ const round = (value: number): number => Math.round(value * 100) / 100;
 //   result — one screen's measurement
 function gateFailures(result: ScreenResult): string[] {
   const failures: string[] = [];
-  if (result.frames.firstFrame !== result.samples) {
-    failures.push(`${result.samples - result.frames.firstFrame} keystroke(s) missed their frame (worst ${result.frames.worst})`);
+  const missed = result.samples - result.frames.firstFrame;
+  const allowed = Math.floor(result.samples * MAX_MISSED_SHARE);
+  if (missed > allowed) {
+    failures.push(`${missed} keystroke(s) missed their frame, more than the ${allowed} allowed (worst ${result.frames.worst})`);
   }
   if (!(result.runToBlit.p95 < BUDGET_MS)) {
     failures.push(`run-to-blit p95 ${result.runToBlit.p95} ms is not under ${BUDGET_MS} ms`);
@@ -241,14 +248,15 @@ test('e2: every keystroke drawn in the first frame after it, run-to-blit p95 und
 });
 
 // The self-test of ruling 10: before trusting the frame gate passing, show it
-// can fail. One keystroke is forced to miss its frame by a hook the test
+// can fail. Four keystrokes of ten — more than ruling 11's 1% — are each forced
+// to miss its frame by a hook the test
 // injects into the page through the existing `window.__u8g2gl` handle: the
 // loaded editor Wasm's `renderFrame` is wrapped to block the main thread for
 // three frame periods inside the pipeline run that draws that keystroke,
 // before its blit, and then unwrapped.
 // The hook exists only in this file; the built designer contains no such code
 // (checked by grep over `designer/dist` in the completion report).
-test('e2 self-test: a keystroke forced to miss its frame is counted 2 or more, and the gate fails', async ({ page, browserName }) => {
+test('e2 self-test: keystrokes forced to miss their frame are each counted 2 or more, and over 1% the gate fails', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
   session = await startDesign();
   await openShell(page, session.url);
@@ -258,9 +266,9 @@ test('e2 self-test: a keystroke forced to miss its frame is counted 2 or more, a
   await placeCaret(page, 'screens/screen_departures.xml', 'name="row0" x="32"', 'name="row0" x="32'.length);
   await page.keyboard.press('Backspace');
 
-  const FORCED = 5;
-  const result = await measure(page, 'departures, one key forced late', '2', 10, async (i) => {
-    if (i !== FORCED) return;
+  const FORCED = [1, 3, 5, 7];
+  const result = await measure(page, 'departures, four keys forced late', '2', 10, async (i) => {
+    if (!FORCED.includes(i)) return;
     await page.evaluate(() => {
       type Module = { renderFrame(ms: number): Uint8Array | undefined };
       const workspace = (window as unknown as {
@@ -293,7 +301,9 @@ test('e2 self-test: a keystroke forced to miss its frame is counted 2 or more, a
   console.log(`e2 self-test: frames per keystroke ${JSON.stringify(result.frames.histogram)}, worst ${result.frames.worst}; gate: ${JSON.stringify(gateFailures(result))}`);
 
   const samples = await page.evaluate(() => (window as unknown as { __u8g2glPerf: { samples: { frames: number }[] } }).__u8g2glPerf.samples.map((s) => s.frames));
-  expect(samples[FORCED], 'the forced keystroke').toBeGreaterThanOrEqual(2);
-  expect(samples.filter((frames, i) => i !== FORCED).every((frames) => frames <= 1), 'every other keystroke').toBe(true);
+  for (const i of FORCED) {
+    expect(samples[i], `forced keystroke ${i}`).toBeGreaterThanOrEqual(2);
+  }
+  expect(samples.filter((frames, i) => !FORCED.includes(i)).every((frames) => frames <= 1), 'every other keystroke').toBe(true);
   expect(gateFailures(result).some((failure) => failure.includes('missed their frame'))).toBe(true);
 });

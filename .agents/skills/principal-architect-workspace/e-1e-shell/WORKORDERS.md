@@ -235,6 +235,33 @@ them taken:
 - keep "all 300" and accept that the gate is flaky under 4× throttle;
 - reduce the spikes, for example by cutting allocation in validate, resolve and scene.
 
+### Ruling 11 — the frame gate at most 1%: PASSES
+
+Ruling 11 verified from PROJECT.md at `34fb5a3`. The frame gate now fails when more than
+`floor(1% × samples)` keystrokes per screen count 2 or more: 3 of 300. The run-to-blit gate is
+unchanged. The self-test forces 4 keystrokes of 10 (keystrokes 1, 3, 5 and 7) to miss their
+frame. It asserts that each counts 2 or more, that the others count at most 1, and that the
+gate fails.
+
+**Self-test:** passed. Frames per keystroke `{"1":6,"3":1,"4":3}`; gate
+`["4 keystroke(s) missed their frame, more than the 0 allowed (worst 4)", "run-to-blit p95 52.6 ms is not under 16 ms"]`.
+
+**e2, three runs** (4× throttle, 300 keystrokes per screen; times in ms):
+
+| Run | Screen | Missed (≥2) / allowed | Histogram | run→blit median / p95 / max | key→blit median / p95 / max (reported) |
+|---|---|---|---|---|---|
+| 1 | departures | 0 / 3 | 0:6 1:294 | 2.8 / 3.7 / 5.0 | 11.7 / 17.7 / 20.1 |
+| 1 | 20 elements | 0 / 3 | 0:19 1:281 | 2.5 / 3.4 / 5.2 | 10.5 / 18.8 / 21.1 |
+| 2 | departures | 0 / 3 | 0:23 1:277 | 2.7 / 3.7 / 5.1 | 11.0 / 18.8 / 20.8 |
+| 2 | 20 elements | 0 / 3 | 0:18 1:282 | 2.5 / 3.4 / 8.2 | 10.7 / 19.0 / 27.5 |
+| 3 | departures | 0 / 3 | 0:15 1:285 | 2.7 / 3.6 / 5.6 | 11.6 / 18.2 / 21.3 |
+| 3 | 20 elements | 0 / 3 | 0:26 1:274 | 2.5 / 3.3 / 4.7 | 10.3 / 18.0 / 20.7 |
+
+All three runs passed both gates on both screens. No keystroke missed its frame in these runs,
+against 0–3 per screen in the five runs before; the misses are tails that vary with load on
+the machine, so a busier machine can still exceed 3. The E-2 follow-up in ruling 11 (cutting
+allocation spikes in resolve, validate and scene) is the fix for those inside U8G2GL's code.
+
 ### e2 under the original definition (superseded by ruling 8): p95 was over 16 ms
 
 Chromium headless, CPU throttled 4×, 300 keystrokes per screen after 30 warm-up, keys spaced
