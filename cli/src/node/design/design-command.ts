@@ -163,7 +163,15 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     process.exit(1);
   }
 
-  // --- Step 4: Report the URL, and open it ---
+  // --- Step 4: A started server's signal handlers, before anything is printed ---
+  // Whoever reads the URL may signal the moment it arrives; a handler
+  // installed after printing leaves a window in which SIGINT or SIGTERM takes
+  // its default action, killing the process with the lock still on disk.
+  if (session.kind === 'started') {
+    installShutdown(projectRoot, session);
+  }
+
+  // --- Step 5: Report the URL, and open it; an attaching run is done ---
   const lock = session.kind === 'started'
     ? { url: session.server.url, port: session.server.port, pid: process.pid }
     : session.lock;
@@ -183,8 +191,17 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
   if (session.kind === 'attached') {
     process.exit(0);
   }
+  // A started server keeps the process alive until a signal ends it.
+}
 
-  // --- Step 5: A started server keeps the process alive; a signal ends it cleanly ---
+// installShutdown
+// SIGINT and SIGTERM close the server, remove the lock and exit 0 (1 if the
+// close fails); a second signal while stopping is ignored. An `exit` hook
+// removes the lock on any exit no signal handler saw (an uncaught error), so
+// the lock never outlives the process that wrote it.
+//   projectRoot — absolute project directory
+//   session     — the started session
+function installShutdown(projectRoot: string, session: Extract<DesignSession, { kind: 'started' }>): void {
   let stopping = false;
   const shutdown = (): void => {
     if (stopping) {
@@ -198,8 +215,6 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
-  // Last resort for an exit no signal handler saw (an uncaught error): the
-  // lock must not outlive the process that wrote it.
   process.on('exit', () => removeLockIfOwned(projectRoot, session.server.token));
 }
 

@@ -9,7 +9,8 @@
  *          running URL; a stale lock (dead pid, a live pid that is not the
  *          server, or a corrupt file) is replaced; the warning when git would
  *          track the lock; and the built CLI end to end, including Ctrl-C
- *          removing the lock.
+ *          removing the lock, even when the signal arrives the moment the
+ *          URL is printed.
  * Description: `startOrAttach` is tested in-process. The end-to-end tests spawn
  *              the built `dist/node/cli.js` (built by the global setup) with
  *              `--no-open --json`, so no browser opens and the URL is read as
@@ -235,6 +236,22 @@ describe('u8g2gl design — the built CLI', () => {
     expect(await exitCode(child)).toBe(0);
     expect(stderr.match(/warning: /g)).toHaveLength(1);
     expect(stderr).toContain(`${LOCK_FILE_NAME} is not ignored by git`);
+  });
+
+  // The signal arrives the moment the URL line does: a handler installed only
+  // after printing would leave the default action (death by signal) in place.
+  it.each([
+    ['SIGINT', ['--json']],
+    ['SIGTERM', ['--json']],
+    ['SIGINT', []],
+    ['SIGTERM', []],
+  ] as const)('a %s sent as soon as the URL is printed (%j) stops it cleanly: exit 0, no lock', async (signal, flags) => {
+    const root = project();
+    const child = spawnCli(['design', root, '--no-open', ...flags]);
+    await linesUntil(child, /http:\/\/127\.0\.0\.1:\d+/);
+    child.kill(signal);
+    expect(await exitCode(child)).toBe(0);
+    expect(existsSync(join(root, LOCK_FILE_NAME))).toBe(false);
   });
 
   it('exits 1 for a directory that is not a project, and 2 for a bad option', async () => {
