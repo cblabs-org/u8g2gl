@@ -125,4 +125,5 @@ function main() {
   console.log('No home-folder paths in tracked files.');
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+// Run only as a script, not when imported (process.argv[1] is unset under `node -e`).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
