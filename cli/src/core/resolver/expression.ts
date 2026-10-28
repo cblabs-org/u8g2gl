@@ -226,6 +226,30 @@ function tokenise(text: string): Parsed<Token[]> {
   return { ok: true, value: tokens };
 }
 
+/**
+ * Parses already made, by text. A parse depends on nothing but the text, and
+ * its tree is only ever read, so one is reused across runs: the designer
+ * resolves every coordinate of the project on every frame of a drag, and
+ * re-parsing the same few dozen expressions each time was a steady source of
+ * garbage. Bounded, so a long session cannot grow it without
+ * limit: when full it is emptied and refills with what is in use.
+ */
+const PARSE_CACHE = new Map<string, Parsed<ExpressionNode>>();
+const PARSE_CACHE_LIMIT = 1024;
+
+// parsedExpression
+// The tokenised and parsed form of `text`, from the cache when it has one.
+//   text — the attribute value as written
+function parsedExpression(text: string): Parsed<ExpressionNode> {
+  const cached = PARSE_CACHE.get(text);
+  if (cached !== undefined) return cached;
+  const tokens = tokenise(text);
+  const parsed = tokens.ok ? parse(tokens.value) : tokens;
+  if (PARSE_CACHE.size >= PARSE_CACHE_LIMIT) PARSE_CACHE.clear();
+  PARSE_CACHE.set(text, parsed);
+  return parsed;
+}
+
 // parse
 // Recursive descent over the grammar, lowest precedence first:
 //   expression := term    (('+' | '-') term)*
@@ -518,8 +542,7 @@ function evaluateNode(node: ExpressionNode, state: EvaluationState): number | un
  */
 export function evaluateExpression(text: string, scope: EvaluationScope, site: ExpressionSite): Evaluation {
   // --- Step 1: Tokenise and parse; a syntax error is the only diagnostic ---
-  const tokens = tokenise(text);
-  const parsed = tokens.ok ? parse(tokens.value) : tokens;
+  const parsed = parsedExpression(text);
   if (!parsed.ok) {
     return {
       kind: 'invalid',

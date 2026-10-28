@@ -107,8 +107,10 @@ for (const zoom of ['1', '8'] as const) {
 test('a marquee shows on the overlay while it is dragged, and is gone on release', async ({ page }) => {
   await open(page);
   const scale = await zoomOf(page);
-  const start = await devicePoint(page, 150, 52);
-  const end = await devicePoint(page, 230, 62);
+  // From the frame's margin below the display, so the press is on no element
+  // (a press on one moves it), up across the bottom row.
+  const start = await devicePoint(page, 230, 64.25);
+  const end = await devicePoint(page, 150, 52);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 6 });
@@ -152,8 +154,10 @@ test('a selection change re-renders only what shows the selection: the status ba
   await nextFrames(page, 2);
   await clickCanvas(page, 220, 57);
   await nextFrames(page, 2);
-  const start = await devicePoint(page, 150, 52);
-  const end = await devicePoint(page, 230, 62);
+  // From the frame's margin below the display, so the press is on no element
+  // (a press on one moves it), up across the bottom row.
+  const start = await devicePoint(page, 230, 64.25);
+  const end = await devicePoint(page, 150, 52);
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 6 });

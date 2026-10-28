@@ -10,10 +10,10 @@
  *          and the loaded editor Wasm — so it exists only in the test build
  *          (`vite build --mode e2e`). `main.tsx` imports this module only behind
  *          `__U8G2GL_TEST_HOOKS__`, which a production build sets to `false`,
- *          so neither this module nor the keystroke probe reaches its bundle.
- * Description: Installs the keystroke probe and publishes the workspace as
- *              `window.__u8g2gl`, the shell's render counts and the property
- *              panel's cost per update.
+ *          so neither this module nor the input probes reach its bundle.
+ * Description: Installs the keystroke and drag probes and publishes the
+ *              workspace as `window.__u8g2gl`, the shell's render counts and
+ *              the property panel's cost per update.
  *              `TestHandle` is the handle's one typed description, which the
  *              tests import rather than restating it.
  *
@@ -22,7 +22,7 @@
  * - installTestHooks():  Add them
  */
 
-import { installKeystrokeProbe, type KeystrokeProbe } from './perf/keystroke-probe';
+import { installInputProbes, type InputProbe } from './perf/input-probe';
 import { panelSamples, resetPanelSamples, type PanelSample } from './perf/panel-probe';
 import { renderCounts } from './perf/render-count';
 import type { Workspace } from './workspace';
@@ -32,7 +32,9 @@ export interface TestHandle {
   /** The session's workspace. */
   readonly __u8g2gl: Workspace;
   /** The keystroke probe's samples. */
-  readonly __u8g2glPerf: KeystrokeProbe;
+  readonly __u8g2glPerf: InputProbe;
+  /** The drag probe's samples: pointer moves with the button held, to the blit. */
+  readonly __u8g2glDragPerf: InputProbe;
   /** Each shell component's render count so far (`perf/render-count.ts`). */
   readonly __u8g2glRenders: () => Record<string, number>;
   /** The property panel's cost per update (`perf/panel-probe.ts`), and a reset. */
@@ -42,14 +44,15 @@ export interface TestHandle {
 /**
  * @brief Installs the probe and publishes the workspace for the tests.
  *
- * Called before `workspace.start()`, so the probe is listening before the
- * first frame and the first key.
+ * Called before `workspace.start()`, so the probes are listening before
+ * the first frame and the first input.
  */
 export function installTestHooks(workspace: Workspace): void {
-  const probe = installKeystrokeProbe(workspace.loop, workspace.documents);
+  const probes = installInputProbes(workspace.loop, workspace.documents);
   Object.assign(window, {
     __u8g2gl: workspace,
-    __u8g2glPerf: probe,
+    __u8g2glPerf: probes.keys,
+    __u8g2glDragPerf: probes.drags,
     __u8g2glRenders: renderCounts,
     __u8g2glPanel: { samples: panelSamples, reset: resetPanelSamples },
   } satisfies TestHandle);
