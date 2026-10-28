@@ -50,10 +50,10 @@ from the same base. Do not touch panel code; keep shared shell files' changes sm
 
 # WO4 — the drag gate (`u8g2gl-e2b/wo4-drag-gate`)
 
-- [ ] Ruling 7's 300-frame drag on both screens, with its self-test; report p95 and frames.
-- [ ] Ruling 8: allocation and GC before and after, and the changes; generator goldens
+- [x] Ruling 7's 300-frame drag on both screens, with its self-test; report p95 and frames.
+- [x] Ruling 8: allocation and GC before and after, and the changes; generator goldens
       unchanged.
-- [ ] E-1e's keystroke gate still passes, its self-test included.
+- [x] E-1e's keystroke gate still passes, its self-test included.
 
 # WO5 — review (`u8g2gl-e2b/wo5-readability`)
 

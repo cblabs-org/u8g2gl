@@ -38,44 +38,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { startDesign, type DesignSession } from './support/design-session';
+import { BUDGET_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
 import { openFile, openShell, placeCaret } from './support/shell';
 import type { TestHandle } from '../src/test-hooks';
 
 /** Keystrokes measured per screen, after the warm-up. */
-const KEYSTROKES = 300;
-/** Keystrokes typed first and discarded: the JIT, Monaco's first layouts. */
-const WARMUP = 30;
-/**
- * The share of keystrokes per screen that may miss their first frame: 1%, so 3
- * of 300. Rounded down, so a smaller sample allows fewer.
- */
-const MAX_MISSED_SHARE = 0.01;
-/** The budget, p95, in milliseconds. */
-const BUDGET_MS = 16;
-/** DevTools' CPU throttling factor. */
-const THROTTLE = 4;
-
-/** A 20-element screen of framework elements: labels, boxes and rules. */
-function twentyElementScreen(): string {
-  const elements: string[] = [];
-  for (let i = 0; i < 10; i++) {
-    elements.push(`        <u8g2gl_label name="l${i}" x="${i === 0 ? 1 : (i % 4) * 64}" y="${Math.floor(i / 4) * 13}" width="60" height="12" font="u8g2_font_6x10_mr" text="label ${i}" />`);
-  }
-  for (let i = 0; i < 6; i++) {
-    elements.push(`        <u8g2gl_box name="b${i}" x="${i * 42}" y="42" width="36" height="10" filled="${i % 2 === 0}" />`);
-  }
-  for (let i = 0; i < 4; i++) {
-    elements.push(`        <u8g2gl_line name="r${i}" x1="0" y1="${54 + i * 3}" x2="255" y2="${54 + i * 3}" />`);
-  }
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<screen name="twenty">\n    <view>\n${elements.join('\n')}\n    </view>\n</screen>\n`;
-}
-
-/** Median, p95 and maximum of a set of milliseconds. */
-interface Spread {
-  readonly median: number;
-  readonly p95: number;
-  readonly max: number;
-}
+const KEYSTROKES = SAMPLES;
 
 /** One screen's measurement. */
 interface ScreenResult {
@@ -97,15 +65,6 @@ interface ScreenResult {
   /** p95 of the same, to show which stage the tail comes from. */
   readonly stageP95s: Readonly<Record<string, number>>;
 }
-
-/** A percentile by nearest rank. */
-function percentile(values: readonly number[], p: number): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))] ?? NaN;
-}
-
-/** Two decimals, for the report. */
-const round = (value: number): number => Math.round(value * 100) / 100;
 
 // gateFailures
 // Ruling 8's two gates for one screen, as the reasons they fail; empty when
@@ -141,7 +100,7 @@ async function measure(
   keystrokes = KEYSTROKES,
   beforeKey: (i: number) => Promise<void> = async () => undefined,
 ): Promise<ScreenResult> {
-  type Sample = { keyToBlit: number; wait: number; keyToEdit: number; editToFrame: number; runToBlit: number; frames: number; stages: Record<string, number> };
+  type Sample = { inputToBlit: number; wait: number; inputToEdit: number; editToFrame: number; runToBlit: number; frames: number; stages: Record<string, number> };
   const count = (): Promise<number> => page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.samples.length);
   await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.reset());
   for (let i = 0; i < WARMUP + keystrokes; i++) {
@@ -156,24 +115,19 @@ async function measure(
     await page.waitForTimeout(Math.random() * 20);
   }
   const samples = await page.evaluate(() => (window as unknown as TestHandle).__u8g2glPerf.samples);
-  const totals = samples.map((s) => s.keyToBlit);
+  const totals = samples.map((s) => s.inputToBlit);
   const stages: Record<string, number> = {
-    keyToEdit: round(percentile(samples.map((s) => s.keyToEdit), 50)),
+    keyToEdit: round(percentile(samples.map((s) => s.inputToEdit), 50)),
     editToFrame: round(percentile(samples.map((s) => s.editToFrame), 50)),
   };
   const tails: Record<string, number> = {
-    keyToEdit: round(percentile(samples.map((s) => s.keyToEdit), 95)),
+    keyToEdit: round(percentile(samples.map((s) => s.inputToEdit), 95)),
     editToFrame: round(percentile(samples.map((s) => s.editToFrame), 95)),
   };
   for (const stage of Object.keys(samples[0]?.stages ?? {})) {
     stages[stage] = round(percentile(samples.map((s) => s.stages[stage] ?? 0), 50));
     tails[stage] = round(percentile(samples.map((s) => s.stages[stage] ?? 0), 95));
   }
-  const spread = (values: readonly number[]): Spread => ({
-    median: round(percentile(values, 50)),
-    p95: round(percentile(values, 95)),
-    max: round(Math.max(...values)),
-  });
   const histogram: Record<string, number> = {};
   for (const sample of samples) histogram[String(sample.frames)] = (histogram[String(sample.frames)] ?? 0) + 1;
   return {
@@ -188,7 +142,7 @@ async function measure(
       histogram,
     },
     misses: samples
-      .map((s, index) => ({ index, frames: s.frames, keyToEdit: round(s.keyToEdit), editToFrame: round(s.editToFrame), runToBlit: round(s.runToBlit), keyToBlit: round(s.keyToBlit), stages: s.stages }))
+      .map((s, index) => ({ index, frames: s.frames, keyToEdit: round(s.inputToEdit), editToFrame: round(s.editToFrame), runToBlit: round(s.runToBlit), keyToBlit: round(s.inputToBlit), stages: s.stages }))
       .filter((s) => s.frames > 1),
     runToBlit: spread(samples.map((s) => s.runToBlit)),
     keyToBlit: spread(totals),
