@@ -53,6 +53,7 @@ import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { HANDLE_SIZE, type GuideLine } from '../canvas/canvas-view';
 import type { CanvasEditor } from '../editing/canvas-editor';
 import { DragEdit } from '../editing/drag-edit';
+import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Handle } from '../editing/resize-rules';
 import type { DrawnTargets } from '../pipeline/edit-loop';
@@ -275,6 +276,9 @@ export class CanvasGestures {
     // --- Step 3: The pointer's delta, unrounded, in device pixels ---
     const scale = this.scale();
     const frame = press.drag.to((event.clientX - press.clientX) / scale.x, (event.clientY - press.clientY) / scale.y, scale.x, event.shiftKey);
+    // Processed, whether it wrote or the element was already there: the drag
+    // probe of the test build measures a frame from the latest such move.
+    signalDragMove(event.timeStamp);
 
     // --- Step 4: The guides it lies on, and why an axis does not follow ---
     this.host.showGuides(frame.guides);

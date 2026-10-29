@@ -15,13 +15,15 @@
  *              manifest that redeclares a framework tag, then resolves each
  *              element's `extends` chain — merging props by name and bindings by
  *              (name, type), parent order first, a child's override keeping its
- *              parent's position — and diagnoses unknown `extends` targets (with
+ *              parent's position, each recording the manifest that declared it
+ *              — and diagnoses unknown `extends` targets (with
  *              §6.5's remedy), cycles, and an `extends` that names a drawing
  *              element, which has no class to inherit (§6.5, [D-18]).
  *
  * Exports:
  * - ManifestOrigin:          Where a manifest came from ('framework' | 'project')
- * - EffectiveManifest:       A manifest with its inherited props and bindings merged in
+ * - EffectiveManifest:       A manifest with its inherited props and bindings merged in,
+ *                            and which manifest declared each
  * - ManifestRegistryInput:   Framework and project manifest lists
  * - ManifestRegistry:        Lookup by tag, declaration lists, and registry diagnostics
  * - buildManifestRegistry(): Build a registry from framework and project manifests
@@ -64,6 +66,16 @@ export interface EffectiveManifest extends WidgetManifest {
    * `['u8g2gl_label', 'u8g2gl_obj']`. Stops at an unknown or cyclic `extends`.
    */
   readonly chain: readonly string[];
+  /**
+   * Which manifest declared each effective prop, index-aligned with
+   * `api.props`: this element's own tag, or the ancestor's the prop was
+   * inherited from. An override is the overriding manifest's, though it keeps
+   * the inherited position. The property panel reads it to group inherited
+   * props by where they come from ([Q-10]); nothing in the build does.
+   */
+  readonly propSources: readonly string[];
+  /** The same for each effective binding, index-aligned with `api.bindings`. */
+  readonly bindingSources: readonly string[];
 }
 
 /**
@@ -108,25 +120,46 @@ interface Registration {
 // mergeByKey
 // Merges inherited declarations with an element's own, by a declaration key.
 // Inherited order is kept; an own declaration either replaces the inherited one
-// with the same key in place or is appended.
+// with the same key in place or is appended. Each entry carries the tag that
+// declared it, which travels with it through the merge.
 //   inherited — the parent's effective list, already fully merged
 //   own       — the element's own declarations, in declaration order
+//   ownTag    — the element's tag, the source of each own declaration
 //   keyOf     — the identity two declarations must share to be one declaration
-function mergeByKey<T>(inherited: readonly T[], own: readonly T[], keyOf: (decl: T) => string): T[] {
+function mergeByKey<T>(
+  inherited: readonly Sourced<T>[],
+  own: readonly T[],
+  ownTag: string,
+  keyOf: (decl: T) => string,
+): Sourced<T>[] {
   const merged = [...inherited];
   const indexByKey = new Map<string, number>();
-  merged.forEach((decl, index) => indexByKey.set(keyOf(decl), index));
+  merged.forEach((entry, index) => indexByKey.set(keyOf(entry.decl), index));
   for (const decl of own) {
     const key = keyOf(decl);
     const index = indexByKey.get(key);
     if (index === undefined) {
       indexByKey.set(key, merged.length);
-      merged.push(decl);
+      merged.push({ decl, source: ownTag });
     } else {
-      merged[index] = decl;
+      merged[index] = { decl, source: ownTag };
     }
   }
   return merged;
+}
+
+/** A declaration and the tag of the manifest that declared it. */
+interface Sourced<T> {
+  readonly decl: T;
+  readonly source: string;
+}
+
+// sourced
+// An effective list paired with its sources, for merging the next level down.
+//   decls   — an effective manifest's props or bindings
+//   sources — the index-aligned sources it carries
+function sourced<T>(decls: readonly T[], sources: readonly string[]): Sourced<T>[] {
+  return decls.map((decl, i) => ({ decl, source: sources[i] ?? '' }));
 }
 
 /** A prop is identified by its attribute name. */
@@ -406,16 +439,30 @@ export function buildManifestRegistry(input: ManifestRegistryInput): ManifestReg
       }
     }
 
+    const props = mergeByKey(
+      parent === undefined ? [] : sourced(parent.api.props, parent.propSources),
+      manifest.api.props,
+      tag,
+      propKey,
+    );
+    const bindings = mergeByKey(
+      parent === undefined ? [] : sourced(parent.api.bindings, parent.bindingSources),
+      manifest.api.bindings,
+      tag,
+      bindingKey,
+    );
     const result: EffectiveManifest = {
       ...manifest,
       api: {
         ...manifest.api,
-        props: mergeByKey(parent?.api.props ?? [], manifest.api.props, propKey),
-        bindings: mergeByKey(parent?.api.bindings ?? [], manifest.api.bindings, bindingKey),
+        props: props.map((entry) => entry.decl),
+        bindings: bindings.map((entry) => entry.decl),
       },
       origin,
       declared: manifest,
       chain: [tag, ...(parent?.chain ?? [])],
+      propSources: props.map((entry) => entry.source),
+      bindingSources: bindings.map((entry) => entry.source),
     };
     effective.set(tag, result);
     return result;

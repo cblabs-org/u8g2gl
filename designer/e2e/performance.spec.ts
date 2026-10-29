@@ -151,6 +151,10 @@ async function measure(
   };
 }
 
+// Tracing records a DOM snapshot on every page call, and these tests poll the
+// page between inputs: on, it would be timed as part of the shell.
+test.use({ trace: 'off' });
+
 let session: DesignSession | undefined;
 test.afterEach(async () => {
   await session?.stop();
