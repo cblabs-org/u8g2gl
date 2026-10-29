@@ -26,10 +26,11 @@
  *              A capturing listener stamps the input the next drawn frame
  *              shows: for keys, the first `keydown` since the last drawn
  *              frame; for a drag, which is a stream of several pointer moves
- *              per frame of which the pipeline draws only the latest, the last
- *              `pointermove` with the primary button held that edited the text
- *              before the run (a move that leaves the delta where it was has
- *              nothing to paint). The edit loop reports each run's stage
+ *              per frame of which the pipeline draws only the latest, the
+ *              latest move the gesture processed before the run — one that
+ *              wrote an edit, or one that snapped or rounded to where the
+ *              element already was, which the frame shows just as much
+ *              (`drag-stamp.ts`). The edit loop reports each run's stage
  *              timings; the first run that draws after a stamped input closes
  *              the sample: input to blit, split into the input's handling
  *              (the input to the text changing), the wait for the frame (that
@@ -48,6 +49,7 @@
 
 import type { EditLoop, FrameTimings } from '../pipeline/edit-loop';
 import type { ProjectDocuments } from '../documents/project-documents';
+import { DragStamper, onDragMove } from './drag-stamp';
 
 /** What a probe measures: keys typed, or a drag's pointer moves. */
 export type InputKind = 'key' | 'drag';
@@ -58,7 +60,10 @@ export interface InputSample {
   readonly inputToBlit: number;
   /** From the input event to the start of the run that drew it. */
   readonly wait: number;
-  /** Of that wait, the part before the text changed: the input's handling. */
+  /**
+   * Of that wait, the input's handling: a key's until the text changed; a drag
+   * move's until the gesture had finished with it (written, or found in place).
+   */
   readonly inputToEdit: number;
   /** And the part after: the edit waiting for the next animation frame. */
   readonly editToFrame: number;
@@ -168,9 +173,10 @@ function installProbe(kind: InputKind, frames: FrameCounter, loop: EditLoop, doc
   // a pointer reports several moves per frame, the pipeline draws only the
   // latest text (EDITOR-DESIGN §3.2), and what the user sees lag is the
   // pointer's latest position against the canvas. So a drag's sample is the
-  // latest move that edited the text before the run, and a move that edits
-  // nothing (its delta unchanged) has nothing to paint and is not one.
-  let move: number | undefined;
+  // latest move the gesture processed before the run, edited or snapped in
+  // place, taken when the run draws (`DragStamper`).
+  const stamper = new DragStamper();
+  let handled: number | undefined;
   const stamp = (time: number): void => {
     pending = time > 0 ? time : performance.now();
     inputFrame = frames.frameAt(pending);
@@ -185,21 +191,17 @@ function installProbe(kind: InputKind, frames: FrameCounter, loop: EditLoop, doc
       { capture: true },
     );
   } else {
-    window.addEventListener(
-      'pointermove',
-      (event) => {
-        move = (event.buttons & 1) !== 0 ? event.timeStamp : undefined;
-      },
-      { capture: true },
-    );
+    onDragMove((input) => stamper.moveProcessed({ input, handled: performance.now() }));
   }
 
   // --- Step 2: Note when the input became an edit ---
+  // For a drag, the edit only says the next drawn run has something to show;
+  // the move it is measured from, and when that move was handled, are taken
+  // at the run.
   documents.onDidChangeContent(() => {
-    if (kind === 'drag' && move !== undefined) {
-      stamp(move);
-      move = undefined;
-      edited = undefined;
+    if (kind === 'drag') {
+      stamper.editLanded();
+      return;
     }
     if (pending !== undefined && edited === undefined) {
       edited = performance.now();
@@ -209,13 +211,20 @@ function installProbe(kind: InputKind, frames: FrameCounter, loop: EditLoop, doc
 
   // --- Step 3: Close the sample at the blit of the next run that draws ---
   loop.onFrame((timings: FrameTimings) => {
+    if (kind === 'drag' && timings.drawn) {
+      const move = stamper.take(timings.runStart);
+      if (move !== undefined) {
+        stamp(move.input);
+        handled = move.handled;
+      }
+    }
     if (pending === undefined || !timings.drawn) return;
     const end = performance.now();
     // Everything in the timings but these three is a stage duration.
     const { frameStart: _frameStart, runStart, drawn: _drawn, ...stages } = timings;
     void _frameStart;
     void _drawn;
-    const edit = edited ?? runStart;
+    const edit = (kind === 'drag' ? handled : edited) ?? runStart;
     samples.push({
       inputToBlit: end - pending,
       wait: runStart - pending,
@@ -234,6 +243,7 @@ function installProbe(kind: InputKind, frames: FrameCounter, loop: EditLoop, doc
     if (samples.length > LIMIT) samples.shift();
     pending = undefined;
     edited = undefined;
+    handled = undefined;
   });
 
   return {
@@ -242,6 +252,8 @@ function installProbe(kind: InputKind, frames: FrameCounter, loop: EditLoop, doc
       samples.length = 0;
       pending = undefined;
       edited = undefined;
+      handled = undefined;
+      stamper.reset();
     },
   };
 }

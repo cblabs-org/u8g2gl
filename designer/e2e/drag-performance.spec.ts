@@ -6,8 +6,12 @@
  * File: designer/e2e/drag-performance.spec.ts
  * Purpose: EDITOR-DESIGN §3.4's acceptance test for direct manipulation: a
  *          scripted drag of 300 frames on the departures screen and on a
- *          20-element screen, with the whole shell running and Chromium's CPU
- *          throttled 4× as a stand-in for a modest laptop. Two gates:
+ *          20-element screen, each at 1× and at 2× zoom, with the whole shell
+ *          running — the property panel open on the dragged element — and
+ *          Chromium's CPU throttled 4× as a stand-in for a modest laptop. Both
+ *          zooms, because the snap window is 3 *screen* pixels (ui_spec §8):
+ *          at 1× it holds runs of moves at one position, at 2× fewer. Two
+ *          gates, at each:
  *          1. **Input to paint:** from each pointer event to the end of the
  *             blit that shows its edit, **p95 under 16 ms**.
  *          2. **No dropped frame at 60 Hz:** each pointer event's edit is on
@@ -16,11 +20,13 @@
  *          Run to blit is reported beside them, as the keystroke gate gates it.
  *          A self-test forces pointer events to miss their frame and checks the
  *          frame gate then fails, so its passing means something.
- * Description: A real press on an element and real pointer moves, each moving
- *              it by enough device pixels that it can never snap to where the
- *              last one did, so every move is an edit. The page's drag probe
- *              (`src/perf/input-probe.ts`) times each move from its event to
- *              the blit and counts the frame intervals between. Moves are
+ * Description: A real press on an element and real pointer moves, one device
+ *              pixel apart, back and forth. Near a guide several moves snap to
+ *              one position and write nothing new; the page's drag probe
+ *              (`src/perf/input-probe.ts`) measures each drawn frame from the
+ *              latest move the gesture processed before it, edited or snapped
+ *              in place (`src/perf/drag-stamp.ts`), to the blit, and counts the
+ *              frame intervals between. Moves are
  *              spaced by a random delay, so they land at every phase of the
  *              frame. The first 30 are warm-up.
  *
@@ -45,6 +51,8 @@ import type { TestHandle } from '../src/test-hooks';
 const POINTER_MS = 4;
 /** Device pixels the drag travels before it turns back. */
 const SPAN = 30;
+/** The zooms the drag gate runs at: the snap window is 3 device pixels at 1×, 1.5 at 2×. */
+const ZOOMS = [1, 2] as const;
 
 /** One screen's drag. */
 interface DragResult {
@@ -168,33 +176,52 @@ async function drag(
   };
 }
 
+// Tracing records a DOM snapshot on every page call, and the drag polls the
+// page every few milliseconds: on, it would be timed as part of the shell.
+test.use({ trace: 'off' });
+
 let session: DesignSession | undefined;
 test.afterEach(async () => {
   await session?.stop();
   session = undefined;
 });
 
-test('a 300-frame drag paints each move in its first frame (at most 1% miss) with input-to-paint p95 under 16 ms, CPU throttled 4×', async ({ page, browserName }) => {
+test('a 300-frame drag paints each move in its first frame (at most 1% miss) with input-to-paint p95 under 16 ms, at 1× and 2×, with the panel open, CPU throttled 4×', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
   test.setTimeout(600_000);
   session = await startDesign({ files: { 'screens/screen_twenty.xml': twentyElementScreen() } });
   await openShell(page, session.url);
   const cdp = await page.context().newCDPSession(page);
 
-  // --- The departures screen: plat_box, pressed where nothing covers it ---
+  // --- Each screen at each zoom: plat_box and l0, pressed where nothing covers them ---
   const results: DragResult[] = [];
-  await openFile(page, 'screens/screen_departures.xml');
-  await expect(page.locator('.canvas-toolbar .screen-name')).toHaveText('departures');
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-  results.push(await drag(page, cdp, 'departures (9 elements)', [2, 10]));
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-
-  // --- The 20-element screen: l0 ---
-  await openFile(page, 'screens/screen_twenty.xml');
-  await expect(page.locator('.canvas-toolbar .screen-name')).toHaveText('twenty');
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-  results.push(await drag(page, cdp, '20 elements', [5, 5]));
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  const screens = [
+    { file: 'screens/screen_departures.xml', screen: 'departures', label: 'departures (9 elements)', element: 'plat_box', at: [2, 10] },
+    { file: 'screens/screen_twenty.xml', screen: 'twenty', label: '20 elements', element: 'l0', at: [5, 5] },
+  ] as const;
+  for (const { file, screen, label, element, at } of screens) {
+    await openFile(page, file);
+    await expect(page.locator('.canvas-toolbar .screen-name')).toHaveText(screen);
+    for (const zoom of ZOOMS) {
+      await page.getByRole('combobox', { name: 'Zoom' }).selectOption({ label: `${zoom}×` });
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+      results.push(await drag(page, cdp, `${label} at ${zoom}×`, at));
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      // The press selected the dragged element, so the panel was open on it throughout.
+      await expect(page.locator('.property-panel .panel-subtitle')).toHaveText(element);
+      // The drag is one undo stop: undoing it puts the element back where the
+      // next zoom's press expects it.
+      const original = await page.evaluate(
+        (path) => {
+          const model = (window as unknown as TestHandle).__u8g2gl.documents.modelOf(path);
+          model?.undo();
+          return model?.getValue() ?? '';
+        },
+        file,
+      );
+      expect(original).toContain(screen === 'departures' ? 'name="plat_box" x="0"' : 'name="l0" x="1"');
+    }
+  }
 
   // --- Report, then gate locally ---
   const report = { throttle: THROTTLE, moves: SAMPLES, budgetMs: BUDGET_MS, ci: process.env.CI !== undefined, results };
