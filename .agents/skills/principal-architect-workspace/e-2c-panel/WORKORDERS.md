@@ -151,10 +151,71 @@ designer code, and the standards should say whether that document is citable.
 
 - [x] Profile one drag frame with the panel open on the dragged element; report where the
       2–4 ms goes. (Diagnosis: zoom and snapping, not the panel — ruling 11's amendment.)
-- [ ] Per ruling 11's amendment: stamp each frame with the latest pointer move the gesture has
+- [x] Per ruling 11's amendment: stamp each frame with the latest pointer move the gesture has
       processed (edited or snapped in place), unit-tested on a snapped run; the gate on both
       screens at both 1× and 2×, panel open on the dragged element; p95 under 16 ms and at most
       1% missing at each; the self-test still fails the gate.
-- [ ] Tracing off for the three timing specs only.
-- [ ] E-1e's keystroke gate and ruling 9's panel gate still pass.
-- [ ] Every suite, one at a time; an addendum to the completion report.
+- [x] Tracing off for the three timing specs only.
+- [x] E-1e's keystroke gate and ruling 9's panel gate still pass.
+- [x] Every suite, one at a time; an addendum to the completion report.
+
+## Addendum: WO6, the drag gate with the panel present
+
+**Diagnosis.** The panel is not the cost. Its per-frame work during a real drag is about 0.5 ms:
+the panel probe's p95 is 1.2–1.3 ms, and only `PanelField:x` renders. Its column narrows the
+canvas, so fit zoom drops from 2× to 1×. At 1× the 3-screen-pixel snap window holds runs of
+1-pixel moves at one position. Those moves write nothing, so the old stamp ("the latest move
+that edited the text") dated a frame from an older move. An A/B showed this directly:
+- E-2b alone, with an empty 280 px column, failed the same way.
+- E-2b alone, wide, forced to 1×, also failed.
+- With the narrow layout forced to 2×, it passed.
+- With the panel removed from the combined tree, it still failed.
+
+**Fix** (`759b140`, ruling 11's amendment). `DragStamper` (`src/perf/drag-stamp.ts`) measures
+each drawn frame from the latest pointer move the gesture processed before the run, whether
+that move edited the text or snapped in place. A move handled after the run began goes to the
+next frame. Four unit tests cover it, including a snapped run. The gesture signals moves through
+a call that does nothing outside the test build. The drag gate now runs both screens at 1× and
+2×, with the panel asserted open on the dragged element, and undoes each drag between zooms.
+Thresholds, `SNAP_THRESHOLD`, the step size, the layout and the self-test are unchanged. Tracing
+is off for the `drag-performance`, `performance` and `panel-budget` specs.
+
+**Gate numbers.** Power source for all runs: battery, 98%, Low Power Mode off. Every timed
+window below was checked against `pmset -g log` and contains no Sleep or DarkWake entry. The
+lid-closed sleep ran 09:49:46–10:11:42, and the runs started at 10:11:55. Each cell is input→blit
+p95, then moves drawn in their first frame out of 300:
+
+| Run (time) | departures 1× | departures 2× | 20 elements 1× | 20 elements 2× | Self-test |
+|---|---|---|---|---|---|
+| 1 (10:11:55–10:12:26) | 11.2 ms, 299 | 9.6 ms, 300 | 9.5 ms, 300 | 10.1 ms, 300 | fails gate: 4 missed, p95 57.3 |
+| 2 (10:12:26–10:12:56) | 10.4 ms, 300 | 11.2 ms, 299 | 10.0 ms, 300 | 10.6 ms, 300 | fails gate: 4 missed, p95 58.2 |
+| 3 (10:12:56–10:13:25) | 10.8 ms, 298 | 9.3 ms, 300 | 9.7 ms, 300 | 9.5 ms, 300 | fails gate: 4 missed, p95 57.7 |
+| Full e2e (10:14:28–10:16:32) | 10.2 ms, 300 | 8.5 ms, 300 | 9.1 ms, 300 | 9.7 ms, 300 | fails gate: 4 missed, p95 57.9 |
+
+Void runs, which overlapped sleep or a maintenance dark-wake and were repeated:
+- 07:44 onward, a lid-closed sleep;
+- 09:12–09:45, maintenance dark-wakes;
+- 09:47:07–09:49:40, dark-wake until FullWake at 09:49:40, with a maintenance sleep at
+  09:48:23.
+
+In the full e2e run, inside the same clean window:
+- E-1e's keystroke gate: 300/300 in the first frame on both screens; run→blit p95 4.4 ms
+  (departures) and 3.6 ms (20 elements). Its self-test failed its gate.
+- Ruling 9's panel gate: panel share p95 1.0 ms, and only `PanelField:x` rendered. Its
+  self-test failed its gate at p95 11.3 ms.
+
+**Suites after WO6** (one at a time):
+
+| Suite | Result |
+|---|---|
+| Home-path guard | clean |
+| CLI `vitest` | 2517 passed, 6 skipped (114 files) |
+| CLI lint (`eslint` + `tsc -p tsconfig.test.json`) | clean |
+| CLI `tsc` | clean |
+| Goldens against `e2bbb4f` | no `expected/` file changed, no CLI version change |
+| C++ (`ctest`) | 100% of 512 passed (1 skipped: `SizeOfReport.ThirtyTwoBitTarget`) |
+| Wasm build and its snapshot, placeholder and last-error tests | built; all pass |
+| `build:e2e` | built |
+| Designer unit | 98 passed |
+| Designer e2e | 58 passed |
+| Production build | no hook found by the CI grep (its pattern includes `u8g2gl:drag-to-blit`); production e2e 3 passed |
