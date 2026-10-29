@@ -133,3 +133,11 @@ the panel needs by looking at it.
   once and did not reproduce.
 - **2026-10-29.** WO6's diagnosis (nothing committed): zoom, not panel cost — see ruling 11's
   amendment. The owner chose "Count snapped moves"; WO6 resumed on that.
+- **2026-10-29. WO6 complete** (`759b140`, report `30a4de6`). Runs that overlapped a sleep or
+  dark-wake in `pmset -g log` were voided and repeated. **PA verification** on `30a4de6`, suites
+  one at a time, Emscripten on PATH, the machine awake (battery, Low Power Mode off): guard clean;
+  CLI 2523, lint and tsc clean; no golden changed against `e2bbb4f` or main; C++ 512/512;
+  designer unit 98; e2e 58 passed. **Drag gate** with the panel open, 300/300 in the first frame
+  at every screen and zoom: departures p95 9.5 ms (1×) and 7.7 ms (2×), 20 elements 9.1 / 8.5 ms;
+  self-test fails it (4 missed, p95 56.6 ms). Keystroke gate 300/300 both, run→blit p95
+  3.9 / 4.0 ms; panel share p95 1.1 ms. Production 3/3, no hook.
