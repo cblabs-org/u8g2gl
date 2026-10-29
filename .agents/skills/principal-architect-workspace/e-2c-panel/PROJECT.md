@@ -84,6 +84,21 @@ the panel needs by looking at it.
     re-render. Commits go on `u8g2gl-e2c/wo5-readability` (PR #38's head). Boundary: designer
     code, both PRs' specs, and nothing in `cli/` without a report first.
 
+    **Amended 2026-10-29 by the owner's decision** on WO6's diagnosis. The panel is not the cost
+    (about 0.5 ms a frame). Its column narrows the canvas, so fit zoom drops from 2× to 1×, and
+    at 1× the 3-screen-px snap window holds runs of 1 px moves at one position: they write no
+    edit, so E-2b ruling 10's "latest move that edited the text" is an older move than the frame
+    shows, and editToFrame grows. Offered (a) count snapped moves, or (b) pin the gate at 2×,
+    the owner chose: **"Count snapped moves"** — *measure from the latest pointer move the frame
+    reflects, counting moves that snapped to the same place; gate at both 1× and 2×; also turn
+    off Playwright tracing for the timing specs.* This **replaces E-2b ruling 10's measurement
+    point**: a move is reflected by a frame once the gesture has processed it, whether it wrote
+    an edit or snapped to where the element already was; a move processed after the run began is
+    not. Thresholds unchanged (p95 under 16 ms, at most 1% of moves missing their first frame),
+    the self-test must still fail the gate, and the gate runs at both 1× and 2× on both screens.
+    Tracing off for `drag-performance`, `performance` and `panel-budget` only. The layout and
+    the scripted step size do not change.
+
 ## Status log
 
 - **2026-10-28.** Worktree created from E-2a's tip `e2bbb4f`, `extern/u8g2` checked out. WO1–WO5
@@ -116,3 +131,5 @@ the panel needs by looking at it.
   `live-pipeline.ts` and `test-hooks.ts`, both sides kept). On the combined tree the drag gate
   fails (ruling 11); WO6 issued. Owner told not to merge #38 until it passes. A CLI test failed
   once and did not reproduce.
+- **2026-10-29.** WO6's diagnosis (nothing committed): zoom, not panel cost — see ruling 11's
+  amendment. The owner chose "Count snapped moves"; WO6 resumed on that.

@@ -149,9 +149,12 @@ designer code, and the standards should say whether that document is citable.
 
 # WO6 — the drag gate with the panel present (on `u8g2gl-e2c/wo5-readability`, ruling 11)
 
-- [ ] Profile one drag frame with the panel open on the dragged element; report where the
-      2–4 ms goes.
-- [ ] Bring E-2b's drag gate under 16 ms p95 on both screens with the panel open (and add the
-      panel to the gate's setup if it does not already open it), self-test intact; E-1e's
-      keystroke gate and ruling 9's panel gate still pass.
+- [x] Profile one drag frame with the panel open on the dragged element; report where the
+      2–4 ms goes. (Diagnosis: zoom and snapping, not the panel — ruling 11's amendment.)
+- [ ] Per ruling 11's amendment: stamp each frame with the latest pointer move the gesture has
+      processed (edited or snapped in place), unit-tested on a snapped run; the gate on both
+      screens at both 1× and 2×, panel open on the dragged element; p95 under 16 ms and at most
+      1% missing at each; the self-test still fails the gate.
+- [ ] Tracing off for the three timing specs only.
+- [ ] E-1e's keystroke gate and ruling 9's panel gate still pass.
 - [ ] Every suite, one at a time; an addendum to the completion report.
