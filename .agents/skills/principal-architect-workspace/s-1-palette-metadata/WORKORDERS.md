@@ -58,7 +58,7 @@ recorded there (rule 00). Read `.agents/rules/03-versioning.md` before WO2.
 
 # WO5 — docs, review, evidence (`u8g2gl-s1/wo5-docs-review`)
 
-- [ ] Update the docs under ruling 6.
+- [x] Update the docs under ruling 6.
 - [ ] Spawn the `readability-reviewer` on S-1's diff against the base. Resolve P1–P3, and decide
       P4 with reasons.
 - [ ] Screenshots under `tmp/s1/`: the palette with categories, the filter matching a
