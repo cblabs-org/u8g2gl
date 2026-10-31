@@ -81,7 +81,21 @@ Rule 03 makes a schema bump the owner's decision; this record is that decision.
    Nothing in the runtime's behaviour, and no new dependency. The downstream pin in rule 04 is
    unaffected: this ships as a new version.
 
+8. **The schema guard is the generator's schema** (PA, 2026-10-31, on deviation 1 in the
+   worker's report). The generator wrote `REQUIRE_SCHEMA_VERSION` from the project's declared
+   version. That made an accepted 0.4 project generate code that runtime 0.11 refuses, which
+   would turn an additive bump into a break. Rule 03 already pins the guard to "the schema the
+   generator wrote for", meaning the generator's own schema: so the guard always emits the
+   current schema (0.5) for any version the validator accepts. The `// schema` provenance stamp
+   keeps recording the version the project declared. A test generates a 0.4 project and checks
+   that its guard reads `(0, 5)`. design_spec §15.4's note telling 0.4 authors to re-declare is
+   replaced by "0.4 projects keep working unchanged". Fixes the version-guard tests if they
+   assumed otherwise. The only golden move this adds is the kept 0.4 fixture's guard line, if it
+   has one.
+
 ## Status log
 
 - **2026-10-31.** #39 merged (`6d3ae16`). Worktree created from `main` @ `6d3ae16`, `extern/u8g2`
   checked out. WO1–WO5 issued to one worker in order.
+- **2026-10-31.** WO1–WO5 reported complete (`2511296`). Ruling 8 issued on deviation 1; the worker
+  resumed to apply it before PA verification.
