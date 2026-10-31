@@ -51,9 +51,9 @@ recorded there (rule 00). Read `.agents/rules/03-versioning.md` before WO2.
 
 # WO4 — the palette (`u8g2gl-s1/wo4-palette`)
 
-- [ ] Implement ruling 5, with unit tests on the model and an e2e for the filter matching a
+- [x] Implement ruling 5, with unit tests on the model and an e2e for the filter matching a
       description.
-- [ ] The render rule: the palette still does not re-render on a keystroke or a drag. Show this
+- [x] The render rule: the palette still does not re-render on a keystroke or a drag. Show this
       with E-2a's render counter.
 
 # WO5 — docs, review, evidence (`u8g2gl-s1/wo5-docs-review`)

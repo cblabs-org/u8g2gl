@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/palette-and-names.test.ts
- * Purpose: The Palette lists what the manifest registry knows, grouped and in
- *          registry order, and narrows by its filter; and the name the canvas
+ * Purpose: The Palette lists what the manifest registry knows, grouped, filed
+ *          by category in first-appearance order and in registry order within
+ *          one, shown by each element's own label and description, and
+ *          narrowed by a filter over label, tag and description; and the name the canvas
  *          gives a new element is one the validator accepts, free across the
  *          whole project — past existing elements, other screens, composites'
  *          own elements and globals — and built the way the parser builds the
@@ -19,7 +21,7 @@ import { expect, test } from '@playwright/test';
 import { parseScreenFile } from '@u8g2gl/core/parser/index.js';
 import { DIAGNOSTIC_CODES } from '@u8g2gl/core/schema/diagnostic.js';
 import { nameStem, nextElementName, projectNames } from '../../src/documents/element-names';
-import { filterPalette, paletteGroups } from '../../src/palette/palette-entries';
+import { filterPalette, paletteGroups, type PaletteEntry, type PaletteGroup } from '../../src/palette/palette-entries';
 import { runTextPipeline, type TextPipelineResult } from '../../src/pipeline/live-pipeline';
 import { ProjectModelCache } from '../../src/project/project-model';
 
@@ -55,33 +57,122 @@ function nameErrors(result: TextPipelineResult): string[] {
   return result.diagnostics.filter((d) => codes.includes(d.code)).map((d) => d.message);
 }
 
-test('the palette groups framework, project and drawing tags, in registry order, from the registry alone', () => {
+/** Every tag a group lists, in display order. */
+function tagsOf(group: PaletteGroup | undefined): string[] {
+  return (group?.sections ?? []).flatMap((section) => section.entries.map((entry) => entry.tag));
+}
+
+/** A project widget whose `<api>` carries `metadata`. */
+function widget(name: string, metadata: string, extendsTag = 'u8g2gl_obj'): string {
+  return `<widget name="${name}" extends="${extendsTag}">\n  <api ${metadata}>\n    <prop name="level" type="int" setter="set_level" default="0" />\n  </api>\n</widget>\n`;
+}
+
+test('the palette groups framework, project and drawing tags, each once, in registry order within a category, from the registry alone', () => {
   const result = run('', { 'widgets/wd_gauge/wd_gauge.xml': WIDGET, 'widgets/wd_badge/wd_badge.xml': COMPOSITE });
   const registry = result.model.manifests;
   const groups = paletteGroups(registry);
   expect(groups.map((group) => group.title)).toEqual(['Framework', 'Project', 'Drawing']);
-  // Every registry tag appears once, and each group keeps the registry's order.
-  const listed = groups.flatMap((group) => group.tags);
+  // Every registry tag appears once, and each section keeps the registry's order.
+  const listed = groups.flatMap((group) => tagsOf(group));
   expect([...listed].sort()).toEqual([...registry.tags].sort());
-  for (const group of groups) {
-    expect(group.tags).toEqual(registry.tags.filter((tag) => group.tags.includes(tag)));
+  for (const section of groups.flatMap((group) => group.sections)) {
+    const tags = section.entries.map((entry) => entry.tag);
+    expect(tags).toEqual(registry.tags.filter((tag) => tags.includes(tag)));
   }
   const [framework, project, drawing] = groups;
-  expect(framework?.tags).toContain('u8g2gl_label');
+  expect(tagsOf(framework)).toContain('u8g2gl_label');
   // Registry order is load order, and the project's files load sorted by path.
-  expect(project?.tags).toEqual(['wd_badge', 'wd_gauge']);
-  expect(drawing?.tags).toContain('u8g2gl_line');
-  expect(drawing?.tags).toContain('u8g2gl_box');
-  expect(framework?.tags).not.toContain('u8g2gl_line');
+  expect(tagsOf(project)).toEqual(['wd_badge', 'wd_gauge']);
+  expect(tagsOf(drawing)).toContain('u8g2gl_line');
+  expect(tagsOf(drawing)).toContain('u8g2gl_box');
+  expect(tagsOf(framework)).not.toContain('u8g2gl_line');
 });
 
-test('a project with no widgets has no Project group; the filter narrows by substring, ignoring case, and drops empty groups', () => {
+test('within a group, entries are filed by category in registry first-appearance order, the uncategorised last under no heading', () => {
+  const registry = run('', {
+    // Loaded in path order: wd_a declares a category the framework never uses,
+    // wd_b one it does, and wd_c none.
+    'widgets/wd_a/wd_a.xml': widget('wd_a', 'label="A" category="Gauges"'),
+    'widgets/wd_b/wd_b.xml': widget('wd_b', 'label="B" category="Text"'),
+    'widgets/wd_c/wd_c.xml': widget('wd_c', ''),
+  }).model.manifests;
+  const groups = paletteGroups(registry);
+
+  // The order each category first appears in across the whole registry.
+  const firstSeen: string[] = [];
+  for (const tag of registry.tags) {
+    const category = registry.get(tag)?.declared.api.category;
+    if (category !== undefined && !firstSeen.includes(category)) firstSeen.push(category);
+  }
+  for (const group of groups) {
+    const categories = group.sections.map((section) => section.category);
+    const named = categories.filter((category): category is string => category !== undefined);
+    expect(named, group.title).toEqual(firstSeen.filter((category) => named.includes(category)));
+    // The uncategorised section, if any, is last.
+    expect([-1, categories.length - 1], group.title).toContain(categories.indexOf(undefined));
+  }
+
+  const project = groups.find((group) => group.title === 'Project');
+  // 'Text' is the framework's before it is wd_b's, so it heads wd_a's 'Gauges'.
+  expect(project?.sections.map((section) => [section.category, section.entries.map((entry) => entry.tag)])).toEqual([
+    ['Text', ['wd_b']],
+    ['Gauges', ['wd_a']],
+    [undefined, ['wd_c']],
+  ]);
+  // Every framework manifest declares a category, so no framework entry is left uncategorised.
+  expect(groups.find((group) => group.title === 'Framework')?.sections.every((section) => section.category !== undefined)).toBe(true);
+  expect(groups.find((group) => group.title === 'Drawing')?.sections.map((section) => section.category)).toEqual(['Drawing']);
+});
+
+test('an entry carries its own label and description, none invented, none inherited, and none shown blank', () => {
+  const registry = run('', {
+    'widgets/wd_gauge/wd_gauge.xml': widget('wd_gauge', 'label="Gauge" category="Gauges" description="A round dial."'),
+    'widgets/wd_meter/wd_meter.xml': widget('wd_meter', '', 'wd_gauge'),
+    'widgets/wd_odd/wd_odd.xml': widget('wd_odd', 'label="" category="" description=""'),
+  }).model.manifests;
+  const entries = paletteGroups(registry).flatMap((group) => group.sections.flatMap((section) => section.entries));
+  const entry = (tag: string): PaletteEntry | undefined => entries.find((candidate) => candidate.tag === tag);
+
+  expect(entry('wd_gauge')).toEqual({ tag: 'wd_gauge', label: 'Gauge', description: 'A round dial.' });
+  // Extends wd_gauge, and gets none of its metadata.
+  expect(entry('wd_meter')).toEqual({ tag: 'wd_meter' });
+  // Empty values (which the validator refuses) are not shown as blanks.
+  expect(entry('wd_odd')).toEqual({ tag: 'wd_odd' });
+  const label = entry('u8g2gl_label');
+  expect(label?.label).toBeDefined();
+  expect(label?.description).toBeDefined();
+});
+
+test('a project with no widgets has no Project group; the filter matches label, tag or description, ignoring case, and drops what it empties', () => {
   const groups = paletteGroups(run('').model.manifests);
   expect(groups.map((group) => group.title)).toEqual(['Framework', 'Drawing']);
-  const lines = filterPalette(groups, '  LINE ');
+  const all = groups.flatMap((group) => group.sections.flatMap((section) => section.entries));
+  const matching = (needle: string): string[] => filterPalette(groups, needle).flatMap((group) => tagsOf(group));
+
+  // By tag, padded and in another case: 'hline' is in no label or description.
+  const lines = filterPalette(groups, '  HLINE ');
   expect(lines.map((group) => group.title)).toEqual(['Drawing']);
-  expect(lines[0]?.tags).toContain('u8g2gl_line');
-  expect(lines[0]?.tags.every((tag) => tag.includes('line'))).toBe(true);
+  expect(tagsOf(lines[0])).toEqual(['u8g2gl_hline']);
+
+  // By a word that is only in one entry's description, never in a tag or label.
+  const box = all.find((entry) => entry.tag === 'u8g2gl_box');
+  const word = box?.description?.split(/\W+/).find(
+    (candidate) =>
+      candidate.length > 4 &&
+      all.every((entry) => !entry.tag.includes(candidate.toLowerCase()) && !(entry.label ?? '').toLowerCase().includes(candidate.toLowerCase())),
+  );
+  expect(word).toBeDefined();
+  expect(matching(word!.toUpperCase())).toContain('u8g2gl_box');
+
+  // By label: each label finds its own entry.
+  for (const entry of all.filter((candidate) => candidate.label !== undefined)) {
+    expect(matching(entry.label!), entry.tag).toContain(entry.tag);
+  }
+
+  // A filter keeps only matching entries, and drops the sections it empties.
+  for (const group of filterPalette(groups, 'line')) {
+    for (const section of group.sections) expect(section.entries.length).toBeGreaterThan(0);
+  }
   expect(filterPalette(groups, 'no such element')).toEqual([]);
   expect(filterPalette(groups, '')).toEqual(groups);
 });

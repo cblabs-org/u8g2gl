@@ -151,8 +151,12 @@ export async function dragCanvas(page: Page, from: readonly [number, number], to
  *        sidebar's view.
  */
 export async function dropTag(page: Page, tag: string, x: number, y: number): Promise<void> {
+  // Scrolled to first, as a user would: with labels and descriptions the
+  // Palette is taller than the sidebar, and a drag cannot start off screen.
+  const entry = page.locator(`.palette-tag[data-tag="${tag}"]`);
+  await entry.scrollIntoViewIfNeeded();
   const point = await devicePoint(page, x, y);
-  const source = await page.locator(`.palette-tag[data-tag="${tag}"]`).boundingBox();
+  const source = await entry.boundingBox();
   if (source === null) throw new Error(`<${tag}> is not in the Palette`);
   // The mouse, not dragTo: dragTo's target is an offset it rounds again, which
   // at 1× can land on the neighbouring device pixel. A drag event's position
