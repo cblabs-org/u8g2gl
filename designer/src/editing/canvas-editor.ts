@@ -22,6 +22,9 @@
  *              when a gesture begins, so text typed in the editor afterwards
  *              never joins a nudge's stop.
  *
+ *              A command — an insert, a delete, an align — is one undo stop
+ *              of its own, closed on both sides.
+ *
  *              The edits are computed by the caller's function from the text
  *              at the moment they apply, so an intent is always measured
  *              against what the document holds now, never against an older
@@ -43,6 +46,7 @@
  * - CanvasEditor:    The canvas's edit path
  *
  *     - begin():       Start a gesture on a document
+ *     - apply():       Apply one command (an insert, a delete) as its own undo stop
  *     - nudge():       Apply one nudge, grouped with its neighbours
  *     - closeGroup():  End the nudge group now
  */
@@ -194,6 +198,27 @@ export class CanvasEditor {
     if (model === undefined) return undefined;
     model.pushStackElement();
     return new EditGesture(model);
+  }
+
+  /**
+   * @brief Applies one command — an insert, a delete, an align — as one undo
+   *        stop of its own: the stop is opened before and closed after, so
+   *        nothing typed or nudged either side joins it.
+   *
+   * @param file    The document.
+   * @param compute The command's edits against the text as it is now.
+   * @return True if the text changed.
+   */
+  apply(file: string, compute: (text: string) => readonly TextEdit[]): boolean {
+    this.closeGroup();
+    const model = this.modelOf(file);
+    if (model === undefined) return false;
+    const edits = compute(model.getValue());
+    if (edits.length === 0) return false;
+    model.pushStackElement();
+    model.pushEditOperations(null, toOperations(model, edits), () => null);
+    model.pushStackElement();
+    return true;
   }
 
   /**

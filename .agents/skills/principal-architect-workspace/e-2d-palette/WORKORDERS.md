@@ -34,7 +34,7 @@ measures).
 
 - [x] The palette (ruling 1) in the primary sidebar behind the activity bar's Palette entry (ui_spec §6), generated, with its filter. If the shell has no activity bar yet, add the smallest one that switches Explorer and Palette, and report it.
 - [x] Generated names (ruling 3), unit-tested against the validator.
-- [ ] Drag-to-insert (ruling 2): screen and container drops, refusals with reasons; one undo
+- [x] Drag-to-insert (ruling 2): screen and container drops, refusals with reasons; one undo
       stop and a minimal diff (e2e and unit).
 
 # WO2 — delete and duplicate (`u8g2gl-e2d/wo2-delete-duplicate`)

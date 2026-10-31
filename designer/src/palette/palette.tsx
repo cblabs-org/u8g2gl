@@ -12,21 +12,17 @@
  *              registry alone, not to the run: the registry is rebuilt only
  *              when a manifest's parse changes, so a keystroke or a drag
  *              re-renders nothing here. Each tag is an HTML drag source
- *              carrying its tag under {@link PALETTE_DRAG_TYPE}, which the
- *              canvas accepts.
+ *              carrying its tag under `PALETTE_DRAG_TYPE`, which the canvas
+ *              accepts.
  *
  * Exports:
- * - PALETTE_DRAG_TYPE:  The drag data type a Palette tag carries
- * - Palette:            The component
+ * - Palette:  The component
  */
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useWorkspace } from '../ui/workspace-context';
 import { countRender } from '../perf/render-count';
-import { filterPalette, paletteGroups } from './palette-entries';
-
-/** The drag data type a Palette tag carries: its value is the tag. */
-export const PALETTE_DRAG_TYPE = 'application/x-u8g2gl-tag';
+import { filterPalette, PALETTE_DRAG_TYPE, paletteGroups } from './palette-entries';
 
 /** @brief The Palette sidebar view. */
 export function Palette(): React.JSX.Element {

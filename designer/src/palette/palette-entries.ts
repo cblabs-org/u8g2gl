@@ -21,6 +21,7 @@
  *              dropped.
  *
  * Exports:
+ * - PALETTE_DRAG_TYPE:  The drag data type a Palette tag carries
  * - PaletteGroupTitle:  The three group headings
  * - PaletteGroup:       One heading and its tags
  * - paletteGroups():    The registry's tags, grouped
@@ -28,6 +29,9 @@
  */
 
 import { isDrawingElement, type ManifestRegistry } from '@u8g2gl/core/manifest/index.js';
+
+/** The drag data type a Palette tag carries from the sidebar to the canvas: its value is the tag. */
+export const PALETTE_DRAG_TYPE = 'application/x-u8g2gl-tag';
 
 /** The Palette's group headings, in the order they are shown. */
 export type PaletteGroupTitle = 'Framework' | 'Project' | 'Drawing';

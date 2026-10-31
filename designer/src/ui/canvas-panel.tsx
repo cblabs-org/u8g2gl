@@ -8,7 +8,8 @@
  *          it, at a chosen zoom, on dark chrome so the display bounds read as a
  *          physical panel, and where elements are selected: click, click again
  *          to cycle through overlaps, drag a marquee, Esc, and where they are
- *          moved: drag one, or nudge the selection with the arrow keys. Every
+ *          moved: drag one, or nudge the selection with the arrow keys; and
+ *          where a Palette tag is dropped to insert it. Every
  *          move is an edit to the text, never a position the text does not hold.
  * Description: React renders the toolbar and the two canvases' container; the
  *              pixels are drawn by `CanvasView`, which the edit loop calls
@@ -28,6 +29,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CanvasView } from '../canvas/canvas-view';
 import { CanvasEditor } from '../editing/canvas-editor';
+import { planInsert } from '../editing/insert-element';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -69,6 +71,12 @@ export function CanvasPanel(): React.JSX.Element {
       editor: new CanvasEditor((path) => workspace.documents.open(path)),
       showMarquee: (rect) => shown.setMarquee(rect),
       showGuides: (lines) => shown.setGuides(lines),
+      planInsert: (tag, file, x, y) => {
+        const run = loop.lastRun.get();
+        if (run === undefined) return undefined;
+        return planInsert({ tag, file, x, y, texts: workspace.documents.texts(), base: run.result, assets: run.assets });
+      },
+      log: (line) => workspace.log(line),
     });
     return () => {
       gestures.dispose();

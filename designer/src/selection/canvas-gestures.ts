@@ -35,6 +35,12 @@
  *              nothing writes: the press still selects, and the cursor and the
  *              tip say why.
  *
+ *              A Palette tag dropped on the canvas is inserted there: the host
+ *              plans it (`insert-element.ts`), the editor writes it as one undo
+ *              stop, and the new element is selected, its XML revealed without
+ *              taking focus. A refused drop writes nothing; the reason is shown
+ *              at the drop point and in Output.
+ *
  *              Pointer positions become device pixels through the frame
  *              canvas's on-screen box, so the answer is right at every zoom.
  *
@@ -52,6 +58,8 @@ import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { HANDLE_SIZE, type GuideLine } from '../canvas/canvas-view';
 import type { CanvasEditor } from '../editing/canvas-editor';
+import type { InsertPlan } from '../editing/insert-element';
+import { PALETTE_DRAG_TYPE } from '../palette/palette-entries';
 import { DragEdit } from '../editing/drag-edit';
 import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
@@ -100,6 +108,10 @@ export interface GestureHost {
   readonly showMarquee: MarqueeSink;
   /** Draws the guides a drag lies on; empty hides them. */
   readonly showGuides: (lines: readonly GuideLine[]) => void;
+  /** Plans the insert of `tag` at device pixel (x, y) of the drawn screen; undefined before the first run. */
+  readonly planInsert: (tag: string, file: string, x: number, y: number) => InsertPlan | undefined;
+  /** Appends a line to Output. */
+  readonly log: (line: string) => void;
 }
 
 /** What a press does if it becomes a drag, decided at pointer-down. */
@@ -154,6 +166,8 @@ export class CanvasGestures {
   private readonly cycler = new ClickCycler();
   private readonly tip: HTMLDivElement;
   private press: Press | undefined;
+  /** True while the tip shows a refused drop's reason, until the pointer moves. */
+  private dropTip = false;
   private readonly listeners: Array<[keyof HTMLElementEventMap, (event: never) => void]>;
 
   /** @param host What the gestures read and write. */
@@ -171,6 +185,8 @@ export class CanvasGestures {
       ['pointercancel', () => this.cancel()],
       ['pointerleave', () => this.hover(undefined)],
       ['keydown', (event: KeyboardEvent) => this.key(event)],
+      ['dragover', (event: DragEvent) => this.dragOver(event)],
+      ['drop', (event: DragEvent) => this.drop(event)],
       ['blur', () => host.editor.closeGroup()],
     ];
     for (const [type, listener] of this.listeners) host.element.addEventListener(type, listener as EventListener);
@@ -234,6 +250,10 @@ export class CanvasGestures {
   private move(event: PointerEvent): void {
     const press = this.press;
     if (press === undefined) {
+      if (this.dropTip) {
+        this.dropTip = false;
+        this.showTip(undefined, event);
+      }
       this.hover(event);
       return;
     }
@@ -382,6 +402,47 @@ export class CanvasGestures {
     this.host.element.title = reasons.join('; ');
   }
 
+  // dragOver
+  // A Palette tag over the canvas: accept it, so the drop event fires.
+  private dragOver(event: DragEvent): void {
+    if (!event.dataTransfer?.types.includes(PALETTE_DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  // drop
+  // A Palette tag dropped: insert it at the device pixel under the drop, as
+  // one undo stop, and select it; or say why not.
+  private drop(event: DragEvent): void {
+    const tag = event.dataTransfer?.getData(PALETTE_DRAG_TYPE) ?? '';
+    if (tag === '') return;
+    event.preventDefault();
+
+    // --- Step 1: Nothing writes while editing is off, or with no screen drawn ---
+    const { file } = this.host.targets.get();
+    const refuse = (reason: string): void => {
+      this.showTip(reason, event);
+      this.dropTip = true;
+      this.host.log(`Not inserted <${tag}>: ${reason}`);
+    };
+    if (!this.host.canvasEditing.get()) return refuse(EDITING_OFF_REASON);
+    if (file === undefined) return refuse('no screen is drawn on the canvas');
+
+    // --- Step 2: Plan it at the drop point, then write it as one stop ---
+    const { x, y } = this.toDevice(event.clientX, event.clientY);
+    const plan = this.host.planInsert(tag, file, x, y);
+    if (plan === undefined) return refuse('the canvas has not drawn a frame yet');
+    if (plan.kind === 'refused') return refuse(plan.reason);
+    // The plan was made against the text now; anything else means it is stale.
+    this.host.editor.apply(file, (text) => (text === plan.text ? plan.edits : []));
+
+    // --- Step 3: The new element is the selection ---
+    this.showTip(undefined, event);
+    this.cycler.reset();
+    this.host.selection.select(file, [plan.name], 'canvas');
+    this.host.element.focus({ preventScroll: true });
+  }
+
   // hover
   // With no press, the cursor says what a press here would do: resize over a
   // handle, move over an element, and not-allowed (with the reason as its
@@ -438,7 +499,7 @@ export class CanvasGestures {
   // Shows a sentence beside the pointer, or hides it (undefined).
   //   text  — what to say
   //   event — where the pointer is
-  private showTip(text: string | undefined, event: PointerEvent): void {
+  private showTip(text: string | undefined, event: MouseEvent): void {
     if (text === undefined) {
       if (!this.tip.hidden) this.tip.hidden = true;
       return;
