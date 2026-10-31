@@ -24,7 +24,7 @@ import type { WidgetNode } from '../../src/core/schema/widget-node.js';
 describe('validateGeometry', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.4',
+      schema: '0.5',
       name: 'geom_test',
       version: '1.0.0',
       targets: [

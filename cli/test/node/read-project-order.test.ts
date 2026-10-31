@@ -70,7 +70,7 @@ function project(): string {
   mkdirSync(resolve(dir, 'widgets/chip'), { recursive: true });
   writeFileSync(
     resolve(dir, 'u8g2gl.xml'),
-    `<u8g2gl schema="0.4" name="order" version="1.0.0">
+    `<u8g2gl schema="0.5" name="order" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
 </u8g2gl>
 `,

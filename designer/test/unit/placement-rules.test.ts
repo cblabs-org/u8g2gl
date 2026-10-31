@@ -31,7 +31,7 @@ function run(elements: string): { text: string; result: TextPipelineResult } {
   const texts = new Map([
     [
       'u8g2gl.xml',
-      '<u8g2gl schema="0.4" name="moves" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
+      '<u8g2gl schema="0.5" name="moves" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
     ],
     ['globals.xml', '<globals>\n  <consts>\n    <int name="margin" value="2" />\n  </consts>\n  <subjects>\n    <int name="knob_x" value="5" />\n  </subjects>\n</globals>\n'],
     [SCREEN, text],

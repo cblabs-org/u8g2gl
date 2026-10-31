@@ -20,7 +20,7 @@ import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 describe('validateDisplay', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.4',
+      schema: '0.5',
       name: 'display_test',
       version: '1.0.0',
       targets: [],

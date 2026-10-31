@@ -27,7 +27,7 @@ import { CATALOGUE } from '../../src/data/catalogue.js';
 import { FRAMEWORK_MANIFESTS } from '../../src/data/manifests.js';
 import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="carries" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="carries" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
     </targets>
@@ -240,7 +240,7 @@ describe('carry 4 — a literal <style> child inside a <view> (WO8a finding 4)',
 
 describe('<output prefix> is diagnosed, not silently ignored (WO5b finding 4)', () => {
   const projectWith = (output: string): string =>
-    `<u8g2gl schema="0.4" name="carries" version="1.0.0">
+    `<u8g2gl schema="0.5" name="carries" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
     ${output}
 </u8g2gl>

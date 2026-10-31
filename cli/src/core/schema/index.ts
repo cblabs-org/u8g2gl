@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/schema/index.ts
- * Purpose: Central barrel export for the U8G2GL schema version 0.4 document model.
+ * Purpose: Central barrel export for the U8G2GL schema version 0.5 document model.
  *          Provides the complete TypeScript type system used across parser, validator,
  *          resolver, code generator, and visual designer tooling.
  * Description: Re-exports all immutable AST types, manifest contracts, display catalogue

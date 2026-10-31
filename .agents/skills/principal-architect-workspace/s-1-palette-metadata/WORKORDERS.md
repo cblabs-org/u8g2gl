@@ -38,10 +38,10 @@ recorded there (rule 00). Read `.agents/rules/03-versioning.md` before WO2.
 
 # WO2 — versions (`u8g2gl-s1/wo2-versions`)
 
-- [ ] Runtime schema minor 5, runtime 0.11.0, CLI 0.14.0 (ruling 2).
-- [ ] Move the fixtures to 0.5, keeping one 0.4 fixture.
-- [ ] Regenerate the goldens. Diff them, and report that **only** version-stamp lines moved.
-- [ ] C++ tests, including the version-guard tests, and the xtensa corpus if it carries a
+- [x] Runtime schema minor 5, runtime 0.11.0, CLI 0.14.0 (ruling 2).
+- [x] Move the fixtures to 0.5, keeping one 0.4 fixture.
+- [x] Regenerate the goldens. Diff them, and report that **only** version-stamp lines moved.
+- [x] C++ tests, including the version-guard tests, and the xtensa corpus if it carries a
       schema version.
 
 # WO3 — metadata (`u8g2gl-s1/wo3-metadata`)

@@ -22,7 +22,7 @@ const LOC = { file: 'globals.xml', line: 4, column: 3 };
 
 function inputWithFont(font: BdfFontDecl): ValidateInput {
   return {
-    project: { schema: '0.4', name: 'bdf_range_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.5', name: 'bdf_range_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [font], images: [] },
     screens: [],
     manifests: frameworkRegistry(),

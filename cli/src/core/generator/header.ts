@@ -62,7 +62,7 @@ export const GENERATED_JSON_MARKER_VALUE =
 export interface HeaderStamp {
   /** Project-relative, forward-slash path of the source document. Never absolute. */
   readonly source: string;
-  /** Schema version the project declares, e.g. "0.4". */
+  /** Schema version the project declares, e.g. "0.5". */
   readonly schema: string;
   /** Version of the CLI that generated the file. */
   readonly generator: string;

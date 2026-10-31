@@ -74,7 +74,7 @@ describe('validate on a valid single file of each kind', () => {
   it.each([
     [
       'u8g2gl.xml',
-      '<u8g2gl schema="0.4" name="p" version="1.0.0">\n    <targets><target name="primary" ' +
+      '<u8g2gl schema="0.5" name="p" version="1.0.0">\n    <targets><target name="primary" ' +
         'setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>\n</u8g2gl>\n',
     ],
     ['globals.xml', '<globals>\n</globals>\n'],

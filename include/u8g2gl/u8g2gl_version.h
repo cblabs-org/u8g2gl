@@ -45,11 +45,15 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 10 ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 11 ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
+// Schema 0.5 adds only palette metadata on <api>, which the designer reads and
+// no generated file carries, so the runtime's behaviour is unchanged. The minor
+// still moves with it: while the major is 0, U8G2GL_REQUIRE_SCHEMA_VERSION()
+// compares the minor exactly, and code generated for 0.5 must compile here.
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements
-#define U8G2GL_SCHEMA_VERSION_MINOR 4  ///< Schema minor this runtime implements
+#define U8G2GL_SCHEMA_VERSION_MINOR 5  ///< Schema minor this runtime implements
 
 /// @cond INTERNAL
 // Two-level stringification so a macro argument is expanded before # applies:

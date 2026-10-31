@@ -138,7 +138,7 @@ describe('what the golden fixture is there to pin', () => {
 
   it('emits the [D-21] capacities and the §16 version guard', () => {
     const config = content('u8g2gl_generated_config.h');
-    expect(config).toContain('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);');
+    expect(config).toContain('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5);');
     expect(config).toContain('#define U8G2GL_MAX_OBJECTS_PER_SCREEN 9');
     expect(config).toContain('#define U8G2GL_MAX_BINDINGS_PER_OBJ 1');
     expect(config).toContain('#define U8G2GL_MAX_TOTAL_BINDINGS 6');
@@ -170,7 +170,7 @@ describe('what the golden fixture is there to pin', () => {
     });
 
     it('leaves the schema guard unchanged and ahead of the runtime guard', () => {
-      const schema = config.indexOf('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);');
+      const schema = config.indexOf('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5);');
       expect(schema).toBeGreaterThan(-1);
       expect(schema).toBeLessThan(config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION'));
     });

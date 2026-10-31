@@ -22,7 +22,7 @@ import type { WidgetManifest } from '../../src/core/schema/widget-manifest.js';
 // 'u8g2gl_obj', so this diagnostic could never fire through the real pipeline.
 describe('validateSchema — required extends on a plain widget', () => {
   const input = (manifests: ValidateInput['manifests']): ValidateInput => ({
-    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.5', name: 'schema_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     manifests,
@@ -83,7 +83,7 @@ describe('validateSchema — required extends on a plain widget', () => {
 
 describe('validateSchema — setter/draw mutual exclusion', () => {
   const baseInput: ValidateInput = {
-    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.5', name: 'schema_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     manifests: registryOf([]),
@@ -149,7 +149,7 @@ describe('validateSchema — setter/draw mutual exclusion', () => {
 // --- PR-04 WO5a: one emission target per manifest ([D-18]) ---
 describe('validateSchema — mixed setter= and draw= manifests', () => {
   const input = (manifests: ValidateInput['manifests']): ValidateInput => ({
-    project: { schema: '0.4', name: 'schema_test', version: '1.0.0', targets: [] },
+    project: { schema: '0.5', name: 'schema_test', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     manifests,

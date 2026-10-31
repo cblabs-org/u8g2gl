@@ -26,7 +26,7 @@ import { ProjectModelCache } from '../../src/project/project-model';
 const SCREEN = 'screens/screen_home.xml';
 
 /** A project manifest for a 128 × 64 display. */
-const PROJECT = '<u8g2gl schema="0.4" name="names" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n';
+const PROJECT = '<u8g2gl schema="0.5" name="names" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n';
 
 /** A project widget: a plain class, and a composite whose template has its own element. */
 const WIDGET = '<widget name="wd_gauge" extends="u8g2gl_obj">\n  <api>\n    <prop name="level" type="int" setter="set_level" default="0" />\n  </api>\n</widget>\n';

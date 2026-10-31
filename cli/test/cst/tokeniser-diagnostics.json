@@ -167,7 +167,7 @@
     },
     {
       "file": "cli/test/generator/fixtures/emit-project/u8g2gl.xml",
-      "sha256": "2963ddab7dcc7c18d954ab49251f982ac9ffe09e65aa33efa2f2f57d476f16a3",
+      "sha256": "fb77defbfd9eccc5851285c97f7420fc9ddfeda0f7f54be1bacf2c93ebf73d52",
       "diagnostics": []
     },
     {
@@ -187,7 +187,7 @@
     },
     {
       "file": "cli/test/integration/fixtures/broken-project/u8g2gl.xml",
-      "sha256": "e6b20bcaa9f54abebe3a50b59561703a670027b9ece04cf9584a32ebfaa5e897",
+      "sha256": "382cbae18efc548d5ddd9e58d8345f7a358f4baf9d2a8d5a315be695a6f704ad",
       "diagnostics": []
     },
     {
@@ -207,7 +207,7 @@
     },
     {
       "file": "cli/test/integration/fixtures/valid-project/u8g2gl.xml",
-      "sha256": "6979ba369adc70978ea337cbe897908b2ff10e2cd53d9a30b33c225c855a2149",
+      "sha256": "c10be1a5019915d9f6c25341d281928933e972562712613bdd71d49bde58c336",
       "diagnostics": []
     },
     {
@@ -300,7 +300,7 @@
     },
     {
       "file": "cli/test/parser/fixtures/unknown-elements.xml",
-      "sha256": "38e85966cebc4c19bcfcb5b2a943728fe80430a57933e22178fe5d2f550b783a",
+      "sha256": "08d291af5baff9698c3e13dbf676663747adef7f8dc4f72ba3a9e5074adf1c18",
       "diagnostics": []
     },
     {
@@ -315,7 +315,7 @@
     },
     {
       "file": "cli/test/parser/fixtures/valid-project.xml",
-      "sha256": "7d42b414e78306633d1be455ecb43b8af27c521c1dd47c207994b2d738c67ef6",
+      "sha256": "7eaa1506d44349d793ac1a009682fd8864fa9a043567f5d3a825aad1e1f82081",
       "diagnostics": []
     },
     {
@@ -365,12 +365,12 @@
     },
     {
       "file": "cli/test/validator/fixtures/invalid/page-mode-display.xml",
-      "sha256": "1218ba1063da83303032f2eeaa84cfbf9788a948d6a43b53363233a8980c4f8a",
+      "sha256": "f3f83b235a205747329437c15723307399bf369e948ff018960caeea8122556b",
       "diagnostics": []
     },
     {
       "file": "cli/test/validator/fixtures/invalid/unknown-display.xml",
-      "sha256": "2e9c62cb81dbbd12922af019b1acc784e0f73918f6069d704e3bf3f5e5d6a5da",
+      "sha256": "befde06a50381aa97fbd150e98f72a8650db05d969f9a860ebbd6bcb37252b84",
       "diagnostics": []
     },
     {
@@ -505,7 +505,7 @@
     },
     {
       "file": "test/generated_fixture/u8g2gl.xml",
-      "sha256": "6de297b913625149777075e78b1c42fabd8350bda866054f5de13ada99ce6169",
+      "sha256": "60c4443a05f33ec4d6be860cd1d52c2950689d626c857a356a7363c9f50160e8",
       "diagnostics": []
     },
     {

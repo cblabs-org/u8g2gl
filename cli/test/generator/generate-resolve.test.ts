@@ -19,7 +19,7 @@ import { DIAGNOSTIC_CODES } from '../../src/core/schema/diagnostic.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="gen" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="gen" version="1.0.0">
     <targets>
         <target name="wide" setup="U8G2_SH1122_256X64_F_3W_HW_SPI" />
         <target name="narrow" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />

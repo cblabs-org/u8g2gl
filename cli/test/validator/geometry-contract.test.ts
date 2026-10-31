@@ -71,7 +71,7 @@ interface RunOptions {
 /** Every diagnostic `validate` gives for a screen holding `body`, against a 128-wide target. */
 function run(body: string, options: RunOptions = {}): readonly Diagnostic[] {
   return validate({
-    project: { schema: '0.4', name: 'contract', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
+    project: { schema: '0.5', name: 'contract', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
     globals: globals(options.consts),
     screens: [screen(body)],
     manifests: frameworkRegistry(options.composites ?? []),
@@ -308,7 +308,7 @@ describe('constants are validated where declared (§7.2)', () => {
 });
 
 describe('bounds for the target being generated (§7.2, §7.3)', () => {
-  const PROJECT_XML = `<u8g2gl schema="0.4" name="gen" version="1.0.0">
+  const PROJECT_XML = `<u8g2gl schema="0.5" name="gen" version="1.0.0">
     <targets>
         <target name="wide" setup="${WIDE}" />
         <target name="narrow" setup="${NARROW}" />

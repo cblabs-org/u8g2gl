@@ -233,7 +233,7 @@ async function fixtureScene(): Promise<{ readonly scene: Record<string, unknown>
     realised: result.realised!,
     resolved: result.resolved!,
     manifests: loaded.model.manifests,
-    generated: { source: 'u8g2gl.xml', schema: '0.4', generator: '0.0.0-golden', target: 'host' },
+    generated: { source: 'u8g2gl.xml', schema: '0.5', generator: '0.0.0-golden', target: 'host' },
   });
   return { scene: scene as Record<string, unknown>, result };
 }

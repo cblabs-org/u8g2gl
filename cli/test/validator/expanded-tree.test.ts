@@ -44,7 +44,7 @@ function composite(lines: readonly string[], file: string): WidgetManifest {
 
 function inputWith(body: string, composites: readonly WidgetManifest[] = []): ValidateInput {
   return {
-    project: { schema: '0.4', name: 'expanded', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
+    project: { schema: '0.5', name: 'expanded', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
     globals: {
       consts: [],
       subjects: [

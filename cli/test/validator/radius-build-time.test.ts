@@ -49,7 +49,7 @@ function run(body: string, options: Options = {}): readonly Diagnostic[] {
     'screens/screen_home.xml',
   );
   return validate({
-    project: { schema: '0.4', name: 'radius', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
+    project: { schema: '0.5', name: 'radius', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
     globals: globals.value!,
     screens: [screen.value!],
     manifests: frameworkRegistry(options.composites ?? []),

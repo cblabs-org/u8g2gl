@@ -418,9 +418,9 @@ u8g2gl_discover_tests(test_version)
 # harness itself can build.
 #
 #   match          — the runtime's own schema macros; must compile
-#   schema_0_4     — literal (0, 4), today's schema; must compile
+#   schema_0_5     — literal (0, 5), today's schema; must compile
 #   mismatch       — schema major + 1; must be refused
-#   stale_minor    — literal (0, 3) against 0.4: the pre-1.0 minor rule (§16)
+#   stale_minor    — literal (0, 3) against 0.5: the pre-1.0 minor rule (§16)
 #
 # The runtime requirement is a floor, not an equality (§16), so it has its own
 # cases, written as expressions from the runtime's own macros so a version bump
@@ -438,7 +438,7 @@ u8g2gl_discover_tests(test_version)
 # the header's own advice says (§16): U8G2GL_GENERATED_CONFIG names it and
 # u8g2gl_config.h includes it.
 
-foreach(_guard_case match schema_0_4 mismatch stale_minor)
+foreach(_guard_case match schema_0_5 mismatch stale_minor)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
         version_guard/${_guard_case}.cpp
     )
@@ -453,8 +453,8 @@ endforeach()
 add_test(NAME VersionGuard.MatchingSchemaMajorCompiles
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_match
 )
-add_test(NAME VersionGuard.SchemaZeroFourCompiles
-    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_schema_0_4
+add_test(NAME VersionGuard.SchemaZeroFiveCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_schema_0_5
 )
 add_test(NAME VersionGuard.MismatchedSchemaMajorFailsToCompile
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_mismatch
@@ -468,7 +468,7 @@ add_test(NAME VersionGuard.StaleSchemaMinorFailsToCompile
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_stale_minor
 )
 set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
-    PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.4"
+    PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.5"
 )
 foreach(_guard_case runtime_floor_match runtime_newer_minor runtime_older runtime_major)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
@@ -1073,7 +1073,7 @@ u8g2gl_check_editor_symbols(EditorBinaryHasEditorSymbols $<TARGET_FILE:test_edit
 # All invoke the build system on the same tree; never run them concurrently.
 set_tests_properties(
     VersionGuard.MatchingSchemaMajorCompiles
-    VersionGuard.SchemaZeroFourCompiles
+    VersionGuard.SchemaZeroFiveCompiles
     VersionGuard.MismatchedSchemaMajorFailsToCompile
     VersionGuard.StaleSchemaMinorFailsToCompile
     VersionGuard.RuntimeFloorMatchCompiles
