@@ -72,7 +72,32 @@ when the shell needs it.
     generated data for rule 7. No schema change, no new dependency (programme ruling 2), nothing
     in the runtime.
 
+11. **Amending rules 2 and 3** (PA, 2026-10-31, on WO1's stop). The validator requires every
+    rectangular element to end up fully sized, and no manifest marks `width`/`height` required,
+    so rule 2 as written refused almost every tag.
+    - **Size.** An insert also writes `width` and `height` wherever the element's manifest
+      declares them: the manifest default if it has one, else a fixed **16 × 8** device pixels,
+      a named designer constant. That keeps the new element visible and grabbable, and it can
+      be resized at once. Not 0 × 0, which is invisible; not a size-by-dragging gesture, which
+      is a new interaction outside this PR. Endpoint and radius props are seeded from the drop
+      point by the resolver's own extras, as WO1 proposed.
+    - **Required props without a default:** `font` takes the first global font, else the first
+      built-in; `image`, `style` and `subject` take the first declared one of their kind. With
+      none declared, the drop is refused with the validator's reason.
+    - **Which container receives the drop.** The innermost element under the drop point that
+      **already has element children** in the XML, else the screen's `<view>`. That is
+      deterministic and needs no manifest flag. It is not "whatever validates": a label must not
+      silently gain a child because the validator allows it. An empty group therefore receives
+      no drop from the canvas, and its children go in through the XML. This is recorded for
+      E-2d's end, beside palette metadata.
+    - **Names (rule 3).** The stem is the parser's synthesis stem, with the reserved `u8g2gl_`
+      and `ui_` prefixes stripped (§13.4), so `label_1` and `service_list_1`. "Free" means
+      unused anywhere in the project: element names in every screen and composite, screen names,
+      and globals. WO1's reading is accepted.
+
 ## Status log
 
 - **2026-10-31.** #38 merged (`ef49a1d`, a merge commit). Worktree created from `main` @ `ef49a1d`,
   `extern/u8g2` checked out. WO1–WO6 issued to one worker in order.
+- **2026-10-31.** WO1 stopped before insert (`4eccc32`: palette and names done): rule 2 conflicted
+  with the validator's sizing rule. Ruling 11 issued; WO1 resumed.
