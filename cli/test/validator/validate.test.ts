@@ -190,8 +190,9 @@ describe('validate orchestrator integration', () => {
 
     expect(schemaDiag).toBeDefined();
     expect(schemaDiag?.severity).toBe('error');
-    expect(schemaDiag?.suggestions).toEqual(['0.4']);
-    expect(schemaDiag?.message).toContain("Expected '0.4'");
+    // Both accepted versions are named; the suggestion is the current one.
+    expect(schemaDiag?.suggestions).toEqual(['0.5']);
+    expect(schemaDiag?.message).toContain("Expected '0.4' or '0.5'");
   });
 
   // --- PR-3R WO8: the §15.4 refusal path — 0.3 is superseded, not merely
