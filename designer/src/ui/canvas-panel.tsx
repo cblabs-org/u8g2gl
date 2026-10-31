@@ -8,18 +8,21 @@
  *          it, at a chosen zoom, on dark chrome so the display bounds read as a
  *          physical panel, and where elements are selected: click, click again
  *          to cycle through overlaps, drag a marquee, Esc, and where they are
- *          moved: drag one, or nudge the selection with the arrow keys. Every
- *          move is an edit to the text, never a position the text does not hold.
+ *          moved: drag one, or nudge the selection with the arrow keys; and
+ *          where a Palette tag is dropped to insert it. Every move is an edit
+ *          to the text, never a position the text does not hold.
  * Description: React renders the toolbar and the two canvases' container; the
  *              pixels are drawn by `CanvasView`, which the edit loop calls
  *              directly, so a frame never passes through React; the selection
  *              gestures are `CanvasGestures`, attached to the frame element for
  *              the panel's life with the edit path they write through
  *              (`CanvasEditor`), and this component never reads the
- *              selection, so selecting or dragging re-renders none of it. The toolbar
- *              sets the zoom (1× to 8×, or fit) and the animation freeze. The
- *              banner says why the frame is the last good one, or what the
- *              renderer cannot draw.
+ *              selection, so selecting or dragging re-renders none of it. The
+ *              toolbar sets the zoom (1× to 8×, or fit) and the animation
+ *              freeze, and holds the align and distribute buttons
+ *              (`align-toolbar.tsx`), which share the gestures' edit path and
+ *              subscribe to the selection themselves. The banner says why the
+ *              frame is the last good one, or what the renderer cannot draw.
  *
  * Exports:
  * - CanvasPanel:  The component
@@ -28,7 +31,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { CanvasView } from '../canvas/canvas-view';
 import { CanvasEditor } from '../editing/canvas-editor';
+import { planInsert } from '../editing/insert-element';
+import { projectNames } from '../documents/element-names';
 import { CanvasGestures } from '../selection/canvas-gestures';
+import { AlignToolbar } from './align-toolbar';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -50,6 +56,9 @@ export function CanvasPanel(): React.JSX.Element {
   const frame = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const view = useRef<CanvasView | undefined>(undefined);
+  // One edit path for the gestures and the align toolbar, so a command closes
+  // any open nudge group as a gesture does.
+  const [editor] = useState(() => new CanvasEditor((path) => workspace.documents.open(path)));
 
   // --- The view and its gestures: created once, attached for the panel's life ---
   useEffect(() => {
@@ -66,16 +75,26 @@ export function CanvasPanel(): React.JSX.Element {
       display: () => loop.frameState.get().display,
       canvasEditing: loop.canvasEditing,
       selection: workspace.selection,
-      editor: new CanvasEditor((path) => workspace.documents.open(path)),
+      editor,
       showMarquee: (rect) => shown.setMarquee(rect),
       showGuides: (lines) => shown.setGuides(lines),
+      planInsert: (tag, file, x, y) => {
+        const run = loop.lastRun.get();
+        if (run === undefined) return undefined;
+        return planInsert({ tag, file, x, y, texts: workspace.documents.texts(), base: run.result, assets: run.assets });
+      },
+      log: (line) => workspace.log(line),
+      takenNames: () => {
+        const run = loop.lastRun.get();
+        return run === undefined ? new Set<string>() : projectNames(run.result.model);
+      },
     });
     return () => {
       gestures.dispose();
       loop.attachCanvas(undefined);
       view.current = undefined;
     };
-  }, [loop, workspace]);
+  }, [loop, workspace, editor]);
 
   // --- Zoom: a fixed factor, or the largest integer that fits the panel ---
   const display = state.display;
@@ -112,6 +131,7 @@ export function CanvasPanel(): React.JSX.Element {
             {display.width}×{display.height}
           </span>
         )}
+        <AlignToolbar editor={editor} />
         <span className="spacer" />
         {placeholderNote !== undefined && <span className="placeholder-note">{placeholderNote}</span>}
         <label>

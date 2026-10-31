@@ -68,7 +68,8 @@
  */
 
 import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
-import { monaco } from '../monaco/monaco';
+import type * as monaco from 'monaco-editor/editor/editor.api';
+import { loadedMonaco } from '../monaco/monaco';
 import { classifyProjectFile } from '../project/project-model';
 import { Observable } from '../state/observable';
 import type { TextChange } from '../selection/selection-model';
@@ -162,7 +163,11 @@ export class ProjectDocuments {
    * document opens clean: closing it unedited writes nothing, because opening
    * a file to look at it must not rewrite it (ui_spec §16.1).
    *
-   * @return The model, or undefined for a path that is not a loaded document.
+   * A model is Monaco's, so none can be opened before Monaco has loaded
+   * (`monaco/monaco.ts`); until then the documents are their disk text.
+   *
+   * @return The model, or undefined for a path that is not a loaded document,
+   *         or while Monaco has not loaded.
    */
   open(path: string): monaco.editor.ITextModel | undefined {
     const existing = this.open_.get(path);
@@ -170,14 +175,15 @@ export class ProjectDocuments {
       return existing.model;
     }
     const disk = this.disk.get(path);
-    if (disk === undefined) {
+    const api = loadedMonaco();
+    if (disk === undefined || api === undefined) {
       return undefined;
     }
     // The URI carries the project path, so markers set for a file find it.
-    const model = monaco.editor.createModel(
+    const model = api.editor.createModel(
       withGeneratedNames(path, disk.text),
       'xml',
-      monaco.Uri.from({ scheme: 'u8g2gl', path: `/${path}` }),
+      api.Uri.from({ scheme: 'u8g2gl', path: `/${path}` }),
     );
     const document: OpenDocument = { model, savedAt: model.getAlternativeVersionId() };
     model.onDidChangeContent((event) => {
@@ -375,7 +381,8 @@ export class ProjectDocuments {
     const document = this.open_.get(path);
     if (document === undefined) return;
     const model = document.model;
-    const editors = monaco.editor.getEditors().filter((editor) => editor.getModel() === model);
+    // A document is open, so Monaco has loaded.
+    const editors = (loadedMonaco()?.editor.getEditors() ?? []).filter((editor) => editor.getModel() === model);
     const names = editors.map((editor) => {
       const position = editor.getPosition();
       const found = position === null ? undefined : elementAt(model.getValue(), model.getOffsetAt(position));

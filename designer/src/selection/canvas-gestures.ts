@@ -20,6 +20,8 @@
  *                selected element: a **move** of the selection;
  *              - on an unselected element: it is selected (the click cycle's
  *                next element there), and the press moves it;
+ *              - with Alt, a move is a **duplicate**: the drag moves copies of
+ *                the selection, which are selected when it ends;
  *              - on empty canvas: a **marquee**.
  *              A press is a click until it travels {@link MARQUEE_THRESHOLD}
  *              screen pixels; a click on a selected element cycles the
@@ -30,10 +32,17 @@
  *              undo stop. The guides it lies on are drawn on the overlay, and
  *              an axis that refuses (an expression, a binding) says why in a
  *              tip at the pointer while the other axis still follows. Arrow
- *              keys nudge (1 px, Shift 8 px), grouped by the editor. While the
+ *              keys nudge (1 px, Shift 8 px), grouped by the editor; Delete or
+ *              Backspace deletes the selection as one undo stop. While the
  *              document is not well-formed (`canvasEditing` false, §3.8)
  *              nothing writes: the press still selects, and the cursor and the
  *              tip say why.
+ *
+ *              A Palette tag dropped on the canvas is inserted there: the host
+ *              plans it (`insert-element.ts`), the editor writes it as one undo
+ *              stop, and the new element is selected, its XML revealed without
+ *              taking focus. A refused drop writes nothing; the reason is shown
+ *              at the drop point and in Output.
  *
  *              Pointer positions become device pixels through the frame
  *              canvas's on-screen box, so the answer is right at every zoom.
@@ -52,7 +61,10 @@ import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { HANDLE_SIZE, type GuideLine } from '../canvas/canvas-view';
 import type { CanvasEditor } from '../editing/canvas-editor';
+import type { InsertPlan } from '../editing/insert-element';
+import { PALETTE_DRAG_TYPE } from '../palette/palette-entries';
 import { DragEdit } from '../editing/drag-edit';
+import { deleteEdits } from '../editing/structure-edits';
 import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Handle } from '../editing/resize-rules';
@@ -100,10 +112,16 @@ export interface GestureHost {
   readonly showMarquee: MarqueeSink;
   /** Draws the guides a drag lies on; empty hides them. */
   readonly showGuides: (lines: readonly GuideLine[]) => void;
+  /** Plans the insert of `tag` at device pixel (x, y) of the drawn screen; undefined before the first run. */
+  readonly planInsert: (tag: string, file: string, x: number, y: number) => InsertPlan | undefined;
+  /** Appends a line to Output. */
+  readonly log: (line: string) => void;
+  /** Every name the project uses now, which a duplicate's copies must avoid. */
+  readonly takenNames: () => ReadonlySet<string>;
 }
 
 /** What a press does if it becomes a drag, decided at pointer-down. */
-type Owner = { readonly kind: 'move' } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
+type Owner = { readonly kind: 'move'; readonly duplicate: boolean } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
 
 /** A press in progress. */
 interface Press {
@@ -154,6 +172,8 @@ export class CanvasGestures {
   private readonly cycler = new ClickCycler();
   private readonly tip: HTMLDivElement;
   private press: Press | undefined;
+  /** True while the tip shows a refused drop's reason, until the pointer moves. */
+  private dropTip = false;
   private readonly listeners: Array<[keyof HTMLElementEventMap, (event: never) => void]>;
 
   /** @param host What the gestures read and write. */
@@ -171,6 +191,8 @@ export class CanvasGestures {
       ['pointercancel', () => this.cancel()],
       ['pointerleave', () => this.hover(undefined)],
       ['keydown', (event: KeyboardEvent) => this.key(event)],
+      ['dragover', (event: DragEvent) => this.dragOver(event)],
+      ['drop', (event: DragEvent) => this.drop(event)],
       ['blur', () => host.editor.closeGroup()],
     ];
     for (const [type, listener] of this.listeners) host.element.addEventListener(type, listener as EventListener);
@@ -202,7 +224,7 @@ export class CanvasGestures {
       // --- Step 2: An element moves; an unselected one is selected first ---
       const stack = hitsAt(targets, x, y);
       if (stack.length > 0) {
-        owner = { kind: 'move' };
+        owner = { kind: 'move', duplicate: event.altKey };
         const selected = this.current(file);
         if (!stack.some((name) => selected.includes(name))) {
           const name = this.cycler.click(targets, x, y);
@@ -234,6 +256,10 @@ export class CanvasGestures {
   private move(event: PointerEvent): void {
     const press = this.press;
     if (press === undefined) {
+      if (this.dropTip) {
+        this.dropTip = false;
+        this.showTip(undefined, event);
+      }
       this.hover(event);
       return;
     }
@@ -269,7 +295,7 @@ export class CanvasGestures {
       press.drag = new DragEdit(
         this.host.editor,
         { file, names: this.current(file), bounds: this.host.bounds.get(), placements: this.host.placements(), display: this.host.display() },
-        owner.kind === 'resize' ? owner : { kind: 'move' },
+        owner.kind === 'resize' ? owner : owner.kind === 'move' && owner.duplicate ? { kind: 'duplicate', taken: this.host.takenNames } : { kind: 'move' },
       );
     }
 
@@ -297,9 +323,11 @@ export class CanvasGestures {
     this.host.showGuides([]);
     const { file, targets } = this.host.targets.get();
 
-    // --- Step 1: A move or a resize: close its one undo stop ---
+    // --- Step 1: A move or a resize: close its one undo stop; a duplicate's copies become the selection ---
     if (press.owner.kind !== 'marquee' && press.dragging) {
       press.drag?.end();
+      const copies = press.drag?.copies() ?? [];
+      if (copies.length > 0 && press.file !== undefined) this.host.selection.select(press.file, copies, 'canvas');
       return;
     }
     if (file === undefined) return;
@@ -343,13 +371,19 @@ export class CanvasGestures {
   }
 
   // key
-  // Esc clears the selection, and any marquee in progress; an arrow nudges it.
+  // Esc clears the selection, and any marquee in progress; an arrow nudges it;
+  // Delete or Backspace deletes it.
   private key(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
       this.cancel();
       this.cycler.reset();
       this.host.selection.clear();
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && !event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      event.preventDefault();
+      this.remove();
       return;
     }
     const step = NUDGES[event.key];
@@ -380,6 +414,63 @@ export class CanvasGestures {
     });
     // No pointer to put a tip at: the canvas's title says why an axis did not move.
     this.host.element.title = reasons.join('; ');
+  }
+
+  // dragOver
+  // A Palette tag over the canvas: accept it, so the drop event fires.
+  private dragOver(event: DragEvent): void {
+    if (!event.dataTransfer?.types.includes(PALETTE_DRAG_TYPE)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  // drop
+  // A Palette tag dropped: insert it at the device pixel under the drop, as
+  // one undo stop, and select it; or say why not.
+  private drop(event: DragEvent): void {
+    const tag = event.dataTransfer?.getData(PALETTE_DRAG_TYPE) ?? '';
+    if (tag === '') return;
+    event.preventDefault();
+
+    // --- Step 1: Nothing writes while editing is off, or with no screen drawn ---
+    const { file } = this.host.targets.get();
+    const refuse = (reason: string): void => {
+      this.showTip(reason, event);
+      this.dropTip = true;
+      this.host.log(`Not inserted <${tag}>: ${reason}`);
+    };
+    if (!this.host.canvasEditing.get()) return refuse(EDITING_OFF_REASON);
+    if (file === undefined) return refuse('no screen is drawn on the canvas');
+
+    // --- Step 2: Plan it at the drop point, then write it as one stop ---
+    const { x, y } = this.toDevice(event.clientX, event.clientY);
+    const plan = this.host.planInsert(tag, file, x, y);
+    if (plan === undefined) return refuse('the canvas has not drawn a frame yet');
+    if (plan.kind === 'refused') return refuse(plan.reason);
+    // The plan was made against the text now; anything else means it is stale.
+    this.host.editor.apply(file, (text) => (text === plan.text ? plan.edits : []));
+
+    // --- Step 3: The new element is the selection ---
+    this.showTip(undefined, event);
+    this.cycler.reset();
+    this.host.selection.select(file, [plan.name], 'canvas');
+    this.host.element.focus({ preventScroll: true });
+  }
+
+  // remove
+  // Deletes the selected elements, as one undo stop, and clears the selection.
+  // A referenced element is deleted all the same; what then fails to resolve
+  // shows in Problems.
+  private remove(): void {
+    const { file, names } = this.host.selection.current.get();
+    if (file === undefined || names.length === 0 || this.press !== undefined) return;
+    if (!this.host.canvasEditing.get()) {
+      this.host.element.title = EDITING_OFF_REASON;
+      return;
+    }
+    this.host.editor.apply(file, (text) => deleteEdits(parseCst(text, file).cst, names));
+    this.cycler.reset();
+    this.host.selection.clear();
   }
 
   // hover
@@ -438,7 +529,7 @@ export class CanvasGestures {
   // Shows a sentence beside the pointer, or hides it (undefined).
   //   text  — what to say
   //   event — where the pointer is
-  private showTip(text: string | undefined, event: PointerEvent): void {
+  private showTip(text: string | undefined, event: MouseEvent): void {
     if (text === undefined) {
       if (!this.tip.hidden) this.tip.hidden = true;
       return;

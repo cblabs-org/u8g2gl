@@ -25,6 +25,7 @@
  * - devicePoint():      Where a device pixel's centre is on the page
  * - clickCanvas():      Click a device pixel on the canvas
  * - dragCanvas():       Drag between two device pixels on the canvas
+ * - dropTag():          Drag a Palette tag onto a device pixel of the canvas
  * - selectedNames():    The selection's file and names
  */
 
@@ -141,6 +142,24 @@ export async function dragCanvas(page: Page, from: readonly [number, number], to
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(end.x, end.y, { steps: 8 });
+  await page.mouse.up();
+}
+
+/**
+ * @brief Drags a Palette tag onto device pixel (x, y) of the canvas, with the
+ *        browser's own drag and drop, as a user would. The Palette must be the
+ *        sidebar's view.
+ */
+export async function dropTag(page: Page, tag: string, x: number, y: number): Promise<void> {
+  const point = await devicePoint(page, x, y);
+  const source = await page.locator(`.palette-tag[data-tag="${tag}"]`).boundingBox();
+  if (source === null) throw new Error(`<${tag}> is not in the Palette`);
+  // The mouse, not dragTo: dragTo's target is an offset it rounds again, which
+  // at 1× can land on the neighbouring device pixel. A drag event's position
+  // is whole screen pixels, so aim at the whole pixel inside the centre.
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(Math.round(point.x), Math.round(point.y), { steps: 5 });
   await page.mouse.up();
 }
 

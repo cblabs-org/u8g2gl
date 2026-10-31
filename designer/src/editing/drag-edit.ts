@@ -21,6 +21,13 @@
  *              changed more leads, and the other follows; a side handle grows
  *              the other axis from its end edge.
  *
+ *              An Alt-drag duplicates: its first write inserts a copy of each
+ *              selected element after it (`structure-edits.ts`), and every
+ *              write then moves the copies, planned from their originals'
+ *              attributes, which they share — so the originals stay, a copy's
+ *              axis refuses where its original's would, and the whole gesture,
+ *              copies and moves, is the one undo stop.
+ *
  * Exports:
  * - DragKind:       A move of the selection, or a resize by one handle
  * - DragFrame:      What one pointer position shows: guides and refusals
@@ -28,6 +35,7 @@
  * - DragEdit:       One drag
  *
  *     - to():         Write the drag at a pointer delta
+ *     - copies():     A duplicate's copies' names, once written
  *     - end():        Close its undo stop
  */
 
@@ -39,9 +47,16 @@ import type { CanvasEditor, EditGesture } from './canvas-editor';
 import { moveEdits, planMove, refusals, type MovePlan } from './placement-rules';
 import { clampResize, planResize, type Edge, type Handle } from './resize-rules';
 import { guidesFor, snapAxis, type Guides } from './snapping';
+import { duplicateEdits } from './structure-edits';
 
-/** What is dragged: the selection, or one element's handle. */
-export type DragKind = { readonly kind: 'move' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
+/**
+ * What is dragged: the selection; a copy of it (an Alt-drag), given the names
+ * the project already uses; or one element's handle.
+ */
+export type DragKind =
+  | { readonly kind: 'move' }
+  | { readonly kind: 'duplicate'; readonly taken: () => ReadonlySet<string> }
+  | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
 
 /** What one pointer position shows besides the text: the guides it lies on and why an axis does not follow. */
 export interface DragFrame {
@@ -106,6 +121,8 @@ export class DragEdit {
   private readonly guides: Guides;
   private gesture: EditGesture | undefined;
   private plans: readonly MovePlan[] | undefined;
+  /** A duplicate's copies by original name, once its first write made them. */
+  private copied: ReadonlyMap<string, string> | undefined;
   private written: { dx: number; dy: number } | undefined;
   private frame: DragFrame = NOTHING;
 
@@ -118,7 +135,7 @@ export class DragEdit {
     this.editor = editor;
     this.start = start;
     this.kind = kind;
-    const dragged = kind.kind === 'move' ? start.names : [kind.name];
+    const dragged = kind.kind === 'resize' ? [kind.name] : start.names;
     this.box = union(dragged.map((name) => start.bounds.get(name)).filter((rect): rect is Rect => rect !== undefined));
     this.guides = guidesFor(start.bounds, dragged, start.display);
   }
@@ -136,8 +153,16 @@ export class DragEdit {
     const { dx, dy, guides } = this.deltas(rawX, rawY, zoom, shift);
     if (this.written !== undefined && this.written.dx === dx && this.written.dy === dy) return this.frame;
 
-    // --- Step 2: The first write opens the undo stop and plans the drag ---
+    // --- Step 2: The first write opens the undo stop (and makes a duplicate's copies) and plans the drag ---
     this.gesture ??= this.editor.begin(this.start.file);
+    const kind = this.kind;
+    if (kind.kind === 'duplicate' && this.copied === undefined) {
+      this.gesture?.update((text) => {
+        const duplication = duplicateEdits(parseCst(text, this.start.file).cst, this.start.names, new Set(kind.taken()));
+        this.copied = duplication.copies;
+        return duplication.edits;
+      });
+    }
     this.gesture?.update((text) => {
       const cst = parseCst(text, this.start.file).cst;
       this.plans ??= this.plan(cst);
@@ -148,6 +173,11 @@ export class DragEdit {
     // --- Step 3: What the canvas shows beside the text ---
     this.frame = { guides, refusals: refusals(this.plans ?? [], dx, dy) };
     return this.frame;
+  }
+
+  /** @brief A duplicate's copies' names, in the selection's document order; empty until written, or for a move or resize. */
+  copies(): string[] {
+    return [...(this.copied?.values() ?? [])];
   }
 
   /** @brief Closes the drag's undo stop. */
@@ -164,8 +194,8 @@ export class DragEdit {
     if (box === undefined) return { dx: Math.round(rawX), dy: Math.round(rawY), guides: [] };
     const kind = this.kind;
 
-    // --- Step 1: A move: each axis snapped on its own, and that is all ---
-    if (kind.kind === 'move') {
+    // --- Step 1: A move or a duplicate: each axis snapped on its own, and that is all ---
+    if (kind.kind !== 'resize') {
       const x = snapAxis(edgeLines(box.x, box.width, 'move'), rawX, this.guides.vertical, zoom);
       const y = snapAxis(edgeLines(box.y, box.height, 'move'), rawY, this.guides.horizontal, zoom);
       return { dx: x.delta, dy: y.delta, guides: lines(x.lines, y.lines) };
@@ -199,13 +229,21 @@ export class DragEdit {
   }
 
   // plan
-  // The drag's plans from the text it starts from. A side handle also plans the
-  // other axis's end edge, which only Shift's ratio moves.
+  // The drag's plans from the text it starts from (a duplicate's, from the
+  // text with its copies). A side handle also plans the other axis's end
+  // edge, which only Shift's ratio moves.
   private plan(cst: CstDocument): MovePlan[] {
     const placements = this.start.placements;
     const kind = this.kind;
     if (kind.kind === 'move') {
       return this.start.names.map((name) => planMove(cst, name, placements.get(name))).filter((plan): plan is MovePlan => plan !== undefined);
+    }
+    if (kind.kind === 'duplicate') {
+      // A copy is not drawn yet; it shares its original's attributes, so its
+      // original's placement says where a default puts it.
+      return [...(this.copied ?? new Map<string, string>())]
+        .map(([original, copy]) => planMove(cst, copy, placements.get(original)))
+        .filter((plan): plan is MovePlan => plan !== undefined);
     }
     const handle: Handle = {
       horizontal: kind.handle.horizontal ?? (kind.handle.vertical === undefined ? undefined : 'end'),

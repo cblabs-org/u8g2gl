@@ -4,44 +4,56 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/monaco/monaco.ts
- * Purpose: The one place Monaco is imported and configured, so every other
- *          module gets the same instance, with its worker wired up before any
- *          editor exists. Monaco owns the document text and its one undo stack
- *          ([UD-3]); this module only makes it available.
- * Description: Monaco's ESM build, with its editor worker bundled by Vite's
- *              `?worker` import — the designer loads nothing from a CDN, so it
- *              works offline and the server can token-check every byte it
- *              serves. XML is the only language the designer edits, and it
- *              needs no language worker of its own, so every worker label gets
- *              the editor worker. A dark theme matches the canvas's dark
- *              chrome (ui_spec §8).
+ * Purpose: Monaco on demand. Monaco is most of the designer's code, and the
+ *          shell and the canvas need none of it to paint and run, so it is
+ *          loaded after them: this module is how every other module reaches
+ *          it, without importing it. Monaco owns the open documents' text and
+ *          their one undo stack ([UD-3]); until it has loaded, no document is
+ *          open, the canvas draws the disk's text, and a canvas edit waits for
+ *          it as it waits for an open document.
+ * Description: `loadMonaco()` imports `monaco-runtime.ts` once — a separate
+ *              chunk — and publishes the API on `monacoReady` when it arrives;
+ *              `loadedMonaco()` is the API if it has. The entry point starts the
+ *              load after the canvas's first frame; an editor tab opened sooner
+ *              starts it itself. Types are imported as types only, which
+ *              brings in no code.
  *
  * Exports:
- * - monaco:        The Monaco API
- * - THEME:         The theme name every editor uses
+ * - Monaco:          The Monaco API's type
+ * - THEME:           The theme name every editor uses
+ * - monacoReady:     The API once loaded, observable
+ * - loadMonaco():    Load it, once
+ * - loadedMonaco():  The API, if loaded
  */
 
-import * as monaco from 'monaco-editor';
-import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
+import type * as MonacoApi from 'monaco-editor/editor/editor.api';
+import { Observable } from '../state/observable';
 
-declare global {
-  interface Window {
-    MonacoEnvironment?: { getWorker(workerId: string, label: string): Worker };
-  }
-}
+/** The Monaco API's type. */
+export type Monaco = typeof MonacoApi;
 
-self.MonacoEnvironment = {
-  getWorker: () => new EditorWorker(),
-};
-
-/** The theme every editor in the designer uses. */
+/** The theme every editor in the designer uses (defined by the runtime as it loads). */
 export const THEME = 'u8g2gl-dark';
 
-monaco.editor.defineTheme(THEME, {
-  base: 'vs-dark',
-  inherit: true,
-  rules: [],
-  colors: { 'editor.background': '#1b1d21' },
-});
+/** The Monaco API once it has loaded; undefined until then. */
+export const monacoReady = new Observable<Monaco | undefined>(undefined);
 
-export { monaco };
+let loading: Promise<Monaco> | undefined;
+
+/**
+ * @brief Loads Monaco, once; later calls return the same promise.
+ *
+ * @return The API, also published on {@link monacoReady}.
+ */
+export function loadMonaco(): Promise<Monaco> {
+  loading ??= import('./monaco-runtime').then(({ monaco }) => {
+    monacoReady.set(monaco);
+    return monaco;
+  });
+  return loading;
+}
+
+/** @brief The Monaco API if it has loaded, else undefined. */
+export function loadedMonaco(): Monaco | undefined {
+  return monacoReady.get();
+}

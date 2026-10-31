@@ -159,7 +159,9 @@ test('a toggle, a segmented control and a dropdown each commit their choice; res
   await field(page, 'format').getByRole('button', { name: 'hh_mm', exact: true }).click();
   await expect.poll(async () => (await changedLines(page))[0]).toContain('format="hh_mm"');
 
-  // A font: a dropdown of the project's fonts.
+  // A font: a dropdown of the project's fonts, built-ins with their pixel heights.
+  await expect(field(page, 'font').getByRole('combobox', { name: 'font' }).locator('option')).toContainText(['u8g2_font_6x10_mr · 10 px', 'u8g2_font_helvR08_tr · 11 px']);
+  await expect(panel(page).locator('.panel-note', { hasText: 'Font heights' })).toHaveCount(0);
   await field(page, 'font').getByRole('combobox', { name: 'font' }).selectOption('u8g2_font_helvR08_tr');
   await expect.poll(async () => (await changedLines(page))[0]).toContain('font="u8g2_font_helvR08_tr"');
 

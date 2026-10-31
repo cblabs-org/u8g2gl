@@ -59,3 +59,7 @@ context's preview gallery (needs `<previews>`); the screen-flow view; packaging.
 
   > "Accept all three"
 
+- **2026-10-29.** E-2c's drag gate: the owner chose "Count snapped moves" (e-2c ruling 11's
+  amendment), which replaces E-2b ruling 10's measurement point.
+- **2026-10-31.** E-2a (#36), E-2b (#37) and E-2c (#38) merged. E-2d issued from `main` @
+  `ef49a1d` (`e-2d-palette`).
