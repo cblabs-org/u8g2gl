@@ -101,3 +101,12 @@ when the shell needs it.
   `extern/u8g2` checked out. WO1–WO6 issued to one worker in order.
 - **2026-10-31.** WO1 stopped before insert (`4eccc32`: palette and names done): rule 2 conflicted
   with the validator's sizing rule. Ruling 11 issued; WO1 resumed.
+- **2026-10-31. WO1–WO6 complete** (report at the end of WORKORDERS.md). Accepted: duplicate renames
+  the copy's named descendants; insert extras seeded visible (line corner to corner, r = 4);
+  "element children" means children the registry knows; `overlays.spec.ts` admits the align
+  toolbar on a selection change; no document opens before Monaco loads. CLI 0.13.5 for the font
+  height data. **PA verification** on `d2eacad`, suites one at a time, AC power, no sleep: guard
+  clean; CLI 2527, lint and tsc clean; no golden moved, catalogue regeneration byte-identical; C++
+  512/512; designer unit 126; e2e 67. Drag gate 300/300 at every screen and zoom, p95 8.0–9.1 ms;
+  keystroke run→blit p95 4.2 / 3.3 ms; panel share p95 1.1 ms; every self-test fails its gate.
+  Production 3/3, no hook. Initial JS gzip 1,340 → 347 KB. PR #39.
