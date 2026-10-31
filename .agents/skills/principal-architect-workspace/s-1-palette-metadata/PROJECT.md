@@ -99,3 +99,18 @@ Rule 03 makes a schema bump the owner's decision; this record is that decision.
   checked out. WO1–WO5 issued to one worker in order.
 - **2026-10-31.** WO1–WO5 reported complete (`2511296`). Ruling 8 issued on deviation 1; the worker
   resumed to apply it before PA verification.
+- **2026-10-31.** Ruling 8 applied (`c9ce6a6`). **PA verification** on `c9ce6a6`, suites run one
+  at a time, on AC power, with no sleep:
+  - guard clean;
+  - CLI 2555, lint and tsc clean;
+  - goldens: against main, only version-stamp lines moved;
+  - C++ 512/512;
+  - designer unit 128, e2e 68;
+  - production 3/3, no hook.
+
+  Through the built CLI, main's 0.4 departures fixture generates
+  `REQUIRE_SCHEMA_VERSION(0, 5)` with `// schema: 0.4`, and the header compiles against runtime
+  0.11. A 0.4 project that uses `label=` is refused, with the fix named in the message. Timing
+  gates: drag p95 8.3–9.2 ms; keystroke run→blit p95 3.6 / 4.1 ms; panel share p95 1.1 ms.
+  Every self-test fails its gate. The palette re-renders on neither typing nor dragging.
+  Xtensa corpora: stamps only, left to CI's cross-compile jobs.
