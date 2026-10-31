@@ -48,7 +48,6 @@ import type { Rect } from '../pipeline/live-pipeline';
 import type { CompletedRun } from '../pipeline/edit-loop';
 import { Observable } from '../state/observable';
 import type { Workspace } from '../workspace';
-import { monaco } from '../monaco/monaco';
 import { panelUpdateEnded, panelUpdateStarted } from '../perf/panel-probe';
 import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
@@ -192,7 +191,11 @@ export class PanelController {
     model.pushStackElement();
     model.pushEditOperations(
       [],
-      edits.map((edit) => ({ range: monaco.Range.fromPositions(model.getPositionAt(edit.start), model.getPositionAt(edit.end)), text: edit.text })),
+      edits.map((edit) => {
+        const start = model.getPositionAt(edit.start);
+        const end = model.getPositionAt(edit.end);
+        return { range: { startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column }, text: edit.text };
+      }),
       () => null,
     );
     model.pushStackElement();

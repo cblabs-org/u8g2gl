@@ -62,7 +62,7 @@
 
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import { DIAGNOSTIC_CODES } from '@u8g2gl/core/schema/diagnostic.js';
-import { monaco } from '../monaco/monaco';
+import { loadedMonaco } from '../monaco/monaco';
 import type { CanvasView, OverlayRect } from '../canvas/canvas-view';
 import { countLit } from '../canvas/framebuffer';
 import { ProjectAssets } from '../project/project-assets';
@@ -477,7 +477,7 @@ export class EditLoop {
     for (const file of files) {
       const model = documents.modelOf(file);
       if (model !== undefined) {
-        monaco.editor.setModelMarkers(model, 'u8g2gl', (byFile.get(file) ?? []).map((marker) => ({ ...marker })));
+        loadedMonaco()?.editor.setModelMarkers(model, 'u8g2gl', (byFile.get(file) ?? []).map((marker) => ({ ...marker })));
       }
     }
     this.diagnosticFiles = new Set(byFile.keys());

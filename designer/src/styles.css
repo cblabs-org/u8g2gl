@@ -195,3 +195,4 @@ button { font: inherit; color: inherit; }
 }
 .align-button:disabled { opacity: 0.35; cursor: default; }
 .align-note { margin-left: 4px; color: var(--text-dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 360px; }
+.editor-loading { margin: 12px; color: var(--text-dim); font-size: 12px; }

@@ -10,8 +10,10 @@
  *          The tab is also where the save rules meet the user: the dirty
  *          marker and the three-way choice when the file changed on disk
  *          under unsaved edits.
- * Description: Monaco is imperative, so the editor is created once per panel
- *              in an effect that owns its lifecycle; React renders only the
+ * Description: Monaco is loaded after the shell (`monaco/monaco.ts`); a tab
+ *              opened before it arrives says so and asks for it. Monaco is
+ *              imperative, so the editor is created once per panel, once
+ *              Monaco is there, in an effect that owns its lifecycle; React renders only the
  *              container and the conflict bar. "Compare" swaps the editor for a
  *              diff editor — the disk's text on the left, the buffer on the
  *              right, still editable — until the user chooses.
@@ -33,7 +35,8 @@
 import type { IDockviewPanelProps } from 'dockview-react';
 import { useEffect, useRef, useState } from 'react';
 import { elementAt } from '../documents/element-at';
-import { monaco, THEME } from '../monaco/monaco';
+import type * as monaco from 'monaco-editor/editor/editor.api';
+import { loadMonaco, monacoReady, THEME, type Monaco } from '../monaco/monaco';
 import type { OpenRequest } from '../workspace';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -59,11 +62,13 @@ const EDITOR_OPTIONS: monaco.editor.IEditorOptions = {
 };
 
 /** How a selected element's text is decorated: a tint, and a mark in the overview ruler. */
-const SELECTED_ELEMENT: monaco.editor.IModelDecorationOptions = {
-  className: 'selected-element',
-  stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-  overviewRuler: { color: '#4f8cff', position: monaco.editor.OverviewRulerLane.Left },
-};
+function selectedElement(api: Monaco): monaco.editor.IModelDecorationOptions {
+  return {
+    className: 'selected-element',
+    stickiness: api.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+    overviewRuler: { color: '#4f8cff', position: api.editor.OverviewRulerLane.Left },
+  };
+}
 
 /** @brief An editor tab. */
 export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): React.JSX.Element {
@@ -76,6 +81,8 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
   const dirty = useObservable(documents.dirty).has(path);
   const theirs = conflicts.get(path);
   const [comparing, setComparing] = useState(false);
+  // Monaco loads after the shell; a tab opened before it has asks for it here.
+  const api = useObservable(monacoReady);
   const title = path.slice(path.lastIndexOf('/') + 1);
 
   // --- The tab's title carries the dirty marker ---
@@ -89,11 +96,16 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
   }, [theirs]);
 
   useEffect(() => {
+    if (api === undefined) {
+      void loadMonaco();
+      return undefined;
+    }
     const element = host.current;
     const model = documents.open(path);
     if (element === null || model === undefined) {
       return undefined;
     }
+    const selected = selectedElement(api);
 
     // --- Step 1: The editor (or, comparing, the diff editor) on the shared model ---
     let editor: monaco.editor.IStandaloneCodeEditor;
@@ -101,14 +113,14 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
     let original: monaco.editor.ITextModel | undefined;
     const showing = comparing ? documents.conflicts.get().get(path) : undefined;
     if (showing !== undefined) {
-      original = monaco.editor.createModel(showing.text, 'xml');
-      diff = monaco.editor.createDiffEditor(element, { ...EDITOR_OPTIONS, theme: THEME, originalEditable: false });
+      original = api.editor.createModel(showing.text, 'xml');
+      diff = api.editor.createDiffEditor(element, { ...EDITOR_OPTIONS, theme: THEME, originalEditable: false });
       diff.setModel({ original, modified: model });
       // The standalone diff editor's halves are standalone editors at run time;
       // its typings only promise the narrower interface.
       editor = diff.getModifiedEditor() as monaco.editor.IStandaloneCodeEditor;
     } else {
-      editor = monaco.editor.create(element, { ...EDITOR_OPTIONS, model, theme: THEME });
+      editor = api.editor.create(element, { ...EDITOR_OPTIONS, model, theme: THEME });
     }
 
     // --- Step 2: Caret placement, now and on later open requests ---
@@ -133,7 +145,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       workspace.selection.caretMoved(path, found?.name, explicit);
     };
     const caretListener = editor.onDidChangeCursorPosition((event) =>
-      select(event.reason === monaco.editor.CursorChangeReason.Explicit),
+      select(event.reason === api.editor.CursorChangeReason.Explicit),
     );
 
     // --- Step 4: The selection decorated, and revealed when the canvas chose it ---
@@ -147,17 +159,17 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       const ranges = workspace.selection.spans().map((span) => {
         const start = model.getPositionAt(span.start);
         const end = model.getPositionAt(span.end);
-        return new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column);
+        return new api.Range(start.lineNumber, start.column, end.lineNumber, end.column);
       });
-      decorations.set(ranges.map((range) => ({ range, options: SELECTED_ELEMENT })));
+      decorations.set(ranges.map((range) => ({ range, options: selected })));
       const first = ranges[0];
       // Reveal only what the canvas selected: the caret's element is already
       // where the user is looking. Never focus — the canvas keeps the keyboard.
       // The element's lines from column 1, so a long line does not scroll the
       // view sideways to its end.
       if (selection.origin === 'canvas' && first !== undefined) {
-        const lines = new monaco.Range(first.startLineNumber, 1, first.endLineNumber, 1);
-        editor.revealRangeInCenterIfOutsideViewport(lines, monaco.editor.ScrollType.Smooth);
+        const lines = new api.Range(first.startLineNumber, 1, first.endLineNumber, 1);
+        editor.revealRangeInCenterIfOutsideViewport(lines, api.editor.ScrollType.Smooth);
       }
     };
     showSelection();
@@ -191,8 +203,9 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
         editor.dispose();
       }
     };
-    // The panel shows one path for its whole life; comparing swaps the editor.
-  }, [path, comparing]);
+    // The panel shows one path for its whole life; comparing swaps the editor;
+    // Monaco's arrival creates it.
+  }, [path, comparing, api]);
 
   return (
     <div className="editor-panel">
@@ -210,7 +223,9 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
           </button>
         </div>
       )}
-      <div className="editor-host" ref={host} data-editor-path={path} data-dirty={dirty} />
+      <div className="editor-host" ref={host} data-editor-path={path} data-dirty={dirty}>
+        {api === undefined && <p className="editor-loading">Loading the editor…</p>}
+      </div>
     </div>
   );
 }

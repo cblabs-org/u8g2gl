@@ -24,7 +24,7 @@
  */
 
 import { parseCst } from '@u8g2gl/core/cst/index.js';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { ALIGN_COMMANDS, alignAvailability, alignEdits, type AlignCommand } from '../editing/align';
 import type { CanvasEditor } from '../editing/canvas-editor';
 import { Observable } from '../state/observable';
@@ -35,8 +35,13 @@ import { useWorkspace } from './workspace-context';
 /** Milliseconds without a pipeline run before the buttons' availability is rechecked. */
 export const SETTLE_MS = 120;
 
-/** @brief The align and distribute buttons; `editor` is the canvas's edit path. */
-export function AlignToolbar({ editor }: { readonly editor: CanvasEditor }): React.JSX.Element {
+/**
+ * @brief The align and distribute buttons; `editor` is the canvas's edit path.
+ *
+ * Memoised: the canvas panel re-renders for every frame it shows, and these
+ * buttons depend on none of it.
+ */
+export const AlignToolbar = memo(function AlignToolbar({ editor }: { readonly editor: CanvasEditor }): React.JSX.Element {
   countRender('AlignToolbar');
   const workspace = useWorkspace();
   const loop = workspace.loop;
@@ -101,4 +106,4 @@ export function AlignToolbar({ editor }: { readonly editor: CanvasEditor }): Rea
       )}
     </span>
   );
-}
+});

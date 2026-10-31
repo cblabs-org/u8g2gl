@@ -11,9 +11,10 @@
  * Description: Reads the session from the URL, connects the served
  *              `ProjectFileSystem` (its event stream must be attached before
  *              the first read, so no external edit between the two is missed),
- *              loads the documents, then renders. The end-to-end test build
- *              also installs its hooks (`test-hooks.ts`); a production build
- *              contains none of them.
+ *              loads the documents, then renders; Monaco is loaded once the
+ *              canvas has drawn its first frame (`monaco/monaco.ts`). The
+ *              end-to-end test build also installs its hooks
+ *              (`test-hooks.ts`); a production build contains none of them.
  *
  * Exports: none; runs on load.
  */
@@ -23,6 +24,7 @@ import { parseProjectFile } from '@u8g2gl/core/parser/index.js';
 import { createRoot } from 'react-dom/client';
 import 'dockview-react/dist/styles/dockview.css';
 import './styles.css';
+import { loadMonaco } from './monaco/monaco';
 import { readSession } from './session';
 import { App } from './ui/app';
 import { Workspace } from './workspace';
@@ -70,6 +72,16 @@ async function start(): Promise<void> {
     installTestHooks(workspace);
   }
   workspace.start();
+
+  // --- Step 4: Monaco, once the canvas has drawn its first frame ---
+  // The shell and the canvas need none of Monaco, which is most of the code,
+  // so it is fetched and evaluated only after they are running. An editor tab
+  // opened sooner asks for it itself.
+  const offFrame = workspace.loop.frameState.subscribe(() => {
+    if (workspace.loop.frameState.get().frame === 0) return;
+    offFrame();
+    void loadMonaco();
+  });
 }
 
 start().catch((error: unknown) => fail(`The designer could not start: ${error instanceof Error ? error.message : String(error)}`));

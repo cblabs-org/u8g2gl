@@ -54,9 +54,9 @@ measures).
 
 # WO5 — Monaco split and the gates (`u8g2gl-e2d/wo5-split-gates`)
 
-- [ ] Before anything else in this WO, record production `dist` size and initial-load JS (gzip).
-- [ ] Ruling 8's split; the sizes after.
-- [ ] Every timing gate re-measured on the finished tree, three clean runs of the drag gate;
+- [x] Before anything else in this WO, record production `dist` size and initial-load JS (gzip).
+- [x] Ruling 8's split; the sizes after.
+- [x] Every timing gate re-measured on the finished tree, three clean runs of the drag gate;
       thresholds and self-tests unchanged.
 
 # WO6 — review and evidence (`u8g2gl-e2d/wo6-readability`)
