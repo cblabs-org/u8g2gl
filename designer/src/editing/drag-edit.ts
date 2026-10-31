@@ -230,8 +230,8 @@ export class DragEdit {
 
   // plan
   // The drag's plans from the text it starts from (a duplicate's, from the
-  // text with its copies). A side handle also plans the
-  // other axis's end edge, which only Shift's ratio moves.
+  // text with its copies). A side handle also plans the other axis's end
+  // edge, which only Shift's ratio moves.
   private plan(cst: CstDocument): MovePlan[] {
     const placements = this.start.placements;
     const kind = this.kind;

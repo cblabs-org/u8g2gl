@@ -30,6 +30,9 @@ import { join } from 'node:path';
 /** U8G2's font header: byte 10 is `max_char_height` (u8g2_font.c, `u8g2_read_font_info`). */
 export const FONT_HEIGHT_BYTE = 10;
 
+/** Characters of source scanned for a font's header bytes (see parseFontHeights). */
+const HEADER_WINDOW = 400;
+
 /** The single-character escapes of C, by the letter after the backslash. */
 const SIMPLE_ESCAPES: Readonly<Record<string, number>> = { a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, "'": 39, '"': 34, '?': 63 };
 
@@ -106,7 +109,10 @@ export function parseFontHeights(clibDir: string, fonts: readonly string[]): Rec
   for (const font of fonts) {
     const start = starts.get(font);
     if (start === undefined) throw new Error(`u8g2_fonts.c has no definition of ${font}.`);
-    const header = decodeCStringPrefix(source.slice(start, start + 400), FONT_HEIGHT_BYTE + 1);
+    // Only the header's first eleven bytes are wanted; each is at most four
+    // source characters (`\377`) with literal breaks between, so a window of
+    // HEADER_WINDOW characters is a generous bound on the text to scan, not a limit on fonts.
+    const header = decodeCStringPrefix(source.slice(start, start + HEADER_WINDOW), FONT_HEIGHT_BYTE + 1);
     const height = header[FONT_HEIGHT_BYTE];
     if (height === undefined) throw new Error(`${font}'s data is shorter than its font header.`);
     heights[font] = height;

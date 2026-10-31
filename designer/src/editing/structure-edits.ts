@@ -26,6 +26,7 @@
  *              Alt-drag's placement rules).
  *
  * Exports:
+ * - Placed:             A selected element and its parent
  * - topSelected():      The selected elements that are not inside another selected one
  * - deleteEdits():      Remove the selected elements
  * - Duplication:        A duplicate's edits and the copies' names
@@ -35,8 +36,8 @@
 import { applyEdits, insertElement, removeElement, replaceAttributeValue, type CstContent, type CstDocument, type CstElement, type TextEdit } from '@u8g2gl/core/cst/index.js';
 import { nextElementName } from '../documents/element-names';
 
-/** An element and the element it is a child of. */
-interface Placed {
+/** A selected element and the element it is a child of. */
+export interface Placed {
   readonly element: CstElement;
   readonly parent: CstElement;
 }
@@ -53,6 +54,7 @@ function nameOf(element: CstElement): string | undefined {
  *
  * @param cst   The document.
  * @param names The selected names.
+ * @return Each such element with its parent, in document order.
  */
 export function topSelected(cst: CstDocument, names: readonly string[]): Placed[] {
   const found: Placed[] = [];
@@ -69,7 +71,7 @@ export function topSelected(cst: CstDocument, names: readonly string[]): Placed[
 }
 
 /**
- * @brief The edits that delete the selected elements (§3.6: one command).
+ * @brief The edits that delete the selected elements, as one command.
  *
  * @param cst   The current text's CST.
  * @param names The selected names; any not in the document are ignored.

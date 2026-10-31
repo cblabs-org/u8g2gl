@@ -16,7 +16,7 @@
  *              Within a group tags keep registry order — framework first, then
  *              project, each in the order it was declared. No icon, category
  *              or description is invented: palette metadata is not part of the
- *              schema (EDITOR-DESIGN §8). The filter narrows by a
+ *              schema: element knowledge is the manifest ([D-17]). The filter narrows by a
  *              case-insensitive substring of the tag; a group left empty is
  *              dropped.
  *

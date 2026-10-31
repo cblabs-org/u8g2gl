@@ -13,10 +13,11 @@
  * Description: Monaco is loaded after the shell (`monaco/monaco.ts`); a tab
  *              opened before it arrives says so and asks for it. Monaco is
  *              imperative, so the editor is created once per panel, once
- *              Monaco is there, in an effect that owns its lifecycle; React renders only the
- *              container and the conflict bar. "Compare" swaps the editor for a
- *              diff editor — the disk's text on the left, the buffer on the
- *              right, still editable — until the user chooses.
+ *              Monaco is there, in an effect that owns its lifecycle; React
+ *              renders only the container and the conflict bar. "Compare"
+ *              swaps the editor for a diff editor — the disk's text on the
+ *              left, the buffer on the right, still editable — until the user
+ *              chooses.
  *
  *              Selection, both ways (ui_spec §4.3, EDITOR-DESIGN §3.7). The
  *              caret's element becomes the selection, which the canvas outlines;
@@ -61,7 +62,12 @@ const EDITOR_OPTIONS: monaco.editor.IEditorOptions = {
   formatOnType: false,
 };
 
-/** How a selected element's text is decorated: a tint, and a mark in the overview ruler. */
+/**
+ * @brief How a selected element's text is decorated: a tint, and a mark in the
+ *        overview ruler.
+ *
+ * @param api Monaco, loaded: the options name its enums.
+ */
 function selectedElement(api: Monaco): monaco.editor.IModelDecorationOptions {
   return {
     className: 'selected-element',

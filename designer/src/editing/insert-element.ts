@@ -134,6 +134,7 @@ function simplestValue(prop: PropDef, globals: Globals): string | undefined {
     case 'enum':
       return prop.values?.split(',')[0]?.trim() ?? '';
     case 'color':
+      // Drawn lit: on a monochrome display 1 is the colour that shows.
       return '1';
     case 'font':
       return globals.fonts[0]?.name ?? BUILTIN_FONTS[0];

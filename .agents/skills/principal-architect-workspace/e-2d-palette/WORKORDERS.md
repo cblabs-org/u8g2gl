@@ -61,7 +61,7 @@ measures).
 
 # WO6 — review and evidence (`u8g2gl-e2d/wo6-readability`)
 
-- [ ] Spawn the `readability-reviewer` on E-2d's diff (against the base); resolve P1–P3, decide
+- [x] Spawn the `readability-reviewer` on E-2d's diff (against the base); resolve P1–P3, decide
       P4 with reasons.
 - [ ] Screenshots under `tmp/e2d/`: the palette with all three groups, the filter in use, an
       insert just dropped, the align toolbar enabled and with a refusal.

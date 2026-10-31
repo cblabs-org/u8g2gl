@@ -7,15 +7,16 @@
  * File: src/node/build-catalogue.ts
  * Purpose: CLI script entry point to parse U8G2 source code and build the
  *          display catalogue and page-mode replacement map data files (§5.2),
- *          the list of fonts U8G2 bundles (§14.1, PR-04 WO11b) and each one's
+ *          the list of fonts U8G2 bundles (§14.1) and each one's
  *          pixel height (so the designer can show it), and to record
  *          which U8G2 commit they were built from, so each can be reproduced and
  *          diffed across a U8G2 upgrade (Q-11).
  * Description: Reads U8G2 from the pinned submodule (extern/u8g2) unless
  *              `--u8g2-path` or U8G2_PATH names another tree, invokes the
- *              catalogue builder and the font-symbol builder, writes
- *              catalogue.json, page-mode-map.json, u8g2-fonts.json,
- *              u8g2-font-heights.json and catalogue-source.json to src/data/, and logs the extraction
+ *              catalogue builder, the font-symbol builder and the font-height
+ *              builder, writes catalogue.json, page-mode-map.json,
+ *              u8g2-fonts.json, u8g2-font-heights.json and
+ *              catalogue-source.json to src/data/, and logs the extraction
  *              metrics and the source commit. One run, one U8G2 tree, one
  *              source record: the fonts and the displays cannot come from two
  *              different U8G2 commits.

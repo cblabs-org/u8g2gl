@@ -7,7 +7,7 @@
  * Purpose: The align and distribute commands of the canvas toolbar (ui_spec
  *          §8): line the selection up on one edge or centre of its bounding
  *          box, or space three or more evenly. Each element moves by the same
- *          placement rules a drag uses (EDITOR-DESIGN §3.5), so an aligned
+ *          placement rules a drag uses (`placement-rules.ts`), so an aligned
  *          element's literal is rewritten, an anchor inverted, and an
  *          expression or a binding refuses — the element stays, and the
  *          command says which and why.

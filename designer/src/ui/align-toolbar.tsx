@@ -40,6 +40,9 @@ export const SETTLE_MS = 120;
  *
  * Memoised: the canvas panel re-renders for every frame it shows, and these
  * buttons depend on none of it.
+ *
+ * @param editor The canvas's edit path, shared with its gestures so a command
+ *               closes any open nudge group.
  */
 export const AlignToolbar = memo(function AlignToolbar({ editor }: { readonly editor: CanvasEditor }): React.JSX.Element {
   countRender('AlignToolbar');
