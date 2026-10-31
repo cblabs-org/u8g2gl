@@ -5,24 +5,27 @@
  *
  * File: designer/src/ui/app.tsx
  * Purpose: The designer's shell, laid out as ui_spec §6 draws it: the activity
- *          bar and explorer down the left, the editor area — canvas beside the
- *          XML — in the middle, the property panel on the right, Problems and
- *          Output below, and the status bar along the bottom. Dockview owns
- *          the editor area and bottom panel, so tabs split, move and resize as
- *          in an IDE; the fixed chrome around it is plain React.
- * Description: On Dockview's ready event the default layout is built: canvas,
- *              then Problems and Output beneath it. Editor tabs open to the
- *              canvas's right, all in one group, when the workspace is asked to
- *              open a file; a file already open is brought to the front.
+ *          bar and the primary sidebar (the Explorer or the Palette) down the
+ *          left, the editor area — canvas beside the XML — in the middle, the
+ *          property panel on the right, Problems and Output below, and the
+ *          status bar along the bottom. Dockview owns the editor area and
+ *          bottom panel, so tabs split, move and resize as in an IDE; the
+ *          fixed chrome around it is plain React.
+ * Description: The activity bar chooses the sidebar's view; the Explorer is
+ *              shown first. On Dockview's ready event the default layout is
+ *              built: canvas, then Problems and Output beneath it. Editor tabs
+ *              open to the canvas's right, all in one group, when the
+ *              workspace is asked to open a file; a file already open is
+ *              brought to the front.
  *
  * Exports:
  * - App:  The shell
  */
 
 import { DockviewReact, themeDark, type DockviewApi, type DockviewReadyEvent } from 'dockview-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Workspace } from '../workspace';
-import { ActivityBar } from './activity-bar';
+import { ActivityBar, type SidebarView } from './activity-bar';
 import { CanvasPanel } from './canvas-panel';
 import { EditorPanel } from './editor-panel';
 import { Explorer } from './explorer';
@@ -32,6 +35,7 @@ import { StatusBar } from './status-bar';
 import { WorkspaceContext } from './workspace-context';
 import { countRender } from '../perf/render-count';
 import { PropertyPanel } from '../panel/property-panel';
+import { Palette } from '../palette/palette';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -48,6 +52,7 @@ const editorId = (path: string): string => `file:${path}`;
 export function App({ workspace }: { readonly workspace: Workspace }): React.JSX.Element {
   countRender('App');
   const dock = useRef<DockviewApi | undefined>(undefined);
+  const [view, setView] = useState<SidebarView>('explorer');
 
   // --- Opening files: a tab per document, in one group right of the canvas ---
   useEffect(
@@ -114,8 +119,8 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   return (
     <WorkspaceContext.Provider value={workspace}>
       <div className="shell">
-        <ActivityBar />
-        <Explorer />
+        <ActivityBar active={view} onSelect={setView} />
+        {view === 'explorer' ? <Explorer /> : <Palette />}
         <main className="editor-area">
           <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
         </main>
