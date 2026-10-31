@@ -12651,7 +12651,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_box.xml",
-   "sha256": "c69de5aa61901b77cc2460b96aec999891a890537c815577a2b6d9a50894e086",
+   "sha256": "bc69101a68639c572419145543e118ba93e77070925f9481526cf5ae57e28325",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -12670,7 +12670,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "14:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Box",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:30",
+        "3:20"
+       ],
+       [
+        "description",
+        "A filled or outlined rectangle, optionally with rounded corners.",
+        "3:52",
+        "3:39"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -12998,7 +13017,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_button.xml",
-   "sha256": "1ec2cdf35967d8a20d5bd05b80eb66cbee2e05e786ad5bef83fdc3f05f6f0e5c",
+   "sha256": "a6c13ee712b1b5dff5e887e7b6c948a76f56dc2c1f6c502fac5a94a12c40d8d8",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -13023,7 +13042,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "14:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Button",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Controls",
+        "3:33",
+        "3:23"
+       ],
+       [
+        "description",
+        "A bordered button with a text caption.",
+        "3:56",
+        "3:43"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -13216,7 +13254,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_circle.xml",
-   "sha256": "9a246528bbe70e55c1400177802854d9a876634a33504f709e1752d15ada6eb8",
+   "sha256": "8838b986d0247a8ddf00220b65363b506d54ac6cdc18f1de9bad71a33ee350bc",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -13235,7 +13273,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "11:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Circle",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:33",
+        "3:23"
+       ],
+       [
+        "description",
+        "A circle or filled disc, whole or in quarters.",
+        "3:55",
+        "3:42"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -13494,7 +13551,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_clock.xml",
-   "sha256": "b96c2f8f4c3ca49f89a6179425155f68b66eefb1c3689295208b466a2c5ec0b0",
+   "sha256": "ea670a154d783fa2d3cf26f0ffafeca4772838fe33662b09fc4a3d55aa4db5fe",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -13519,7 +13576,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "17:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Clock",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Text",
+        "3:32",
+        "3:22"
+       ],
+       [
+        "description",
+        "A time of day shown as text in a chosen format, with an optional blinking colon.",
+        "3:51",
+        "3:38"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -13757,7 +13833,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_ellipse.xml",
-   "sha256": "c753c3ad3d40f0d0c132aa3408885373e1f6d30cc24d8495726b3d2263c1d121",
+   "sha256": "2655dc5b19a6d8d686f4510c60dc7e8908e0e4bfd52b1f5a8f48185b6b0c67a5",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -13776,7 +13852,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "12:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Ellipse",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:34",
+        "3:24"
+       ],
+       [
+        "description",
+        "An ellipse, outlined or filled, whole or in quarters.",
+        "3:56",
+        "3:43"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -14074,7 +14169,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_glyph.xml",
-   "sha256": "f87e4f43720d6343cbe8cc96850d1f9da3055d6bb14614eb05d9517a846ec18c",
+   "sha256": "0af32bc0820450af6acdc7f1a21d75823d36353fe98b70a154e310911169fa85",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -14099,7 +14194,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "8:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Glyph",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Images",
+        "3:32",
+        "3:22"
+       ],
+       [
+        "description",
+        "One character drawn from a font, such as an icon from an icon font.",
+        "3:53",
+        "3:40"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -14187,7 +14301,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_hline.xml",
-   "sha256": "2f1cbc3c6ae12539cde37ec669c6a6478d832c302ff5c6231a1842e5ec0c740c",
+   "sha256": "db9b9047c5c46140d2e093c17ada61422ed5d73abe13f4b724bc93394dadaac8",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -14206,7 +14320,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "10:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Horizontal line",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:42",
+        "3:32"
+       ],
+       [
+        "description",
+        "A horizontal line of a given width.",
+        "3:64",
+        "3:51"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -14396,7 +14529,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_label.xml",
-   "sha256": "2756c53d7582ae0072c64129ba4bdc7241c62ee086968b179df9d3b6c4b219c4",
+   "sha256": "a253dca9e32bc8375df49c2eae8669e3df9e9e484d5a96de66260babe94f8b73",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -14421,7 +14554,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "35:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Label",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Text",
+        "3:32",
+        "3:22"
+       ],
+       [
+        "description",
+        "One line of text, clipped, cut short with dots, or scrolled when it is too long.",
+        "3:51",
+        "3:38"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -14794,7 +14946,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_line.xml",
-   "sha256": "82d2ede684ed097ebd0873b6777b7aad8bf943c6c6fd18db3da93793aee448a4",
+   "sha256": "70883ccbdda841041daaf4c3c6d1feeb76aba6bf9d1884900bd55ca171d697f5",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -14813,7 +14965,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "8:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Line",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:31",
+        "3:21"
+       ],
+       [
+        "description",
+        "A straight line between two points.",
+        "3:53",
+        "3:40"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -14979,7 +15150,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_obj.xml",
-   "sha256": "fc6855cfec4b17e4cb1e1bdb3896810798d674c94f7cc9dbd509892e56723515",
+   "sha256": "8ad4c10d27d3c70262eedb71561fb5d9942be4d2865e28727ff646a44b86b0c4",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -14998,7 +15169,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "25:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Object",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Layout",
+        "3:33",
+        "3:23"
+       ],
+       [
+        "description",
+        "The base element: a positioned, styled rectangle that can hold other elements.",
+        "3:54",
+        "3:41"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -15773,7 +15963,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_pixel.xml",
-   "sha256": "4649bdb131e379be38a5c3ea6e8e996ebc944f2ccc1a85b6f7d357071180c3c8",
+   "sha256": "08ec2e6d6add98f1423b156210aebf80364a044f2520d4e720519928ef98a163",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -15792,7 +15982,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "8:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Pixel",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:32",
+        "3:22"
+       ],
+       [
+        "description",
+        "A single pixel.",
+        "3:54",
+        "3:41"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -15922,7 +16131,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_progress_bar.xml",
-   "sha256": "3f476fc30d3e4a6ac8043fd1c9aebb6a9c8174eb8ad9f4a67d7612a580599336",
+   "sha256": "8faa675a87baefbd12d43d5d5da95a20091378986215e65b5a489cc4862dafaa",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -15947,7 +16156,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "17:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Progress bar",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Indicators",
+        "3:39",
+        "3:29"
+       ],
+       [
+        "description",
+        "A bar filled in proportion to a value, optionally animated and labelled with a percentage.",
+        "3:64",
+        "3:51"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -16185,7 +16413,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_switch.xml",
-   "sha256": "f2b47abdd6841368e8147bffa6f33d9a0a7832229616aa43edbe88ba47dda3c8",
+   "sha256": "8ebac227f25eaf86b82259e5ef22f702e4e3dd145a0c66da8e42351a175f2c2c",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -16210,7 +16438,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "7:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Switch",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Controls",
+        "3:33",
+        "3:23"
+       ],
+       [
+        "description",
+        "An on/off toggle showing a boolean value.",
+        "3:56",
+        "3:43"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -16286,7 +16533,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_triangle.xml",
-   "sha256": "bf44b91ba6858095d080b2e569b661951696d037a2b810c15ffdb193bf108a90",
+   "sha256": "e26d60c629033b4c2cc5a5db14c7b2948a1af9efd38cdee0a2360d5428a07073",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -16305,7 +16552,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "11:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Triangle",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:35",
+        "3:25"
+       ],
+       [
+        "description",
+        "A triangle between three points, filled or outlined.",
+        "3:57",
+        "3:44"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -16588,7 +16854,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_vline.xml",
-   "sha256": "52b94d2f5084fa4859222888cad6cadb3ce15e58f8445d55c21c300db6193de5",
+   "sha256": "fd034da78146958f6bead49a39175ba6283b2e8b943eb91ac4be4dcb149be8af",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -16607,7 +16873,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "10:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Vertical line",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Drawing",
+        "3:40",
+        "3:30"
+       ],
+       [
+        "description",
+        "A vertical line of a given height.",
+        "3:62",
+        "3:49"
+       ]
+      ],
       "comments": [],
       "children": [
        {
@@ -16797,7 +17082,7 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_xbm.xml",
-   "sha256": "37aafc283b62b3b6abdc30c664ad5308b029c1c00551bf1f899722e17747e76f",
+   "sha256": "30d9f210a3b9aad97229dab85eaa11dc20ab9ac33250f67fce9a44d4d8d9594a",
    "root": {
     "name": "widget",
     "loc": "2:1",
@@ -16822,7 +17107,26 @@
       "name": "api",
       "loc": "3:3",
       "endLoc": "9:3",
-      "attributes": [],
+      "attributes": [
+       [
+        "label",
+        "Bitmap",
+        "3:15",
+        "3:8"
+       ],
+       [
+        "category",
+        "Images",
+        "3:33",
+        "3:23"
+       ],
+       [
+        "description",
+        "A monochrome XBM image.",
+        "3:54",
+        "3:41"
+       ]
+      ],
       "comments": [
        " `bitmap_mode` is NOT declared here: u8g2gl_obj declares it identically\n         and every element inherits it. A redeclaration would be a second\n         spelling of one property, which is what [D-17] exists to prevent. "
       ],

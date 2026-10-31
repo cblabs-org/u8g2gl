@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="wd_service_list" extends="u8g2gl_obj">
-    <api>
+    <api label="Service list" category="Text" description="A table of departures, one service per row, scrolling page by page when the rows do not fit.">
         <prop name="font" type="font" required="true" help="Font used to render table cells." />
         <prop name="max_rows" type="int" default="16" help="Row capacity. Determines allocated RAM." />
         <prop name="max_cols" type="int" default="6" help="Maximum columns per row. Determines allocated RAM." />

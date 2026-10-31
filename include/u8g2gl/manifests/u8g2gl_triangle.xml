@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_triangle">
-  <api>
+  <api label="Triangle" category="Drawing" description="A triangle between three points, filled or outlined.">
     <prop name="x0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 X coordinate" />
     <prop name="y0" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 0 Y coordinate" />
     <prop name="x1" type="int" draw="u8g2gl_draw_triangle" required="true" help="Vertex 1 X coordinate" />

@@ -46,7 +46,7 @@ recorded there (rule 00). Read `.agents/rules/03-versioning.md` before WO2.
 
 # WO3 — metadata (`u8g2gl-s1/wo3-metadata`)
 
-- [ ] Add all three attributes to every framework manifest, and to the departures fixture's
+- [x] Add all three attributes to every framework manifest, and to the departures fixture's
       project widgets (ruling 4). List the category set in the report.
 
 # WO4 — the palette (`u8g2gl-s1/wo4-palette`)

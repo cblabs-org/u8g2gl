@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_box">
-  <api>
+  <api label="Box" category="Drawing" description="A filled or outlined rectangle, optionally with rounded corners.">
     <prop name="x" type="int" draw="u8g2gl_draw_box" help="Left edge" />
     <prop name="y" type="int" draw="u8g2gl_draw_box" help="Top edge" />
     <prop name="width" type="int" draw="u8g2gl_draw_box" help="Length in pixels" />

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_ellipse">
-  <api>
+  <api label="Ellipse" category="Drawing" description="An ellipse, outlined or filled, whole or in quarters.">
     <prop name="x" type="int" draw="u8g2gl_draw_ellipse" help="Center X coordinate" />
     <prop name="y" type="int" draw="u8g2gl_draw_ellipse" help="Center Y coordinate" />
     <prop name="rx" type="int" draw="u8g2gl_draw_ellipse" required="true" help="Horizontal radius in pixels" />

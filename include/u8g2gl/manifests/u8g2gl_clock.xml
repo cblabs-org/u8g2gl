@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_clock" extends="u8g2gl_obj">
-  <api>
+  <api label="Clock" category="Text" description="A time of day shown as text in a chosen format, with an optional blinking colon.">
     <prop name="time" type="int" setter="set_time" default="0"
           help="Initial epoch time in seconds." />
     <prop name="format" type="enum" setter="set_format"

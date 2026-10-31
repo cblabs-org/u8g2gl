@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_circle">
-  <api>
+  <api label="Circle" category="Drawing" description="A circle or filled disc, whole or in quarters.">
     <prop name="x" type="int" draw="u8g2gl_draw_circle" help="Center X coordinate" />
     <prop name="y" type="int" draw="u8g2gl_draw_circle" help="Center Y coordinate" />
     <prop name="radius" type="int" draw="u8g2gl_draw_circle" required="true" help="Circle radius in pixels" />

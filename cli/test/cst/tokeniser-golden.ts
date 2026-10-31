@@ -37,6 +37,10 @@
  *              move no recorded location are applied this way. Schema 0.5's
  *              move of the fixtures from `schema="0.4"` to `"0.5"` is one: a
  *              same-length value, so the record changes in that value alone.
+ *              Its palette metadata is another: `label`, `category` and
+ *              `description` were added to each framework manifest's own
+ *              `<api>` line, where only the closing `>` follows them, so the
+ *              record gains those three attributes and nothing else moves.
  *
  * Exports:
  *   Golden shapes:

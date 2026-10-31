@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_vline">
-  <api>
+  <api label="Vertical line" category="Drawing" description="A vertical line of a given height.">
     <prop name="x" type="int" draw="u8g2gl_draw_vline" help="Left edge" />
     <prop name="y" type="int" draw="u8g2gl_draw_vline" help="Top edge" />
     <prop name="height" type="int" draw="u8g2gl_draw_vline" help="Length in pixels" />

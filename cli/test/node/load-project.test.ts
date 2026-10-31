@@ -67,7 +67,7 @@ describe('loadProject (PR-04 WO5b)', () => {
 
   it('prints the source line of a diagnostic inside a bundled framework manifest (WO1 F9)', () => {
     const broken = FRAMEWORK_MANIFESTS.map((m) =>
-      m.filename === 'u8g2gl_box.xml' ? { ...m, xml: m.xml.replace('<api>', '<api>\n        <bogus_child />') } : m,
+      m.filename === 'u8g2gl_box.xml' ? { ...m, xml: m.xml.replace('</api>', '  <bogus_child />\n  </api>') } : m,
     );
     const loaded = loadProject(createProject(), { frameworkManifests: broken });
 

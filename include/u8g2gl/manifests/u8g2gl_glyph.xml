@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_glyph" extends="u8g2gl_obj">
-  <api>
+  <api label="Glyph" category="Images" description="One character drawn from a font, such as an icon from an icon font.">
     <prop name="glyph" type="int" setter="set_glyph" required="true"
           help="16-bit glyph codepoint from font table." />
     <prop name="font" type="font" setter="set_font" required="true"

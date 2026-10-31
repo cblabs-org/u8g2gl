@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_obj">
-  <api>
+  <api label="Object" category="Layout" description="The base element: a positioned, styled rectangle that can hold other elements.">
     <prop name="x" type="int" setter="set_coords" help="Left edge in device pixels." />
     <prop name="y" type="int" setter="set_coords" help="Top edge in device pixels." />
     <prop name="width" type="int" setter="set_coords" help="Width in device pixels." />

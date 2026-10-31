@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_progress_bar" extends="u8g2gl_obj">
-  <api>
+  <api label="Progress bar" category="Indicators" description="A bar filled in proportion to a value, optionally animated and labelled with a percentage.">
     <prop name="value" type="int" setter="set_value" default="0"
           help="Target progress percentage (0..100)." />
     <prop name="fill_style" type="enum" setter="set_fill_style"
