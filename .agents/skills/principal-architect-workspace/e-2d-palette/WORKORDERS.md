@@ -44,7 +44,7 @@ measures).
 
 # WO3 — align and distribute (`u8g2gl-e2d/wo3-align`)
 
-- [ ] The toolbar (ruling 6), every command unit-tested on literal, anchored and refusing
+- [x] The toolbar (ruling 6), every command unit-tested on literal, anchored and refusing
       elements; e2e for each from the canvas.
 
 # WO4 — font heights (`u8g2gl-e2d/wo4-font-heights`)
