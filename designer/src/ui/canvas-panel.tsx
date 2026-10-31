@@ -30,6 +30,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CanvasView } from '../canvas/canvas-view';
 import { CanvasEditor } from '../editing/canvas-editor';
 import { planInsert } from '../editing/insert-element';
+import { projectNames } from '../documents/element-names';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -77,6 +78,10 @@ export function CanvasPanel(): React.JSX.Element {
         return planInsert({ tag, file, x, y, texts: workspace.documents.texts(), base: run.result, assets: run.assets });
       },
       log: (line) => workspace.log(line),
+      takenNames: () => {
+        const run = loop.lastRun.get();
+        return run === undefined ? new Set<string>() : projectNames(run.result.model);
+      },
     });
     return () => {
       gestures.dispose();

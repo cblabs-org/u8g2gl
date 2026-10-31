@@ -20,6 +20,8 @@
  *                selected element: a **move** of the selection;
  *              - on an unselected element: it is selected (the click cycle's
  *                next element there), and the press moves it;
+ *              - with Alt, a move is a **duplicate**: the drag moves copies of
+ *                the selection, which are selected when it ends;
  *              - on empty canvas: a **marquee**.
  *              A press is a click until it travels {@link MARQUEE_THRESHOLD}
  *              screen pixels; a click on a selected element cycles the
@@ -30,7 +32,8 @@
  *              undo stop. The guides it lies on are drawn on the overlay, and
  *              an axis that refuses (an expression, a binding) says why in a
  *              tip at the pointer while the other axis still follows. Arrow
- *              keys nudge (1 px, Shift 8 px), grouped by the editor. While the
+ *              keys nudge (1 px, Shift 8 px), grouped by the editor; Delete or
+ *              Backspace deletes the selection as one undo stop. While the
  *              document is not well-formed (`canvasEditing` false, §3.8)
  *              nothing writes: the press still selects, and the cursor and the
  *              tip say why.
@@ -61,6 +64,7 @@ import type { CanvasEditor } from '../editing/canvas-editor';
 import type { InsertPlan } from '../editing/insert-element';
 import { PALETTE_DRAG_TYPE } from '../palette/palette-entries';
 import { DragEdit } from '../editing/drag-edit';
+import { deleteEdits } from '../editing/structure-edits';
 import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Handle } from '../editing/resize-rules';
@@ -112,10 +116,12 @@ export interface GestureHost {
   readonly planInsert: (tag: string, file: string, x: number, y: number) => InsertPlan | undefined;
   /** Appends a line to Output. */
   readonly log: (line: string) => void;
+  /** Every name the project uses now, which a duplicate's copies must avoid. */
+  readonly takenNames: () => ReadonlySet<string>;
 }
 
 /** What a press does if it becomes a drag, decided at pointer-down. */
-type Owner = { readonly kind: 'move' } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
+type Owner = { readonly kind: 'move'; readonly duplicate: boolean } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
 
 /** A press in progress. */
 interface Press {
@@ -218,7 +224,7 @@ export class CanvasGestures {
       // --- Step 2: An element moves; an unselected one is selected first ---
       const stack = hitsAt(targets, x, y);
       if (stack.length > 0) {
-        owner = { kind: 'move' };
+        owner = { kind: 'move', duplicate: event.altKey };
         const selected = this.current(file);
         if (!stack.some((name) => selected.includes(name))) {
           const name = this.cycler.click(targets, x, y);
@@ -289,7 +295,7 @@ export class CanvasGestures {
       press.drag = new DragEdit(
         this.host.editor,
         { file, names: this.current(file), bounds: this.host.bounds.get(), placements: this.host.placements(), display: this.host.display() },
-        owner.kind === 'resize' ? owner : { kind: 'move' },
+        owner.kind === 'resize' ? owner : owner.kind === 'move' && owner.duplicate ? { kind: 'duplicate', taken: this.host.takenNames } : { kind: 'move' },
       );
     }
 
@@ -317,9 +323,11 @@ export class CanvasGestures {
     this.host.showGuides([]);
     const { file, targets } = this.host.targets.get();
 
-    // --- Step 1: A move or a resize: close its one undo stop ---
+    // --- Step 1: A move or a resize: close its one undo stop; a duplicate's copies become the selection ---
     if (press.owner.kind !== 'marquee' && press.dragging) {
       press.drag?.end();
+      const copies = press.drag?.copies() ?? [];
+      if (copies.length > 0 && press.file !== undefined) this.host.selection.select(press.file, copies, 'canvas');
       return;
     }
     if (file === undefined) return;
@@ -363,13 +371,19 @@ export class CanvasGestures {
   }
 
   // key
-  // Esc clears the selection, and any marquee in progress; an arrow nudges it.
+  // Esc clears the selection, and any marquee in progress; an arrow nudges it;
+  // Delete or Backspace deletes it.
   private key(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
       event.preventDefault();
       this.cancel();
       this.cycler.reset();
       this.host.selection.clear();
+      return;
+    }
+    if ((event.key === 'Delete' || event.key === 'Backspace') && !event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      event.preventDefault();
+      this.remove();
       return;
     }
     const step = NUDGES[event.key];
@@ -441,6 +455,22 @@ export class CanvasGestures {
     this.cycler.reset();
     this.host.selection.select(file, [plan.name], 'canvas');
     this.host.element.focus({ preventScroll: true });
+  }
+
+  // remove
+  // Deletes the selected elements, as one undo stop, and clears the selection.
+  // A referenced element is deleted all the same; what then fails to resolve
+  // shows in Problems.
+  private remove(): void {
+    const { file, names } = this.host.selection.current.get();
+    if (file === undefined || names.length === 0 || this.press !== undefined) return;
+    if (!this.host.canvasEditing.get()) {
+      this.host.element.title = EDITING_OFF_REASON;
+      return;
+    }
+    this.host.editor.apply(file, (text) => deleteEdits(parseCst(text, file).cst, names));
+    this.cycler.reset();
+    this.host.selection.clear();
   }
 
   // hover

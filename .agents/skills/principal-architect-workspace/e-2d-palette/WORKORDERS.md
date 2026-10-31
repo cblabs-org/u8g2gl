@@ -39,8 +39,8 @@ measures).
 
 # WO2 — delete and duplicate (`u8g2gl-e2d/wo2-delete-duplicate`)
 
-- [ ] Delete (ruling 4), single and multi, with the whitespace rule unit-tested.
-- [ ] Alt-drag duplicate (ruling 5), single and multi; refusals as a move's.
+- [x] Delete (ruling 4), single and multi, with the whitespace rule unit-tested.
+- [x] Alt-drag duplicate (ruling 5), single and multi; refusals as a move's.
 
 # WO3 — align and distribute (`u8g2gl-e2d/wo3-align`)
 
