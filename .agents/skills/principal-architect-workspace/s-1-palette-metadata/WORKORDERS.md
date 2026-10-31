@@ -166,3 +166,18 @@ Left alone:
    - two tests that edited the bare `<api>` tag.
    - `e2e/support/shell.ts`: `dropTag` scrolls an entry into view first, because the taller Palette pushed Drawing below the fold.
 8. **Generated output in the departures fixture** (`generated/`, stamped generator 0.13.1) is not a golden. It was left as it was.
+
+## Addendum: ruling 8 applied (worker, 2026-10-31)
+
+- **The guard is the generator's schema.** `u8g2gl_generated_config.h` now asserts the generator's own schema, `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5)`, for every version the validator accepts. Each file's `// schema:` stamp still records the version the project declared.
+- **The schema version is defined once.** It lives in a new neutral module, `cli/src/core/schema/schema-version.ts`. `CURRENT_SCHEMA` holds the major and minor, and `CURRENT_SCHEMA_VERSION` is the string derived from them. The validator and the generator both import it, as SKILL.md §4 asks for a shared table.
+- **One code path removed.** The emitter's "not 'major.minor'" diagnostic could no longer be reached, so it is gone.
+- **New test.** `cli/test/generator/schema-guard.test.ts` generates the emit-project fixture declared as 0.4 and as 0.5. Both guards read `(0, 5)` and each stamp keeps the declared version. It also checks `CURRENT_SCHEMA` against `U8G2GL_SCHEMA_VERSION_MAJOR` and `_MINOR` in the runtime header.
+- **Version-guard tests unchanged.** They use literals or the runtime's own macros, and none of them assumed the declared version.
+- **design_spec §15.4.** The note telling 0.4 authors to re-declare 0.5 is replaced by "0.4 projects keep working unchanged", with the reason.
+- **Goldens: none moved.** `refresh-goldens.mjs` leaves an empty diff. Every golden fixture already declares 0.5, and the kept 0.4 fixture is a validator fixture with no golden.
+- **Runs, one at a time:**
+  - CLI: 2549 passed, 6 skipped (118 files); lint and tsc clean.
+  - Goldens subset: 54 passed (emit-golden, compile-fixture, determinism, schema-guard, palette-metadata-output).
+  - C++: 512 tests, 1 skipped as before, zero warnings; all 10 VersionGuard cases pass.
+- **e2e not re-run**, because no designer file changed.

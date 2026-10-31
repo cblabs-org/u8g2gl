@@ -2019,7 +2019,7 @@ This is the mechanism by which "diagnostics are the product" (§1.2) actually pa
 
 **0.4 → 0.5 is additive**, so it has no migration table. 0.5 adds only the palette metadata on `<api>` (§13.1); a 0.4 document means exactly what it meant, and the CLI accepts both `0.4` and `0.5`. What a 0.4 project may not do is use 0.5's additions: each `label`, `category` or `description` in one of its own manifests is `U8G2GL_NEWER_SCHEMA_REQUIRED`, naming `schema="0.5"` as the fix, never silently accepted. The framework's own manifests carry the metadata and are not held to the project's version, because the project did not write them.
 
-The runtime implements one schema minor at a time (§16), and generated code asserts the version the project declares. So a 0.4 project still validates, but code generated from it asserts `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4)`, which a 0.5 runtime refuses by name at compile time. Declaring `schema="0.5"` — one line, and always safe for an additive bump — is the fix.
+**0.4 projects keep working unchanged.** The generated schema guard asserts the schema the generator wrote for, not the one the project declares (§16, `rules/03-versioning.md`): every version the CLI accepts is the current schema or an older minor that 0.5 only adds to, so code generated from a 0.4 project asserts `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5)` and builds against the 0.5 runtime. Each generated file's `// schema:` stamp still records the version the project declared.
 
 **0.3 → 0.4 is breaking**, and the CLI must refuse 0.3 naming each change rather than failing obscurely:
 

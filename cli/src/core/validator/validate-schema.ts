@@ -65,12 +65,8 @@ import { COLOR_VALUES, STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type 
 import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
+import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
 
-/**
- * The schema version this CLI writes for: the one an unknown or superseded
- * version is told to declare.
- */
-const CURRENT_SCHEMA_VERSION = '0.5';
 
 /**
  * Every schema version this CLI accepts. 0.5 only adds to 0.4 (§15.4), so a
