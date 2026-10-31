@@ -49,7 +49,7 @@ measures).
 
 # WO4 — font heights (`u8g2gl-e2d/wo4-font-heights`)
 
-- [ ] Ruling 7: the generated height table, its test, the panel showing heights for built-ins.
+- [x] Ruling 7: the generated height table, its test, the panel showing heights for built-ins.
       Report whether any golden or the CLI version moved.
 
 # WO5 — Monaco split and the gates (`u8g2gl-e2d/wo5-split-gates`)

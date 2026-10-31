@@ -54,6 +54,10 @@ import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
 import { panelLayout, sharedLayout, type FieldSpec, type PanelLayout } from './panel-layout';
+import FONT_HEIGHTS from '@u8g2gl/data/u8g2-font-heights.json' with { type: 'json' };
+
+/** Each bundled U8G2 font's pixel height, by symbol, as the catalogue build read it. */
+const BUILTIN_FONT_HEIGHTS: Readonly<Record<string, number | undefined>> = FONT_HEIGHTS;
 
 /** The header: what is selected, and anything said about it as a whole. */
 export interface PanelSummary {
@@ -70,7 +74,7 @@ export interface PanelSummary {
 /** A font the project declares, and its pixel height where the browser can know it. */
 export interface FontOption {
   readonly name: string;
-  /** Height in pixels, or undefined when the designer has no glyph data for it. */
+  /** Height in pixels; undefined for a `<bdf>` font not compiled yet, or a built-in U8G2 does not bundle. */
   readonly height: number | undefined;
 }
 
@@ -128,13 +132,6 @@ const SCREEN_NAME_FIELD: FieldSpec = {
 
 /** The [Q-19] rule's line: no figure for a cost §18 cannot compute. */
 const PROJECT_COST_NOTE = 'RAM cost not reported for project widgets ([Q-19])';
-
-/**
- * Said once when a font field's choices include a font whose height the page
- * cannot know: a `<builtin>` font's glyph data is compiled into the editor
- * Wasm, and the page has no copy of it to measure.
- */
-const FONT_HEIGHT_NOTE = 'Font heights are shown for <bdf> fonts; a built-in font’s glyphs are in the renderer, not the page.';
 
 /** Nothing to show yet. */
 const WAITING: PanelView = { kind: 'empty', message: 'Waiting for the first frame…' };
@@ -304,12 +301,10 @@ export class PanelController {
 
     // --- Step 3: The header and each field's state ---
     const project = manifests.some((manifest) => manifest.origin === 'project');
-    const hasFont = layout.sections.some((section) => section.rows.flat().some((spec) => spec.type === 'font'));
-    const heightUnknown = hasFont && this.options.get().fonts.some((font) => font.height === undefined);
     view.summary.set({
       title: facts.length === 1 ? layout.tag : `${facts.length} elements`,
       subtitle: facts.map((fact) => fact.name).join(', '),
-      notes: [...(project && !layout.drawing ? [PROJECT_COST_NOTE] : []), ...(heightUnknown ? [FONT_HEIGHT_NOTE] : [])],
+      notes: project && !layout.drawing ? [PROJECT_COST_NOTE] : [],
       problems: facts.flatMap((fact) => fact.problems.get(ELEMENT_PROBLEMS) ?? []),
     });
     const context = { wellFormed: run.result.wellFormed, box: boxOf(facts.map((fact) => run.result.bounds.get(fact.name))) };
@@ -439,13 +434,17 @@ function boxOf(rects: readonly (Rect | undefined)[]): Rect | undefined {
 // optionsOf
 // The editors' choices from a run's globals, drawn screen and compiled assets.
 // A compiled `<bdf>` font's height is its glyph box's (byte 10 of a U8G2 font
-// header, max_char_height); a `<builtin>` font's glyphs are in the editor Wasm,
-// not in the page, so its height is not known here.
+// header, max_char_height). A `<builtin>` font's glyphs are in the editor Wasm,
+// not in the page, so its height is the same byte read from U8G2's own font
+// data when the catalogue was built (`u8g2-font-heights.json`).
 function optionsOf(run: CompletedRun): PanelOptions {
   const { globals, screens } = run.result.model;
   const screen = screens.find((s) => s.name === run.result.screen);
   return {
-    fonts: globals.fonts.map((font) => ({ name: font.name, height: run.assets?.fonts.get(font.name)?.bytes[10] })),
+    fonts: globals.fonts.map((font) => ({
+      name: font.name,
+      height: font.kind === 'builtin' ? BUILTIN_FONT_HEIGHTS[font.name] : run.assets?.fonts.get(font.name)?.bytes[10],
+    })),
     subjects: globals.subjects.map((subject) => ({ name: subject.name, type: subject.type })),
     styles: [...globals.styles.map((style) => style.name), ...(screen?.styles ?? []).map((style) => style.name)],
     images: globals.images.map((image) => {
