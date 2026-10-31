@@ -37,10 +37,10 @@ button { font: inherit; color: inherit; }
 
 .fatal { display: grid; place-items: center; padding: 2rem; color: var(--error); font-size: 15px; }
 
-/* --- The ui_spec §6 grid: activity bar, sidebar, editor area; status bar below --- */
+/* --- The ui_spec §6 grid: activity bar, sidebar, editor area, property panel; status bar below --- */
 .shell {
   display: grid;
-  grid-template-columns: 44px 230px 1fr;
+  grid-template-columns: 44px 230px 1fr 280px;
   grid-template-rows: 1fr 24px;
   height: 100%;
 }
