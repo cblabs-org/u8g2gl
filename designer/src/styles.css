@@ -183,10 +183,10 @@ button { font: inherit; color: inherit; }
   user-select: none;
 }
 .palette-tag:hover { background: #2c3036; }
-.palette-label { margin-right: 6px; }
+.palette-label { margin-right: 6px; white-space: nowrap; }
 .palette-tag-name,
 .palette-label.is-tag { font-family: ui-monospace, Menlo, monospace; }
-.palette-tag-name { color: var(--text-dim); font-size: 11px; }
+.palette-tag-name { display: inline-block; color: var(--text-dim); font-size: 11px; }
 .palette-description { display: block; color: var(--text-dim); font-size: 11px; line-height: 1.3; }
 
 /* --- The canvas toolbar's align and distribute buttons (ui_spec §8) --- */
