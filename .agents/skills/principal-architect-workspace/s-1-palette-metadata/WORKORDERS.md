@@ -61,8 +61,108 @@ recorded there (rule 00). Read `.agents/rules/03-versioning.md` before WO2.
 - [x] Update the docs under ruling 6.
 - [x] Spawn the `readability-reviewer` on S-1's diff against the base. Resolve P1–P3, and decide
       P4 with reasons.
-- [ ] Screenshots under `tmp/s1/`: the palette with categories, the filter matching a
+- [x] Screenshots under `tmp/s1/`: the palette with categories, the filter matching a
       description, and a project widget's entry.
-- [ ] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
+- [x] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
       then `build:e2e`; designer unit; e2e; production and its no-hook grep. Then write a
       completion report at the end of this file.
+
+# Completion report (worker, 2026-10-31)
+
+## Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-s1/wo1-schema` | `5797998` |
+| WO2 | `u8g2gl-s1/wo2-versions` | `491f365` |
+| WO3 | `u8g2gl-s1/wo3-metadata` | `8a4bfe9` |
+| WO4 | `u8g2gl-s1/wo4-palette` | `44f9959` |
+| WO5 | `u8g2gl-s1/wo5-docs-review` | `0159ef2` (docs), `6b1f5d9` (review fixes), `d20914b` (Palette wrapping), and this report |
+
+Nothing is pushed, tagged or published.
+
+## Versions
+
+| | Before | After |
+|---|---|---|
+| Schema | 0.4 | 0.5 (0.4 still accepted) |
+| Runtime | 0.10.0 | 0.11.0 (`U8G2GL_SCHEMA_VERSION_MINOR` 5; header, CMakeLists.txt, library.json) |
+| CLI | 0.13.5 | 0.14.0 |
+
+## Suites, before and after (one at a time)
+
+| Suite | Before | After |
+|---|---|---|
+| Home-path guard (+ self-test 11/11) | clean | clean |
+| CLI `npm test` | 2521 passed, 6 skipped (115 files) | 2546 passed, 6 skipped (117 files) |
+| CLI lint + tsc | clean | clean |
+| CLI Emscripten tests (toolchain present) | 50 | 50 |
+| C++ ctest | 512, 1 skipped (SizeOfReport.ThirtyTwoBitTarget) | 512, 1 skipped; zero warnings |
+| Wasm snapshot / placeholder / last-error | pass | pass |
+| Designer unit | 126 | 128 |
+| Designer e2e | 67 | 68 |
+| Production build: no-hook grep / e2e | clean / 3 | clean / 3 |
+
+E2e runs: 22:13–22:15, 22:34–22:36 and 22:42–22:44. `pmset -g log` shows no Sleep, DarkWake or Wake after 17:10 that day, so none of them is void.
+
+## Goldens
+
+They were regenerated with `refresh-goldens.mjs` (emit-project expected, generated_fixture generated and generated_editor). 20 files changed, 26 lines in and 26 out, and **every one is a version stamp**:
+
+- `// schema: 0.4` → `0.5` (19 lines)
+- `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4)` → `(0, 5)` (2 lines)
+- `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 10)` → `(0, 11)` (2 lines)
+- the floor in the `#error` text, 0.10 → 0.11 (2 lines)
+- `"schema": "0.4"` → `"0.5"` in ui_scene.json (1 line)
+
+WO3's metadata moved no golden. `palette-metadata-output.test.ts` proves this for both fixtures and every target. The xtensa corpus and ctl_corpus were synced by the same stamp edits. They were not compiled locally, because the pinned PlatformIO platform is not installed and installing it would mean a download.
+
+## Category set
+
+Layout, Text, Images, Controls, Indicators, Drawing.
+
+- Object → Layout
+- Label and Clock → Text
+- Glyph and Bitmap → Images
+- Button and Switch → Controls
+- Progress bar → Indicators
+- all 8 drawing elements → Drawing
+- the departures widgets: Service list → Text; Probe box and Train formation → Indicators
+
+## Render rule
+
+`e2e/palette.spec.ts` gives `Palette renders: typing 0, dragging 0`. That covers four keystrokes, which the test checks reached the buffer, and two canvas drags, the first checked to have moved row0. The self-test shows a filter change does re-render the Palette.
+
+## Screenshots (tmp/s1/, not committed)
+
+`palette-categories.png`, `palette-filter-description.png` ("rounded corners" leaves only Box), `palette-project-widget.png`.
+
+## Readability review
+
+No P1. Resolved:
+
+- **P2-1:** the bound-position diagnostic and its comment now say "this schema" instead of "schema 0.4".
+- **P3-2:** a workspace citation removed.
+- **P4-1:** a why-comment tying `BEFORE_PALETTE_METADATA` to `PALETTE_METADATA_SINCE`.
+- **P4-3:** the diagnostic doc points at the limits table.
+
+Left alone:
+
+- **P2-1's design_spec §7.2/§21 and `u8g2gl_obj.h` sites:** outside ruling 7's boundary and ruling 6's doc list. Those sentences still hold, since 0.5 changed nothing there.
+- **P3-1, the illustrative §13.12 header sample:** outside ruling 6's list, and its generator version is just as illustrative.
+- **P4-2, the ternary:** reads clearly as it is.
+
+## Deviations and findings
+
+1. **A 0.4 project validates but its generated code does not compile against runtime 0.11.** The generator emits `U8G2GL_REQUIRE_SCHEMA_VERSION` from the project's declared schema, and while the major is 0 the runtime compares the minor exactly. I did not change the generator: the rulings do not cover it, and it is a design question. design_spec §15.4 now states this behaviour and its one-line fix. **PA decision needed:** keep it, or have the generator assert the current schema for any accepted older minor.
+2. **Line breaks are refused in all three attributes**, not only in `description`. I read ruling 1's "plain text" that way for `label` and `category`.
+3. **New diagnostic codes:** `U8G2GL_INVALID_PALETTE_METADATA` and `U8G2GL_NEWER_SCHEMA_REQUIRED`.
+4. **0.3's refusal is unchanged** apart from pointing at the current version: its message and suggestion now say 0.5.
+5. **Category order is by first appearance in the whole registry**, not per group, so a heading keeps its place across groups.
+6. **Tokeniser goldens** (`cli/test/cst/tokeniser-*.json`) record the old tokeniser's output by file hash and cannot be regenerated. For the 8 fixtures that moved to 0.5 and the 16 framework manifests, each entry carries the same mechanical edit and the new hash: a same-length value, or three attributes added on the `<api>` line, so no recorded location moves. Assertion scripts checked that each file's only change was that edit. `tokeniser-golden.ts` documents it.
+7. **Necessary touches outside the literal boundary list:**
+   - `library.json` version: CMake refuses a mismatch.
+   - `test/version_guard` and `test/CMakeLists.txt`: `schema_0_4` became `schema_0_5`, and `stale_minor` now names 0.5.
+   - two tests that edited the bare `<api>` tag.
+   - `e2e/support/shell.ts`: `dropTag` scrolls an entry into view first, because the taller Palette pushed Drawing below the fold.
+8. **Generated output in the departures fixture** (`generated/`, stamped generator 0.13.1) is not a golden. It was left as it was.
