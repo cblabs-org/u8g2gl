@@ -974,7 +974,7 @@ function checkBoundContainers(
 
 // checkBoundPosition
 // Ruling 1c (Chief Architect, 2026-09-19; §7.2, §21 Q-16): a container whose own
-// position is bound may have no children in schema 0.4. Reported once per
+// position is bound may have no children (schema 0.4 and 0.5). Reported once per
 // container, at its binding. A container fixed by a template — written inside a
 // composite's `<view>` and bound from a literal — is the template's defect,
 // reported once however often the composite is used; one whose binding comes
@@ -1009,7 +1009,7 @@ function checkBoundPosition(
   const count = container.children.length;
   const diagnostic = createGeomDiagnostic(
     DIAGNOSTIC_CODES.BOUND_POSITION_HAS_CHILDREN,
-    `Container '${name}' <${node.tag}> binds its position with '${binding}', so in schema 0.4 it may have no ` +
+    `Container '${name}' <${node.tag}> binds its position with '${binding}', so in this schema it may have no ` +
       `children, and it has ${count} (the first is '${childName}'${first === undefined ? '' : ` <${first.tag}>`}). ` +
       `Children are positioned at build time and there is no reflow yet, so they could not follow the container ` +
       `when the binding moves it (§7.2). Bind the children's own positions instead, or see §21 Q-16 for how ` +

@@ -11,7 +11,7 @@
  *              attribute values match expected primitive types and enum sets.
  *              Accepts schema versions "0.4" and "0.5", refusing the superseded
  *              "0.3" with a specific migration diagnostic rather than a generic
- *              mismatch (§15.4, PR-3R WO8). 0.5 is additive: it adds palette
+ *              mismatch (§15.4). 0.5 is additive: it adds palette
  *              metadata (`label`, `category`, `description`) to `<api>`, which
  *              this pass holds to its limits, and which a project still
  *              declaring 0.4 is told it may not use until it says 0.5.
@@ -82,7 +82,12 @@ const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', CURRENT_SC
 /** The first schema version whose `<api>` may carry palette metadata. */
 const PALETTE_METADATA_SINCE = '0.5';
 
-/** The accepted schema versions that predate palette metadata. */
+/**
+ * The accepted schema versions that predate palette metadata. Kept with
+ * PALETTE_METADATA_SINCE: every accepted version below it belongs here, so a
+ * schema bump that accepts another older version must add it, or that
+ * version's projects would use the metadata unchecked.
+ */
 const BEFORE_PALETTE_METADATA: ReadonlySet<string> = new Set(['0.4']);
 
 /**

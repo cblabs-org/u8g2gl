@@ -377,7 +377,8 @@ export const DIAGNOSTIC_CODES = {
   /**
    * An `<api>`'s palette metadata (schema 0.5) breaks its rule: `label`,
    * `category` or `description` is empty once trimmed, longer than its limit
-   * (32, 24 and 120 characters), or runs over more than one line. An empty
+   * (`PALETTE_METADATA_LIMITS` in validate-schema.ts), or runs over more than
+   * one line. An empty
    * value is refused rather than ignored because an author who writes the
    * attribute means something by it. Located at the value; the message names
    * the attribute, the rule and the length.
