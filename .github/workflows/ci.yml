@@ -109,7 +109,7 @@ jobs:
           set -o pipefail
           source "$HOME/emsdk/emsdk_env.sh"
           cd cli
-          npx vitest run test/node/design/build test/node/toolchain 2>&1 | tee "$RUNNER_TEMP/wasm-cli-tests.txt"
+          npx vitest run test/node/design/build test/node/design/test-run test/node/toolchain 2>&1 | tee "$RUNNER_TEMP/wasm-cli-tests.txt"
           if grep -q "skipped, no Emscripten" "$RUNNER_TEMP/wasm-cli-tests.txt"; then
             echo "::error::the Emscripten-dependent CLI tests were skipped: no toolchain detected"
             exit 1

@@ -8,8 +8,9 @@
  *          (a fixture with custom widgets) generated for its firmware target,
  *          compiled with its widgets' C++ and the runtime at -O3, and its
  *          real frame loop run on the memory display; its object sharing with
- *          the editor Wasm build; a compile error located in the widget; and
- *          the harness's refusal to boot twice.
+ *          the editor Wasm build; a compile error located in the widget; the
+ *          harness's refusal to boot twice; and the `test-run` job on the
+ *          design server, testing an unsaved buffer and writing a bug report.
  * Description: Needs Emscripten 5.0.3 (on PATH, or the managed install). Without
  *              one every case here is skipped with a message, so the suite
  *              still passes on a machine that has none. All cases share one
@@ -17,11 +18,15 @@
  */
 
 import { cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildEditorWasm } from '../../../../src/node/design/build/editor-wasm-build.js';
+import { BuildQueue } from '../../../../src/node/design/build-queue.js';
+import { testRunReportRoute } from '../../../../src/node/design/test-run/bug-report.js';
 import { loadHarness } from '../../../../src/node/design/test-run/harness-runner.js';
+import { registerTestRunJob, TEST_RUN_JOB, type TestRunResult } from '../../../../src/node/design/test-run/test-run-job.js';
 import { buildTestRunHarness, HARNESS_FILES, type TestRunBuild } from '../../../../src/node/design/test-run/test-run-build.js';
 import { detectToolchain, type SelectedToolchain } from '../../../../src/node/toolchain/detect-toolchain.js';
 import { nodeToolchainHost } from '../../../../src/node/toolchain/toolchain-host.js';
@@ -171,4 +176,81 @@ describe.skipIf(toolchain === undefined)('the test-run harness build (needs Emsc
     expect(error?.line).toBeLessThanOrEqual(lines);
     expect(error?.column).toBeGreaterThan(0);
   }, 120_000);
+});
+
+describe.skipIf(toolchain === undefined)('the test-run job (needs Emscripten)', () => {
+  let cache: string;
+  let project: string;
+  let queue: BuildQueue;
+  const run = async (params: unknown): Promise<{ id: string; result: TestRunResult }> => {
+    const record = queue.submit(TEST_RUN_JOB, params);
+    await queue.idle();
+    const done = queue.get(record!.id);
+    expect(done?.status, done?.error).toBe('succeeded');
+    return { id: record!.id, result: done!.result as TestRunResult };
+  };
+
+  beforeAll(() => {
+    cache = makeTempDir('job-cache');
+    project = join(makeTempDir('job-departures'), 'project');
+    cpSync(DEPARTURES_PROJECT, project, { recursive: true });
+    queue = new BuildQueue(project);
+    registerTestRunJob(queue, { buildCacheRoot: cache, frameworkRoot: FRAMEWORK_ROOT });
+  });
+  afterAll(removeTempDirs);
+
+  it('runs the saved project: one hashed frame per time, and the versions tested', async () => {
+    const { result } = await run({ screen: 'departures', documents: [] });
+    expect(result.frames.map((frame) => frame.time)).toEqual(TIMES);
+    for (const frame of result.frames) {
+      const bytes = Buffer.from(frame.bytes, 'base64');
+      expect(bytes.length).toBe((256 / 8) * 64);
+      expect(frame.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
+    }
+    expect(result.versions).toMatchObject({ documents: [], emscripten: toolchain!.version });
+    expect(result.versions.generator).toMatch(/^\d+\.\d+\.\d+/);
+  }, 300_000);
+
+  it('tests the unsaved buffer, not the file, and leaves the file as it was', async () => {
+    const path = 'screens/screen_departures.xml';
+    const disk = readFileSync(join(project, path), 'utf8');
+    const saved = await run({ screen: 'departures', documents: [] });
+    const buffer = disk.replace('x="190" y="51"', 'x="150" y="51"');
+    expect(buffer).not.toBe(disk);
+    const unsaved = await run({ screen: 'departures', documents: [{ path, content: buffer, version: '42' }] });
+    expect(unsaved.result.frames[0]!.sha256).not.toBe(saved.result.frames[0]!.sha256);
+    expect(unsaved.result.versions.documents).toEqual([{ path, version: '42' }]);
+    expect(readFileSync(join(project, path), 'utf8')).toBe(disk);
+    // And back: the saved text again gives the saved frames.
+    const again = await run({ screen: 'departures', documents: [] });
+    expect(again.result.frames.map((f) => f.sha256)).toEqual(saved.result.frames.map((f) => f.sha256));
+  }, 300_000);
+
+  it('reports a compile error in Problems form, file:line:column, as editor-wasm does', async () => {
+    const broken = join(makeTempDir('job-broken'), 'project');
+    cpSync(DEPARTURES_PROJECT, broken, { recursive: true });
+    const file = join(broken, 'widgets', 'wd_probe_box', 'wd_probe_box.cpp');
+    writeFileSync(file, `${readFileSync(file, 'utf8')}\nint broken( {\n`);
+    const brokenQueue = new BuildQueue(broken);
+    registerTestRunJob(brokenQueue, { buildCacheRoot: cache, frameworkRoot: FRAMEWORK_ROOT });
+    const record = brokenQueue.submit(TEST_RUN_JOB, { screen: 'departures', documents: [] });
+    await brokenQueue.idle();
+    const done = brokenQueue.get(record!.id);
+    expect(done?.status).toBe('failed');
+    expect(done?.error).toMatch(/^error: widgets\/wd_probe_box\/wd_probe_box\.cpp:\d+:\d+$/m);
+  }, 300_000);
+
+  it('a bug report holds the run\'s own harness frame and the live frame it was sent', async () => {
+    const { id, result } = await run({ screen: 'departures', documents: [] });
+    const live = Buffer.from(result.frames[2]!.bytes, 'base64');
+    live[0] = (live[0] ?? 0) ^ 0x01;
+    const route = testRunReportRoute(() => cache, (recordId) => queue.get(recordId));
+    const answer = await route({ run: id, time: 100, live: live.toString('base64'), scene: '{}', documents: [] });
+    expect(answer.status).toBe(200);
+    const { path } = answer.body as { path: string };
+    const report = JSON.parse(readFileSync(join(path, 'report.json'), 'utf8'));
+    expect(report).toMatchObject({ screen: 'departures', time: 100, differingPixels: 1 });
+    expect(report.sha256.harness).toBe(result.frames[2]!.sha256);
+    expect(readFileSync(join(path, 'harness-100ms.pbm')).subarray(0, 10).toString()).toBe('P4\n256 64\n');
+  }, 300_000);
 });
