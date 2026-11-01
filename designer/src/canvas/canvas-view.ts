@@ -19,7 +19,7 @@
  *              snapped to, the outlines of placeholder widgets, and
  *              the hatching over an element an error is in (§3.8: the frame
  *              stays live, and the problem is marked over it, not in it), and
- *              a test run's differing pixels (EDITOR-DESIGN §4.1).
+ *              a test run's differing pixels.
  *              It is never part of the framebuffer, so nothing it draws can be
  *              mistaken for a pixel the display would light.
  *

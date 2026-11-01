@@ -42,7 +42,7 @@ if (toolchain === undefined) {
   console.warn('test-run-build.test.ts: skipped, no Emscripten 5.0.3 (run `u8g2gl toolchain install` or put em++ on PATH)');
 }
 
-/** The test run's frame times (EDITOR-DESIGN §4). */
+/** The test run's fixed frame times, in ms. */
 const TIMES = [0, 16, 100, 250, 500, 1000, 2000, 5000];
 
 // litPixels

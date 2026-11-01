@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/test-run.spec.ts
- * Purpose: Run, end to end, with the real toolchain (EDITOR-DESIGN §4): the
+ * Purpose: Run, end to end, with the real toolchain: the
  *          departures project's firmware target, built by the real server and
  *          compared with the live canvas, shows `✓ parity`; the text tested is
  *          the unsaved buffer and the file is left alone; an edit afterwards
  *          marks the verdict stale; ⌘↵ in Monaco runs and inserts no line;
  *          Run waits for a rebuild and is disabled, with its reason, in each
- *          state ruling 7 names; *Run after a pause* is off until turned
+ *          state where it cannot run; *Run after a pause* is off until turned
  *          on, then runs after an edit and is remembered; and the self-test
  *          hook's flipped pixel shows `≠ 1 px differ`, the overlay with both
  *          hashes, and a bug report.

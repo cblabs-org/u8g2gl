@@ -298,6 +298,13 @@ for that.
 
 ### 4.4 What the test run needs that does not exist
 
+> **Built (E-2T, 2026-11-01).** The harness is `wasm/harness.cpp`, on the memory display
+> it shares with the bridge (`wasm/memory_display.{h,cpp}`); the server builds it per project
+> (`cli/src/node/design/test-run/`) as the `test-run` job; the designer's Run and verdict are
+> `designer/src/test-run/`. The parity corpus (`cli/test/node/design/test-run/parity-corpus.test.ts`)
+> compares harness and editor frames for every fixture project in CI. Sample data is not yet
+> applied through the generated setters: that is E-3's.
+
 A harness that runs the generated `ui_init()`/`ui_handler()` loop against a virtual U8G2
 display in Wasm, and takes sample data through the generated subject setters. **This
 harness is new.** PR-06's snapshot test (`wasm/test/snapshot.test.mjs`) renders through the

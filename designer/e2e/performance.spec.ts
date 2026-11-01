@@ -20,7 +20,7 @@
  *          machine. A self-test forces keystrokes to miss their frame and checks
  *          that the frame gate then fails, so its passing means something.
  *          The same measurement is taken once more while test runs compile on
- *          the server (EDITOR-DESIGN §4): reported, not gated, because the
+ *          the server: reported, not gated, because the
  *          question it answers — whether a compile beside the edit loop needs
  *          its parallelism limited — is a design ruling, not a pass or fail.
  * Description: Real key presses into Monaco, each changing the x of one element

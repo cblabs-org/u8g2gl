@@ -54,7 +54,7 @@ test('frames are compared in time order; the first differing one is reported wit
   expect(compareFrames([0], [new Uint8Array(8)], [new Uint8Array(4)], 8, 8).kind).toBe('mismatch');
 });
 
-test('the toolbar says each state as EDITOR-DESIGN §2.2 and §4.2 draw it', () => {
+test('the toolbar says each state: none, waiting, running, parity, mismatch, failed, with its staleness', () => {
   expect(verdictText({ kind: 'none' }, 0)).toBe('');
   expect(verdictText({ kind: 'running' }, 0)).toBe('running…');
   expect(verdictText({ kind: 'parity', finishedAt: 1000, editsSince: 0 }, 3500)).toBe('✓ parity · 2 s ago');
@@ -67,7 +67,7 @@ test('the toolbar says each state as EDITOR-DESIGN §2.2 and §4.2 draw it', () 
   expect(formatAgo(-5)).toBe('0 s ago');
 });
 
-test('Run is unavailable for each of ruling 7\'s reasons, and waits for a rebuild rather than refusing', () => {
+test('Run is unavailable for each reason it can be, and waits for a rebuild rather than refusing', () => {
   const ready: RunInputs = { cannotBuild: undefined, wasm: 'current', placeholders: 0, wellFormed: true, live: true };
   expect(runAvailability(ready)).toEqual({ state: 'ready' });
   const reason = (inputs: Partial<RunInputs>): string => {

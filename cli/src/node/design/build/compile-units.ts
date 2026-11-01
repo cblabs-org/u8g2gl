@@ -187,6 +187,7 @@ export interface CompileResult {
  * the new one exists.
  */
 export async function compileOne(job: CompileJob, host: ToolchainHost, env: NodeJS.ProcessEnv): Promise<CompileResult> {
+  // --- Step 1: The object's name: the unit's stem, its path's hash, its content key ---
   const text = readFileSync(job.source);
   const key = createHash('sha256')
     .update(`${job.driver}\0${job.flags.join('\0')}\0${job.source}\0${job.extra}\0`)
@@ -195,6 +196,7 @@ export async function compileOne(job: CompileJob, host: ToolchainHost, env: Node
     .slice(0, 16);
   const stem = basename(job.source).replace(/\.[^.]+$/, '');
   const object = join(job.dir, `${stem}-${sha256(job.source).slice(0, 8)}-${key}.o`);
+  // --- Step 2: Compile, unless this exact object already exists ---
   if (existsSync(object)) {
     return { source: job.source, object, ok: true, compiled: false, output: '' };
   }
@@ -204,6 +206,10 @@ export async function compileOne(job: CompileJob, host: ToolchainHost, env: Node
     rmSync(object, { force: true });
     return { source: job.source, object, ok: false, compiled: true, output: result.stderr + result.stdout };
   }
+  // --- Step 3: Drop this unit's superseded objects ---
+  // Every edit makes a new key, so without this the cache would keep one
+  // object per edit forever. The prefix includes the path's hash so that two
+  // units with one file name (two widgets' util.cpp) never prune each other.
   const prefix = `${stem}-${sha256(job.source).slice(0, 8)}-`;
   for (const name of readdirSync(job.dir)) {
     if (name.startsWith(prefix) && name !== basename(object)) {

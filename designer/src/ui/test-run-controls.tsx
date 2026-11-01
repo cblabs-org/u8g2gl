@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/ui/test-run-controls.tsx
- * Purpose: Run and its verdict in the canvas toolbar (EDITOR-DESIGN §2.2), and
+ * Purpose: Run and its verdict in the canvas toolbar, and
  *          the mismatch's detail over the canvas: the only places a test run
  *          shows itself. There is no second canvas and no mode: Live is always
  *          on, and Run is an action whose result is one line of the toolbar
@@ -12,7 +12,7 @@
  * Description: `TestRunControls` is the button, disabled with its reason as
  *              the tooltip when Run is unavailable, and the verdict, which
  *              re-renders once a second while it shows an age, and beside it
- *              the *after a pause* setting (EDITOR-DESIGN §4.2). On a mismatch
+ *              the *after a pause* setting. On a mismatch
  *              it says that a mismatch is a framework bug and offers *Save bug
  *              report*, then shows the path written. `TestRunDiffInfo` is the
  *              overlay's legend: both frames' SHA-256 hashes and the time,

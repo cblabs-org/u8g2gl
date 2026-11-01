@@ -66,12 +66,9 @@ const CORPUS: readonly CorpusProject[] = [
   { name: 'valid-project', dir: join(CLI_ROOT, 'test', 'integration', 'fixtures', 'valid-project'), refusedWith: 'U8G2GL_NOT_YET_SUPPORTED' },
   { name: 'emit-project', dir: join(CLI_ROOT, 'test', 'generator', 'fixtures', 'emit-project') },
   { name: 'generated_fixture', dir: join(FRAMEWORK_ROOT, 'test', 'generated_fixture') },
-  // The widget probe project: the departures widgets as first written, at
-  // schema 0.4, before their manifests carried palette metadata.
-  {
-    name: 'widget probe (schema 0.4)',
-    dir: join(FRAMEWORK_ROOT, '.agents', 'skills', 'principal-architect-workspace', 'g-probe2-widgets', 'evidence', 'probe-project'),
-  },
+  // The departures widgets as first written, at schema 0.4, before their
+  // manifests carried palette metadata: the validator still accepts 0.4.
+  { name: 'widget probe (schema 0.4)', dir: join(__dirname, 'fixtures', 'widget-probe-0.4') },
 ];
 
 /** The editor API of wasm/u8g2gl_editor.mjs, as the corpus drives it. */

@@ -68,8 +68,9 @@ const LINKING = 'the test-run harness';
  * The harness's link settings. Named here rather than read from
  * wasm/CMakeLists.txt, as the editor's are, because no CMake target links the
  * harness: it exists only per project, on the design server. `-O3` is the
- * test run's level (EDITOR-DESIGN §5.2): the shipped build's optimiser runs,
- * so a pixel it changed would show up as a mismatch.
+ * test run's level, while the canvas's editor Wasm links at -O1 for speed:
+ * the shipped build's optimiser runs, so a pixel it changed would show up as
+ * a mismatch.
  */
 const HARNESS_LINK_FLAGS: readonly string[] = [
   '-O3',

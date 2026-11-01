@@ -59,7 +59,13 @@ export function framePbm(frame: Uint8Array, width: number, height: number): Uint
   return out;
 }
 
-/** @brief How many pixels two frames of the same size differ in. */
+/**
+ * @brief How many pixels two frames of the same size differ in.
+ *
+ * A count, for the report. The designer has its own comparison
+ * (designer/src/test-run/verdict.ts) that returns where they differ, for the
+ * overlay; the two packages share no runtime code, so each keeps its own.
+ */
 export function differingPixels(a: Uint8Array, b: Uint8Array): number {
   let count = 0;
   for (let i = 0; i < Math.max(a.length, b.length); i++) {

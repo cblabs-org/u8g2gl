@@ -336,8 +336,8 @@ the shell) joins it at E-2.
 | **E-1c** | U8G2GL | `u8g2gl design`: loopback server with a token, `ProjectFileSystem` (served and in-memory), watcher | E-D |
 | **E-1d** | U8G2GL | Project editor Wasm: managed pinned Emscripten, a project-driven bridge (fixes LOOP-BUDGET F6), placeholders, build hash, Wasm CI | E-1c |
 | **E-1e** | U8G2GL | The shell: Vite, React, Dockview, Monaco; live diagnostics; save and conflict handling; read-only canvas | E-1c, E-1d |
-| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) | E-1b, E-1e |
-| **E-2T** | U8G2GL | Test run: firmware-target harness in Wasm, parity verdict against the live frame | E-2 |
+| **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) ✅ **Done**, as E-2a to E-2d (#36 to #39) | E-1b, E-1e |
+| **E-2T** | U8G2GL | Test run: firmware-target harness in Wasm, parity verdict against the live frame ✅ **Done**: Run (⌘↵) in the canvas toolbar, the parity corpus over every fixture project in CI | E-2 |
 | **E-3** | U8G2GL | Sample data for binding preview; screen navigation design | E-2 · blocked by [U-6] · collection data needs PR-08 to meet EDITOR-DESIGN §9 |
 
 **What runs where.** The per-edit loop runs in the browser: [D-10] made the CLI isomorphic, so

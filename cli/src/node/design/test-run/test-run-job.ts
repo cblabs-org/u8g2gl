@@ -17,7 +17,7 @@
  *              - `documents`: every buffer differing from disk,
  *                `{ path, content, version }` (stage-project.ts);
  *              - `times` (optional): frame times in ms, non-decreasing;
- *                TEST_RUN_TIMES when absent (EDITOR-DESIGN §4, ruling 5).
+ *                TEST_RUN_TIMES when absent.
  *              The result carries each frame's bytes (base64) and SHA-256,
  *              the timings, and the versions tested: each posted document's,
  *              the generator's, the runtime's and the compiler's. A failure
@@ -61,7 +61,7 @@ export const TEST_RUN_JOB = 'test-run';
 /**
  * The frame times every run renders, in ms. Boot, the first frame after it,
  * then points spread over five seconds, so an animation's start, its motion
- * and its steady state are all compared (EDITOR-DESIGN §4).
+ * and its steady state are all compared.
  */
 export const TEST_RUN_TIMES: readonly number[] = [0, 16, 100, 250, 500, 1000, 2000, 5000];
 

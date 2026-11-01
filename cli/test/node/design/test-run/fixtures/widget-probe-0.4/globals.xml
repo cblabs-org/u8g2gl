@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <string name="platform" value="9" max_len="8" />
+        <time name="system_time" value="71700" />
+        <string name="row0_time" value="19:55" max_len="16" />
+        <string name="row0_dest" value="London Paddington" max_len="64" />
+        <string name="row0_status" value="On time" max_len="32" />
+        <int name="box_fill" value="8" />
+        <string name="message_text" value="" max_len="256" />
+    </subjects>
+
+    <fonts>
+        <builtin name="u8g2_font_6x10_mr" />
+        <builtin name="u8g2_font_helvR08_tr" />
+    </fonts>
+</globals>

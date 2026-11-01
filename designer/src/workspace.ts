@@ -21,7 +21,7 @@
  *     State:
  *     - documents, activeFile, selection, problems, output, projectName
  *     - wasm, loop:     The editor Wasm and the edit loop
- *     - testRun:        Run and its verdict (EDITOR-DESIGN §4)
+ *     - testRun:        Run and its parity verdict
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded

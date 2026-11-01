@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/test-run/test-run-controller.ts
- * Purpose: The designer's half of a test run (EDITOR-DESIGN §4): Run checks
+ * Purpose: The designer's half of a test run: Run checks
  *          that the real build — the generated firmware code, compiled with
  *          the widgets at -O3 — draws what the live canvas draws. It is a
  *          check, not a second view, so its whole output is a verdict in the
@@ -237,20 +237,26 @@ export class TestRunController {
    *                then not reported, since nobody asked.
    */
   run(pressed = true): void {
+    // --- Step 1: Coalesce: behind a run in flight, one rerun waits ---
+    // Whatever is pressed meanwhile collapses into that one, which snapshots
+    // the text when it starts, so it always tests the latest text.
     const availability = this.availability.get();
     if (this.inFlight) {
       this.queued = true;
       return;
     }
+    // --- Step 2: Unavailable: nothing runs; said only when someone pressed ---
     if (availability.state === 'unavailable') {
       if (pressed) this.target.log(`test run: unavailable, ${availability.reason}`);
       return;
     }
+    // --- Step 3: Parked: the editor Wasm is rebuilding; updateAvailability() resumes it ---
     if (availability.state === 'wait') {
       this.waiting = true;
       this.view.set({ kind: 'waiting', reason: availability.reason });
       return;
     }
+    // --- Step 4: Run, then the coalesced rerun if one was asked for ---
     this.inFlight = true;
     this.execute()
       .catch((error: unknown) => {

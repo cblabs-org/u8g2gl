@@ -7,7 +7,7 @@
  * Purpose: The decisions a test run makes that need no page, no Wasm and no
  *          server, so they are tested on their own: whether two frames match
  *          and where they differ, what the canvas toolbar says about a run
- *          (EDITOR-DESIGN §2.2, §4.1–4.3), and whether Run can be pressed now,
+ *          (docs/ui_flows.md), and whether Run can be pressed now,
  *          must wait, or is unavailable and why.
  * Description: A verdict compares frames in time order and reports the first
  *              that differs, with its pixel count and the differing pixels,
@@ -110,7 +110,7 @@ export type TestRunView =
   | { readonly kind: 'failed'; readonly finishedAt: number; readonly editsSince: number };
 
 /**
- * @brief The canvas toolbar's text for the last run (EDITOR-DESIGN §2.2, §4.2).
+ * @brief The canvas toolbar's text for the last run.
  *
  * @param view The run's state.
  * @param now  The page clock, in the same units as `finishedAt` (ms).
@@ -166,7 +166,7 @@ export type RunAvailability =
   | { readonly state: 'unavailable'; readonly reason: string };
 
 /**
- * @brief Whether Run can be pressed now (EDITOR-DESIGN §4, ruling 7).
+ * @brief Whether Run can be pressed now.
  *
  * In order of what the user must fix first: a machine that cannot build at
  * all, then the editor Wasm (which Run waits for when it is being rebuilt,

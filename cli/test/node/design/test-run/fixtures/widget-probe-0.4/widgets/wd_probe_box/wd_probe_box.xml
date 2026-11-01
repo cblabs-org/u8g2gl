@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="wd_probe_box" extends="u8g2gl_obj">
+    <api>
+        <prop name="fill_height" type="int" default="8" help="Height of filled inner box in pixels" />
+    </api>
+</widget>

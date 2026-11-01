@@ -826,6 +826,32 @@ no such members. An element that wants box-like drawing has two routes, and
 neither of them extends the box. Declare a drawing element of its own (`draw=`
 props, no `extends`), or extend `u8g2gl_obj` and draw from your own class.
 
+#### What the designer's Run checks
+
+The designer's canvas draws a custom element through the **editor target**: the
+scene, the generated editor registry, and the element's own C++ compiled into the
+project editor Wasm. The device runs the **firmware target**: the generated
+`ui_init()` and `ui_handler()` calling the same C++. [D-9] says the two draw the
+same pixels, and **Run** (⌘↵, Ctrl+Enter) checks it. It generates the firmware
+target from the text the canvas shows, saved or not, compiles it with the
+project's widgets, the runtime and U8G2 at `-O3`, runs the real frame loop on a
+memory display at t = 0, 16, 100, 250, 500, 1000, 2000 and 5000 ms, and
+compares each frame with the canvas's at the same time, pixel for pixel.
+
+What a pass tells a widget author: the element draws identically through its
+generated setters and through the editor's property thunks; its `tick()` and
+`render()` produce the same frames when driven by `ui_handler()`'s dirty gating
+as when the canvas redraws every frame; and the optimiser changes nothing. What
+it does not: anything about a real panel, a real clock or sample data, which the
+check does not use. A mismatch is a framework bug, not the author's. The
+designer marks the differing pixels, shows both frames' SHA-256 hashes, and
+saves a bug report (both frames as PBM, the scene, the text tested and the
+versions) to attach to an issue.
+
+Run needs the toolchain and the U8G2GL source tree, and is unavailable while the
+canvas shows placeholders or the document does not parse, since there is then no
+comparable frame.
+
 #### Worked examples, built and rendered
 
 Two custom elements exist as reference implementations, written against this

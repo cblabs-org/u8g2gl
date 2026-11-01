@@ -124,7 +124,7 @@ Refusing is not obstruction. The user retains the constant and the ability to ab
 | `Esc` | Clear selection |
 | `Tab` | Next element in document order — see `[FQ-2]` |
 | `Ctrl/⌘ Z` | Undo one coalesced run (`[FD-1]`) |
-| `⌘↵` / `Ctrl+Enter` | **Run**: the test run (EDITOR-DESIGN §4), from anywhere in the designer, the XML editor included. It overrides Monaco's *Insert Line Below*, which it would otherwise be |
+| `⌘↵` / `Ctrl+Enter` | **Run**: the test run, which builds the generated firmware code and compares its frames with the canvas, from anywhere in the designer, the XML editor included. It overrides Monaco's *Insert Line Below*, which it would otherwise be |
 
 ### 2.10 What this flow proves
 

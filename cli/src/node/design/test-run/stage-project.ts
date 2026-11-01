@@ -11,7 +11,7 @@
  *          differs from disk; this module stages a copy of the project in the
  *          build cache with those buffers in place, and the test run generates
  *          from the copy. Nothing is written to the project: saving stays the
- *          user's act (EDITOR-DESIGN §2.3).
+ *          user's act, never the designer's.
  * Description: The copy lives at `<project cache>/staged/`, one per project,
  *              and is synchronised rather than rebuilt: a file is written only
  *              when its bytes differ, and a file the project no longer has is

@@ -56,7 +56,7 @@
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *     - lastRun:          The latest run, for the property panel
  *
- *     Test run (EDITOR-DESIGN §4):
+ *     Test run:
  *     - addDiagnosticSource(): More diagnostics for Problems (a failed run's)
  *     - settled():        Resolves once the latest text is drawn
  *     - requestRun():     Book a normal run: restores the canvas after Run's frames
