@@ -46,7 +46,7 @@ function sandbox(): { out: string; outside: string } {
 function stamped(path: string, body = ''): GeneratedFile {
   return {
     path,
-    content: formatHeaderStamp({ source: 'u8g2gl.xml', schema: '0.4', generator: '1.0.0', target: 'primary' }) + body,
+    content: formatHeaderStamp({ source: 'u8g2gl.xml', schema: '0.5', generator: '1.0.0', target: 'primary' }) + body,
   };
 }
 

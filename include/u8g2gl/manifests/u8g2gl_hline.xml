@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_hline">
-  <api>
+  <api label="Horizontal line" category="Drawing" description="A horizontal line of a given width.">
     <prop name="x" type="int" draw="u8g2gl_draw_hline" help="Left edge" />
     <prop name="y" type="int" draw="u8g2gl_draw_hline" help="Top edge" />
     <prop name="width" type="int" draw="u8g2gl_draw_hline" help="Length in pixels" />

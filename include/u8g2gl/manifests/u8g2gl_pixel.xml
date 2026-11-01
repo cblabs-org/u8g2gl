@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_pixel">
-  <api>
+  <api label="Pixel" category="Drawing" description="A single pixel.">
     <prop name="x" type="int" draw="u8g2gl_draw_pixel" help="Pixel X coordinate" />
     <prop name="y" type="int" draw="u8g2gl_draw_pixel" help="Pixel Y coordinate" />
     <bind name="bind_x" type="int" setter="x" />

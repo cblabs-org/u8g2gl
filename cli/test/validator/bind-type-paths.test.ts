@@ -23,7 +23,7 @@ import { frameworkRegistry } from '../helpers/manifest-registry.js';
 const NARROW = 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C';
 const FONT = 'u8g2_font_6x10_mr';
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="bind_paths" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="bind_paths" version="1.0.0">
     <targets><target name="primary" setup="${NARROW}" /></targets>
 </u8g2gl>
 `;

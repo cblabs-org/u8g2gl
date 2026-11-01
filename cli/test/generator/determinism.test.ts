@@ -108,7 +108,7 @@ describe('file-discovery order cannot reach the emitted bytes (§13.9)', () => {
     mkdirSync(resolve(dir, 'screens'));
     writeFileSync(
       resolve(dir, 'u8g2gl.xml'),
-      `<u8g2gl schema="0.4" name="shuffle" version="1.0.0">
+      `<u8g2gl schema="0.5" name="shuffle" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
 </u8g2gl>
 `,
@@ -296,7 +296,7 @@ describe('discovery order is code-unit, not locale (§13.9, WO12 follow-up)', ()
     mkdirSync(resolve(dir, 'widgets/w1'), { recursive: true });
     writeFileSync(
       resolve(dir, 'u8g2gl.xml'),
-      `<u8g2gl schema="0.4" name="pair" version="1.0.0">
+      `<u8g2gl schema="0.5" name="pair" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
 </u8g2gl>
 `,

@@ -31,6 +31,17 @@
  *              one, and check that each correction still differs from its
  *              record, so a correction is never a silent no-op.
  *
+ *              Where a recorded file was later edited, its entry carries the
+ *              same edit applied to the record, and the new hash, rather than
+ *              a fresh recording, which nothing could make. Only edits that
+ *              move no recorded location are applied this way. Schema 0.5's
+ *              move of the fixtures from `schema="0.4"` to `"0.5"` is one: a
+ *              same-length value, so the record changes in that value alone.
+ *              Its palette metadata is another: `label`, `category` and
+ *              `description` were added to each framework manifest's own
+ *              `<api>` line, where only the closing `>` follows them, so the
+ *              record gains those three attributes and nothing else moves.
+ *
  * Exports:
  *   Golden shapes:
  *   - FrozenDiagnostic:       One diagnostic as recorded

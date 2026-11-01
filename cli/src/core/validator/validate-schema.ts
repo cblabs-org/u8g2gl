@@ -9,9 +9,12 @@
  * Description: Checks that all required attributes are present across project,
  *              globals, screens, components, and widget manifests. Validates that
  *              attribute values match expected primitive types and enum sets.
- *              Enforces schema version "0.4", refusing the superseded "0.3"
- *              with a specific migration diagnostic rather than a generic
- *              mismatch (§15.4, PR-3R WO8).
+ *              Accepts schema versions "0.4" and "0.5", refusing the superseded
+ *              "0.3" with a specific migration diagnostic rather than a generic
+ *              mismatch (§15.4). 0.5 is additive: it adds palette
+ *              metadata (`label`, `category`, `description`) to `<api>`, which
+ *              this pass holds to its limits, and which a project still
+ *              declaring 0.4 is told it may not use until it says 0.5.
  *
  *              The 254-object ceiling is **not** checked here. This pass used to
  *              count objects structurally, and that count predated [D-18]: it
@@ -47,16 +50,56 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import { parseBdfRange } from '../fonts/bdf-range.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { ValidateInput } from './validate.js';
-import type { BindDef, PropDef, PropType, WidgetManifest } from '../schema/widget-manifest.js';
-import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
+import {
+  PALETTE_METADATA_KEYS,
+  type BindDef,
+  type PaletteMetadataKey,
+  type PropDef,
+  type PropType,
+  type WidgetManifest,
+} from '../schema/widget-manifest.js';
+import { ROOT_CLASS_MANIFEST, isDrawingElement, type ManifestRegistry } from '../manifest/manifest-registry.js';
 import { geometryBindingFor, geometryBindingNamed } from '../resolver/geometry-bindings.js';
 import { BUILTIN_CONSTANTS, INT32_MAX, INT32_MIN, integerLiteralValue } from '../resolver/index.js';
 import { COLOR_VALUES, STYLE_PROPERTIES, type StyleDecl, type SubjectDecl, type SubjectType } from '../schema/globals.js';
 import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
+import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
 
-const VALID_SCHEMA_VERSION = '0.4';
+
+/**
+ * Every schema version this CLI accepts. 0.5 only adds to 0.4 (§15.4), so a
+ * 0.4 project means exactly what it meant before and still validates; what it
+ * may not do is use 0.5's additions, which section 7 reports.
+ */
+const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', CURRENT_SCHEMA_VERSION]);
+
+/** The first schema version whose `<api>` may carry palette metadata. */
+const PALETTE_METADATA_SINCE = '0.5';
+
+/**
+ * The accepted schema versions that predate palette metadata. Kept with
+ * PALETTE_METADATA_SINCE: every accepted version below it belongs here, so a
+ * schema bump that accepts another older version must add it, or that
+ * version's projects would use the metadata unchecked.
+ */
+const BEFORE_PALETTE_METADATA: ReadonlySet<string> = new Set(['0.4']);
+
+/**
+ * The palette metadata rules (schema 0.5): each attribute's length limit in
+ * characters. Every one is also refused empty and refused over more than one
+ * line — a label or heading spread over lines is no more plain text than a
+ * description is.
+ *
+ * Characters are counted as code points, so a limit means what an author
+ * counting what they typed would expect; the designer is the only reader.
+ */
+const PALETTE_METADATA_LIMITS: Readonly<Record<PaletteMetadataKey, number>> = {
+  label: 32,
+  category: 24,
+  description: 120,
+};
 
 /**
  * The prefix §13.4 fixes every generated identifier at, and the only value
@@ -507,22 +550,23 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION,
-          `Schema version '0.3' is no longer supported (now '${VALID_SCHEMA_VERSION}'). ` +
+          `Schema version '0.3' is no longer supported (now '${CURRENT_SCHEMA_VERSION}'). ` +
             `Required changes:\n` +
             SCHEMA_0_3_MIGRATIONS.map((m, i) => `  ${i + 1}. ${m}`).join('\n'),
           project.loc,
           project.schema,
-          [VALID_SCHEMA_VERSION],
+          [CURRENT_SCHEMA_VERSION],
         ),
       );
-    } else if (!project.schema || project.schema !== VALID_SCHEMA_VERSION) {
+    } else if (!project.schema || !ACCEPTED_SCHEMA_VERSIONS.has(project.schema)) {
       diagnostics.push(
         createDiagnostic(
           DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
-          `Unknown or unsupported schema version '${project.schema || ''}'. Expected '${VALID_SCHEMA_VERSION}'.`,
+          `Unknown or unsupported schema version '${project.schema || ''}'. Expected ` +
+            `${[...ACCEPTED_SCHEMA_VERSIONS].map((v) => `'${v}'`).join(' or ')}.`,
           project.loc,
           project.schema || undefined,
-          [VALID_SCHEMA_VERSION],
+          [CURRENT_SCHEMA_VERSION],
         ),
       );
     }
@@ -1087,5 +1131,85 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     diagnostics.push(...checkBindDeclarations(composite, manifests));
   }
 
+  // --- 7. Palette metadata on `<api>` (schema 0.5) ---
+  // Every declaration, framework and project, plain and composite: the
+  // framework's own manifests are held to the same limits as an author's.
+  // Only the project's own files are held to the project's schema version,
+  // though — the framework's manifests ship with this CLI, and a 0.4 project
+  // did not write them.
+  const olderSchema = project !== undefined && BEFORE_PALETTE_METADATA.has(project.schema) ? project.schema : undefined;
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    const tooOld = olderSchema !== undefined && !isFrameworkDeclaration(manifest, manifests);
+    diagnostics.push(...checkPaletteMetadata(manifest, tooOld ? olderSchema : undefined));
+  }
+
+  return diagnostics;
+}
+
+// isFrameworkDeclaration
+// Whether a declared manifest is one the framework shipped. The declared lists
+// carry no origin, but the registry registers the framework first and refuses
+// a project manifest that redeclares a framework tag, so a framework
+// declaration is exactly the one its tag's registration was made from.
+//   manifest  — a declared manifest, from `declaredWidgets` or `declaredComposites`
+//   manifests — the registry it was declared into
+function isFrameworkDeclaration(manifest: WidgetManifest, manifests: ManifestRegistry): boolean {
+  const registered = manifests.get(manifest.name);
+  return registered?.origin === 'framework' && registered.declared === manifest;
+}
+
+// checkPaletteMetadata
+// Section 7's rule for one manifest's `<api>`, attribute by attribute in
+// PALETTE_METADATA_KEYS order. A project on an older schema gets one
+// diagnostic per attribute naming the version to declare, and nothing more:
+// until it declares 0.5 the attribute is not part of its vocabulary, so its
+// value is not judged.
+//   manifest    — a declared manifest
+//   olderSchema — the project's schema when it predates palette metadata and
+//                 this is a project manifest; undefined otherwise
+function checkPaletteMetadata(manifest: WidgetManifest, olderSchema: string | undefined): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const { api } = manifest;
+  for (const key of PALETTE_METADATA_KEYS) {
+    const value = api[key];
+    const loc = api.metadataLocs?.[key];
+    if (value === undefined) continue;
+
+    if (olderSchema !== undefined) {
+      diagnostics.push(
+        createDiagnostic(
+          DIAGNOSTIC_CODES.NEWER_SCHEMA_REQUIRED,
+          `Widget '${manifest.name}' declares <api ${key}="…">, which schema '${olderSchema}' does not ` +
+            `have: palette metadata arrived in '${PALETTE_METADATA_SINCE}'. Declare ` +
+            `schema="${PALETTE_METADATA_SINCE}" in u8g2gl.xml, or remove '${key}' (§15.4).`,
+          // The attribute is what this version does not allow, so the name.
+          loc?.name ?? api.loc ?? manifest.loc,
+          key,
+        ),
+      );
+      continue;
+    }
+
+    const limit = PALETTE_METADATA_LIMITS[key];
+    const length = Array.from(value).length;
+    const problem =
+      value === ''
+        ? `is empty; write what it should say, or remove the attribute`
+        : /[\r\n]/.test(value)
+          ? `runs over more than one line; it must be a single line`
+          : length > limit
+            ? `is ${length} characters, over the limit of ${limit}`
+            : undefined;
+    if (problem === undefined) continue;
+    diagnostics.push(
+      createDiagnostic(
+        DIAGNOSTIC_CODES.INVALID_PALETTE_METADATA,
+        `Widget '${manifest.name}' <api ${key}> ${problem} (palette metadata: at most ${limit} ` +
+          `characters on one line, schema ${PALETTE_METADATA_SINCE}).`,
+        loc?.value ?? api.loc ?? manifest.loc,
+        value === '' ? key : value,
+      ),
+    );
+  }
   return diagnostics;
 }

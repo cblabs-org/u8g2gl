@@ -420,7 +420,7 @@ ui_spec §15 asked for these, and schema 0.4 does not have them:
 | Feature | What E-2 does without it |
 |---|---|
 | Grouping and order (`group=`) | One list per widget, in **declaration order**: the manifest's order already says something about importance. Geometry (`x`, `y`, `width`, `height`) is pinned first and paired, because every element has it |
-| Palette metadata (name, category, icon) | The palette shows **tag names**, grouped **Framework** / **Project** / **Drawing**, from the manifest registry's own split. Usable, but plain |
+| Palette metadata (name, category, icon) | The palette shows **tag names**, grouped **Framework** / **Project** / **Drawing**, from the manifest registry's own split. Usable, but plain. *Now delivered without icons — see below* |
 | `<previews>` | Element context (ui_spec §7.2, flow F5) renders the element **once, at its manifest's default size**, with no gallery |
 | `visible_when` ([Q-7]) | Every prop shows |
 | Hiding inherited props ([Q-10]) | The collapsed *From u8g2gl_obj* group |
@@ -429,6 +429,15 @@ ui_spec §15 asked for these, and schema 0.4 does not have them:
 E-2: §1.5 makes schema surface the permanent kind, and the right moment to judge "does the
 panel need grouping?" is when you can see the ungrouped one. Not one at a time: five small
 bumps is five migrations for authors, and one is one. **This is checkpoint C4** (§10).
+
+**Decided at C4 (2026-10-31, S-1).** Palette metadata is added in **schema 0.5**:
+`label`, `category` and `description` on `<api>`, not inherited, reaching no
+generated file (design_spec §13.1, §15.4). The Palette keeps its three groups,
+files each group's entries by category in registry first-appearance order with
+the uncategorised last, and shows each entry's label, its tag muted, and its
+description; the filter matches all three. **Icons** are held back.
+**`<previews>`** is deferred to E-3. **Grouping** and **`visible_when`** are
+declined: the panel's declaration order and every-prop-shows stand.
 
 ---
 

@@ -6,8 +6,10 @@
  * File: designer/e2e/palette.spec.ts
  * Purpose: The Palette in the real shell (ui_spec §6): the activity bar
  *          switches the primary sidebar between the Explorer and the Palette;
- *          the Palette lists the departures project's tags in their three
- *          groups, from its manifests, and its filter narrows them; and a tag
+ *          the Palette lists the departures project's elements in their three
+ *          groups, filed by category and shown by label and description, from
+ *          its manifests; its filter matches a description; a keystroke or a
+ *          drag re-renders none of it; and a tag
  *          dragged onto the canvas is inserted there as one new line and one
  *          undo stop, selected, or refused with the reason and nothing written.
  * Description: The departures project, which declares three widgets of its
@@ -17,7 +19,7 @@
 
 import { expect, test } from '@playwright/test';
 import { startDesign, type DesignSession } from './support/design-session';
-import { bufferText, dropTag, openFile, openShell, selectedNames } from './support/shell';
+import { bufferText, dragCanvas, dropTag, nextFrames, openFile, openShell, placeCaret, selectedNames } from './support/shell';
 import type { TestHandle } from '../src/test-hooks';
 
 const SCREEN = 'screens/screen_departures.xml';
@@ -28,7 +30,7 @@ test.afterEach(async () => {
   session = undefined;
 });
 
-test('the activity bar shows the Palette: three groups from the manifests, and a filter that narrows them', async ({ page }) => {
+test('the activity bar shows the Palette: three groups from the manifests, filed by category, and a filter that narrows them', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
 
@@ -38,19 +40,80 @@ test('the activity bar shows the Palette: three groups from the manifests, and a
   await expect(palette).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Explorer' })).toHaveCount(0);
   await expect(palette.locator('.palette-group h2')).toHaveText(['Framework', 'Project', 'Drawing']);
-  await expect(palette.locator('[data-group="Project"] .palette-tag')).toHaveText(['wd_probe_box', 'wd_service_list', 'wd_train_formation']);
+  const tags = (group: string): Promise<string[]> =>
+    palette.locator(`[data-group="${group}"] .palette-tag`).evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-tag') ?? ''));
+  await expect.poll(() => tags('Project')).toEqual(['wd_service_list', 'wd_probe_box', 'wd_train_formation']);
   await expect(palette.locator('[data-group="Framework"] .palette-tag[data-tag="u8g2gl_label"]')).toBeVisible();
   await expect(palette.locator('[data-group="Drawing"] .palette-tag[data-tag="u8g2gl_line"]')).toBeVisible();
 
+  // --- Categories head each group's entries; the project's follow the framework's order ---
+  await expect(palette.locator('[data-group="Project"] .palette-category h3')).toHaveText(['Text', 'Indicators']);
+  await expect(palette.locator('[data-group="Drawing"] .palette-category h3')).toHaveText(['Drawing']);
+  await expect(palette.locator('[data-group="Framework"] .palette-category h3')).not.toHaveCount(0);
+
+  // --- A project widget's entry: its label, its tag muted beside it, its description beneath ---
+  const serviceList = palette.locator('.palette-tag[data-tag="wd_service_list"]');
+  await expect(serviceList.locator('.palette-label')).toHaveText('Service list');
+  await expect(serviceList.locator('.palette-tag-name')).toHaveText('wd_service_list');
+  await expect(serviceList.locator('.palette-description')).toHaveText(/one service per row/);
+
   // --- The filter narrows by name; a group left empty goes ---
-  await palette.getByRole('searchbox', { name: 'Filter elements' }).fill('service');
+  const filter = palette.getByRole('searchbox', { name: 'Filter elements' });
+  await filter.fill('service');
   await expect(palette.locator('.palette-group h2')).toHaveText(['Project']);
-  await expect(palette.locator('.palette-tag')).toHaveText(['wd_service_list']);
-  await palette.getByRole('searchbox', { name: 'Filter elements' }).fill('zzz');
+  await expect.poll(() => tags('Project')).toEqual(['wd_service_list']);
+  // --- …and matches a description, where neither the tag nor the label has the word ---
+  await filter.fill('ROUNDED CORNERS');
+  await expect(palette.locator('.palette-group h2')).toHaveText(['Drawing']);
+  await expect.poll(() => tags('Drawing')).toEqual(['u8g2gl_box']);
+  await filter.fill('zzz');
   await expect(palette.locator('.palette-note')).toHaveText(/No element matches/);
 
   await page.getByRole('button', { name: 'Explorer' }).click();
   await expect(page.locator('.sidebar .file').first()).toBeVisible();
+});
+
+test('the Palette does not re-render on a keystroke or a drag, and does when its own filter changes', async ({ page }) => {
+  session = await startDesign();
+  await openShell(page, session.url);
+  await openFile(page, SCREEN);
+  await page.getByRole('button', { name: /live/ }).click();
+  await expect(page.locator('.canvas-frame')).toHaveAttribute('data-stale', 'false');
+  await page.getByRole('button', { name: 'Palette' }).click();
+  const palette = page.getByRole('complementary', { name: 'Palette' });
+  await expect(palette.locator('.palette-tag[data-tag="wd_service_list"]')).toBeVisible();
+  const renders = async (): Promise<number> => (await page.evaluate(() => (window as unknown as TestHandle).__u8g2glRenders())).Palette ?? 0;
+  // Settle: the Wasm status and the first frames have rendered what they will.
+  await expect(page.locator('.status-item.wasm')).toHaveAttribute('data-wasm', /none|current|failed/, { timeout: 30_000 });
+  await nextFrames(page, 3);
+
+  // --- Keystrokes in the XML: each re-runs the pipeline, none changes a manifest ---
+  const beforeTyping = await renders();
+  await placeCaret(page, SCREEN, 'name="row0" x="3', 'name="row0" x="3'.length);
+  const typed: string[] = [];
+  for (const key of ['3', 'Backspace', '4', 'Backspace']) {
+    await page.keyboard.press(key);
+    await nextFrames(page, 2);
+    typed.push((await bufferText(page, SCREEN)).match(/name="row0" x="(\d+)"/)?.[1] ?? '');
+  }
+  // The keystrokes reached the document: row0's x went 332, 32, 342, 32.
+  expect(typed).toEqual(['332', '32', '342', '32']);
+  const afterTyping = await renders();
+
+  // --- A drag on the canvas: row0 moved and back ---
+  await dragCanvas(page, [100, 8], [106, 11]);
+  await nextFrames(page, 2);
+  await expect.poll(() => bufferText(page, SCREEN)).toContain('name="row0" x="38" y="3"');
+  await dragCanvas(page, [106, 11], [100, 8]);
+  await nextFrames(page, 3);
+  const afterDrag = await renders();
+  console.log(`Palette renders: typing ${afterTyping - beforeTyping}, dragging ${afterDrag - afterTyping}`);
+  expect(afterTyping - beforeTyping).toBe(0);
+  expect(afterDrag - afterTyping).toBe(0);
+
+  // --- The self-test: the count does move for the Palette's own state ---
+  await palette.getByRole('searchbox', { name: 'Filter elements' }).fill('line');
+  await expect.poll(renders).toBeGreaterThan(afterDrag);
 });
 
 test('a tag dropped on the canvas is inserted at the drop point as one new line, selected, and one undo removes it', async ({ page }) => {

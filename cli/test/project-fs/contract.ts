@@ -76,7 +76,7 @@ export const INVALID_PATHS: readonly string[] = [
 ];
 
 const SEED: Readonly<Record<string, string>> = {
-  'u8g2gl.xml': '<u8g2gl schema="0.4" name="contract" version="1.0.0" />\n',
+  'u8g2gl.xml': '<u8g2gl schema="0.5" name="contract" version="1.0.0" />\n',
   'globals.xml': '<globals />\n',
   'screens/screen_a.xml': '<screen name="a" />\n',
 };

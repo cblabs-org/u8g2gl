@@ -13,8 +13,9 @@
  *
  *          It also carries §16's two version guards, so a stale `generated/`
  *          directory fails as one named compile error rather than as a missing
- *          symbol or, worse, not at all: the schema, which must match, and the
- *          runtime, which must be at least the one this CLI was built beside.
+ *          symbol or, worse, not at all: the schema this generator wrote for,
+ *          which must match, and the runtime, which must be at least the one
+ *          this CLI was built beside.
  * Description: Emits the four [D-21] capacities,
  *              `U8G2GL_REQUIRE_SCHEMA_VERSION`, and
  *              `U8G2GL_REQUIRE_RUNTIME_VERSION` behind an `#ifndef` that names
@@ -57,7 +58,8 @@
  */
 
 import { RUNTIME_VERSION } from '../../../data/runtime-version.js';
-import { declarationError, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
+import { CURRENT_SCHEMA } from '../../schema/schema-version.js';
+import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 
 /** §13.7's generated capacity header ([D-21]). */
 export const GENERATED_CONFIG_HEADER = 'u8g2gl_generated_config.h';
@@ -104,32 +106,22 @@ interface CapacityMacro {
  * @brief Emits `u8g2gl_generated_config.h` ([D-21], §13.7, §16).
  *
  * @param input Project, capacities and this file's stamp.
- * @return The header, and a diagnostic if the project's schema version cannot be
- *         split into the major and minor the guard needs.
+ * @return The header. It never raises a diagnostic: the guard asserts the
+ *         generator's own schema, so nothing in the document can stop it.
  */
 export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit {
-  const { capacities, project } = input;
+  const { capacities } = input;
   const guard = 'U8G2GL_GENERATED_CONFIG_H';
 
   // --- Step 1: The schema version the guard asserts ---
-  // Taken from the document rather than from a constant of our own: the guard's
-  // whole job is to compare what this code was generated *for* against what the
-  // runtime implements, so a hardcoded version would assert nothing.
-  const version = /^(\d+)\.(\d+)$/.exec(project.schema.trim());
-  if (version === null) {
-    return {
-      content: '',
-      diagnostics: [
-        declarationError(
-          `Schema version '${project.schema}' is not 'major.minor', so the generated version guard ` +
-            `cannot be emitted (§16). Pass 1 reports the version itself.`,
-          project.loc,
-          project.schema,
-        ),
-      ],
-    };
-  }
-  const [, major, minor] = version;
+  // The schema this generator wrote for (rules/03-versioning.md), not the one
+  // the project declares. Every version the validator accepts is the current
+  // schema or an older minor of it, which 0.5's additive bump makes a subset,
+  // so the code emitted here is code for the current schema whatever the
+  // document says. Asserting the declared version instead made an accepted
+  // 0.4 project generate code the 0.5 runtime refused: an additive bump turned
+  // into a break. The declared version stays in each file's `// schema` stamp.
+  const { major, minor } = CURRENT_SCHEMA;
 
   // The runtime floor: the version of the runtime this CLI was built beside,
   // stamped from the header (src/data/runtime-version.ts). Not an option, and

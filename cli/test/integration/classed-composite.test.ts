@@ -57,7 +57,7 @@ function createProject(): string {
   mkdirSync(join(dir, 'widgets/card'), { recursive: true });
   writeFileSync(
     join(dir, 'u8g2gl.xml'),
-    '<u8g2gl schema="0.4" name="classed" version="1.0.0">\n    <targets>\n        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />\n    </targets>\n</u8g2gl>\n',
+    '<u8g2gl schema="0.5" name="classed" version="1.0.0">\n    <targets>\n        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />\n    </targets>\n</u8g2gl>\n',
   );
   writeFileSync(join(dir, 'globals.xml'), '<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>\n');
   writeFileSync(

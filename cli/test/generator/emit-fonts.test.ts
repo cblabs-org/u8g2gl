@@ -39,7 +39,7 @@ const bdfDir = resolve(repoRoot, 'extern', 'u8g2', 'tools', 'font', 'bdf');
 const u8g2FontsC = resolve(repoRoot, 'extern', 'u8g2', 'csrc', 'u8g2_fonts.c');
 const FOUR_BY_SIX = () => readFileSync(resolve(bdfDir, '4x6.bdf'));
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="fonts_test" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="fonts_test" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
     </targets>
@@ -279,7 +279,7 @@ describe('emitFontsUnit() — comment sanitisation', () => {
 
   function projectEmitInputFor(font: { readonly name: string; readonly src: string; readonly range?: string }): ProjectEmitInput {
     return {
-      project: { schema: '0.4', name: 'p', version: '1.0.0', targets: [] },
+      project: { schema: '0.5', name: 'p', version: '1.0.0', targets: [] },
       globals: { consts: [], subjects: [], styles: [], fonts: [{ kind: 'bdf', ...font }], images: [] },
       screens: [],
       capacities: {
@@ -330,7 +330,7 @@ describe('emitFontsUnit() — comment sanitisation', () => {
 describe('fontDeclarations() — both kinds share one declared form', () => {
   it('gives a <bdf> the same identifier shape as a <builtin>, pointing at its own array', () => {
     const input: ProjectEmitInput = {
-      project: { schema: '0.4', name: 'p', version: '1.0.0', targets: [] },
+      project: { schema: '0.5', name: 'p', version: '1.0.0', targets: [] },
       globals: {
         consts: [],
         subjects: [],

@@ -30,7 +30,7 @@ function createProject(): string {
   mkdirSync(join(dir, 'screens'));
   writeFileSync(
     join(dir, 'u8g2gl.xml'),
-    `<u8g2gl schema="0.4" name="loaded" version="1.0.0">
+    `<u8g2gl schema="0.5" name="loaded" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
 </u8g2gl>
 `,
@@ -67,7 +67,7 @@ describe('loadProject (PR-04 WO5b)', () => {
 
   it('prints the source line of a diagnostic inside a bundled framework manifest (WO1 F9)', () => {
     const broken = FRAMEWORK_MANIFESTS.map((m) =>
-      m.filename === 'u8g2gl_box.xml' ? { ...m, xml: m.xml.replace('<api>', '<api>\n        <bogus_child />') } : m,
+      m.filename === 'u8g2gl_box.xml' ? { ...m, xml: m.xml.replace('</api>', '  <bogus_child />\n  </api>') } : m,
     );
     const loaded = loadProject(createProject(), { frameworkManifests: broken });
 

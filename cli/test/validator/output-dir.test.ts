@@ -29,7 +29,7 @@ const EMPTY_GLOBALS: Globals = { consts: [], subjects: [], styles: [], fonts: []
 /** A minimal, otherwise valid project declaring `<output dir="…">`. */
 function projectWith(dir: string | undefined): U8g2glProject {
   return {
-    schema: '0.4',
+    schema: '0.5',
     name: 'out_dir',
     version: '1.0.0',
     targets: [{ name: 'primary', setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C' }],

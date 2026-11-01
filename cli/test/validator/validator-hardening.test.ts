@@ -80,7 +80,7 @@ function model(body: string, options: ProjectOptions = {}): ProjectModel {
     SCREEN_FILE,
   );
   return {
-    project: { schema: '0.4', name: 'hardening', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
+    project: { schema: '0.5', name: 'hardening', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
     globals: globals.value!,
     screens: [screen.value!],
     manifests: frameworkRegistry(options.composites ?? []),

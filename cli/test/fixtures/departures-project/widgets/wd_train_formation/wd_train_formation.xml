@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="wd_train_formation" extends="u8g2gl_obj">
-    <api>
+    <api label="Train formation" category="Indicators" description="The carriages of a train in order, each drawn as a labelled frame.">
         <prop name="font" type="font" required="true" help="Font for carriage labels." />
         <prop name="max_carriages" type="int" default="12" help="Carriage capacity." />
     </api>

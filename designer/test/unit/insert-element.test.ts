@@ -26,7 +26,7 @@ import { ProjectModelCache } from '../../src/project/project-model';
 import { FakeModel } from './support/fake-model';
 
 const SCREEN = 'screens/screen_home.xml';
-const PROJECT = '<u8g2gl schema="0.4" name="insert" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n';
+const PROJECT = '<u8g2gl schema="0.5" name="insert" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n';
 const GLOBALS = '<globals>\n  <fonts>\n    <builtin name="u8g2_font_6x10_mr" />\n  </fonts>\n</globals>\n';
 const NO_ASSETS = { fonts: new Map(), images: new Map(), diagnostics: [], failedFonts: new Set<string>(), failedImages: new Set<string>() };
 

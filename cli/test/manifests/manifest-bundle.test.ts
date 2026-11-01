@@ -76,7 +76,7 @@ describe('framework manifest bundle', () => {
 
   describe('the drift check itself', () => {
     it('detects a manifest edited without rebuilding', () => {
-      const edited = onDisk.map((m, i) => (i === 0 ? { ...m, xml: m.xml.replace('<api>', '<api> ') } : m));
+      const edited = onDisk.map((m, i) => (i === 0 ? { ...m, xml: m.xml.replace('</api>', '</api> ') } : m));
       expect(bundleDrift(FRAMEWORK_MANIFESTS, edited)).toEqual([
         `content differs: ${onDisk[0]!.filename}`,
       ]);

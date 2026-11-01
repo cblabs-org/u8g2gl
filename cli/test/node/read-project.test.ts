@@ -67,7 +67,7 @@ describe('readProjectFiles', () => {
     try {
       writeFileSync(
         join(tmpDir, 'u8g2gl.xml'),
-        '<u8g2gl schema="0.4" name="t" version="1.0.0"></u8g2gl>',
+        '<u8g2gl schema="0.5" name="t" version="1.0.0"></u8g2gl>',
       );
       mkdirSync(join(tmpDir, 'components', 'badge'), { recursive: true });
       writeFileSync(
@@ -97,7 +97,7 @@ describe('readProjectFiles — files discovery passes over (design_spec §19)', 
     mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
     const dir = mkdtempSync(resolve(__dirname, '../../tmp/skipped-'));
     dirs.push(dir);
-    writeFileSync(join(dir, 'u8g2gl.xml'), '<u8g2gl schema="0.4" name="t" version="1.0.0"></u8g2gl>');
+    writeFileSync(join(dir, 'u8g2gl.xml'), '<u8g2gl schema="0.5" name="t" version="1.0.0"></u8g2gl>');
     for (const [path, text] of Object.entries(files)) {
       mkdirSync(join(dir, path, '..'), { recursive: true });
       writeFileSync(join(dir, path), text);

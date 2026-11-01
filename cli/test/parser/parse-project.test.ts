@@ -30,7 +30,7 @@ describe('parseProjectFile', () => {
     expect(result.value).toBeDefined();
 
     const project = result.value!;
-    expect(project.schema).toBe('0.4');
+    expect(project.schema).toBe('0.5');
     expect(project.name).toBe('departures-board');
     expect(project.version).toBe('1.0');
 

@@ -26,7 +26,11 @@
  *
  * Exports:
  * - WidgetManifest: Root widget manifest model parsed from widget XML declarations
- * - ApiBlock: Public API declaration block defining properties, bindings, and elements
+ * - ApiBlock: Public API declaration block defining properties, bindings, elements,
+ *             and the Palette's label, category and description (schema 0.5)
+ * - PaletteMetadataKey: The three `<api>` palette metadata attribute names
+ * - PALETTE_METADATA_KEYS: Those names, the one list the parser and validator share
+ * - PaletteMetadataLocations: Where an `<api>`'s palette metadata was written
  * - PropType: Property data type union per design_spec §13.2
  * - PropDef: Individual property descriptor and C++ setter mapping
  * - BindDef: Reactive subject binding slot descriptor
@@ -84,9 +88,45 @@ export interface ApiBlock {
   readonly bindings: readonly BindDef[];
   /** Child collection elements (e.g. `<column>`, §9). */
   readonly elements: readonly ElementDef[];
+  /**
+   * The element's display name in the designer's Palette, e.g. "Label"
+   * (schema 0.5). Trimmed as parsed; at most 32 characters.
+   *
+   * None of the three palette fields is inherited through `extends`: they
+   * describe the element that declares them, and a project widget extending
+   * `u8g2gl_obj` is not an "Object". The manifest registry keeps the
+   * element's own `api`, so an effective manifest carries only what its own
+   * file wrote. None reaches generated code.
+   */
+  readonly label?: string;
+  /**
+   * The heading the Palette files the element under within its group, e.g.
+   * "Text" (schema 0.5). Trimmed; at most 24 characters; compared exactly,
+   * case included, so "Text" and "text" are two headings.
+   */
+  readonly category?: string;
+  /** One line describing the element in the Palette (schema 0.5). Trimmed; at most 120 characters. */
+  readonly description?: string;
+  /**
+   * Where each palette field was written, for those that were, so a refused
+   * value is reported at the attribute rather than at `<api>`.
+   */
+  readonly metadataLocs?: PaletteMetadataLocations;
   /** Source location where the API block was declared. */
   readonly loc?: SourceLocation;
 }
+
+/** The three palette metadata attributes an `<api>` may carry (schema 0.5). */
+export type PaletteMetadataKey = 'label' | 'category' | 'description';
+
+/**
+ * The palette metadata attribute names, as one list so the parser that reads
+ * them and the schema pass that checks them cannot disagree on which exist.
+ */
+export const PALETTE_METADATA_KEYS: readonly PaletteMetadataKey[] = ['label', 'category', 'description'];
+
+/** The written locations of an `<api>`'s palette metadata, by attribute name. */
+export type PaletteMetadataLocations = { readonly [K in PaletteMetadataKey]?: AttributeLocation };
 
 /**
  * Supported widget property types from design_spec §13.2.

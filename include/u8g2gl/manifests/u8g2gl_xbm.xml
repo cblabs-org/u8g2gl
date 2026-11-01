@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_xbm" extends="u8g2gl_obj">
-  <api>
+  <api label="Bitmap" category="Images" description="A monochrome XBM image.">
     <!-- `bitmap_mode` is NOT declared here: u8g2gl_obj declares it identically
          and every element inherits it. A redeclaration would be a second
          spelling of one property, which is what [D-17] exists to prevent. -->

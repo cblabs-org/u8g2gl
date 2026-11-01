@@ -103,7 +103,7 @@ test('a duplicate is the source verbatim after its original, renamed — its nam
 function altDrag(elements: string, names: readonly string[]): { model: FakeModel; drag: DragEdit; text: string } {
   const text = screen(elements);
   const texts = new Map([
-    ['u8g2gl.xml', '<u8g2gl schema="0.4" name="dup" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n'],
+    ['u8g2gl.xml', '<u8g2gl schema="0.5" name="dup" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n'],
     ['globals.xml', '<globals>\n  <subjects>\n    <int name="level" value="5" />\n  </subjects>\n</globals>\n'],
     [SCREEN, text],
   ]);

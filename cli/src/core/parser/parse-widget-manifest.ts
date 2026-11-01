@@ -22,19 +22,29 @@
  *              fix is always the same three-step migration and the CLI can
  *              say so instead of making the author work it out.
  *
+ *              Schema 0.5's palette metadata — `label`, `category` and
+ *              `description` on `<api>` — is read here, trimmed, and nothing
+ *              else: whether a value is allowed (its length, an empty value,
+ *              a 0.4 project using it at all) is the schema pass's question,
+ *              so this parser keeps whatever was written for that pass to
+ *              judge.
+ *
  * Exports:
  * - parseWidgetManifest: Transform a parsed RawXmlElement into a WidgetManifest model
  * - parseWidgetManifestFile: Parse a raw XML string into a ParseResult<WidgetManifest>
  */
 
-import type {
-  ApiBlock,
-  BindDef,
-  ElementArgDef,
-  ElementDef,
-  PropDef,
-  PropType,
-  WidgetManifest,
+import {
+  PALETTE_METADATA_KEYS,
+  type ApiBlock,
+  type BindDef,
+  type ElementArgDef,
+  type ElementDef,
+  type PaletteMetadataKey,
+  type PaletteMetadataLocations,
+  type PropDef,
+  type PropType,
+  type WidgetManifest,
 } from '../schema/widget-manifest.js';
 import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
@@ -248,6 +258,7 @@ export function parseWidgetManifest(
     props,
     bindings,
     elements,
+    ...(apiEl ? parsePaletteMetadata(apiEl) : {}),
     loc: apiEl?.loc,
   };
 
@@ -299,6 +310,32 @@ export function parseWidgetManifest(
     view,
     loc: root.loc,
   };
+}
+
+/** An `<api>`'s palette metadata as parsed: the values written, and where. */
+type ParsedPaletteMetadata = { -readonly [K in PaletteMetadataKey]?: string } & {
+  metadataLocs?: PaletteMetadataLocations;
+};
+
+// parsePaletteMetadata
+// Reads schema 0.5's `label`, `category` and `description` from an `<api>`,
+// each trimmed, with where each was written. An attribute that is absent
+// leaves its field absent; one written empty (or only whitespace) is kept as
+// '' so the schema pass can say the author wrote it and meant nothing by it,
+// rather than the parser quietly treating it as never written.
+//   apiEl — the `<api>` element
+function parsePaletteMetadata(apiEl: RawXmlElement): ParsedPaletteMetadata {
+  const parsed: ParsedPaletteMetadata = {};
+  const locs: { -readonly [K in PaletteMetadataKey]?: PaletteMetadataLocations[K] } = {};
+  for (const key of PALETTE_METADATA_KEYS) {
+    const value = getAttributeValue(apiEl, key);
+    const loc = getAttributeLocation(apiEl, key);
+    if (value === undefined || loc === undefined) continue;
+    parsed[key] = value.trim();
+    locs[key] = loc;
+  }
+  if (Object.keys(locs).length > 0) parsed.metadataLocs = locs;
+  return parsed;
 }
 
 /**

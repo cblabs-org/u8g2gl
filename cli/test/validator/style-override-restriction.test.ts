@@ -53,7 +53,7 @@ function model(body: string): ProjectModel {
   );
   const screen = parseScreenFile(`<screen name="home">\n    <view>\n${body}\n    </view>\n</screen>\n`, 'screens/screen_home.xml');
   return {
-    project: { schema: '0.4', name: 'overrides', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
+    project: { schema: '0.5', name: 'overrides', version: '1.0.0', targets: [{ name: 'primary', setup: NARROW }] },
     globals: globals.value!,
     screens: [screen.value!],
     manifests: REGISTRY,
@@ -99,7 +99,7 @@ function editorOverrides(result: Journeys): readonly { readonly name: string }[]
     realised: result.generated.realised!,
     resolved: result.generated.resolved!,
     manifests: REGISTRY,
-    generated: { source: 'u8g2gl.xml', schema: '0.4', generator: '9.9.9', target: 'host' },
+    generated: { source: 'u8g2gl.xml', schema: '0.5', generator: '9.9.9', target: 'host' },
   }) as { readonly screens: readonly { readonly elements: readonly { readonly style_overrides: readonly { name: string }[] }[] }[] };
   return scene.screens[0]!.elements[0]!.style_overrides;
 }

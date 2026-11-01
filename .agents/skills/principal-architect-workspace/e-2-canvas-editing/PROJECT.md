@@ -63,3 +63,7 @@ context's preview gallery (needs `<previews>`); the screen-flow view; packaging.
   amendment), which replaces E-2b ruling 10's measurement point.
 - **2026-10-31.** E-2a (#36), E-2b (#37) and E-2c (#38) merged. E-2d issued from `main` @
   `ef49a1d` (`e-2d-palette`).
+- **2026-10-31.** E-2d (#39) merged; **E-2 complete.** At E-2d's end, on C4's item 1, the PA
+  recommended no schema feature yet. The owner answered "Add palette metadata", then approved
+  the S-1 plan ("Approved, proceed"): schema 0.5 with `label`, `category` and `description` on
+  `<api>`, with icons held back. `<previews>` is deferred to E-3. See `s-1-palette-metadata`.

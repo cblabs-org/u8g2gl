@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/core/schema/index.ts
- * Purpose: Central barrel export for the U8G2GL schema version 0.4 document model.
+ * Purpose: Central barrel export for the U8G2GL schema version 0.5 document model.
  *          Provides the complete TypeScript type system used across parser, validator,
  *          resolver, code generator, and visual designer tooling.
  * Description: Re-exports all immutable AST types, manifest contracts, display catalogue
@@ -67,7 +67,10 @@
  *     a `WidgetManifest` whose `<api>` carries a `view`, not a second type
  *     with the same shape — see widget-manifest.ts for why `extends` is
  *     optional as a result.
- *   - ApiBlock: Public API declaration block
+ *   - ApiBlock: Public API declaration block, with the Palette's label,
+ *     category and description (schema 0.5)
+ *   - PaletteMetadataKey: The three palette metadata attribute names
+ *   - PaletteMetadataLocations: Where an `<api>`'s palette metadata was written
  *   - PropType: Widget property data type union
  *   - PropDef: Property descriptor mapping to C++ setter method
  *   - BindDef: Reactive subject binding slot descriptor
@@ -140,6 +143,8 @@ export type {
 export type {
   WidgetManifest,
   ApiBlock,
+  PaletteMetadataKey,
+  PaletteMetadataLocations,
   PropType,
   PropDef,
   BindDef,

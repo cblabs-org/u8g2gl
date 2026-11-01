@@ -190,8 +190,9 @@ describe('validate orchestrator integration', () => {
 
     expect(schemaDiag).toBeDefined();
     expect(schemaDiag?.severity).toBe('error');
-    expect(schemaDiag?.suggestions).toEqual(['0.4']);
-    expect(schemaDiag?.message).toContain("Expected '0.4'");
+    // Both accepted versions are named; the suggestion is the current one.
+    expect(schemaDiag?.suggestions).toEqual(['0.5']);
+    expect(schemaDiag?.message).toContain("Expected '0.4' or '0.5'");
   });
 
   // --- PR-3R WO8: the §15.4 refusal path — 0.3 is superseded, not merely
@@ -226,7 +227,9 @@ describe('validate orchestrator integration', () => {
       ).toBe(false);
     });
 
-    it('validates cleanly at schema="0.4" (the fixture default)', () => {
+    it('validates cleanly at schema="0.4", the version this fixture is kept at', () => {
+      // The one fixture left at 0.4 when the rest moved to 0.5: it proves a
+      // 0.4 project still validates (§15.4, 0.5 is additive).
       const input = loadValidProject();
       expect(input.project.schema).toBe('0.4');
 

@@ -25,7 +25,7 @@ const created: string[] = [];
 
 /** A u8g2gl.xml and one screen — enough for `design` to accept the directory. */
 export const MINIMAL_PROJECT: Readonly<Record<string, string>> = {
-  'u8g2gl.xml': '<u8g2gl schema="0.4" name="design" version="1.0.0" />\n',
+  'u8g2gl.xml': '<u8g2gl schema="0.5" name="design" version="1.0.0" />\n',
   'screens/screen_home.xml': '<screen name="home" />\n',
 };
 

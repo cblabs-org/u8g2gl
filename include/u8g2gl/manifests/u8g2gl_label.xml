@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <widget name="u8g2gl_label" extends="u8g2gl_obj">
-  <api>
+  <api label="Label" category="Text" description="One line of text, clipped, cut short with dots, or scrolled when it is too long.">
     <prop name="text" type="string" setter="set_text" default=""
           help="Static display text. Overridden when bind_text is active." />
     <prop name="font" type="font" setter="set_font" required="true"

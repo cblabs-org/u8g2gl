@@ -65,7 +65,7 @@ const GLOBALS_XML = `<globals>
 </globals>
 `;
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="realise" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="realise" version="1.0.0">
     <targets><target name="primary" setup="${WIDE}" /></targets>
 </u8g2gl>
 `;

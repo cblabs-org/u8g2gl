@@ -120,7 +120,7 @@ interface Options {
 /** Generates a project in memory against the real framework manifests. */
 function generateProject(options: Options): GenerateResult {
   const project = parseProjectFile(
-    `<u8g2gl schema="0.4" name="t" version="1.0.0"><targets><target name="primary" setup="${
+    `<u8g2gl schema="0.5" name="t" version="1.0.0"><targets><target name="primary" setup="${
       options.display ?? DISPLAY_128
     }" /></targets></u8g2gl>`,
     'u8g2gl.xml',

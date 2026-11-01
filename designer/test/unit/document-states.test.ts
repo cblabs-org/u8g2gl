@@ -24,7 +24,7 @@ function run(screen: string): TextPipelineResult {
   const texts = new Map([
     [
       'u8g2gl.xml',
-      '<u8g2gl schema="0.4" name="states" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
+      '<u8g2gl schema="0.5" name="states" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
     ],
     ['globals.xml', '<globals>\n</globals>\n'],
     [SCREEN, screen],

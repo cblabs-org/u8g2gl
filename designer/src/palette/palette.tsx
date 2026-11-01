@@ -4,16 +4,20 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/palette/palette.tsx
- * Purpose: The Palette view of the primary sidebar (ui_spec §6): the element
- *          tags a screen may use, grouped Framework / Project / Drawing, with a
- *          filter, each one dragged from here onto the canvas to insert it.
+ * Purpose: The Palette view of the primary sidebar (ui_spec §6): the elements
+ *          a screen may use, grouped Framework / Project / Drawing and filed by
+ *          category within each, with a filter, each one dragged from here
+ *          onto the canvas to insert it.
  * Description: The groups come from the latest pipeline run's manifest
  *              registry (`palette-entries.ts`). The component subscribes to the
  *              registry alone, not to the run: the registry is rebuilt only
  *              when a manifest's parse changes, so a keystroke or a drag
- *              re-renders nothing here. Each tag is an HTML drag source
- *              carrying its tag under `PALETTE_DRAG_TYPE`, which the canvas
- *              accepts.
+ *              re-renders nothing here. Each entry shows its label (or its tag
+ *              when it has none), the tag in muted text beside a label, and its
+ *              description beneath; a category heading is shown above its
+ *              entries, and the uncategorised come last with none. Each entry
+ *              is an HTML drag source carrying its tag under
+ *              `PALETTE_DRAG_TYPE`, which the canvas accepts.
  *
  * Exports:
  * - Palette:  The component
@@ -53,24 +57,33 @@ export function Palette(): React.JSX.Element {
       {shown.map((group) => (
         <section key={group.title} className="file-group palette-group" data-group={group.title}>
           <h2>{group.title}</h2>
-          <ul>
-            {group.tags.map((tag) => (
-              <li key={tag}>
-                <div
-                  className="palette-tag"
-                  draggable
-                  data-tag={tag}
-                  title={`Drag <${tag}> onto the canvas to insert it`}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData(PALETTE_DRAG_TYPE, tag);
-                    event.dataTransfer.effectAllowed = 'copy';
-                  }}
-                >
-                  {tag}
-                </div>
-              </li>
-            ))}
-          </ul>
+          {group.sections.map((section) => (
+            // The uncategorised section is the only one without a category,
+            // and a category is never empty, so '' cannot collide with one.
+            <div key={section.category ?? ''} className="palette-category" data-category={section.category}>
+              {section.category !== undefined && <h3>{section.category}</h3>}
+              <ul>
+                {section.entries.map((entry) => (
+                  <li key={entry.tag}>
+                    <div
+                      className="palette-tag"
+                      draggable
+                      data-tag={entry.tag}
+                      title={`Drag <${entry.tag}> onto the canvas to insert it`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.setData(PALETTE_DRAG_TYPE, entry.tag);
+                        event.dataTransfer.effectAllowed = 'copy';
+                      }}
+                    >
+                      <span className={entry.label === undefined ? 'palette-label is-tag' : 'palette-label'}>{entry.label ?? entry.tag}</span>
+                      {entry.label !== undefined && <span className="palette-tag-name">{entry.tag}</span>}
+                      {entry.description !== undefined && <span className="palette-description">{entry.description}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       ))}
     </aside>

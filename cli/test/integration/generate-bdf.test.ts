@@ -56,7 +56,7 @@ function createProject(): string {
   copyFileSync(fourBySix, join(dir, 'fonts/4x6.bdf'));
   writeFileSync(
     join(dir, 'u8g2gl.xml'),
-    `<u8g2gl schema="0.4" name="bdf_determinism" version="1.0.0">
+    `<u8g2gl schema="0.5" name="bdf_determinism" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
     </targets>

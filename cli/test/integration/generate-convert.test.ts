@@ -64,7 +64,7 @@ function createProject(): string {
   writeFileSync(join(dir, 'assets/disc.png'), discPng());
   writeFileSync(
     join(dir, 'u8g2gl.xml'),
-    `<u8g2gl schema="0.4" name="convert_determinism" version="1.0.0">
+    `<u8g2gl schema="0.5" name="convert_determinism" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
     </targets>

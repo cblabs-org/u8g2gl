@@ -29,7 +29,7 @@ import { CATALOGUE } from '../../src/data/catalogue.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
 import type { Diagnostic } from '../../src/core/schema/diagnostic.js';
 
-const PROJECT_XML = `<u8g2gl schema="0.4" name="draws" version="1.0.0">
+const PROJECT_XML = `<u8g2gl schema="0.5" name="draws" version="1.0.0">
     <targets><target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" /></targets>
 </u8g2gl>
 `;

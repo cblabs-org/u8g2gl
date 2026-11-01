@@ -26,7 +26,7 @@ const WIDE = 'U8G2_SH1122_256X64_F_3W_HW_SPI';
 
 function inputFor(setup: string): ValidateInput {
   return {
-    project: { schema: '0.4', name: 'geom', version: '1.0.0', targets: [{ name: 'primary', setup }] },
+    project: { schema: '0.5', name: 'geom', version: '1.0.0', targets: [{ name: 'primary', setup }] },
     globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
     screens: [],
     manifests: frameworkRegistry(),

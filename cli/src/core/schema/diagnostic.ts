@@ -374,6 +374,26 @@ export const DIAGNOSTIC_CODES = {
    * the author's.
    */
   MISSING_COMPILED_IMAGE: 'U8G2GL_MISSING_COMPILED_IMAGE',
+  /**
+   * An `<api>`'s palette metadata (schema 0.5) breaks its rule: `label`,
+   * `category` or `description` is empty once trimmed, longer than its limit
+   * (`PALETTE_METADATA_LIMITS` in validate-schema.ts), or runs over more than
+   * one line. An empty
+   * value is refused rather than ignored because an author who writes the
+   * attribute means something by it. Located at the value; the message names
+   * the attribute, the rule and the length.
+   */
+  INVALID_PALETTE_METADATA: 'U8G2GL_INVALID_PALETTE_METADATA',
+  /**
+   * A project's own manifest uses vocabulary newer than the schema version the
+   * project declares — today `label`, `category` or `description` on `<api>`,
+   * which arrived in 0.5, in a `schema="0.4"` project (§15.4). One diagnostic
+   * per attribute, located at the attribute's name, the message naming
+   * `schema="0.5"` as the fix. Never silently accepted: an older version is a
+   * promise about which vocabulary the files use. No suggestion is carried,
+   * because the fix is in `u8g2gl.xml`, not at the attribute reported.
+   */
+  NEWER_SCHEMA_REQUIRED: 'U8G2GL_NEWER_SCHEMA_REQUIRED',
 } as const;
 
 /**
