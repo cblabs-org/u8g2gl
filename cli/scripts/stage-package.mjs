@@ -18,15 +18,17 @@
  *              2. builds the designer (production) against it;
  *              3. builds the CLI;
  *              4. stages `designer/` and `framework/`, each stamped with the
- *                 CLI version and the commit (package-copy.ts).
- *              Run as `postpack` with `--clean`, it removes the staged
- *              directories, which are git-ignored. Progress and the builds'
+ *                 CLI version and the commit (package-copy.ts), and copies in
+ *                 the repository's `THIRD-PARTY-NOTICES.md`, which covers
+ *                 what they carry.
+ *              Run as `postpack` with `--clean`, it removes what it staged,
+ *              all of which is git-ignored. Progress and the builds'
  *              output go to stderr, so `npm pack --json` stays parseable.
  *              Usage: node scripts/stage-package.mjs [--clean]
  */
 
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -36,8 +38,12 @@ const REPO_ROOT = resolve(CLI_ROOT, '..');
 const DESIGNER_ROOT = join(REPO_ROOT, 'designer');
 /** Where the framework editor Wasm is built; removed first, so it is never reused. */
 const WASM_BUILD = join(REPO_ROOT, 'build', 'package-wasm');
-/** The staged directories, inside the CLI package. */
-const STAGED = { designer: join(CLI_ROOT, 'designer'), framework: join(CLI_ROOT, 'framework') };
+/** What is staged, inside the CLI package. */
+const STAGED = {
+  designer: join(CLI_ROOT, 'designer'),
+  framework: join(CLI_ROOT, 'framework'),
+  notices: join(CLI_ROOT, 'THIRD-PARTY-NOTICES.md'),
+};
 
 // log
 // A progress line, on stderr (see the header).
@@ -77,10 +83,10 @@ function capture(command, args) {
 }
 
 // removeStaged
-// Removes both staged directories, if present.
+// Removes everything staged, if present.
 function removeStaged() {
-  for (const dir of Object.values(STAGED)) {
-    rmSync(dir, { recursive: true, force: true });
+  for (const path of Object.values(STAGED)) {
+    rmSync(path, { recursive: true, force: true });
   }
 }
 
@@ -181,12 +187,15 @@ async function stage(designerDist, commit) {
   writePackageStamp(STAGED.designer, stamp);
   const files = stageFramework(REPO_ROOT, STAGED.framework);
   writePackageStamp(STAGED.framework, stamp);
+  // npm packs files from the package directory only, so the repository's
+  // notices are copied in, as cli/LICENSE is a copy of the repository's.
+  copyFileSync(join(REPO_ROOT, 'THIRD-PARTY-NOTICES.md'), STAGED.notices);
   log(`staged designer/ and framework/ (${files.length} files) for ${version} at ${commit}`);
 }
 
 // main
-// --clean for postpack; otherwise check, build and stage. The staged
-// directories are removed first in both, so a pack that failed halfway
+// --clean for postpack; otherwise check, build and stage. What was staged
+// is removed first in both, so a pack that failed halfway
 // leaves nothing a later pack could carry.
 async function main() {
   removeStaged();

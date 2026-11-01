@@ -11,9 +11,10 @@
  * Description: Reads the real `npm pack --dry-run --json` file list rather than
  *              trusting the `files` field, so what is asserted is what would
  *              actually be published. The pack skips its lifecycle scripts:
- *              `prepack` builds and stages `designer/` and `framework/`
+ *              `prepack` builds and stages `designer/` and `framework/`, and
+ *              copies in the repository's `THIRD-PARTY-NOTICES.md`
  *              (scripts/stage-package.mjs), which is the install smoke test's
- *              job, not a unit test's. Those two entries are therefore absent
+ *              job, not a unit test's. Those entries are therefore absent
  *              here, by design.
  */
 
@@ -27,7 +28,7 @@ const cliDir = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const repoLicence = resolve(cliDir, '../LICENSE');
 
 /** The `files` entries `prepack` stages, absent from a checkout until it runs. */
-const STAGED_ENTRIES = ['designer/', 'framework/'];
+const STAGED_ENTRIES = ['designer/', 'framework/', 'THIRD-PARTY-NOTICES.md'];
 
 /** Runs `npm pack --dry-run --json` without its scripts and returns the paths it would publish. */
 function packedPaths(): string[] {

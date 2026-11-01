@@ -28,6 +28,7 @@ cli/dist/
 # removed by it again (postpack): built output, never committed.
 /cli/designer/
 /cli/framework/
+/cli/THIRD-PARTY-NOTICES.md
 .vite/
 *.tsbuildinfo
 .npm/
