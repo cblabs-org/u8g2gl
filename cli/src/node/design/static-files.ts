@@ -111,6 +111,7 @@ export interface DesignerLookup extends StagedCopyLookup {
  */
 export function locateDesignerDist(lookup: DesignerLookup = {}): string | undefined {
   const staged = locateStagedCopy('designer', 'index.html', lookup);
+  // An ignored copy's reason is not surfaced, as in locateFrameworkRoot().
   if (staged.kind === 'staged') {
     return staged.dir;
   }

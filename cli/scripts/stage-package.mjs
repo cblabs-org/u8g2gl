@@ -38,7 +38,7 @@ const REPO_ROOT = resolve(CLI_ROOT, '..');
 const DESIGNER_ROOT = join(REPO_ROOT, 'designer');
 /** Where the framework editor Wasm is built; removed first, so it is never reused. */
 const WASM_BUILD = join(REPO_ROOT, 'build', 'package-wasm');
-/** What is staged, inside the CLI package. */
+/** What is staged, inside the CLI package: all of it git-ignored, all of it removed at postpack. */
 const STAGED = {
   designer: join(CLI_ROOT, 'designer'),
   framework: join(CLI_ROOT, 'framework'),

@@ -47,7 +47,12 @@ export const PACKAGE_STAMP_FILE = 'STAMP.json';
  */
 export const CLI_PACKAGE_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** What a stamp records: the CLI version and the commit a copy was staged from. */
+/**
+ * What a stamp records: the CLI version and the commit a copy was staged from.
+ * Only the version is a trust key. The commit is provenance, for a person
+ * asking what a package was built from: a lookup never compares it, because an
+ * installed CLI has no commit of its own to compare it with.
+ */
 export interface PackageStamp {
   readonly version: string;
   readonly commit: string;
@@ -75,6 +80,9 @@ export type StagedCopy =
  *
  * @param dir   The staged directory (`designer/` or `framework/`), which must exist.
  * @param stamp The CLI version and commit it was staged from.
+ * @throws Error (ENOENT, EACCES) if the directory is missing or not writable:
+ *         a staging defect, which must stop the pack rather than ship a copy
+ *         no lookup will trust.
  */
 export function writePackageStamp(dir: string, stamp: PackageStamp): void {
   writeFileSync(join(dir, PACKAGE_STAMP_FILE), `${JSON.stringify({ version: stamp.version, commit: stamp.commit }, null, 2)}\n`);
@@ -87,7 +95,9 @@ export function writePackageStamp(dir: string, stamp: PackageStamp): void {
  * marker file exists. The version check is what makes a staged copy safe to
  * prefer over a source tree: a copy left behind by an older pack, in a
  * checkout whose CLI has since moved on, names an older version and is
- * ignored, so the lookup falls back to the live sources.
+ * ignored, so the lookup falls back to the live sources. A copy of the
+ * same version from another commit is trusted; only an interrupted pack in a
+ * checkout leaves one, and the stage script removes it at the next pack.
  *
  * @param name   Which staged directory.
  * @param marker A file, relative to it, that a complete copy has.

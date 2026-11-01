@@ -230,10 +230,12 @@ function startDesign(cli, project, env) {
     const child = spawn(process.execPath, [cli, 'design', project, '--no-open', '--json'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
     designChild = child;
     let out = '';
+    let settled = false;
     child.stdout.on('data', (chunk) => {
       out += chunk;
       const line = out.split('\n')[0];
-      if (out.includes('\n')) {
+      if (!settled && out.includes('\n')) {
+        settled = true;
         try {
           resolvePromise({ child, url: new URL(JSON.parse(line).url) });
         } catch (cause) {
@@ -241,7 +243,11 @@ function startDesign(cli, project, env) {
         }
       }
     });
-    child.on('exit', (code) => reject(new Error(`design exited (${code}) before printing its URL`)));
+    // After the URL is printed, an exit (the SIGTERM that ends the check) has
+    // nothing left to report: the promise is already settled.
+    child.on('exit', (code) => {
+      if (!settled) reject(new Error(`design exited (${code}) before printing its URL`));
+    });
   });
 }
 

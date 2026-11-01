@@ -101,7 +101,9 @@ export function frameworkBuildSetup(
   // Every framework file an object can depend on. In a release these change
   // only with the version; in a working tree they change without one, and an
   // object compiled from an older source must not be reused. It is the set the
-  // npm package stages too, so the key covers exactly what a package carries.
+  // npm package stages too, so the key covers exactly what a package carries
+  // (it includes the CMake files and src/'s internal header, which earlier
+  // keys missed; caches from those keys are simply not reused).
   const frameworkHash = hashFiles(frameworkFiles(framework)).slice(0, 16);
   const toolchainKey = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}.${RUNTIME_VERSION.patch}-em${toolchain.version}-${frameworkHash}`;
   const configKey = `${toolchainKey}-${configHash}`;

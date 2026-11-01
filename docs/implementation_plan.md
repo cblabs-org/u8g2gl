@@ -98,6 +98,8 @@ This is a stronger answer than the original question anticipated: it also correc
 
 Generated code is never published from U8G2GL; it belongs to the app that owns the screens, as LVGL Pro's output belongs to the app. A git submodule is the pragmatic pre-1.0 choice for both runtime and CLI — it avoids npm publishing on every iteration — with npm as the release channel once the schema stabilises.
 
+**The npm package is built, not yet published.** `npm pack` in `cli/` produces a package that does everything a checkout does: its `prepack` (`cli/scripts/stage-package.mjs`) refuses a dirty tree or an unpinned Emscripten, builds the framework editor Wasm, the production designer and the CLI from scratch, and stages `designer/` and `framework/` (the sources a project's Wasm builds compile, U8G2's `u8g2_fonts.c` included), each stamped with the CLI version and commit. The CLI's lookups prefer a staged copy whose stamp is their own version, and fall back to the source tree as before. `scripts/check-package.mjs` is the gate, locally and as CI's `package` job: it installs the tarball where no source tree is visible, with no registry access, and runs `validate`, `generate` and `design` on the departures fixture, including an `editor-wasm` build and a test run (about 15 MB packed, 54 MB installed, 751 files at CLI 0.15.1). Publishing and tagging remain the owner's (rules/03); the runtime still reaches firmware through PlatformIO, never npm.
+
 ### ~~PD-3~~ · Core object model — **RESOLVED**
 
 **Ratified: LVGL-parallel decomposition, virtual base class, flat runtime array with parent index.**

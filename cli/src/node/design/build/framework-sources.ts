@@ -107,6 +107,9 @@ export function locateSourceTree(start: string = dirname(fileURLToPath(import.me
  */
 export function locateFrameworkRoot(lookup: FrameworkLookup = {}): string | undefined {
   const staged = locateStagedCopy('framework', MARKER, lookup);
+  // An ignored copy's reason is not surfaced: the stage script stamps every
+  // copy with the version it packs, so a mismatch arises only in a checkout,
+  // where the source tree found next is the right answer and not an error.
   return staged.kind === 'staged' ? staged.dir : locateSourceTree(lookup.start);
 }
 
