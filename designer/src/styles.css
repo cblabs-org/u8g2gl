@@ -149,6 +149,17 @@ button { font: inherit; color: inherit; }
 /* The canvas's tip at the pointer: why a gesture does not write (canvas-gestures.ts). */
 .canvas-tip { position: absolute; z-index: 2; pointer-events: none; padding: 2px 6px; border-radius: 3px; background: #2b2f38; color: #e6e6e6; border: 1px solid #4f8cff; font-size: 11px; white-space: nowrap; }
 .canvas-banner { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 3px; background: #4a2a2c; color: #ffd6d6; font-size: 12px; white-space: nowrap; }
+/* Run and the test run's verdict (EDITOR-DESIGN §2.2), and the mismatch's legend over the stage. */
+.test-run { display: inline-flex; align-items: center; gap: 6px; }
+.canvas-toolbar .run-button { cursor: pointer; }
+.canvas-toolbar .run-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.verdict { white-space: nowrap; color: var(--text-dim); }
+.verdict-parity { color: #7fd17f; }
+.verdict-mismatch, .verdict-failed { color: var(--error); }
+.verdict-note { color: var(--text-dim); }
+.report-path { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-family: ui-monospace, Menlo, monospace; }
+.diff-info { position: absolute; bottom: 8px; left: 8px; z-index: 1; padding: 4px 8px; border-radius: 3px; background: #0d2a30; border: 1px solid #00e5ff; color: #d8fbff; font-size: 11px; }
+.diff-info .hash code { font-family: ui-monospace, Menlo, monospace; }
 /* The selected elements' text in the XML editor (selection, ui_spec §4.3). */
 .monaco-editor .selected-element { background: rgba(79, 140, 255, 0.16); }
 

@@ -18,7 +18,8 @@
  *              while one is dragged, the alignment guides a drag has
  *              snapped to, the outlines of placeholder widgets, and
  *              the hatching over an element an error is in (§3.8: the frame
- *              stays live, and the problem is marked over it, not in it).
+ *              stays live, and the problem is marked over it, not in it), and
+ *              a test run's differing pixels (EDITOR-DESIGN §4.1).
  *              It is never part of the framebuffer, so nothing it draws can be
  *              mistaken for a pixel the display would light.
  *
@@ -40,6 +41,7 @@
  *     - setOverlay():  Replace what the overlay shows
  *     - setMarquee():  Show or hide the marquee being dragged
  *     - setGuides():   Show the alignment guides a drag lies on
+ *     - setDiff():     Mark a test run's differing pixels
  *     - setStale():    Dim the frame while the document has an error
  */
 
@@ -81,6 +83,13 @@ export interface GuideLine {
   readonly at: number;
 }
 
+/**
+ * A differing pixel's mark: a filled square over the pixel and a ring around
+ * it, so one pixel is findable at 1×. Apart from every other overlay colour.
+ */
+const DIFF_COLOUR = '#00e5ff';
+const DIFF_RING = 4;
+
 /** The guides' colour: apart from the selection's blue and the hatch's red. */
 const GUIDE_COLOUR = '#ff4fd8';
 
@@ -115,6 +124,7 @@ export class CanvasView {
   private overlayRects: readonly OverlayRect[] = [];
   private marquee: Box | undefined;
   private guides: readonly GuideLine[] = [];
+  private diff: readonly Box[] = [];
 
   /**
    * @param frame     The frame canvas.
@@ -181,6 +191,16 @@ export class CanvasView {
     if (lines.length === 0 && this.guides.length === 0) return;
     if (lines.length === this.guides.length && lines.every((line, i) => line.axis === this.guides[i]?.axis && line.at === this.guides[i]?.at)) return;
     this.guides = lines;
+    this.drawOverlay();
+  }
+
+  /**
+   * @brief Marks a test run's differing pixels, in device pixels; undefined or
+   *        empty clears them. Drawn over everything else on the overlay.
+   */
+  setDiff(pixels: readonly { readonly x: number; readonly y: number }[] | undefined): void {
+    if ((pixels === undefined || pixels.length === 0) && this.diff.length === 0) return;
+    this.diff = (pixels ?? []).map(({ x, y }) => ({ x, y, width: 1, height: 1 }));
     this.drawOverlay();
   }
 
@@ -261,7 +281,24 @@ export class CanvasView {
       context.stroke();
     }
 
-    // --- Step 4: The marquee, while one is dragged ---
+    // --- Step 4: A test run's differing pixels, over everything but the marquee ---
+    if (this.diff.length > 0) {
+      context.setLineDash([]);
+      context.lineWidth = 1;
+      context.fillStyle = DIFF_COLOUR;
+      context.strokeStyle = DIFF_COLOUR;
+      for (const pixel of this.diff) {
+        context.fillRect(pixel.x * this.zoom, pixel.y * this.zoom, this.zoom, this.zoom);
+        context.strokeRect(
+          pixel.x * this.zoom - DIFF_RING + 0.5,
+          pixel.y * this.zoom - DIFF_RING + 0.5,
+          this.zoom + 2 * DIFF_RING - 1,
+          this.zoom + 2 * DIFF_RING - 1,
+        );
+      }
+    }
+
+    // --- Step 5: The marquee, while one is dragged ---
     if (this.marquee !== undefined) {
       const box = this.screenBox(this.marquee);
       context.setLineDash([4, 3]);

@@ -21,8 +21,10 @@
  *              toolbar sets the zoom (1× to 8×, or fit) and the animation
  *              freeze, and holds the align and distribute buttons
  *              (`align-toolbar.tsx`), which share the gestures' edit path and
- *              subscribe to the selection themselves. The banner says why the
- *              frame is the last good one, or what the renderer cannot draw.
+ *              subscribe to the selection themselves, and Run with the last
+ *              test run's verdict (`test-run-controls.tsx`), whose mismatch
+ *              legend sits over the stage. The banner says why the frame is
+ *              the last good one, or what the renderer cannot draw.
  *
  * Exports:
  * - CanvasPanel:  The component
@@ -35,6 +37,7 @@ import { planInsert } from '../editing/insert-element';
 import { projectNames } from '../documents/element-names';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { AlignToolbar } from './align-toolbar';
+import { TestRunControls, TestRunDiffInfo } from './test-run-controls';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -132,6 +135,7 @@ export function CanvasPanel(): React.JSX.Element {
           </span>
         )}
         <AlignToolbar editor={editor} />
+        <TestRunControls />
         <span className="spacer" />
         {placeholderNote !== undefined && <span className="placeholder-note">{placeholderNote}</span>}
         <label>
@@ -150,6 +154,7 @@ export function CanvasPanel(): React.JSX.Element {
       </div>
       <div className="canvas-stage" ref={stage}>
         {state.stale && state.banner !== undefined && <div className="canvas-banner">{state.banner}</div>}
+        <TestRunDiffInfo />
         <div className="canvas-frame" ref={container} data-frame={state.frame} data-lit={state.lit} data-stale={state.stale}>
           <canvas className="frame" ref={frame} aria-label="Canvas" />
           <canvas className="overlay" ref={overlay} />

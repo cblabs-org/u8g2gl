@@ -21,6 +21,7 @@
  *     State:
  *     - documents, activeFile, selection, problems, output, projectName
  *     - wasm, loop:     The editor Wasm and the edit loop
+ *     - testRun:        Run and its verdict (EDITOR-DESIGN §4)
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded
@@ -39,6 +40,7 @@ import { EditLoop } from './pipeline/edit-loop';
 import type { DesignSession } from './session';
 import { SelectionModel } from './selection/selection-model';
 import { Observable } from './state/observable';
+import { TestRunController } from './test-run/test-run-controller';
 import { EditorWasmController } from './wasm/editor-wasm-controller';
 
 /** A file to show, and optionally the position to put the caret at. */
@@ -75,6 +77,8 @@ export class Workspace {
   readonly wasm: EditorWasmController;
   /** The live loop from text to pixels. */
   readonly loop: EditLoop;
+  /** Run: the firmware target checked against the live canvas. */
+  readonly testRun: TestRunController;
 
   /**
    * @param fs      The served project file system, connected.
@@ -92,6 +96,25 @@ export class Workspace {
     });
     this.wasm = new EditorWasmController(session, (line) => this.log(line));
     this.loop = new EditLoop(this, this.wasm);
+    this.testRun = new TestRunController({
+      session,
+      wasmStatus: this.wasm.status,
+      module: this.wasm.module,
+      lastRun: this.loop.lastRun,
+      wellFormed: this.loop.canvasEditing,
+      canvas: this.loop.frameState,
+      settled: () => this.loop.settled(),
+      restoreCanvas: () => this.loop.requestRun(),
+      dirtyDocuments: () =>
+        [...this.documents.dirty.get()].sort().flatMap((path) => {
+          const model = this.documents.modelOf(path);
+          return model === undefined ? [] : [{ path, content: model.getValue(), version: String(model.getVersionId()) }];
+        }),
+      onEdit: (listener) => this.documents.onDidChangeContent(() => listener()),
+      log: (line) => this.log(line),
+    });
+    this.loop.addDiagnosticSource(this.testRun.diagnostics);
+    this.testRun.mismatch.subscribe(() => this.loop.showDiff(this.testRun.mismatch.get()?.pixels));
   }
 
   /**
@@ -101,6 +124,7 @@ export class Workspace {
   start(): void {
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
+    this.testRun.start();
     void this.wasm.start();
   }
 
