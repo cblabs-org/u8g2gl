@@ -153,6 +153,7 @@ button { font: inherit; color: inherit; }
 .test-run { display: inline-flex; align-items: center; gap: 6px; }
 .canvas-toolbar .run-button { cursor: pointer; }
 .canvas-toolbar .run-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.after-pause { display: inline-flex; align-items: center; gap: 3px; color: var(--text-dim); white-space: nowrap; }
 .verdict { white-space: nowrap; color: var(--text-dim); }
 .verdict-parity { color: #7fd17f; }
 .verdict-mismatch, .verdict-failed { color: var(--error); }

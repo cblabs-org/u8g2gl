@@ -11,7 +11,8 @@
  *          (§4.3).
  * Description: `TestRunControls` is the button, disabled with its reason as
  *              the tooltip when Run is unavailable, and the verdict, which
- *              re-renders once a second while it shows an age. On a mismatch
+ *              re-renders once a second while it shows an age, and beside it
+ *              the *after a pause* setting (EDITOR-DESIGN §4.2). On a mismatch
  *              it says that a mismatch is a framework bug and offers *Save bug
  *              report*, then shows the path written. `TestRunDiffInfo` is the
  *              overlay's legend: both frames' SHA-256 hashes and the time,
@@ -40,6 +41,7 @@ export function TestRunControls(): React.JSX.Element {
   const view = useObservable(testRun.view);
   const availability = useObservable(testRun.availability);
   const reportPath = useObservable(testRun.reportPath);
+  const afterPause = useObservable(testRun.afterPause);
   const [now, setNow] = useState(() => performance.now());
 
   // --- The age: once a second while a finished verdict is shown ---
@@ -69,6 +71,10 @@ export function TestRunControls(): React.JSX.Element {
       >
         ▶ Run
       </button>
+      <label className="after-pause" title="Run 2 s after the last edit. Off by default; remembered by this browser">
+        <input type="checkbox" aria-label="Run after a pause" checked={afterPause} onChange={(event) => testRun.setAfterPause(event.target.checked)} />
+        after a pause
+      </label>
       {text !== '' && (
         <span className={`verdict verdict-${view.kind}`} data-verdict={view.kind} title={view.kind === 'mismatch' ? 'A mismatch is a framework bug' : undefined}>
           {text}

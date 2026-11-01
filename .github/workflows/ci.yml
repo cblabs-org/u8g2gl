@@ -189,7 +189,7 @@ jobs:
       - name: Build the designer (production) and check it carries no test hook
         run: |
           cd designer && npm run build
-          if grep -rlE '__u8g2gl|installTestHooks|u8g2gl:key-to-blit|u8g2gl:drag-to-blit|E2E-TEST-BUILD' dist; then
+          if grep -rlE '__u8g2gl|installTestHooks|u8g2gl:key-to-blit|u8g2gl:drag-to-blit|u8g2gl:flip-harness-pixel|E2E-TEST-BUILD' dist; then
             echo "::error::the production designer build contains a test hook"
             exit 1
           fi

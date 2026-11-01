@@ -9,14 +9,15 @@
  *          in every state, the staleness count, the reasons Run is
  *          unavailable, and the controller's state machine — waiting for a
  *          rebuild, queueing at most one run, the overlay clearing at the
- *          next edit, and a failed run's diagnostics for Problems.
+ *          next edit, a failed run's diagnostics for Problems, and *Run after
+ *          a pause*: off by default, kept per browser, 2 s after the last edit.
  * Description: The controller is driven through a fake target and a fake
  *              `fetch` that answers the job's records; the live frames come
  *              from a fake editor module that draws a fixed frame.
  */
 
 import { expect, test } from '@playwright/test';
-import { TestRunController, type TestRunTarget } from '../../src/test-run/test-run-controller';
+import { AFTER_PAUSE_KEY, PAUSE_MS, TestRunController, type TestRunTarget } from '../../src/test-run/test-run-controller';
 import {
   compareFrames,
   differingPixels,
@@ -221,4 +222,33 @@ test('Runs pressed while one is in flight queue at most one, which runs after it
   await h.until(() => h.posted.length === 2 && !h.controller.busy);
   expect(h.posted).toHaveLength(2);
   expect(h.controller.view.get().kind).toBe('parity');
+});
+
+test('Run after a pause is off by default; on, it runs once, PAUSE_MS after the last of several edits, and is remembered', async () => {
+  const stored = new Map<string, string>();
+  Object.assign(globalThis, {
+    localStorage: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => void stored.set(key, value) },
+  });
+  try {
+    const off = harness();
+    expect(off.controller.afterPause.get()).toBe(false);
+    off.edit();
+    await new Promise((resolve) => setTimeout(resolve, PAUSE_MS + 200));
+    expect(off.posted).toHaveLength(0);
+
+    off.controller.setAfterPause(true);
+    expect(stored.get(AFTER_PAUSE_KEY)).toBe('on');
+    const on = harness();
+    expect(on.controller.afterPause.get()).toBe(true);
+    on.edit();
+    await new Promise((resolve) => setTimeout(resolve, PAUSE_MS / 2));
+    on.edit();
+    await new Promise((resolve) => setTimeout(resolve, PAUSE_MS / 2 + 100));
+    expect(on.posted).toHaveLength(0);
+    await on.until(() => on.posted.length === 1 && on.controller.view.get().kind === 'parity');
+    expect(on.posted).toHaveLength(1);
+    expect(on.controller.view.get()).toMatchObject({ kind: 'parity', editsSince: 0 });
+  } finally {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
 });

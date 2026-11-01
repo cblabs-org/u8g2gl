@@ -29,9 +29,17 @@
  *              it; one pressed while another run is in flight is queued, at
  *              most one, and runs with the text current when it starts.
  *
+ *              *Run after a pause* (§4.2) is a setting, off by default and
+ *              kept per browser: when on, a run starts PAUSE_MS after the
+ *              last edit, through the same path as a press, so it waits,
+ *              queues and is refused exactly as one would be (silently, when
+ *              Run is unavailable: nobody pressed anything).
+ *
  * Exports:
  * - TEST_RUN_JOB:         The server's job name
  * - TEST_RUN_REPORT_PATH: The bug-report route
+ * - PAUSE_MS:             How long a pause is
+ * - AFTER_PAUSE_KEY:      Where the setting is kept
  * - Source:               A read-only observable value
  * - TestRunTarget:        What the controller drives, so tests can fake it
  * - MismatchDetail:       The last mismatch
@@ -42,6 +50,8 @@
  *     - mismatch:          The last mismatch's detail, for the overlay
  *     - diagnostics:       A failed run's diagnostics, for Problems
  *     - reportPath:        Where the last bug report was written
+ *     - afterPause:        The *Run after a pause* setting
+ *     - setAfterPause():   Change it, and remember it for this browser
  *     - run():             Press Run
  *     - saveReport():      Save the bug report for the last mismatch
  *
@@ -74,6 +84,12 @@ export const TEST_RUN_JOB = 'test-run';
 
 /** The design server's bug-report route. */
 export const TEST_RUN_REPORT_PATH = '/api/test-run/report';
+
+/** How long after the last edit *Run after a pause* starts a run. */
+export const PAUSE_MS = 2000;
+
+/** Where this browser remembers the *Run after a pause* setting. */
+export const AFTER_PAUSE_KEY = 'u8g2gl.test-run.after-pause';
 
 /** How often a running job's record is polled. */
 const POLL_MS = 200;
@@ -161,6 +177,8 @@ export class TestRunController {
   readonly diagnostics = new Observable<readonly Diagnostic[]>([]);
   /** Where the last bug report was written, once saved. */
   readonly reportPath = new Observable<string | undefined>(undefined);
+  /** *Run after a pause in editing*: off unless this browser turned it on. */
+  readonly afterPause = new Observable<boolean>(false);
   private readonly target: TestRunTarget;
   private readonly subscriptions: Array<() => void> = [];
   private edits = 0;
@@ -170,14 +188,16 @@ export class TestRunController {
   private waiting = false;
   private deciding = false;
   private lastMismatch: MismatchDetail | undefined;
+  private pauseTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** @param target The workspace parts the controller reads and asks. */
   constructor(target: TestRunTarget) {
     this.target = target;
   }
 
-  /** @brief Subscribes to what decides availability and staleness. */
+  /** @brief Reads the setting, and subscribes to what decides availability and staleness. */
   start(): void {
+    this.afterPause.set(readSetting());
     const update = (): void => this.updateAvailability();
     this.subscriptions.push(
       this.target.wasmStatus.subscribe(update),
@@ -190,7 +210,20 @@ export class TestRunController {
 
   /** @brief Stops listening. A run in flight finishes on the server unobserved. */
   dispose(): void {
+    if (this.pauseTimer !== undefined) clearTimeout(this.pauseTimer);
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
+  }
+
+  /**
+   * @brief Turns *Run after a pause* on or off, and remembers it for this browser.
+   */
+  setAfterPause(on: boolean): void {
+    this.afterPause.set(on);
+    writeSetting(on);
+    if (!on && this.pauseTimer !== undefined) {
+      clearTimeout(this.pauseTimer);
+      this.pauseTimer = undefined;
+    }
   }
 
   /**
@@ -199,15 +232,18 @@ export class TestRunController {
    * Runs now when available; waits for a rebuilding editor Wasm; queues
    * behind a run in flight (at most one waits, and it takes the latest text);
    * does nothing while Run is unavailable.
+   *
+   * @param pressed False when the pause started it: an unavailable Run is
+   *                then not reported, since nobody asked.
    */
-  run(): void {
+  run(pressed = true): void {
     const availability = this.availability.get();
     if (this.inFlight) {
       this.queued = true;
       return;
     }
     if (availability.state === 'unavailable') {
-      this.target.log(`test run: unavailable, ${availability.reason}`);
+      if (pressed) this.target.log(`test run: unavailable, ${availability.reason}`);
       return;
     }
     if (availability.state === 'wait') {
@@ -359,6 +395,13 @@ export class TestRunController {
   // One content change: the verdict is one edit staler and the overlay goes.
   private edited(): void {
     this.edits += 1;
+    if (this.afterPause.get()) {
+      if (this.pauseTimer !== undefined) clearTimeout(this.pauseTimer);
+      this.pauseTimer = setTimeout(() => {
+        this.pauseTimer = undefined;
+        this.run(false);
+      }, PAUSE_MS);
+    }
     this.mismatch.set(undefined);
     const view = this.view.get();
     if (view.kind === 'parity' || view.kind === 'mismatch' || view.kind === 'failed') {
@@ -414,6 +457,24 @@ export class TestRunController {
   // The session token, as every API request carries it.
   private headers(): Record<string, string> {
     return { Authorization: `Bearer ${this.target.session.token}`, 'Content-Type': 'application/json' };
+  }
+}
+
+// readSetting, writeSetting
+// The setting in this browser's storage. Storage can be unavailable (a
+// private window, a test page): the setting is then off, and not kept.
+function readSetting(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(AFTER_PAUSE_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+function writeSetting(on: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(AFTER_PAUSE_KEY, on ? 'on' : 'off');
+  } catch {
+    // Not kept: see readSetting.
   }
 }
 
