@@ -132,14 +132,15 @@ const BLOCK_HEADER = /^(error|warning|info): (.+):(\d+):(\d+)$/;
  *
  * The build job reports its diagnostics in the CLI's compiler-style blocks
  * (`format-diagnostic.ts`): a `severity: file:line:column` line, then the
- * message indented. Each block becomes a diagnostic coded
- * `U8G2GL_EDITOR_BUILD`, since the block does not carry the original code.
- * Text that is not in that shape (no toolchain, say) yields nothing, and the
- * caller shows it as it came.
+ * message indented. Each block becomes a diagnostic coded `code`
+ * (`U8G2GL_EDITOR_BUILD` for the editor Wasm's build), since the block does
+ * not carry the original code. Text that is not in that shape (no toolchain,
+ * say) yields nothing, and the caller shows it as it came.
  *
  * @param text The failed build record's `error`.
+ * @param code The code to give each diagnostic: which build failed.
  */
-export function parseBuildFailure(text: string): Diagnostic[] {
+export function parseBuildFailure(text: string, code = 'U8G2GL_EDITOR_BUILD'): Diagnostic[] {
   const lines = text.split('\n');
   const found: Diagnostic[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -149,12 +150,12 @@ export function parseBuildFailure(text: string): Diagnostic[] {
     }
     const [, severity = 'error', file = '', line = '1', column = '1'] = match;
     found.push({
-      code: 'U8G2GL_EDITOR_BUILD',
+      code,
       severity: severity as Severity,
       file,
       line: Number(line),
       column: Number(column),
-      message: (lines[i + 1] ?? '').trim() || 'the editor Wasm build failed here',
+      message: (lines[i + 1] ?? '').trim() || 'the build failed here',
     });
   }
   return found;

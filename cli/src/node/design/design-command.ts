@@ -14,8 +14,8 @@
  *              reports its errors as usage errors). `startOrAttach` is the
  *              testable core: it either attaches to a live server named by the
  *              project's lock, or replaces a stale lock, starts a server with
- *              the `editor-wasm` build job registered and the built designer
- *              (if there is one) at `/`, and takes the lock.
+ *              the `editor-wasm` build job and the test run registered and
+ *              the built designer (if there is one) at `/`, and takes the lock.
  *              `runDesignCommand` wraps it with output, the browser and
  *              signal handling.
  *
@@ -30,6 +30,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { registerEditorWasmJob } from './build/editor-wasm-job.js';
+import { registerTestRun } from './test-run/register-test-run.js';
 import { startDesignServer, type DesignServer } from './design-server.js';
 import { isLockLive, lockIgnoreWarning, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
 import { openBrowser } from './open-browser.js';
@@ -107,6 +108,7 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
   const designerRoot = locateDesignerDist();
   const server = await startDesignServer({ projectRoot, port, ...(designerRoot !== undefined ? { designerRoot } : {}) });
   registerEditorWasmJob(server.builds);
+  registerTestRun(server);
   const lock: DesignLock = { pid: process.pid, port: server.port, token: server.token, url: server.url };
   if (!tryCreateLock(projectRoot, lock)) {
     // Another instance won the race between Step 1 and here: defer to it.

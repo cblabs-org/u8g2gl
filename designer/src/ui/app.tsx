@@ -78,16 +78,24 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   );
 
   // --- ⌘S or Ctrl-S anywhere in the shell saves the active document ---
+  // --- ⌘↵ or Ctrl+Enter anywhere, Monaco included, presses Run ---
   // One handler, in the capture phase, rather than a Monaco keybinding: Monaco
   // binds its "CtrlCmd" by the user agent's platform, so a browser reporting
   // another platform than the keyboard's would never save. Either modifier
-  // saves, and the browser's own "Save page" never opens.
+  // works, and the browser's own "Save page" never opens. Capturing at the
+  // window also means Monaco never sees ⌘↵, which it binds to Insert Line
+  // Below: Run overrides it, and the Run button's tooltip says so.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 's') {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         event.stopPropagation();
         void workspace.saveActive();
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        workspace.testRun.run();
       }
     };
     window.addEventListener('keydown', onKey, { capture: true });

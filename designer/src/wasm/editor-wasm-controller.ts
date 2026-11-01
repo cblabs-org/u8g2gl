@@ -57,7 +57,7 @@ export type WasmStatus =
   | { readonly kind: 'building' }
   | { readonly kind: 'current'; readonly hash: string }
   | { readonly kind: 'stale'; readonly hash: string }
-  | { readonly kind: 'none'; readonly reason: string }
+  | { readonly kind: 'none'; readonly reason: string; readonly code: string }
   | { readonly kind: 'failed'; readonly reason: string; readonly hash?: string };
 
 /** The design server's job that builds a project's editor Wasm. */
@@ -210,7 +210,7 @@ export class EditorWasmController {
       // defect, so the indicator shows it differently: the project still opens
       // without one. The record's code says so; its message is only shown.
       if (isNoToolchain(record) && this.loadedHash === undefined) {
-        this.status.set({ kind: 'none', reason });
+        this.status.set({ kind: 'none', reason, code: record.code ?? '' });
       } else {
         this.status.set({ kind: 'failed', reason, ...(this.loadedHash !== undefined ? { hash: this.loadedHash } : {}) });
       }

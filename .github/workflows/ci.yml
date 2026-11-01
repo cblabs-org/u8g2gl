@@ -109,7 +109,7 @@ jobs:
           set -o pipefail
           source "$HOME/emsdk/emsdk_env.sh"
           cd cli
-          npx vitest run test/node/design/build test/node/toolchain 2>&1 | tee "$RUNNER_TEMP/wasm-cli-tests.txt"
+          npx vitest run test/node/design/build test/node/design/test-run test/node/toolchain 2>&1 | tee "$RUNNER_TEMP/wasm-cli-tests.txt"
           if grep -q "skipped, no Emscripten" "$RUNNER_TEMP/wasm-cli-tests.txt"; then
             echo "::error::the Emscripten-dependent CLI tests were skipped: no toolchain detected"
             exit 1
@@ -189,7 +189,7 @@ jobs:
       - name: Build the designer (production) and check it carries no test hook
         run: |
           cd designer && npm run build
-          if grep -rlE '__u8g2gl|installTestHooks|u8g2gl:key-to-blit|u8g2gl:drag-to-blit|E2E-TEST-BUILD' dist; then
+          if grep -rlE '__u8g2gl|installTestHooks|u8g2gl:key-to-blit|u8g2gl:drag-to-blit|u8g2gl:flip-harness-pixel|E2E-TEST-BUILD' dist; then
             echo "::error::the production designer build contains a test hook"
             exit 1
           fi

@@ -56,11 +56,18 @@
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *     - lastRun:          The latest run, for the property panel
  *
+ *     Test run:
+ *     - addDiagnosticSource(): More diagnostics for Problems (a failed run's)
+ *     - settled():        Resolves once the latest text is drawn
+ *     - requestRun():     Book a normal run: restores the canvas after Run's frames
+ *     - showDiff():       Mark a mismatch's differing pixels on the overlay
+ *
  *     Measurement:
  *     - onFrame():        Subscribe to each run's timings
  */
 
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
+import type { Pixel } from '../test-run/verdict';
 import { DIAGNOSTIC_CODES } from '@u8g2gl/core/schema/diagnostic.js';
 import { loadedMonaco } from '../monaco/monaco';
 import type { CanvasView, OverlayRect } from '../canvas/canvas-view';
@@ -179,6 +186,8 @@ export class EditLoop {
   private drawn = 0;
   private diagnosticFiles = new Set<string>();
   private latestDiagnostics: readonly Diagnostic[] = [];
+  private readonly diagnosticSources: Array<Observable<readonly Diagnostic[]>> = [];
+  private diff: readonly Pixel[] | undefined;
 
   /**
    * @param workspace The session: documents, active file, Problems.
@@ -250,8 +259,46 @@ export class EditLoop {
     this.view = view;
     if (view !== undefined) {
       this.showOverlay();
+      view.setDiff(this.diff);
       this.scheduler.request();
     }
+  }
+
+  /**
+   * @brief Adds diagnostics to every run's Problems: a failed test run's, say.
+   *        A change to the source books a run, so they appear on the next frame.
+   */
+  addDiagnosticSource(source: Observable<readonly Diagnostic[]>): void {
+    this.diagnosticSources.push(source);
+    this.subscriptions.push(source.subscribe(() => this.scheduler.request()));
+  }
+
+  /**
+   * @brief Resolves once the canvas shows the latest text: at once when no run
+   *        is booked, else after the booked run has finished.
+   */
+  settled(): Promise<void> {
+    if (!this.scheduler.pending) return Promise.resolve();
+    return new Promise((resolve) => {
+      const unsubscribe = this.onFrame(() => {
+        unsubscribe();
+        resolve();
+      });
+    });
+  }
+
+  /** @brief Books a normal run on the next frame, as an edit would. */
+  requestRun(): void {
+    this.scheduler.request();
+  }
+
+  /**
+   * @brief Marks a mismatch's differing pixels on the overlay; undefined clears them.
+   *        On the overlay, never the frame: the frame stays the live canvas's.
+   */
+  showDiff(pixels: readonly Pixel[] | undefined): void {
+    this.diff = pixels;
+    this.view?.setDiff(pixels);
   }
 
   // showOverlay
@@ -295,7 +342,11 @@ export class EditLoop {
       activeFile: this.workspace.activeFile.get(),
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
-    this.publishDiagnostics([...result.diagnostics, ...this.wasm.buildDiagnostics.get()]);
+    this.publishDiagnostics([
+      ...result.diagnostics,
+      ...this.wasm.buildDiagnostics.get(),
+      ...this.diagnosticSources.flatMap((source) => source.get()),
+    ]);
     this.workspace.selection.reconcile();
     this.canvasEditing.set(result.wellFormed);
 

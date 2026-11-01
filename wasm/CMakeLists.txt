@@ -62,6 +62,7 @@ add_executable(u8g2gl_editor
     ${U8G2GL_FIXTURE_DIR}/generated_editor/ui_editor_registry.cpp
     ${U8G2GL_FIXTURE_DIR}/generated/ui_fonts.cpp
     ${U8G2GL_FIXTURE_DIR}/generated/ui_images.cpp
+    memory_display.cpp
     bridge.cpp
 )
 

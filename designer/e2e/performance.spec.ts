@@ -19,6 +19,10 @@
  *          measured only at full speed would prove nothing about the user's
  *          machine. A self-test forces keystrokes to miss their frame and checks
  *          that the frame gate then fails, so its passing means something.
+ *          The same measurement is taken once more while test runs compile on
+ *          the server: reported, not gated, because the
+ *          question it answers — whether a compile beside the edit loop needs
+ *          its parallelism limited — is a design ruling, not a pass or fail.
  * Description: Real key presses into Monaco, each changing the x of one element
  *              between two valid values, so every keystroke must reach the
  *              canvas. The page's key probe (`src/perf/input-probe.ts`) counts animation
@@ -37,7 +41,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { startDesign, type DesignSession } from './support/design-session';
+import { emscriptenOnPath, startDesign, type DesignSession } from './support/design-session';
 import { BUDGET_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
 import { openFile, openShell, placeCaret } from './support/shell';
 import type { TestHandle } from '../src/test-hooks';
@@ -270,4 +274,47 @@ test('self-test of the frame gate: keystrokes forced to miss their frame are eac
     expect(samples.filter((frames, i) => !FORCED.includes(i)).every((frames) => frames <= 1), 'every other keystroke').toBe(true);
   }
   expect(gateFailures(result).some((failure) => failure.includes('missed their frame'))).toBe(true);
+});
+
+test('keystrokes while a test run compiles (reported): the same gates, measured with the server compiling and linking the harness', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
+  test.skip(!emscriptenOnPath(), 'skipped, no Emscripten 5.0.3 on PATH');
+  test.setTimeout(900_000);
+  session = await startDesign({ toolchain: true });
+  await openShell(page, session.url);
+  await expect(page.locator('.status-item.wasm')).toHaveAttribute('data-wasm', 'current', { timeout: 400_000 });
+  await expect(page.locator('.run-button')).toHaveAttribute('data-availability', 'ready');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+  await openFile(page, 'screens/screen_departures.xml');
+  await placeCaret(page, 'screens/screen_departures.xml', 'name="row0" x="32"', 'name="row0" x="32'.length);
+  await page.keyboard.press('Backspace');
+
+  // Before each measured key, Run is pressed unless a run is already in
+  // flight or queued: every run posts a buffer that differs from the last
+  // run's (the measured key edits row0's x), so each compiles the screen unit
+  // and links the harness at -O3, and the server is building throughout.
+  let busyKeys = 0;
+  const result = await measure(page, 'departures, while test runs compile', '2', KEYSTROKES, async () => {
+    const busy = await page.evaluate(() => {
+      const testRun = (window as unknown as TestHandle).__u8g2gl.testRun;
+      const wasBusy = testRun.busy;
+      if (!wasBusy) testRun.run();
+      return wasBusy;
+    });
+    if (busy) busyKeys++;
+  });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  const runs = await page.evaluate(() => (window as unknown as TestHandle).__u8g2gl.output.get().filter((line) => line.includes('test run: ')).length);
+
+  const report = { throttle: THROTTLE, keystrokes: KEYSTROKES, budgetMs: BUDGET_MS, keysWithARunInFlight: busyKeys, testRuns: runs, result, gate: gateFailures(result) };
+  mkdirSync(test.info().project.outputDir, { recursive: true });
+  writeFileSync(join(test.info().project.outputDir, 'keystroke-during-test-run.json'), `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`keystroke latency while test runs compile (CPU ${THROTTLE}x, ${result.samples} keystrokes, ${busyKeys} of them with a run in flight, ${runs} runs logged):`);
+  console.log(`    frames key->blit: ${result.frames.firstFrame}/${result.samples} in the first frame, worst ${result.frames.worst}, histogram ${JSON.stringify(result.frames.histogram)}`);
+  console.log(`    run->blit: median ${result.runToBlit.median} ms, p95 ${result.runToBlit.p95} ms, max ${result.runToBlit.max} ms`);
+  console.log(`    key->blit (reported): median ${result.keyToBlit.median} ms, p95 ${result.keyToBlit.p95} ms, max ${result.keyToBlit.max} ms`);
+  console.log(`    gate (reported, not applied): ${JSON.stringify(gateFailures(result))}`);
+  expect(result.samples).toBe(KEYSTROKES);
+  expect(busyKeys, 'the measurement must overlap test runs to answer its question').toBeGreaterThan(KEYSTROKES / 2);
 });

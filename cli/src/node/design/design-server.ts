@@ -30,10 +30,15 @@
  *              - `GET /api/build/<id>`     a build's record
  *              - `GET /api/editor-wasm/<id>/<file>` the editor Wasm a
  *                                          succeeded `editor-wasm` build made
+ *              - `POST <path>`             a JSON route a later piece of the
+ *                                          designer registered with
+ *                                          `registerJsonRoute()` (the test
+ *                                          run's bug report, say)
  *
  * Exports:
  * - LOOPBACK:              The one address the server binds
  * - DesignServerOptions:   Project, port, token
+ * - JsonRoute:             A registered JSON route's handler
  * - DesignServer:          A running server
  * - startDesignServer():   Start one
  */
@@ -85,6 +90,13 @@ export interface DesignServerOptions {
   readonly designerRoot?: string;
 }
 
+/**
+ * A registered JSON route: the request's parsed body in, a status and a JSON
+ * body out. It runs after the token and Host checks, like every route. A
+ * handler that throws answers 500 with no detail.
+ */
+export type JsonRoute = (body: unknown) => Promise<{ readonly status: number; readonly body: unknown }>;
+
 /** A running design server. */
 export interface DesignServer {
   /** The URL to open: `http://127.0.0.1:<port>/?token=<token>`. */
@@ -97,6 +109,14 @@ export interface DesignServer {
   readonly address: AddressInfo;
   /** The build queue; a job kind is added with `builds.register()`. */
   readonly builds: BuildQueue;
+  /**
+   * @brief Adds a `POST` route taking and answering JSON.
+   *
+   * @param path Under `/api/`, and not one of the server's own routes.
+   * @throws Error for a path outside `/api/`, a built-in one, or one already
+   *         registered: two pieces of code claiming a route is a defect.
+   */
+  registerJsonRoute(path: string, route: JsonRoute): void;
   /** @brief Stops watching, ends every event stream and connection, and closes. */
   close(): Promise<void>;
 }
@@ -123,6 +143,7 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
   const token = options.token ?? generateSessionToken();
   const builds = new BuildQueue(project.root);
   const streams = new Set<ServerResponse>();
+  const jsonRoutes = new Map<string, JsonRoute>();
 
   // --- Step 1: The watcher, broadcasting to every open event stream ---
   const broadcast = (event: ProjectFsEvent): void => {
@@ -222,6 +243,8 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       sendResult(response, result, (r) => ({ path: r.path, version: r.version, created: r.created }));
     } else if (route === '/api/events' && method === 'GET') {
       openStream(response);
+    } else if (jsonRoutes.has(route) && method === 'POST') {
+      await serveJsonRoute(request, response, jsonRoutes.get(route)!);
     } else if (route.startsWith('/api/build/') && method === 'POST') {
       const job = decodeStrict(route.slice('/api/build/'.length));
       if (job === undefined) {
@@ -308,6 +331,27 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     send(response, 200, found.contentType, found.bytes);
   }
 
+  // serveJsonRoute
+  // A registered route: the body parsed as JSON (absent is undefined), the
+  // handler's status and JSON body sent back.
+  //   route — the handler
+  async function serveJsonRoute(request: IncomingMessage, response: ServerResponse, route: JsonRoute): Promise<void> {
+    const body = await readBody(request);
+    if (body === undefined) {
+      sendJson(response, 413, { code: 'unavailable', message: 'request body too large' });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = body.length === 0 ? undefined : JSON.parse(new TextDecoder().decode(body));
+    } catch {
+      sendJson(response, 400, { code: 'bad-request', message: 'the request body must be JSON' });
+      return;
+    }
+    const answer = await route(parsed);
+    sendJson(response, answer.status, answer.body);
+  }
+
   // openStream
   // Holds a response open as a server-sent event stream until the client goes.
   // `ready` is sent first, so a client knows it is attached and that no event
@@ -349,6 +393,16 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     token,
     address,
     builds,
+    registerJsonRoute(path, route) {
+      // The server's own routes are matched before registered ones only for
+      // the paths below; refusing them here makes a shadowed route an error
+      // at registration instead of a handler that silently never runs.
+      const builtIn = path === '/api/files' || path === '/api/file' || path === '/api/events' || path.startsWith('/api/build/') || path.startsWith(EDITOR_WASM_ROUTE);
+      if (!path.startsWith('/api/') || builtIn || jsonRoutes.has(path)) {
+        throw new Error(`cannot register the route '${path}'`);
+      }
+      jsonRoutes.set(path, route);
+    },
     close: () => closeServer(server, watcher, streams),
   };
 }
