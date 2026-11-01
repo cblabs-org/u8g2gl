@@ -1014,6 +1014,7 @@ target_compile_options(u8g2gl_parity_csrc PRIVATE -w)
 
 add_executable(test_wasm_parity
     test_wasm_parity.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/memory_display.cpp
     ${PROJECT_SOURCE_DIR}/wasm/bridge.cpp
     ${U8G2GL_RUNTIME_SOURCES}
     ${CMAKE_CURRENT_SOURCE_DIR}/editor_host/scene_json.cpp

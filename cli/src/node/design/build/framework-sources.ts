@@ -4,12 +4,15 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/node/design/build/framework-sources.ts
- * Purpose: Where the project editor Wasm's framework half comes from: the
- *          runtime library, U8G2's C sources, the Wasm bridge and its scene
- *          parser, and the link settings. These are read from the same CMake
- *          files that build the framework editor Wasm, rather than listed a
- *          second time here, so a source added to the runtime or a function
- *          exported from the bridge reaches both builds or neither.
+ * Purpose: Where the framework half of the design server's Wasm builds comes
+ *          from: the runtime library, U8G2's C sources, the memory display
+ *          both builds draw on, the editor's Wasm bridge and its scene parser,
+ *          the test run's harness, and the editor's link settings. The
+ *          runtime and U8G2 lists and the link settings are read from the
+ *          CMake files that build the framework editor Wasm, rather than
+ *          listed a second time here, so a source added to the runtime or a
+ *          function exported from the bridge reaches every build or none. The
+ *          host units (display, bridge, harness) are named here.
  * Description: `locateFrameworkRoot()` finds the U8G2GL source tree beside this
  *              CLI. `readFrameworkSources()` parses `CMakeLists.txt`'s
  *              `U8G2GL_RUNTIME_SOURCES`, `wasm/CMakeLists.txt`'s
@@ -32,8 +35,12 @@ export interface FrameworkSources {
   readonly root: string;
   /** The runtime library's C++ sources (U8G2GL_RUNTIME_SOURCES). */
   readonly runtime: readonly string[];
-  /** The bridge and the scene parser it uses. */
+  /** The memory display (wasm/memory_display.cpp): the panel both the editor and the harness draw on. */
+  readonly display: readonly string[];
+  /** The bridge and the scene parser it uses: the editor Wasm's host. */
   readonly bridge: readonly string[];
+  /** The test-run harness (wasm/harness.cpp): the firmware target's host. */
+  readonly harness: readonly string[];
   /** U8G2's C sources (WASM_U8G2_C_SOURCES). */
   readonly u8g2: readonly string[];
   /** Include directories for C++ units, before the project's own. */
@@ -97,7 +104,9 @@ export function readFrameworkSources(root: string): FrameworkSources {
   return {
     root,
     runtime,
+    display: [join(root, 'wasm', 'memory_display.cpp')],
     bridge: [join(root, 'wasm', 'bridge.cpp'), join(root, 'test', 'editor_host', 'scene_json.cpp')],
+    harness: [join(root, 'wasm', 'harness.cpp')],
     u8g2,
     includes: [join(root, 'wasm'), join(root, 'include'), join(root, 'test', 'real_u8g2'), join(root, 'test', 'editor_host')],
     systemIncludes: [join(u8g2Dir, 'cppsrc'), join(u8g2Dir, 'csrc')],

@@ -86,6 +86,7 @@
 #include <vector>
 
 #include "U8g2lib.h"
+#include "memory_display.h"
 #include "scene_json.h"
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
@@ -221,12 +222,9 @@ private:
 // written by the CLI's scene emitter (emit/scene.ts). Bump both together.
 constexpr int32_t kSceneVersion = 3;
 
-// Virtual display, sized for each scene
-std::vector<uint8_t> s_display_buffer;
-u8x8_display_info_t s_display_info = {};
-int32_t s_display_width = 0;
-int32_t s_display_height = 0;
-U8G2 s_display;
+// Virtual display, sized for each scene (memory_display.h, shared with the
+// test-run harness so both hosts hold their frames the same way)
+memory_display s_display;
 
 // The active screen's objects live here, sized for the classes it constructs
 std::vector<std::max_align_t> s_arena;
@@ -699,46 +697,6 @@ bool render_draw_call(U8G2& display, const scene_json& element) {
     return true;
 }
 
-// memory_display_cb
-// A U8X8 display that is only memory: it reports the scene's geometry and
-// accepts every other message, because nothing is ever sent to hardware. The
-// frame buffer's layout depends only on that geometry and the buffer
-// function, so any panel size renders as the same pixels a real controller of
-// that size would hold.
-uint8_t memory_display_cb(u8x8_t* u8x8, uint8_t msg, uint8_t /*arg_int*/, void* /*arg_ptr*/) {
-    if (msg == U8X8_MSG_DISPLAY_SETUP_MEMORY) {
-        u8x8_d_helper_display_setup_memory(u8x8, &s_display_info);
-    }
-    return 1;
-}
-
-// setup_virtual_display
-// Allocates a full frame buffer for the scene's display (one byte per 8-pixel
-// column of each tile row, U8G2's vertical_top_lsb layout) and points U8G2 at it.
-// Fails for a size U8X8's 8-bit tile counts cannot describe.
-bool setup_virtual_display() {
-    const int32_t tile_w = (s_display_width + 7) / 8;
-    const int32_t tile_h = (s_display_height + 7) / 8;
-    if (tile_w > std::numeric_limits<uint8_t>::max() || tile_h > std::numeric_limits<uint8_t>::max()) {
-        return fail("display " + std::to_string(s_display_width) + "x" + std::to_string(s_display_height) +
-                    " is larger than U8G2 can address");
-    }
-    s_display_info = u8x8_display_info_t{};
-    s_display_info.tile_width = static_cast<uint8_t>(tile_w);
-    s_display_info.tile_height = static_cast<uint8_t>(tile_h);
-    s_display_info.pixel_width = static_cast<uint16_t>(s_display_width);
-    s_display_info.pixel_height = static_cast<uint16_t>(s_display_height);
-    s_display_buffer.assign(static_cast<size_t>(tile_w) * 8u * static_cast<size_t>(tile_h), 0);
-
-    u8g2_t* u8g2 = s_display.getU8g2();
-    u8g2_SetupDisplay(u8g2, memory_display_cb, u8x8_cad_001, u8x8_byte_empty, u8x8_dummy_cb);
-    u8g2_SetupBuffer(u8g2, s_display_buffer.data(), static_cast<uint8_t>(tile_h), u8g2_ll_hvline_vertical_top_lsb,
-                     U8G2_R0);
-    u8g2_InitDisplay(u8g2);
-    s_display.clearBuffer();
-    return true;
-}
-
 // observers_wanted
 // How many observer slots each subject needs: one per binding or flag
 // directive naming it, on any screen, so selecting any screen fits.
@@ -789,9 +747,7 @@ void teardown() {
     s_subjects.clear();
     s_scene = scene_json{};
     s_last_error.clear();
-    s_display_buffer.clear();
-    s_display_width = 0;
-    s_display_height = 0;
+    s_display.release();
 }
 
 /**
@@ -828,13 +784,15 @@ int applyScene(const char* json_str) {
     // is generated from the same document, so the editor is still sized by the
     // project and never by a constant of its own.
     const scene_json& disp = s_scene.get("display");
-    s_display_width = disp.get("width").as_int();
-    s_display_height = disp.get("height").as_int();
-    if (s_display_width <= 0 || s_display_height <= 0) {
+    const int32_t width = disp.get("width").as_int();
+    const int32_t height = disp.get("height").as_int();
+    if (width <= 0 || height <= 0) {
         s_last_error = "scene display has no width and height";
         return 0;
     }
-    if (!setup_virtual_display()) {
+    std::string display_error;
+    if (!s_display.setup(width, height, &display_error)) {
+        fail(display_error);
         return 0;
     }
 
@@ -988,7 +946,8 @@ uint8_t* renderFrame(uint32_t current_ms) {
     }
 
     // --- Step 2: Clear buffer ---
-    s_display.clearBuffer();
+    U8G2& display = s_display.u8g2();
+    display.clearBuffer();
 
     // --- Step 3: Render elements in scene order ---
     for (const scene_json& element : s_active_screen->get("elements").items()) {
@@ -996,17 +955,17 @@ uint8_t* renderFrame(uint32_t current_ms) {
         if (realisation == "object") {
             const int32_t obj_idx = element.get("object").as_int();
             if (obj_idx >= 0 && static_cast<size_t>(obj_idx) < s_objects.size()) {
-                u8g2gl_render_object(s_display, s_objects.data(), s_parents.data(),
+                u8g2gl_render_object(display, s_objects.data(), s_parents.data(),
                                      static_cast<uint8_t>(obj_idx));
             }
         } else if (realisation == "draw_calls") {
-            if (!render_draw_call(s_display, element)) {
+            if (!render_draw_call(display, element)) {
                 return nullptr;
             }
         }
     }
 
-    return s_display.getBufferPtr();
+    return s_display.buffer();
 }
 
 /**
@@ -1014,7 +973,7 @@ uint8_t* renderFrame(uint32_t current_ms) {
  */
 EMSCRIPTEN_KEEPALIVE
 int getDisplayWidth() {
-    return s_display_width;
+    return s_display.width();
 }
 
 /**
@@ -1022,7 +981,7 @@ int getDisplayWidth() {
  */
 EMSCRIPTEN_KEEPALIVE
 int getDisplayHeight() {
-    return s_display_height;
+    return s_display.height();
 }
 
 /**
@@ -1033,7 +992,7 @@ int getDisplayHeight() {
  */
 EMSCRIPTEN_KEEPALIVE
 uint8_t* getBufferPtr() {
-    return s_display.getBufferPtr();
+    return s_display.buffer();
 }
 
 /**
@@ -1041,7 +1000,7 @@ uint8_t* getBufferPtr() {
  */
 EMSCRIPTEN_KEEPALIVE
 uint32_t getBufferSize() {
-    return static_cast<uint32_t>(s_display_buffer.size());
+    return s_display.buffer_size();
 }
 
 /**
