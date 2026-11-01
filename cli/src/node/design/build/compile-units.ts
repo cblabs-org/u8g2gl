@@ -47,7 +47,7 @@ import { RUNTIME_VERSION } from '../../../data/runtime-version.js';
 import type { Diagnostic } from '../../../core/schema/diagnostic.js';
 import type { SelectedToolchain } from '../../toolchain/detect-toolchain.js';
 import type { ToolchainHost } from '../../toolchain/toolchain-host.js';
-import type { FrameworkSources } from './framework-sources.js';
+import { frameworkFiles, type FrameworkSources } from './framework-sources.js';
 
 /** The stable code a compiler diagnostic from a project unit carries. */
 export const COMPILE_CODE = 'U8G2GL_EDITOR_COMPILE';
@@ -98,6 +98,10 @@ export function frameworkBuildSetup(
   // --- Step 1: The keys: the runtime version, the compiler, the sources, the configuration ---
   const configText = readFileSync(configFile, 'utf8');
   const configHash = sha256(configText).slice(0, 16);
+  // Every framework file an object can depend on. In a release these change
+  // only with the version; in a working tree they change without one, and an
+  // object compiled from an older source must not be reused. It is the set the
+  // npm package stages too, so the key covers exactly what a package carries.
   const frameworkHash = hashFiles(frameworkFiles(framework)).slice(0, 16);
   const toolchainKey = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}.${RUNTIME_VERSION.patch}-em${toolchain.version}-${frameworkHash}`;
   const configKey = `${toolchainKey}-${configHash}`;
@@ -295,26 +299,6 @@ function displayPath(file: string, projectRoot: string, cacheDir: string): strin
     }
   }
   return file;
-}
-
-// frameworkFiles
-// Every framework file an object can depend on: sources, the editor host,
-// the harness, the headers they include, and U8G2's. In a release these
-// change only with the version; in a working tree they change without one,
-// and an object compiled from an older source must not be reused.
-function frameworkFiles(framework: FrameworkSources): string[] {
-  const headers = (dir: string): string[] =>
-    existsSync(dir) ? readdirSync(dir).filter((name) => /\.(h|hpp)$/.test(name)).map((name) => join(dir, name)) : [];
-  return [
-    ...framework.runtime,
-    ...framework.display,
-    ...framework.bridge,
-    ...framework.harness,
-    ...framework.u8g2,
-    ...framework.includes.flatMap(headers),
-    ...headers(join(framework.root, 'include', 'u8g2gl')),
-    ...framework.systemIncludes.flatMap(headers),
-  ];
 }
 
 /** @brief SHA-256 hex over files' paths and contents, in sorted order. */

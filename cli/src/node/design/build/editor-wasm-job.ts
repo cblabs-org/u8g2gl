@@ -39,7 +39,8 @@ import { locateFrameworkRoot } from './framework-sources.js';
  * The codes a failed `editor-wasm` record can carry. Part of the server's
  * protocol: the designer matches these strings, so they never change meaning.
  * - `no-emscripten`:  no usable Emscripten of the pinned version
- * - `no-source-tree`: no U8G2GL runtime sources beside the CLI (an npm install)
+ * - `no-source-tree`: no framework sources, neither staged in the package nor
+ *   in a source tree beside the CLI
  */
 export const EDITOR_WASM_FAILURE = {
   noEmscripten: 'no-emscripten',
@@ -56,7 +57,7 @@ export interface EditorWasmJobOptions {
   readonly toolchainCacheRoot?: string;
   /** The editor build cache. */
   readonly buildCacheRoot?: string;
-  /** The U8G2GL source tree; `null` for none, as an npm install has. */
+  /** The framework sources (locateFrameworkRoot()); `null` for none. */
   readonly frameworkRoot?: string | null;
 }
 
@@ -83,7 +84,7 @@ export function registerEditorWasmJob(queue: BuildQueue, options: EditorWasmJobO
     if (frameworkRoot === undefined) {
       throw new BuildJobFailure(
         EDITOR_WASM_FAILURE.noSourceTree,
-        'no U8G2GL source tree beside this CLI, so the project editor Wasm cannot be built',
+        'no U8G2GL framework sources: none staged in this package, and no source tree beside the CLI, so the project editor Wasm cannot be built',
       );
     }
     const { selected } = await detectToolchain(host, cacheRoot);

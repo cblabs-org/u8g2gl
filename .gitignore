@@ -24,6 +24,10 @@ node_modules/
 dist/
 cli/node_modules/
 cli/dist/
+# Staged into the CLI package by cli/scripts/stage-package.mjs (prepack) and
+# removed by it again (postpack): built output, never committed.
+/cli/designer/
+/cli/framework/
 .vite/
 *.tsbuildinfo
 .npm/

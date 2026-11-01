@@ -21,15 +21,14 @@
   },
   "files": [
     "dist/",
-    "src/data/catalogue.json",
-    "src/data/manifests.json",
-    "src/data/runtime-version.json",
-    "src/data/page-mode-map.json",
-    "src/data/bdfconv/bdfconv-wasm.json",
+    "designer/",
+    "framework/",
     "LICENSES/"
   ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc",
+    "prepack": "node scripts/stage-package.mjs",
+    "postpack": "node scripts/stage-package.mjs --clean",
     "build:catalogue": "tsx src/node/build-catalogue.ts",
     "build:manifests": "tsx src/node/build-manifests.ts",
     "build:runtime-version": "tsx src/node/build-runtime-version.ts",

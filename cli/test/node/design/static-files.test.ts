@@ -44,10 +44,18 @@ describe('readStaticFile()', () => {
 });
 
 describe('locateDesignerDist()', () => {
+  // Every case names an empty package directory, so a copy the CLI under test
+  // happens to have staged cannot answer for the source tree.
+  const noPackage = (): { packageRoot: string; version: string } => ({ packageRoot: makeTempDir('package'), version: '1.2.3' });
+
   it('finds designer/dist only when its index page exists', () => {
     const root = makeTempDir('framework');
-    expect(locateDesignerDist(root)).toBeUndefined();
+    expect(locateDesignerDist({ ...noPackage(), sourceRoot: root })).toBeUndefined();
     writeFiles(root, { 'designer/dist/index.html': '<p>' });
-    expect(locateDesignerDist(root)).toBe(join(root, 'designer', 'dist'));
+    expect(locateDesignerDist({ ...noPackage(), sourceRoot: root })).toBe(join(root, 'designer', 'dist'));
+  });
+
+  it('finds nothing with neither a staged copy nor a source tree', () => {
+    expect(locateDesignerDist({ ...noPackage(), sourceRoot: null })).toBeUndefined();
   });
 });
