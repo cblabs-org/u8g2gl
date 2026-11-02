@@ -15,20 +15,24 @@
  *              (`isInsideProject`) refuses a symlink pointing out. The media
  *              type comes from the extension, from a fixed table of what Vite
  *              and Emscripten emit; anything else is `application/octet-stream`.
- *              `locateDesignerDist` finds the built designer beside the CLI's
- *              source tree, as the editor Wasm job finds the framework sources.
+ *              `locateDesignerDist` finds the built designer: the package's
+ *              staged `designer/` when its stamp is this CLI's version
+ *              (package-copy.ts), else `designer/dist/` in the source tree
+ *              beside the CLI, as the editor Wasm job finds the framework.
  *
  * Exports:
  * - StaticFile:            A file's bytes and media type
  * - readStaticFile():      A file beneath a directory, or undefined
- * - locateDesignerDist():  `designer/dist/` beside this CLI, if it was built
+ * - DesignerLookup:        Where locateDesignerDist() looks (tests override it)
+ * - locateDesignerDist():  The package's designer, or the source tree's build
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { checkProjectPath } from '../../core/project-fs/project-path-rule.js';
 import { isInsideProject } from '../project-path.js';
-import { locateFrameworkRoot } from './build/framework-sources.js';
+import { locateSourceTree } from './build/framework-sources.js';
+import { locateStagedCopy, type StagedCopyLookup } from './package-copy.js';
 
 /** A file to serve. */
 export interface StaticFile {
@@ -87,19 +91,34 @@ export function readStaticFile(root: string, path: string): StaticFile | undefin
   };
 }
 
+/** Where locateDesignerDist() looks. Every field defaults to this CLI's own. */
+export interface DesignerLookup extends StagedCopyLookup {
+  /** The U8G2GL source tree; found from this file when omitted, `null` for none. */
+  readonly sourceRoot?: string | null;
+}
+
 /**
- * @brief The built designer beside this CLI's source tree: `<root>/designer/dist/`.
+ * @brief The built designer to serve.
  *
- * An npm-installed CLI has no source tree beside it, and a checkout whose
- * designer was never built has no `dist/`; both return undefined, and the
- * server keeps serving its placeholder page.
+ * The package's staged `designer/` comes first, when its stamp names this
+ * CLI's version: that is what an installed CLI has. Otherwise
+ * `<source tree>/designer/dist/`, as a checkout has always found it. A
+ * checkout whose designer was never built has neither, and the server keeps
+ * serving its placeholder page.
  *
- * @param frameworkRoot The U8G2GL source tree; found from this file when omitted.
+ * @param lookup Overrides for tests; this CLI's package, version and source tree otherwise.
+ * @return The directory holding the designer's `index.html`, or undefined.
  */
-export function locateDesignerDist(frameworkRoot: string | undefined = locateFrameworkRoot()): string | undefined {
-  if (frameworkRoot === undefined) {
+export function locateDesignerDist(lookup: DesignerLookup = {}): string | undefined {
+  const staged = locateStagedCopy('designer', 'index.html', lookup);
+  // An ignored copy's reason is not surfaced, as in locateFrameworkRoot().
+  if (staged.kind === 'staged') {
+    return staged.dir;
+  }
+  const sourceRoot = lookup.sourceRoot === undefined ? locateSourceTree() : (lookup.sourceRoot ?? undefined);
+  if (sourceRoot === undefined) {
     return undefined;
   }
-  const dist = join(frameworkRoot, 'designer', 'dist');
+  const dist = join(sourceRoot, 'designer', 'dist');
   return existsSync(join(dist, 'index.html')) ? dist : undefined;
 }

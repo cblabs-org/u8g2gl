@@ -2401,9 +2401,12 @@ This resolves [Q-6]. The concern was that departures-board is CC BY-NC-SA and U8
 
 | Dependency | Licence | Compatible with MIT distribution |
 |---|---|---|
-| U8G2 (linked by user firmware) | BSD 2-clause | Yes |
+| U8G2 (linked by user firmware) | BSD 2-clause; fonts per font group | Yes |
+| U8G2 sources and fonts (**ship in the npm package**, `framework/extern/u8g2/`, compiled to Wasm by the design server) | BSD 2-clause; fonts per font group | Yes — U8G2's own `LICENSE`, with its font terms, travels beside them and as `cli/LICENSES/u8g2-BSD-2-Clause.txt`; runs on the host, never linked into firmware from the package |
 | `bdfconv` (Wasm, **ships in the npm package**) | BSD 2-clause | Yes — notice in `cli/LICENSES/`; runs on the host, never linked into firmware |
-| Emscripten-generated glue (ships with the Wasm) | MIT | Yes — notice in `cli/LICENSES/` |
+| Emscripten-generated glue (ships with each Wasm module) | MIT | Yes — notice in `cli/LICENSES/` |
+| The designer bundle (**ships in the npm package**, `designer/`): React, react-dom, scheduler, dockview, monaco-editor, marked | MIT | Yes — each named in `THIRD-PARTY-NOTICES.md`, texts in `cli/LICENSES/`, Monaco's own third-party notices verbatim; a test fails on an unannounced dependency |
+| DOMPurify (in the designer bundle, through monaco-editor) | MPL-2.0 OR Apache-2.0, taken as Apache-2.0 | Yes — text in `cli/LICENSES/` |
 | Emscripten toolchain (build-time, to regenerate the Wasm only) | MIT / NCSA | Yes |
 
 ### 22.1 Fonts — Follow U8G2's Model

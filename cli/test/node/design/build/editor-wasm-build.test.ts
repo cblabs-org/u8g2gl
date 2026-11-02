@@ -179,7 +179,7 @@ describe('the editor-wasm job without a toolchain', () => {
     expect(queue.get(record!.id)).toMatchObject({
       status: 'failed',
       code: 'no-source-tree',
-      error: expect.stringMatching(/no U8G2GL source tree/),
+      error: expect.stringMatching(/no U8G2GL framework sources/),
     });
     expect(runs).toEqual([]);
   });

@@ -103,8 +103,8 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
   }
 
   // --- Step 2: Start a server with its build jobs, then take the lock exclusively ---
-  // The designer is served when this CLI sits in a source tree that built it;
-  // otherwise `/` is the placeholder page (static-files.ts).
+  // The designer is served from the package's staged copy, or from a source
+  // tree that built it; otherwise `/` is the placeholder page (static-files.ts).
   const designerRoot = locateDesignerDist();
   const server = await startDesignServer({ projectRoot, port, ...(designerRoot !== undefined ? { designerRoot } : {}) });
   registerEditorWasmJob(server.builds);
