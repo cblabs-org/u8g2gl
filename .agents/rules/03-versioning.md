@@ -64,6 +64,10 @@ commit pins a `dev` tag, never a bare SHA (`04-branch-hygiene.md`).
   PATCH after the highest one that has a beta or stable tag, or after the files'
   current PATCH if that has been merged untagged. Every later commit in the PR
   keeps that PATCH.
+- **A fix to a beta that has not been promoted keeps its PATCH** and becomes the
+  next beta (`-beta.2`), as in the foundation. The exception is a fix that
+  changes generated output: the determinism check below then forces a new CLI
+  PATCH, whose first release is its `-beta.1`.
 - **MINOR and MAJOR bumps are the owner's decision.** Propose one in the plan;
   never make it.
 - The numbers carry on from where they were before this scheme (runtime 0.11,
