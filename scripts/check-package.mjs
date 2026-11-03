@@ -11,17 +11,31 @@
  *          install can show that the staged designer and framework are found,
  *          complete and current.
  * Description: Packs the CLI (its `prepack` builds and stages everything, and
- *              refuses a dirty tree or an unpinned Emscripten), then:
+ *              refuses a dirty tree, an untagged HEAD or an unpinned
+ *              Emscripten), then:
  *              1. checks the tarball's file list against the package's
  *                 allowlist, and every file in it for home-folder paths and
  *                 the owner's address;
  *              2. installs the tarball into an empty directory with no
  *                 registry access (the CLI has no runtime dependencies), and
  *                 confirms the installed CLI sees no source tree;
- *              3. on a copy of the departures fixture runs `validate`,
- *                 `generate`, and `design --no-open`, and through the design
- *                 server checks the real designer is served at `/` and that
- *                 an `editor-wasm` build and a `test-run` both succeed.
+ *              3. confirms the installed CLI reports the release tag's full
+ *                 version (`0.15.2-beta.1`), not the committed core;
+ *              4. on a copy of the departures fixture runs `validate` and
+ *                 `generate`, confirming the generated header is stamped with
+ *                 that version, then `design --no-open`, and through the
+ *                 design server checks the real designer is served at `/` and
+ *                 that an `editor-wasm` build and a `test-run` both succeed.
+ *
+ *              The package is versioned by the `cli-v*` release tag at HEAD
+ *              (.agents/rules/03-versioning.md), so packing needs one. When
+ *              HEAD has one (CI on a tag push), the checkout is packed. When it
+ *              has none (a pull request, or a local run), the check packs a
+ *              throwaway clone of HEAD in the work directory instead, tagged
+ *              there `cli-v<core>-dev.1`, so this repository is never tagged.
+ *              The clone is made without network access: HEAD is fetched from
+ *              this checkout, U8G2 from its local submodule, and the CLI's and
+ *              designer's dependencies are copied.
  *              Prints the tarball and unpacked sizes. The CLI runs with its
  *              home directory inside the work directory, so its build caches
  *              never touch the user's. Needs the pinned Emscripten on PATH and
@@ -32,10 +46,11 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scanText } from './check-home-paths.mjs';
+import { compareReleases, nextTag, parseReleaseTag } from './release-version.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI_ROOT = join(REPO_ROOT, 'cli');
@@ -114,13 +129,71 @@ function filesUnder(dir) {
     .map((entry) => relative(dir, join(entry.parentPath, entry.name)).split(sep).join('/'));
 }
 
+// cliTagAtHead
+// The `cli-v*` release tag at a checkout's HEAD that prepack packs as (the
+// highest by precedence), or undefined.
+//   root — the checkout
+function cliTagAtHead(root) {
+  const listed = run('git', ['tag', '--points-at', 'HEAD', '--list', 'cli-v*'], { cwd: root, quiet: true });
+  const tags = listed
+    .split('\n')
+    .map((name) => ({ name: name.trim(), parsed: parseReleaseTag(name.trim()) }))
+    .filter((tag) => tag.parsed !== null && tag.parsed.component === 'cli')
+    .sort((a, b) => compareReleases(a.parsed, b.parsed));
+  return tags.at(-1)?.name;
+}
+
+// taggedClone
+// A throwaway clone of this checkout's HEAD, tagged with its next `dev` tag,
+// for when HEAD has no release tag (see the header). Nothing is downloaded:
+// HEAD is fetched from this checkout with no tags, U8G2 is cloned from the
+// local submodule, and the dependencies prepack needs are copied (as
+// copy-on-write clones where the filesystem supports them). Returns the
+// clone's root and its tag.
+//   work — the work directory
+function taggedClone(work) {
+  const root = join(work, 'repo');
+  const git = (...args) => run('git', ['-c', 'protocol.file.allow=always', '-c', 'tag.gpgSign=false', ...args], { cwd: root, quiet: true });
+
+  // --- Step 1: HEAD, with none of this repository's tags ---
+  mkdirSync(root, { recursive: true });
+  git('init', '-q');
+  git('fetch', '-q', '--no-tags', REPO_ROOT, 'HEAD');
+  git('checkout', '-q', '--detach', 'FETCH_HEAD');
+
+  // --- Step 2: U8G2, from the checked-out submodule's own repository ---
+  const u8g2GitDir = run('git', ['rev-parse', '--absolute-git-dir'], { cwd: join(REPO_ROOT, 'extern', 'u8g2'), quiet: true }).trim();
+  git('submodule', 'init', '-q', 'extern/u8g2');
+  git('config', 'submodule.extern/u8g2.url', u8g2GitDir);
+  git('submodule', 'update', '-q', '--checkout', 'extern/u8g2');
+
+  // --- Step 3: The installed dependencies prepack builds with (git-ignored there) ---
+  for (const dir of ['cli', 'designer']) {
+    const from = join(REPO_ROOT, dir, 'node_modules');
+    if (!existsSync(from)) {
+      fail(`${dir}/node_modules is not installed: 'npm ci' in ${dir}/`);
+    }
+    cpSync(from, join(root, dir, 'node_modules'), { recursive: true, verbatimSymlinks: true, mode: constants.COPYFILE_FICLONE });
+  }
+
+  // --- Step 4: The tag prepack packs as ---
+  const { tag, refusals } = nextTag('cli', 'dev', { cwd: root });
+  if (tag === null) {
+    fail(`cannot choose a dev tag for the clone:\n  ${refusals.join('\n  ')}`);
+  }
+  git('tag', tag);
+  return { root, tag };
+}
+
 // pack
 // `npm pack` into the work directory, returning its JSON report (name,
 // size, unpackedSize, entryCount, files). The stage script keeps its own
 // output on stderr, so stdout is the report alone.
-function pack(work) {
+//   work    — the work directory
+//   cliRoot — the CLI directory of the checkout being packed
+function pack(work, cliRoot) {
   step('packing (prepack builds the framework Wasm, the designer and the CLI)');
-  const out = run('npm', ['pack', '--json', '--pack-destination', work], { cwd: CLI_ROOT, quiet: true });
+  const out = run('npm', ['pack', '--json', '--pack-destination', work], { cwd: cliRoot, quiet: true });
   const [report] = JSON.parse(out);
   if (report === undefined || !existsSync(join(work, report.filename))) {
     fail('npm pack reported no tarball');
@@ -324,15 +397,32 @@ async function main() {
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
 
-  // --- Step 1: Pack, install, and check what was installed ---
-  const report = pack(work);
+  // --- Step 1: Pack, at the release tag here or in a tagged clone ---
+  let source = { root: REPO_ROOT, tag: cliTagAtHead(REPO_ROOT) };
+  if (source.tag === undefined) {
+    step('HEAD has no cli-v* release tag: packing a throwaway clone of it, tagged there');
+    source = taggedClone(work);
+  }
+  const version = source.tag.slice('cli-v'.length);
+  step(`packing as ${source.tag}`);
+  const report = pack(work, join(source.root, 'cli'));
+
+  // --- Step 2: Install, and check what was installed ---
   const packageDir = install(work, report.filename);
   const u8g2 = inspectInstalled(packageDir);
   checkFileList(report.files.map((file) => file.path), u8g2);
   checkContents(packageDir);
   step(`${report.entryCount} files, inside the allowlist, free of home paths`);
 
-  // --- Step 2: The CLI on a copy of the departures fixture ---
+  // --- Step 3: The installed CLI is the tag's version, not the committed core ---
+  const cli = join(packageDir, 'dist', 'node', 'cli.js');
+  const reported = run(process.execPath, [cli, '--version'], { quiet: true }).trim();
+  if (reported !== version) {
+    fail(`the installed CLI reports version '${reported}', not the release tag's '${version}'`);
+  }
+  step(`the installed CLI reports ${version}`);
+
+  // --- Step 4: The CLI on a copy of the departures fixture ---
   // Its home is inside the work directory, so the toolchain detection and the
   // build caches it writes stay there; PATH still carries the pinned em++.
   const home = join(work, 'home');
@@ -340,7 +430,6 @@ async function main() {
   const env = { ...process.env, HOME: home, USERPROFILE: home, XDG_CACHE_HOME: join(home, '.cache'), LOCALAPPDATA: join(home, 'AppData', 'Local') };
   const project = join(work, 'project');
   cpSync(FIXTURE, project, { recursive: true });
-  const cli = join(packageDir, 'dist', 'node', 'cli.js');
   if (!existsSync(join(work, 'install', 'node_modules', '.bin', process.platform === 'win32' ? 'u8g2gl.cmd' : 'u8g2gl'))) {
     fail('the install has no u8g2gl bin link');
   }
@@ -348,9 +437,14 @@ async function main() {
     step(command);
     run(process.execPath, [cli, command, project], { env });
   }
+  const header = readFileSync(join(project, 'generated', 'u8g2gl_generated_config.h'), 'utf8');
+  if (!header.includes(`// generator: ${version}\n`)) {
+    fail(`the generated header is not stamped '// generator: ${version}'`);
+  }
+  step(`generate stamps ${version}`);
   await checkDesign(cli, project, env);
 
-  // --- Step 3: The sizes ---
+  // --- Step 5: The sizes ---
   const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
   step(`PASS: ${report.filename}: tarball ${mb(report.size)} (${report.size} bytes), unpacked ${mb(report.unpackedSize)} (${report.unpackedSize} bytes), ${report.entryCount} files`);
 }

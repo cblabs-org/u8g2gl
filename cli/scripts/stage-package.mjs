@@ -12,23 +12,46 @@
  *          `framework/`, the sources a project's Wasm builds compile, named by
  *          the same parser the builds use (framework-sources.ts). Nothing is
  *          reused from an earlier build, so nothing stale can be packed.
- * Description: Run as `prepack`, it refuses unless the tree is clean at HEAD
- *              and the Emscripten on PATH is the pinned version, then:
+ *
+ *          The package is also versioned by its release tag
+ *          (.agents/rules/03-versioning.md): the committed `package.json`
+ *          holds only the core, `0.15.2`, and the channel lives in the
+ *          `cli-v*` tag. Packing writes the tag's full version,
+ *          `0.15.2-beta.1`, into the packed `package.json`, so the installed
+ *          CLI reports, and stamps into generated code, the channel it was
+ *          released on.
+ * Description: Run as `prepack`, it refuses unless the tree is clean at HEAD,
+ *              HEAD carries a `cli-v*` release tag that
+ *              scripts/release-version.mjs accepts (its core equal to
+ *              `package.json`'s), and the Emscripten on PATH is the pinned
+ *              version, then:
  *              1. builds the framework editor Wasm into a fresh build directory;
  *              2. builds the designer (production) against it;
  *              3. builds the CLI;
  *              4. stages `designer/` and `framework/`, each stamped with the
- *                 CLI version and the commit (package-copy.ts), and copies in
- *                 the repository's `THIRD-PARTY-NOTICES.md`, which covers
- *                 what they carry.
+ *                 tag's full version and the commit (package-copy.ts), and
+ *                 copies in the repository's `THIRD-PARTY-NOTICES.md`, which
+ *                 covers what they carry;
+ *              5. writes the tag's full version into `package.json`, keeping
+ *                 the committed file under build/ to restore.
  *              Run as `postpack` with `--clean`, it removes what it staged,
- *              all of which is git-ignored. Progress and the builds'
- *              output go to stderr, so `npm pack --json` stays parseable.
+ *              all of which is git-ignored, and restores `package.json`.
+ *              Progress and the builds' output go to stderr, so
+ *              `npm pack --json` stays parseable.
+ *
+ *              It refuses to run under `npm publish` from the directory. npm
+ *              reads the version it publishes as from `package.json` again
+ *              after `postpack` has restored it, so a directory publish would
+ *              register the core version for a tarball whose `package.json`
+ *              says the full one. The tarball is published instead:
+ *              `npm pack`, then `npm publish <tarball> --tag <channel>`,
+ *              which reads the version from inside the tarball and runs no
+ *              scripts (docs/RELEASING.md).
  *              Usage: node scripts/stage-package.mjs [--clean]
  */
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -44,6 +67,12 @@ const STAGED = {
   framework: join(CLI_ROOT, 'framework'),
   notices: join(CLI_ROOT, 'THIRD-PARTY-NOTICES.md'),
 };
+const PACKAGE_JSON = join(CLI_ROOT, 'package.json');
+/**
+ * The committed package.json, kept while the packed one carries the tag's
+ * full version. Under build/, which is git-ignored and outside the package.
+ */
+const PACKAGE_JSON_KEPT = join(REPO_ROOT, 'build', 'stage-package', 'package.json');
 
 // log
 // A progress line, on stderr (see the header).
@@ -83,11 +112,61 @@ function capture(command, args) {
 }
 
 // removeStaged
-// Removes everything staged, if present.
+// Removes everything staged, if present, and puts the committed package.json
+// back if a pack left the tag's version in it.
 function removeStaged() {
   for (const path of Object.values(STAGED)) {
     rmSync(path, { recursive: true, force: true });
   }
+  if (existsSync(PACKAGE_JSON_KEPT)) {
+    copyFileSync(PACKAGE_JSON_KEPT, PACKAGE_JSON);
+    rmSync(PACKAGE_JSON_KEPT);
+  }
+}
+
+// releaseVersion
+// The full version to pack as, from the `cli-v*` release tag at HEAD: the
+// highest by precedence when several are (a stable promoted onto its beta's
+// commit), and only once scripts/release-version.mjs accepts it. With no tag,
+// refuses with the commands that would create one.
+async function releaseVersion() {
+  const release = await import(pathToFileURL(join(REPO_ROOT, 'scripts', 'release-version.mjs')).href);
+
+  // --- Step 1: The release tags at HEAD ---
+  const atHead = (capture('git', ['tag', '--points-at', 'HEAD', '--list', 'cli-v*']) ?? '')
+    .split('\n')
+    .map((name) => ({ name: name.trim(), parsed: release.parseReleaseTag(name.trim()) }))
+    .filter((tag) => tag.parsed !== null && tag.parsed.component === 'cli')
+    .sort((a, b) => release.compareReleases(a.parsed, b.parsed));
+  if (atHead.length === 0) {
+    const suggest = (channel) => release.nextTag('cli', channel, { cwd: REPO_ROOT }).tag ?? `$(node scripts/release-version.mjs next cli ${channel})`;
+    refuse(
+      'HEAD has no cli-v* release tag, and the package is versioned by its tag (.agents/rules/03-versioning.md). ' +
+        `Tag HEAD first: 'git tag ${suggest('beta')}' for a release (the owner's), ` +
+        `or 'git tag ${suggest('dev')}' in a throwaway clone to test a pack (docs/RELEASING.md)`,
+    );
+  }
+
+  // --- Step 2: The highest one must pass the tag check ---
+  const chosen = atHead[atHead.length - 1];
+  const { refusals } = release.checkTag(chosen.name, { cwd: REPO_ROOT });
+  if (refusals.length > 0) {
+    refuse(`release-version refuses ${chosen.name}:\n  - ${refusals.join('\n  - ')}`);
+  }
+  return chosen.name.slice('cli-v'.length);
+}
+
+// writePackedVersion
+// Step 5 of the header: the packed package.json carries the tag's full
+// version. The committed file is kept first, so postpack can restore it.
+//   version — the tag's full version
+function writePackedVersion(version) {
+  const committed = readFileSync(PACKAGE_JSON, 'utf8');
+  mkdirSync(dirname(PACKAGE_JSON_KEPT), { recursive: true });
+  writeFileSync(PACKAGE_JSON_KEPT, committed);
+  const manifest = JSON.parse(committed);
+  manifest.version = version;
+  writeFileSync(PACKAGE_JSON, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 // pinnedEmscripten
@@ -175,12 +254,15 @@ function build() {
 // stage
 // Step 4 of the header: copy and stamp. The framework's file set comes from
 // the CLI just built, so it is the parser the packed CLI will run.
+// The stamps carry the tag's full version, because that is the version the
+// packed CLI reads from its package.json, and a staged copy is trusted only
+// when its stamp names the CLI's own version (package-copy.ts).
 //   designerDist — the designer build to copy
 //   commit       — HEAD, for the stamps
-async function stage(designerDist, commit) {
+//   version      — the tag's full version
+async function stage(designerDist, commit, version) {
   const { stageFramework } = await import(pathToFileURL(join(CLI_ROOT, 'dist', 'node', 'design', 'build', 'framework-sources.js')).href);
   const { writePackageStamp } = await import(pathToFileURL(join(CLI_ROOT, 'dist', 'node', 'design', 'package-copy.js')).href);
-  const { version } = JSON.parse(readFileSync(join(CLI_ROOT, 'package.json'), 'utf8'));
   const stamp = { version, commit };
 
   cpSync(designerDist, STAGED.designer, { recursive: true });
@@ -198,13 +280,28 @@ async function stage(designerDist, commit) {
 // is removed first in both, so a pack that failed halfway
 // leaves nothing a later pack could carry.
 async function main() {
+  // --- Step 1: Undo any earlier pack; postpack stops here ---
   removeStaged();
   if (process.argv.includes('--clean')) {
     return;
   }
+
+  // --- Step 2: Refuse a directory publish (see the header) ---
+  if (process.env.npm_command === 'publish') {
+    refuse(
+      "'npm publish' from the directory would register the committed core version, not the tag's. " +
+        "Pack, then publish the tarball: 'npm pack', then 'npm publish <tarball> --tag <beta|rc>' " +
+        "(or with no --tag for a stable release); see docs/RELEASING.md",
+    );
+  }
+
+  // --- Step 3: Preconditions, including the release tag at HEAD ---
   const commit = checkPreconditions();
+  const version = await releaseVersion();
+
+  // --- Step 4: Build and stage ---
   const designerDist = build();
-  await stage(designerDist, commit);
+  await stage(designerDist, commit, version);
 
   // The builds write only git-ignored output; a tree that is no longer clean
   // means one wrote somewhere it should not, and the stamp would be false.
@@ -212,6 +309,12 @@ async function main() {
     removeStaged();
     refuse('the build changed tracked or unignored files; the staged copy would not match its commit');
   }
+
+  // --- Step 5: The packed package.json carries the tag's full version ---
+  // Last, after the clean-tree check, because it is the one tracked file the
+  // pack changes, and postpack puts it back.
+  writePackedVersion(version);
+  log(`packing as ${version}`);
 }
 
 await main();
