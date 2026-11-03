@@ -40,14 +40,15 @@
 U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5);
 
 // Refuses to compile against a runtime older than the one this generator was
-// built beside (§16). A floor, not an equality: a newer runtime minor is fine.
+// built beside (§16). A floor, not an equality: a newer runtime is fine. The
+// patch is compared too, because new runtime API can arrive in a patch.
 // A runtime that predates the check does not define the macro, and would
 // report a syntax error instead of a refusal, so say what is needed here.
 // The call sits in the #else, so a runtime without the macro reports only this #error.
-#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION
-#error "This code requires u8g2gl runtime 0.11 or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
+#ifndef U8G2GL_REQUIRE_RUNTIME_AT_LEAST
+#error "This code requires u8g2gl runtime 0.11.1 or newer, but the runtime in use predates this runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."
 #else
-U8G2GL_REQUIRE_RUNTIME_VERSION(0, 11);
+U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 11, 1);
 #endif
 
 // --- Static capacities, counted from this document ([D-21]) ---

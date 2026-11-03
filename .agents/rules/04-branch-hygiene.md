@@ -75,17 +75,33 @@ intermediate commits reachable from no ref at all, breaking a branch nobody is
 currently looking at.
 
 **So: merge U8G2GL PRs with merge commits, not squash, while any downstream
-branch pins a bare commit.**
+branch pins a bare commit.** Only the owner lifts this ban.
+
+### Under the release scheme, a pin is a tag
 
 That is a policy, and a policy is a weak guarantee for something a build depends
-on. **The robust fix is a tag**, which is a ref and is never collected. Tagging
-is an owner action (`.agents/rules/03-versioning.md`).
+on. **The robust fix is a tag**, which is a ref and is never collected, however
+the PR that made the commit was merged. The release scheme
+(`03-versioning.md`) makes this routine:
+
+- **A downstream pin to an unreleased commit is a `dev` tag**, such as
+  `runtime-v0.11.2-dev.1`. Agents create and push `dev` tags without asking, in
+  a PATCH that has no beta, rc or stable tag yet; `node
+  scripts/release-version.mjs next runtime dev` prints the next one.
+- **A pin to a released commit is the release tag** (`runtime-v0.11.1-beta.1`,
+  `runtime-v0.11.1`).
+- **Never pin a bare SHA.** Tag the commit first, then pin the tag by name.
+
+Tagging the commit makes it safe from collection; it does not make the ban
+redundant on its own. The ban lasts until no downstream branch names a bare
+commit, and then only the owner lifts it.
 
 ### Where that stands: the pinned commit is tagged
 
 The owner tagged foundation's pinned commit **`v0.7.0-integration`** (→
-`82ec83f`). That tag is now what keeps the commit alive, and it would be even
-if every PR were squashed. Check it rather than trust this paragraph:
+`82ec83f`). That tag predates the release scheme and is not in its shape, but it
+is a ref, and it keeps the commit alive even if every PR were squashed. Check it
+rather than trust this paragraph:
 
 ```bash
 git rev-parse 'v0.7.0-integration^{commit}'      # 82ec83f…
@@ -98,16 +114,19 @@ The last line matters: as of 2026-10-28 `82ec83f` is **not** an ancestor of
 tag is, and nothing else.
 
 **What that changes:** this one pin no longer depends on how PRs are merged.
-**What it does not:** the policy stays, because it is about *any* bare-commit
-pin, and two remain possible:
+**What it does not:** the ban stays, because it is about *any* bare-commit pin,
+and two remain possible:
 
-1. Foundation still names the bare SHA, not the tag, so nothing on its side
-   says which ref keeps that commit alive: moving or deleting the tag would
-   break it silently. Until it pins `v0.7.0-integration` by name, treat the tag
-   as untouchable.
-2. The next pin — the cut-over on a newer runtime — will be another bare
-   commit until it, too, is tagged.
+1. Foundation still names the bare SHA, not a tag, so nothing on its side says
+   which ref keeps that commit alive: moving or deleting the tag would break it
+   silently. Until it pins a tag by name, treat `v0.7.0-integration` as
+   untouchable. Adding a scheme tag on the same commit (`runtime-v0.7.0-dev.1`,
+   which an agent may create under `03-versioning.md`) touches nothing, and
+   gives foundation a scheme-shaped name to repin to; repinning is foundation
+   work.
+2. The next pin — the cut-over on a newer runtime — must be a `dev` or release
+   tag from the start.
 
-So the order is unchanged: the owner tags a commit before anything downstream
-pins it, and the downstream pins the tag. When no downstream branch pins a bare
-commit, this section can go.
+So the order is: tag a commit before anything downstream pins it, and the
+downstream pins the tag. When no downstream branch pins a bare commit, the owner
+can lift the ban and this section can go.

@@ -18,8 +18,10 @@
  *          this CLI was built beside.
  * Description: Emits the four [D-21] capacities,
  *              `U8G2GL_REQUIRE_SCHEMA_VERSION`, and
- *              `U8G2GL_REQUIRE_RUNTIME_VERSION` behind an `#ifndef` that names
- *              the floor for a runtime too old to define it. The figures come from the
+ *              `U8G2GL_REQUIRE_RUNTIME_AT_LEAST` behind an `#ifndef` that names
+ *              the floor for a runtime too old to define it. The floor is the
+ *              full MAJOR.MINOR.PATCH, because new runtime API can arrive in a
+ *              PATCH (.agents/rules/03-versioning.md). The figures come from the
  *              `Capacities` counted in `src/core/realise/capacities.ts` — this module does not count anything, because a
  *              second count is the defect WO8c spent a whole work order
  *              removing.
@@ -126,7 +128,8 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
   // The runtime floor: the version of the runtime this CLI was built beside,
   // stamped from the header (src/data/runtime-version.ts). Not an option, and
   // not the CLI's own version, which is independent of the runtime's (§16).
-  const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}`;
+  // All three parts: a runtime one PATCH short can lack API this code calls.
+  const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}.${RUNTIME_VERSION.patch}`;
 
   // --- Step 2: The four [D-21] capacities, as counted by WO8b ---
   // `busiestScreen` and `busiestObject` are mangled names (§13.4) — what the
@@ -211,14 +214,15 @@ export function emitGeneratedConfigHeader(input: ProjectEmitInput): EmittedUnit 
     `U8G2GL_REQUIRE_SCHEMA_VERSION(${major}, ${minor});`,
     '',
     '// Refuses to compile against a runtime older than the one this generator was',
-    '// built beside (§16). A floor, not an equality: a newer runtime minor is fine.',
+    '// built beside (§16). A floor, not an equality: a newer runtime is fine. The',
+    '// patch is compared too, because new runtime API can arrive in a patch.',
     '// A runtime that predates the check does not define the macro, and would',
     '// report a syntax error instead of a refusal, so say what is needed here.',
     '// The call sits in the #else, so a runtime without the macro reports only this #error.',
-    '#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION',
-    `#error "This code requires u8g2gl runtime ${floor} or newer, but the runtime in use predates the runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."`,
+    '#ifndef U8G2GL_REQUIRE_RUNTIME_AT_LEAST',
+    `#error "This code requires u8g2gl runtime ${floor} or newer, but the runtime in use predates this runtime version check. Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI matching the runtime."`,
     '#else',
-    `U8G2GL_REQUIRE_RUNTIME_VERSION(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor});`,
+    `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor}, ${RUNTIME_VERSION.patch});`,
     '#endif',
     '',
     section('Static capacities, counted from this document ([D-21])'),

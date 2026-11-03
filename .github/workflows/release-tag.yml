@@ -1,0 +1,106 @@
+# U8G2GL — declarative UI for U8G2 monochrome displays
+# Copyright (c) 2026 Matt McNeill (CB Labs)
+# SPDX-License-Identifier: MIT
+#
+# File: .github/workflows/release-tag.yml
+# Purpose: The check on every release tag pushed (.agents/rules/03-versioning.md).
+#          A tag's core version must equal its component's committed files, and
+#          the channel lives only in the tag, so two places must agree; this is
+#          where a tag that disagrees is caught, before anyone pins or publishes
+#          it. It publishes nothing: npm publishing stays the owner's, by hand
+#          (docs/RELEASING.md).
+# Description: On a `runtime-v*` or `cli-v*` tag push:
+#              - `check`: the release-version tests, then
+#                `scripts/release-version.mjs check <tag>` on the tagged commit;
+#              - `package`, for a `cli-v*` tag only: scripts/check-package.mjs
+#                packs the CLI as the tag (HEAD carries it), installs it, and
+#                confirms the installed CLI reports, and `generate` stamps, the
+#                tag's full version. Emscripten is the same pinned emsdk as
+#                ci.yml's package job.
+#              ci.yml is unchanged, and still runs on pull requests and main.
+
+name: Release tag
+on:
+  push:
+    tags:
+      - 'runtime-v*'
+      - 'cli-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Every tag, so the check sees a beta or stable that supersedes a dev tag.
+          fetch-depth: 0
+      - name: Init U8G2 submodule
+        # .gitmodules sets update = none; override with --checkout. A full
+        # clone, so U8G2's own tags are present: the runtime check reads the
+        # U8G2 release from the tag at the submodule's commit.
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: The tag check's own tests
+        run: node --test scripts/release-version.test.mjs
+      - name: Check ${{ github.ref_name }}
+        run: node scripts/release-version.mjs check "$GITHUB_REF_NAME"
+
+  package:
+    if: startsWith(github.ref_name, 'cli-v')
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      # The same pin as ci.yml's package job and
+      # cli/src/node/toolchain/toolchain-paths.ts: change all three together.
+      EMSDK_VERSION: '5.0.3'
+      EMSDK_COMMIT: a620cf1d71c62dfdfbb0c01fe0a371e2af2dda6c
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # prepack packs as the cli-v* tag at HEAD, and checks it, so tags are needed.
+          fetch-depth: 0
+      - name: Init U8G2 submodule
+        run: git submodule update --init --checkout extern/u8g2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Cache Emscripten
+        id: emsdk-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/emsdk
+          key: emsdk-${{ runner.os }}-${{ env.EMSDK_VERSION }}-${{ env.EMSDK_COMMIT }}
+      - name: Install Emscripten ${{ env.EMSDK_VERSION }} (pinned)
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
+        run: |
+          git -c advice.detachedHead=false clone --depth 1 --branch "$EMSDK_VERSION" \
+            https://github.com/emscripten-core/emsdk.git "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+      - name: Verify the emsdk checkout is the pinned commit
+        # On a cache hit too: a cache is only as trustworthy as its key.
+        run: |
+          HEAD_COMMIT=$(git -C "$HOME/emsdk" rev-parse HEAD)
+          if [ "$HEAD_COMMIT" != "$EMSDK_COMMIT" ]; then
+            echo "::error::emsdk is at $HEAD_COMMIT, not the pinned $EMSDK_COMMIT"
+            exit 1
+          fi
+      - name: Install the CLI's and the designer's build dependencies
+        run: |
+          cd cli && npm ci
+          cd ../designer && npm ci
+      - name: Pack as ${{ github.ref_name }}, install and use the package
+        # As in ci.yml: emsdk_env.sh puts emsdk's own Node first on PATH, and
+        # the runner's Node 22 is put back in front.
+        run: |
+          RUNNER_NODE_DIR=$(dirname "$(command -v node)")
+          source "$HOME/emsdk/emsdk_env.sh"
+          export PATH="$RUNNER_NODE_DIR:$PATH"
+          node --version
+          emcc --version | head -1
+          node scripts/check-package.mjs
