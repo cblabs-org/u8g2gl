@@ -133,11 +133,7 @@ async function releaseVersion() {
   const release = await import(pathToFileURL(join(REPO_ROOT, 'scripts', 'release-version.mjs')).href);
 
   // --- Step 1: The release tags at HEAD ---
-  const atHead = (capture('git', ['tag', '--points-at', 'HEAD', '--list', 'cli-v*']) ?? '')
-    .split('\n')
-    .map((name) => ({ name: name.trim(), parsed: release.parseReleaseTag(name.trim()) }))
-    .filter((tag) => tag.parsed !== null && tag.parsed.component === 'cli')
-    .sort((a, b) => release.compareReleases(a.parsed, b.parsed));
+  const atHead = release.releaseTagsAtHead('cli', { cwd: REPO_ROOT });
   if (atHead.length === 0) {
     const suggest = (channel) => release.nextTag('cli', channel, { cwd: REPO_ROOT }).tag ?? `$(node scripts/release-version.mjs next cli ${channel})`;
     refuse(
@@ -149,15 +145,15 @@ async function releaseVersion() {
 
   // --- Step 2: The highest one must pass the tag check ---
   const chosen = atHead[atHead.length - 1];
-  const { refusals } = release.checkTag(chosen.name, { cwd: REPO_ROOT });
+  const { refusals } = release.checkTag(chosen, { cwd: REPO_ROOT });
   if (refusals.length > 0) {
-    refuse(`release-version refuses ${chosen.name}:\n  - ${refusals.join('\n  - ')}`);
+    refuse(`release-version refuses ${chosen}:\n  - ${refusals.join('\n  - ')}`);
   }
-  return chosen.name.slice('cli-v'.length);
+  return chosen.slice('cli-v'.length);
 }
 
 // writePackedVersion
-// Step 5 of the header: the packed package.json carries the tag's full
+// Stage 5 in the header's list: the packed package.json carries the tag's full
 // version. The committed file is kept first, so postpack can restore it.
 //   version — the tag's full version
 function writePackedVersion(version) {
@@ -222,7 +218,7 @@ function checkPreconditions() {
 }
 
 // build
-// Steps 1 to 3 of the header, in that order: the designer bundles the
+// Stages 1 to 3 in the header's list, in that order: the designer bundles the
 // framework editor Wasm, and the CLI is built last so its dist/ is the one
 // staged beside them.
 function build() {
@@ -252,7 +248,7 @@ function build() {
 }
 
 // stage
-// Step 4 of the header: copy and stamp. The framework's file set comes from
+// Stage 4 in the header's list: copy and stamp. The framework's file set comes from
 // the CLI just built, so it is the parser the packed CLI will run.
 // The stamps carry the tag's full version, because that is the version the
 // packed CLI reads from its package.json, and a staged copy is trusted only

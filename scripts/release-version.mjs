@@ -46,6 +46,7 @@
  *     - rangeAdmits():          Whether a library.json version range admits a version
  *
  *     Repository queries:
+ *     - releaseTagsAtHead():    A component's release tags at HEAD, lowest precedence first
  *     - readComponentCore():    A component's committed core at a commit, or why it has none
  *     - checkTag():             Every refusal for one tag at HEAD
  *     - nextTag():              The tag to create next, or why there is none
@@ -79,6 +80,8 @@ const CLI_PACKAGE = 'cli/package.json';
 const RUNTIME_STAMP = 'cli/src/data/runtime-version.json';
 const U8G2_PATH = 'extern/u8g2';
 const U8G2_DEPENDENCY = 'olikraus/U8g2';
+/** How many hex digits of a commit a message shows. */
+const SHORT_SHA = 12;
 
 // ─── Tags and versions ──────────────────────────────────────────────────────
 
@@ -111,7 +114,11 @@ export function formatReleaseTag({ component, core, channel, preNum }) {
 
 /**
  * SemVer precedence of two parsed tags of one component: core first, then
- * channel (dev < beta < rc < stable), then PRE_NUM. Negative when a < b.
+ * channel (dev < beta < rc < stable), then PRE_NUM.
+ * @param {{ core: number[], channel: string, preNum: number }} a  from parseReleaseTag()
+ * @param {{ core: number[], channel: string, preNum: number }} b  from parseReleaseTag()
+ * @returns {number} negative when a < b, 0 when equal, positive when a > b;
+ *          usable directly as an Array.prototype.sort() comparator
  */
 export function compareReleases(a, b) {
   for (let i = 0; i < 3; i++) {
@@ -204,6 +211,25 @@ function releaseTagsOf(repo, component) {
     .split('\n')
     .map((name) => ({ name, release: parseReleaseTag(name) }))
     .filter((t) => t.release !== null && t.release.component === component);
+}
+
+/**
+ * A component's release tags at HEAD, lowest precedence first, so the last is
+ * the one a build at HEAD is versioned as (a stable promoted onto its beta's
+ * commit outranks the beta). Packing and the package check both use this, so
+ * they cannot disagree about which tag that is.
+ * @param {string} component  `runtime` or `cli`
+ * @param {{ cwd?: string }} [options]  any directory in the repository
+ * @returns {string[]} tag names
+ */
+export function releaseTagsAtHead(component, { cwd = process.cwd() } = {}) {
+  const listed = git(repositoryRoot(cwd), ['tag', '--points-at', 'HEAD', '--list', `${component}-v*`]) ?? '';
+  return listed
+    .split('\n')
+    .map((name) => ({ name, release: parseReleaseTag(name) }))
+    .filter((t) => t.release !== null && t.release.component === component)
+    .sort((a, b) => compareReleases(a.release, b.release))
+    .map((t) => t.name);
 }
 
 /** Tags in one component's PATCH, given that PATCH's core. */
@@ -328,7 +354,7 @@ function u8g2VersionAt(repo, commit) {
     return {
       version: null,
       problem:
-        `${U8G2_PATH} at ${gitlink[1].slice(0, 12)} has no U8G2 version tag ` +
+        `${U8G2_PATH} at ${gitlink[1].slice(0, SHORT_SHA)} has no U8G2 version tag ` +
         `(fetch the submodule's tags, or point it at a U8G2 release)`,
     };
   }
@@ -369,7 +395,7 @@ export function checkTag(tag, { cwd = process.cwd() } = {}) {
     refusals.push(`no tag "${tag}" exists in this repository`);
   } else if (tagged !== head) {
     refusals.push(
-      `"${tag}" is at ${tagged.slice(0, 12)}, not at the commit being checked (HEAD ${head.slice(0, 12)})`,
+      `"${tag}" is at ${tagged.slice(0, SHORT_SHA)}, not at the commit being checked (HEAD ${head.slice(0, SHORT_SHA)})`,
     );
   }
 
@@ -377,8 +403,10 @@ export function checkTag(tag, { cwd = process.cwd() } = {}) {
   const files = readComponentCore(repo, release.component, 'HEAD');
   refusals.push(...files.problems);
   if (files.core && compareCores(files.core, release.core) !== 0) {
-    const file = release.component === 'cli' ? CLI_PACKAGE : `${LIBRARY_JSON}, ${CMAKE_LISTS} and ${VERSION_HEADER}`;
-    refusals.push(`the tag's core is ${core}, but ${file} say${release.component === 'cli' ? 's' : ''} ${files.core.join('.')}`);
+    const stated = release.component === 'cli'
+      ? `${CLI_PACKAGE} says`
+      : `${LIBRARY_JSON}, ${CMAKE_LISTS} and ${VERSION_HEADER} say`;
+    refusals.push(`the tag's core is ${core}, but ${stated} ${files.core.join('.')}`);
   }
 
   // --- Step 4: component-specific agreement ---
@@ -407,7 +435,7 @@ export function checkTag(tag, { cwd = process.cwd() } = {}) {
   const built = u8g2 ? `, built against U8G2 ${u8g2.join('.')}` : '';
   return {
     refusals,
-    summary: `${tag}: ${release.component} ${core}, channel ${release.channel}, at ${head.slice(0, 12)}${built}`,
+    summary: `${tag}: ${release.component} ${core}, channel ${release.channel}, at ${head.slice(0, SHORT_SHA)}${built}`,
   };
 }
 

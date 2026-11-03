@@ -50,7 +50,7 @@ import { constants, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rm
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scanText } from './check-home-paths.mjs';
-import { compareReleases, nextTag, parseReleaseTag } from './release-version.mjs';
+import { nextTag, releaseTagsAtHead } from './release-version.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CLI_ROOT = join(REPO_ROOT, 'cli');
@@ -130,17 +130,11 @@ function filesUnder(dir) {
 }
 
 // cliTagAtHead
-// The `cli-v*` release tag at a checkout's HEAD that prepack packs as (the
-// highest by precedence), or undefined.
+// The `cli-v*` release tag at a checkout's HEAD that prepack packs as, or
+// undefined. The same lookup prepack makes, so the two cannot disagree.
 //   root — the checkout
 function cliTagAtHead(root) {
-  const listed = run('git', ['tag', '--points-at', 'HEAD', '--list', 'cli-v*'], { cwd: root, quiet: true });
-  const tags = listed
-    .split('\n')
-    .map((name) => ({ name: name.trim(), parsed: parseReleaseTag(name.trim()) }))
-    .filter((tag) => tag.parsed !== null && tag.parsed.component === 'cli')
-    .sort((a, b) => compareReleases(a.parsed, b.parsed));
-  return tags.at(-1)?.name;
+  return releaseTagsAtHead('cli', { cwd: root }).at(-1);
 }
 
 // taggedClone

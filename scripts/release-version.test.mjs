@@ -32,6 +32,7 @@ import {
   formatReleaseTag,
   parseReleaseTag,
   rangeAdmits,
+  releaseTagsAtHead,
 } from './release-version.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -362,6 +363,22 @@ describe('check refuses', () => {
     git(repo, 'tag', 'cli-v0.15.3-beta.1');
     writeVersions(repo, { runtime: '0.11.1', cli: '0.15.3' }); // edited, never committed
     assertRefused(run(repo, 'check', 'cli-v0.15.3-beta.1'), /cli\/package\.json says 0\.15\.2/);
+  });
+});
+
+// ─── releaseTagsAtHead ───────────────────────────────────────────────────────
+
+describe('releaseTagsAtHead', () => {
+  test("lists one component's release tags at HEAD, lowest precedence first", () => {
+    const repo = freshRepo();
+    git(repo, 'tag', 'cli-v0.15.1-beta.1'); // moved off HEAD below
+    put(repo, 'README.md', 'later\n');
+    commitAll(repo, 'later');
+    for (const tag of ['cli-v0.15.2', 'cli-v0.15.2-dev.2', 'cli-v0.15.2-beta.1', 'runtime-v0.11.1', 'v0.7.0-integration']) {
+      git(repo, 'tag', tag);
+    }
+    assert.deepEqual(releaseTagsAtHead('cli', { cwd: repo }), ['cli-v0.15.2-dev.2', 'cli-v0.15.2-beta.1', 'cli-v0.15.2']);
+    assert.deepEqual(releaseTagsAtHead('runtime', { cwd: repo }), ['runtime-v0.11.1']);
   });
 });
 

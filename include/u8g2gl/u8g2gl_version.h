@@ -87,7 +87,8 @@
  *
  * This guard answers "does this runtime implement the vocabulary the code was
  * written for?", which only equality can. The separate question "does this
- * runtime have the API the code calls?" is U8G2GL_REQUIRE_RUNTIME_VERSION().
+ * runtime have the API the code calls?" is U8G2GL_REQUIRE_RUNTIME_AT_LEAST()
+ * (the older MAJOR.MINOR form is U8G2GL_REQUIRE_RUNTIME_VERSION()).
  * The CLI and runtime are versioned independently
  * (.agents/rules/03-versioning.md).
  *
