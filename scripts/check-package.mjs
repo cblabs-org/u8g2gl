@@ -155,10 +155,11 @@ function taggedClone(work) {
   const root = join(work, 'repo');
   const git = (...args) => run('git', ['-c', 'protocol.file.allow=always', '-c', 'tag.gpgSign=false', ...args], { cwd: root, quiet: true });
 
-  // --- Step 1: HEAD, with none of this repository's tags ---
+  // --- Step 1: HEAD alone: none of this repository's tags, and no history ---
+  // (Depth 1 also lets a shallow checkout, as CI's is, be the source.)
   mkdirSync(root, { recursive: true });
   git('init', '-q');
-  git('fetch', '-q', '--no-tags', REPO_ROOT, 'HEAD');
+  git('fetch', '-q', '--no-tags', '--depth=1', REPO_ROOT, 'HEAD');
   git('checkout', '-q', '--detach', 'FETCH_HEAD');
 
   // --- Step 2: U8G2, from the checked-out submodule's own repository ---
