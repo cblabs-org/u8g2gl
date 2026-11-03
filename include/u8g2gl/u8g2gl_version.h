@@ -21,8 +21,11 @@
  *          (.agents/rules/03-versioning.md).
  *
  * Description: Runtime version, the schema version this runtime implements, and
- *              the two static_assert hooks a generated header invokes: one for
- *              the schema (an equality) and one for the runtime (a floor).
+ *              the static_assert hooks a generated header invokes: one for the
+ *              schema (an equality) and one for the runtime (a floor). The
+ *              runtime floor has two forms: the current one compares
+ *              MAJOR.MINOR.PATCH, and the older MAJOR.MINOR one stays so code
+ *              generated before it still compiles.
  *
  * Exported Constants:
  *
@@ -35,8 +38,11 @@
  *
  * Exported Macros:
  * - U8G2GL_REQUIRE_SCHEMA_VERSION(): compile-time refusal of a mismatched schema version
- * - U8G2GL_REQUIRE_RUNTIME_VERSION(): compile-time refusal of a runtime older than the
- *                                     floor the code was generated for
+ * - U8G2GL_REQUIRE_RUNTIME_AT_LEAST(): compile-time refusal of a runtime older than
+ *                                      the MAJOR.MINOR.PATCH floor the code was
+ *                                      generated for (what the generator emits)
+ * - U8G2GL_REQUIRE_RUNTIME_VERSION():  the older MAJOR.MINOR floor, kept for code
+ *                                      generated before the PATCH-aware one
  */
 #ifndef U8G2GL_VERSION_H
 #define U8G2GL_VERSION_H
@@ -46,7 +52,7 @@
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
 #define U8G2GL_VERSION_MINOR 11 ///< Runtime minor version
-#define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
+#define U8G2GL_VERSION_PATCH 1  ///< Runtime patch version
 
 // Schema 0.5 adds only palette metadata on <api>, which the designer reads and
 // no generated file carries, so the runtime's behaviour is unchanged. The minor
@@ -104,10 +110,65 @@
         "runtime.")
 
 /**
- * @brief Refuse to compile unless the runtime has the major, and at least the minor, the code was generated for.
+ * @brief Refuse to compile unless the runtime has the major, and at least the minor.patch, the code was generated for.
  *
  * A generated header invokes this once, at namespace scope, with the runtime
  * version the generator was built beside (§16):
+ *
+ * @code
+ * #include "u8g2gl/u8g2gl_version.h"
+ * U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 11, 1);
+ * @endcode
+ *
+ * A **floor**, not an equality: the major must be equal, and this runtime's
+ * MINOR.PATCH must be at least @p minor.@p patch. The minor is compared
+ * first, so runtime 0.12.0 satisfies a floor of 0.11.5.
+ *
+ * The patch is compared because the runtime's PATCH goes up once per merged
+ * pull request, and new API can arrive in a PATCH
+ * (.agents/rules/03-versioning.md). A floor on MAJOR.MINOR alone would let
+ * code generated for 0.11.1 compile against 0.11.0 and fail on a missing
+ * symbol, or not at all until a later edit reached the gap, which is the
+ * failure this guard exists to prevent.
+ *
+ * The refusal message names both versions: the floor the code was generated
+ * for and the version of this runtime.
+ *
+ * Every runtime that lacks this macro is older than 0.11.1, the version that
+ * introduced it, so generated code guards the call with
+ * `#ifndef U8G2GL_REQUIRE_RUNTIME_AT_LEAST`, an `#error` naming the floor, and
+ * an `#else` holding the call (§16).
+ *
+ * @param major Runtime major version the generated code requires; must equal this runtime's.
+ * @param minor Lowest runtime minor version the generated code requires.
+ * @param patch Lowest runtime patch the generated code requires, when the minor is equal.
+ */
+#define U8G2GL_REQUIRE_RUNTIME_AT_LEAST(major, minor, patch)                      \
+    static_assert((major) == U8G2GL_VERSION_MAJOR &&                              \
+                  ((minor) < U8G2GL_VERSION_MINOR ||                              \
+                   ((minor) == U8G2GL_VERSION_MINOR &&                            \
+                    (patch) <= U8G2GL_VERSION_PATCH)),                            \
+        "U8G2GL runtime too old or mismatched: this code was generated for "      \
+        "runtime " U8G2GL_VERSION_STR(major) "." U8G2GL_VERSION_STR(minor) "."    \
+        U8G2GL_VERSION_STR(patch)                                                 \
+        " or later within that major, but this runtime is "                       \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_MAJOR) "."                              \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_MINOR) "."                              \
+        U8G2GL_VERSION_STR(U8G2GL_VERSION_PATCH)                                  \
+        ". Update the u8g2gl runtime library, or regenerate with a u8g2gl CLI "   \
+        "matching the runtime.")
+
+/**
+ * @brief The older floor: refuse to compile unless the runtime has the major, and at least the minor, the code was generated for.
+ *
+ * **Kept for code generated before U8G2GL_REQUIRE_RUNTIME_AT_LEAST() (runtime
+ * 0.11.0 and earlier, CLI 0.15.1 and earlier).** That code calls this form,
+ * and committed `generated/` directories must keep compiling against newer
+ * runtimes. The generator no longer emits it, because it does not compare the
+ * patch.
+ *
+ * Such code invokes this once, at namespace scope, with the runtime version
+ * its generator was built beside (§16):
  *
  * @code
  * #include "u8g2gl/u8g2gl_version.h"
@@ -123,9 +184,9 @@
  * The refusal message names both versions: the floor the code was generated for
  * and the version of this runtime.
  *
- * A runtime that predates this macro cannot refuse by itself, so generated code
- * guards the call with `#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION`, an `#error`
- * naming the floor, and an `#else` holding the call (§16).
+ * A runtime that predates this macro cannot refuse by itself, so code generated
+ * for it guards the call with `#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION`, an
+ * `#error` naming the floor, and an `#else` holding the call (§16).
  *
  * @param major Runtime major version the generated code requires; must equal this runtime's.
  * @param minor Lowest runtime minor version the generated code requires.

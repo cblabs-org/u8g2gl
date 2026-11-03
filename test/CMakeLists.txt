@@ -470,7 +470,12 @@ add_test(NAME VersionGuard.StaleSchemaMinorFailsToCompile
 set_tests_properties(VersionGuard.StaleSchemaMinorFailsToCompile PROPERTIES
     PASS_REGULAR_EXPRESSION "U8G2GL schema version mismatch: this code was generated for schema 0\\.3, but this runtime implements schema 0\\.5"
 )
-foreach(_guard_case runtime_floor_match runtime_newer_minor runtime_older runtime_major)
+# runtime_floor_match and runtime_newer_minor use the older two-argument
+# U8G2GL_REQUIRE_RUNTIME_VERSION(), which code generated before the PATCH-aware
+# floor still calls; they prove it still compiles. The runtime_at_least and
+# runtime_patch_short cases are the three-argument form the generator emits.
+foreach(_guard_case runtime_floor_match runtime_newer_minor runtime_older runtime_major
+        runtime_at_least_match runtime_at_least_newer runtime_patch_short)
     add_executable(version_guard_${_guard_case} EXCLUDE_FROM_ALL
         version_guard/${_guard_case}.cpp
     )
@@ -527,6 +532,20 @@ add_test(NAME VersionGuard.MismatchedRuntimeMajorFailsToCompile
 set_tests_properties(VersionGuard.MismatchedRuntimeMajorFailsToCompile PROPERTIES
     PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime major [^,]+, minor [^,]+ or later, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
 )
+add_test(NAME VersionGuard.RuntimeAtLeastMatchCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_at_least_match
+)
+add_test(NAME VersionGuard.NewerRuntimeAtLeastCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_at_least_newer
+)
+add_test(NAME VersionGuard.RuntimeOnePatchShortFailsToCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_runtime_patch_short
+)
+set_tests_properties(VersionGuard.RuntimeOnePatchShortFailsToCompile PROPERTIES
+    # The floor is an expression (patch + 1), which the message spells as
+    # written; the runtime's own version is exact, from this project's version.
+    PASS_REGULAR_EXPRESSION "U8G2GL runtime too old or mismatched: this code was generated for runtime .+ or later within that major, but this runtime is ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH}\\."
+)
 add_test(NAME VersionGuard.GeneratedConfigCompiles
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target version_guard_generated_config
 )
@@ -535,8 +554,8 @@ add_test(NAME VersionGuard.PreMacroRuntimeFailsByName
 )
 set_tests_properties(VersionGuard.PreMacroRuntimeFailsByName PROPERTIES
     # The #error text the emitted guard carries; it must name the floor the
-    # generated code needs, which is this runtime's major.minor.
-    PASS_REGULAR_EXPRESSION "requires u8g2gl runtime ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR} or newer"
+    # generated code needs, which is this runtime's major.minor.patch.
+    PASS_REGULAR_EXPRESSION "requires u8g2gl runtime ${PROJECT_VERSION_MAJOR}\\.${PROJECT_VERSION_MINOR}\\.${PROJECT_VERSION_PATCH} or newer"
 )
 
 # --- Real U8G2 acceptance target (WO4c) ---
@@ -1081,6 +1100,9 @@ set_tests_properties(
     VersionGuard.NewerRuntimeMinorCompiles
     VersionGuard.OlderRuntimeFailsToCompile
     VersionGuard.MismatchedRuntimeMajorFailsToCompile
+    VersionGuard.RuntimeAtLeastMatchCompiles
+    VersionGuard.NewerRuntimeAtLeastCompiles
+    VersionGuard.RuntimeOnePatchShortFailsToCompile
     VersionGuard.GeneratedConfigCompiles
     VersionGuard.PreMacroRuntimeFailsByName
     RealU8g2.RuntimeCompilesAgainstRealHeaders

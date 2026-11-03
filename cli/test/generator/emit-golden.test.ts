@@ -147,16 +147,24 @@ describe('what the golden fixture is there to pin', () => {
 
   describe('the §16 runtime floor', () => {
     const config = content('u8g2gl_generated_config.h');
-    const call = `U8G2GL_REQUIRE_RUNTIME_VERSION(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor});`;
-    const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}`;
+    const call = `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(${RUNTIME_VERSION.major}, ${RUNTIME_VERSION.minor}, ${RUNTIME_VERSION.patch});`;
+    const floor = `${RUNTIME_VERSION.major}.${RUNTIME_VERSION.minor}.${RUNTIME_VERSION.patch}`;
 
     it('emits the stamped floor, which is the runtime version and not the CLI version', () => {
       expect(config).toContain(call);
       expect(config).toContain(`This code requires u8g2gl runtime ${floor} or newer`);
     });
 
+    it('compares the patch: the three-part macro, never the older MAJOR.MINOR one', () => {
+      // Under PATCH per merged PR, new runtime API can arrive in a patch, so a
+      // floor without it would accept a runtime that lacks what the code calls
+      // (.agents/rules/03-versioning.md). The older macro stays in the header
+      // only for code generated before this one.
+      expect(config).not.toContain('U8G2GL_REQUIRE_RUNTIME_VERSION');
+    });
+
     it('puts the macro call in the #else of an #ifndef whose #error names the floor and the remedy', () => {
-      const guard = config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION');
+      const guard = config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_AT_LEAST');
       const error = config.indexOf('#error', guard);
       const otherwise = config.indexOf('#else', error);
       const endif = config.indexOf('#endif', otherwise);
@@ -172,7 +180,7 @@ describe('what the golden fixture is there to pin', () => {
     it('leaves the schema guard unchanged and ahead of the runtime guard', () => {
       const schema = config.indexOf('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5);');
       expect(schema).toBeGreaterThan(-1);
-      expect(schema).toBeLessThan(config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_VERSION'));
+      expect(schema).toBeLessThan(config.indexOf('#ifndef U8G2GL_REQUIRE_RUNTIME_AT_LEAST'));
     });
   });
 
