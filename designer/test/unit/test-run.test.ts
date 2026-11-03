@@ -86,6 +86,9 @@ test('Run is unavailable for each reason it can be, and waits for a rebuild rath
   expect(reason({ wasm: 'none', cannotBuild: 'no-emscripten', wellFormed: false })).toMatch(/no toolchain/);
 });
 
+/** How long the harness's `until()` waits before it fails the test. */
+const UNTIL_DEADLINE_MS = 10_000;
+
 /** A fake target, a fake server, and a controller over them. */
 function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
   const status = new Observable<WasmStatus>({ kind: 'current', hash: 'h' });
@@ -151,8 +154,15 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
   }) as typeof fetch;
   const controller = new TestRunController(target);
   controller.start();
+  // Waits by the clock, not by a count of polls, and throws at the deadline. A
+  // count of 5 ms polls ran out in about a second on a fast machine, before the
+  // pause timer and one job poll had finished, and then returned silently.
   const until = async (done: () => boolean): Promise<void> => {
-    for (let i = 0; i < 200 && !done(); i++) {
+    const deadline = performance.now() + UNTIL_DEADLINE_MS;
+    while (!done()) {
+      if (performance.now() > deadline) {
+        throw new Error(`still waiting after ${UNTIL_DEADLINE_MS} ms for: ${done.toString()}`);
+      }
       release?.();
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
