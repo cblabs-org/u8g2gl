@@ -134,9 +134,26 @@ and WO2 can run while the download waits for approval. The rulings above use the
 and their substance is unchanged. **Pinned version:** `lucide-static@1.61.0` (published
 2026-10-21, ISC licence).
 
+## PA ruling 6a — Open in editor opens source and assets only (2026-11-09, PA review of WO2)
+
+`POST /api/open` must not let the session token start native code. Today the token reads and
+writes project files and builds Wasm, which runs sandboxed; the platform opener (`open`,
+`explorer.exe`, `xdg-open`) *runs* what it is given when the file is executable by type (a
+`.command`, `.app`, `.bat`, `.desktop`, `.sh` …), and `PUT /api/file` can write any name. So:
+
+- `/api/open` accepts only an allowlist of extensions: `.xml`, `.cpp`, `.cc`, `.c`, `.hpp`, `.h`,
+  `.json`, `.md`, `.txt`, `.bdf`, `.xbm`, `.png`. Any other gives 403 with no spawn. The check
+  applies to the requested path **and** to its real path, so a symlink named `.cpp` cannot reach
+  an executable. It applies whether or not `--editor` is set.
+- The Explorer offers "Open in editor" only for allowlisted files.
+- Reveal is unchanged: `open -R` and opening a directory start nothing from the file.
+- Tests: a `.command`, a `.sh`, an extensionless file, and a `.cpp` symlink to a `.command`
+  inside the project each give 403 and no spawn.
+
 ## Status log
 
 | Date | Entry |
 |---|---|
 | 2026-11-09 | Owner approved the E-2e + S-2 plan: "Approved, proceed". Download of `lucide-static` not yet approved; asked. |
 | 2026-11-09 | PA created worktree `../U8G2GL-e2e` from `29f976a`, branch `u8g2gl-e2e/wo1-explorer`. Worker spawned on WO1–WO2. |
+| 2026-11-09 | Worker finished WO1–WO2 (`4072d51`, `df5e578`, `263aee7`). PA accepted deviations 1–6 of its report (the `session` field on Workspace, `cli.ts` help and `disk-project.ts` `locate()` outside the listed files, `explorer.exe` on Windows, the `.xml` item opening the editable tab, the platform label taken from the browser, `aria-disabled` rows). PA found that `/api/open` lets the token start native code through the platform opener; added ruling 6a and returned WO2 for it. |
