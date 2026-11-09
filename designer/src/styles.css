@@ -89,6 +89,33 @@ button { font: inherit; color: inherit; }
 .file.inert { color: var(--text-dim); cursor: default; }
 .file.dirty::after { content: ' ●'; color: var(--text-dim); }
 
+/* --- Context menu: fixed to the viewport, above Dockview's panels --- */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+.context-menu-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 3px 12px;
+  border: 0;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.context-menu-item:focus { outline: none; background: #2f3a4d; }
+.context-menu-item[aria-expanded='true'] { background: #2c3036; }
+.context-menu-arrow { color: var(--text-dim); }
+
 .editor-area { grid-row: 1; min-width: 0; min-height: 0; }
 .editor-area > * { height: 100%; }
 

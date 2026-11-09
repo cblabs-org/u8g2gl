@@ -30,6 +30,9 @@
  *     - write():              Conditional write, creating directories
  *     - list():               Every project source file
  *
+ *     Handing a file to another program:
+ *     - locate():             An existing project source file's absolute path
+ *
  *     Shared with the watcher:
  *     - absolutePath():       A project-relative path on disk
  *     - listFiles():          The same walk `list()` does, as a plain array
@@ -92,6 +95,37 @@ export class DiskProject {
       return error('not-found', `'${path}' does not exist.`);
     }
     return { ok: true, path, bytes, version: contentVersion(bytes) };
+  }
+
+  /**
+   * @brief An existing project source file's absolute path, for handing to
+   *        another program (the author's editor, the file manager).
+   *
+   * The checks `read()` makes — the lexical rule, then the real-path rule —
+   * plus the write route's refusal of ignored paths: a program the server
+   * starts is given only what the editor may itself see as project source.
+   *
+   * @param path As the client sent it; checked here.
+   * @return The absolute path, or `invalid-path`, `outside-project` (an
+   *         ignored path, or a symlink out of the project) or `not-found`
+   *         (absent, or not a regular file).
+   */
+  locate(path: string): { readonly ok: true; readonly absolute: string } | ProjectFsError {
+    const check = checkProjectPath(path);
+    if (!check.ok) {
+      return error('invalid-path', refusedPathMessage(path, check.reason));
+    }
+    if (isIgnoredPath(path)) {
+      return error('outside-project', `'${path}' is not project source.`);
+    }
+    const absolute = this.absolutePath(path);
+    if (!isInsideProject(this.root, absolute)) {
+      return error('outside-project', `'${path}' resolves outside the project directory.`);
+    }
+    if (!isFile(absolute)) {
+      return error('not-found', `'${path}' does not exist.`);
+    }
+    return { ok: true, absolute };
   }
 
   /**

@@ -26,6 +26,10 @@
  *              - `GET /api/file?path=`     bytes, version in `U8G2GL-Version`
  *              - `PUT /api/file?path=`     conditional write; 409 on conflict
  *              - `GET /api/events`         server-sent events of file changes
+ *              - `POST /api/open`          `{ path, line? }`: open a project
+ *                                          file in the author's editor
+ *              - `POST /api/reveal`        `{ path }`: show it in the file
+ *                                          manager
  *              - `POST /api/build/<job>`   queue a build; 202 with its record
  *              - `GET /api/build/<id>`     a build's record
  *              - `GET /api/editor-wasm/<id>/<file>` the editor Wasm a
@@ -55,6 +59,7 @@ import {
 import { EDITOR_WASM_JOB } from './build/editor-wasm-build.js';
 import { BuildQueue, type BuildJobRecord } from './build-queue.js';
 import { DiskProject } from './disk-project.js';
+import type { FileOpener } from './file-opener.js';
 import { placeholderPage } from './placeholder-page.js';
 import { ProjectWatcher } from './project-watcher.js';
 import { APP_PATH_PREFIX, generateSessionToken, presentedToken, tokenMatches } from './session-token.js';
@@ -72,6 +77,10 @@ const EDITOR_WASM_ROUTE = '/api/editor-wasm/';
 /** The files an editor Wasm build serves: the Emscripten loader and its module. */
 const EDITOR_WASM_FILES: readonly string[] = ['u8g2gl_editor.js', 'u8g2gl_editor.wasm'];
 
+/** The routes that hand a project file to another program. */
+const OPEN_ROUTE = '/api/open';
+const REVEAL_ROUTE = '/api/reveal';
+
 /** How often an idle event stream is sent a comment, so proxies and browsers keep it open. */
 const KEEPALIVE_MS = 15_000;
 
@@ -88,6 +97,12 @@ export interface DesignServerOptions {
    * the placeholder page.
    */
   readonly designerRoot?: string;
+  /**
+   * What `/api/open` and `/api/reveal` start programs with. Omitted, both
+   * routes answer 501 and start nothing — so a server a test starts can never
+   * open a window on the desktop unless the test hands it a fake.
+   */
+  readonly opener?: FileOpener;
 }
 
 /**
@@ -243,6 +258,8 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       sendResult(response, result, (r) => ({ path: r.path, version: r.version, created: r.created }));
     } else if (route === '/api/events' && method === 'GET') {
       openStream(response);
+    } else if ((route === OPEN_ROUTE || route === REVEAL_ROUTE) && method === 'POST') {
+      await serveOpen(request, response, route === OPEN_ROUTE ? 'open' : 'reveal');
     } else if (jsonRoutes.has(route) && method === 'POST') {
       await serveJsonRoute(request, response, jsonRoutes.get(route)!);
     } else if (route.startsWith('/api/build/') && method === 'POST') {
@@ -352,6 +369,48 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     sendJson(response, answer.status, answer.body);
   }
 
+  // serveOpen
+  // `/api/open` or `/api/reveal`: a project file handed to the author's editor
+  // or file manager. Everything that can refuse runs before anything starts —
+  // the body's shape, then the same path checks as reading a file plus the
+  // ignored paths — so a refused request never spawns a process. The program
+  // and its options were fixed at start-up; the request supplies only which
+  // project file, and for `open` a line.
+  //   action — which of the two routes
+  async function serveOpen(request: IncomingMessage, response: ServerResponse, action: 'open' | 'reveal'): Promise<void> {
+    // --- Step 1: The body: `{ path, line? }` ---
+    const body = await readBody(request);
+    const parsed = body === undefined ? undefined : parseOpenBody(body, action);
+    if (parsed === undefined) {
+      const expected = action === 'open' ? '{ path, line? }, line a positive integer' : '{ path }';
+      sendJson(response, 400, { code: 'bad-request', message: `the request body must be JSON ${expected}` });
+      return;
+    }
+
+    // --- Step 2: The path, as project source that exists ---
+    const located = project.locate(parsed.path);
+    if (!located.ok) {
+      sendError(response, located);
+      return;
+    }
+    const opener = options.opener;
+    if (opener === undefined) {
+      sendJson(response, 501, { code: 'unavailable', message: 'this server opens no programs' });
+      return;
+    }
+
+    // --- Step 3: Start the program ---
+    try {
+      if (action === 'open') await opener.open(located.absolute, parsed.line);
+      else await opener.reveal(located.absolute);
+    } catch (cause) {
+      const reason = cause instanceof Error ? cause.message : String(cause);
+      sendJson(response, 500, { code: 'unavailable', message: `could not start the ${action === 'open' ? 'editor' : 'file manager'}: ${reason}` });
+      return;
+    }
+    sendJson(response, 200, { path: parsed.path });
+  }
+
   // openStream
   // Holds a response open as a server-sent event stream until the client goes.
   // `ready` is sent first, so a client knows it is attached and that no event
@@ -397,7 +456,14 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       // The server's own routes are matched before registered ones only for
       // the paths below; refusing them here makes a shadowed route an error
       // at registration instead of a handler that silently never runs.
-      const builtIn = path === '/api/files' || path === '/api/file' || path === '/api/events' || path.startsWith('/api/build/') || path.startsWith(EDITOR_WASM_ROUTE);
+      const builtIn =
+        path === '/api/files' ||
+        path === '/api/file' ||
+        path === '/api/events' ||
+        path === OPEN_ROUTE ||
+        path === REVEAL_ROUTE ||
+        path.startsWith('/api/build/') ||
+        path.startsWith(EDITOR_WASM_ROUTE);
       if (!path.startsWith('/api/') || builtIn || jsonRoutes.has(path)) {
         throw new Error(`cannot register the route '${path}'`);
       }
@@ -468,6 +534,28 @@ function pathParam(url: URL): string | undefined {
     }
   }
   return '';
+}
+
+// parseOpenBody
+// The `{ path, line? }` body of `/api/open` or `/api/reveal`, or undefined if
+// it is not JSON of that shape. `line` is accepted only by `open`, and only as
+// a positive integer: it becomes part of an argument (`path:line`), so it must
+// be a number, never text.
+//   body   — the raw request body
+//   action — which route; `reveal` takes no line
+function parseOpenBody(body: Uint8Array, action: 'open' | 'reveal'): { readonly path: string; readonly line?: number } | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { path, line } = value as { path?: unknown; line?: unknown };
+  if (typeof path !== 'string') return undefined;
+  if (line === undefined) return { path };
+  if (action !== 'open' || typeof line !== 'number' || !Number.isSafeInteger(line) || line < 1) return undefined;
+  return { path, line };
 }
 
 // sendMalformed

@@ -16,7 +16,9 @@
  *              built: canvas, then Problems and Output beneath it. Editor tabs
  *              open to the canvas's right, all in one group, when the
  *              workspace is asked to open a file; a file already open is
- *              brought to the front.
+ *              brought to the front. A file that is not a project document —
+ *              a widget's C++, from View source or a Problems row — opens in
+ *              a read-only source tab instead, in the same group.
  *
  * Exports:
  * - App:  The shell
@@ -31,6 +33,8 @@ import { EditorPanel } from './editor-panel';
 import { Explorer } from './explorer';
 import { OutputPanel } from './output-panel';
 import { ProblemsPanel } from './problems-panel';
+import { sourceTitle } from './file-actions';
+import { SourcePanel } from './source-panel';
 import { StatusBar } from './status-bar';
 import { WorkspaceContext } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -41,12 +45,15 @@ import { Palette } from '../palette/palette';
 const COMPONENTS = {
   canvas: CanvasPanel,
   editor: EditorPanel,
+  source: SourcePanel,
   problems: ProblemsPanel,
   output: OutputPanel,
 };
 
 /** A file's editor panel id. */
 const editorId = (path: string): string => `file:${path}`;
+/** A file's read-only source panel id; a prefix of its own, so closing one never closes a document. */
+const sourceId = (path: string): string => `source:${path}`;
 
 /** @brief The designer shell. */
 export function App({ workspace }: { readonly workspace: Workspace }): React.JSX.Element {
@@ -54,22 +61,26 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   const dock = useRef<DockviewApi | undefined>(undefined);
   const [view, setView] = useState<SidebarView>('explorer');
 
-  // --- Opening files: a tab per document, in one group right of the canvas ---
+  // --- Opening files: a tab per file, in one group right of the canvas ---
+  // A project document gets an editor; anything else (a widget's C++) a
+  // read-only source tab, since the designer edits only the documents.
   useEffect(
     () =>
       workspace.onOpenFile((request) => {
         const api = dock.current;
         if (api === undefined) return;
-        const existing = api.getPanel(editorId(request.path));
+        const isDocument = workspace.documents.isDocument(request.path);
+        const id = isDocument ? editorId(request.path) : sourceId(request.path);
+        const existing = api.getPanel(id);
         if (existing !== undefined) {
           existing.api.setActive();
           return;
         }
-        const sibling = api.panels.find((panel) => panel.id.startsWith('file:'));
+        const sibling = api.panels.find((panel) => panel.id.startsWith('file:') || panel.id.startsWith('source:'));
         api.addPanel({
-          id: editorId(request.path),
-          component: 'editor',
-          title: request.path.slice(request.path.lastIndexOf('/') + 1),
+          id,
+          component: isDocument ? 'editor' : 'source',
+          title: isDocument ? request.path.slice(request.path.lastIndexOf('/') + 1) : sourceTitle(request.path),
           params: { path: request.path, line: request.line, column: request.column },
           position: sibling !== undefined ? { referencePanel: sibling.id, direction: 'within' } : { referencePanel: 'canvas', direction: 'right' },
         });
