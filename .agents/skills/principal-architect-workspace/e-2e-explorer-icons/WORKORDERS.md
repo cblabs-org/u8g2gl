@@ -41,31 +41,31 @@ circumstances; the PA will place the tarball in `tmp/`.
 
 # WO1 — widget-centred Explorer (`u8g2gl-e2e/wo1-explorer`)
 
-- [ ] Ruling 5. The groups are Project, Screens, Widgets (one entry per widget directory, opening
+- [x] Ruling 5. The groups are Project, Screens, Widgets (one entry per widget directory, opening
       its `.xml`, the C++ not listed), Assets, and "Other files" for anything else.
-- [ ] Add `generated_editor` to `IGNORED_DIRECTORIES` in `cli/src/node/design/ignored-paths.ts`,
+- [x] Add `generated_editor` to `IGNORED_DIRECTORIES` in `cli/src/node/design/ignored-paths.ts`,
       with its why-comment updated, and a test for the watcher, the listing and the write route.
-- [ ] Unit tests on the grouping, including a widget whose directory has no `.xml`, which falls
+- [x] Unit tests on the grouping, including a widget whose directory has no `.xml`, which falls
       to "Other files".
-- [ ] Update the existing e2e tests that click Explorer file entries.
+- [x] Update the existing e2e tests that click Explorer file entries.
 
 # WO2 — context menu (`u8g2gl-e2e/wo2-context-menu`)
 
-- [ ] Ruling 6. A context menu component, opened by right-click, Shift+F10 or the
+- [x] Ruling 6. A context menu component, opened by right-click, Shift+F10 or the
       context-menu key, closed by Escape or a click outside, navigable by the arrow keys.
-- [ ] **View source:** a read-only Monaco tab with C++ highlighting, read through
+- [x] **View source:** a read-only Monaco tab with C++ highlighting, read through
       `GET /api/file`. Its title says read-only. A Problems row on a C++ file opens it at the line.
-- [ ] **Open in editor:** `POST /api/open` with `{ path, line? }`, and the `--editor <command>`
+- [x] **Open in editor:** `POST /api/open` with `{ path, line? }`, and the `--editor <command>`
       flag and `U8G2GL_EDITOR`. The command is split once at start-up. `code`, `code-insiders`
       and `cursor` get `-g path:line`; any other command gets the absolute path only.
       Otherwise the platform opener.
-- [ ] **Reveal:** `POST /api/reveal`. On macOS `open -R <path>`; elsewhere open the containing
+- [x] **Reveal:** `POST /api/reveal`. On macOS `open -R <path>`; elsewhere open the containing
       folder, and the menu label says "Reveal in file manager".
-- [ ] **Copy path:** the project-relative path, with no server.
-- [ ] **Security tests** for both routes: no token gives 403; `..`, an absolute path, an ignored
+- [x] **Copy path:** the project-relative path, with no server.
+- [x] **Security tests** for both routes: no token gives 403; `..`, an absolute path, an ignored
       path, and a missing file each give 4xx, and **no spawn happens** (assert on the fake
       opener). Every spawn uses an argument array and no shell.
-- [ ] `--help` documents `--editor`.
+- [x] `--help` documents `--editor`.
 
 # WO3 — the icon set (`u8g2gl-e2e/wo3-icons`) — **waits for the PA**
 
