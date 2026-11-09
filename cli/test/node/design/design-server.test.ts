@@ -567,6 +567,44 @@ describe('open in editor and reveal', () => {
     expect(launches).toEqual([]);
   });
 
+  // Ruling 6a: the platform opener runs a file executable by type, and the
+  // token can write any name, so open accepts source and asset types only —
+  // with an editor configured too, and judged on the real path as well.
+  const NOT_OPENABLE: ReadonlyArray<readonly [string, string]> = [
+    ['a .command', 'run.command'],
+    ['a .sh', 'scripts/run.sh'],
+    ['an extensionless file', 'widgets/wd_a/run'],
+    ['a .cpp symlink to a .command', 'widgets/wd_a/looks.cpp'],
+  ];
+  it.each(NOT_OPENABLE)('/api/open refuses %s with 403 and starts nothing, with or without an editor', async (_label, path) => {
+    for (const editor of [true, false]) {
+      const launches: Launch[] = [];
+      const opener = new FileOpener({
+        platform: 'darwin',
+        ...(editor ? { editor: { command: 'code', args: [] } } : {}),
+        spawn: (command, args) => {
+          launches.push({ command, args: [...args] });
+          return Promise.resolve();
+        },
+      });
+      await start({ 'run.command': '#!/bin/sh\n', 'scripts/run.sh': '#!/bin/sh\n', 'widgets/wd_a/run': '#!/bin/sh\n' }, { opener });
+      symlinkSync(join(root, 'run.command'), join(root, 'widgets', 'wd_a', 'looks.cpp'));
+      const response = await post('/api/open', { path });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'not-openable' });
+      expect(launches).toEqual([]);
+      await server?.close();
+      server = undefined;
+    }
+  });
+
+  it('reveals a file whatever its type: revealing starts nothing from it', async () => {
+    const { launches } = await started();
+    writeFileSync(join(root, 'run.command'), '#!/bin/sh\n');
+    expect((await post('/api/reveal', { path: 'run.command' })).status).toBe(200);
+    expect(launches).toEqual([{ command: 'open', args: ['-R', join(root, 'run.command')] }]);
+  });
+
   it('answers 500, saying why, when the program cannot be started', async () => {
     const opener = new FileOpener({ spawn: () => Promise.reject(new Error('spawn nope ENOENT')) });
     await start({}, { opener });

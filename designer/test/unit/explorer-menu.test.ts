@@ -74,6 +74,16 @@ test('an entry with nothing to view has no View source…; a stray C++ file has 
   expect(shape(entryMenu(stray, 'Other files', 'Win32', commands))[0]).toEqual(['View source…', ['wd_b.cpp']]);
 });
 
+test('Open in editor is offered only for a file type the server will open', () => {
+  const { commands } = recording();
+  for (const path of ['run.command', 'scripts/run.sh', 'widgets/wd_a/run']) {
+    const entry = { label: path, path, files: [path] };
+    expect(shape(entryMenu(entry, 'Other files', 'macOS', commands)), path).toEqual(['Reveal in Finder', 'Copy path']);
+  }
+  const font = { label: 'fonts/a.bdf', path: 'fonts/a.bdf', files: ['fonts/a.bdf'] };
+  expect(shape(entryMenu(font, 'Assets', 'macOS', commands))).toEqual(['Open in editor', 'Reveal in Finder', 'Copy path']);
+});
+
 test('the reveal label names Finder on macOS only', () => {
   expect(revealLabel('macOS')).toBe('Reveal in Finder');
   expect(revealLabel('MacIntel')).toBe('Reveal in Finder');

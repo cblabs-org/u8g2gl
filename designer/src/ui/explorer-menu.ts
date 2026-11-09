@@ -5,10 +5,10 @@
  *
  * File: designer/src/ui/explorer-menu.ts
  * Purpose: What the Explorer's context menu holds for an entry (ui_spec §6):
- *          "View source…" for a widget's files, then "Open in editor", the
- *          platform's reveal, and "Copy path". A pure description, apart from
- *          the component, so which items an entry gets is unit-tested
- *          without a browser.
+ *          "View source…" for a widget's files, then "Open in editor" (for
+ *          source and asset types only), the platform's reveal, and "Copy
+ *          path". A pure description, apart from the component, so which
+ *          items an entry gets is unit-tested without a browser.
  * Description: Items are `MenuItem`s whose actions are the caller's
  *              `EntryCommands`, so nothing here talks to the server.
  *
@@ -17,6 +17,7 @@
  * - entryMenu():    The menu items for an entry
  */
 
+import { isOpenablePath } from '@u8g2gl/core/project-fs/openable-files.js';
 import type { MenuItem } from './menu-item';
 import type { ExplorerEntry, ExplorerGroup } from './explorer-groups';
 import { isCppSource, revealLabel } from './file-actions';
@@ -38,7 +39,9 @@ export interface EntryCommands {
  * no such item. Viewing goes through `commands.view`, which shows the
  * manifest in its ordinary editor tab — a read-only copy of a document the
  * designer edits could only fall out of step with it — and C++ in a read-only
- * one. The other three act on the file the entry opens.
+ * one. The other three act on the file the entry opens. "Open in editor" is
+ * offered only for a file type the server will open (`isOpenablePath`): an
+ * executable type is refused there, so offering it here would be a dead item.
  *
  * @param entry    The entry.
  * @param group    Its group's title.
@@ -55,8 +58,10 @@ export function entryMenu(entry: ExplorerEntry, group: ExplorerGroup['title'], p
       items: viewable.map((path) => ({ id: path, label: path.slice(path.lastIndexOf('/') + 1), onSelect: () => commands.view(path) })),
     });
   }
+  if (isOpenablePath(entry.path)) {
+    items.push({ id: 'open-in-editor', label: 'Open in editor', onSelect: () => commands.openInEditor(entry.path) });
+  }
   items.push(
-    { id: 'open-in-editor', label: 'Open in editor', onSelect: () => commands.openInEditor(entry.path) },
     { id: 'reveal', label: revealLabel(platform), onSelect: () => commands.reveal(entry.path) },
     { id: 'copy-path', label: 'Copy path', onSelect: () => commands.copyPath(entry.path) },
   );

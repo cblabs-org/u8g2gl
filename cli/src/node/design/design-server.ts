@@ -27,7 +27,8 @@
  *              - `PUT /api/file?path=`     conditional write; 409 on conflict
  *              - `GET /api/events`         server-sent events of file changes
  *              - `POST /api/open`          `{ path, line? }`: open a project
- *                                          file in the author's editor
+ *                                          file in the author's editor; only
+ *                                          source and asset types
  *              - `POST /api/reveal`        `{ path }`: show it in the file
  *                                          manager
  *              - `POST /api/build/<job>`   queue a build; 202 with its record
@@ -50,6 +51,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { basename } from 'node:path';
+import { isOpenablePath } from '../../core/project-fs/openable-files.js';
 import type { ProjectFsError, ProjectFsEvent } from '../../core/project-fs/project-file-system.js';
 import {
   EXPECTED_ABSENT,
@@ -373,9 +375,9 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
   // `/api/open` or `/api/reveal`: a project file handed to the author's editor
   // or file manager. Everything that can refuse runs before anything starts —
   // the body's shape, then the same path checks as reading a file plus the
-  // ignored paths — so a refused request never spawns a process. The program
-  // and its options were fixed at start-up; the request supplies only which
-  // project file, and for `open` a line.
+  // ignored paths, and for open the file type — so a refused request never
+  // spawns a process. The program and its options were fixed at start-up;
+  // the request supplies only which project file, and for `open` a line.
   //   action — which of the two routes
   async function serveOpen(request: IncomingMessage, response: ServerResponse, action: 'open' | 'reveal'): Promise<void> {
     // --- Step 1: The body: `{ path, line? }` ---
@@ -393,13 +395,24 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       sendError(response, located);
       return;
     }
+    // --- Step 3: For open, a file type that cannot run ---
+    // The platform opener runs a file that is executable by type, and the
+    // token can write any name, so only the allowlisted types are handed on —
+    // judged on the requested name and on the real path, so a `.cpp` symlink
+    // to a `.command` is refused too. Applied with --editor as well, which
+    // may itself be an opener. Reveal starts nothing from the file: `open -R`
+    // selects it, and elsewhere a directory is opened.
+    if (action === 'open' && !(isOpenablePath(parsed.path) && isOpenablePath(located.real))) {
+      sendJson(response, 403, { code: 'not-openable', message: `'${parsed.path}' is not a source or asset file type, so it is not opened.` });
+      return;
+    }
     const opener = options.opener;
     if (opener === undefined) {
       sendJson(response, 501, { code: 'unavailable', message: 'this server opens no programs' });
       return;
     }
 
-    // --- Step 3: Start the program ---
+    // --- Step 4: Start the program ---
     try {
       if (action === 'open') await opener.open(located.absolute, parsed.line);
       else await opener.reveal(located.absolute);

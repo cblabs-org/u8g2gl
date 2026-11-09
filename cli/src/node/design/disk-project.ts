@@ -106,11 +106,13 @@ export class DiskProject {
    * starts is given only what the editor may itself see as project source.
    *
    * @param path As the client sent it; checked here.
-   * @return The absolute path, or `invalid-path`, `outside-project` (an
-   *         ignored path, or a symlink out of the project) or `not-found`
-   *         (absent, or not a regular file).
+   * @return The absolute path and the real path it resolves to (they differ
+   *         for a symlink inside the project, and a caller judging the file by
+   *         its type must judge the real one), or `invalid-path`,
+   *         `outside-project` (an ignored path, or a symlink out of the
+   *         project) or `not-found` (absent, or not a regular file).
    */
-  locate(path: string): { readonly ok: true; readonly absolute: string } | ProjectFsError {
+  locate(path: string): { readonly ok: true; readonly absolute: string; readonly real: string } | ProjectFsError {
     const check = checkProjectPath(path);
     if (!check.ok) {
       return error('invalid-path', refusedPathMessage(path, check.reason));
@@ -125,7 +127,13 @@ export class DiskProject {
     if (!isFile(absolute)) {
       return error('not-found', `'${path}' does not exist.`);
     }
-    return { ok: true, absolute };
+    let real: string;
+    try {
+      real = realpathSync(absolute);
+    } catch {
+      return error('not-found', `'${path}' does not exist.`);
+    }
+    return { ok: true, absolute, real };
   }
 
   /**

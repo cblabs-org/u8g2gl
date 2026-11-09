@@ -6,13 +6,15 @@
  * File: test/node/design/file-opener.test.ts
  * Purpose: What "Open in editor" and "Reveal" start, on each platform and
  *          with each kind of editor, and how an editor command line is split:
- *          once, into an argument array, with no shell syntax honoured.
+ *          once, into an argument array, with no shell syntax honoured; and
+ *          which file types may be opened at all.
  * Description: A fake spawner records each launch, so nothing is opened on the
  *              desktop. The real spawner is exercised only on Node itself, with
  *              an empty script, and on a program that does not exist.
  */
 
 import { describe, expect, it } from 'vitest';
+import { isOpenablePath } from '../../../src/core/project-fs/openable-files.js';
 import { FileOpener, parseEditorCommand, spawnDetached, type Launch } from '../../../src/node/design/file-opener.js';
 
 const FILE = '/work/proj/widgets/wd_a/wd_a.cpp';
@@ -108,4 +110,20 @@ describe('spawnDetached()', () => {
   it('rejects for a program that does not exist, rather than through a shell', async () => {
     await expect(spawnDetached('u8g2gl-no-such-program', ['x'])).rejects.toMatchObject({ code: 'ENOENT' });
   });
+});
+
+describe('isOpenablePath()', () => {
+  it.each(['u8g2gl.xml', 'widgets/wd_a/wd_a.CPP', 'a.c', 'a.cc', 'a.h', 'a.hpp', 'notes.md', 'x.json', 'x.txt', 'fonts/a.bdf', 'i.xbm', 'i.png', '/abs/p/a.xml'])(
+    'opens %s',
+    (path) => {
+      expect(isOpenablePath(path)).toBe(true);
+    },
+  );
+
+  it.each(['run.command', 'run.sh', 'run', 'Tool.app', 'x.bat', 'x.desktop', 'x.exe', '.profile', 'a.cpp/run', 'C:\\p\\x.bat', 'x.xml.command'])(
+    'refuses %s',
+    (path) => {
+      expect(isOpenablePath(path)).toBe(false);
+    },
+  );
 });
