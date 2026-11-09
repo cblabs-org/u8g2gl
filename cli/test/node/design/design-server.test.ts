@@ -192,7 +192,7 @@ describe('no write escapes the project', () => {
     expect(readFileSync(join(root, 'screens', 'real.xml'), 'utf8')).toBe('new\n');
   });
 
-  it.each(['.git/hooks/pre-commit', 'node_modules/x/index.js', 'generated/ui.cpp', LOCK_FILE_NAME])(
+  it.each(['.git/hooks/pre-commit', 'node_modules/x/index.js', 'generated/ui.cpp', 'generated_editor/ui_editor_registry.cpp', LOCK_FILE_NAME])(
     'refuses a write to %s, which is not project source',
     async (path) => {
       await start();
@@ -204,9 +204,10 @@ describe('no write escapes the project', () => {
 });
 
 describe('files and events', () => {
-  it('lists project source only — not generated/, .git/, node_modules/ or the lock', async () => {
+  it('lists project source only — not generated/, generated_editor/, .git/, node_modules/ or the lock', async () => {
     await start({
       'generated/ui.cpp': '// GENERATED\n',
+      'generated_editor/ui_editor_registry.cpp': '// GENERATED\n',
       '.git/HEAD': 'ref: refs/heads/main\n',
       'node_modules/x/index.js': '',
       [LOCK_FILE_NAME]: '{}',
@@ -217,14 +218,19 @@ describe('files and events', () => {
     });
   });
 
-  it('sends no event for generated/ or the lock file', async () => {
+  it('sends no event for generated/, generated_editor/ or the lock file', async () => {
     const s = await start();
     const fs = new ServedProjectFileSystem({ origin: `http://127.0.0.1:${s.port}`, token: s.token, createEventSource: createTestEventSource });
     await fs.connect();
     const events: ProjectFsEvent[] = [];
     fs.watch((e) => events.push(e));
     try {
-      writeFiles(root, { 'generated/ui.cpp': '// x\n', [LOCK_FILE_NAME]: '{}', 'screens/screen_home.xml': '<screen name="home" v="2" />\n' });
+      writeFiles(root, {
+        'generated/ui.cpp': '// x\n',
+        'generated_editor/ui_editor_registry.cpp': '// x\n',
+        [LOCK_FILE_NAME]: '{}',
+        'screens/screen_home.xml': '<screen name="home" v="2" />\n',
+      });
       await waitUntil(() => events.some((e) => e.path === 'screens/screen_home.xml'), 1000);
       await new Promise((r) => setTimeout(r, 200));
       expect(events).toEqual([{ kind: 'changed', path: 'screens/screen_home.xml' }]);

@@ -46,7 +46,11 @@ export async function openShell(page: Page, url: string): Promise<void> {
   await expect(page.locator('.canvas-frame')).toHaveAttribute('data-stale', 'false', { timeout: 20_000 });
 }
 
-/** @brief Opens a project file in an editor tab, from the explorer. */
+/**
+ * @brief Opens a project file in an editor tab, from the explorer. An entry's
+ *        `data-path` is the file it opens, so a widget's manifest is opened by
+ *        its path through the widget's entry, which is labelled by name.
+ */
 export async function openFile(page: Page, path: string): Promise<void> {
   await page.click(`.sidebar .file[data-path="${path}"]`);
   await expect(page.locator(`.editor-host[data-editor-path="${path}"] .monaco-editor`)).toBeVisible();

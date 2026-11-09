@@ -4,51 +4,24 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/ui/explorer.tsx
- * Purpose: The primary sidebar's project tree (ui_spec §6): every file the
- *          design server lists, grouped the way an author thinks of the
- *          project — screens, widgets, the project's own files, and assets —
+ * Purpose: The primary sidebar's project tree (ui_spec §6): the files the
+ *          design server lists, grouped by what an author edits — the
+ *          project's own files, its screens, its widgets by name, its assets —
  *          rather than as a raw directory listing.
  * Description: Rendered from `ProjectFileSystem.list()` (through
- *              `ProjectDocuments.files`). An XML document opens in an editor
- *              tab; any other file (a widget's C++, a font) is listed but not
- *              opened, because the designer does not edit C++ (ui_spec §14).
+ *              `ProjectDocuments.files`), grouped by `groupFiles()`. An XML
+ *              document opens in an editor tab; a widget's row opens its
+ *              manifest; any other file (a font, a stray file) is listed but
+ *              not opened, because the designer does not edit it (ui_spec §14).
  *
  * Exports:
  * - Explorer:       The component
- * - groupFiles():   The listing, grouped
  */
 
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
+import { groupFiles } from './explorer-groups';
 import { countRender } from '../perf/render-count';
-
-/** One explorer group: a heading and its files. */
-interface FileGroup {
-  readonly title: string;
-  readonly files: readonly string[];
-}
-
-/**
- * @brief Groups a project listing for the explorer.
- *
- * @param files The listing, sorted.
- * @return Screens, widgets, project files and everything else, empty groups omitted.
- */
-export function groupFiles(files: readonly string[]): FileGroup[] {
-  const groups: { title: string; test: (path: string) => boolean }[] = [
-    { title: 'Project', test: (p) => p === 'u8g2gl.xml' || p === 'globals.xml' },
-    { title: 'Screens', test: (p) => p.startsWith('screens/') },
-    { title: 'Widgets', test: (p) => p.startsWith('widgets/') },
-  ];
-  const placed = new Set<string>();
-  const result: FileGroup[] = groups.map((group) => {
-    const matching = files.filter((path) => group.test(path));
-    for (const path of matching) placed.add(path);
-    return { title: group.title, files: matching };
-  });
-  result.push({ title: 'Other files', files: files.filter((path) => !placed.has(path)) });
-  return result.filter((group) => group.files.length > 0);
-}
 
 /** @brief The explorer sidebar. */
 export function Explorer(): React.JSX.Element {
@@ -65,7 +38,7 @@ export function Explorer(): React.JSX.Element {
         <section key={group.title} className="file-group">
           <h2>{group.title}</h2>
           <ul>
-            {group.files.map((path) => {
+            {group.entries.map(({ label, path }) => {
               const openable = workspace.documents.isDocument(path);
               return (
                 <li key={path}>
@@ -77,7 +50,7 @@ export function Explorer(): React.JSX.Element {
                     disabled={!openable}
                     onClick={() => workspace.openFile({ path })}
                   >
-                    {group.title === 'Project' ? path : path.slice(path.indexOf('/') + 1)}
+                    {label}
                   </button>
                 </li>
               );

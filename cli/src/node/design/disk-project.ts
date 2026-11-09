@@ -114,7 +114,7 @@ export class DiskProject {
     // `invalid-path`: the path is well formed, it is just not project source.
     // `.git/` matters most — a write to `.git/hooks/` would run on the next commit.
     if (isIgnoredPath(path)) {
-      return error('outside-project', `'${path}' is not project source; generated/, .git/, node_modules/ and the lock file are not written by the editor.`);
+      return error('outside-project', `'${path}' is not project source; generated/, generated_editor/, .git/, node_modules/ and the lock file are not written by the editor.`);
     }
 
     // --- Step 2: The real-path rule, on the nearest thing that exists ---
