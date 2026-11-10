@@ -463,6 +463,8 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 *Status, 2026-10-31 (S-1).* The C4 decision is taken. Schema 0.5 adds palette metadata, without icons; `<previews>` is deferred to E-3; property grouping and `visible_when` are declined.
 
+*Status, 2026-11-10 (S-2).* Schema 0.6 adds the icon: `icon` on `<api>`, a name from the vendored Lucide set. Palette metadata is complete.
+
 **This section has a deadline.** PR-02 freezes schema 0.3. The schema must be an editor's document model first and a compiler input second ([design_spec.md §1.2](design_spec.md)): a compiler can ignore what it does not need, but an editor cannot invent what was never stored. Risk R-8 tracks this.
 
 | Requirement | Detail | Status |
@@ -470,7 +472,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | **`<previews>`** | Named preview configurations per element — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Deferred to E-3** — *2026-10-31: decided at C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8); not in schema 0.5* |
 | **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** — *2026-10-26: done, schema 0.4* |
 | **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): the panel keeps declaration order, geometry first* |
-| **Palette metadata** | Display name, category, icon per element | **Done (0.5, icons not yet)** — *2026-10-31: `label`, `category` and `description` on `<api>` ([design_spec.md §13.1](design_spec.md)); the Palette files by category and shows the label and description* |
+| **Palette metadata** | Display name, category, icon per element | **Done (0.5; icons done, 0.6)** — *2026-10-31: `label`, `category` and `description` on `<api>` ([design_spec.md §13.1](design_spec.md)); the Palette files by category and shows the label and description. 2026-11-10: `icon` on `<api>`, which every framework manifest declares; a tile shows its element's icon, else its category's* |
 | **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): every prop shows* |
 | **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** — *2026-10-26: done, fixture-bound; E-1d makes it project-driven* |
 | **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`)* |
