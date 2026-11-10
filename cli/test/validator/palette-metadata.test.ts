@@ -280,12 +280,12 @@ describe('schema versions (§15.4)', () => {
     ]);
   });
 
-  it('keeps refusing 0.3 with its migration table, now pointing at 0.5', () => {
+  it('keeps refusing 0.3 with its migration table, now pointing at 0.6', () => {
     const diagnostics = validate(projectWith('0.3', [])).diagnostics.filter(
       (d) => d.code === DIAGNOSTIC_CODES.DEPRECATED_SCHEMA_VERSION,
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.message).toContain('long_mode="clip"');
-    expect(diagnostics[0]?.suggestions).toEqual(['0.5']);
+    expect(diagnostics[0]?.suggestions).toEqual(['0.6']);
   });
 });

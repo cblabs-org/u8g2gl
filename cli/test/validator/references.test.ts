@@ -47,7 +47,7 @@ const BASE_WIDGETS: readonly WidgetManifest[] = [
 describe('validateReferences', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.5',
+      schema: '0.6',
       name: 'ref_test',
       version: '1.0.0',
       targets: [],

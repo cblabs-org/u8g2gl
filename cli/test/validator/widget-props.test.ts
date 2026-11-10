@@ -66,7 +66,7 @@ function screenWith(node: Omit<WidgetNode, 'children' | 'styleOverrides'>): Scre
 describe('validateWidgetProps', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.5',
+      schema: '0.6',
       name: 'widget_props_test',
       version: '1.0.0',
       targets: [],

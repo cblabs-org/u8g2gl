@@ -13,8 +13,9 @@
  *              registry alone, not to the run: the registry is rebuilt only
  *              when a manifest's parse changes, so a keystroke or a drag
  *              re-renders nothing here. Each entry is a 56 px tile: its icon
- *              (`palette-icons.ts`) over its label, cut short with an ellipsis,
- *              or its tag when it has no label. A category heading is shown
+ *              (its manifest's own, else its category's; `palette-icons.ts`)
+ *              over its label, cut short with an ellipsis, or its tag when
+ *              it has no label. A category heading is shown
  *              above its tiles, and the uncategorised come last with none.
  *              Each tile is an HTML drag source carrying its tag under
  *              `PALETTE_DRAG_TYPE`, which the canvas accepts.
@@ -85,7 +86,7 @@ function PaletteTile({ entry, category }: { readonly entry: PaletteEntry; readon
           event.dataTransfer.effectAllowed = 'copy';
         }}
       >
-        <Icon name={paletteIcon(entry.tag, category)} size={TILE_ICON_SIZE} />
+        <Icon name={paletteIcon(entry.icon, category)} size={TILE_ICON_SIZE} />
         <span className={entry.label === undefined ? 'palette-label is-tag' : 'palette-label'}>{entry.label ?? entry.tag}</span>
       </div>
       {tooltip !== undefined && (

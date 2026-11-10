@@ -9,12 +9,15 @@
  * Description: Checks that all required attributes are present across project,
  *              globals, screens, components, and widget manifests. Validates that
  *              attribute values match expected primitive types and enum sets.
- *              Accepts schema versions "0.4" and "0.5", refusing the superseded
- *              "0.3" with a specific migration diagnostic rather than a generic
- *              mismatch (§15.4). 0.5 is additive: it adds palette
- *              metadata (`label`, `category`, `description`) to `<api>`, which
- *              this pass holds to its limits, and which a project still
- *              declaring 0.4 is told it may not use until it says 0.5.
+ *              Accepts schema versions "0.4", "0.5" and "0.6", refusing the
+ *              superseded "0.3" with a specific migration diagnostic rather
+ *              than a generic mismatch (§15.4). 0.5 and 0.6 are additive. 0.5
+ *              adds palette metadata (`label`, `category`, `description`) to
+ *              `<api>`, which this pass holds to its limits, and which a
+ *              project still declaring 0.4 is told it may not use until it
+ *              says 0.5. 0.6 adds `icon` to `<api>`, which must name an icon
+ *              in the vendored set (`icon-rules.ts`), and which a 0.4 or 0.5
+ *              project is told it may not use until it says 0.6.
  *
  *              The 254-object ceiling is **not** checked here. This pass used to
  *              count objects structurally, and that count predated [D-18]: it
@@ -66,14 +69,16 @@ import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
 import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
+import { iconValueProblem } from './icon-rules.js';
 
 
 /**
- * Every schema version this CLI accepts. 0.5 only adds to 0.4 (§15.4), so a
- * 0.4 project means exactly what it meant before and still validates; what it
- * may not do is use 0.5's additions, which section 7 reports.
+ * Every schema version this CLI accepts. Each only adds to the one before it
+ * (§15.4), so a 0.4 or 0.5 project means exactly what it meant before and
+ * still validates; what it may not do is use a later version's additions,
+ * which sections 7 and 8 report.
  */
-const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', CURRENT_SCHEMA_VERSION]);
+const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', '0.5', CURRENT_SCHEMA_VERSION]);
 
 /** The first schema version whose `<api>` may carry palette metadata. */
 const PALETTE_METADATA_SINCE = '0.5';
@@ -85,6 +90,15 @@ const PALETTE_METADATA_SINCE = '0.5';
  * version's projects would use the metadata unchecked.
  */
 const BEFORE_PALETTE_METADATA: ReadonlySet<string> = new Set(['0.4']);
+
+/** The first schema version whose `<api>` may carry an `icon`. */
+const ICON_SINCE = '0.6';
+
+/**
+ * The accepted schema versions that predate `icon`, kept with ICON_SINCE on
+ * the same rule as BEFORE_PALETTE_METADATA.
+ */
+const BEFORE_ICON: ReadonlySet<string> = new Set(['0.4', '0.5']);
 
 /**
  * The palette metadata rules (schema 0.5): each attribute's length limit in
@@ -1143,7 +1157,52 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     diagnostics.push(...checkPaletteMetadata(manifest, tooOld ? olderSchema : undefined));
   }
 
+  // --- 8. The icon on `<api>` (schema 0.6) ---
+  // The same split as section 7: every declaration must name an icon that
+  // exists, and only the project's own are held to the project's version.
+  const preIconSchema = project !== undefined && BEFORE_ICON.has(project.schema) ? project.schema : undefined;
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    const tooOld = preIconSchema !== undefined && !isFrameworkDeclaration(manifest, manifests);
+    const diagnostic = checkIcon(manifest, tooOld ? preIconSchema : undefined);
+    if (diagnostic !== undefined) diagnostics.push(diagnostic);
+  }
+
   return diagnostics;
+}
+
+// checkIcon
+// Section 8's rule for one manifest's `<api icon>`. As in section 7, a project
+// on an older schema is told only to declare the newer one: until it does,
+// the attribute is not part of its vocabulary, so its value is not judged.
+//   manifest    — a declared manifest
+//   olderSchema — the project's schema when it predates `icon` and this is a
+//                 project manifest; undefined otherwise
+function checkIcon(manifest: WidgetManifest, olderSchema: string | undefined): Diagnostic | undefined {
+  const { icon, iconLoc } = manifest.api;
+  if (icon === undefined) return undefined;
+
+  if (olderSchema !== undefined) {
+    return createDiagnostic(
+      DIAGNOSTIC_CODES.NEWER_SCHEMA_REQUIRED,
+      `Widget '${manifest.name}' declares <api icon="…">, which schema '${olderSchema}' does not ` +
+        `have: the icon arrived in '${ICON_SINCE}'. Declare schema="${ICON_SINCE}" in u8g2gl.xml, ` +
+        `or remove 'icon' (§15.4).`,
+      // The attribute is what this version does not allow, so the name.
+      iconLoc?.name ?? manifest.api.loc ?? manifest.loc,
+      'icon',
+    );
+  }
+
+  const found = iconValueProblem(icon);
+  if (found === undefined) return undefined;
+  return createDiagnostic(
+    DIAGNOSTIC_CODES.INVALID_ICON,
+    `Widget '${manifest.name}' <api icon> ${found.problem} (an icon is a Lucide name from the ` +
+      `vendored set, schema ${ICON_SINCE}).`,
+    iconLoc?.value ?? manifest.api.loc ?? manifest.loc,
+    icon === '' ? 'icon' : icon,
+    found.suggestions,
+  );
 }
 
 // isFrameworkDeclaration

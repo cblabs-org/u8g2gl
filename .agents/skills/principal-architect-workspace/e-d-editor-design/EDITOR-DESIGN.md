@@ -427,7 +427,7 @@ ui_spec §15 asked for these, and schema 0.4 does not have them:
 | Feature | What E-2 does without it |
 |---|---|
 | Grouping and order (`group=`) | One list per widget, in **declaration order**: the manifest's order already says something about importance. Geometry (`x`, `y`, `width`, `height`) is pinned first and paired, because every element has it |
-| Palette metadata (name, category, icon) | The palette shows **tag names**, grouped **Framework** / **Project** / **Drawing**, from the manifest registry's own split. Usable, but plain. *Now delivered without icons — see below* |
+| Palette metadata (name, category, icon) | The palette shows **tag names**, grouped **Framework** / **Project** / **Drawing**, from the manifest registry's own split. Usable, but plain. *Now delivered, icons included — see below* |
 | `<previews>` | Element context (ui_spec §7.2, flow F5) renders the element **once, at its manifest's default size**, with no gallery |
 | `visible_when` ([Q-7]) | Every prop shows |
 | Hiding inherited props ([Q-10]) | The collapsed *From u8g2gl_obj* group |
@@ -445,6 +445,14 @@ the uncategorised last, and shows each entry's label, its tag muted, and its
 description; the filter matches all three. **Icons** are held back.
 **`<previews>`** is deferred to E-3. **Grouping** and **`visible_when`** are
 declined: the panel's declaration order and every-prop-shows stand.
+
+**Icons, 2026-11-10 (S-2).** The owner chose an icon set for the Palette (E-2e
+vendored Lucide) and, for project widgets, a per-widget `icon` on `<api>` with
+the category's icon as the fallback. That is **schema 0.6**: `icon` names a
+Lucide icon or alias, is not inherited and reaches no generated file
+(design_spec §13.1, §15.4). Every framework manifest declares its icon, so the
+designer's tag-to-icon map, E-2e's one exception to [D-17], is gone. A tile
+shows the element's icon, else its category's, else `puzzle`.
 
 ---
 

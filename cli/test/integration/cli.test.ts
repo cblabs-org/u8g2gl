@@ -62,6 +62,12 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(res.stdout).toContain('Validation passed: 0 errors, 1 warning(s).');
   });
 
+  it('valid-project is kept at schema 0.5, so the run above proves 0.5 still validates (§15.4)', () => {
+    // The one fixture left at 0.5 when the rest moved to 0.6, which is additive.
+    const project = readFileSync(join(validProjectDir, 'u8g2gl.xml'), 'utf-8');
+    expect(project).toContain('<u8g2gl schema="0.5"');
+  });
+
   it('u8g2gl validate valid-project/ --json -> valid JSON, errors: 0', async () => {
     const res = await runCliSubprocess(['validate', validProjectDir, '--json']);
 
@@ -138,7 +144,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
       mkdirSync(join(dir, 'screens'), { recursive: true });
       writeFileSync(
         join(dir, 'u8g2gl.xml'),
-        `<u8g2gl schema="0.5" name="label_only" version="1.0.0">
+        `<u8g2gl schema="0.6" name="label_only" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
     </targets>
@@ -290,7 +296,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
 
 describe('WO9: validate --fix-names end-to-end', () => {
   const projectXml = `<?xml version="1.0" encoding="UTF-8"?>
-<u8g2gl schema="0.5" name="fix_names_demo" version="1.0.0">
+<u8g2gl schema="0.6" name="fix_names_demo" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
     </targets>

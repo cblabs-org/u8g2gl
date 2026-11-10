@@ -18,7 +18,7 @@
  *              recorded, in each file's `// schema` provenance stamp.
  *
  * Exports:
- * - CURRENT_SCHEMA_VERSION: The schema version this CLI writes for, e.g. "0.5"
+ * - CURRENT_SCHEMA_VERSION: The schema version this CLI writes for, e.g. "0.6"
  * - CURRENT_SCHEMA:         Its major and minor, as the version guard emits them
  */
 
@@ -27,7 +27,7 @@
  * takes it. Must equal the runtime's `U8G2GL_SCHEMA_VERSION_MAJOR` / `_MINOR`
  * in the tree this CLI ships from; the C++ suite compiles the guard against them.
  */
-export const CURRENT_SCHEMA: { readonly major: number; readonly minor: number } = { major: 0, minor: 5 };
+export const CURRENT_SCHEMA: { readonly major: number; readonly minor: number } = { major: 0, minor: 6 };
 
-/** {@link CURRENT_SCHEMA} as `u8g2gl.xml` spells it, e.g. "0.5". Derived, so the two cannot disagree. */
+/** {@link CURRENT_SCHEMA} as `u8g2gl.xml` spells it, e.g. "0.6". Derived, so the two cannot disagree. */
 export const CURRENT_SCHEMA_VERSION = `${CURRENT_SCHEMA.major}.${CURRENT_SCHEMA.minor}`;

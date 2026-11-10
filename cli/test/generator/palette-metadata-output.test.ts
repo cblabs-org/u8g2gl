@@ -13,7 +13,7 @@
  *              declares, twice: once with every manifest's metadata removed,
  *              framework and project alike, and once with every manifest given
  *              all three. The file lists and every byte must match. Both runs
- *              declare schema 0.5, so the version stamp is held equal and only
+ *              declare schema 0.6, so the version stamp is held equal and only
  *              the metadata differs.
  */
 
@@ -64,7 +64,7 @@ describe('palette metadata reaches no generated file (§13.9)', () => {
   it.each(FIXTURES)('generates identical bytes with and without it: %s', async (dir) => {
     const loaded = loadProject(dir);
     const compiledAssets = await compileProjectAssets({ globals: loaded.model.globals, assets: loaded.assets });
-    const project = { ...loaded.model.project, schema: '0.5' };
+    const project = { ...loaded.model.project, schema: '0.6' };
     const targets = project.targets.map((target) => target.name);
     expect(targets.length).toBeGreaterThan(0);
 
