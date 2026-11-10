@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/node/design/design-command.test.ts
- * Purpose: The command around the server: argument parsing; one
+ * Purpose: The command around the server: argument parsing, the editor
+ *          command (`--editor`, else `U8G2GL_EDITOR`) split once; one
  *          server per project — a second instance attaches and prints the
  *          running URL; a stale lock (dead pid, a live pid that is not the
  *          server, or a corrupt file) is replaced; the warning when git would
@@ -21,7 +22,7 @@ import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
-import { parseDesignArgs, startOrAttach, type DesignSession } from '../../../src/node/design/design-command.js';
+import { parseDesignArgs, resolveEditorCommand, startOrAttach, type DesignSession } from '../../../src/node/design/design-command.js';
 import { startDesignServer } from '../../../src/node/design/design-server.js';
 import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
@@ -65,16 +66,41 @@ describe('parseDesignArgs()', () => {
     [[], { projectDir: '.', port: 0, open: true }],
     [['proj', '--no-open'], { projectDir: 'proj', port: 0, open: false }],
     [['--port', '5199', 'proj'], { projectDir: 'proj', port: 5199, open: true }],
+    [['--editor', 'subl --wait', 'proj'], { projectDir: 'proj', port: 0, open: true, editor: 'subl --wait' }],
   ])('parses %j', (args, expected) => {
     expect(parseDesignArgs(args)).toEqual(expected);
   });
 
-  it.each([[['--port']], [['--port', 'x']], [['--port', '70000']], [['--port', '-1']], [['--nope']], [['a', 'b']]])(
+  it.each([[['--port']], [['--port', 'x']], [['--port', '70000']], [['--port', '-1']], [['--nope']], [['a', 'b']], [['--editor']], [['--editor', '  ']]])(
     'refuses %j',
     (args) => {
       expect(parseDesignArgs(args)).toHaveProperty('error');
     },
   );
+});
+
+describe('resolveEditorCommand()', () => {
+  it('splits --editor once, and prefers it to U8G2GL_EDITOR', () => {
+    expect(resolveEditorCommand('code --reuse-window', { U8G2GL_EDITOR: 'vim' })).toEqual({ command: 'code', args: ['--reuse-window'] });
+  });
+
+  it('falls back to U8G2GL_EDITOR, then to none', () => {
+    expect(resolveEditorCommand(undefined, { U8G2GL_EDITOR: 'cursor' })).toEqual({ command: 'cursor', args: [] });
+    expect(resolveEditorCommand(undefined, {})).toBeUndefined();
+    expect(resolveEditorCommand(undefined, { U8G2GL_EDITOR: '   ' })).toBeUndefined();
+  });
+
+  it('is documented by --help', () => {
+    const help = spawnSync(process.execPath, [CLI, '--help'], { encoding: 'utf8' });
+    expect(help.status).toBe(0);
+    expect(help.stdout).toContain('--editor <command>');
+    expect(help.stdout).toContain('U8G2GL_EDITOR');
+  });
+
+  it('names where an unparseable command came from', () => {
+    expect(resolveEditorCommand('"code', {})).toEqual({ error: '--editor: the editor command has an unterminated " quote' });
+    expect(resolveEditorCommand(undefined, { U8G2GL_EDITOR: "'x" })).toEqual({ error: "U8G2GL_EDITOR: the editor command has an unterminated ' quote" });
+  });
 });
 
 describe('one server per project', () => {

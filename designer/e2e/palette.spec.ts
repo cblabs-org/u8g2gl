@@ -7,9 +7,11 @@
  * Purpose: The Palette in the real shell (ui_spec §6): the activity bar
  *          switches the primary sidebar between the Explorer and the Palette;
  *          the Palette lists the departures project's elements in their three
- *          groups, filed by category and shown by label and description, from
- *          its manifests; its filter matches a description; a keystroke or a
- *          drag re-renders none of it; and a tag
+ *          groups, filed by category, from its manifests, as 56 px icon tiles
+ *          whose tooltip (on hover and on focus) shows the label, the tag and
+ *          the description; the arrow keys move between tiles; its filter
+ *          matches a description; a keystroke, a drag or a tooltip re-renders
+ *          none of it; and a tag
  *          dragged onto the canvas is inserted there as one new line and one
  *          undo stop, selected, or refused with the reason and nothing written.
  * Description: The departures project, which declares three widgets of its
@@ -35,7 +37,11 @@ test('the activity bar shows the Palette: three groups from the manifests, filed
   await openShell(page, session.url);
 
   // --- The Palette replaces the Explorer in the sidebar, and back ---
+  // Its icons come from one sprite, served under the token path like the rest.
+  const sprite = page.waitForResponse((response) => /\/assets\/lucide-sprite-[^/]+\.svg$/.test(new URL(response.url()).pathname));
   await page.getByRole('button', { name: 'Palette' }).click();
+  expect((await sprite).status()).toBe(200);
+  expect((await sprite).headers()['content-type']).toBe('image/svg+xml');
   const palette = page.getByRole('complementary', { name: 'Palette' });
   await expect(palette).toBeVisible();
   await expect(page.getByRole('complementary', { name: 'Explorer' })).toHaveCount(0);
@@ -51,11 +57,42 @@ test('the activity bar shows the Palette: three groups from the manifests, filed
   await expect(palette.locator('[data-group="Drawing"] .palette-category h3')).toHaveText(['Drawing']);
   await expect(palette.locator('[data-group="Framework"] .palette-category h3')).not.toHaveCount(0);
 
-  // --- A project widget's entry: its label, its tag muted beside it, its description beneath ---
+  // --- A tile: its icon over its label; a project widget's icon is its category's ---
   const serviceList = palette.locator('.palette-tag[data-tag="wd_service_list"]');
   await expect(serviceList.locator('.palette-label')).toHaveText('Service list');
-  await expect(serviceList.locator('.palette-tag-name')).toHaveText('wd_service_list');
-  await expect(serviceList.locator('.palette-description')).toHaveText(/one service per row/);
+  await expect(serviceList.locator('svg.icon')).toHaveAttribute('data-icon', 'type');
+  await expect(palette.locator('.palette-tag[data-tag="u8g2gl_label"] svg.icon')).toHaveAttribute('data-icon', 'text-cursor');
+  await expect(palette.locator('svg.icon[data-icon-missing]')).toHaveCount(0);
+  const box = await serviceList.boundingBox();
+  expect([box?.width, box?.height]).toEqual([56, 56]);
+
+  // --- Its tooltip, on hover: the label, the <tag> and the description ---
+  const tooltip = page.getByRole('tooltip');
+  await serviceList.hover();
+  await expect(tooltip.locator('.palette-tooltip-label')).toHaveText('Service list');
+  await expect(tooltip.locator('.palette-tooltip-tag')).toHaveText('<wd_service_list>');
+  await expect(tooltip.locator('.palette-tooltip-description')).toHaveText(/one service per row/);
+  await expect(serviceList).toHaveAttribute('aria-describedby', 'palette-tooltip-wd_service_list');
+  await page.mouse.move(700, 400);
+  await expect(tooltip).toHaveCount(0);
+
+  // --- …and on keyboard focus; the arrow keys move between tiles ---
+  const first = palette.locator('.palette-tag').first();
+  await first.focus();
+  await expect(tooltip.locator('.palette-tooltip-tag')).toHaveText(`<${await first.getAttribute('data-tag')}>`);
+  const second = await palette.locator('.palette-tag').nth(1).getAttribute('data-tag');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator(`.palette-tag[data-tag="${second}"]`)).toBeFocused();
+  await expect(tooltip.locator('.palette-tooltip-tag')).toHaveText(`<${second}>`);
+  await page.keyboard.press('ArrowLeft');
+  await expect(first).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const below = await page.evaluate(() => document.activeElement?.getBoundingClientRect().top ?? 0);
+  expect(below).toBeGreaterThan((await first.boundingBox())?.y ?? Infinity);
+  await page.keyboard.press('End');
+  await expect(palette.locator('.palette-tag').last()).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(first).toBeFocused();
 
   // --- The filter narrows by name; a group left empty goes ---
   const filter = palette.getByRole('searchbox', { name: 'Filter elements' });
@@ -107,13 +144,20 @@ test('the Palette does not re-render on a keystroke or a drag, and does when its
   await dragCanvas(page, [106, 11], [100, 8]);
   await nextFrames(page, 3);
   const afterDrag = await renders();
-  console.log(`Palette renders: typing ${afterTyping - beforeTyping}, dragging ${afterDrag - afterTyping}`);
+  // --- A tooltip is the tile's own state: showing one re-renders no Palette ---
+  await palette.locator('.palette-tag[data-tag="wd_service_list"]').hover();
+  await expect(page.getByRole('tooltip')).toBeVisible();
+  await page.mouse.move(700, 400);
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
+  const afterTooltip = await renders();
+  console.log(`Palette renders: typing ${afterTyping - beforeTyping}, dragging ${afterDrag - afterTyping}, tooltip ${afterTooltip - afterDrag}`);
   expect(afterTyping - beforeTyping).toBe(0);
   expect(afterDrag - afterTyping).toBe(0);
+  expect(afterTooltip - afterDrag).toBe(0);
 
   // --- The self-test: the count does move for the Palette's own state ---
   await palette.getByRole('searchbox', { name: 'Filter elements' }).fill('line');
-  await expect.poll(renders).toBeGreaterThan(afterDrag);
+  await expect.poll(renders).toBeGreaterThan(afterTooltip);
 });
 
 test('a tag dropped on the canvas is inserted at the drop point as one new line, selected, and one undo removes it', async ({ page }) => {

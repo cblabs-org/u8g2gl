@@ -6,27 +6,145 @@
  * File: designer/src/palette/palette.tsx
  * Purpose: The Palette view of the primary sidebar (ui_spec §6): the elements
  *          a screen may use, grouped Framework / Project / Drawing and filed by
- *          category within each, with a filter, each one dragged from here
- *          onto the canvas to insert it.
+ *          category within each, as a grid of icon tiles with a filter, each
+ *          one dragged from here onto the canvas to insert it.
  * Description: The groups come from the latest pipeline run's manifest
  *              registry (`palette-entries.ts`). The component subscribes to the
  *              registry alone, not to the run: the registry is rebuilt only
  *              when a manifest's parse changes, so a keystroke or a drag
- *              re-renders nothing here. Each entry shows its label (or its tag
- *              when it has none), the tag in muted text beside a label, and its
- *              description beneath; a category heading is shown above its
- *              entries, and the uncategorised come last with none. Each entry
- *              is an HTML drag source carrying its tag under
+ *              re-renders nothing here. Each entry is a 56 px tile: its icon
+ *              (`palette-icons.ts`) over its label, cut short with an ellipsis,
+ *              or its tag when it has no label. A category heading is shown
+ *              above its tiles, and the uncategorised come last with none.
+ *              Each tile is an HTML drag source carrying its tag under
  *              `PALETTE_DRAG_TYPE`, which the canvas accepts.
+ *
+ *              A tooltip shows the label, the `<tag>` and the description on
+ *              hover and on keyboard focus. Its state is the tile's own, so
+ *              showing it re-renders that tile and not the Palette. Tiles are
+ *              in the tab order, and the arrow keys move between them: ←/→
+ *              to the neighbour in reading order, ↑/↓ to the nearest tile in
+ *              the row above or below, Home/End to the first and last.
  *
  * Exports:
  * - Palette:  The component
  */
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Icon } from '../icons/icon';
 import { useWorkspace } from '../ui/workspace-context';
 import { countRender } from '../perf/render-count';
-import { filterPalette, PALETTE_DRAG_TYPE, paletteGroups } from './palette-entries';
+import { filterPalette, PALETTE_DRAG_TYPE, paletteGroups, type PaletteEntry } from './palette-entries';
+import { paletteIcon } from './palette-icons';
+
+/** The icon's size in a 56 px tile, in CSS pixels: room for a label beneath. */
+const TILE_ICON_SIZE = 22;
+/** The gap between a tile and its tooltip, in CSS pixels. */
+const TOOLTIP_GAP = 6;
+/**
+ * How far apart two tiles' top edges may be and still share a row, in CSS
+ * pixels: layout positions are fractional, and 1 px absorbs the rounding.
+ */
+const ROW_TOLERANCE = 1;
+
+/** Where a tooltip goes: beside its tile, in viewport pixels. */
+interface TooltipAt {
+  readonly x: number;
+  readonly y: number;
+}
+
+// PaletteTile
+// One element's tile, its drag, and its tooltip.
+//   entry    — the element
+//   category — its section's category, for the icon fallback
+function PaletteTile({ entry, category }: { readonly entry: PaletteEntry; readonly category: string | undefined }): React.JSX.Element {
+  const [tooltip, setTooltip] = useState<TooltipAt | undefined>(undefined);
+  const tooltipId = `palette-tooltip-${entry.tag}`;
+  const show = (element: HTMLElement): void => {
+    const box = element.getBoundingClientRect();
+    setTooltip({ x: box.right + TOOLTIP_GAP, y: box.top });
+  };
+  const hide = (): void => setTooltip(undefined);
+  return (
+    <li>
+      <div
+        className="palette-tag"
+        draggable
+        tabIndex={0}
+        role="button"
+        aria-label={entry.label ?? entry.tag}
+        aria-describedby={tooltip !== undefined ? tooltipId : undefined}
+        data-tag={entry.tag}
+        onPointerEnter={(event) => show(event.currentTarget)}
+        onPointerLeave={hide}
+        onFocus={(event) => show(event.currentTarget)}
+        onBlur={hide}
+        onDragStart={(event) => {
+          hide();
+          event.dataTransfer.setData(PALETTE_DRAG_TYPE, entry.tag);
+          event.dataTransfer.effectAllowed = 'copy';
+        }}
+      >
+        <Icon name={paletteIcon(entry.tag, category)} size={TILE_ICON_SIZE} />
+        <span className={entry.label === undefined ? 'palette-label is-tag' : 'palette-label'}>{entry.label ?? entry.tag}</span>
+      </div>
+      {tooltip !== undefined && (
+        <div id={tooltipId} role="tooltip" className="palette-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
+          {entry.label !== undefined && <span className="palette-tooltip-label">{entry.label}</span>}
+          <span className="palette-tooltip-tag">&lt;{entry.tag}&gt;</span>
+          {entry.description !== undefined && <span className="palette-tooltip-description">{entry.description}</span>}
+          <span className="palette-tooltip-hint">Drag onto the canvas to insert it.</span>
+        </div>
+      )}
+    </li>
+  );
+}
+
+// moveFocus
+// The arrow keys between tiles, in the Palette's own element. Reading order is
+// the document order of the tiles; a row is the tiles sharing a top edge.
+//   root  — the Palette's element
+//   event — the key
+function moveFocus(root: HTMLElement | null, event: React.KeyboardEvent): void {
+  // --- Step 1: The tiles, and which has focus ---
+  const current = event.target as HTMLElement;
+  if (root === null || !current.classList.contains('palette-tag')) return;
+  const tiles = [...root.querySelectorAll<HTMLElement>('.palette-tag')];
+  const index = tiles.indexOf(current);
+
+  // --- Step 2: The tile the key moves to ---
+  let next: HTMLElement | undefined;
+  if (event.key === 'ArrowRight') next = tiles[index + 1];
+  else if (event.key === 'ArrowLeft') next = tiles[index - 1];
+  else if (event.key === 'Home') next = tiles[0];
+  else if (event.key === 'End') next = tiles[tiles.length - 1];
+  else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    // The nearest tile by column in the closest row above or below: rows are
+    // not aligned across categories, so "same index in the next row" is not
+    // a thing; the nearest centre is.
+    const from = current.getBoundingClientRect();
+    const down = event.key === 'ArrowDown';
+    const candidates = tiles
+      .map((tile) => ({ tile, box: tile.getBoundingClientRect() }))
+      .filter(({ box }) => (down ? box.top > from.top + ROW_TOLERANCE : box.top < from.top - ROW_TOLERANCE));
+    if (candidates.length > 0) {
+      const rowTop = down ? Math.min(...candidates.map(({ box }) => box.top)) : Math.max(...candidates.map(({ box }) => box.top));
+      const centre = from.left + from.width / 2;
+      next = candidates
+        .filter(({ box }) => Math.abs(box.top - rowTop) <= ROW_TOLERANCE)
+        .reduce((best, each) =>
+          Math.abs(each.box.left + each.box.width / 2 - centre) < Math.abs(best.box.left + best.box.width / 2 - centre) ? each : best,
+        ).tile;
+    }
+  } else {
+    return;
+  }
+
+  // --- Step 3: Move focus there, keeping it in view ---
+  event.preventDefault();
+  next?.focus();
+  next?.scrollIntoView({ block: 'nearest' });
+}
 
 /** @brief The Palette sidebar view. */
 export function Palette(): React.JSX.Element {
@@ -40,9 +158,10 @@ export function Palette(): React.JSX.Element {
   const [filter, setFilter] = useState('');
   const groups = useMemo(() => (registry === undefined ? [] : paletteGroups(registry)), [registry]);
   const shown = filterPalette(groups, filter);
+  const root = useRef<HTMLElement>(null);
 
   return (
-    <aside className="sidebar palette" aria-label="Palette">
+    <aside ref={root} className="sidebar palette" aria-label="Palette" onKeyDown={(event) => moveFocus(root.current, event)}>
       <header className="sidebar-title">Palette</header>
       <input
         className="palette-filter"
@@ -62,24 +181,9 @@ export function Palette(): React.JSX.Element {
             // and a category is never empty, so '' cannot collide with one.
             <div key={section.category ?? ''} className="palette-category" data-category={section.category}>
               {section.category !== undefined && <h3>{section.category}</h3>}
-              <ul>
+              <ul className="palette-tiles">
                 {section.entries.map((entry) => (
-                  <li key={entry.tag}>
-                    <div
-                      className="palette-tag"
-                      draggable
-                      data-tag={entry.tag}
-                      title={`Drag <${entry.tag}> onto the canvas to insert it`}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData(PALETTE_DRAG_TYPE, entry.tag);
-                        event.dataTransfer.effectAllowed = 'copy';
-                      }}
-                    >
-                      <span className={entry.label === undefined ? 'palette-label is-tag' : 'palette-label'}>{entry.label ?? entry.tag}</span>
-                      {entry.label !== undefined && <span className="palette-tag-name">{entry.tag}</span>}
-                      {entry.description !== undefined && <span className="palette-description">{entry.description}</span>}
-                    </div>
-                  </li>
+                  <PaletteTile key={entry.tag} entry={entry} category={section.category} />
                 ))}
               </ul>
             </div>

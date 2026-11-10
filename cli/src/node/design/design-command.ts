@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: src/node/design/design-command.ts
- * Purpose: `u8g2gl design [project-dir] [--port N] [--no-open]` — the
+ * Purpose: `u8g2gl design [project-dir] [--port N] [--no-open] [--editor CMD]` — the
  *          served-first entry point to the designer. It
  *          owns everything about the server's life that the server itself
  *          should not: finding an already-running server for the project and
@@ -16,12 +16,16 @@
  *              project's lock, or replaces a stale lock, starts a server with
  *              the `editor-wasm` build job and the test run registered and
  *              the built designer (if there is one) at `/`, and takes the lock.
+ *              The editor command (`--editor`, else `U8G2GL_EDITOR`) is split
+ *              here, once, into the `FileOpener` the server's open and reveal
+ *              routes use; no request can change it.
  *              `runDesignCommand` wraps it with output, the browser and
  *              signal handling.
  *
  * Exports:
  * - DesignArgs:            The parsed command line
  * - parseDesignArgs():     Parse it
+ * - resolveEditorCommand(): --editor, else U8G2GL_EDITOR, split once
  * - DesignSession:         Started (with a stop function) or attached
  * - startOrAttach():       Attach to a live server or start one, taking the lock
  * - runDesignCommand():    The command: output, browser, signals
@@ -33,6 +37,7 @@ import { registerEditorWasmJob } from './build/editor-wasm-job.js';
 import { registerTestRun } from './test-run/register-test-run.js';
 import { startDesignServer, type DesignServer } from './design-server.js';
 import { isLockLive, lockIgnoreWarning, readLock, removeLockIfOwned, tryCreateLock, type DesignLock } from './lock-file.js';
+import { FileOpener, parseEditorCommand, type EditorCommand } from './file-opener.js';
 import { openBrowser } from './open-browser.js';
 import { locateDesignerDist } from './static-files.js';
 
@@ -44,6 +49,8 @@ export interface DesignArgs {
   readonly port: number;
   /** Whether to open the browser. */
   readonly open: boolean;
+  /** The `--editor` command line, unsplit, if given. */
+  readonly editor?: string;
 }
 
 /** What {@link startOrAttach} did. */
@@ -61,6 +68,7 @@ export function parseDesignArgs(args: readonly string[]): DesignArgs | { readonl
   let projectDir: string | undefined;
   let port = 0;
   let open = true;
+  let editor: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i] ?? '';
     if (arg === '--no-open') {
@@ -72,15 +80,39 @@ export function parseDesignArgs(args: readonly string[]): DesignArgs | { readonl
         return { error: `--port needs a port number from 0 to 65535, not '${value ?? ''}'.` };
       }
       port = parsed;
+    } else if (arg === '--editor') {
+      const value = args[++i];
+      if (value === undefined || value.trim() === '') {
+        return { error: "--editor needs a command, such as 'code' or 'subl --wait'." };
+      }
+      editor = value;
     } else if (arg.startsWith('-')) {
-      return { error: `Unknown option '${arg}' for design. Options: --port <n>, --no-open.` };
+      return { error: `Unknown option '${arg}' for design. Options: --port <n>, --no-open, --editor <command>.` };
     } else if (projectDir === undefined) {
       projectDir = arg;
     } else {
       return { error: `design takes one project directory; '${arg}' is a second.` };
     }
   }
-  return { projectDir: projectDir ?? '.', port, open };
+  return { projectDir: projectDir ?? '.', port, open, ...(editor !== undefined ? { editor } : {}) };
+}
+
+/**
+ * @brief The editor the open route starts: `--editor`, else `U8G2GL_EDITOR`,
+ *        split once.
+ *
+ * @param flag The `--editor` value, if given; it wins over the environment.
+ * @param env  The environment to read `U8G2GL_EDITOR` from.
+ * @return The command, undefined for none (the platform's opener is used), or
+ *         `{ error }` naming where the unparseable command came from.
+ */
+export function resolveEditorCommand(
+  flag: string | undefined,
+  env: Readonly<Record<string, string | undefined>>,
+): EditorCommand | undefined | { readonly error: string } {
+  const [source, text] = flag !== undefined ? ['--editor', flag] : ['U8G2GL_EDITOR', env.U8G2GL_EDITOR ?? ''];
+  const parsed = parseEditorCommand(text);
+  return parsed !== undefined && 'error' in parsed ? { error: `${source}: ${parsed.error}` } : parsed;
 }
 
 /**
@@ -91,11 +123,13 @@ export function parseDesignArgs(args: readonly string[]): DesignArgs | { readonl
  *
  * @param projectRoot Absolute project directory, containing u8g2gl.xml.
  * @param port        Port for a new server; 0 for any free one.
+ * @param opener      What a new server opens and reveals files with; an
+ *                    attached server keeps its own.
  * @return `started` with the server and a `stop` that closes it and removes
  *         the lock; `attached` with the live lock; or `failed` if another
  *         instance took the lock in the same instant and then did not answer.
  */
-export async function startOrAttach(projectRoot: string, port: number): Promise<DesignSession> {
+export async function startOrAttach(projectRoot: string, port: number, opener?: FileOpener): Promise<DesignSession> {
   // --- Step 1: Attach to a live server, or clear a stale lock ---
   const attached = await attachOrClear(projectRoot);
   if (attached !== undefined) {
@@ -106,7 +140,12 @@ export async function startOrAttach(projectRoot: string, port: number): Promise<
   // The designer is served from the package's staged copy, or from a source
   // tree that built it; otherwise `/` is the placeholder page (static-files.ts).
   const designerRoot = locateDesignerDist();
-  const server = await startDesignServer({ projectRoot, port, ...(designerRoot !== undefined ? { designerRoot } : {}) });
+  const server = await startDesignServer({
+    projectRoot,
+    port,
+    ...(designerRoot !== undefined ? { designerRoot } : {}),
+    ...(opener !== undefined ? { opener } : {}),
+  });
   registerEditorWasmJob(server.builds);
   registerTestRun(server);
   const lock: DesignLock = { pid: process.pid, port: server.port, token: server.token, url: server.url };
@@ -158,14 +197,22 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     console.error(`u8g2gl design: warning: ${warning}`);
   }
 
-  // --- Step 3: Attach to the running server, or start one ---
-  const session = await startOrAttach(projectRoot, args.port);
+  // --- Step 3: The editor command, split once, before any request can arrive ---
+  const editor = resolveEditorCommand(args.editor, process.env);
+  if (editor !== undefined && 'error' in editor) {
+    console.error(`u8g2gl design: ${editor.error}`);
+    process.exit(1);
+  }
+  const opener = new FileOpener(editor !== undefined ? { editor } : {});
+
+  // --- Step 4: Attach to the running server, or start one ---
+  const session = await startOrAttach(projectRoot, args.port, opener);
   if (session.kind === 'failed') {
     console.error(`u8g2gl design: ${session.message}`);
     process.exit(1);
   }
 
-  // --- Step 4: A started server's signal handlers, before anything is printed ---
+  // --- Step 5: A started server's signal handlers, before anything is printed ---
   // Whoever reads the URL may signal the moment it arrives; a handler
   // installed after printing leaves a window in which SIGINT or SIGTERM takes
   // its default action, killing the process with the lock still on disk.
@@ -173,7 +220,7 @@ export async function runDesignCommand(args: DesignArgs, json: boolean): Promise
     installShutdown(projectRoot, session);
   }
 
-  // --- Step 5: Report the URL, and open it; an attaching run is done ---
+  // --- Step 6: Report the URL, and open it; an attaching run is done ---
   const lock = session.kind === 'started'
     ? { url: session.server.url, port: session.server.port, pid: process.pid }
     : session.lock;

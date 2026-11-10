@@ -202,6 +202,11 @@ Design Options:
   u8g2gl design [path]                         Start the design server for a project (default: .)
     --port <n>    Port to listen on (default: any free port)
     --no-open     Print the URL without opening a browser
+    --editor <command>
+                  The editor the designer's "Open in editor" starts, such as
+                  'code' or 'subl --wait' (default: U8G2GL_EDITOR, else the
+                  app the system associates with the file). code,
+                  code-insiders and cursor are opened at the line.
   Listens on 127.0.0.1 only. The printed URL carries a per-session token;
   requests without it are refused. A second 'design' in the same project
   attaches to the running server and prints its URL. Ctrl-C stops it.

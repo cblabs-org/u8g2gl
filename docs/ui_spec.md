@@ -225,20 +225,20 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 ```
 ┌──┬───────────────────┬──────────────────────────────────┬─────────────────┐
 │  │ PRIMARY SIDEBAR   │  EDITOR AREA (tabbed, splittable)│ PROPERTY PANEL  │
-│A │                   │ ┌──────────────┬───────────────┐ │                 │
-│C │  ▾ Screens        │ │              │               │ │ u8g2gl_clock    │
-│T │    ▸ home         │ │   CANVAS     │  XML (Monaco) │ │ name: clock     │
-│I │      settings     │ │              │               │ │ ─── Geometry ───│
-│V │  ▾ Elements       │ │  ┌────────┐  │ <screen ...   │ │ x [216] y [  0] │
-│I │      status_bar   │ │  │        │  │   <u8g2gl_cl..│ │ w [ 40] h [ 11] │
-│T │  ▾ Widgets        │ │  │ 256×64 │  │     x="216"   │ │ ⓘ right="0" set │
-│Y │      wd_list      │ │  │        │  │     ...       │ │ ── Appearance ──│
-│  │  ▾ Assets         │ │  └────────┘  │               │ │ font [clock_7 ▾]│
-│B │      fonts        │ │              │               │ │ ⓘ 7px, 11 glyphs│
-│A │      images       │ │ ⊞grid ⊡tile  │               │ │ ─── Binding ────│
-│R │  ▾ Subjects       │ │ 4× ▾  ▶ anim │               │ │ bind_time [sys▾]│
-│  │  ▾ Sample data    │ │              │               │ │ blink [✓]       │
-│  │      ● typical    │ └──────────────┴───────────────┘ │                 │
+│A │  ▾ Project        │ ┌──────────────┬───────────────┐ │                 │
+│C │      u8g2gl.xml   │ │              │               │ │ u8g2gl_clock    │
+│T │      globals.xml  │ │   CANVAS     │  XML (Monaco) │ │ name: clock     │
+│I │  ▾ Screens        │ │              │               │ │ ─── Geometry ───│
+│V │      screen_home  │ │  ┌────────┐  │ <screen ...   │ │ x [216] y [  0] │
+│I │  ▾ Widgets        │ │  │        │  │   <u8g2gl_cl..│ │ w [ 40] h [ 11] │
+│T │      wd_list      │ │  │ 256×64 │  │     x="216"   │ │ ⓘ right="0" set │
+│Y │  ▾ Assets         │ │  │        │  │     ...       │ │ ── Appearance ──│
+│  │      fonts/x.bdf  │ │  └────────┘  │               │ │ font [clock_7 ▾]│
+│B │  ▸ Other files    │ │              │               │ │ ⓘ 7px, 11 glyphs│
+│A │                   │ │ ⊞grid ⊡tile  │               │ │ ─── Binding ────│
+│R │                   │ │ 4× ▾  ▶ anim │               │ │ bind_time [sys▾]│
+│  │                   │ │              │               │ │ blink [✓]       │
+│  │                   │ └──────────────┴───────────────┘ │                 │
 ├──┴───────────────────┴──────────────────────────────────┴─────────────────┤
 │ Problems (2) │ Output │ Budget                                     ▲ ─ □  │
 │ ⛔ screens/home.xml:14:32 unknown font 'small_9' — did you mean 'small_09'?│
@@ -251,11 +251,24 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 | Region | Contents |
 |---|---|
 | **Activity bar** | Explorer · Palette · Assets · Fonts · Sample data · Flow · Search |
-| **Primary sidebar** | Context-dependent. Explorer shows the project tree; Palette shows draggable widgets grouped by category |
+| **Primary sidebar** | Context-dependent. Explorer shows the project grouped by what an author edits; Palette shows draggable elements as icon tiles, grouped and filed by category |
 | **Editor area** | Tabs per document. Default split: canvas ∥ XML. Either pane collapsible; ratio draggable and remembered |
 | **Property panel** | Selection properties, grouped. With nothing selected, shows screen-level properties |
 | **Bottom panel** | Problems · Output · Budget. Collapsible; auto-opens to Problems on a failed build |
 | **Status bar** | Build state and duration · active target · selection geometry · zoom · RAM total |
+
+**The Explorer** is grouped by what an author edits, not by directory: **Project** (`u8g2gl.xml`, `globals.xml`), **Screens** (one entry per screen file), **Widgets** (one entry per widget, under its own name, opening its manifest; its `.cpp` and `.hpp` travel with the entry rather than being listed) and **Assets** (fonts and images). Anything else is listed under **Other files**, so nothing on disk goes missing; a widget directory with no manifest falls there too. Generated output — `generated/` and the editor target's `generated_editor/` — is not listed, watched or writable from the designer.
+
+Every Explorer entry has a **context menu**, opened by right-click, Shift+F10 or the context-menu key, driven by the arrow keys and closed by Escape or a click outside:
+
+- **View source…** — a widget's files (manifest, `.cpp`, `.hpp`). C++ opens read-only (§10); the manifest opens in its ordinary editor tab.
+- **Open in editor** — hands the file to the author's own editor: `u8g2gl design --editor <command>` or `U8G2GL_EDITOR`, otherwise the application the system associates with the file. `code`, `code-insiders` and `cursor` open at the line. Offered, and accepted by the server, only for source and asset types (`.xml`, `.cpp`, `.cc`, `.c`, `.hpp`, `.h`, `.json`, `.md`, `.txt`, `.bdf`, `.xbm`, `.png`): the system's opener *runs* an executable file type, and the session token can write a file of any name.
+- **Reveal in Finder** (macOS) or **Reveal in file manager** (elsewhere, opening the containing folder).
+- **Copy path** — the project-relative path.
+
+The server starts these programs itself, with an argument array and never a shell; the editor command is split once at start-up and never comes from a request.
+
+**The Palette** is a grid of 56 px icon tiles, each its element's icon over its label (cut short with an ellipsis; the tag when there is no label), grouped Framework / Project / Drawing and filed by category. A tooltip on hover and on keyboard focus gives the label, the `<tag>` and the description. The filter matches all three; tiles are drag sources onto the canvas; they are in the tab order, and the arrow keys move between them. An element's icon is its own, else its category's, else a generic one. The icons are [Lucide](https://lucide.dev), vendored whole (THIRD-PARTY-NOTICES.md), so a project widget's icon is not limited to the ones the framework uses.
 
 **Selection geometry lives permanently in the status bar.** F2 depends on knowing exact coordinates without opening anything.
 
@@ -379,6 +392,8 @@ Monaco, configured for this schema.
 - **Format on demand only, never on save** — formatting belongs to the author (principle 5).
 - **Breadcrumbs** showing the element path at the caret.
 
+**View source.** A widget's C++ opens in a read-only tab, highlighted as C++ and marked *read-only* in its title, read through the server's ordinary file route and refreshed when the file changes on disk. A Problems row on a C++ file — a failed widget build, say — opens the same tab at its line. Editing C++ is the author's editor's job (§14): **Open in editor** (§6) is one click away.
+
 **Round-trip is non-negotiable.** A canvas nudge must produce a one-line diff. Comments, blank lines, attribute order and indentation elsewhere survive untouched. This constrains implementation ([UD-3]) and is the requirement most likely to be quietly compromised under delivery pressure — hence its restatement here.
 
 ---
@@ -438,6 +453,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | Modals / overlays | Not a framework capability yet (§7.3) |
 | Cross-file undo | Per-document undo only. Large problem, narrow benefit |
 | Firmware build / flashing | The user's toolchain does this |
+| Editing C++ | A widget's C++ is shown read-only (View source, §10) and handed to the author's own editor (Open in editor, §6). The designer edits the XML it understands, not code it cannot check |
 
 ---
 

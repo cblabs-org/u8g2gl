@@ -16,6 +16,8 @@
  *              lock never touch the user's, and — unless the test asks for the
  *              toolchain — a PATH with no Emscripten on it, which is the
  *              state in which a project with no toolchain must still open.
+ *              Its editor (`U8G2GL_EDITOR`) is a Node no-op, so an "Open in
+ *              editor" can never start the user's own.
  *              It refuses to run against the wrong designer build: most tests
  *              need the test build's hooks, and the production check must not
  *              have them. `stop` sends SIGINT and waits for the exit, which
@@ -113,7 +115,17 @@ export async function startDesign(options: StartOptions = {}): Promise<DesignSes
   const path = options.toolchain === true ? (process.env.PATH ?? '') : withoutEmscripten(process.env.PATH ?? '');
   const child = spawn(process.execPath, [CLI, 'design', project, '--no-open', '--json', '--port', '0'], {
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...withoutEmsdkVariables(process.env), PATH: path, HOME: home, XDG_CACHE_HOME: join(home, '.cache') },
+    // The editor is Node with an empty script, so an "Open in editor" that
+    // reached the server would start nothing visible. The tests intercept
+    // those requests in the page; this is the second barrier, and it also
+    // keeps a U8G2GL_EDITOR in the runner's environment out of the session.
+    env: {
+      ...withoutEmsdkVariables(process.env),
+      PATH: path,
+      HOME: home,
+      XDG_CACHE_HOME: join(home, '.cache'),
+      U8G2GL_EDITOR: `"${process.execPath}" -e ""`,
+    },
   });
   let stderr = '';
   child.stderr?.on('data', (chunk) => (stderr += String(chunk)));

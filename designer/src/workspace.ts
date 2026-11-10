@@ -19,6 +19,7 @@
  * - Workspace:       The session
  *
  *     State:
+ *     - session:        The server and token, for requests beyond the file system
  *     - documents, activeFile, selection, problems, output, projectName
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
@@ -55,6 +56,8 @@ const OUTPUT_LIMIT = 500;
 
 /** The designer session. */
 export class Workspace {
+  /** The server this page belongs to, and its token: for the routes that are not file I/O. */
+  readonly session: DesignSession;
   /** The project's documents. */
   readonly documents: ProjectDocuments;
   /** The project file the editor shows, if any; the canvas shows its screen. */
@@ -82,9 +85,11 @@ export class Workspace {
 
   /**
    * @param fs      The served project file system, connected.
-   * @param session The server and token, for builds and the Wasm route.
+   * @param session The server and token: for builds, the Wasm route, and the
+   *                Explorer's open and reveal requests, through `session`.
    */
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
+    this.session = session;
     this.documents = new ProjectDocuments(fs, (line) => this.log(line));
     this.selection = new SelectionModel((path) => this.documents.textOf(path));
     // Canvas to XML: a selection made on the canvas shows its file, so the

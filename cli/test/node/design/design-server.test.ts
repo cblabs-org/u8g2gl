@@ -9,7 +9,8 @@
  *          symlink), loopback only, an external edit becoming a `changed` event
  *          within 200 ms, the ignored paths, malformed percent-encodings, the
  *          build queue's routes, the designer's files and the editor Wasm
- *          route, and a clean close with streams open.
+ *          route, the open and reveal routes (which must start nothing for a
+ *          refused request), and a clean close with streams open.
  * Description: Each test starts a server on port 0 against a temporary project
  *              and closes it in afterEach. Requests use `fetch`, except the
  *              Host-header check, which needs `node:http` because `fetch` will
@@ -24,6 +25,7 @@ import { ServedProjectFileSystem, type ProjectFsEvent } from '../../../src/core/
 import { startDesignServer, type DesignServer, type DesignServerOptions } from '../../../src/node/design/design-server.js';
 import { EDITOR_WASM_JOB } from '../../../src/node/design/build/editor-wasm-build.js';
 import { BuildJobFailure } from '../../../src/node/design/build-queue.js';
+import { FileOpener, type Launch } from '../../../src/node/design/file-opener.js';
 import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
 import { INVALID_PATHS } from '../../project-fs/contract.js';
 import { createTestEventSource } from '../../project-fs/test-event-source.js';
@@ -67,6 +69,8 @@ const ROUTES: ReadonlyArray<{ readonly method: string; readonly path: string; re
   { method: 'GET', path: '/api/file?path=u8g2gl.xml' },
   { method: 'PUT', path: '/api/file?path=screens/screen_x.xml', body: '<screen />\n' },
   { method: 'GET', path: '/api/events' },
+  { method: 'POST', path: '/api/open', body: '{"path":"u8g2gl.xml"}' },
+  { method: 'POST', path: '/api/reveal', body: '{"path":"u8g2gl.xml"}' },
   { method: 'POST', path: '/api/build/editor-wasm' },
   { method: 'GET', path: '/api/build/1' },
   { method: 'GET', path: '/app/not-the-token/index.html' },
@@ -192,7 +196,7 @@ describe('no write escapes the project', () => {
     expect(readFileSync(join(root, 'screens', 'real.xml'), 'utf8')).toBe('new\n');
   });
 
-  it.each(['.git/hooks/pre-commit', 'node_modules/x/index.js', 'generated/ui.cpp', LOCK_FILE_NAME])(
+  it.each(['.git/hooks/pre-commit', 'node_modules/x/index.js', 'generated/ui.cpp', 'generated_editor/ui_editor_registry.cpp', LOCK_FILE_NAME])(
     'refuses a write to %s, which is not project source',
     async (path) => {
       await start();
@@ -204,9 +208,10 @@ describe('no write escapes the project', () => {
 });
 
 describe('files and events', () => {
-  it('lists project source only — not generated/, .git/, node_modules/ or the lock', async () => {
+  it('lists project source only — not generated/, generated_editor/, .git/, node_modules/ or the lock', async () => {
     await start({
       'generated/ui.cpp': '// GENERATED\n',
+      'generated_editor/ui_editor_registry.cpp': '// GENERATED\n',
       '.git/HEAD': 'ref: refs/heads/main\n',
       'node_modules/x/index.js': '',
       [LOCK_FILE_NAME]: '{}',
@@ -217,14 +222,19 @@ describe('files and events', () => {
     });
   });
 
-  it('sends no event for generated/ or the lock file', async () => {
+  it('sends no event for generated/, generated_editor/ or the lock file', async () => {
     const s = await start();
     const fs = new ServedProjectFileSystem({ origin: `http://127.0.0.1:${s.port}`, token: s.token, createEventSource: createTestEventSource });
     await fs.connect();
     const events: ProjectFsEvent[] = [];
     fs.watch((e) => events.push(e));
     try {
-      writeFiles(root, { 'generated/ui.cpp': '// x\n', [LOCK_FILE_NAME]: '{}', 'screens/screen_home.xml': '<screen name="home" v="2" />\n' });
+      writeFiles(root, {
+        'generated/ui.cpp': '// x\n',
+        'generated_editor/ui_editor_registry.cpp': '// x\n',
+        [LOCK_FILE_NAME]: '{}',
+        'screens/screen_home.xml': '<screen name="home" v="2" />\n',
+      });
       await waitUntil(() => events.some((e) => e.path === 'screens/screen_home.xml'), 1000);
       await new Promise((r) => setTimeout(r, 200));
       expect(events).toEqual([{ kind: 'changed', path: 'screens/screen_home.xml' }]);
@@ -466,6 +476,155 @@ describe('the editor Wasm route', () => {
       await response.body?.cancel();
     }
     expect((await api(`/api/editor-wasm/${good.id}/u8g2gl_editor.wasm`)).status).toBe(200);
+  });
+});
+
+describe('open in editor and reveal', () => {
+  // started
+  // A server whose opener records launches instead of starting anything.
+  async function started(platform: NodeJS.Platform = 'darwin'): Promise<{ readonly s: DesignServer; readonly launches: Launch[] }> {
+    const launches: Launch[] = [];
+    const opener = new FileOpener({
+      platform,
+      editor: { command: 'code', args: ['--reuse-window'] },
+      spawn: (command, args) => {
+        launches.push({ command, args: [...args] });
+        return Promise.resolve();
+      },
+    });
+    const s = await start({ 'widgets/wd_a/wd_a.cpp': '// a\n', 'generated/ui.cpp': '// x\n' }, { opener });
+    return { s, launches };
+  }
+
+  // post
+  // An authorised JSON POST.
+  function post(route: string, body: unknown): Promise<Response> {
+    return api(route, { method: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body) });
+  }
+
+  it('opens a project file in the configured editor, at its line, as an argument array', async () => {
+    const { launches } = await started();
+    const response = await post('/api/open', { path: 'widgets/wd_a/wd_a.cpp', line: 12 });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ path: 'widgets/wd_a/wd_a.cpp' });
+    expect(launches).toEqual([{ command: 'code', args: ['--reuse-window', '-g', `${join(root, 'widgets', 'wd_a', 'wd_a.cpp')}:12`] }]);
+  });
+
+  it('reveals with open -R on macOS, and the containing folder elsewhere', async () => {
+    const mac = await started('darwin');
+    expect((await post('/api/reveal', { path: 'u8g2gl.xml' })).status).toBe(200);
+    expect(mac.launches).toEqual([{ command: 'open', args: ['-R', join(root, 'u8g2gl.xml')] }]);
+    await server?.close();
+    const linux = await started('linux');
+    expect((await post('/api/reveal', { path: 'widgets/wd_a/wd_a.cpp' })).status).toBe(200);
+    expect(linux.launches).toEqual([{ command: 'xdg-open', args: [join(root, 'widgets', 'wd_a')] }]);
+  });
+
+  it.each(['/api/open', '/api/reveal'])('%s with no token is 403 and starts nothing', async (route) => {
+    const { s, launches } = await started();
+    const refused: Record<string, string>[] = [{}, { Authorization: `Bearer ${'0'.repeat(64)}` }];
+    for (const headers of refused) {
+      const response = await fetch(`http://127.0.0.1:${s.port}${route}`, { method: 'POST', headers, body: '{"path":"u8g2gl.xml"}' });
+      expect(response.status).toBe(403);
+      await response.body?.cancel();
+    }
+    expect(launches).toEqual([]);
+  });
+
+  const REFUSED: ReadonlyArray<readonly [string, unknown, number]> = [
+    ['a .. path', { path: '../outside.xml' }, 400],
+    ['a nested .. path', { path: 'widgets/../../outside.xml' }, 400],
+    ['an absolute path', { path: '/etc/passwd' }, 400],
+    ['a drive path', { path: 'C:/Windows/win.ini' }, 400],
+    ['an ignored path (generated/)', { path: 'generated/ui.cpp' }, 403],
+    ['an ignored path (.git/)', { path: '.git/config' }, 403],
+    ['the lock file', { path: LOCK_FILE_NAME }, 403],
+    ['a missing file', { path: 'widgets/wd_a/nope.cpp' }, 404],
+    ['a directory', { path: 'widgets/wd_a' }, 404],
+    ['a body that is not JSON', 'not json', 400],
+    ['a body with no path', { line: 3 }, 400],
+    ['a non-numeric line', { path: 'u8g2gl.xml', line: '3; rm' }, 400],
+    ['a line below 1', { path: 'u8g2gl.xml', line: 0 }, 400],
+    ['a fractional line', { path: 'u8g2gl.xml', line: 1.5 }, 400],
+  ];
+  for (const route of ['/api/open', '/api/reveal']) {
+    it.each(REFUSED)(`${route} refuses %s with a 4xx and starts nothing`, async (_label, body, status) => {
+      const { launches } = await started();
+      const response = await post(route, body);
+      expect(response.status).toBe(status);
+      await response.body?.cancel();
+      expect(launches).toEqual([]);
+    });
+  }
+
+  it('refuses a symlink that leads out of the project, and starts nothing', async () => {
+    const { launches } = await started();
+    const outside = makeTempDir('design-server-outside');
+    writeFileSync(join(outside, 'secret.cpp'), '// secret\n');
+    symlinkSync(join(outside, 'secret.cpp'), join(root, 'link.cpp'));
+    const response = await post('/api/open', { path: 'link.cpp' });
+    expect(response.status).toBe(403);
+    expect(launches).toEqual([]);
+  });
+
+  // Ruling 6a: the platform opener runs a file executable by type, and the
+  // token can write any name, so open accepts source and asset types only —
+  // with an editor configured too, and judged on the real path as well.
+  const NOT_OPENABLE: ReadonlyArray<readonly [string, string]> = [
+    ['a .command', 'run.command'],
+    ['a .sh', 'scripts/run.sh'],
+    ['an extensionless file', 'widgets/wd_a/run'],
+    ['a .cpp symlink to a .command', 'widgets/wd_a/looks.cpp'],
+  ];
+  it.each(NOT_OPENABLE)('/api/open refuses %s with 403 and starts nothing, with or without an editor', async (_label, path) => {
+    for (const editor of [true, false]) {
+      const launches: Launch[] = [];
+      const opener = new FileOpener({
+        platform: 'darwin',
+        ...(editor ? { editor: { command: 'code', args: [] } } : {}),
+        spawn: (command, args) => {
+          launches.push({ command, args: [...args] });
+          return Promise.resolve();
+        },
+      });
+      await start({ 'run.command': '#!/bin/sh\n', 'scripts/run.sh': '#!/bin/sh\n', 'widgets/wd_a/run': '#!/bin/sh\n' }, { opener });
+      symlinkSync(join(root, 'run.command'), join(root, 'widgets', 'wd_a', 'looks.cpp'));
+      const response = await post('/api/open', { path });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'not-openable' });
+      expect(launches).toEqual([]);
+      await server?.close();
+      server = undefined;
+    }
+  });
+
+  it('reveals a file whatever its type: revealing starts nothing from it', async () => {
+    const { launches } = await started();
+    writeFileSync(join(root, 'run.command'), '#!/bin/sh\n');
+    expect((await post('/api/reveal', { path: 'run.command' })).status).toBe(200);
+    expect(launches).toEqual([{ command: 'open', args: ['-R', join(root, 'run.command')] }]);
+  });
+
+  it('answers 500, saying why, when the program cannot be started', async () => {
+    const opener = new FileOpener({ spawn: () => Promise.reject(new Error('spawn nope ENOENT')) });
+    await start({}, { opener });
+    const response = await post('/api/open', { path: 'u8g2gl.xml' });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ code: 'unavailable', message: 'could not start the editor: spawn nope ENOENT' });
+  });
+
+  it('with no opener, answers 501 and starts nothing', async () => {
+    await start();
+    const response = await post('/api/open', { path: 'u8g2gl.xml' });
+    expect(response.status).toBe(501);
+    await response.body?.cancel();
+  });
+
+  it('will not let a later piece of the designer register over them', async () => {
+    const s = await start();
+    for (const path of ['/api/open', '/api/reveal']) {
+      expect(() => s.registerJsonRoute(path, () => Promise.resolve({ status: 200, body: {} }))).toThrow();
+    }
   });
 });
 

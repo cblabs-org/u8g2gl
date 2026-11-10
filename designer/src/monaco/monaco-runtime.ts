@@ -16,8 +16,10 @@
  *              go to next problem; folding, bracket matching, comment toggling,
  *              multi-cursor, line and word operations, word highlighting,
  *              indentation, clipboard, the context menu and cursor undo; and
- *              the codicon font those widgets draw with. XML is registered as
- *              the only language. The editor worker is bundled by Vite's
+ *              the codicon font those widgets draw with. XML is registered for
+ *              the documents, and C++ for the read-only source tabs on a
+ *              widget's code — highlighting only, since nothing edits C++.
+ *              The editor worker is bundled by Vite's
  *              `?worker` import — the designer loads nothing from a CDN, so it
  *              works offline and the server can token-check every byte it
  *              serves — and every worker label gets it, since XML needs no
@@ -47,6 +49,7 @@ import 'monaco-editor/features/clipboard/register';
 import 'monaco-editor/features/contextmenu/register';
 import 'monaco-editor/features/cursorUndo/register';
 import 'monaco-editor/languages/definitions/xml/register';
+import 'monaco-editor/languages/definitions/cpp/register';
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 import { THEME } from './monaco';
 
