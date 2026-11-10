@@ -405,82 +405,82 @@
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_box.xml",
-      "sha256": "bc69101a68639c572419145543e118ba93e77070925f9481526cf5ae57e28325",
+      "sha256": "78b6b57566d3c03c67ca48bce83ef560d093c6a6eec1f1d079f601416647d40e",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_button.xml",
-      "sha256": "a6c13ee712b1b5dff5e887e7b6c948a76f56dc2c1f6c502fac5a94a12c40d8d8",
+      "sha256": "b26498e0acf21d22bd54f92351330d6e2873d60fc841935bf8f14fbb6f3c95d9",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_circle.xml",
-      "sha256": "8838b986d0247a8ddf00220b65363b506d54ac6cdc18f1de9bad71a33ee350bc",
+      "sha256": "529b56488ae13946c9d40901b2a4a971dd30d7a0fdccf1517dbb35f06021745d",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_clock.xml",
-      "sha256": "ea670a154d783fa2d3cf26f0ffafeca4772838fe33662b09fc4a3d55aa4db5fe",
+      "sha256": "8779553fc361c7c7b25121d73f109df048158fab41885ea51e2c831b18c34cfb",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_ellipse.xml",
-      "sha256": "2655dc5b19a6d8d686f4510c60dc7e8908e0e4bfd52b1f5a8f48185b6b0c67a5",
+      "sha256": "c0aacdd49aa45a0580963678059486e367e560b1776550c4a342863386f71888",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_glyph.xml",
-      "sha256": "0af32bc0820450af6acdc7f1a21d75823d36353fe98b70a154e310911169fa85",
+      "sha256": "1043db51f562d2506d13ba77a72152b24bad25c3ffb0f94693f45090678fee3d",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_hline.xml",
-      "sha256": "db9b9047c5c46140d2e093c17ada61422ed5d73abe13f4b724bc93394dadaac8",
+      "sha256": "98193a21c3817c45a434e70cfdd2088a60d721dcf158c2bb824b0edb5c356073",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_label.xml",
-      "sha256": "a253dca9e32bc8375df49c2eae8669e3df9e9e484d5a96de66260babe94f8b73",
+      "sha256": "ca44455db4f9b552936b71252d515f783a549f6c485a999ffed752e2bad98f35",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_line.xml",
-      "sha256": "70883ccbdda841041daaf4c3c6d1feeb76aba6bf9d1884900bd55ca171d697f5",
+      "sha256": "ac1ffee4448ae19f2189a988df1ff5d4f9949c5aa874f2f145ca6c136341fac0",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_obj.xml",
-      "sha256": "8ad4c10d27d3c70262eedb71561fb5d9942be4d2865e28727ff646a44b86b0c4",
+      "sha256": "e3ad1e13ce1479f95fce9679b70486fe8b7ebfdee4d0d068a6c1b544b41fc9fa",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_pixel.xml",
-      "sha256": "08ec2e6d6add98f1423b156210aebf80364a044f2520d4e720519928ef98a163",
+      "sha256": "d26569c5dae1a25be55919b863d1c700b84284ae1dc7429ab7d0bee6ca490b90",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_progress_bar.xml",
-      "sha256": "8faa675a87baefbd12d43d5d5da95a20091378986215e65b5a489cc4862dafaa",
+      "sha256": "770e1f104fb7b816376b36704039aefa734d6548f45938a2af2ab26fa49a28a7",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_switch.xml",
-      "sha256": "8ebac227f25eaf86b82259e5ef22f702e4e3dd145a0c66da8e42351a175f2c2c",
+      "sha256": "c4812a0919bbd32f7564cba6fd8ae274da8e3a14154486faba6906f50a004305",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_triangle.xml",
-      "sha256": "e26d60c629033b4c2cc5a5db14c7b2948a1af9efd38cdee0a2360d5428a07073",
+      "sha256": "5e3915e0ab3fa8de630ccbbd2973a91e5f54b310944215f5c792e8ba8c4444d9",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_vline.xml",
-      "sha256": "fd034da78146958f6bead49a39175ba6283b2e8b943eb91ac4be4dcb149be8af",
+      "sha256": "c8c8112eb3dbdc4c1a2ba1818ffa0b54de0eb10d3a19c1fdf6c83068e185ef03",
       "diagnostics": []
     },
     {
       "file": "include/u8g2gl/manifests/u8g2gl_xbm.xml",
-      "sha256": "30d9f210a3b9aad97229dab85eaa11dc20ab9ac33250f67fce9a44d4d8d9594a",
+      "sha256": "cb73bbe18deafdfc2942f92e5ba27691b266eda9c15b17a7d26d65770f588aa9",
       "diagnostics": []
     },
     {

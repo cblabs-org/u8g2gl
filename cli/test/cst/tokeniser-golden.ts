@@ -42,7 +42,8 @@
  *              `<api>` line, where only the closing `>` follows them, so the
  *              record gains those three attributes and nothing else moves.
  *              Schema 0.6's move from `"0.5"` to `"0.6"` is a third, of the
- *              same same-length kind.
+ *              same same-length kind, and its `icon`, added after
+ *              `description` on the same `<api>` lines, a fourth.
  *
  * Exports:
  *   Golden shapes:

@@ -25,6 +25,8 @@
  *              element's `label` and `description` when its manifest declares
  *              them; nothing is invented for one that does not, and the
  *              metadata is the element's own, never inherited ([D-17]).
+ *              Schema 0.6's `<api icon>` travels the same way, and
+ *              `palette-icons.ts` turns it into the tile's icon.
  *
  *              The filter narrows by a case-insensitive substring of the
  *              label, the tag or the description; a category or group left
@@ -33,7 +35,7 @@
  * Exports:
  * - PALETTE_DRAG_TYPE:  The drag data type a Palette entry carries
  * - PaletteGroupTitle:  The three group headings
- * - PaletteEntry:       One element: its tag, and its label and description if any
+ * - PaletteEntry:       One element: its tag, and its label, description and icon if any
  * - PaletteSection:     One category's entries, or the uncategorised ones
  * - PaletteGroup:       One heading and its sections
  * - paletteGroups():    The registry's elements, grouped and categorised
@@ -56,6 +58,8 @@ export interface PaletteEntry {
   readonly label?: string;
   /** Its `<api description>`, shown beneath; absent when it declares none. */
   readonly description?: string;
+  /** Its `<api icon>`, as written; absent when it declares none, and the tile shows its category's. */
+  readonly icon?: string;
 }
 
 /** One category's entries within a group, in registry order. */
@@ -114,7 +118,13 @@ export function paletteGroups(registry: ManifestRegistry): PaletteGroup[] {
     if (category !== undefined && !rank.has(category)) rank.set(category, rank.size);
     const label = shown(api.label);
     const description = shown(api.description);
-    const entry: PaletteEntry = { tag, ...(label !== undefined ? { label } : {}), ...(description !== undefined ? { description } : {}) };
+    const icon = shown(api.icon);
+    const entry: PaletteEntry = {
+      tag,
+      ...(label !== undefined ? { label } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(icon !== undefined ? { icon } : {}),
+    };
     placed.push({ title, category, entry });
   }
 

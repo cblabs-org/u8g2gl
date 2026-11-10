@@ -7,11 +7,11 @@
  * Purpose: The Palette in the real shell (ui_spec §6): the activity bar
  *          switches the primary sidebar between the Explorer and the Palette;
  *          the Palette lists the departures project's elements in their three
- *          groups, filed by category, from its manifests, as 56 px icon tiles
- *          whose tooltip (on hover and on focus) shows the label, the tag and
- *          the description; the arrow keys move between tiles; its filter
- *          matches a description; a keystroke, a drag or a tooltip re-renders
- *          none of it; and a tag
+ *          groups, filed by category, from its manifests, as 56 px icon tiles,
+ *          each showing its manifest's own icon, whose tooltip (on hover and
+ *          on focus) shows the label, the tag and the description; the arrow
+ *          keys move between tiles; its filter matches a description; a
+ *          keystroke, a drag or a tooltip re-renders none of it; and a tag
  *          dragged onto the canvas is inserted there as one new line and one
  *          undo stop, selected, or refused with the reason and nothing written.
  * Description: The departures project, which declares three widgets of its
@@ -57,10 +57,13 @@ test('the activity bar shows the Palette: three groups from the manifests, filed
   await expect(palette.locator('[data-group="Drawing"] .palette-category h3')).toHaveText(['Drawing']);
   await expect(palette.locator('[data-group="Framework"] .palette-category h3')).not.toHaveCount(0);
 
-  // --- A tile: its icon over its label; a project widget's icon is its category's ---
+  // --- A tile: its icon over its label; a project widget's icon is its manifest's own ---
   const serviceList = palette.locator('.palette-tag[data-tag="wd_service_list"]');
   await expect(serviceList.locator('.palette-label')).toHaveText('Service list');
-  await expect(serviceList.locator('svg.icon')).toHaveAttribute('data-icon', 'type');
+  // Each declares `<api icon>` (schema 0.6), so none shows its category's.
+  await expect(serviceList.locator('svg.icon')).toHaveAttribute('data-icon', 'table');
+  await expect(palette.locator('.palette-tag[data-tag="wd_train_formation"] svg.icon')).toHaveAttribute('data-icon', 'train-front');
+  await expect(palette.locator('.palette-tag[data-tag="wd_probe_box"] svg.icon')).toHaveAttribute('data-icon', 'square-dashed-bottom');
   await expect(palette.locator('.palette-tag[data-tag="u8g2gl_label"] svg.icon')).toHaveAttribute('data-icon', 'text-cursor');
   await expect(palette.locator('svg.icon[data-icon-missing]')).toHaveCount(0);
   const box = await serviceList.boundingBox();

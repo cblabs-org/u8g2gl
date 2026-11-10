@@ -61,13 +61,13 @@ Its owner approval, including the schema bump, is recorded in its status log (ru
 
 # WO3 — icons in the data (`u8g2gl-s2/wo3-icons`)
 
-- [ ] Ruling 5: add `icon=` to all 16 framework manifests in `include/u8g2gl/manifests/`, each
+- [x] Ruling 5: add `icon=` to all 16 framework manifests in `include/u8g2gl/manifests/`, each
       the same icon E-2e's `designer/src/palette/palette-icons.ts` map gives it today, and to the
       fixture's three project widgets (and the demo/example copies of them, wherever they live).
-- [ ] The Palette reads `icon` from the manifest. Lookup: the declared `icon`, then the category
+- [x] The Palette reads `icon` from the manifest. Lookup: the declared `icon`, then the category
       icon, then `puzzle`. Delete the tag → icon map and its exception note; no framework tag is
       named in designer code afterwards. Grep to show it.
-- [ ] Unit tests on the lookup, plus an e2e test that a project widget with `icon=` shows that
+- [x] Unit tests on the lookup, plus an e2e test that a project widget with `icon=` shows that
       icon. The Palette still does not re-render on a keystroke or a drag.
 
 # WO4 — docs, review, evidence (`u8g2gl-s2/wo4-docs-review`)
