@@ -39,6 +39,16 @@ table does not name, or a version here drifts from the lock file.
 `@types/trusted-types`, also in that tree, is TypeScript type declarations
 only: no code from it reaches the bundle, so it is not redistributed.
 
+## Icons: Lucide, vendored
+
+The designer draws its icons from [Lucide](https://lucide.dev), **vendored**:
+it is not an npm dependency, and nothing is fetched at run time. Updating it
+is a deliberate change made with `scripts/update-icons.mjs`.
+
+| Component | Version | Licence | How U8G2GL uses it |
+|---|---|---|---|
+| [Lucide](https://github.com/lucide-icons/lucide), as the `lucide-static` package | 1.61.0 | **ISC**. The icons Lucide derived from [Feather](https://github.com/feathericons/feather), listed in its licence, are also under Feather's **MIT** licence. | `scripts/update-icons.mjs` generates two files from the package: `cli/src/data/icons.json`, the icon **names** only (and Lucide's aliases for renamed icons), and `designer/src/icons/lucide-sprite.svg`, the icons' path data as one SVG sprite, which the designer bundle carries as an asset (`designer/assets/lucide-sprite-*.svg` in the package). Lucide's licence text, with Feather's, verbatim, is in `LICENSES/lucide-ISC.txt` (`cli/LICENSES/` in this repository). |
+
 ## Fonts and images
 
 Converting a font does not change its licence. A font compiled from a BDF
