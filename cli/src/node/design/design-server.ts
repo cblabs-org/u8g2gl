@@ -42,7 +42,7 @@
  *
  * Exports:
  * - LOOPBACK:              The one address the server binds
- * - DesignServerOptions:   Project, port, token
+ * - DesignServerOptions:   Project, port, token, designer root and the file opener
  * - JsonRoute:             A registered JSON route's handler
  * - DesignServer:          A running server
  * - startDesignServer():   Start one
@@ -395,7 +395,7 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       sendError(response, located);
       return;
     }
-    // --- Step 3: For open, a file type that cannot run ---
+    // --- Step 3: For open, a file type that cannot run; and an opener to run it ---
     // The platform opener runs a file that is executable by type, and the
     // token can write any name, so only the allowlisted types are handed on —
     // judged on the requested name and on the real path, so a `.cpp` symlink
@@ -406,6 +406,8 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       sendJson(response, 403, { code: 'not-openable', message: `'${parsed.path}' is not a source or asset file type, so it is not opened.` });
       return;
     }
+    // A server started without an opener (every test's, unless it hands one
+    // in) starts nothing, whatever it is asked.
     const opener = options.opener;
     if (opener === undefined) {
       sendJson(response, 501, { code: 'unavailable', message: 'this server opens no programs' });

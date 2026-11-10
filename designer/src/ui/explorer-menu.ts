@@ -26,8 +26,11 @@ import { isCppSource, revealLabel } from './file-actions';
 export interface EntryCommands {
   /** Shows a file: an editor tab for a document, a read-only tab otherwise. */
   readonly view: (path: string) => void;
+  /** Hands the entry's own file (its `path`) to the author's editor. */
   readonly openInEditor: (path: string) => void;
+  /** Shows the entry's own file in the file manager. */
   readonly reveal: (path: string) => void;
+  /** Copies the entry's own file's project-relative path. */
   readonly copyPath: (path: string) => void;
 }
 

@@ -30,6 +30,7 @@ import type { MenuItem } from './menu-item';
 interface ContextMenuProps {
   /** The menu's accessible name. */
   readonly label: string;
+  /** The entries, top to bottom; an entry with `items` opens a submenu. */
   readonly items: readonly MenuItem[];
   /** Where the menu's top-left corner goes, in viewport pixels. */
   readonly x: number;
@@ -49,9 +50,9 @@ export function ContextMenu(props: ContextMenuProps): React.JSX.Element {
   const root = useRef<HTMLDivElement>(null);
   const { onClose } = props;
 
-  // --- Dismissal: a pointer-down outside, or the window losing focus ---
-  // Capture phase, so a click that lands on something that stops propagation
-  // still closes the menu first.
+  // Dismissal: a pointer-down outside, or the window losing focus. Capture
+  // phase, so a click that lands on something that stops propagation still
+  // closes the menu first.
   useEffect(() => {
     const onPointerDown = (event: PointerEvent): void => {
       if (root.current !== null && !root.current.contains(event.target as Node)) onClose(false);

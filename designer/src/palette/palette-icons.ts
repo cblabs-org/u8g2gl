@@ -16,11 +16,13 @@
  * Exports:
  * - FRAMEWORK_TAG_ICONS:  Each framework element's icon (temporary; see below)
  * - CATEGORY_ICONS:       Each framework category's icon
- * - FALLBACK_ICON:        The icon of last resort
+ * - FALLBACK_ICON:        The icon of last resort (`icon-names.ts`'s, re-exported)
  * - paletteIcon():        A tile's icon, by the lookup order
  */
 
-import { resolveIcon } from '../icons/icon-names';
+import { FALLBACK_ICON, resolveIcon } from '../icons/icon-names';
+
+export { FALLBACK_ICON };
 
 /**
  * Each framework element's icon, by tag.
@@ -52,7 +54,7 @@ export const FRAMEWORK_TAG_ICONS: ReadonlyMap<string, string> = new Map([
 ]);
 
 /**
- * The framework's six categories' icons. A category is data an author can
+ * The framework's categories' icons. A category is data an author can
  * write too; one this table does not know falls to {@link FALLBACK_ICON}.
  */
 export const CATEGORY_ICONS: ReadonlyMap<string, string> = new Map([
@@ -63,9 +65,6 @@ export const CATEGORY_ICONS: ReadonlyMap<string, string> = new Map([
   ['Layout', 'layout-template'],
   ['Text', 'type'],
 ]);
-
-/** The icon of last resort: an element with no icon and no known category. */
-export const FALLBACK_ICON = 'puzzle';
 
 /**
  * @brief The icon a Palette tile shows.

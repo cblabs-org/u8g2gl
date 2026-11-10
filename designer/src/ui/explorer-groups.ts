@@ -25,6 +25,7 @@
  */
 
 import { classifyProjectFile } from '../project/project-model';
+import { isCppSource } from './file-actions';
 
 /** One Explorer row. */
 export interface ExplorerEntry {
@@ -44,9 +45,6 @@ export interface ExplorerGroup {
   readonly title: 'Project' | 'Screens' | 'Widgets' | 'Assets' | 'Other files';
   readonly entries: readonly ExplorerEntry[];
 }
-
-/** A widget's C++ sources, which its entry carries rather than lists. */
-const WIDGET_SOURCE_EXTENSIONS: readonly string[] = ['.cpp', '.cc', '.hpp', '.h'];
 
 /**
  * The asset files a project declares in `globals.xml`: BDF fonts, and XBM and
@@ -116,7 +114,8 @@ export function groupFiles(files: readonly string[]): ExplorerGroup[] {
   const sourcesByManifest = new Map<string, string[]>();
   const attached = new Set<string>();
   for (const path of files) {
-    if (!WIDGET_SOURCE_EXTENSIONS.includes(extensionOf(path))) continue;
+    // A widget's C++ sources, which its entry carries rather than lists.
+    if (!isCppSource(path)) continue;
     const directory = directoryOf(path);
     const owners = manifestsByDirectory.get(directory);
     if (owners === undefined || owners.length === 0) continue;

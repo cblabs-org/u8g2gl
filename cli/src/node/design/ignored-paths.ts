@@ -9,8 +9,8 @@
  *          `generated/` is the generator's output ([D-11]), written by
  *          `u8g2gl generate`, not by hand, and `generated_editor/` is the same
  *          for `--target editor` (the editor registry and scene); `.git/` and
- *          `node_modules/` belong to other tools; the lock file is this server's own state. Watching them
- *          would flood the editor with events it has no use for, and letting
+ *          `node_modules/` belong to other tools; the lock file is this
+ *          server's own state. Watching them would flood the editor with events it has no use for, and letting
  *          the editor write them would let a token holder plant a git hook.
  * Description: A path is ignored when its first segment is one of the ignored
  *              directories, or it is the lock file at the project root.
@@ -23,11 +23,11 @@
 /** The design server's lock file, at the project root. */
 export const LOCK_FILE_NAME = '.u8g2gl-design.lock';
 
-/** Top-level directories that are never project source. */
 // `generated_editor` sits beside `generated` for the same reason: it is
 // regenerated output, so listing it in the Explorer offers an author files whose
 // edits the next `generate` silently discards, and watching it turns every
 // regeneration into a burst of change events for files nobody has open.
+/** Top-level directories that are never project source. */
 const IGNORED_DIRECTORIES: readonly string[] = ['generated', 'generated_editor', '.git', 'node_modules'];
 
 /**

@@ -23,6 +23,7 @@
  * - EditorCommand:          A program and its leading arguments
  * - parseEditorCommand():   Split an editor command line, once
  * - SpawnProgram:           Starts a program; resolves once it has started
+ * - FileOpenerOptions:      A FileOpener's editor, platform and spawner
  * - spawnDetached():        The real SpawnProgram
  * - Launch:                 One program start: the command and its arguments
  * - FileOpener:             Opens and reveals files
@@ -150,6 +151,10 @@ export class FileOpener {
       // Matched on the program's base name, so `/usr/local/bin/code` and
       // Windows' `code.cmd` both count; any other editor's line syntax is
       // unknown, so it is given the path alone rather than a guess.
+      // On Windows, `spawn` with no shell cannot start a `.cmd` or `.bat`
+      // file, and VS Code's `code` is one: there, `--editor` must name the
+      // editor's executable (`Code.exe`), which takes the same `-g`. Starting
+      // a shell to run the `.cmd` would undo the no-shell rule above.
       const name = basename(command).replace(/\.(cmd|exe)$/i, '').toLowerCase();
       const file = line !== undefined && GOTO_EDITORS.includes(name) ? ['-g', `${absolute}:${line}`] : [absolute];
       return { command, args: [...args, ...file] };
@@ -178,6 +183,8 @@ export class FileOpener {
   /**
    * @brief Starts the editor on a file.
    *
+   * @param absolute The file's absolute path, already validated by the server.
+   * @param line     1-based; only `code`, `code-insiders` and `cursor` are given it.
    * @return Resolves once started; rejects if the program could not be.
    */
   open(absolute: string, line?: number): Promise<Launch> {
@@ -187,6 +194,7 @@ export class FileOpener {
   /**
    * @brief Shows a file in the file manager.
    *
+   * @param absolute The file's absolute path, already validated by the server.
    * @return Resolves once started; rejects if the program could not be.
    */
   reveal(absolute: string): Promise<Launch> {

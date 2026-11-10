@@ -94,6 +94,7 @@ export class FileActions {
   /**
    * @brief Asks the server to show a project file in the file manager.
    *
+   * @param path Project-relative.
    * @return Whether the server started it; a refusal is logged.
    */
   reveal(path: string): Promise<boolean> {
@@ -103,6 +104,7 @@ export class FileActions {
   /**
    * @brief Copies a project-relative path to the clipboard.
    *
+   * @param path Project-relative.
    * @return Whether it was copied; the clipboard can refuse (no focus, no
    *         permission), which is logged.
    */

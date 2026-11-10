@@ -26,6 +26,8 @@
  *              Usage: node scripts/update-icons.mjs <lucide-static-X.Y.Z.tgz>
  *
  * Exports:
+ * - ICONS_JSON:         The name list's path, for the validator
+ * - SPRITE:             The sprite's path, for the designer
  * - pascalCase():       Lucide's export name for a kebab-case icon name
  * - readLucide():       The icon set from an extracted package directory
  * - droppedNames():     Names in the current list the new set lacks
@@ -124,6 +126,7 @@ export function readLucide(packageDir) {
  *
  * @param current The current `icons.json`, parsed, or undefined for none.
  * @param next    `readLucide()`'s result.
+ * @return The dropped names, sorted; empty when nothing is dropped.
  */
 export function droppedNames(current, next) {
   if (current === undefined) return [];
@@ -131,7 +134,11 @@ export function droppedNames(current, next) {
   return [...current.names, ...Object.keys(current.aliases)].filter((name) => !known(name)).sort(compareCodeUnits);
 }
 
-/** @brief The text of `cli/src/data/icons.json`: names and aliases, sorted. */
+/**
+ * @brief The text of `cli/src/data/icons.json`: names and aliases, sorted.
+ *
+ * @param set `readLucide()`'s result.
+ */
 export function renderIconsJson(set) {
   const aliases = Object.fromEntries([...set.aliases].sort(([a], [b]) => compareCodeUnits(a, b)));
   return `${JSON.stringify({ source: 'lucide-static', version: set.version, names: [...set.icons.keys()], aliases }, null, 2)}\n`;
@@ -141,6 +148,8 @@ export function renderIconsJson(set) {
  * @brief The text of the designer's sprite: one `<symbol>` per canonical icon,
  *        one per line, with no presentation attributes — the designer's
  *        `<Icon>` sets stroke and fill on the `<svg>` that uses it.
+ *
+ * @param set `readLucide()`'s result.
  */
 export function renderSprite(set) {
   const lines = [

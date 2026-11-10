@@ -25,6 +25,7 @@
  * Exports:
  * - DesignArgs:            The parsed command line
  * - parseDesignArgs():     Parse it
+ * - resolveEditorCommand(): --editor, else U8G2GL_EDITOR, split once
  * - DesignSession:         Started (with a stop function) or attached
  * - startOrAttach():       Attach to a live server or start one, taking the lock
  * - runDesignCommand():    The command: output, browser, signals

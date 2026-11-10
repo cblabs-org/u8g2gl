@@ -85,7 +85,8 @@ export class Workspace {
 
   /**
    * @param fs      The served project file system, connected.
-   * @param session The server and token, for builds and the Wasm route.
+   * @param session The server and token: for builds, the Wasm route, and the
+   *                Explorer's open and reveal requests, through `session`.
    */
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
     this.session = session;

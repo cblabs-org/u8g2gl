@@ -16,6 +16,7 @@
  *
  * Exports:
  * - ICON_SET_VERSION:  The vendored Lucide version
+ * - FALLBACK_ICON:     The generic icon, for anything with none of its own
  * - resolveIcon():     A name's sprite symbol, or undefined if unknown
  */
 
@@ -23,6 +24,9 @@ import ICONS from '@u8g2gl/data/icons.json' with { type: 'json' };
 
 /** The vendored Lucide version. */
 export const ICON_SET_VERSION: string = ICONS.version;
+
+/** The generic icon: an unknown name draws it, and the Palette's lookup ends on it. */
+export const FALLBACK_ICON = 'puzzle';
 
 const CANONICAL: ReadonlySet<string> = new Set(ICONS.names);
 const ALIASES: ReadonlyMap<string, string> = new Map(Object.entries(ICONS.aliases));

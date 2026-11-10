@@ -22,7 +22,7 @@
  */
 
 import SPRITE_URL from './lucide-sprite.svg?url';
-import { resolveIcon } from './icon-names';
+import { FALLBACK_ICON, resolveIcon } from './icon-names';
 
 /** The {@link Icon}'s properties. */
 interface IconProps {
@@ -32,9 +32,6 @@ interface IconProps {
   readonly size?: number;
   readonly className?: string;
 }
-
-/** The fallback for a name the set does not have. */
-const FALLBACK = 'puzzle';
 
 /** @brief One icon. Decorative: the label beside it carries the meaning. */
 export function Icon({ name, size = 24, className }: IconProps): React.JSX.Element {
@@ -52,10 +49,10 @@ export function Icon({ name, size = 24, className }: IconProps): React.JSX.Eleme
       strokeLinejoin="round"
       aria-hidden="true"
       focusable="false"
-      data-icon={symbol ?? FALLBACK}
+      data-icon={symbol ?? FALLBACK_ICON}
       data-icon-missing={symbol === undefined ? name : undefined}
     >
-      <use href={`${SPRITE_URL}#${symbol ?? FALLBACK}`} />
+      <use href={`${SPRITE_URL}#${symbol ?? FALLBACK_ICON}`} />
     </svg>
   );
 }
