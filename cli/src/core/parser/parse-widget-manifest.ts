@@ -27,7 +27,9 @@
  *              else: whether a value is allowed (its length, an empty value,
  *              a 0.4 project using it at all) is the schema pass's question,
  *              so this parser keeps whatever was written for that pass to
- *              judge.
+ *              judge. Schema 0.6's `icon` on `<api>` is read the same way,
+ *              trimmed and located; whether the name exists is again the
+ *              schema pass's question.
  *
  * Exports:
  * - parseWidgetManifest: Transform a parsed RawXmlElement into a WidgetManifest model
@@ -259,6 +261,7 @@ export function parseWidgetManifest(
     bindings,
     elements,
     ...(apiEl ? parsePaletteMetadata(apiEl) : {}),
+    ...(apiEl ? parseIcon(apiEl) : {}),
     loc: apiEl?.loc,
   };
 
@@ -336,6 +339,18 @@ function parsePaletteMetadata(apiEl: RawXmlElement): ParsedPaletteMetadata {
   }
   if (Object.keys(locs).length > 0) parsed.metadataLocs = locs;
   return parsed;
+}
+
+// parseIcon
+// Reads schema 0.6's `icon` from an `<api>`, trimmed, with where it was
+// written. As with the palette metadata, an empty value is kept as '' for the
+// schema pass to refuse, and an absent one leaves both fields absent.
+//   apiEl — the `<api>` element
+function parseIcon(apiEl: RawXmlElement): Pick<ApiBlock, 'icon' | 'iconLoc'> {
+  const value = getAttributeValue(apiEl, 'icon');
+  const iconLoc = getAttributeLocation(apiEl, 'icon');
+  if (value === undefined || iconLoc === undefined) return {};
+  return { icon: value.trim(), iconLoc };
 }
 
 /**

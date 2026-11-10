@@ -385,11 +385,21 @@ export const DIAGNOSTIC_CODES = {
    */
   INVALID_PALETTE_METADATA: 'U8G2GL_INVALID_PALETTE_METADATA',
   /**
+   * An `<api icon>` (schema 0.6) is not an icon the Palette can draw: empty
+   * once trimmed, not lowercase kebab-case, longer than 48 characters, or a
+   * name the vendored Lucide set (`data/icons.json`) has neither as a name
+   * nor as an alias. Located at the value. An unknown name carries the one
+   * close match as its suggestion when there is exactly one, so `--json`
+   * consumers can apply it; with several, none is guessed.
+   */
+  INVALID_ICON: 'U8G2GL_INVALID_ICON',
+  /**
    * A project's own manifest uses vocabulary newer than the schema version the
-   * project declares — today `label`, `category` or `description` on `<api>`,
-   * which arrived in 0.5, in a `schema="0.4"` project (§15.4). One diagnostic
-   * per attribute, located at the attribute's name, the message naming
-   * `schema="0.5"` as the fix. Never silently accepted: an older version is a
+   * project declares — `label`, `category` or `description` on `<api>`, which
+   * arrived in 0.5, in a `schema="0.4"` project, or `icon`, which arrived in
+   * 0.6, in a 0.4 or 0.5 one (§15.4). One diagnostic per attribute, located at
+   * the attribute's name, the message naming the version that has it as the
+   * fix. Never silently accepted: an older version is a
    * promise about which vocabulary the files use. No suggestion is carried,
    * because the fix is in `u8g2gl.xml`, not at the attribute reported.
    */

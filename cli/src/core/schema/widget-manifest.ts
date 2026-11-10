@@ -27,7 +27,8 @@
  * Exports:
  * - WidgetManifest: Root widget manifest model parsed from widget XML declarations
  * - ApiBlock: Public API declaration block defining properties, bindings, elements,
- *             and the Palette's label, category and description (schema 0.5)
+ *             the Palette's label, category and description (schema 0.5), and
+ *             its icon (schema 0.6)
  * - PaletteMetadataKey: The three `<api>` palette metadata attribute names
  * - PALETTE_METADATA_KEYS: Those names, the one list the parser and validator share
  * - PaletteMetadataLocations: Where an `<api>`'s palette metadata was written
@@ -112,6 +113,20 @@ export interface ApiBlock {
    * value is reported at the attribute rather than at `<api>`.
    */
   readonly metadataLocs?: PaletteMetadataLocations;
+  /**
+   * The icon the Palette draws for the element, e.g. "train-front" (schema
+   * 0.6): a name, or an alias, from the vendored Lucide set
+   * (`data/icons.json`). Trimmed as parsed; the schema pass holds it to
+   * lowercase kebab-case, at most 48 characters, and a name the set has.
+   *
+   * Like the palette fields above it is not inherited through `extends`,
+   * and it reaches no generated code. It is kept apart from them because its
+   * rule is different: it names something that must exist, where they are
+   * free text.
+   */
+  readonly icon?: string;
+  /** Where `icon` was written, present exactly when `icon` is. */
+  readonly iconLoc?: AttributeLocation;
   /** Source location where the API block was declared. */
   readonly loc?: SourceLocation;
 }
