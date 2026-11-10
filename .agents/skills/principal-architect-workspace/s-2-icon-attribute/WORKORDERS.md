@@ -49,14 +49,14 @@ Its owner approval, including the schema bump, is recorded in its status log (ru
 
 # WO2 — versions (`u8g2gl-s2/wo2-versions`)
 
-- [ ] Runtime schema minor 6, runtime 0.12.0 (header, `CMakeLists.txt`, `library.json` and any
+- [x] Runtime schema minor 6, runtime 0.12.0 (header, `CMakeLists.txt`, `library.json` and any
       other place S-1 bumped), CLI 0.16.0 (ruling 3).
-- [ ] Move the fixtures to 0.6, keeping one 0.5 fixture to prove 0.5 still validates.
-- [ ] Regenerate the goldens. Diff them and report that **only** version-stamp lines moved; any
+- [x] Move the fixtures to 0.6, keeping one 0.5 fixture to prove 0.5 still validates.
+- [x] Regenerate the goldens. Diff them and report that **only** version-stamp lines moved; any
       other change stops the work.
-- [ ] A `ChangeLog` entry for 0.12, in the existing U8G2 format, recording the U8G2 version
+- [x] A `ChangeLog` entry for 0.12, in the existing U8G2 format, recording the U8G2 version
       tested against.
-- [ ] C++ tests, including the version-guard tests. Sync the xtensa corpus and ctl_corpus stamps
+- [x] C++ tests, including the version-guard tests. Sync the xtensa corpus and ctl_corpus stamps
       as S-1 did; do not install PlatformIO platforms.
 
 # WO3 — icons in the data (`u8g2gl-s2/wo3-icons`)

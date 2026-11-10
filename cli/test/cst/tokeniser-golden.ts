@@ -41,6 +41,8 @@
  *              `description` were added to each framework manifest's own
  *              `<api>` line, where only the closing `>` follows them, so the
  *              record gains those three attributes and nothing else moves.
+ *              Schema 0.6's move from `"0.5"` to `"0.6"` is a third, of the
+ *              same same-length kind.
  *
  * Exports:
  *   Golden shapes:

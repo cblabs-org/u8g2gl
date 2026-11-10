@@ -78,7 +78,7 @@ import { iconValueProblem } from './icon-rules.js';
  * still validates; what it may not do is use a later version's additions,
  * which sections 7 and 8 report.
  */
-const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', CURRENT_SCHEMA_VERSION, '0.6']);
+const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', '0.5', CURRENT_SCHEMA_VERSION]);
 
 /** The first schema version whose `<api>` may carry palette metadata. */
 const PALETTE_METADATA_SINCE = '0.5';

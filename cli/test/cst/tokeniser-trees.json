@@ -7776,7 +7776,7 @@
   },
   {
    "file": "cli/test/generator/fixtures/emit-project/u8g2gl.xml",
-   "sha256": "fb77defbfd9eccc5851285c97f7420fc9ddfeda0f7f54be1bacf2c93ebf73d52",
+   "sha256": "d70db7db922e892de996b43a13737cd5b0bf14242dfe183c397d6bba4d1cc31f",
    "root": {
     "name": "u8g2gl",
     "loc": "9:1",
@@ -7784,7 +7784,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "9:17",
       "9:9"
      ],
@@ -8134,7 +8134,7 @@
   },
   {
    "file": "cli/test/integration/fixtures/broken-project/u8g2gl.xml",
-   "sha256": "382cbae18efc548d5ddd9e58d8345f7a358f4baf9d2a8d5a315be695a6f704ad",
+   "sha256": "43e1208b715056cd22820c01ea14e9ce64d16d3aea23472e7997dd2c78198c34",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -8142,7 +8142,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "2:17",
       "2:9"
      ],
@@ -9101,7 +9101,7 @@
   },
   {
    "file": "cli/test/parser/fixtures/unknown-elements.xml",
-   "sha256": "08d291af5baff9698c3e13dbf676663747adef7f8dc4f72ba3a9e5074adf1c18",
+   "sha256": "5c033e8766b58843ff651e84e61e6bb361ddb789407f313456b27755ef8628e7",
    "root": {
     "name": "u8g2gl",
     "loc": "3:1",
@@ -9109,7 +9109,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "3:17",
       "3:9"
      ],
@@ -10102,7 +10102,7 @@
   },
   {
    "file": "cli/test/parser/fixtures/valid-project.xml",
-   "sha256": "7eaa1506d44349d793ac1a009682fd8864fa9a043567f5d3a825aad1e1f82081",
+   "sha256": "29affe5b06fe87db7c0d793eca0326bc3eec7adfb3338028b30ea34390960dd0",
    "root": {
     "name": "u8g2gl",
     "loc": "3:1",
@@ -10110,7 +10110,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "3:17",
       "3:9"
      ],
@@ -11646,7 +11646,7 @@
   },
   {
    "file": "cli/test/validator/fixtures/invalid/page-mode-display.xml",
-   "sha256": "f3f83b235a205747329437c15723307399bf369e948ff018960caeea8122556b",
+   "sha256": "548d6d6e41634ea3df8a3169424ca41144934963aaa61d59acdccd5a8e230e66",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -11654,7 +11654,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "2:17",
       "2:9"
      ],
@@ -11708,7 +11708,7 @@
   },
   {
    "file": "cli/test/validator/fixtures/invalid/unknown-display.xml",
-   "sha256": "befde06a50381aa97fbd150e98f72a8650db05d969f9a860ebbd6bcb37252b84",
+   "sha256": "75903cb38e7e41a29f650a433874a4a7624e37c39ef6a8c26fa7d320e44daa07",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -11716,7 +11716,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "2:17",
       "2:9"
      ],
@@ -18573,7 +18573,7 @@
   },
   {
    "file": "test/generated_fixture/u8g2gl.xml",
-   "sha256": "60c4443a05f33ec4d6be860cd1d52c2950689d626c857a356a7363c9f50160e8",
+   "sha256": "d9d749f59c1d06e6695252dd12d6d3e1bf1acb3c1c80ba18b9f3d88cfefaeff6",
    "root": {
     "name": "u8g2gl",
     "loc": "14:1",
@@ -18581,7 +18581,7 @@
     "attributes": [
      [
       "schema",
-      "0.5",
+      "0.6",
       "14:17",
       "14:9"
      ],

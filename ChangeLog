@@ -8,6 +8,19 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-10	runtime v0.12.xx	U8G2GL
+  * 0.12.0: Implements schema 0.6 (U8G2GL_SCHEMA_VERSION_MINOR 6). Schema
+    0.6 adds only an optional icon on <api>, which the designer's Palette
+    draws and no generated file carries, so the runtime's behaviour is
+    unchanged. Code generated for schema 0.5 must be regenerated, because
+    the schema guard compares the minor exactly while the major is 0.
+    Built and tested against U8G2 2.36.18.
+2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.0: Schema 0.6: <api icon="..."> names the widget's Palette icon
+    from the vendored Lucide set, by name or alias, with a "did you mean"
+    for a near miss. The validator accepts 0.4, 0.5 and 0.6; a 0.4 or 0.5
+    project using icon is told to declare 0.6. Generated code requires
+    runtime 0.12.0.
 2026-11-03	runtime v0.11.xx	U8G2GL
   * 0.11.1: The runtime version check compares PATCH as well as MINOR:
     U8G2GL_REQUIRE_RUNTIME_AT_LEAST(major, minor, patch), which the
