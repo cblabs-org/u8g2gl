@@ -1,6 +1,6 @@
 # S-2: Schema 0.6 — `icon=` on `<api>`
 
-**Base:** `main` @ `29f976a` (#44 merged). Runtime 0.11.1, CLI 0.15.2. **Runs after E-2e merges**, on a fresh worktree from that merge.
+**Base:** `main` @ `fa96254` (E-2e, #45, merged). Runtime 0.11.1, CLI 0.15.3. **Worktree:** `../U8G2GL-s2`. **Runs after E-2e merges**, on a fresh worktree from that merge.
 
 ## Owner decisions and approval
 
@@ -73,3 +73,4 @@ The owner then answered the plan, in their own words:
 | Date | Entry |
 |---|---|
 | 2026-11-09 | Owner approved the E-2e + S-2 plan: "Approved, proceed", including this schema bump. Waits on E-2e. |
+| 2026-11-10 | E-2e merged as #45 (`fa96254`, merge commit). PA created worktree `../U8G2GL-s2` from it, branch `u8g2gl-s2/wo1-schema`; checked that `table`, `train-front` and `square-dashed-bottom` are in the vendored set. Worker spawned on WO1–WO4. |
