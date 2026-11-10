@@ -72,13 +72,129 @@ Its owner approval, including the schema bump, is recorded in its status log (ru
 
 # WO4 — docs, review, evidence (`u8g2gl-s2/wo4-docs-review`)
 
-- [ ] Ruling 6's docs: design_spec §15.4 (0.6 is additive), the schema reference wherever
+- [x] Ruling 6's docs: design_spec §15.4 (0.6 is additive), the schema reference wherever
       `<api>`'s attributes are listed, ui_spec §15's status column (icons **done, 0.6**), and
       EDITOR-DESIGN §8. The README or getting-started schema version, if one is stated.
-- [ ] Spawn the `readability-reviewer` on S-2's diff against `fa96254`. Resolve P1–P3, and
+- [x] Spawn the `readability-reviewer` on S-2's diff against `fa96254`. Resolve P1–P3, and
       decide P4 with reasons.
-- [ ] A screenshot under `tmp/s2/` of the Palette with the project widgets showing their own
+- [x] A screenshot under `tmp/s2/` of the Palette with the project widgets showing their own
       icons.
-- [ ] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
+- [x] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
       then `build:e2e`; designer unit; e2e; production and its no-hook grep;
       `check-package.mjs`. Then write a completion report at the end of this file.
+
+# Completion report (worker, 2026-11-10)
+
+**Provenance.** Read from PROJECT.md's status log before work began: the owner's "Approved, proceed" of 2026-11-09, covering the schema bump. The PA's 2026-11-10 entry spawns this worker on WO1–WO4.
+
+## Commits
+
+Each branch is cut from the one before. Nothing is pushed, tagged or published.
+
+| WO | Branch | Commits |
+|---|---|---|
+| WO1 | `u8g2gl-s2/wo1-schema` | `a9cdc17` |
+| WO2 | `u8g2gl-s2/wo2-versions` | `da220c7` |
+| WO3 | `u8g2gl-s2/wo3-icons` | `8077899` |
+| WO4 | `u8g2gl-s2/wo4-docs-review` | `9ccc4a4` (docs), `1526ff1` (review fixes), and this report |
+
+## Versions
+
+| | Before | After |
+|---|---|---|
+| Schema | 0.5 | 0.6 (0.4 and 0.5 still accepted; 0.3 still refused with its migration table) |
+| Runtime | 0.11.1 | 0.12.0 (`U8G2GL_SCHEMA_VERSION_MINOR` 6; header, `CMakeLists.txt`, `library.json`) |
+| CLI | 0.15.3 | 0.16.0 (`runtime-version.json` 0.12.0; `CURRENT_SCHEMA` 0.6) |
+
+`ChangeLog` has new `runtime v0.12.xx` and `cli v0.16.xx` entries. The runtime entry records U8G2 2.36.18.
+
+## Suites, before and after (one at a time)
+
+| Suite | Before (`78b1e97`) | After (`1526ff1`) |
+|---|---|---|
+| Home-path guard | self-test 11/11; clean | self-test 11/11; clean |
+| CLI `npm test` | 2710 passed, 23 skipped (125 files) | 2740 passed, 23 skipped (127 files) |
+| CLI lint and tsc | clean | clean |
+| Goldens (`test/generator`) | 276 passed | 279 passed |
+| C++ (Debug) | 515/515, 1 skipped (`SizeOfReport.ThirtyTwoBitTarget`); 0 warnings | the same; all 13 VersionGuard cases pass |
+| Wasm editor build; snapshot, placeholder, last-error | pass | pass |
+| `build:e2e` | builds | builds |
+| Designer unit | 157 passed | 159 passed |
+| `update-icons.test.mjs` | — | 7 passed |
+| Designer e2e | 79 passed, 1 failed (see below) | 80 passed |
+| Production build: no-hook grep / `test:e2e:production` | clean / 3 passed | clean / 3 passed |
+| `check-package.mjs` | PASS, 15,324,753 bytes, 762 files | PASS, 15,341,395 bytes, 767 files |
+
+- **The baseline e2e failure** was `drag-performance.spec.ts`'s timing gate (22 missed frames; p95 25.4 ms at 1×). It passed when rerun alone at once, and in the final run. Nothing in S-2 touches the canvas.
+- **Timing runs.** E2e ran 18:57–19:01, 19:01–19:02, 19:17 (Palette spec) and 19:24–19:27. `pmset -g log` shows no Sleep, DarkWake or Wake on 2026-11-10, so none is void.
+- **Package growth** is 5 files and 16.6 KB: `icon-rules.js` with its `.d.ts` and two maps, and `dist/data/icons.json`, which the validator now imports.
+
+## Goldens
+
+They were regenerated with `refresh-goldens.mjs` at WO2. 20 files changed, 26 lines in and 26 out, and **every one is a version stamp**:
+
+- `// schema: 0.5` → `0.6` (19 lines);
+- `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5)` → `(0, 6)` (2 lines);
+- `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 11, 1)` → `(0, 12, 0)` (2 lines);
+- the floor in the `#error` text, 0.11.1 → 0.12.0 (2 lines);
+- `"schema": "0.5"` → `"0.6"` in `ui_scene.json` (1 line).
+
+WO3 moved no golden; a refresh after it, and after WO4, leaves an empty diff. `icon-output.test.ts` proves ruling 4 for both fixtures and every target. The xtensa `corpus` and `ctl_corpus` were synced by the same stamp edits (their older two-argument runtime floor went 0.11 → 0.12). They were not compiled locally: the pinned PlatformIO platform is not installed.
+
+## WO1 notes
+
+- **New diagnostic code:** `U8G2GL_INVALID_ICON`. It covers empty, not lowercase kebab-case, over 48 characters, and unknown. A 0.4 or 0.5 project gets `NEWER_SCHEMA_REQUIRED` at the attribute's name, and the value is not judged.
+- **"One close match"** means exactly one canonical name within two edits (`findClosest` with a maximum of 2). At the helper's default of 3, most names have several neighbours among 1903. Aliases are accepted but never suggested. Examples: `train-frnt` → `train-front`, `puzle` → `puzzle`, `house-plux` → none (`house-plus` and `house-plug` tie).
+- **A malformed value** is reported once, for its shape. It is not also reported as unknown.
+- The rule lives in `cli/src/core/validator/icon-rules.ts`, which reads the same `icons.json` the designer's `icon-names.ts` does.
+
+## WO2 notes
+
+- **Kept 0.5 fixture:** `cli/test/integration/fixtures/valid-project`. `cli.test.ts` validates it through the built CLI, and a new test asserts it still declares 0.5. The validator's `valid` fixture stays at 0.4, as S-1 left it.
+- **Version guard:** `schema_0_5.cpp` became `schema_0_6.cpp` (`VersionGuard.SchemaZeroSixCompiles`). `stale_minor` still refuses 0.3, now against 0.6.
+- **Tokeniser records:** the 7 recorded fixtures that moved to 0.6 carry the same-length value edit and their new hashes, as S-1's did. `tokeniser-golden.ts` documents it.
+
+## WO3 notes
+
+- **Framework icons:** all 16 manifests carry exactly the icon E-2e's map gave them. The map was the source of the edit script.
+- **Fixture widgets:** `wd_service_list` `table`, `wd_train_formation` `train-front`, `wd_probe_box` `square-dashed-bottom`. `manifests.json` was rebuilt with `build:manifests`.
+- **Tokeniser records** for the 16 manifests gain the `icon` attribute and their new hashes; nothing else moves. The departures widgets have no record.
+- **The grep:** no framework tag appears in `designer/src` code. Three doc comments mention `u8g2gl_obj` or `u8g2gl_label` as examples; they predate S-2 and are not icon lookups (`panel-layout.ts`, `property-panel.tsx`, `element-names.ts`).
+- **The Palette's render counts** stay `typing 0, dragging 0, tooltip 0`.
+
+## Readability review
+
+No P1, P2 or P3. Of the four P4s:
+
+- **Accepted, three:** a repeated "same" in `tokeniser-golden.ts`, and re-wrapped paragraphs in `diagnostic.ts`, `palette.tsx` and `schema-guard.test.ts`.
+- **Declined, one:** shortening ui_spec's status cell to "icons 0.6". This work order asks for **done, 0.6**.
+
+The reviewer also made three observations without findings:
+
+- The "(S-2)" status tag in ui_spec, following S-1's.
+- The fixture-guarding test for the kept 0.5 project.
+- `generated-config.ts`'s historical "0.5's additive bump" comment, which is still accurate.
+
+None was changed.
+
+## Evidence
+
+Screenshots, taken headless and git-ignored:
+
+- `tmp/s2/palette-project-icons.png`: the Palette.
+- `tmp/s2/palette-project-group.png`: the Project group, where Service list shows `table`, Probe box `square-dashed-bottom` and Train formation `train-front`.
+
+`tmp/s2/golden-diff.patch` holds WO2's golden diff.
+
+## Deviations and findings
+
+1. **A second copy of the fixture widgets has no icons.** `cli/test/node/design/test-run/fixtures/widget-probe-0.4/` is deliberately a 0.4 project, where `icon=` would be `NEWER_SCHEMA_REQUIRED`. The PA-workspace evidence copy under `g-probe2-widgets/evidence/` is a frozen record. Neither was touched.
+2. **A necessary touch outside the literal boundary list:** `test/CMakeLists.txt` and `test/version_guard/`, renamed and restamped for 0.6 as S-1 did. `library.json` too, which CMake checks against the header.
+3. **S-1's `palette-metadata-output.test.ts` now declares 0.6.** The departures fixture's widgets carry `icon=`, which a 0.5 run refuses.
+4. **The ChangeLog has a CLI 0.16 entry beside the runtime 0.12 one.** `docs/RELEASING.md` starts a new entry per MINOR for each component.
+5. **The departures fixture's `generated/`** is not a golden. It was left stamped as it was, as in S-1.
+
+## Not verified
+
+- The xtensa corpora were not compiled; that needs the PlatformIO platform download.
+- Firefox and WebKit did not run, because the `@cross-browser` subset does not include `palette.spec.ts`.
