@@ -399,9 +399,9 @@ export const DIAGNOSTIC_CODES = {
    * arrived in 0.5, in a `schema="0.4"` project, or `icon`, which arrived in
    * 0.6, in a 0.4 or 0.5 one (§15.4). One diagnostic per attribute, located at
    * the attribute's name, the message naming the version that has it as the
-   * fix. Never silently accepted: an older version is a
-   * promise about which vocabulary the files use. No suggestion is carried,
-   * because the fix is in `u8g2gl.xml`, not at the attribute reported.
+   * fix. Never silently accepted: an older version is a promise about which
+   * vocabulary the files use. No suggestion is carried, because the fix is in
+   * `u8g2gl.xml`, not at the attribute reported.
    */
   NEWER_SCHEMA_REQUIRED: 'U8G2GL_NEWER_SCHEMA_REQUIRED',
 } as const;

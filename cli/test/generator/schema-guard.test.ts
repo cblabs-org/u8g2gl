@@ -7,9 +7,9 @@
  * Purpose: The generated schema guard asserts the schema the generator wrote
  *          for, not the one the project declares (rules/03-versioning.md).
  *          Every version the validator accepts is the current schema or an
- *          older, additive minor of it, so a project still declaring 0.4 or 0.5 must
- *          generate code the current runtime accepts — otherwise an additive
- *          bump breaks every project that has not re-declared.
+ *          older, additive minor of it, so a project still declaring 0.4 or
+ *          0.5 must generate code the current runtime accepts — otherwise an
+ *          additive bump breaks every project that has not re-declared.
  * Description: Generates the emit-project fixture declared as 0.4, 0.5 and 0.6:
  *              both guards read the current schema, and each file's
  *              `// schema` stamp keeps the declared version. Also checks the

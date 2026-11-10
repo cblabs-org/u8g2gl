@@ -14,8 +14,8 @@
  *              when a manifest's parse changes, so a keystroke or a drag
  *              re-renders nothing here. Each entry is a 56 px tile: its icon
  *              (its manifest's own, else its category's; `palette-icons.ts`)
- *              over its label, cut short with an ellipsis,
- *              or its tag when it has no label. A category heading is shown
+ *              over its label, cut short with an ellipsis, or its tag when
+ *              it has no label. A category heading is shown
  *              above its tiles, and the uncategorised come last with none.
  *              Each tile is an HTML drag source carrying its tag under
  *              `PALETTE_DRAG_TYPE`, which the canvas accepts.
