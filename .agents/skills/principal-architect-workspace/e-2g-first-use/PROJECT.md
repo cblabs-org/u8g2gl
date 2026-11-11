@@ -40,6 +40,21 @@ runtime change, and no golden moves.
 
 ### PA rulings
 
+**Amendment, 2026-11-11 (after WO4): WO5, selecting circles, ellipses and lines drawn by
+`hline`/`vline`.**
+- **The gap.** The worker found that `rectangleOf()` in `designer/src/pipeline/live-pipeline.ts`
+  gives circles, ellipses, hlines and vlines no rectangle. So they can't be selected, and ruling
+  3's resize for them is unreachable.
+- **The ruling.** `rectangleOf()` gains one last fallback: the box from the resolver's
+  `drawnExtent()`, where it returns `undefined` today. An hline or vline gets a one-pixel
+  thickness.
+- **The rule stays narrow:**
+  - The two existing paths are unchanged, so no element that is selectable today changes its
+    hit rectangle.
+  - `pipeline/live-pipeline.ts` joins the boundary for this fallback only.
+- **Why this is within the approval.** The owner approved circle and ellipse resize under ruling
+  3, and this only makes it reachable.
+
 1. **Icons (WO1).**
    - Each view draws an `<Icon>`: Explorer `files`, Palette `shapes`, Assets `image`, Fonts
      `type`, Sample data `database`, Flow `workflow`, Search `search`.
@@ -113,3 +128,4 @@ runtime change, and no golden moves.
 | Date | Entry |
 |---|---|
 | 2026-11-11 | Owner approved the E-2g plan: "Palette is fine. Approved to proceed autonomously." PA created worktree `../U8G2GL-e2g` from `60a4202`, branch `u8g2gl-e2g/wo1-activity-icons`, with `extern/u8g2` checked out at the pinned `d66b49a` from the main checkout's local module clone (no network, no config written). Worker spawned on WO1–WO4. |
+| 2026-11-11 | Worker completed WO1–WO4 (tip `1d546de`). It reported that circles, ellipses, hlines and vlines cannot be selected (`rectangleOf()` gives them no rectangle), so their resize is unreachable. PA added WO5 under the amendment above, as a narrow fallback that changes no selectable element's rectangle, and resumed the worker on it. |

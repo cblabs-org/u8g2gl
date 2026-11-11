@@ -98,6 +98,24 @@ The owner's approval is recorded in its status log (rule 00). Read
       `check-package.mjs`. Then write a completion report at the end of this file: commits,
       suite counts, decisions, and anything left open.
 
+# WO5 — select shapes boxed by their drawn extent (`u8g2gl-e2g/wo5-extent-selection`)
+
+Added by the PA after WO4, under PROJECT.md's amendment. Cut the branch from the WO4 tip.
+
+- [ ] `rectangleOf()` in `designer/src/pipeline/live-pipeline.ts` gains one last fallback: the
+      box from `drawnExtent()`, used only where it returns `undefined` today. An hline or vline
+      gets a one-pixel thickness on the axis it only starts on. The two existing paths are
+      unchanged.
+- [ ] Unit test: a box, label, line and triangle get the same rectangle as before; a circle,
+      ellipse (including a `segments` quadrant), hline and vline get their drawn extent.
+- [ ] e2e: select a circle on the canvas and resize it by a handle, checking `radius` (and
+      `x`/`y` where the anchor demands it); select an hline and resize its width. Tick WO3's
+      circle e2e box.
+- [ ] Remove the "not yet reachable" notes from `docs/ui_spec.md` §8 and the ChangeLog.
+- [ ] Run, one at a time: CLI lint and tsc; designer unit; `build:e2e`; e2e; production and
+      `test:e2e:production`; `check-package.mjs`. Append a WO5 section to the completion
+      report below, with the commit, counts and anything left open.
+
 # Completion report (worker, 2026-11-11)
 
 **Provenance.** Read from PROJECT.md's status log before work began: the owner's "Palette is fine. Approved to proceed autonomously." of 2026-11-11, and the PA's entry creating this worktree from `60a4202` and spawning this worker on WO1–WO4.
