@@ -47,18 +47,18 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO2 — visible saving (`u8g2gl-e2g/wo2-saving`)
 
-- [ ] Ruling 2: the status-bar "● N unsaved · Save" button (save all, with a tooltip listing the
+- [x] Ruling 2: the status-bar "● N unsaved · Save" button (save all, with a tooltip listing the
       files and the shortcuts), absent while nothing is dirty.
-- [ ] The canvas toolbar's Save button, enabled only while the drawn screen is dirty.
-- [ ] ⌘S / Ctrl-S falls back to the canvas's file when no editor tab is active. ⌘⌥S / Ctrl-Alt-S
+- [x] The canvas toolbar's Save button, enabled only while the drawn screen is dirty.
+- [x] ⌘S / Ctrl-S falls back to the canvas's file when no editor tab is active. ⌘⌥S / Ctrl-Alt-S
       saves all. `preventDefault` on both.
-- [ ] The Explorer shows a visible ● on a dirty file.
-- [ ] Save-all goes through `ProjectDocuments.save` per file, so E-2f's failure and conflict
+- [x] The Explorer shows a visible ● on a dirty file.
+- [x] Save-all goes through `ProjectDocuments.save` per file, so E-2f's failure and conflict
       behaviour holds for each file.
-- [ ] Render counts: no new re-render of the Palette, the Explorer or the canvas on a keystroke
+- [x] Render counts: no new re-render of the Palette, the Explorer or the canvas on a keystroke
       or a drag. The existing render-count tests stay green.
-- [ ] Unit tests for the status text (zero, one and several files) and for the ⌘S target choice.
-- [ ] e2e: edit on the canvas, then the status Save appears, a click saves (the file on disk
+- [x] Unit tests for the status text (zero, one and several files) and for the ⌘S target choice.
+- [x] e2e: edit on the canvas, then the status Save appears, a click saves (the file on disk
       changes) and the button disappears; ⌘S with only the canvas active saves; the canvas Save
       button's enabled state follows dirtiness.
 

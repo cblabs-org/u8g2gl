@@ -16,6 +16,7 @@
  *              document opens in an editor tab; a widget's row opens its
  *              manifest; any other file (a font, a stray file) is listed but
  *              not opened, because the designer does not edit it (ui_spec §14).
+ *              A file with unsaved changes shows a ● after its name.
  *              Such a row is `aria-disabled` rather than `disabled`, so it can
  *              still take focus and open its menu.
  *
@@ -105,12 +106,13 @@ export function Explorer(): React.JSX.Element {
             {group.entries.map((entry) => {
               const { label, path } = entry;
               const openable = workspace.documents.isDocument(path);
+              const unsaved = dirty.has(path);
               return (
                 <li key={path}>
                   <button
                     type="button"
-                    className={`file${path === active ? ' active' : ''}${openable ? '' : ' inert'}${dirty.has(path) ? ' dirty' : ''}`}
-                    title={openable ? path : `${path} (not edited in the designer)`}
+                    className={`file${path === active ? ' active' : ''}${openable ? '' : ' inert'}${unsaved ? ' dirty' : ''}`}
+                    title={openable ? `${path}${unsaved ? ' (unsaved)' : ''}` : `${path} (not edited in the designer)`}
                     data-path={path}
                     aria-disabled={openable ? undefined : true}
                     onClick={() => {
@@ -121,7 +123,13 @@ export function Explorer(): React.JSX.Element {
                       if ((event.key === 'F10' && event.shiftKey) || event.key === 'ContextMenu') openMenu(event, entry, group.title);
                     }}
                   >
-                    {label}
+                    <span className="file-label">{label}</span>
+                    {/* The mark is outside the label's ellipsis, so a long name never hides it. */}
+                    {unsaved && (
+                      <span className="dirty-mark" aria-hidden="true">
+                        ●
+                      </span>
+                    )}
                   </button>
                 </li>
               );

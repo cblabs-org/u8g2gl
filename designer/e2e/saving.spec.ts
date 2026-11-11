@@ -8,9 +8,11 @@
  *          IDE, which has the same files open: a save changes only what was
  *          edited, and keeps a byte-order mark the file had; a file changed
  *          on disk reloads when its buffer is clean and offers the three-way
- *          choice when it is dirty, overwriting nothing; and a file opened and
+ *          choice when it is dirty, overwriting nothing; a file opened and
  *          closed without an edit is never rewritten, even when names were
- *          generated into its buffer.
+ *          generated into its buffer; and saving is visible: the status bar's
+ *          "● N unsaved · Save", the canvas toolbar's Save, the Explorer's ●,
+ *          and ⌘S with no editor tab saving the screen the canvas draws.
  * Description: The "IDE" is the test writing the project copy directly, as an
  *              editor beside the designer would; the server's watcher reports
  *              it. Bytes and modification times are read from disk.
@@ -20,7 +22,8 @@ import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
-import { bufferText, openFile, openShell, placeCaret } from './support/shell';
+import { bufferText, clickCanvas, dragCanvas, nextFrames, openFile, openShell, placeCaret } from './support/shell';
+import type { TestHandle } from '../src/test-hooks';
 
 const SCREEN = 'screens/screen_departures.xml';
 const ORIGINAL = readFileSync(join(PROJECT_FIXTURE, SCREEN), 'utf8');
@@ -155,4 +158,96 @@ test('a file opened and closed without an edit is not rewritten, even with names
   await page.waitForTimeout(1000);
   expect(readFileSync(path).equals(bytes)).toBe(true);
   expect(statSync(path).mtimeMs).toBe(mtime);
+});
+
+// --- Visible saving: the affordances an author finds without knowing ⌘S ---
+
+/** The status bar's save-all button. */
+const statusSave = (page: Page) => page.locator('.status-bar .unsaved-save');
+/** The canvas toolbar's Save. */
+const canvasSave = (page: Page) => page.locator('.canvas-toolbar .canvas-save');
+/** The screen's Explorer row. */
+const explorerRow = (page: Page) => page.locator(`.sidebar .file[data-path="${SCREEN}"]`);
+
+// moveRow0OnCanvas
+// An edit made only on the canvas: row0 (x="32" y="0", 224 × 16) dragged 6
+// right and 3 down, with the animation frozen so the frame is stable.
+async function moveRow0OnCanvas(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /live/ }).click();
+  await expect(page.locator('.canvas-frame')).toHaveAttribute('data-stale', 'false');
+  // A canvas edit is written into the document's Monaco model, which can open
+  // only once Monaco has loaded, a moment after the first frame.
+  await expect.poll(() => page.evaluate((path) => (window as unknown as TestHandle).__u8g2gl.documents.open(path) !== undefined, SCREEN)).toBe(true);
+  // Selected first: a canvas selection opens its file in an editor tab, which
+  // narrows the canvas, so the drag is measured on the settled layout.
+  await clickCanvas(page, 100, 8);
+  await expect(page.locator(`.editor-host[data-editor-path="${SCREEN}"]`)).toBeVisible();
+  await nextFrames(page, 2);
+  await dragCanvas(page, [100, 8], [106, 11]);
+  await expect.poll(() => bufferText(page, SCREEN)).toContain('name="row0" x="38" y="3"');
+}
+
+test('after a canvas edit, the status bar offers "● 1 unsaved · Save", a click saves to disk, and it disappears', async ({ page }) => {
+  session = await startDesign();
+  await openShell(page, session.url);
+  await expect(statusSave(page)).toHaveCount(0);
+  await expect(canvasSave(page)).toBeDisabled();
+  await expect(explorerRow(page).locator('.dirty-mark')).toHaveCount(0);
+
+  // --- The edit: every affordance says so ---
+  await moveRow0OnCanvas(page);
+  await expect(statusSave(page)).toHaveText('● 1 unsaved · Save');
+  const title = (await statusSave(page).getAttribute('title')) ?? '';
+  expect(title).toContain(SCREEN);
+  expect(title).toContain('⌘⌥S / Ctrl-Alt-S');
+  expect(title).toContain('⌘S / Ctrl-S');
+  await expect(canvasSave(page)).toBeEnabled();
+  await expect(explorerRow(page).locator('.dirty-mark')).toBeVisible();
+  await expect(explorerRow(page).locator('.dirty-mark')).toHaveText('●');
+
+  // --- The click saves the file on disk, and every affordance clears ---
+  await statusSave(page).click();
+  await expect(statusSave(page)).toHaveCount(0);
+  expect(readFileSync(session.file(SCREEN), 'utf8')).toContain('name="row0" x="38" y="3"');
+  await expect(canvasSave(page)).toBeDisabled();
+  await expect(explorerRow(page).locator('.dirty-mark')).toHaveCount(0);
+});
+
+test('⌘S with no editor tab, only the canvas, saves the screen the canvas draws', async ({ page }) => {
+  session = await startDesign();
+  await openShell(page, session.url);
+  await moveRow0OnCanvas(page);
+
+  // A canvas selection shows its file in an editor tab; close it, so the canvas is all there is.
+  const tab = page.locator('.dv-tab', { hasText: 'screen_departures.xml' });
+  if ((await tab.count()) > 0) await tab.locator('.dv-default-tab-action').click();
+  await expect(page.locator('.editor-host')).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as TestHandle).__u8g2gl.activeFile.get())).toBeUndefined();
+  await expect(statusSave(page)).toHaveText('● 1 unsaved · Save');
+
+  await page.keyboard.press('ControlOrMeta+s');
+  await expect(statusSave(page)).toHaveCount(0);
+  expect(readFileSync(session.file(SCREEN), 'utf8')).toContain('name="row0" x="38" y="3"');
+});
+
+test('the canvas Save is enabled exactly while the drawn screen is unsaved, and ⌘⌥S saves every unsaved file', async ({ page }) => {
+  session = await startDesign();
+  await openShell(page, session.url);
+  await openFile(page, SCREEN);
+  await expect(canvasSave(page)).toBeDisabled();
+
+  // --- An edit in the XML enables it, and its click saves the file ---
+  await replaceRow0X(page, '40');
+  await expect(canvasSave(page)).toBeEnabled();
+  await canvasSave(page).click();
+  await expect(canvasSave(page)).toBeDisabled();
+  expect(readFileSync(session.file(SCREEN), 'utf8')).toContain('name="row0" x="40"');
+
+  // --- ⌘⌥S: save all, here the one file ---
+  await replaceRow0X(page, '60');
+  await expect(canvasSave(page)).toBeEnabled();
+  await page.keyboard.press('ControlOrMeta+Alt+s');
+  await expect(canvasSave(page)).toBeDisabled();
+  await expect(statusSave(page)).toHaveCount(0);
+  expect(readFileSync(session.file(SCREEN), 'utf8')).toContain('name="row0" x="60"');
 });

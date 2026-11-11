@@ -19,7 +19,8 @@
  *              (`CanvasEditor`), and this component never reads the
  *              selection, so selecting or dragging re-renders none of it. The
  *              toolbar sets the zoom (1× to 8×, or fit) and the animation
- *              freeze, and holds the align and distribute buttons
+ *              freeze, and holds Save for the drawn screen
+ *              (`canvas-save-button.tsx`), the align and distribute buttons
  *              (`align-toolbar.tsx`), which share the gestures' edit path and
  *              subscribe to the selection themselves, and Run with the last
  *              test run's verdict (`test-run-controls.tsx`), whose mismatch
@@ -37,6 +38,7 @@ import { planInsert } from '../editing/insert-element';
 import { projectNames } from '../documents/element-names';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { AlignToolbar } from './align-toolbar';
+import { CanvasSaveButton } from './canvas-save-button';
 import { TestRunControls, TestRunDiffInfo } from './test-run-controls';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -134,6 +136,7 @@ export function CanvasPanel(): React.JSX.Element {
             {display.width}×{display.height}
           </span>
         )}
+        <CanvasSaveButton />
         <AlignToolbar editor={editor} />
         <TestRunControls />
         <span className="spacer" />
