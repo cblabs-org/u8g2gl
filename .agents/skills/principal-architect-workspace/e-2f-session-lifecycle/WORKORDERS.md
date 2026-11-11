@@ -38,14 +38,14 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO1 — connection state (`u8g2gl-e2f/wo1-connection`)
 
-- [ ] Ruling 1: `ServedProjectFileSystem` exposes its connection state, `connected` or `lost`,
+- [x] Ruling 1: `ServedProjectFileSystem` exposes its connection state, `connected` or `lost`,
       in the style the core already uses for observable state. An error after `ready` → `lost`;
       a later `ready` → `connected`. An error before the first `ready` still rejects
       `connect()`, exactly as today.
-- [ ] Decide whether `ProjectFileSystem` needs the state. Add it there, with
+- [x] Decide whether `ProjectFileSystem` needs the state. Add it there, with
       `InMemoryProjectFileSystem` always `connected`, only if the designer cannot reach it
       otherwise. Record the choice and the reason in the completion report.
-- [ ] Unit tests with a fake `EventSource`: an error before `ready` rejects; an error after it
+- [x] Unit tests with a fake `EventSource`: an error before `ready` rejects; an error after it
       gives `lost`; a second `ready` gives `connected`; `close()` reports neither.
 
 # WO2 — the designer (`u8g2gl-e2f/wo2-designer`)

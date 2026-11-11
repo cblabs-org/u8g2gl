@@ -26,6 +26,8 @@ export {
   EXPECTED_VERSION_HEADER,
   EXPECTED_ABSENT,
   type EventSourceLike,
+  type ConnectionState,
+  type ConnectionListener,
   type ServedProjectFsOptions,
 } from './served-project-file-system.js';
 export { checkProjectPath, refusedPathMessage, type ProjectPathCheck } from './project-path-rule.js';
