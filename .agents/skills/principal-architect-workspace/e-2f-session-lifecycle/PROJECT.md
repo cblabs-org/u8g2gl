@@ -123,3 +123,4 @@ the schema or the runtime, and no golden moves.
 | Date | Entry |
 |---|---|
 | 2026-11-11 | Owner approved the E-2f plan: "Approved, proceed". PA created worktree `../U8G2GL-e2f` from `af6996f`, branch `u8g2gl-e2f/wo1-connection`. Worker spawned on WO1–WO4. |
+| 2026-11-11 | Worker completed WO1–WO4 (tip `219f690`). PA verified, running the suites one at a time: CLI 2773, lint and tsc clean, designer unit 163, e2e 85/85 (the `build:e2e` build). In a browser, on the production build through the built CLI: an edit, then a restart on the same port (new token): the banner stays, ⌘S shows "✕ not saved" with the 403 reason in Output, and a navigation shows the refusal page. The unsaved-changes guard is armed while dirty; the real prompt is covered by the e2e spec. PA pushed `u8g2gl-e2f/wo4-docs-review` and opened the PR. |
