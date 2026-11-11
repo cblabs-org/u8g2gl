@@ -274,6 +274,17 @@ The server starts these programs itself, with an argument array and never a shel
 
 **Responsive behaviour.** Below roughly 1200px the property panel collapses to an icon rail and expands on selection; below 900px the XML pane collapses by default, leaving the canvas. The tool assumes a desktop-class screen — this is not a mobile target.
 
+### 6.1 Session lifecycle (served mode)
+
+A served designer tab belongs to one run of `u8g2gl design`. The link carries that run's session token, so it stops working when the command stops or restarts. The designer says so, rather than looking alive until a save fails:
+
+- **The session banner.** When the server can no longer be reached (Ctrl-C, a closed terminal, a reboot), a bar across the top of the window says the design server has stopped. It names the files with unsaved changes, which are still in the tab, and says to run `npx u8g2gl design` in the project folder for a new session; until then, saving is not possible. Editing stays possible. If the same server comes back, the banner clears and the project is listed and read again, so changes made in the gap are seen.
+- **A failed save is visible.** It brings Output forward, which holds the reason, and the status bar shows **✕ not saved: *file*** until that file saves or its buffer is clean again. A conflict, where the file changed on disk while its buffer was unsaved, keeps its own bar on the editor.
+- **Unsaved changes are guarded.** While any buffer is unsaved, reloading or closing the tab gets the browser's own "Leave site?" prompt. With nothing unsaved it never asks.
+- **A stale link explains itself.** A browser opening a link the server refuses — the bare address, an old bookmark, a tab from an earlier run — gets a short page, still a 403, saying the link needs a running session and to run `npx u8g2gl design` in the project folder. The page is the same for every refusal and names no project, path or token. The designer's own requests are still refused with JSON.
+
+Running `npx u8g2gl design` again while a session is live reopens that session in the browser rather than starting a second one. A new session is a new port, so unsaved edits in an old tab do not carry into it. The old tab keeps them on screen, and the guard stops a reload from discarding them.
+
 ---
 
 ## 7. Document Contexts

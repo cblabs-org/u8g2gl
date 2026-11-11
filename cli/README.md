@@ -31,6 +31,7 @@ npx u8g2gl design              # open the project in the designer
 - **`design [path]`** starts a local server (127.0.0.1 only, with a per-session
   token in its URL) and opens the designer in your browser. `--no-open`
   prints the URL instead. The designer renders the built-in elements at once.
+  Lost the tab? Run it again. It reopens the running session.
   Its Explorer's context menu shows a widget's C++ read-only and opens files
   in your own editor: `--editor <command>` (or `U8G2GL_EDITOR`) names it,
   such as `code`; otherwise the application your system associates with

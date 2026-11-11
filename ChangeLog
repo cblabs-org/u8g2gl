@@ -17,6 +17,13 @@ history is in git. See docs/RELEASING.md.
     exactly while the major is 0.
     Built and tested against U8G2 2.36.18.
 2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.1: The designer says when its design session ends: a banner
+    names the unsaved files and the command for a new session, a failed
+    save shows "not saved" in the status bar and brings Output forward,
+    and a reload with unsaved changes asks first. A browser opening a
+    refused designer link gets a page saying how to start a session,
+    instead of JSON; API callers still get JSON. No change to generated
+    output.
   * 0.16.0: Schema 0.6: <api icon="..."> names the widget's Palette icon
     from the vendored Lucide set, by name or alias, with a "did you mean"
     for a near miss. The validator accepts 0.4, 0.5 and 0.6; a 0.4 or 0.5
