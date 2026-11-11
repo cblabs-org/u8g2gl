@@ -195,6 +195,8 @@ export class ProjectDocuments {
         touched.push(path);
       }
     }
+
+    // --- Step 3: Tell the disk listeners, once the documents are consistent ---
     for (const path of touched) {
       for (const listener of [...this.diskListeners]) listener(path);
     }

@@ -44,6 +44,7 @@ import { WorkspaceContext } from './workspace-context';
 import { countRender } from '../perf/render-count';
 import { PropertyPanel } from '../panel/property-panel';
 import { SessionBanner } from './session-banner';
+import { useUnsavedGuard } from './use-unsaved-guard';
 import { Palette } from '../palette/palette';
 
 /** The Dockview component of each panel kind. */
@@ -122,26 +123,7 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   useEffect(() => workspace.onShowOutput(() => dock.current?.getPanel('output')?.api.setActive()), [workspace]);
 
   // --- The unsaved-changes guard: armed exactly while a buffer is dirty ---
-  // A reload or a closed tab then gets the browser's own "Leave site?"
-  // prompt. It is never armed while nothing is unsaved, so it never nags.
-  useEffect(() => {
-    const dirty = workspace.documents.dirty;
-    const guard = (event: BeforeUnloadEvent): void => event.preventDefault();
-    let armed = false;
-    const update = (): void => {
-      const wanted = dirty.get().size > 0;
-      if (wanted === armed) return;
-      armed = wanted;
-      if (armed) window.addEventListener('beforeunload', guard);
-      else window.removeEventListener('beforeunload', guard);
-    };
-    update();
-    const off = dirty.subscribe(update);
-    return () => {
-      off();
-      window.removeEventListener('beforeunload', guard);
-    };
-  }, [workspace]);
+  useUnsavedGuard(workspace.documents.dirty);
 
   // onReady
   // The default layout: the canvas, with Problems and Output tabbed beneath.

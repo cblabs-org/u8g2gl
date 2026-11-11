@@ -102,6 +102,7 @@ export class Workspace {
     this.documents = new ProjectDocuments(fs, (line) => this.log(line));
     // The server going and coming back. Events sent in the gap were lost, so
     // a return re-lists the project, as ServedProjectFileSystem.connect asks.
+    // The workspace lives as long as the page, so this is never unsubscribed.
     this.connection = new Observable<ConnectionState>(fs.connection);
     fs.onConnectionChange((state) => {
       this.connection.set(state);
