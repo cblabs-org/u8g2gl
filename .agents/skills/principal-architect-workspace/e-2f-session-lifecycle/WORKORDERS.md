@@ -50,21 +50,21 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO2 — the designer (`u8g2gl-e2f/wo2-designer`)
 
-- [ ] Ruling 2: the session banner. It sits above the dock while `lost`, with `role="alert"` and
+- [x] Ruling 2: the session banner. It sits above the dock while `lost`, with `role="alert"` and
       the conflict bar's styling. It says the design server has stopped, lists the files with
       unsaved changes (or says there are none), and tells the user to run `npx u8g2gl design`
       in the project folder to open a new session; until then saving is not possible. Editing
       stays enabled. It clears on `connected`, and the designer then re-lists the project so
       changes made during the gap are seen.
-- [ ] Ruling 3: a save that ends `failed` activates the Output panel and shows
+- [x] Ruling 3: a save that ends `failed` activates the Output panel and shows
       "✕ not saved: <file>" in the status bar until that file next saves (or its buffer
       returns to clean). `conflict` is unchanged.
-- [ ] Ruling 4: `beforeunload` is armed exactly while `documents.dirty` is non-empty.
-- [ ] Neither the banner nor the status item may make the Palette, the Explorer or the canvas
+- [x] Ruling 4: `beforeunload` is armed exactly while `documents.dirty` is non-empty.
+- [x] Neither the banner nor the status item may make the Palette, the Explorer or the canvas
       re-render on a keystroke or a drag. The existing render-count tests must stay green.
-- [ ] Unit tests: the banner's text for zero, one and several dirty files; the status item's
+- [x] Unit tests: the banner's text for zero, one and several dirty files; the status item's
       text and its clearing.
-- [ ] e2e, using the session helper's `stop()`: stopping the server shows the banner; an edit
+- [x] e2e, using the session helper's `stop()`: stopping the server shows the banner; an edit
       and ⌘S then shows the status item and activates Output; with a dirty buffer, a reload
       raises a `beforeunload` dialog (Playwright's `page.on('dialog')`); with none, it does not.
       The existing saving specs still pass.

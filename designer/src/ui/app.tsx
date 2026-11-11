@@ -20,6 +20,10 @@
  *              a widget's C++, from View source or a Problems row — opens in
  *              a read-only source tab instead, in the same group.
  *
+ *              When the design session ends, a banner shows above it all
+ *              (`session-banner.tsx`), and while any buffer is unsaved the
+ *              browser asks before the page is reloaded or closed.
+ *
  * Exports:
  * - App:  The shell
  */
@@ -39,6 +43,7 @@ import { StatusBar } from './status-bar';
 import { WorkspaceContext } from './workspace-context';
 import { countRender } from '../perf/render-count';
 import { PropertyPanel } from '../panel/property-panel';
+import { SessionBanner } from './session-banner';
 import { Palette } from '../palette/palette';
 
 /** The Dockview component of each panel kind. */
@@ -113,6 +118,31 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [workspace]);
 
+  // --- Requests to bring Output to the front, as after a failed save ---
+  useEffect(() => workspace.onShowOutput(() => dock.current?.getPanel('output')?.api.setActive()), [workspace]);
+
+  // --- The unsaved-changes guard: armed exactly while a buffer is dirty ---
+  // A reload or a closed tab then gets the browser's own "Leave site?"
+  // prompt. It is never armed while nothing is unsaved, so it never nags.
+  useEffect(() => {
+    const dirty = workspace.documents.dirty;
+    const guard = (event: BeforeUnloadEvent): void => event.preventDefault();
+    let armed = false;
+    const update = (): void => {
+      const wanted = dirty.get().size > 0;
+      if (wanted === armed) return;
+      armed = wanted;
+      if (armed) window.addEventListener('beforeunload', guard);
+      else window.removeEventListener('beforeunload', guard);
+    };
+    update();
+    const off = dirty.subscribe(update);
+    return () => {
+      off();
+      window.removeEventListener('beforeunload', guard);
+    };
+  }, [workspace]);
+
   // onReady
   // The default layout: the canvas, with Problems and Output tabbed beneath.
   const onReady = (event: DockviewReadyEvent): void => {
@@ -137,14 +167,17 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
 
   return (
     <WorkspaceContext.Provider value={workspace}>
-      <div className="shell">
-        <ActivityBar active={view} onSelect={setView} />
-        {view === 'explorer' ? <Explorer /> : <Palette />}
-        <main className="editor-area">
-          <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
-        </main>
-        <PropertyPanel />
-        <StatusBar onShowOutput={() => dock.current?.getPanel('output')?.api.setActive()} />
+      <div className="window">
+        <SessionBanner />
+        <div className="shell">
+          <ActivityBar active={view} onSelect={setView} />
+          {view === 'explorer' ? <Explorer /> : <Palette />}
+          <main className="editor-area">
+            <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
+          </main>
+          <PropertyPanel />
+          <StatusBar onShowOutput={() => workspace.showOutput()} />
+        </div>
       </div>
     </WorkspaceContext.Provider>
   );

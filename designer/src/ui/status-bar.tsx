@@ -13,18 +13,21 @@
  *              component for that reason: a selection change, or a drag that
  *              moves the selection, re-renders it and nothing else here
  *              (EDITOR-DESIGN §3.3). It shows one element's `x,y w×h`, or for
- *              several the box around them with how many there are.
+ *              several the box around them with how many there are. The
+ *              "not saved" item is its own component too, for the same reason.
  *
  * Exports:
  * - StatusBar:          The component
  * - describeWasm():     The indicator's text for a state
  * - SelectionGeometry:  Its selection readout
+ * - NotSaved:           Its failed-save item
  */
 
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
+import { describeNotSaved } from './session-status';
 
 /**
  * @brief The indicator's text: a glyph, the state, and the hash or reason.
@@ -68,6 +71,7 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
       <span className="status-item problems-count">
         ⛔ {errors} ⚠ {warnings}
       </span>
+      <NotSaved onShowOutput={onShowOutput} />
       <span className="status-spacer" />
       <SelectionGeometry />
       {frame.display !== undefined && (
@@ -76,6 +80,22 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
         </span>
       )}
     </footer>
+  );
+}
+
+/**
+ * @brief The files whose last save failed, as "✕ not saved: <file>", until
+ *        each saves or its buffer is clean; nothing while there are none.
+ *        Clicking it opens Output, which holds the reason.
+ */
+export function NotSaved({ onShowOutput }: { readonly onShowOutput: () => void }): React.JSX.Element | null {
+  countRender('NotSaved');
+  const text = describeNotSaved(useObservable(useWorkspace().documents.notSaved));
+  if (text === undefined) return null;
+  return (
+    <button type="button" className="status-item not-saved" title="Open Output" onClick={onShowOutput}>
+      {text}
+    </button>
   );
 }
 
