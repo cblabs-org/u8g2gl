@@ -1,0 +1,10 @@
+RAM:   [==        ]  17.5% (used 57380 bytes from 327680 bytes)
+Flash: [========= ]  85.6% (used 1345631 bytes from 1572864 bytes)
+diag_log_add: 1
+elf sha256: 5def9c43d266448a
+.iram0.text               90843   1074267140
+.dram0.data               16028   1073414144
+.dram0.bss                41352   1073430176
+.flash.rodata            264564   1061159200
+.flash.text              973168   1074593824
+u8g2gl-named symbol bytes: 4722
