@@ -28,7 +28,7 @@
  *              Nothing is written until a field commits.
  *
  * Exports:
- * - PanelSummary:     The header's lines: tag, names, notes and element problems
+ * - PanelSummary:     The header's lines: tag, names, notes, a resize refusal and element problems
  * - PanelOptions:     The choices the dropdowns and pickers offer
  * - FontOption, SubjectOption, ImageOption: One choice each
  * - PanelView:        What the panel shows: nothing, a screen, or elements
@@ -49,6 +49,7 @@ import type { CompletedRun } from '../pipeline/edit-loop';
 import { Observable } from '../state/observable';
 import type { Workspace } from '../workspace';
 import { panelUpdateEnded, panelUpdateStarted } from '../perf/panel-probe';
+import { resizeRefusalReasons } from '../editing/shape-resize-rules';
 import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
@@ -66,6 +67,13 @@ export interface PanelSummary {
   readonly subtitle: string;
   /** Muted notes about the element as a whole. */
   readonly notes: readonly string[];
+  /**
+   * "Can't resize: …" when a handle could not resize the one selected element
+   * on an axis, with every reason; undefined when every handle works, or for
+   * several elements or a screen. Shown before any drag, so the reason is not
+   * only the tip a drag shows (ui_spec §8).
+   */
+  readonly resize: string | undefined;
   /** Diagnostics about the element rather than one attribute (a missing required prop). */
   readonly problems: readonly FieldProblem[];
 }
@@ -304,10 +312,13 @@ export class PanelController {
 
     // --- Step 3: The header and each field's state ---
     const project = manifests.some((manifest) => manifest.origin === 'project');
+    const [only] = facts;
+    const refused = facts.length === 1 && only !== undefined && cst !== undefined ? resizeRefusalReasons(cst, only.name, run.result.placements.get(only.name)) : [];
     view.summary.set({
       title: facts.length === 1 ? layout.tag : `${facts.length} elements`,
       subtitle: facts.map((fact) => fact.name).join(', '),
       notes: project && !layout.drawing ? [PROJECT_COST_NOTE] : [],
+      resize: refused.length === 0 ? undefined : `Can't resize: ${refused.join('; ')}`,
       problems: facts.flatMap((fact) => fact.problems.get(ELEMENT_PROBLEMS) ?? []),
     });
     const context = { wellFormed: run.result.wellFormed, box: boxOf(facts.map((fact) => run.result.bounds.get(fact.name))) };
@@ -346,6 +357,7 @@ export class PanelController {
         ...(display === undefined ? [] : [`Display ${display.width}×${display.height}`]),
         `${namedCstElements(cst).size} elements. Select one on the canvas or in the XML to edit it.`,
       ],
+      resize: undefined,
       problems: [],
     });
     this.updateFields(layout, view.fields, [root], { wellFormed: run.result.wellFormed, box: undefined });
@@ -414,7 +426,7 @@ const EMPTY_FIELD: FieldState = {
 };
 
 /** A header before its first summary. */
-const EMPTY_SUMMARY: PanelSummary = { title: '', subtitle: '', notes: [], problems: [] };
+const EMPTY_SUMMARY: PanelSummary = { title: '', subtitle: '', notes: [], resize: undefined, problems: [] };
 
 // layoutKey
 // A layout's identity: its tag and every section's fields with their types.
@@ -464,6 +476,7 @@ function sameSummary(a: PanelSummary, b: PanelSummary): boolean {
     a.title === b.title &&
     a.subtitle === b.subtitle &&
     a.notes.join('\n') === b.notes.join('\n') &&
+    a.resize === b.resize &&
     a.problems.map((p) => p.message).join('\n') === b.problems.map((p) => p.message).join('\n')
   );
 }

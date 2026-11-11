@@ -14,7 +14,8 @@
  *              with `image-rendering: pixelated`, so a zoom costs the browser
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
- *              outline, eight handles and an `x, y, w×h` badge, the marquee
+ *              outline, eight handles and an `x, y, w×h` badge, a round handle
+ *              on each vertex of a single selected line or triangle, the marquee
  *              while one is dragged, the alignment guides a drag has
  *              snapped to, the outlines of placeholder widgets, and
  *              the hatching over an element an error is in (§3.8: the frame
@@ -32,6 +33,7 @@
  * Exports:
  * - OVERLAY_MARGIN: CSS pixels the overlay extends past the frame
  * - HANDLE_SIZE:   A selection handle's side, in CSS pixels
+ * - VERTEX_SIZE:   A vertex handle's diameter, in CSS pixels
  * - OverlayRect:  A rectangle to draw on the overlay, and how
  * - GuideLine:    An alignment guide to draw
  * - CanvasView:   The two canvases
@@ -41,6 +43,7 @@
  *     - setOverlay():  Replace what the overlay shows
  *     - setMarquee():  Show or hide the marquee being dragged
  *     - setGuides():   Show the alignment guides a drag lies on
+ *     - setVertices(): Show the vertex handles of a line or triangle
  *     - setDiff():     Mark a test run's differing pixels
  *     - setStale():    Dim the frame while the document has an error
  */
@@ -106,6 +109,13 @@ export const OVERLAY_MARGIN = 10;
 /** A selection handle's side, in CSS pixels, whatever the zoom. */
 export const HANDLE_SIZE = 6;
 
+/**
+ * A vertex handle's diameter, in CSS pixels, whatever the zoom. Round and
+ * filled, unlike the box's white squares, so the two kinds read apart where a
+ * vertex sits on the box's corner.
+ */
+export const VERTEX_SIZE = 7;
+
 /** The badge's font and height, in CSS pixels. */
 const BADGE_FONT = '10px ui-monospace, Menlo, monospace';
 const BADGE_HEIGHT = 14;
@@ -124,6 +134,7 @@ export class CanvasView {
   private overlayRects: readonly OverlayRect[] = [];
   private marquee: Box | undefined;
   private guides: readonly GuideLine[] = [];
+  private vertices: readonly { readonly x: number; readonly y: number }[] = [];
   private diff: readonly Box[] = [];
 
   /**
@@ -195,6 +206,16 @@ export class CanvasView {
   }
 
   /**
+   * @brief Shows a handle on each vertex, in device pixels, centred on the
+   *        vertex's pixel; an empty list hides them. Unchanged points redraw nothing.
+   */
+  setVertices(points: readonly { readonly x: number; readonly y: number }[]): void {
+    if (points.length === this.vertices.length && points.every((point, i) => point.x === this.vertices[i]?.x && point.y === this.vertices[i]?.y)) return;
+    this.vertices = points;
+    this.drawOverlay();
+  }
+
+  /**
    * @brief Marks a test run's differing pixels, in device pixels; undefined or
    *        empty clears them. Drawn over everything else on the overlay.
    */
@@ -259,6 +280,9 @@ export class CanvasView {
         this.drawBadge(context, rect, box);
       }
     }
+
+    // --- Step 2b: Vertex handles, over the selection's box ---
+    if (this.vertices.length > 0) this.drawVertices(context);
 
     // --- Step 3: The guides a drag lies on, across the frame, on the pixel boundary ---
     if (this.guides.length > 0) {
@@ -357,6 +381,22 @@ export class CanvasView {
         context.fillRect(x, y, HANDLE_SIZE, HANDLE_SIZE);
         context.strokeRect(x + 0.5, y + 0.5, HANDLE_SIZE - 1, HANDLE_SIZE - 1);
       }
+    }
+  }
+
+  // drawVertices
+  // A filled circle on each vertex's pixel centre, ringed in white so it reads
+  // over lit and unlit pixels alike.
+  private drawVertices(context: CanvasRenderingContext2D): void {
+    context.setLineDash([]);
+    context.lineWidth = 1.5;
+    context.fillStyle = OVERLAY_COLOUR.selection;
+    context.strokeStyle = '#ffffff';
+    for (const vertex of this.vertices) {
+      context.beginPath();
+      context.arc((vertex.x + 0.5) * this.zoom, (vertex.y + 0.5) * this.zoom, VERTEX_SIZE / 2, 0, 2 * Math.PI);
+      context.fill();
+      context.stroke();
     }
   }
 

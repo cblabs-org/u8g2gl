@@ -61,12 +61,15 @@ export function PropertyPanel(): React.JSX.Element {
   );
 }
 
-/** @brief The header: the tag and names, notes about the whole element, and its own problems. */
+/**
+ * @brief The header: the tag and names, notes about the whole element, why a
+ *        handle cannot resize it, and its own problems.
+ */
 function PanelHeader({ summary }: { readonly summary: Observable<PanelSummary> }): React.JSX.Element {
   countRender('PanelHeader');
   panelRenderStarted();
   useLayoutEffect(panelCommitted);
-  const { title, subtitle, notes, problems } = useObservable(summary);
+  const { title, subtitle, notes, resize, problems } = useObservable(summary);
   return (
     <div className="panel-header">
       <div className="panel-title">{title}</div>
@@ -76,6 +79,7 @@ function PanelHeader({ summary }: { readonly summary: Observable<PanelSummary> }
           {note}
         </p>
       ))}
+      {resize !== undefined && <p className="panel-note resize-refusal">{resize}</p>}
       {problems.map((problem) => (
         <p key={problem.message} className={`field-problem ${problem.severity}`} role="alert">
           {problem.message}

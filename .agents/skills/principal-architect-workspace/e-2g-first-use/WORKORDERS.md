@@ -64,21 +64,24 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO3 — resize by points and radii (`u8g2gl-e2g/wo3-shape-resize`)
 
-- [ ] Ruling 3 in `resize-rules.ts`, or beside it, in the style of `placement-rules.ts`:
+- [x] Ruling 3 in `resize-rules.ts`, or beside it, in the style of `placement-rules.ts`:
       - line and triangle box handles scale the vertices about the opposite edge, rounded;
       - circle `radius` and ellipse `rx`/`ry` follow the handles, with the anchor derived from
         the resolver;
       - `hline`/`vline` keep resizing on the axis they have.
-- [ ] Vertex handles for a single selected line or triangle: drawn by the canvas and hit-tested
+- [x] Vertex handles for a single selected line or triangle: drawn by the canvas and hit-tested
       before the box handles. Dragging one moves that vertex alone. The cursor and snapping
       behave like the existing handles.
-- [ ] Refusals follow the existing rule (integer literals only; bindings and expressions refuse
+- [x] Refusals follow the existing rule (integer literals only; bindings and expressions refuse
       with a reason), and clamps keep each size at least one pixel.
-- [ ] The property panel says "Can't resize: <reason>" for a selected element whose resize is
+- [x] The property panel says "Can't resize: <reason>" for a selected element whose resize is
       refused on an axis.
-- [ ] Each gesture is one undo step, through the existing edit path.
+- [x] Each gesture is one undo step, through the existing edit path.
 - [ ] Unit tests and e2e, as ruling 4 lists. The existing resize and move specs stay green.
-- [ ] If a resolver helper is needed in `cli/src/core`, keep it minimal, test it, and report it.
+      *(Worker: all done except the circle e2e, which is blocked: the canvas cannot select a
+      circle, ellipse, hline or vline. See the completion report.)*
+- [x] If a resolver helper is needed in `cli/src/core`, keep it minimal, test it, and report it.
+      *(Worker: none needed. `drawnExtent()` and the resolved extras were enough.)*
 
 # WO4 — docs, version, review, evidence (`u8g2gl-e2g/wo4-docs-review`)
 

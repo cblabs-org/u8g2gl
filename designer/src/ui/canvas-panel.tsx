@@ -83,6 +83,7 @@ export function CanvasPanel(): React.JSX.Element {
       editor,
       showMarquee: (rect) => shown.setMarquee(rect),
       showGuides: (lines) => shown.setGuides(lines),
+      showVertices: (points) => shown.setVertices(points),
       planInsert: (tag, file, x, y) => {
         const run = loop.lastRun.get();
         if (run === undefined) return undefined;
