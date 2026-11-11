@@ -60,12 +60,16 @@ button { font: inherit; color: inherit; }
 }
 .activity {
   height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: none;
   color: var(--text-dim);
-  font-size: 18px;
   cursor: pointer;
 }
+.activity:not(:disabled):hover { color: var(--text); }
 .activity.active { color: var(--text); box-shadow: inset 2px 0 var(--accent); }
 .activity:disabled { opacity: 0.35; cursor: default; }
 

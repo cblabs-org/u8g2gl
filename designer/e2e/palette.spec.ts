@@ -5,9 +5,10 @@
  *
  * File: designer/e2e/palette.spec.ts
  * Purpose: The Palette in the real shell (ui_spec §6): the activity bar
- *          switches the primary sidebar between the Explorer and the Palette;
- *          the Palette lists the departures project's elements in their three
- *          groups, filed by category, from its manifests, as 56 px icon tiles,
+ *          draws a Lucide icon for every view, and switches the primary
+ *          sidebar between the Explorer and the Palette; the Palette lists
+ *          the departures project's elements in their three groups, filed by
+ *          category, from its manifests, as 56 px icon tiles,
  *          each showing its manifest's own icon, whose tooltip (on hover and
  *          on focus) shows the label, the tag and the description; the arrow
  *          keys move between tiles; its filter matches a description; a
@@ -32,13 +33,48 @@ test.afterEach(async () => {
   session = undefined;
 });
 
-test('the activity bar shows the Palette: three groups from the manifests, filed by category, and a filter that narrows them', async ({ page }) => {
+test('the activity bar draws a Lucide icon for every view, none of them the fallback, and keeps its labels and states', async ({ page }) => {
   session = await startDesign();
   await openShell(page, session.url);
 
-  // --- The Palette replaces the Explorer in the sidebar, and back ---
-  // Its icons come from one sprite, served under the token path like the rest.
+  // --- One icon per view, each a named symbol, none marked missing ---
+  const bar = page.getByRole('navigation', { name: 'Views' });
+  const icons = await bar.locator('button.activity').evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      label: button.getAttribute('aria-label'),
+      icon: button.querySelector('svg.icon')?.getAttribute('data-icon') ?? null,
+      missing: button.querySelector('svg.icon')?.hasAttribute('data-icon-missing') ?? null,
+      text: button.textContent ?? '',
+      disabled: (button as HTMLButtonElement).disabled,
+    })),
+  );
+  expect(icons).toEqual([
+    { label: 'Explorer', icon: 'files', missing: false, text: '', disabled: false },
+    { label: 'Palette', icon: 'shapes', missing: false, text: '', disabled: false },
+    { label: 'Assets', icon: 'image', missing: false, text: '', disabled: true },
+    { label: 'Fonts', icon: 'type', missing: false, text: '', disabled: true },
+    { label: 'Sample data', icon: 'database', missing: false, text: '', disabled: true },
+    { label: 'Flow', icon: 'workflow', missing: false, text: '', disabled: true },
+    { label: 'Search', icon: 'search', missing: false, text: '', disabled: true },
+  ]);
+  await expect(bar.locator('[data-icon-missing]')).toHaveCount(0);
+
+  // --- The pressed state follows the view, and the tooltips are unchanged ---
+  await expect(bar.getByRole('button', { name: 'Explorer' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(bar.getByRole('button', { name: 'Fonts' })).toHaveAttribute('title', 'Fonts: not in this release');
+  await bar.getByRole('button', { name: 'Palette' }).click();
+  await expect(bar.getByRole('button', { name: 'Palette' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(bar.getByRole('button', { name: 'Explorer' })).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('the activity bar shows the Palette: three groups from the manifests, filed by category, and a filter that narrows them', async ({ page }) => {
+  session = await startDesign();
+  // The icons come from one sprite, served under the token path like the rest.
+  // The activity bar draws from it too, so it arrives with the shell.
   const sprite = page.waitForResponse((response) => /\/assets\/lucide-sprite-[^/]+\.svg$/.test(new URL(response.url()).pathname));
+  await openShell(page, session.url);
+
+  // --- The Palette replaces the Explorer in the sidebar, and back ---
   await page.getByRole('button', { name: 'Palette' }).click();
   expect((await sprite).status()).toBe(200);
   expect((await sprite).headers()['content-type']).toBe('image/svg+xml');

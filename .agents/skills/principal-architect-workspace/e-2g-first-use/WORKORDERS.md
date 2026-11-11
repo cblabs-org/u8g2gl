@@ -39,11 +39,11 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO1 — activity bar icons (`u8g2gl-e2g/wo1-activity-icons`)
 
-- [ ] Ruling 1: `activity-bar.tsx` draws `<Icon>` per view (files, shapes, image, type, database,
+- [x] Ruling 1: `activity-bar.tsx` draws `<Icon>` per view (files, shapes, image, type, database,
       workflow, search) in place of the glyphs. The label stays "Palette". Size and colour suit
       the bar's existing `.activity` styling, and the active and disabled states still read.
-- [ ] Unit test: every view's icon resolves through `resolveIcon`.
-- [ ] e2e: the activity bar draws an icon for each view, and none has `data-icon-missing`.
+- [x] Unit test: every view's icon resolves through `resolveIcon`.
+- [x] e2e: the activity bar draws an icon for each view, and none has `data-icon-missing`.
 
 # WO2 — visible saving (`u8g2gl-e2g/wo2-saving`)
 
