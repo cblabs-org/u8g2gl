@@ -17,6 +17,15 @@ history is in git. See docs/RELEASING.md.
     exactly while the major is 0.
     Built and tested against U8G2 2.36.18.
 2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.2: The designer's first-use fixes. The activity bar draws Lucide
+    icons. Saving is visible and stays explicit: the status bar offers
+    "● N unsaved · Save", the canvas toolbar has Save for the screen it
+    draws, the Explorer marks unsaved files, ⌘S with no editor tab saves
+    the canvas's screen and ⌘⌥S saves all. A line's or triangle's handles
+    scale its points, and a vertex drags alone; the property panel says
+    why a selected element cannot be resized. The resize rules for a
+    circle's and an ellipse's radii are in place, but the canvas cannot
+    select either yet. No change to generated output.
   * 0.16.1: The designer says when its design session ends: a banner
     names the unsaved files and the command for a new session, a failed
     save shows "not saved" in the status bar and brings Output forward,

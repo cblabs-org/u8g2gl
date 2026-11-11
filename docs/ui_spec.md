@@ -126,7 +126,7 @@ How an edit becomes pixels. Every surface in this document sits over this pipeli
                     ┌──────────────────────────────────────────┐
                     │  .xml on disk (ProjectFileSystem, UD-2)  │
                     └────────────┬───────────────┬─────────────┘
-                          load   │               ▲  save (debounced)
+                          load   │               ▲  save (explicit)
                                  ▼               │
                     ┌──────────────────────────────────────────┐
                     │  CST — text + source ranges  [UD-3]      │
@@ -255,7 +255,7 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 | **Editor area** | Tabs per document. Default split: canvas ∥ XML. Either pane collapsible; ratio draggable and remembered |
 | **Property panel** | Selection properties, grouped. With nothing selected, shows screen-level properties |
 | **Bottom panel** | Problems · Output · Budget. Collapsible; auto-opens to Problems on a failed build |
-| **Status bar** | Build state and duration · active target · selection geometry · zoom · RAM total |
+| **Status bar** | Build state and duration · active target · selection geometry · zoom · RAM total · while anything is unsaved, **● N unsaved · Save** |
 
 **The Explorer** is grouped by what an author edits, not by directory: **Project** (`u8g2gl.xml`, `globals.xml`), **Screens** (one entry per screen file), **Widgets** (one entry per widget, under its own name, opening its manifest; its `.cpp` and `.hpp` travel with the entry rather than being listed) and **Assets** (fonts and images). Anything else is listed under **Other files**, so nothing on disk goes missing; a widget directory with no manifest falls there too. Generated output — `generated/` and the editor target's `generated_editor/` — is not listed, watched or writable from the designer.
 
@@ -268,13 +268,26 @@ Every Explorer entry has a **context menu**, opened by right-click, Shift+F10 or
 
 The server starts these programs itself, with an argument array and never a shell; the editor command is split once at start-up and never comes from a request.
 
+**The activity bar** draws each view as a Lucide icon (§6, the Palette's own set): Explorer `files`, Palette `shapes`, Assets `image`, Fonts `type`, Sample data `database`, Flow `workflow`, Search `search`. The name is the button's tooltip and accessible label; a view not in this release is shown disabled.
+
 **The Palette** is a grid of 56 px icon tiles, each its element's icon over its label (cut short with an ellipsis; the tag when there is no label), grouped Framework / Project / Drawing and filed by category. A tooltip on hover and on keyboard focus gives the label, the `<tag>` and the description. The filter matches all three; tiles are drag sources onto the canvas; they are in the tab order, and the arrow keys move between them. An element's icon is its own, else its category's, else a generic one. The icons are [Lucide](https://lucide.dev), vendored whole (THIRD-PARTY-NOTICES.md), so a project widget's icon is not limited to the ones the framework uses.
 
 **Selection geometry lives permanently in the status bar.** F2 depends on knowing exact coordinates without opening anything.
 
 **Responsive behaviour.** Below roughly 1200px the property panel collapses to an icon rail and expands on selection; below 900px the XML pane collapses by default, leaving the canvas. The tool assumes a desktop-class screen — this is not a mobile target.
 
-### 6.1 Session lifecycle (served mode)
+### 6.1 Saving
+
+Saving is **explicit**: nothing is written to disk until the author asks. There is no autosave, because the author's IDE may hold the same files, and a write they did not ask for makes a conflict out of nothing. So the ways to save are in sight:
+
+- **The status bar** shows **● N unsaved · Save** while any file has unsaved changes, and nothing otherwise. A click saves every unsaved file; its tooltip lists them and the shortcuts.
+- **The canvas toolbar** has **Save**, enabled while the screen the canvas draws has unsaved changes. It saves that file, so a layout with no editor tab can still save what was edited on the canvas.
+- **The Explorer** shows a **●** after the name of every file with unsaved changes. An editor tab shows one on its own tab.
+- **⌘S / Ctrl-S** saves the active editor tab's file, or, when no editor tab is active, the file of the screen the canvas draws. **⌘⌥S / Ctrl-Alt-S** saves every unsaved file. Neither opens the browser's own "Save page".
+
+Every save is the same conditional write: a file changed on disk since it was read is never overwritten, and its conflict bar offers keep, take or compare. Saving several files saves each in turn, and Output logs each one's outcome; a failure behaves as §6.2 describes.
+
+### 6.2 Session lifecycle (served mode)
 
 A served designer tab belongs to one run of `u8g2gl design`. The link carries that run's session token, so it stops working when the command stops or restarts. The designer says so, rather than looking alive until a save fails:
 
@@ -334,6 +347,17 @@ The most important surface.
 
 **Selection.** Click selects; repeated clicks cycle down through overlaps; marquee selects many; Esc clears. Selected elements show handles and a live `x, y, w, h` badge.
 
+**Resizing.** A handle moves one edge of the element's drawn box (two at a corner) and leaves the opposite edge where it is, written in the attributes that place the element:
+
+- **A box** (`x`, `width`, or a far anchor) rewrites those attributes, as a move does.
+- **A line or triangle** is placed by its points. Every point is scaled about the opposite edge of the box around them, rounded to a whole pixel. Points that all share one `x` (or `y`) have no width (or height) to scale on that axis. A single selected line or triangle also shows a round handle on each vertex; dragging one moves that vertex alone, snapped as a move is. Vertex handles take precedence over the box's where they overlap, and are not shown with more than one element selected.
+- **A circle or ellipse** is placed by a centre and radii. A circle's handles change `radius`, a side by its own axis and a corner by the larger of the two; an ellipse's change `rx` or `ry`, a corner both. The centre moves too where it must, so the opposite edge stays put: a whole circle reaches a radius on both sides of its centre, a quadrant (`segments`) on one.
+- **An hline or vline** resizes on the axis it has.
+
+Every attribute a handle writes must be an integer literal. A binding or an expression refuses that axis with its reason, shown beside the pointer during the drag and, while the element is selected, as **Can't resize: …** in the property panel; the other axis still follows. A box, radius or radii stay at least one pixel; a triangle may become degenerate, as the validator allows. Each drag is one undo step.
+
+*Not yet reachable:* the canvas draws no hit rectangle for a circle, an ellipse, an hline or a vline, so these cannot yet be selected on the canvas, and their handles do not appear. Their resize behaviour is in place for when they can.
+
 **Movement.**
 
 | Input | Effect |
@@ -343,6 +367,7 @@ The most important surface.
 | Shift + arrow | 8 px (one tile) |
 | Alt + drag | Duplicate |
 | Drag handle | Resize; Shift constrains ratio |
+| Drag vertex | Move one vertex of a line or triangle |
 | Property field | Exact value; steppers ±1 |
 
 **Alignment.** Edge and centre guides against siblings and display bounds appear during drag, with a snap threshold of 3 *screen* pixels — not device pixels, so it stays usable at 1×. Snapping is to integers only; there is no sub-pixel position. An align toolbar (left/centre/right, top/middle/bottom, distribute) acts on multi-selection.
