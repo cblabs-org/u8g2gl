@@ -85,15 +85,99 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO4 — docs, version, review, evidence (`u8g2gl-e2g/wo4-docs-review`)
 
-- [ ] Ruling 5's docs: the save affordances in `docs/ui_spec.md`, with §4's "save (debounced)"
+- [x] Ruling 5's docs: the save affordances in `docs/ui_spec.md`, with §4's "save (debounced)"
       corrected; the resize behaviour for point and radius shapes; and a `ChangeLog` line.
-- [ ] CLI 0.16.1 → 0.16.2, in the files the 0.16.0 → 0.16.1 bump touched. No schema or runtime
+- [x] CLI 0.16.1 → 0.16.2, in the files the 0.16.0 → 0.16.1 bump touched. No schema or runtime
       change. Show that no golden moved.
-- [ ] Spawn the `readability-reviewer` on E-2g's diff against `60a4202`. Resolve P1–P3, and
+- [x] Spawn the `readability-reviewer` on E-2g's diff against `60a4202`. Resolve P1–P3, and
       decide P4 with reasons.
-- [ ] Screenshots under `tmp/e2g/`: the activity bar, the status Save, a triangle with its
+- [x] Screenshots under `tmp/e2g/`: the activity bar, the status Save, a triangle with its
       vertex handles, and a refusal line in the property panel.
-- [ ] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
+- [x] A final run of every suite, one at a time: guard; CLI, lint and tsc; goldens; C++; Wasm,
       then `build:e2e`; designer unit; e2e; production and its no-hook grep;
       `check-package.mjs`. Then write a completion report at the end of this file: commits,
       suite counts, decisions, and anything left open.
+
+# Completion report (worker, 2026-11-11)
+
+**Provenance.** Read from PROJECT.md's status log before work began: the owner's "Palette is fine. Approved to proceed autonomously." of 2026-11-11, and the PA's entry creating this worktree from `60a4202` and spawning this worker on WO1–WO4.
+
+## Commits
+
+Each branch is cut from the one before. Nothing is pushed, tagged or published.
+
+| WO | Branch | Commits |
+|---|---|---|
+| WO1 | `u8g2gl-e2g/wo1-activity-icons` | `58e68f1` |
+| WO2 | `u8g2gl-e2g/wo2-saving` | `69a3a9e` |
+| WO3 | `u8g2gl-e2g/wo3-shape-resize` | `1437157` |
+| WO4 | `u8g2gl-e2g/wo4-docs-review` | `062fd49` (docs, version), `8e44904` (review fixes), and this report |
+
+## Versions
+
+CLI 0.16.1 → **0.16.2** in `cli/package.json` and `cli/package-lock.json`, the files the 0.16.0 → 0.16.1 bump touched, with a `0.16.2` line under `cli v0.16.xx` in `ChangeLog`. No schema or runtime change. `refresh-goldens.mjs`, run on the built 0.16.2 CLI, leaves an **empty diff**.
+
+## Suites, before and after (one at a time)
+
+| Suite | Before (`0274f6a`) | After (`8e44904`) |
+|---|---|---|
+| Home-path guard | self-test 11/11; clean | self-test 11/11; clean |
+| CLI `npm test` | 2750 passed, 23 skipped (130 files) | the same |
+| CLI lint and tsc | clean | clean |
+| Goldens (`test/generator`) | 279 passed | 279 passed |
+| C++ (Debug) | 515/515, 1 skipped (`SizeOfReport.ThirtyTwoBitTarget`); 0 warnings | the same |
+| Wasm editor build; snapshot, placeholder, last-error | pass | pass |
+| `build:e2e` | builds | builds |
+| Designer unit | 163 passed | 187 passed |
+| Designer e2e | 85 passed | 92 passed |
+| Production build: no-hook grep / `test:e2e:production` | clean / 3 passed | clean / 3 passed |
+| `check-package.mjs` | PASS, 0.16.1, 15,348,185 bytes, 771 files | PASS, 0.16.2, 15,349,735 bytes, 771 files |
+
+- **No e2e failure or flake** in any full run: 85 at baseline (16:51), 89 at WO2 (17:06), 92 at WO3 (17:20) and 92 final (17:28).
+- **Timing runs.** `pmset -g log` shows the last Wake at 08:00:11 and no Sleep, DarkWake or Wake after it, so none is void.
+
+## Decisions under the rulings
+
+- **WO1.** The view list moved to a pure `ui/activity-views.ts` so the unit test can call `resolveIcon` without a bundler. The palette spec waited for the Lucide sprite after clicking Palette; the activity bar now loads it with the shell, so the wait starts before `openShell`.
+- **WO2.**
+  - The canvas's file is a new `Workspace.canvasFile`, derived from the drawn frame's hit targets. It notifies only when the file changes, so the toolbar's Save (`ui/canvas-save-button.tsx`, memoised) never renders per frame.
+  - The status-bar button (`UnsavedSave`) reads only the dirty set. Its text and the ⌘S target choice are pure, in `ui/save-status.ts`.
+  - Save-all is sequential and sorted, each file through `ProjectDocuments.save`. Output is shown once if any failed.
+  - ⌘⌥S matches `event.code === 'KeyS'` as well as the key, because Option+S on a Mac yields `ß`.
+  - The Explorer's ● is now a real element outside the label's ellipsis, in the accent colour.
+- **WO3, anchoring.** For a circle or ellipse, whether `x`/`y` is the centre or a corner is read from the resolver's `drawnExtent()`: an edge whose `from` list includes the radius coordinate reaches past the centre by it. That gives a `reach` of `[before, after]` per axis, so `segments` quadrants come out right.
+  - The radius changes by the edge's delta over `before + after`.
+  - The centre moves by `before` (end edge) or `after` (start edge) times the radius change, so the opposite edge stays exactly put.
+  - A whole circle's moving edge therefore lands in two-pixel steps.
+- **WO3, the circle's "larger of the two".** Only axes the pointer actually moved ask for a radius. Because `DragEdit` maps a side handle to `end` on the other axis (its Shift rule), a circle's side handle grows the other axis from its end edge, as a box's Shift-side does.
+- **WO3, other choices.**
+  - A line or triangle whose points share one coordinate on an axis refuses that axis ("…has no width to scale"). Its vertex handles still work.
+  - Vertex handles are round and filled, so they read apart from the box's squares. A vertex snaps as a 1×1 move.
+  - The property-panel line is a new `PanelSummary.resize`, built from `resizeRefusalReasons()` with both corners' handles.
+- **WO3, cli/src/core.** **No change was needed.** `drawnExtent()`, `SEGMENT_EXTENTS` and the resolved extras were enough.
+- **WO4 review (readability-reviewer).** No P1 or P2 findings.
+  - All three P3s are fixed: a workspace-document citation in two new headers, the stale ⌘S comment in `app.tsx`, and a misplaced sentence in the Explorer header.
+  - P4s taken: the overlay's "Step 2b" is renumbered, and `Workspace.save()` gains `@param`.
+  - P4 declined: moving `saveTarget` out of `ui/`. `workspace.ts` pulls in Monaco through `ProjectDocuments`, so the pure helper would lose its browser-free unit test.
+  - P4 declined: sharing `Point` with `canvas-view.ts`. The canvas keeps local shape types by design, so it does not depend on `editing/`, as its `Box` alias already says.
+
+## Left open, and a deviation from ruling 3
+
+**Circles, ellipses, hlines and vlines cannot be selected on the canvas, so their resize is not reachable.**
+- `rectangleOf()` in `designer/src/pipeline/live-pipeline.ts` builds hit rectangles from `x/y/width/height`, or from point extras. It does not use `drawnExtent()`, which the ruling assumed.
+- A circle (a `length` extra) and an hline (no `height`) therefore get no hit target, no bounds and no placement.
+- `pipeline/` is outside this PR's boundary, so I did not change it.
+
+What is done for these elements:
+- The rules for a circle's and an ellipse's radii, quadrants included, are implemented in `editing/shape-resize-rules.ts`.
+- Those rules, and the hline's axis behaviour, are unit-tested with placements built by the same resolver.
+- The circle e2e ("resize a circle") is **not** written, and its WO3 box stays unticked.
+- `docs/ui_spec.md` §8 and the ChangeLog say plainly that these are not yet reachable.
+
+The fix is small:
+- Box `rectangleOf()` by `drawnExtent()`, falling back to a one-pixel span on an axis the element only starts on (an hline's `y`).
+- Add a circle e2e.
+
+That needs the PA's go-ahead, because it changes hit-testing for every shape.
+
+Screenshots are in `tmp/e2g/`: `activity-bar.png`, `status-save.png`, `shell-unsaved.png`, `triangle-vertex-handles.png` and `resize-refusal.png`.
