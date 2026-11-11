@@ -19,6 +19,12 @@
  *              stream and resolves once the server says it is attached, so no
  *              event between connecting and watching is lost; `close()` ends it.
  *
+ *              The stream doubles as the session's heartbeat: once attached,
+ *              its failing means the server has gone, and `EventSource`'s own
+ *              retry succeeding means it is back. That is reported as the
+ *              connection state, so the designer can say so instead of letting
+ *              the next save fail without explanation.
+ *
  *              The wire protocol, which `src/node/design/` serves:
  *              - `GET /api/files` → `{ files: string[] }`
  *              - `GET /api/file?path=` → the bytes; version in `U8G2GL-Version`
@@ -32,6 +38,8 @@
  * Exports:
  * - VERSION_HEADER, EXPECTED_VERSION_HEADER, EXPECTED_ABSENT: Wire names shared with the server
  * - EventSourceLike:            The part of `EventSource` this uses
+ * - ConnectionState:            'connected' | 'lost'
+ * - ConnectionListener:         A connection-state callback
  * - ServedProjectFsOptions:     Server origin, token, and injectable fetch/EventSource
  * - ServedProjectFileSystem:    The implementation
  *
@@ -41,6 +49,8 @@
  *     Connection:
  *     - connect():              Open the event stream
  *     - close():                Close it
+ *     - connection:             Whether the server is reachable, as the stream last said
+ *     - onConnectionChange():   Subscribe to that; returns the unsubscribe
  */
 
 import {
@@ -69,6 +79,18 @@ export interface EventSourceLike {
   addEventListener(type: 'ready', listener: () => void): void;
   close(): void;
 }
+
+/**
+ * Whether the design server is reachable, as the event stream last reported.
+ *
+ * - `connected` — the stream is attached, or has not been opened yet.
+ * - `lost` — the stream failed after it was attached: the server has stopped,
+ *   or restarted with a new token. Reads and writes will fail until it is back.
+ */
+export type ConnectionState = 'connected' | 'lost';
+
+/** A {@link ServedProjectFileSystem.onConnectionChange} callback, given the new state. */
+export type ConnectionListener = (state: ConnectionState) => void;
 
 /** Options for {@link ServedProjectFileSystem}. */
 export interface ServedProjectFsOptions {
@@ -100,6 +122,8 @@ export class ServedProjectFileSystem extends GuardedProjectFileSystem {
   private readonly fetchImpl: typeof fetch;
   private readonly createEventSource: (url: string) => EventSourceLike;
   private source: EventSourceLike | undefined;
+  private state: ConnectionState = 'connected';
+  private readonly connectionListeners = new Set<ConnectionListener>();
 
   /**
    * @param options The server origin and session token, and optionally the
@@ -120,7 +144,8 @@ export class ServedProjectFileSystem extends GuardedProjectFileSystem {
    * Rejects if the stream fails before it is ready (a wrong token gives 403).
    * Calling it while connected is a no-op. After it resolves, a dropped stream
    * is retried by `EventSource` itself; events while disconnected are lost, so
-   * a long-lived caller should re-`list()` on reconnect.
+   * a long-lived caller should re-`list()` on reconnect. The drop and the
+   * reconnection are reported through {@link onConnectionChange}.
    */
   connect(): Promise<void> {
     if (this.source !== undefined) {
@@ -130,14 +155,23 @@ export class ServedProjectFileSystem extends GuardedProjectFileSystem {
     this.source = source;
     return new Promise((resolve, reject) => {
       let ready = false;
+      // The handlers below ignore a stream that `close()` has already
+      // replaced: a closed stream says nothing about the server.
       source.addEventListener('ready', () => {
+        if (this.source !== source) return;
+        // The first `ready` settles connect(); a later one is EventSource's
+        // retry reaching the server again.
         ready = true;
+        this.setConnection('connected');
         resolve();
       });
       source.onerror = () => {
+        if (this.source !== source) return;
         if (!ready) {
           this.close();
           reject(new Error(`could not open the event stream at ${this.origin}`));
+        } else {
+          this.setConnection('lost');
         }
       };
       source.onmessage = (message) => {
@@ -149,10 +183,53 @@ export class ServedProjectFileSystem extends GuardedProjectFileSystem {
     });
   }
 
-  /** @brief Closes the event stream. Harmless if not connected. */
+  /**
+   * @brief Closes the event stream. Harmless if not connected.
+   *
+   * Closing is the caller's choice, not a lost server, so it changes no
+   * connection state and notifies no listener.
+   */
   close(): void {
     this.source?.close();
     this.source = undefined;
+  }
+
+  /** @brief Whether the server is reachable, as the event stream last reported. */
+  get connection(): ConnectionState {
+    return this.state;
+  }
+
+  /**
+   * @brief Calls `listener` with the new state each time {@link connection} changes.
+   *
+   * A repeated error while already `lost`, which is `EventSource` retrying, is
+   * not a change and is not reported.
+   *
+   * @return A function that unsubscribes; calling it twice is harmless.
+   */
+  onConnectionChange(listener: ConnectionListener): () => void {
+    // A wrapper, as in `watch`, so each subscription is its own.
+    const entry: ConnectionListener = (state) => listener(state);
+    this.connectionListeners.add(entry);
+    return () => {
+      this.connectionListeners.delete(entry);
+    };
+  }
+
+  // setConnection
+  // Records the connection state and, if it changed, tells every listener. A
+  // listener that throws does not stop the others, as in `emit`.
+  //   next — the state the stream has just reported
+  private setConnection(next: ConnectionState): void {
+    if (next === this.state) return;
+    this.state = next;
+    for (const listener of [...this.connectionListeners]) {
+      try {
+        listener(next);
+      } catch {
+        // Deliberately swallowed; see above.
+      }
+    }
   }
 
   protected async readBytesChecked(path: string): Promise<ProjectFsResult<BytesFile>> {

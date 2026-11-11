@@ -15,7 +15,10 @@
  *              — an unauthorised request learns nothing, not even which routes
  *              exist. The Host header must also name the loopback address,
  *              which defeats DNS rebinding: a hostile page that rebinds its own
- *              name to 127.0.0.1 sends its own name as Host.
+ *              name to 127.0.0.1 sends its own name as Host. A refused token
+ *              is JSON for every caller but a browser asking for a page, which
+ *              gets `refusal-page.ts`'s page saying how to start a session; a
+ *              wrong Host is always JSON, since no person reads that refusal.
  *
  *              Routes, all token-checked:
  *              - `GET /`                   the designer (a redirect to
@@ -64,6 +67,7 @@ import { DiskProject } from './disk-project.js';
 import type { FileOpener } from './file-opener.js';
 import { placeholderPage } from './placeholder-page.js';
 import { ProjectWatcher } from './project-watcher.js';
+import { REFUSAL_PAGE, wantsPage } from './refusal-page.js';
 import { APP_PATH_PREFIX, generateSessionToken, presentedToken, tokenMatches } from './session-token.js';
 import { readStaticFile } from './static-files.js';
 
@@ -208,8 +212,15 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
     // an unauthorised caller cannot learn which routes exist: a real route and
     // a made-up one answer alike. The body is identical for a missing and a
     // wrong token, so the response says nothing about what was presented.
+    // A browser navigating to a stale link gets a page instead of the JSON;
+    // it is the same bytes for every route and every token, so it keeps both
+    // properties.
     if (!tokenMatches(presentedToken(request, url), token)) {
-      sendJson(response, 403, { code: 'forbidden', message: 'missing or wrong session token' });
+      if (wantsPage(request.method ?? 'GET', request.headers)) {
+        send(response, 403, 'text/html; charset=utf-8', REFUSAL_PAGE);
+      } else {
+        sendJson(response, 403, { code: 'forbidden', message: 'missing or wrong session token' });
+      }
       return;
     }
 

@@ -34,6 +34,11 @@
  *              - A clean document is disposed when its tab closes and is never
  *                written: opening a file to look at it does not rewrite it.
  *                A dirty one keeps its model, so closing a tab loses nothing.
+ *              - A save that fails for any other reason (the server is gone)
+ *                is held in `notSaved` until the file saves or its buffer is
+ *                clean again, so the failure stays visible after the moment.
+ *              - Events missed while the server was unreachable are caught up
+ *                by `resync()`, under the same rules as a change event.
  *
  * Exports:
  * - DiskText:              A document's text on disk and its version
@@ -42,6 +47,7 @@
  *
  *     Loading:
  *     - load():            List the project and read its documents
+ *     - resync():          List and read again, after the event stream was lost
  *     - files:             Every project file, as listed
  *     - fileSystem:        Where the documents come from
  *
@@ -56,6 +62,7 @@
  *
  *     Saving and conflicts:
  *     - dirty:             The paths whose buffer differs from what was saved
+ *     - notSaved:          The dirty paths whose last save failed
  *     - conflicts:         Paths changed on disk while dirty, with their text
  *     - save():            Write a buffer, conditionally
  *     - keepMine():        Resolve a conflict for the buffer
@@ -101,6 +108,12 @@ export class ProjectDocuments {
   readonly dirty = new Observable<ReadonlySet<string>>(new Set());
   /** Documents changed on disk while dirty, with the disk's text: the three-way choice is pending. */
   readonly conflicts = new Observable<ReadonlyMap<string, DiskText>>(new Map());
+  /**
+   * Documents whose last save failed (`failed`, not `conflict`), until the
+   * file saves or its buffer is clean again: what the status bar's
+   * "not saved" item shows.
+   */
+  readonly notSaved = new Observable<ReadonlySet<string>>(new Set());
 
   private readonly fs: ServedProjectFileSystem;
   private readonly log: (line: string) => void;
@@ -148,6 +161,45 @@ export class ProjectDocuments {
     this.fs.watch((event) => {
       void this.diskChanged(event.path, event.kind).catch((error: unknown) => console.error(error));
     });
+  }
+
+  /**
+   * @brief Catches up with the disk after the event stream came back.
+   *
+   * Changes made while the server could not be reached sent no event, so the
+   * project is listed again and every document read again. Each is then
+   * treated as a change event would have been: a clean buffer reloads, a
+   * dirty one becomes a conflict, and the disk listeners hear of every file
+   * added, removed, or whose text moved.
+   */
+  async resync(): Promise<void> {
+    // --- Step 1: The listing ---
+    const listing = await this.fs.list();
+    if (!listing.ok) {
+      this.log(`could not list the project again: ${listing.message}`);
+      return;
+    }
+    const before = new Set(this.files.get());
+    const after = new Set(listing.files);
+    this.files.set(listing.files);
+
+    // --- Step 2: Each file that came, went, or whose document text moved ---
+    const touched: string[] = [];
+    for (const path of listing.files) {
+      const moved = this.isDocument(path) && (await this.catchUp(path));
+      if (moved || !before.has(path)) touched.push(path);
+    }
+    for (const path of before) {
+      if (!after.has(path)) {
+        this.disk.delete(path);
+        touched.push(path);
+      }
+    }
+
+    // --- Step 3: Tell the disk listeners, once the documents are consistent ---
+    for (const path of touched) {
+      for (const listener of [...this.diskListeners]) listener(path);
+    }
   }
 
   /** @brief Whether the pipeline reads this path as a project document. */
@@ -284,6 +336,7 @@ export class ProjectDocuments {
       return 'conflict';
     }
     this.log(`could not save ${path}: ${result.message}`);
+    this.setNotSaved(path, true);
     return 'failed';
   }
 
@@ -343,31 +396,43 @@ export class ProjectDocuments {
     }
 
     // --- Step 2: A document's new text, and what it means for its buffer ---
-    if (this.isDocument(path) && kind !== 'removed') {
-      const read = await this.fs.read(path);
-      const known = this.disk.get(path);
-      if (read.ok && (known === undefined || read.text !== known.text || read.version !== known.version)) {
-        const theirs = { text: read.text, version: read.version, bom: read.bom };
-        const document = this.open_.get(path);
-        if (document === undefined) {
-          this.disk.set(path, theirs);
-        } else if (document.model.getValue() === theirs.text) {
-          this.disk.set(path, theirs);
-          this.markSaved(path, document.model.getAlternativeVersionId());
-        } else if (!this.dirty.get().has(path)) {
-          this.reload(path, theirs);
-          this.log(`${path} changed on disk: reloaded`);
-        } else {
-          this.setConflict(path, theirs);
-          this.log(`${path} changed on disk while you were editing it: keep yours, take theirs, or compare`);
-        }
-      }
-    } else if (kind === 'removed') {
+    if (kind === 'removed') {
       // An open buffer is kept, so nothing typed is lost; it is no longer
       // read by the pipeline once its disk text is gone.
       this.disk.delete(path);
+    } else if (this.isDocument(path)) {
+      await this.catchUp(path);
     }
     for (const listener of [...this.diskListeners]) listener(path);
+  }
+
+  // catchUp
+  // Reads a document and applies the save rules above to what it finds: a
+  // buffer equal to the new text is simply saved (the echo of our own save), a
+  // clean buffer reloads, a dirty one becomes a conflict. Returns whether the
+  // disk held anything new.
+  //   path — a project document
+  private async catchUp(path: string): Promise<boolean> {
+    const read = await this.fs.read(path);
+    const known = this.disk.get(path);
+    if (!read.ok || (known !== undefined && read.text === known.text && read.version === known.version)) {
+      return false;
+    }
+    const theirs = { text: read.text, version: read.version, bom: read.bom };
+    const document = this.open_.get(path);
+    if (document === undefined) {
+      this.disk.set(path, theirs);
+    } else if (document.model.getValue() === theirs.text) {
+      this.disk.set(path, theirs);
+      this.markSaved(path, document.model.getAlternativeVersionId());
+    } else if (!this.dirty.get().has(path)) {
+      this.reload(path, theirs);
+      this.log(`${path} changed on disk: reloaded`);
+    } else {
+      this.setConflict(path, theirs);
+      this.log(`${path} changed on disk while you were editing it: keep yours, take theirs, or compare`);
+    }
+    return true;
   }
 
   // reload
@@ -407,16 +472,29 @@ export class ProjectDocuments {
   }
 
   // updateDirty
-  // Recomputes one path's place in the dirty set, notifying only on change.
+  // Recomputes one path's place in the dirty set, notifying only on change. A
+  // clean buffer has nothing left unsaved, so it also leaves `notSaved`.
   private updateDirty(path: string): void {
     const document = this.open_.get(path);
     const isDirty = document !== undefined && document.model.getAlternativeVersionId() !== document.savedAt;
+    if (!isDirty) this.setNotSaved(path, false);
     const current = this.dirty.get();
     if (current.has(path) === isDirty) return;
     const next = new Set(current);
     if (isDirty) next.add(path);
     else next.delete(path);
     this.dirty.set(next);
+  }
+
+  // setNotSaved
+  // Adds a path to, or removes it from, the failed saves, notifying only on change.
+  private setNotSaved(path: string, failed: boolean): void {
+    const current = this.notSaved.get();
+    if (current.has(path) === failed) return;
+    const next = new Set(current);
+    if (failed) next.add(path);
+    else next.delete(path);
+    this.notSaved.set(next);
   }
 
   // setConflict

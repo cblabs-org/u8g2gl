@@ -11,8 +11,11 @@
  *          from it; it does not live in React, because the edit loop runs at
  *          frame rate and must not wait on a render.
  * Description: Observables per concern, so each panel subscribes to only what
- *              it shows. Opening a file is a request the layout fulfils, since
- *              only the layout knows where editor tabs go.
+ *              it shows. Opening a file, and showing Output, are requests the
+ *              layout fulfils, since only the layout knows where panels go.
+ *              The connection state follows the served file system's: when it
+ *              comes back, the documents catch up with whatever changed on
+ *              disk in the gap.
  *
  * Exports:
  * - OpenRequest:     A file to show, and optionally where
@@ -20,6 +23,7 @@
  *
  *     State:
  *     - session:        The server and token, for requests beyond the file system
+ *     - connection:     Whether the design server can be reached
  *     - documents, activeFile, selection, problems, output, projectName
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
@@ -28,13 +32,15 @@
  *     - start():        Start the loop and the Wasm, once loaded
  *
  *     Requests:
- *     - saveActive():   Save the active document
+ *     - saveActive():   Save the active document; show Output if that fails
  *     - openFile():     Ask the layout to show a file
  *     - onOpenFile():   The layout's subscription to those requests
+ *     - showOutput():   Ask the layout to bring Output to the front
+ *     - onShowOutput(): The layout's subscription to those requests
  *     - log():          Append a line to Output
  */
 
-import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
+import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import { ProjectDocuments } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
 import { EditLoop } from './pipeline/edit-loop';
@@ -73,8 +79,11 @@ export class Workspace {
   readonly selection: SelectionModel;
   /** The project's name from `u8g2gl.xml`, once loaded, for the title and status bar. */
   readonly projectName = new Observable<string>('');
+  /** Whether the design server can be reached: the session banner shows while it is `lost`. */
+  readonly connection: Observable<ConnectionState>;
 
   private readonly openListeners = new Set<(request: OpenRequest) => void>();
+  private readonly outputListeners = new Set<() => void>();
 
   /** The editor Wasm the canvas draws with. */
   readonly wasm: EditorWasmController;
@@ -91,6 +100,19 @@ export class Workspace {
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
     this.session = session;
     this.documents = new ProjectDocuments(fs, (line) => this.log(line));
+    // The server going and coming back. Events sent in the gap were lost, so
+    // a return re-lists the project, as ServedProjectFileSystem.connect asks.
+    // The workspace lives as long as the page, so this is never unsubscribed.
+    this.connection = new Observable<ConnectionState>(fs.connection);
+    fs.onConnectionChange((state) => {
+      this.connection.set(state);
+      if (state === 'lost') {
+        this.log('the design server has stopped: saving is not possible until a new session is open');
+      } else {
+        this.log('the design server is back');
+        void this.documents.resync().catch((error: unknown) => console.error(error));
+      }
+    });
     this.selection = new SelectionModel((path) => this.documents.textOf(path));
     // Canvas to XML: a selection made on the canvas shows its file, so the
     // editor can reveal it. An open request without a position never moves
@@ -137,11 +159,14 @@ export class Workspace {
    * @brief Saves the active document (⌘S). Explicit only: there is no
    *        autosave, because a write the author did not ask for, into a file
    *        their IDE also holds, makes a conflict out of nothing.
+   *
+   * A save that fails brings Output to the front, since it holds the reason;
+   * a conflict has its own bar on the editor, so it does not.
    */
   async saveActive(): Promise<void> {
     const path = this.activeFile.get();
-    if (path !== undefined) {
-      await this.documents.save(path);
+    if (path !== undefined && (await this.documents.save(path)) === 'failed') {
+      this.showOutput();
     }
   }
 
@@ -155,6 +180,19 @@ export class Workspace {
     this.openListeners.add(listener);
     return () => {
       this.openListeners.delete(listener);
+    };
+  }
+
+  /** @brief Asks the layout to bring the Output panel to the front. */
+  showOutput(): void {
+    for (const listener of [...this.outputListeners]) listener();
+  }
+
+  /** @brief The layout's subscription to show-Output requests; returns the unsubscribe. */
+  onShowOutput(listener: () => void): () => void {
+    this.outputListeners.add(listener);
+    return () => {
+      this.outputListeners.delete(listener);
     };
   }
 
