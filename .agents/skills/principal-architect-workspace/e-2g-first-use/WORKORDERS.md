@@ -77,9 +77,9 @@ The owner's approval is recorded in its status log (rule 00). Read
 - [x] The property panel says "Can't resize: <reason>" for a selected element whose resize is
       refused on an axis.
 - [x] Each gesture is one undo step, through the existing edit path.
-- [ ] Unit tests and e2e, as ruling 4 lists. The existing resize and move specs stay green.
-      *(Worker: all done except the circle e2e, which is blocked: the canvas cannot select a
-      circle, ellipse, hline or vline. See the completion report.)*
+- [x] Unit tests and e2e, as ruling 4 lists. The existing resize and move specs stay green.
+      *(Worker: the circle e2e was blocked at WO4, because the canvas could not select a circle.
+      It landed with WO5.)*
 - [x] If a resolver helper is needed in `cli/src/core`, keep it minimal, test it, and report it.
       *(Worker: none needed. `drawnExtent()` and the resolved extras were enough.)*
 
@@ -102,17 +102,17 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 Added by the PA after WO4, under PROJECT.md's amendment. Cut the branch from the WO4 tip.
 
-- [ ] `rectangleOf()` in `designer/src/pipeline/live-pipeline.ts` gains one last fallback: the
+- [x] `rectangleOf()` in `designer/src/pipeline/live-pipeline.ts` gains one last fallback: the
       box from `drawnExtent()`, used only where it returns `undefined` today. An hline or vline
       gets a one-pixel thickness on the axis it only starts on. The two existing paths are
       unchanged.
-- [ ] Unit test: a box, label, line and triangle get the same rectangle as before; a circle,
+- [x] Unit test: a box, label, line and triangle get the same rectangle as before; a circle,
       ellipse (including a `segments` quadrant), hline and vline get their drawn extent.
-- [ ] e2e: select a circle on the canvas and resize it by a handle, checking `radius` (and
+- [x] e2e: select a circle on the canvas and resize it by a handle, checking `radius` (and
       `x`/`y` where the anchor demands it); select an hline and resize its width. Tick WO3's
       circle e2e box.
-- [ ] Remove the "not yet reachable" notes from `docs/ui_spec.md` §8 and the ChangeLog.
-- [ ] Run, one at a time: CLI lint and tsc; designer unit; `build:e2e`; e2e; production and
+- [x] Remove the "not yet reachable" notes from `docs/ui_spec.md` §8 and the ChangeLog.
+- [x] Run, one at a time: CLI lint and tsc; designer unit; `build:e2e`; e2e; production and
       `test:e2e:production`; `check-package.mjs`. Append a WO5 section to the completion
       report below, with the commit, counts and anything left open.
 
@@ -199,3 +199,40 @@ The fix is small:
 That needs the PA's go-ahead, because it changes hit-testing for every shape.
 
 Screenshots are in `tmp/e2g/`: `activity-bar.png`, `status-save.png`, `shell-unsaved.png`, `triangle-vertex-handles.png` and `resize-refusal.png`.
+
+## WO5 (worker, 2026-11-11)
+
+**Provenance.** I first declined WO5 under rule 00, because the status log held no owner approval of the widened boundary. I resumed only after the log recorded the owner's own words, "Approve WO5" (`24e2823`).
+
+**Commit.** One commit on `u8g2gl-e2g/wo5-extent-selection`, cut from the WO4 tip `24e2823`; the commit message gives its subject. Nothing is pushed, tagged or published.
+
+**The change.** In `pipeline/live-pipeline.ts`, `rectangleOf()` keeps its two paths unchanged, and only where both used to return `undefined` it now falls back to `extentRectangle()`, the box from `drawnExtent()`.
+- An hline or vline needs no special case: the drawn extent is already one pixel on an axis the element only starts on.
+- A `u8g2gl_pixel` falls into the same fallback, so it also becomes selectable, as a 1×1 box. It is the one element beyond the four the amendment names, and it is within the ruling, since it returned `undefined` before.
+- No element that was selectable before changes its rectangle. The new unit test checks this for a box, a progress bar, a line and a triangle, and the existing hit-test, overlay, selection and manipulation specs pass.
+
+**Tests.**
+- `test/unit/drawn-rectangles.test.ts` (new) checks the unchanged rectangles, plus the circle, a quadrant, an ellipse, an hline, a vline and a pixel. It also checks that every element is a hit target with a placement.
+- `test/unit/shape-resize.test.ts` now uses the pipeline's own placements and boxes instead of building them with the resolver. All 17 tests pass unchanged on the real data.
+- `e2e/shape-resize.spec.ts` gains two tests:
+  - A circle is selected by its drawn box (`sel 70,20 21×21`). Its right handle +4 writes `x="82" y="32" radius="12"`, the left edge stays at 70, and the gesture is one undo step.
+  - An hline is selected (`sel 10,50 30×1`). Its right handle +6 writes `width="36"`, and the panel says `Can't resize: <u8g2gl_hline> has no height`.
+
+**Docs.** I removed the "not yet reachable" note from `docs/ui_spec.md` §8; its resizing paragraph now says how each kind of element is boxed. The ChangeLog's 0.16.2 line now says that these shapes can be selected.
+
+**Suites (one at a time).**
+
+| Suite | After WO4 (`1d546de`) | After WO5 |
+|---|---|---|
+| Home-path guard | clean | clean |
+| CLI lint and tsc | clean | clean |
+| Designer typecheck | clean | clean |
+| Designer unit | 187 passed | 191 passed |
+| `build:e2e` | builds | builds |
+| Designer e2e | 92 passed | 94 passed |
+| Production build: no-hook grep / `test:e2e:production` | clean / 3 passed | clean / 3 passed |
+| `check-package.mjs` | PASS, 771 files | PASS, 771 files, 15,349,734 bytes |
+
+The e2e run was 23:09 to 23:13, with no failure or flake. `pmset -g log` shows no Sleep, DarkWake or Wake after 08:00:11, so the run is not void.
+
+**Left open.** Nothing from E-2g. One observation: now that an hline or vline can be selected, the property panel shows "Can't resize: … has no height" (or "width") whenever one is selected. That is accurate, under ruling 3's refusal line. If it reads as noise, the PA could decide not to report an axis the element does not have.

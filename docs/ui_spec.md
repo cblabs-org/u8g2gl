@@ -347,7 +347,7 @@ The most important surface.
 
 **Selection.** Click selects; repeated clicks cycle down through overlaps; marquee selects many; Esc clears. Selected elements show handles and a live `x, y, w, h` badge.
 
-**Resizing.** A handle moves one edge of the element's drawn box (two at a corner) and leaves the opposite edge where it is, written in the attributes that place the element:
+**Resizing.** Every element is selected by its drawn box: its own rectangle, the box around a line's or triangle's points, or, for a circle, an ellipse, an hline or a vline, the pixels it draws (one pixel thick across a line). A handle moves one edge of that box (two at a corner) and leaves the opposite edge where it is, written in the attributes that place the element:
 
 - **A box** (`x`, `width`, or a far anchor) rewrites those attributes, as a move does.
 - **A line or triangle** is placed by its points. Every point is scaled about the opposite edge of the box around them, rounded to a whole pixel. Points that all share one `x` (or `y`) have no width (or height) to scale on that axis. A single selected line or triangle also shows a round handle on each vertex; dragging one moves that vertex alone, snapped as a move is. Vertex handles take precedence over the box's where they overlap, and are not shown with more than one element selected.
@@ -355,8 +355,6 @@ The most important surface.
 - **An hline or vline** resizes on the axis it has.
 
 Every attribute a handle writes must be an integer literal. A binding or an expression refuses that axis with its reason, shown beside the pointer during the drag and, while the element is selected, as **Can't resize: …** in the property panel; the other axis still follows. A box, radius or radii stay at least one pixel; a triangle may become degenerate, as the validator allows. Each drag is one undo step.
-
-*Not yet reachable:* the canvas draws no hit rectangle for a circle, an ellipse, an hline or a vline, so these cannot yet be selected on the canvas, and their handles do not appear. Their resize behaviour is in place for when they can.
 
 **Movement.**
 

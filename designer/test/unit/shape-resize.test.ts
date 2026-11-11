@@ -12,23 +12,18 @@
  *          keeps resizing on the axis it has; sizes stay at least one pixel;
  *          an expression or a binding refuses its axis with the reason and
  *          writes nothing there; and each drag is one undo stop.
- * Description: `DragEdit` end to end over a stand-in Monaco model, with
- *              placements from the live pipeline where it draws the element.
- *              Where it does not yet give one (a circle, an ellipse, an hline
- *              have no hit rectangle), the placement is made by the same
- *              resolver, at screen level, and the box from `drawnExtent()`.
+ * Description: `DragEdit` end to end over a stand-in Monaco model, with the
+ *              placements and boxes the live pipeline gives the canvas.
  */
 
 import { expect, test } from '@playwright/test';
 import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
-import { drawnExtent, resolveScreens } from '@u8g2gl/core/resolver/index.js';
 import { CanvasEditor } from '../../src/editing/canvas-editor';
 import { DragEdit, type DragKind } from '../../src/editing/drag-edit';
 import type { Handle } from '../../src/editing/resize-rules';
 import { planHandleResize, resizeRefusalReasons, vertexPoints } from '../../src/editing/shape-resize-rules';
 import { runTextPipeline } from '../../src/pipeline/live-pipeline';
-import type { Rect } from '../../src/pipeline/live-pipeline';
 import { ProjectModelCache } from '../../src/project/project-model';
 import { FakeModel } from './support/fake-model';
 
@@ -51,9 +46,8 @@ interface Setup {
 }
 
 // setup
-// A 128 × 64 screen holding `elements`, with each element's placement and box:
-// the live pipeline's where it has them, else the resolver's own at screen
-// level, boxed by its drawn extent.
+// A 128 × 64 screen holding `elements`, with each element's placement and box
+// as the live pipeline gives them.
 function setup(elements: string): Setup {
   const text = `<screen name="home">\n  <view>\n${elements}\n  </view>\n</screen>\n`;
   const result = runTextPipeline({
@@ -62,21 +56,7 @@ function setup(elements: string): Setup {
     assets: { fonts: new Map(), images: new Map(), diagnostics: [], failedFonts: new Set(), failedImages: new Set() },
     activeFile: SCREEN,
   });
-  const placements = new Map(result.placements);
-  const bounds = new Map<string, Rect>(result.bounds);
-  const resolved = resolveScreens({ globals: result.model.globals, screens: result.model.screens, manifests: result.model.manifests });
-  for (const element of resolved.screens[0]?.elements ?? []) {
-    const name = String(element.node.attributes.name);
-    const manifest = result.model.manifests.get(element.node.tag);
-    if (placements.has(name) || manifest === undefined) continue;
-    placements.set(name, { manifest, absolute: element, origin: { x: 0, y: 0 } });
-    const extent = drawnExtent(element, manifest);
-    const x = extent.horizontal ?? (element.geometry.x === undefined ? undefined : { min: element.geometry.x, max: element.geometry.x });
-    const y = extent.vertical ?? (element.geometry.y === undefined ? undefined : { min: element.geometry.y, max: element.geometry.y });
-    if (x !== undefined && y !== undefined) {
-      bounds.set(name, { x: x.min.value, y: y.min.value, width: x.max.value - x.min.value + 1, height: y.max.value - y.min.value + 1 });
-    }
-  }
+  const { placements, bounds } = result;
   const model = new FakeModel(text);
   const editor = new CanvasEditor((file) => (file === SCREEN ? model : undefined));
   return {
