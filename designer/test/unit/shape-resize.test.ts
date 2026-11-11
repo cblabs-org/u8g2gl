@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/shape-resize.test.ts
- * Purpose: Resizing what is not placed by a box (ui_spec §8, EDITOR-DESIGN
- *          §3.5): a line's or triangle's box handles scale its points about
- *          the opposite edge, rounded; a circle's handles change its radius,
+ * Purpose: Resizing what is not placed by a box (ui_spec §8): a line's
+ *          or triangle's box handles scale its points about the opposite
+ *          edge, rounded; a circle's handles change its radius,
  *          an ellipse's its radii, with the centre moved so the opposite edge
  *          stays put, whole or quadrant; one vertex drags alone; an hline
  *          keeps resizing on the axis it has; sizes stay at least one pixel;

@@ -177,6 +177,7 @@ export class Workspace {
    * A save that fails brings Output to the front, since it holds the reason;
    * a conflict has its own bar on the editor, so it does not.
    *
+   * @param path A project document; one not open in a model reports `failed`.
    * @return What the save did.
    */
   async save(path: string): Promise<SaveOutcome> {

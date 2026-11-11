@@ -281,10 +281,10 @@ export class CanvasView {
       }
     }
 
-    // --- Step 2b: Vertex handles, over the selection's box ---
+    // --- Step 3: Vertex handles, over the selection's box ---
     if (this.vertices.length > 0) this.drawVertices(context);
 
-    // --- Step 3: The guides a drag lies on, across the frame, on the pixel boundary ---
+    // --- Step 4: The guides a drag lies on, across the frame, on the pixel boundary ---
     if (this.guides.length > 0) {
       const width = this.frame.width * this.zoom;
       const height = this.frame.height * this.zoom;
@@ -305,7 +305,7 @@ export class CanvasView {
       context.stroke();
     }
 
-    // --- Step 4: A test run's differing pixels, over everything but the marquee ---
+    // --- Step 5: A test run's differing pixels, over everything but the marquee ---
     if (this.diff.length > 0) {
       context.setLineDash([]);
       context.lineWidth = 1;
@@ -322,7 +322,7 @@ export class CanvasView {
       }
     }
 
-    // --- Step 5: The marquee, while one is dragged ---
+    // --- Step 6: The marquee, while one is dragged ---
     if (this.marquee !== undefined) {
       const box = this.screenBox(this.marquee);
       context.setLineDash([4, 3]);

@@ -5,7 +5,7 @@
  *
  * File: designer/src/editing/shape-resize-rules.ts
  * Purpose: What dragging a handle writes on an element that is not placed by
- *          a box (EDITOR-DESIGN §3.5, ui_spec §8): a line or triangle, placed
+ *          a box (ui_spec §8): a line or triangle, placed
  *          by its points, and a circle or ellipse, placed by a centre and a
  *          radius. `resize-rules.ts` rewrites `x`/`width`-style axes, which
  *          these elements do not have, so on its own it refused them all; this

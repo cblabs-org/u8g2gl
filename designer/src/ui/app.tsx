@@ -94,7 +94,7 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     [workspace],
   );
 
-  // --- ⌘S or Ctrl-S anywhere in the shell saves the active document ---
+  // --- ⌘S or Ctrl-S anywhere in the shell saves the active document, else the canvas's screen ---
   // --- ⌘⌥S or Ctrl-Alt-S saves every unsaved document ---
   // --- ⌘↵ or Ctrl+Enter anywhere, Monaco included, presses Run ---
   // One handler, in the capture phase, rather than a Monaco keybinding: Monaco

@@ -16,9 +16,9 @@
  *              document opens in an editor tab; a widget's row opens its
  *              manifest; any other file (a font, a stray file) is listed but
  *              not opened, because the designer does not edit it (ui_spec §14).
- *              A file with unsaved changes shows a ● after its name.
  *              Such a row is `aria-disabled` rather than `disabled`, so it can
  *              still take focus and open its menu.
+ *              A file with unsaved changes shows a ● after its name.
  *
  *              The menu opens on right-click, Shift+F10 or the context-menu
  *              key; from the keyboard it is placed at the row, not the
