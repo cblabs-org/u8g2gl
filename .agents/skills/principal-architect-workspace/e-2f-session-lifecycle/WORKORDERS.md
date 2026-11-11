@@ -71,14 +71,14 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO3 — the refusal page (`u8g2gl-e2f/wo3-refusal-page`)
 
-- [ ] Ruling 5: a new `cli/src/node/design/refusal-page.ts`, in the style of
+- [x] Ruling 5: a new `cli/src/node/design/refusal-page.ts`, in the style of
       `placeholder-page.ts`. It is served, with status 403, to a `GET` with
       `Sec-Fetch-Mode: navigate`, or one whose `Accept` prefers `text/html` over JSON. Every
       other refused request gets today's JSON, byte for byte. `wrong Host` stays JSON.
-- [ ] The page is byte-identical for a missing token, a wrong token and every route. It holds
+- [x] The page is byte-identical for a missing token, a wrong token and every route. It holds
       no project name, path or token; check that by test, not by reading. Its text follows
       ruling 5.
-- [ ] Tests: a navigation request gets HTML, the same for missing and wrong tokens across every
+- [x] Tests: a navigation request gets HTML, the same for missing and wrong tokens across every
       route in the existing route table; an API request still gets JSON; neither the token nor
       the project directory name appears in the page. The existing 403 tests are unchanged.
 

@@ -10,7 +10,8 @@
  *          within 200 ms, the ignored paths, malformed percent-encodings, the
  *          build queue's routes, the designer's files and the editor Wasm
  *          route, the open and reveal routes (which must start nothing for a
- *          refused request), and a clean close with streams open.
+ *          refused request), the refusal page a browser gets for a stale link,
+ *          and a clean close with streams open.
  * Description: Each test starts a server on port 0 against a temporary project
  *              and closes it in afterEach. Requests use `fetch`, except the
  *              Host-header check, which needs `node:http` because `fetch` will
@@ -19,7 +20,7 @@
 
 import { existsSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { ServedProjectFileSystem, type ProjectFsEvent } from '../../../src/core/project-fs/index.js';
 import { startDesignServer, type DesignServer, type DesignServerOptions } from '../../../src/node/design/design-server.js';
@@ -147,6 +148,99 @@ describe('the token, on every route', () => {
       req.end();
     });
     expect(status).toBe(403);
+  });
+});
+
+describe('the refusal page, for a browser opening a stale link', () => {
+  /** What Chromium sends for a top-level navigation. */
+  const NAVIGATE = {
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Sec-Fetch-Mode': 'navigate',
+  };
+  const JSON_REFUSAL = '{"code":"forbidden","message":"missing or wrong session token"}';
+
+  // refused
+  // A request with no token, or a wrong one in the query, as a stale bookmark carries.
+  async function refused(s: DesignServer, route: (typeof ROUTES)[number], wrong: boolean, headers: Record<string, string>): Promise<Response> {
+    const path = wrong ? `${route.path}${route.path.includes('?') ? '&' : '?'}token=${'0'.repeat(s.token.length)}` : route.path;
+    return fetch(`http://127.0.0.1:${s.port}${path}`, { method: route.method, headers, body: route.body });
+  }
+
+  it('gives a navigation the same HTML page, status 403, for a missing and a wrong token on every GET route', async () => {
+    const s = await start();
+    const pages = new Set<string>();
+    for (const route of ROUTES.filter((r) => r.method === 'GET')) {
+      for (const wrong of [false, true]) {
+        const response = await refused(s, route, wrong, NAVIGATE);
+        const label = `${route.path} ${wrong ? 'wrong' : 'missing'}`;
+        expect(response.status, label).toBe(403);
+        expect(response.headers.get('content-type'), label).toBe('text/html; charset=utf-8');
+        pages.add(await response.text());
+      }
+    }
+    expect(pages.size).toBe(1);
+    const [page = ''] = pages;
+    expect(page).toContain('This designer link needs a running session');
+    expect(page).toContain('npx u8g2gl design');
+  });
+
+  it('serves the page for an Accept that prefers HTML, with no Sec-Fetch-Mode', async () => {
+    const s = await start();
+    const response = await fetch(`http://127.0.0.1:${s.port}/`, { headers: { Accept: 'text/html, application/json;q=0.5' } });
+    expect(response.status).toBe(403);
+    expect(await response.text()).toContain('<!doctype html>');
+  });
+
+  it('keeps the JSON, byte for byte, for API callers and for every non-GET route', async () => {
+    const s = await start();
+    const apiAccepts: ReadonlyArray<Record<string, string>> = [
+      {},
+      { Accept: '*/*' },
+      { Accept: 'application/json' },
+      { Accept: 'text/event-stream' },
+      { Accept: 'application/json, text/html' },
+      { Accept: 'text/html;q=0.5, application/json' },
+      { Accept: 'text/html;q=0' },
+    ];
+    for (const route of ROUTES) {
+      const tries = route.method === 'GET' ? apiAccepts : [...apiAccepts, NAVIGATE];
+      for (const headers of tries) {
+        const response = await refused(s, route, false, headers);
+        const label = `${route.method} ${route.path} ${JSON.stringify(headers)}`;
+        expect(response.status, label).toBe(403);
+        expect(response.headers.get('content-type'), label).toBe('application/json; charset=utf-8');
+        expect(await response.text(), label).toBe(JSON_REFUSAL);
+      }
+    }
+  });
+
+  it('names neither the token, the presented token nor the project directory', async () => {
+    const s = await start();
+    const presented = 'a'.repeat(s.token.length);
+    const response = await fetch(`http://127.0.0.1:${s.port}/?token=${presented}`, { headers: NAVIGATE });
+    const page = await response.text();
+    expect(page).toContain('<!doctype html>');
+    for (const secret of [s.token, presented, basename(root), root]) {
+      expect(page).not.toContain(secret);
+    }
+  });
+
+  it('keeps a wrong Host as JSON, even for a navigation', async () => {
+    const s = await start();
+    const reply = await new Promise<{ status: number; type: string | undefined; body: string }>((resolve, reject) => {
+      const req = httpRequest(
+        { host: '127.0.0.1', port: s.port, path: '/', headers: { ...NAVIGATE, Host: `evil.example:${s.port}` } },
+        (res) => {
+          let body = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => (body += chunk));
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, type: res.headers['content-type'], body }));
+        },
+      );
+      req.on('error', reject);
+      req.end();
+    });
+    expect(reply).toEqual({ status: 403, type: 'application/json; charset=utf-8', body: '{"code":"forbidden","message":"wrong Host"}' });
   });
 });
 
