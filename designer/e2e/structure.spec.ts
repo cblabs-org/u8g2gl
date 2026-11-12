@@ -41,6 +41,11 @@ async function undo(page: Page, file = SCREEN): Promise<void> {
   await page.evaluate((path) => (window as unknown as TestHandle).__u8g2gl.documents.modelOf(path)?.undo(), file);
 }
 
+/** Whether the canvas has drawn `name`, so a click on it can hit it. */
+async function isDrawn(page: Page, name: string): Promise<boolean> {
+  return page.evaluate((name) => (window as unknown as TestHandle).__u8g2gl.loop.bounds.get().has(name), name);
+}
+
 /** Lines in `after` that `before` lacks, and lines of `before` that `after` lacks. */
 function diff(before: string, after: string): { added: string[]; removed: string[] } {
   const a = before.split('\n');
@@ -73,6 +78,9 @@ test('Delete removes the selected element’s line; with two selected, both; eac
   await undo(page);
   expect(await bufferText(page, SCREEN)).toBe(before);
 
+  // The undo restores the text at once, but the canvas redraws on its next
+  // frame; a click before then hits the frame without row0.
+  await expect.poll(() => isDrawn(page, 'row0')).toBe(true);
   await clickCanvas(page, 100, 8);
   await clickCanvas(page, 200, 55, ['Shift']);
   expect((await selectedNames(page)).names).toEqual(['row0', 'sys_clock']);
