@@ -48,11 +48,16 @@ test('a binding shows its subject types', () => {
   expect(fieldFacts(spec)).toBe('subject · string | int');
 });
 
-test('the framework label’s long_mode reads as the manifest declares it', () => {
+test('the framework label’s long_mode reads as the manifest declares it: user help, then its facts', () => {
   const manifest = new ProjectModelCache().build(new Map()).manifests.get('u8g2gl_label');
   if (manifest === undefined) throw new Error('no u8g2gl_label manifest');
   const longMode = panelLayout(manifest)
     .sections.flatMap((section) => section.rows.flat())
     .find((spec) => spec.key === 'long_mode');
   expect(longMode === undefined ? undefined : fieldFacts(longMode)).toBe('enum · clip | dots | scroll | scroll_circular · default clip');
+  // Help spans lines in the XML; the tooltip shows it with its whitespace collapsed.
+  expect(longMode?.help?.replace(/\s+/g, ' ')).toBe(
+    'Overflow behaviour when text exceeds the widget width: clip hard-clips at the bounds; dots truncates with an ellipsis; ' +
+      'scroll and scroll_circular marquee the text. Labels are single-line, so there is no wrap.',
+  );
 });

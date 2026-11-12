@@ -106,7 +106,9 @@ test('a property’s help is in a tooltip, on its ⓘ and its name, with its fac
   const longMode = field(page, 'long_mode');
   const info = longMode.getByRole('button', { name: 'About long_mode' });
   const tooltip = page.getByRole('tooltip');
-  const helpText = /^Overflow behaviour when text exceeds the widget width/;
+  const helpText =
+    'Overflow behaviour when text exceeds the widget width: clip hard-clips at the bounds; dots truncates with an ellipsis; ' +
+    'scroll and scroll_circular marquee the text. Labels are single-line, so there is no wrap.';
   const facts = 'enum · clip | dots | scroll | scroll_circular · default clip';
 
   // --- No help inline under any field; each field's ⓘ is after its name ---

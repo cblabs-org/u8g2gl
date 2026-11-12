@@ -59,11 +59,11 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO2 — help wording (`u8g2gl-e2i/wo2-help-text`)
 
-- [ ] Ruling 6: the `long_mode` help and the three "Used only when…" strings in
+- [x] Ruling 6: the `long_mode` help and the three "Used only when…" strings in
       `include/u8g2gl/manifests/u8g2gl_label.xml`. Never edit `test/xtensa_control/pre_fix/`.
-- [ ] Regenerate `cli/src/data/manifests.json` (`npm run build:manifests`) and
+- [x] Regenerate `cli/src/data/manifests.json` (`npm run build:manifests`) and
       `cli/test/cst/tokeniser-trees.json` through its own refresh path.
-- [ ] Prove no other golden moved: `git diff --stat`, and `scripts/refresh-goldens.mjs` on the
+- [x] Prove no other golden moved: `git diff --stat`, and `scripts/refresh-goldens.mjs` on the
       built CLI leaves an empty diff.
 
 # WO3 — docs, version, review, evidence (`u8g2gl-e2i/wo3-docs-review`)

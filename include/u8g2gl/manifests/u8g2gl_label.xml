@@ -12,21 +12,19 @@
     <prop name="long_mode" type="enum" setter="set_long_mode"
           values="clip,dots,scroll,scroll_circular" default="clip"
           emit="U8G2GL_LONG_{VALUE^^}"
-          help="Overflow behaviour when text exceeds the widget width ([D-19]).
+          help="Overflow behaviour when text exceeds the widget width:
                 clip hard-clips at the bounds; dots truncates with an
                 ellipsis; scroll and scroll_circular marquee the text.
-                wrap is not offered — U8G2GL labels are single-line, so a
-                user arriving from LVGL Pro will meet this omission
-                deliberately rather than find it missing silently." />
+                Labels are single-line, so there is no wrap." />
     <prop name="scroll_px_per_sec" type="int" setter="set_scroll_px_per_sec" default="25"
-          help="Marquee scroll speed in pixels per second. Meaningless unless
+          help="Marquee scroll speed in pixels per second. Used only when
                 long_mode is scroll or scroll_circular." />
     <prop name="initial_delay_ms" type="int" setter="set_initial_delay_ms" default="3000"
           help="Initial pause delay in milliseconds before scrolling starts.
-                Meaningless unless long_mode is scroll or scroll_circular." />
+                Used only when long_mode is scroll or scroll_circular." />
     <prop name="static_dwell_ms" type="int" setter="set_static_dwell_ms" default="5000"
           help="Dwell duration in milliseconds for text that fits within
-                bounds before signalling completion. Meaningless unless
+                bounds before signalling completion. Used only when
                 long_mode is scroll or scroll_circular." />
     <bind name="bind_text" type="string" setter="bind_text"
           fmt="bind_text_fmt" />
