@@ -23,10 +23,10 @@
  *              A tooltip (`ui/tooltip.tsx`) shows the label, the `<tag>` and
  *              the description on hover and on keyboard focus. Its state is
  *              the tile's own, so showing it re-renders that tile and not the
- *              Palette. Tiles are
- *              in the tab order, and the arrow keys move between them: ←/→
- *              to the neighbour in reading order, ↑/↓ to the nearest tile in
- *              the row above or below, Home/End to the first and last.
+ *              Palette. Tiles are in the tab order, and the arrow keys move
+ *              between them: ←/→ to the neighbour in reading order, ↑/↓ to
+ *              the nearest tile in the row above or below, Home/End to the
+ *              first and last.
  *
  * Exports:
  * - Palette:  The component

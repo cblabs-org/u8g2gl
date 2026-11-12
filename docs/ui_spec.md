@@ -44,7 +44,7 @@ Monochrome UI work is **pixel work**. On a 128×64 panel an element one pixel ou
 3. **Two views of one document.** Canvas and XML are the same thing seen differently. Selection, edits and errors are shared, live and bidirectional. This is the defining behaviour.
 4. **Pixel-exact by default.** Every position is an integer, always visible, always nudgeable.
 5. **The XML stays authored.** Round-trip preserves comments, ordering and formatting. The editor is a *co-author*, not the file's owner.
-6. **The property panel teaches.** Every property carries its description, its consequence and its constraints inline. This is the gap in the incumbent tools and the main reason to build another.
+6. **The property panel teaches.** Every property carries its description, its consequence and its constraints where it is edited: its help one step away behind an ⓘ (§9.2), its reasons and problems inline. This is the gap in the incumbent tools and the main reason to build another.
 7. **One editing surface, three contexts, four supporting panels.** Beyond that needs a case (§14).
 
 ---
@@ -412,7 +412,7 @@ Every attribute a handle writes must be an integer literal. A binding or an expr
 
 ### 9.2 Guidance — what makes it teach
 
-- **Descriptions on the field, one step away.** A property whose manifest gives `help` has a quiet ⓘ after its name. Hovering the name or the ⓘ, or focusing the ⓘ from the keyboard, opens a tooltip beside the panel: the help, then one facts line — the type; an enum's values, or a binding's subject types, separated by ` | `; and the default, if there is one (`enum · clip | dots | scroll | scroll_circular · default clip`). Escape closes it and does nothing else; the selection stays. It is the Palette's tooltip (§6), so both look and behave alike. Opening one re-renders only its field. *2026-11-12 (E-2i), the owner's decision:* this replaces help rendered as text beneath every control, so a property is explained the way a Palette element is. The ⓘ marks every property that has help, so its meaning is still found without guessing where to hover.
+- **Descriptions on the field, one step away.** A property whose manifest gives `help` has a quiet ⓘ after its name. Hovering the name or the ⓘ, clicking the ⓘ, or focusing it from the keyboard, opens a tooltip beside the panel: the help, then one facts line — the type; an enum's values, or a binding's subject types, separated by ` | `; and the default, if there is one (`enum · clip | dots | scroll | scroll_circular · default clip`). Escape closes it and does nothing else; the selection stays. It is the Palette's tooltip (§6), so both look and behave alike. Opening one re-renders only its field. *2026-11-12 (E-2i), the owner's decision:* this replaces help rendered as text beneath every control, so a property is explained the way a Palette element is. The ⓘ marks every property that has help, so its meaning is still found without guessing where to hover.
 - **What needs acting on stays inline.** Why a field is disabled, its problems, and the note on a computed value with Detach and Edit in XML are shown beneath the control, never only in a tooltip.
 - **Live validation.** A value the compiler would reject is flagged as typed, with the reason.
 - **Consequence shown where it is incurred.** Capacity fields display their memory cost (`max_rows 16 → 2.3 KB`) from the §18 budget model, so a costly choice is felt when made rather than at build time.
@@ -520,7 +520,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | Requirement | Detail | Status |
 |---|---|---|
 | **`<previews>`** | Named preview configurations per element — size and context for isolated rendering (§7.2) and palette thumbnails. Present in LVGL Pro; dropped from ours as "editor-only" | **Deferred to E-3** — *2026-10-31: decided at C4 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8); not in schema 0.5* |
-| **`help` on every `<prop>`** | Inline description text. The core of principle 6 | **Must formalise** — *2026-10-26: done, schema 0.4* |
+| **`help` on every `<prop>`** | Description text, shown in a tooltip behind an ⓘ (§9.2). The core of principle 6 | **Must formalise** — *2026-10-26: done, schema 0.4* |
 | **Property grouping and order** | `group="geometry\|appearance\|content\|binding\|advanced"`; declaration order drives panel order | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): the panel keeps declaration order, geometry first* |
 | **Palette metadata** | Display name, category, icon per element | **Done (0.5; icons done, 0.6)** — *2026-10-31: `label`, `category` and `description` on `<api>` ([design_spec.md §13.1](design_spec.md)); the Palette files by category and shows the label and description. 2026-11-10: `icon` on `<api>`, which every framework manifest declares; a tile shows its element's icon, else its category's* |
 | **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): every prop shows* |

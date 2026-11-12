@@ -17,8 +17,8 @@
  *
  *              A field's help is in a tooltip (`ui/tooltip.tsx`, ui_spec
  *              §9.2), not beneath its control: an ⓘ after the property's name,
- *              there only when the manifest gives help, opens it on focus,
- *              and hovering the name or the ⓘ opens it too. It shows the help,
+ *              there only when the manifest gives help, opens it on focus
+ *              and on a click, and hovering the name or the ⓘ opens it too. It shows the help,
  *              then the facts line (`field-facts.ts`). It sits beside the
  *              panel, to its left, level with the field. Its state is the
  *              field's own, so opening it re-renders that field alone. What
@@ -191,6 +191,8 @@ function FieldRow({
               aria-describedby={tooltip.at !== undefined ? tooltipId : undefined}
               onFocus={onFocus}
               onBlur={onBlur}
+              // Safari does not focus a button it clicks, and a touch has no
+              // hover: without this a click there would open nothing.
               onClick={(event) => tooltip.show(event.currentTarget)}
             >
               <Icon name="info" size={INFO_ICON_SIZE} />

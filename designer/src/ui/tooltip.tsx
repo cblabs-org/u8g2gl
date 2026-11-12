@@ -76,6 +76,7 @@ export interface TooltipHandle {
   readonly at: TooltipAt | undefined;
   /** Opens it, placed against `anchor`. */
   readonly show: (anchor: HTMLElement) => void;
+  /** Closes it. */
   readonly hide: () => void;
 }
 
@@ -87,7 +88,9 @@ export interface TooltipHandle {
  *              unless given.
  * @return The handle. While it is open, Escape closes it and is consumed.
  */
-export function useTooltip(place: (anchor: HTMLElement) => TooltipAt = (anchor) => rightOf(anchor.getBoundingClientRect())): TooltipHandle {
+export function useTooltip(
+  place: (anchor: HTMLElement) => TooltipAt = (anchor) => rightOf(anchor.getBoundingClientRect()),
+): TooltipHandle {
   const [at, setAt] = useState<TooltipAt | undefined>(undefined);
   const open = at !== undefined;
   useEffect(() => {

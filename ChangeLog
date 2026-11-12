@@ -19,8 +19,8 @@ history is in git. See docs/RELEASING.md.
 2026-11-10	cli v0.16.xx	U8G2GL
   * 0.16.4: The designer's property panel puts each property's help in a
     tooltip, as the Palette does for elements, instead of beneath its
-    control. An ⓘ after the name opens it on hover or keyboard focus, as
-    does hovering the name; it shows the help and a facts line with the
+    control. An ⓘ after the name opens it on hover, click or keyboard
+    focus, as does hovering the name; it shows the help and a facts line with the
     type, an enum's values or a binding's subject types, and the default.
     Escape closes it and leaves the selection alone. Why a field is
     disabled, its problems and the computed-value note stay inline.
