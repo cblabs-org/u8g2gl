@@ -20,12 +20,13 @@
  *              Each tile is an HTML drag source carrying its tag under
  *              `PALETTE_DRAG_TYPE`, which the canvas accepts.
  *
- *              A tooltip shows the label, the `<tag>` and the description on
- *              hover and on keyboard focus. Its state is the tile's own, so
- *              showing it re-renders that tile and not the Palette. Tiles are
- *              in the tab order, and the arrow keys move between them: ←/→
- *              to the neighbour in reading order, ↑/↓ to the nearest tile in
- *              the row above or below, Home/End to the first and last.
+ *              A tooltip (`ui/tooltip.tsx`) shows the label, the `<tag>` and
+ *              the description on hover and on keyboard focus. Its state is
+ *              the tile's own, so showing it re-renders that tile and not the
+ *              Palette. Tiles are in the tab order, and the arrow keys move
+ *              between them: ←/→ to the neighbour in reading order, ↑/↓ to
+ *              the nearest tile in the row above or below, Home/End to the
+ *              first and last.
  *
  * Exports:
  * - Palette:  The component
@@ -33,6 +34,7 @@
 
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Icon } from '../icons/icon';
+import { Tooltip, tooltipTriggers, useTooltip } from '../ui/tooltip';
 import { useWorkspace } from '../ui/workspace-context';
 import { countRender } from '../perf/render-count';
 import { filterPalette, PALETTE_DRAG_TYPE, paletteGroups, type PaletteEntry } from './palette-entries';
@@ -40,32 +42,19 @@ import { paletteIcon } from './palette-icons';
 
 /** The icon's size in a 56 px tile, in CSS pixels: room for a label beneath. */
 const TILE_ICON_SIZE = 22;
-/** The gap between a tile and its tooltip, in CSS pixels. */
-const TOOLTIP_GAP = 6;
 /**
  * How far apart two tiles' top edges may be and still share a row, in CSS
  * pixels: layout positions are fractional, and 1 px absorbs the rounding.
  */
 const ROW_TOLERANCE = 1;
 
-/** Where a tooltip goes: beside its tile, in viewport pixels. */
-interface TooltipAt {
-  readonly x: number;
-  readonly y: number;
-}
-
 // PaletteTile
 // One element's tile, its drag, and its tooltip.
 //   entry    — the element
 //   category — its section's category, for the icon fallback
 function PaletteTile({ entry, category }: { readonly entry: PaletteEntry; readonly category: string | undefined }): React.JSX.Element {
-  const [tooltip, setTooltip] = useState<TooltipAt | undefined>(undefined);
+  const tooltip = useTooltip();
   const tooltipId = `palette-tooltip-${entry.tag}`;
-  const show = (element: HTMLElement): void => {
-    const box = element.getBoundingClientRect();
-    setTooltip({ x: box.right + TOOLTIP_GAP, y: box.top });
-  };
-  const hide = (): void => setTooltip(undefined);
   return (
     <li>
       <div
@@ -74,14 +63,11 @@ function PaletteTile({ entry, category }: { readonly entry: PaletteEntry; readon
         tabIndex={0}
         role="button"
         aria-label={entry.label ?? entry.tag}
-        aria-describedby={tooltip !== undefined ? tooltipId : undefined}
+        aria-describedby={tooltip.at !== undefined ? tooltipId : undefined}
         data-tag={entry.tag}
-        onPointerEnter={(event) => show(event.currentTarget)}
-        onPointerLeave={hide}
-        onFocus={(event) => show(event.currentTarget)}
-        onBlur={hide}
+        {...tooltipTriggers(tooltip)}
         onDragStart={(event) => {
-          hide();
+          tooltip.hide();
           event.dataTransfer.setData(PALETTE_DRAG_TYPE, entry.tag);
           event.dataTransfer.effectAllowed = 'copy';
         }}
@@ -89,13 +75,13 @@ function PaletteTile({ entry, category }: { readonly entry: PaletteEntry; readon
         <Icon name={paletteIcon(entry.icon, category)} size={TILE_ICON_SIZE} />
         <span className={entry.label === undefined ? 'palette-label is-tag' : 'palette-label'}>{entry.label ?? entry.tag}</span>
       </div>
-      {tooltip !== undefined && (
-        <div id={tooltipId} role="tooltip" className="palette-tooltip" style={{ left: tooltip.x, top: tooltip.y }}>
+      {tooltip.at !== undefined && (
+        <Tooltip id={tooltipId} at={tooltip.at} className="palette-tooltip">
           {entry.label !== undefined && <span className="palette-tooltip-label">{entry.label}</span>}
           <span className="palette-tooltip-tag">&lt;{entry.tag}&gt;</span>
           {entry.description !== undefined && <span className="palette-tooltip-description">{entry.description}</span>}
           <span className="palette-tooltip-hint">Drag onto the canvas to insert it.</span>
-        </div>
+        </Tooltip>
       )}
     </li>
   );

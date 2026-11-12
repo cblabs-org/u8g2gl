@@ -17,6 +17,16 @@ history is in git. See docs/RELEASING.md.
     exactly while the major is 0.
     Built and tested against U8G2 2.36.18.
 2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.4: The designer's property panel puts each property's help in a
+    tooltip, as the Palette does for elements, instead of beneath its
+    control. An ⓘ after the name opens it on hover, click or keyboard
+    focus, as does hovering the name; it shows the help and a facts line with the
+    type, an enum's values or a binding's subject types, and the default.
+    Escape closes it and leaves the selection alone. Why a field is
+    disabled, its problems and the computed-value note stay inline.
+    u8g2gl_label's long_mode help is rewritten as user help, and its three
+    scroll props now say "Used only when long_mode is scroll or
+    scroll_circular." No change to generated output.
   * 0.16.3: The designer's canvas has an Outlines toggle, beside freeze,
     that boxes every drawn element on the overlay, never in the frame, and
     is remembered per browser. A single selected line, hline or vline
