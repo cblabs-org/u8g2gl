@@ -48,14 +48,14 @@ The owner's approval is recorded in its status log (rule 00). Read
 
 # WO1 — field tooltips (`u8g2gl-e2i/wo1-field-tooltips`)
 
-- [ ] Rulings 1: extract the Palette's tooltip into one shared component; move the Palette onto
+- [x] Rulings 1: extract the Palette's tooltip into one shared component; move the Palette onto
       it with no change in look or behaviour. The Palette tooltip specs pass unedited.
-- [ ] Rulings 2–3: the ⓘ trigger after each property name that has help, the name hover, and the
+- [x] Rulings 2–3: the ⓘ trigger after each property name that has help, the name hover, and the
       tooltip with the help text and the facts line (a pure, unit-tested function).
-- [ ] Ruling 4: remove the inline `.field-help` and its CSS; keep the disabled reason, problems
+- [x] Ruling 4: remove the inline `.field-help` and its CSS; keep the disabled reason, problems
       and the computed / Detach / Edit in XML note inline.
-- [ ] Ruling 5: render counts unchanged.
-- [ ] Ruling 7's unit and e2e tests.
+- [x] Ruling 5: render counts unchanged.
+- [x] Ruling 7's unit and e2e tests.
 
 # WO2 — help wording (`u8g2gl-e2i/wo2-help-text`)
 

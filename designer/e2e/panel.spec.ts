@@ -11,7 +11,9 @@
  *          the screen's own. Each type has its control (§9.1), and each
  *          committed value — Enter, blur, a stepper, a toggle, a choice — is
  *          one undo stop with a one-line diff; typing alone writes nothing,
- *          and reset removes the attribute.
+ *          and reset removes the attribute. A field's help is in a tooltip
+ *          behind an ⓘ after its name (§9.2), with a facts line; what a user
+ *          must act on stays inline.
  * Description: Each test starts `u8g2gl design` on a fresh copy of the
  *              departures project and selects and edits through the canvas and
  *              the panel, as a user would; undo is the editor's own key.
@@ -21,7 +23,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
-import { bufferText, clickCanvas, openFile, openShell, placeCaret } from './support/shell';
+import { bufferText, clickCanvas, nextFrames, openFile, openShell, placeCaret, selectedNames } from './support/shell';
+import type { TestHandle } from '../src/test-hooks';
 
 const SCREEN = 'screens/screen_departures.xml';
 /** The departures screen as the fixture has it. */
@@ -84,8 +87,9 @@ test('selecting an element shows its manifest’s fields: geometry first, its ow
   const inherited = panel(page).locator('details.inherited');
   await expect(inherited.locator('summary')).toHaveText('From u8g2gl_obj');
   await expect(inherited).not.toHaveAttribute('open', '');
-  // Help renders beneath the control, not on hover (ui_spec §9.2).
-  await expect(panel(page).locator('[data-field="blink"] .field-help')).toHaveText('Enable 1Hz colon blink animation.');
+  // Help is in the field's tooltip, behind its ⓘ (ui_spec §9.2).
+  await field(page, 'blink').getByRole('button', { name: 'About blink' }).hover();
+  await expect(page.getByRole('tooltip').locator('.field-tooltip-help')).toHaveText('Enable 1Hz colon blink animation.');
 });
 
 test('with nothing selected the panel shows the screen’s own properties', async ({ page }) => {
@@ -93,6 +97,80 @@ test('with nothing selected the panel shows the screen’s own properties', asyn
   await expect(panel(page).locator('.panel-title')).toHaveText('<screen>');
   await expect(panel(page).locator('[data-field="name"]')).toBeVisible();
   await expect(panel(page).locator('.panel-note').first()).toHaveText('Display 256×64');
+});
+
+test('a property’s help is in a tooltip, on its ⓘ and its name, with its facts; Escape closes it and keeps the selection', async ({ page }) => {
+  await open(page);
+  await clickCanvas(page, 12, 12); // plat_label, a u8g2gl_label
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('plat_label');
+  const longMode = field(page, 'long_mode');
+  const info = longMode.getByRole('button', { name: 'About long_mode' });
+  const tooltip = page.getByRole('tooltip');
+  const helpText = /^Overflow behaviour when text exceeds the widget width/;
+  const facts = 'enum · clip | dots | scroll | scroll_circular · default clip';
+
+  // --- No help inline under any field; each field's ⓘ is after its name ---
+  await expect(panel(page).locator('.field-help')).toHaveCount(0);
+  await expect(panel(page).getByText(helpText)).toHaveCount(0);
+  await expect(info).toBeVisible();
+  await expect(longMode.locator('.field-label .field-name .field-info')).toHaveCount(1);
+
+  // --- Hover on the ⓘ: the help, then the facts line, beside the panel to its left ---
+  const counts = (): Promise<Record<string, number>> => page.evaluate(() => (window as unknown as TestHandle).__u8g2glRenders());
+  await nextFrames(page, 2);
+  const before = await counts();
+  await info.hover();
+  await expect(tooltip.locator('.field-tooltip-help')).toHaveText(helpText);
+  await expect(tooltip.locator('.field-tooltip-facts')).toHaveText(facts);
+  await expect(info).toHaveAttribute('aria-describedby', 'field-tooltip-long_mode');
+  const tip = await tooltip.boundingBox();
+  const region = await panel(page).boundingBox();
+  expect((tip?.x ?? Infinity) + (tip?.width ?? 0)).toBeLessThanOrEqual(region?.x ?? -Infinity);
+  // Opening it re-renders that field and nothing else in the panel.
+  await nextFrames(page, 2);
+  const after = await counts();
+  const rendered = Object.keys(after).filter((name) => (after[name] ?? 0) > (before[name] ?? 0) && (name === 'PropertyPanel' || name.startsWith('Panel')));
+  expect(rendered).toEqual(['PanelField:long_mode']);
+  await page.mouse.move(700, 400);
+  await expect(tooltip).toHaveCount(0);
+  await expect(info).not.toHaveAttribute('aria-describedby');
+
+  // --- Hover on the name opens the same tooltip ---
+  await longMode.locator('label').hover();
+  await expect(tooltip.locator('.field-tooltip-help')).toHaveText(helpText);
+  await page.mouse.move(700, 400);
+  await expect(tooltip).toHaveCount(0);
+
+  // --- Escape on a hovered tooltip, the canvas focused, closes it and nothing else ---
+  await longMode.locator('label').hover();
+  await expect(tooltip).toHaveCount(1);
+  expect(await page.evaluate(() => document.activeElement?.querySelector('canvas.frame') !== null)).toBe(true);
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await nextFrames(page, 2);
+  expect((await selectedNames(page)).names).toEqual(['plat_label']);
+
+  // --- Keyboard focus opens it; Escape closes it and keeps the selection ---
+  await page.mouse.move(700, 400);
+  await info.focus();
+  await expect(tooltip.locator('.field-tooltip-facts')).toHaveText(facts);
+  await page.keyboard.press('Escape');
+  await expect(tooltip).toHaveCount(0);
+  await expect(info).toBeFocused();
+  expect((await selectedNames(page)).names).toEqual(['plat_label']);
+
+  // --- The control: with no tooltip open, Escape on the canvas clears the selection ---
+  await page.locator('.canvas-frame canvas.frame').evaluate((canvas) => (canvas.closest('[tabindex="0"]') as HTMLElement | null)?.focus());
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await selectedNames(page)).names).toEqual([]);
+
+  // --- What a user must act on stays inline: a disabled reason (a problem: below) ---
+  // message_bar, under formation: the second click at that point.
+  await clickCanvas(page, 100, 22);
+  await clickCanvas(page, 100, 22);
+  await expect(panel(page).locator('.panel-subtitle')).toHaveText('message_bar');
+  await expect(field(page, 'text').locator('.field-reason')).toBeVisible();
+  await expect(tooltip).toHaveCount(0);
 });
 
 test('typing in a field writes nothing until Enter; the commit is a one-line diff and one undo stop', async ({ page }) => {
@@ -270,6 +348,7 @@ test('a value the validator rejects is flagged at its field, with the validator�
   await width.getByRole('textbox', { name: 'width' }).press('Enter');
   await expect(width.locator('.field-problem.error')).toHaveCount(1);
   await expect(width.locator('.field-problem.error')).toContainText('display is 256px wide');
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
   await expect(field(page, 'height').locator('.field-problem')).toHaveCount(0);
 });
 
@@ -284,7 +363,8 @@ test('a prop at its default is greyed with no reset; a project widget says its R
   await expect(maxCols.getByRole('button', { name: 'Reset max_cols' })).toHaveCount(0);
   await expect(field(page, 'max_rows').getByRole('button', { name: 'Reset max_rows' })).toBeVisible();
   // The author's help as written; the panel's own line never puts a figure on it.
-  await expect(field(page, 'max_rows').locator('.field-help')).toHaveText('Row capacity. Determines allocated RAM.');
+  await field(page, 'max_rows').getByRole('button', { name: 'About max_rows' }).hover();
+  await expect(page.getByRole('tooltip').locator('.field-tooltip-help')).toHaveText('Row capacity. Determines allocated RAM.');
   await expect(panel(page).locator('.panel-note', { hasText: 'RAM cost not reported for project widgets ([Q-19])' })).toBeVisible();
   await expect(panel(page).getByText(/\d+(\.\d+)? ?(KB|B)\b/)).toHaveCount(0);
 
