@@ -17,6 +17,13 @@ history is in git. See docs/RELEASING.md.
     exactly while the major is 0.
     Built and tested against U8G2 2.36.18.
 2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.3: The designer's canvas has an Outlines toggle, beside freeze,
+    that boxes every drawn element on the overlay, never in the frame, and
+    is remembered per browser. A single selected line, hline or vline
+    shows a round handle at each end instead of box handles: a line's end
+    moves that vertex, and an hline's or vline's end moves along its axis
+    with the other end held. A selected line no longer says it cannot
+    resize on an axis it has no handle on. No change to generated output.
   * 0.16.2: The designer's first-use fixes. The activity bar draws Lucide
     icons. Saving is visible and stays explicit: the status bar offers
     "● N unsaved · Save", the canvas toolbar has Save for the screen it

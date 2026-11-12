@@ -196,6 +196,14 @@ Hit-testing respects draw order ([D-4]): the topmost element under the cursor wi
 | File access | File System Access API | Local server |
 | Firmware build | User's own toolchain | User's own toolchain |
 
+### 4.5 Element outlines
+
+An **Outlines** toggle beside the freeze toggle (`⬚ Outlines`, *Show every element's box*) draws every drawn element's box on the canvas: a 1-pixel dashed amber border and a faint amber fill, under any placeholder outline and the selection, over the error hatching. It shows where each element is even when it lights no pixel, which the framework Wasm's placeholder hatch otherwise shows only for project widgets, and only until the project's own Wasm loads.
+
+- **Overlay only.** The outlines are never part of the framebuffer, so parity, a test run's diff and the lit-pixel count are unchanged by them.
+- **Live.** They follow each run's element boxes, through drags and edits. A stale frame keeps the last outlines, as it keeps the selection.
+- **Remembered per browser.** Off by default. Where the browser's storage is unavailable (a private window), the toggle still works and is simply not remembered.
+
 ---
 
 ## 5. User Flows
@@ -345,16 +353,22 @@ The most important surface.
 
 **Zoom.** 1× · 2× · 4× · 8× · fit. Ctrl/⌘+scroll zooms about the cursor; space-drag pans. A **pixel grid** appears at 4× and above; an **8-pixel tile grid** toggles independently, because tile boundaries are real — partial refresh works in tiles.
 
-**Selection.** Click selects; repeated clicks cycle down through overlaps; marquee selects many; Esc clears. Selected elements show handles and a live `x, y, w, h` badge.
+**Selection.** Click selects; repeated clicks cycle down through overlaps; marquee selects many; Esc clears. Selected elements show handles and a live `x, y, w, h` badge. A single selected line-shaped element shows end handles instead of box handles (below).
 
 **Resizing.** Every element is selected by its drawn box: its own rectangle, the box around a line's or triangle's points, or, for a circle, an ellipse, an hline or a vline, the pixels it draws (one pixel thick across a line). A handle moves one edge of that box (two at a corner) and leaves the opposite edge where it is, written in the attributes that place the element:
 
 - **A box** (`x`, `width`, or a far anchor) rewrites those attributes, as a move does.
-- **A line or triangle** is placed by its points. Every point is scaled about the opposite edge of the box around them, rounded to a whole pixel. Points that all share one `x` (or `y`) have no width (or height) to scale on that axis. A single selected line or triangle also shows a round handle on each vertex; dragging one moves that vertex alone, snapped as a move is. Vertex handles take precedence over the box's where they overlap, and are not shown with more than one element selected.
+- **A line or triangle** is placed by its points. Every point is scaled about the opposite edge of the box around them, rounded to a whole pixel; a line's box handles are shown only with several elements selected (below). Points that all share one `x` (or `y`) have no width (or height) to scale on that axis. A single selected triangle also shows a round handle on each vertex; dragging one moves that vertex alone, snapped as a move is. Vertex handles take precedence over the box's where they overlap, and are not shown with more than one element selected.
 - **A circle or ellipse** is placed by a centre and radii. A circle's handles change `radius`, a side by its own axis and a corner by the larger of the two; an ellipse's change `rx` or `ry`, a corner both. The centre moves too where it must, so the opposite edge stays put: a whole circle reaches a radius on both sides of its centre, a quadrant (`segments`) on one.
-- **An hline or vline** resizes on the axis it has.
 
-Every attribute a handle writes must be an integer literal. A binding or an expression refuses that axis with its reason, shown beside the pointer during the drag and, while the element is selected, as **Can't resize: …** in the property panel; the other axis still follows. A box, radius or radii stay at least one pixel; a triangle may become degenerate, as the validator allows. Each drag is one undo step.
+**Lines have end handles, not a box's.** A line's box is redundant, and a horizontal or vertical one is flat, so its box handles would stack on the ends and win the grab. A **single** selected line-shaped element therefore shows one round handle at each end and **no box handles**; its outline and badge stay. Line-shaped is what the element is, never whether its box happens to be flat: an element placed by exactly two points (`u8g2gl_line`, diagonal or not), or one placed by `x`, `y` and a size on one axis only (`u8g2gl_hline`'s `width`, `u8g2gl_vline`'s `height`).
+
+- **A line's** end handles are its vertex handles: dragging one moves that point alone.
+- **An hline's** left end moves `x` and changes `width` so the right end stays put; its right end changes `width`. A **vline** is the same with `y` and `height`. Each end moves along the line's own axis only, is snapped as a resize edge is, and Shift has no ratio to keep. A line stays at least one pixel long, so an end cannot be dragged past the other.
+- **Dragging the line's body** still moves the whole element.
+- **With several elements selected**, a line keeps the box handles of its box, as every element does.
+
+Every attribute a handle writes must be an integer literal. A binding or an expression refuses that axis with its reason, shown beside the pointer during the drag and, while the element is selected, as **Can't resize: …** in the property panel; the other axis still follows. A line is asked only about its ends, so the panel never reports an axis it has no handle on, while a real refusal on an end, such as a bound `width`, still shows. A box, radius or radii stay at least one pixel; a triangle may become degenerate, as the validator allows. Each drag is one undo step.
 
 **Movement.**
 
@@ -366,6 +380,7 @@ Every attribute a handle writes must be an integer literal. A binding or an expr
 | Alt + drag | Duplicate |
 | Drag handle | Resize; Shift constrains ratio |
 | Drag vertex | Move one vertex of a line or triangle |
+| Drag end | Move one end of a line, hline or vline |
 | Property field | Exact value; steppers ±1 |
 
 **Alignment.** Edge and centre guides against siblings and display bounds appear during drag, with a snap threshold of 3 *screen* pixels — not device pixels, so it stays usable at 1×. Snapping is to integers only; there is no sub-pixel position. An align toolbar (left/centre/right, top/middle/bottom, distribute) acts on multi-selection.
