@@ -13,11 +13,12 @@
  *          class the canvas panel attaches to its frame element.
  * Description: Gesture ownership, decided at pointer-down:
  *              - on a vertex of a single selected line or triangle: a drag of
- *                that **vertex** alone; vertex handles are hit before the box's;
+ *                that **vertex** alone;
  *              - on an end of a single selected hline or vline: a drag of that
- *                **end** alone, along the line's axis. A single selected
- *                line-shaped element (`line-ends.ts`) has no box handles at
- *                all, only its two ends;
+ *                **end** alone, along the line's axis;
+ *              round handles (vertices or ends) are hit before a box's, and a
+ *              single selected line-shaped element (`line-ends.ts`) has no box
+ *              handles at all, only its two ends;
  *              - on a selected element's handle: a **resize** by that handle
  *                (Shift keeps the ratio);
  *              - with Shift elsewhere: a toggle on click and an adding marquee
@@ -125,7 +126,7 @@ export interface GestureHost {
   readonly showMarquee: MarqueeSink;
   /** Draws the guides a drag lies on; empty hides them. */
   readonly showGuides: (lines: readonly GuideLine[]) => void;
-  /** Draws the vertex handles of the selected line or triangle; empty hides them. */
+  /** Draws the round handles of the single selected element: its vertices, or an hline's or vline's ends; empty hides them. */
   readonly showVertices: (points: readonly Point[]) => void;
   /** Plans the insert of `tag` at device pixel (x, y) of the drawn screen; undefined before the first run. */
   readonly planInsert: (tag: string, file: string, x: number, y: number) => InsertPlan | undefined;

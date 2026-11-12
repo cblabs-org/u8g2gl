@@ -14,16 +14,15 @@
  *              with `image-rendering: pixelated`, so a zoom costs the browser
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
- *              outline, eight handles and an `x, y, w×h` badge, a round handle
+ *              outline, eight handles and an `x, y, w×h` badge; a round handle
  *              on each vertex of a single selected line or triangle, or on
  *              each end of an hline or vline, in place of a line's box
- *              handles, the marquee
- *              while one is dragged, the alignment guides a drag has
- *              snapped to, the outlines of placeholder widgets, a
- *              dashed box round every drawn element while the Outlines toggle
- *              is on, and the hatching over an element an error is in (§3.8: the frame
- *              stays live, and the problem is marked over it, not in it), and
- *              a test run's differing pixels.
+ *              handles; the marquee while one is dragged; the alignment
+ *              guides a drag has snapped to; the outlines of placeholder
+ *              widgets; a dashed box round every drawn element while the
+ *              Outlines toggle is on; the hatching over an element an error
+ *              is in (§3.8: the frame stays live, and the problem is marked
+ *              over it, not in it); and a test run's differing pixels.
  *              It is never part of the framebuffer, so nothing it draws can be
  *              mistaken for a pixel the display would light.
  *
@@ -47,7 +46,7 @@
  *     - setOverlay():  Replace what the overlay shows
  *     - setMarquee():  Show or hide the marquee being dragged
  *     - setGuides():   Show the alignment guides a drag lies on
- *     - setVertices(): Show the vertex handles of a line or triangle
+ *     - setVertices(): Show the round handles: a line's or triangle's vertices, an hline's or vline's ends
  *     - setDiff():     Mark a test run's differing pixels
  *     - setStale():    Dim the frame while the document has an error
  */
@@ -242,8 +241,9 @@ export class CanvasView {
   }
 
   /**
-   * @brief Shows a handle on each vertex, in device pixels, centred on the
-   *        vertex's pixel; an empty list hides them. Unchanged points redraw nothing.
+   * @brief Shows a round handle on each point, in device pixels, centred on
+   *        its pixel: each vertex of a line or triangle, or each end of an
+   *        hline or vline. An empty list hides them; unchanged points redraw nothing.
    */
   setVertices(points: readonly { readonly x: number; readonly y: number }[]): void {
     if (points.length === this.vertices.length && points.every((point, i) => point.x === this.vertices[i]?.x && point.y === this.vertices[i]?.y)) return;

@@ -23,7 +23,7 @@
  *              (both sizes) are not line-shaped.
  *
  *              A two-point line's ends are its vertex handles, planned by
- *              `planVertex()` as before. A span's ends are its first and last
+ *              `planVertex()`. A span's ends are its first and last
  *              pixel on its axis; dragging one is a resize by that edge alone
  *              (`planResize()`), so the start end moves `x` and takes the
  *              difference from `width` and the far end changes `width`, with

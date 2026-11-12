@@ -197,7 +197,7 @@ export class EditLoop {
    */
   private selectionRects: readonly OverlayRect[] = [];
   private problemRects: readonly OverlayRect[] = [];
-  private outlineRects: readonly OverlayRect[] = [];
+  private outlineOverlay: readonly OverlayRect[] = [];
   private composedOverlay: readonly OverlayRect[] = [];
   private drawnPlacements: ReadonlyMap<string, Placement> = new Map();
   private applied: EditorModule | undefined;
@@ -277,7 +277,7 @@ export class EditLoop {
   // Every drawn element's box while the Outlines toggle is on, none while it
   // is off. Composed only; the caller shows the overlay.
   private composeOutlines(): void {
-    this.outlineRects = this.outlines.get() ? outlineRects(this.bounds.get()) : [];
+    this.outlineOverlay = this.outlines.get() ? outlineRects(this.bounds.get()) : [];
   }
 
   /**
@@ -349,7 +349,7 @@ export class EditLoop {
   // The overlay's hatching, element outlines and selection outlines, to the
   // view if attached.
   private showOverlay(): void {
-    this.composedOverlay = [...this.problemRects, ...this.outlineRects, ...this.selectionRects];
+    this.composedOverlay = [...this.problemRects, ...this.outlineOverlay, ...this.selectionRects];
     this.view?.setOverlay(this.composedOverlay);
   }
 

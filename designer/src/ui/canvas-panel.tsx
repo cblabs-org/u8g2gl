@@ -19,9 +19,9 @@
  *              (`CanvasEditor`), and this component never reads the
  *              selection, so selecting or dragging re-renders none of it. The
  *              toolbar sets the zoom (1× to 8×, or fit), the animation
- *              freeze and the Outlines toggle, which boxes every drawn element
- *              on the overlay and is remembered per browser, and holds Save for the drawn screen
- *              (`canvas-save-button.tsx`), the align and distribute buttons
+ *              freeze and the Outlines toggle, which boxes every drawn
+ *              element on the overlay and is remembered per browser. It holds
+ *              Save for the drawn screen (`canvas-save-button.tsx`), the align and distribute buttons
  *              (`align-toolbar.tsx`), which share the gestures' edit path and
  *              subscribe to the selection themselves, and Run with the last
  *              test run's verdict (`test-run-controls.tsx`), whose mismatch
