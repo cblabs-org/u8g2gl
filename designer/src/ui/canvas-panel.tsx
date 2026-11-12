@@ -18,8 +18,9 @@
  *              the panel's life with the edit path they write through
  *              (`CanvasEditor`), and this component never reads the
  *              selection, so selecting or dragging re-renders none of it. The
- *              toolbar sets the zoom (1× to 8×, or fit) and the animation
- *              freeze, and holds Save for the drawn screen
+ *              toolbar sets the zoom (1× to 8×, or fit), the animation
+ *              freeze and the Outlines toggle, which boxes every drawn element
+ *              on the overlay and is remembered per browser, and holds Save for the drawn screen
  *              (`canvas-save-button.tsx`), the align and distribute buttons
  *              (`align-toolbar.tsx`), which share the gestures' edit path and
  *              subscribe to the selection themselves, and Run with the last
@@ -54,6 +55,7 @@ export function CanvasPanel(): React.JSX.Element {
   const loop = workspace.loop;
   const state = useObservable(loop.frameState);
   const frozen = useObservable(loop.frozen);
+  const outlines = useObservable(loop.outlines);
   const isFramework = useObservable(workspace.wasm.isFramework);
   const [zoom, setZoom] = useState<number>(0);
   const stage = useRef<HTMLDivElement>(null);
@@ -154,6 +156,9 @@ export function CanvasPanel(): React.JSX.Element {
         </label>
         <button type="button" aria-pressed={frozen} onClick={() => loop.frozen.set(!frozen)} title="Pin animation at t = 0">
           {frozen ? '❚❚ frozen' : '▶ live'}
+        </button>
+        <button type="button" className="outlines-toggle" aria-pressed={outlines} onClick={() => loop.outlines.set(!outlines)} title="Show every element's box">
+          ⬚ Outlines
         </button>
       </div>
       <div className="canvas-stage" ref={stage}>

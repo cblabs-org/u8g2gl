@@ -34,6 +34,9 @@
  *              the drawn screen is outlined on the canvas from the run's
  *              rectangles (ui_spec §4.3). The run's hit targets are published
  *              for the canvas's selection gestures. Selection is never an edit.
+ *              While the Outlines toggle is on, every drawn element's box is
+ *              outlined too, from the same rectangles; on a stale frame the
+ *              last outlines stay, as the selection does.
  *
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how a keystroke measurement attributes a keystroke's cost.
@@ -52,6 +55,8 @@
  *
  *     State:
  *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
+ *     - outlines:         Whether every element's box is outlined (remembered)
+ *     - overlay:          The overlay's rectangles as last composed
  *     - placements:       The drawn elements' placements, for canvas edits
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *     - lastRun:          The latest run, for the property panel
@@ -72,6 +77,7 @@ import { DIAGNOSTIC_CODES } from '@u8g2gl/core/schema/diagnostic.js';
 import { loadedMonaco } from '../monaco/monaco';
 import type { CanvasView, OverlayRect } from '../canvas/canvas-view';
 import { countLit } from '../canvas/framebuffer';
+import { outlineRects, readOutlines, writeOutlines } from '../canvas/outlines';
 import { ProjectAssets } from '../project/project-assets';
 import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
@@ -141,6 +147,12 @@ export class EditLoop {
   readonly frameState = new Observable<FrameState>({ frame: 0, stale: true, placeholders: [], lit: 0 });
   /** Whether animation is pinned at t = 0 (ui_spec §4.2's freeze toggle). */
   readonly frozen = new Observable<boolean>(false);
+  /**
+   * Whether every drawn element's box is outlined on the overlay (ui_spec §4's
+   * Outlines toggle). Off unless this browser remembers it on; each change is
+   * remembered. Overlay only: the frame's pixels never change with it.
+   */
+  readonly outlines = new Observable<boolean>(readOutlines());
   /** The selectable element rectangles of the drawn screen, by name. */
   readonly bounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
   /** What a click on the drawn frame can hit, and the file its names are in. */
@@ -177,9 +189,14 @@ export class EditLoop {
   private readonly frameListeners = new Set<(timings: FrameTimings) => void>();
   private readonly subscriptions: Array<() => void> = [];
   private view: CanvasView | undefined;
-  /** The overlay's selection outlines and its hatching, kept apart so each can change alone. */
+  /**
+   * The overlay's selection outlines, its hatching and its element outlines,
+   * kept apart so each can change alone.
+   */
   private selectionRects: readonly OverlayRect[] = [];
   private problemRects: readonly OverlayRect[] = [];
+  private outlineRects: readonly OverlayRect[] = [];
+  private composedOverlay: readonly OverlayRect[] = [];
   private drawnPlacements: ReadonlyMap<string, Placement> = new Map();
   private applied: EditorModule | undefined;
   private tickHandle: number | undefined;
@@ -225,7 +242,17 @@ export class EditLoop {
     );
     this.subscriptions.push(
       this.workspace.selection.current.subscribe(() => this.highlightSelection()),
-      this.bounds.subscribe(() => this.highlightSelection()),
+      // New bounds recompose the outlines before the selection draws the
+      // overlay, so a run redraws it once, not twice.
+      this.bounds.subscribe(() => {
+        this.composeOutlines();
+        this.highlightSelection();
+      }),
+      this.outlines.subscribe(() => {
+        writeOutlines(this.outlines.get());
+        this.composeOutlines();
+        this.showOverlay();
+      }),
     );
     request();
     this.tick();
@@ -243,6 +270,13 @@ export class EditLoop {
     this.selectionCount.set(rects.length);
     this.selectionRects = rects.map((rect) => ({ ...rect, kind: 'selection' }));
     this.showOverlay();
+  }
+
+  // composeOutlines
+  // Every drawn element's box while the Outlines toggle is on, none while it
+  // is off. Composed only; the caller shows the overlay.
+  private composeOutlines(): void {
+    this.outlineRects = this.outlines.get() ? outlineRects(this.bounds.get()) : [];
   }
 
   /**
@@ -301,10 +335,21 @@ export class EditLoop {
     this.view?.setDiff(pixels);
   }
 
+  /**
+   * The overlay's rectangles as last composed, whether or not a view is
+   * attached: hatching, element outlines and selection, in no draw order
+   * (the view orders them). For tests and the curious.
+   */
+  get overlay(): readonly OverlayRect[] {
+    return this.composedOverlay;
+  }
+
   // showOverlay
-  // The overlay's hatching and selection outlines, to the view if attached.
+  // The overlay's hatching, element outlines and selection outlines, to the
+  // view if attached.
   private showOverlay(): void {
-    this.view?.setOverlay([...this.problemRects, ...this.selectionRects]);
+    this.composedOverlay = [...this.problemRects, ...this.outlineRects, ...this.selectionRects];
+    this.view?.setOverlay(this.composedOverlay);
   }
 
   /**

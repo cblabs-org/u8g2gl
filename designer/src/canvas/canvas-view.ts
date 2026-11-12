@@ -17,8 +17,9 @@
  *              outline, eight handles and an `x, y, w×h` badge, a round handle
  *              on each vertex of a single selected line or triangle, the marquee
  *              while one is dragged, the alignment guides a drag has
- *              snapped to, the outlines of placeholder widgets, and
- *              the hatching over an element an error is in (§3.8: the frame
+ *              snapped to, the outlines of placeholder widgets, a
+ *              dashed box round every drawn element while the Outlines toggle
+ *              is on, and the hatching over an element an error is in (§3.8: the frame
  *              stays live, and the problem is marked over it, not in it), and
  *              a test run's differing pixels.
  *              It is never part of the framebuffer, so nothing it draws can be
@@ -35,6 +36,7 @@
  * - HANDLE_SIZE:   A selection handle's side, in CSS pixels
  * - VERTEX_SIZE:   A vertex handle's diameter, in CSS pixels
  * - OverlayRect:  A rectangle to draw on the overlay, and how
+ * - overlayOrder(): The overlay's rectangles in the order they are drawn
  * - GuideLine:    An alignment guide to draw
  * - CanvasView:   The two canvases
  *
@@ -65,20 +67,46 @@ export interface OverlayRect {
   readonly height: number;
   /**
    * `selection` a selected element; `placeholder` a widget the Wasm cannot
-   * draw; `problem` an element an error is in, hatched (EDITOR-DESIGN §3.8).
+   * draw; `problem` an element an error is in, hatched (EDITOR-DESIGN §3.8);
+   * `outline` any drawn element's box, while the Outlines toggle is on.
    */
-  readonly kind: 'selection' | 'placeholder' | 'problem';
+  readonly kind: 'selection' | 'placeholder' | 'problem' | 'outline';
 }
 
-/** The overlay's colour for each kind. */
+/**
+ * The overlay's colour for each kind. The outline is amber, the placeholder's
+ * family, because both say "an element is here"; it stays apart from the
+ * selection's blue, the hatch's red, the guides' magenta and the diff's cyan.
+ */
 const OVERLAY_COLOUR: Readonly<Record<OverlayRect['kind'], string>> = {
   selection: '#4f8cff',
   placeholder: 'rgba(230, 180, 80, 0.7)',
   problem: '#ff5a5f',
+  outline: 'rgba(255, 191, 0, 0.8)',
 };
 
-/** The order kinds are drawn in: hatching and placeholders under, selection on top. */
-const OVERLAY_ORDER: Readonly<Record<OverlayRect['kind'], number>> = { problem: 0, placeholder: 1, selection: 2 };
+/** The outline's fill: faint, so the frame's pixels read through it. */
+const OUTLINE_FILL = 'rgba(255, 191, 0, 0.1)';
+
+/** The outline's dash, in CSS pixels: shorter than the placeholder's, so the two read apart. */
+const OUTLINE_DASH = [2, 2];
+
+/**
+ * The order kinds are drawn in: hatching under, then outlines, then
+ * placeholders, and the selection on top, so a selected element's box is
+ * never covered by its own outline.
+ */
+const OVERLAY_ORDER: Readonly<Record<OverlayRect['kind'], number>> = { problem: 0, outline: 1, placeholder: 2, selection: 3 };
+
+/**
+ * @brief The overlay's rectangles in the order they are drawn: by kind, as
+ *        {@link OVERLAY_ORDER} ranks them, and in their given order within a
+ *        kind. Returns a new array; `rects` is untouched.
+ */
+export function overlayOrder(rects: readonly OverlayRect[]): OverlayRect[] {
+  // Array.prototype.sort is stable, so each kind keeps its given order.
+  return [...rects].sort((a, b) => OVERLAY_ORDER[a.kind] - OVERLAY_ORDER[b.kind]);
+}
 
 /** An alignment guide: a vertical line at device x, or a horizontal one at device y. */
 export interface GuideLine {
@@ -263,12 +291,15 @@ export class CanvasView {
     context.clearRect(0, 0, this.overlay.width, this.overlay.height);
     context.setTransform(ratio, 0, 0, ratio, OVERLAY_MARGIN * ratio, OVERLAY_MARGIN * ratio);
 
-    // --- Step 2: Hatching and placeholder outlines under, selections over ---
-    const order = [...this.overlayRects].sort((a, b) => OVERLAY_ORDER[a.kind] - OVERLAY_ORDER[b.kind]);
-    for (const rect of order) {
+    // --- Step 2: Hatching, element outlines and placeholders under, selections over ---
+    for (const rect of overlayOrder(this.overlayRects)) {
       const box = this.screenBox(rect);
       if (rect.kind === 'problem') {
         this.drawHatch(context, box);
+        continue;
+      }
+      if (rect.kind === 'outline') {
+        this.drawOutline(context, box);
         continue;
       }
       context.strokeStyle = OVERLAY_COLOUR[rect.kind];
@@ -361,6 +392,18 @@ export class CanvasView {
     context.stroke();
     context.restore();
     context.strokeStyle = OVERLAY_COLOUR.problem;
+    context.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
+  }
+
+  // drawOutline
+  // An element's box while the Outlines toggle is on: a faint fill and a 1-pixel
+  // dashed border, drawn on the pixel boundary just outside the element.
+  private drawOutline(context: CanvasRenderingContext2D, box: Box): void {
+    context.fillStyle = OUTLINE_FILL;
+    context.fillRect(box.x, box.y, box.width, box.height);
+    context.setLineDash(OUTLINE_DASH);
+    context.lineWidth = 1;
+    context.strokeStyle = OVERLAY_COLOUR.outline;
     context.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
   }
 
