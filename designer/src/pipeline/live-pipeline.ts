@@ -56,7 +56,7 @@ import { checkProject, finaliseDiagnostics, GENERATE_REFUSAL_POLICY } from '@u8g
 import { describeScenes } from '@u8g2gl/core/generator/emit/scene.js';
 import { placeScreen, type Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { computeCapacities, realiseScreens, type RealisedElement, type RealisedScreen } from '@u8g2gl/core/realise/index.js';
-import { createScreenPipeline, findTargetDisplay } from '@u8g2gl/core/resolver/index.js';
+import { createScreenPipeline, drawnExtent, findTargetDisplay } from '@u8g2gl/core/resolver/index.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
@@ -341,7 +341,13 @@ function union(a: Rect, b: Rect): Rect {
 // One placed element's device-space rectangle. A rectangle element has x, y,
 // width and height once placed; a line or triangle has only endpoints, so its
 // rectangle is their box, one pixel wide where the points share an axis.
-// Undefined for an element with neither, which nothing can hit.
+// Anything else (a circle or an ellipse, placed by a centre and radii; an
+// hline or vline, which has one size) is boxed by what it draws, the
+// resolver's drawn extent, which reaches a radius from the centre only on the
+// sides its `segments` draw, and is one pixel thick on an axis the element only
+// starts on. That last path is a fallback only, so no element the first two
+// box changes its rectangle. Undefined for an element with no extent on an
+// axis, which nothing can hit.
 //   placement — the element's placement
 function rectangleOf(placement: Placement): Rect | undefined {
   const { geometry, extras } = placement.absolute;
@@ -354,8 +360,23 @@ function rectangleOf(placement: Placement): Rect | undefined {
   }
   const xs = extras.filter((e) => e.axis === 'horizontal' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
   const ys = extras.filter((e) => e.axis === 'vertical' && e.coordinate !== undefined).map((e) => e.coordinate?.value ?? 0);
-  if (xs.length === 0 || ys.length === 0) return undefined;
+  if (xs.length === 0 || ys.length === 0) return extentRectangle(placement);
   const left = Math.min(...xs);
   const top = Math.min(...ys);
   return { x: left, y: top, width: Math.max(...xs) - left + 1, height: Math.max(...ys) - top + 1 };
+}
+
+// extentRectangle
+// The box of pixels an element draws (`drawnExtent()`), as a rectangle;
+// undefined when either axis is not known at build time or draws nothing.
+//   placement — the element's placement
+function extentRectangle(placement: Placement): Rect | undefined {
+  const { horizontal, vertical } = drawnExtent(placement.absolute, placement.manifest);
+  if (horizontal === undefined || vertical === undefined) return undefined;
+  return {
+    x: horizontal.min.value,
+    y: vertical.min.value,
+    width: horizontal.max.value - horizontal.min.value + 1,
+    height: vertical.max.value - vertical.min.value + 1,
+  };
 }

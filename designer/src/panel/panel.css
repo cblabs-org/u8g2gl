@@ -21,6 +21,7 @@
 .panel-title { font-weight: 600; font-family: ui-monospace, Menlo, monospace; }
 .panel-subtitle { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel-note { margin: 4px 0 0; color: var(--text-dim); font-style: italic; }
+.panel-note.resize-refusal { color: var(--warning); font-style: normal; }
 
 .panel-section { padding: 6px 12px; border-bottom: 1px solid var(--border); }
 .panel-section h3,

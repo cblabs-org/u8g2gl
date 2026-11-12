@@ -9,29 +9,25 @@
  *          the Palette exist in this release; the others are shown, disabled,
  *          so the layout is the one the specification draws and a person can
  *          see what is coming rather than finding it missing.
- * Description: A static list. The shell owns which view is active and passes
- *              it in; a click on a ready view asks the shell to show it.
+ * Description: Draws `ACTIVITY_VIEWS` as icon buttons. The shell owns which
+ *              view is active and passes it in; a click on a ready view asks
+ *              the shell to show it. Each icon is a Lucide `<Icon>`, which takes
+ *              the button's text colour, so the active and disabled states read
+ *              through the same colour and opacity rules as the text did.
  *
  * Exports:
- * - SidebarView:  The views the primary sidebar can show
+ * - SidebarView:  The views the primary sidebar can show (from activity-views)
  * - ActivityBar:  The component
  */
 
+import { Icon } from '../icons/icon';
 import { countRender } from '../perf/render-count';
+import { ACTIVITY_VIEWS, type SidebarView } from './activity-views';
 
-/** The views the primary sidebar can show in this release. */
-export type SidebarView = 'explorer' | 'palette';
+export type { SidebarView } from './activity-views';
 
-/** The views ui_spec §6 lists, with whether this release has them. */
-const VIEWS: readonly { readonly id: string; readonly label: string; readonly glyph: string; readonly ready: boolean }[] = [
-  { id: 'explorer', label: 'Explorer', glyph: '▤', ready: true },
-  { id: 'palette', label: 'Palette', glyph: '▦', ready: true },
-  { id: 'assets', label: 'Assets', glyph: '▣', ready: false },
-  { id: 'fonts', label: 'Fonts', glyph: 'A', ready: false },
-  { id: 'samples', label: 'Sample data', glyph: '≡', ready: false },
-  { id: 'flow', label: 'Flow', glyph: '⇄', ready: false },
-  { id: 'search', label: 'Search', glyph: '⌕', ready: false },
-];
+/** The icon's size in CSS pixels: Lucide's own 24-pixel grid, centred in the 44-pixel bar. */
+const ICON_SIZE = 24;
 
 /**
  * @brief The activity bar.
@@ -43,7 +39,7 @@ export function ActivityBar({ active, onSelect }: { readonly active: SidebarView
   countRender('ActivityBar');
   return (
     <nav className="activity-bar" aria-label="Views">
-      {VIEWS.map((view) => (
+      {ACTIVITY_VIEWS.map((view) => (
         <button
           key={view.id}
           type="button"
@@ -52,11 +48,12 @@ export function ActivityBar({ active, onSelect }: { readonly active: SidebarView
           aria-label={view.label}
           aria-pressed={view.id === active}
           disabled={!view.ready}
+          data-view={view.id}
           onClick={() => {
             if (view.id === 'explorer' || view.id === 'palette') onSelect(view.id);
           }}
         >
-          {view.glyph}
+          <Icon name={view.icon} size={ICON_SIZE} />
         </button>
       ))}
     </nav>

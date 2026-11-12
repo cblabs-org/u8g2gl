@@ -12,6 +12,8 @@
  *          than frames and must never pass through React, so this is a plain
  *          class the canvas panel attaches to its frame element.
  * Description: Gesture ownership, decided at pointer-down:
+ *              - on a vertex of a single selected line or triangle: a drag of
+ *                that **vertex** alone; vertex handles are hit before the box's;
  *              - on a selected element's handle: a **resize** by that handle
  *                (Shift keeps the ratio);
  *              - with Shift elsewhere: a toggle on click and an adding marquee
@@ -47,6 +49,11 @@
  *              Pointer positions become device pixels through the frame
  *              canvas's on-screen box, so the answer is right at every zoom.
  *
+ *              The vertex handles follow the frame: after every run and every
+ *              selection change, the single selected element's vertices
+ *              (`vertexPoints()`) are handed to the overlay, which redraws only
+ *              when they moved.
+ *
  * Exports:
  * - MARQUEE_THRESHOLD:   Screen pixels a press must move to become a drag
  * - EDITING_OFF_REASON:  What the cursor's tip says while editing is off
@@ -59,7 +66,7 @@
 
 import { parseCst } from '@u8g2gl/core/cst/index.js';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
-import { HANDLE_SIZE, type GuideLine } from '../canvas/canvas-view';
+import { HANDLE_SIZE, VERTEX_SIZE, type GuideLine } from '../canvas/canvas-view';
 import type { CanvasEditor } from '../editing/canvas-editor';
 import type { InsertPlan } from '../editing/insert-element';
 import { PALETTE_DRAG_TYPE } from '../palette/palette-entries';
@@ -68,6 +75,7 @@ import { deleteEdits } from '../editing/structure-edits';
 import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Handle } from '../editing/resize-rules';
+import { vertexPoints, type Point } from '../editing/shape-resize-rules';
 import type { DrawnTargets } from '../pipeline/edit-loop';
 import type { Rect } from '../pipeline/live-pipeline';
 import type { Observable } from '../state/observable';
@@ -112,6 +120,8 @@ export interface GestureHost {
   readonly showMarquee: MarqueeSink;
   /** Draws the guides a drag lies on; empty hides them. */
   readonly showGuides: (lines: readonly GuideLine[]) => void;
+  /** Draws the vertex handles of the selected line or triangle; empty hides them. */
+  readonly showVertices: (points: readonly Point[]) => void;
   /** Plans the insert of `tag` at device pixel (x, y) of the drawn screen; undefined before the first run. */
   readonly planInsert: (tag: string, file: string, x: number, y: number) => InsertPlan | undefined;
   /** Appends a line to Output. */
@@ -121,7 +131,16 @@ export interface GestureHost {
 }
 
 /** What a press does if it becomes a drag, decided at pointer-down. */
-type Owner = { readonly kind: 'move'; readonly duplicate: boolean } | { readonly kind: 'marquee' } | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle };
+type Owner =
+  | { readonly kind: 'move'; readonly duplicate: boolean }
+  | { readonly kind: 'marquee' }
+  | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle }
+  | { readonly kind: 'vertex'; readonly name: string; readonly index: number };
+
+/** A handle under the pointer: a box handle, or a vertex by its index; and the cursor it shows. */
+type HandleHit =
+  | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle; readonly cursor: string }
+  | { readonly kind: 'vertex'; readonly name: string; readonly index: number; readonly cursor: string };
 
 /** A press in progress. */
 interface Press {
@@ -175,6 +194,7 @@ export class CanvasGestures {
   /** True while the tip shows a refused drop's reason, until the pointer moves. */
   private dropTip = false;
   private readonly listeners: Array<[keyof HTMLElementEventMap, (event: never) => void]>;
+  private readonly unsubscribe: Array<() => void>;
 
   /** @param host What the gestures read and write. */
   constructor(host: GestureHost) {
@@ -196,11 +216,17 @@ export class CanvasGestures {
       ['blur', () => host.editor.closeGroup()],
     ];
     for (const [type, listener] of this.listeners) host.element.addEventListener(type, listener as EventListener);
+    // A run moves the vertices with the text; a selection change chooses whose.
+    const vertices = (): void => host.showVertices(this.vertices());
+    this.unsubscribe = [host.bounds.subscribe(vertices), host.selection.current.subscribe(vertices)];
+    vertices();
   }
 
   /** @brief Removes every listener and the tip, and ends any gesture. */
   dispose(): void {
     for (const [type, listener] of this.listeners) this.host.element.removeEventListener(type, listener as EventListener);
+    for (const off of this.unsubscribe) off();
+    this.host.showVertices([]);
     this.cancel();
     this.tip.remove();
   }
@@ -213,12 +239,12 @@ export class CanvasGestures {
     const { file, targets } = this.host.targets.get();
     const { x, y } = this.toDevice(event.clientX, event.clientY);
 
-    // --- Step 1: A selected element's handle resizes, Shift or not ---
+    // --- Step 1: A vertex drags alone; a selected element's handle resizes, Shift or not ---
     let owner: Owner = { kind: 'marquee' };
     let clickOnRelease = true;
     const handle = file === undefined ? undefined : this.handleAt(file, event.clientX, event.clientY);
     if (handle !== undefined) {
-      owner = { kind: 'resize', name: handle.name, handle: handle.handle };
+      owner = handle.kind === 'vertex' ? { kind: 'vertex', name: handle.name, index: handle.index } : { kind: 'resize', name: handle.name, handle: handle.handle };
       clickOnRelease = false;
     } else if (!event.shiftKey && file !== undefined) {
       // --- Step 2: An element moves; an unselected one is selected first ---
@@ -295,7 +321,11 @@ export class CanvasGestures {
       press.drag = new DragEdit(
         this.host.editor,
         { file, names: this.current(file), bounds: this.host.bounds.get(), placements: this.host.placements(), display: this.host.display() },
-        owner.kind === 'resize' ? owner : owner.kind === 'move' && owner.duplicate ? { kind: 'duplicate', taken: this.host.takenNames } : { kind: 'move' },
+        owner.kind === 'resize' || owner.kind === 'vertex'
+          ? owner
+          : owner.kind === 'move' && owner.duplicate
+            ? { kind: 'duplicate', taken: this.host.takenNames }
+            : { kind: 'move' },
       );
     }
 
@@ -495,18 +525,41 @@ export class CanvasGestures {
     if (this.host.element.title !== title) this.host.element.title = title;
   }
 
+  // vertices
+  // The vertex handles to show: those of the one selected element, if it is a
+  // line or triangle on the drawn screen; none for several, or for anything else.
+  private vertices(): Point[] {
+    const { file } = this.host.targets.get();
+    const names = file === undefined ? [] : this.current(file);
+    const [name] = names;
+    return names.length === 1 && name !== undefined ? vertexPoints(this.host.placements().get(name)) : [];
+  }
+
   // handleAt
-  // The selected element's handle under a client position, if any: the
-  // squares the overlay draws, in screen pixels, with a little slop.
+  // The selected element's handle under a client position, if any: first a
+  // vertex's circle, then the box's squares, as the overlay draws them, in
+  // screen pixels, with a little slop.
   //   file             — the drawn screen's file
   //   clientX, clientY — the pointer
-  private handleAt(file: string, clientX: number, clientY: number): { name: string; handle: Handle; cursor: string } | undefined {
+  private handleAt(file: string, clientX: number, clientY: number): HandleHit | undefined {
     const names = this.current(file);
     if (names.length === 0) return undefined;
     const box = this.host.frame.getBoundingClientRect();
     const scale = this.scale();
     const px = clientX - box.left;
     const py = clientY - box.top;
+
+    // --- Step 1: A vertex of the one selected line or triangle, before the box's handles ---
+    const [only] = names;
+    if (names.length === 1 && only !== undefined) {
+      const reach = VERTEX_SIZE / 2 + HANDLE_SLOP;
+      const vertices = vertexPoints(this.host.placements().get(only));
+      for (const [index, vertex] of vertices.entries()) {
+        if (Math.hypot(px - (vertex.x + 0.5) * scale.x, py - (vertex.y + 0.5) * scale.y) <= reach) return { kind: 'vertex', name: only, index, cursor: 'crosshair' };
+      }
+    }
+
+    // --- Step 2: The box's eight handles ---
     const reach = HANDLE_SIZE / 2 + HANDLE_SLOP;
     const bounds = this.host.bounds.get();
     for (let i = names.length - 1; i >= 0; i--) {
@@ -519,7 +572,7 @@ export class CanvasGestures {
       const width = rect.width * scale.x + 2;
       const height = rect.height * scale.y + 2;
       for (const { fx, fy, handle, cursor } of HANDLES) {
-        if (Math.abs(px - (left + fx * width)) <= reach && Math.abs(py - (top + fy * height)) <= reach) return { name, handle, cursor };
+        if (Math.abs(px - (left + fx * width)) <= reach && Math.abs(py - (top + fy * height)) <= reach) return { kind: 'resize', name, handle, cursor };
       }
     }
     return undefined;

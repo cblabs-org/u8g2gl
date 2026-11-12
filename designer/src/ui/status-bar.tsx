@@ -14,13 +14,18 @@
  *              moves the selection, re-renders it and nothing else here
  *              (EDITOR-DESIGN §3.3). It shows one element's `x,y w×h`, or for
  *              several the box around them with how many there are. The
- *              "not saved" item is its own component too, for the same reason.
+ *              "not saved" item is its own component too, for the same reason,
+ *              and so is the Save button, which shows while anything is
+ *              unsaved and saves it all: it reads only the dirty set, which
+ *              changes when a file becomes dirty or clean, not on every
+ *              keystroke.
  *
  * Exports:
  * - StatusBar:          The component
  * - describeWasm():     The indicator's text for a state
  * - SelectionGeometry:  Its selection readout
  * - NotSaved:           Its failed-save item
+ * - UnsavedSave:        Its "● N unsaved · Save" button
  */
 
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
@@ -28,6 +33,7 @@ import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
 import { describeNotSaved } from './session-status';
+import { describeUnsaved } from './save-status';
 
 /**
  * @brief The indicator's text: a glyph, the state, and the hash or reason.
@@ -71,6 +77,7 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
       <span className="status-item problems-count">
         ⛔ {errors} ⚠ {warnings}
       </span>
+      <UnsavedSave />
       <NotSaved onShowOutput={onShowOutput} />
       <span className="status-spacer" />
       <SelectionGeometry />
@@ -95,6 +102,23 @@ export function NotSaved({ onShowOutput }: { readonly onShowOutput: () => void }
   return (
     <button type="button" className="status-item not-saved" title="Open Output" onClick={onShowOutput}>
       {text}
+    </button>
+  );
+}
+
+/**
+ * @brief "● N unsaved · Save" while any file is unsaved; nothing otherwise.
+ *        A click saves every unsaved file; its tooltip lists them and the
+ *        shortcuts.
+ */
+export function UnsavedSave(): React.JSX.Element | null {
+  countRender('UnsavedSave');
+  const workspace = useWorkspace();
+  const text = describeUnsaved(useObservable(workspace.documents.dirty));
+  if (text === undefined) return null;
+  return (
+    <button type="button" className="status-item unsaved-save" title={text.title} onClick={() => void workspace.saveAll()}>
+      {text.label}
     </button>
   );
 }

@@ -25,6 +25,7 @@
  *     - session:        The server and token, for requests beyond the file system
  *     - connection:     Whether the design server can be reached
  *     - documents, activeFile, selection, problems, output, projectName
+ *     - canvasFile:     The file of the screen the canvas draws
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
  *
@@ -32,7 +33,9 @@
  *     - start():        Start the loop and the Wasm, once loaded
  *
  *     Requests:
- *     - saveActive():   Save the active document; show Output if that fails
+ *     - save():         Save one document; show Output if that fails
+ *     - saveActive():   ⌘S: the active document, else the canvas's
+ *     - saveAll():      ⌘⌥S: every unsaved document, one at a time
  *     - openFile():     Ask the layout to show a file
  *     - onOpenFile():   The layout's subscription to those requests
  *     - showOutput():   Ask the layout to bring Output to the front
@@ -41,13 +44,14 @@
  */
 
 import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
-import { ProjectDocuments } from './documents/project-documents';
+import { ProjectDocuments, type SaveOutcome } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
 import { EditLoop } from './pipeline/edit-loop';
 import type { DesignSession } from './session';
 import { SelectionModel } from './selection/selection-model';
 import { Observable } from './state/observable';
 import { TestRunController } from './test-run/test-run-controller';
+import { saveTarget } from './ui/save-status';
 import { EditorWasmController } from './wasm/editor-wasm-controller';
 
 /** A file to show, and optionally the position to put the caret at. */
@@ -68,6 +72,13 @@ export class Workspace {
   readonly documents: ProjectDocuments;
   /** The project file the editor shows, if any; the canvas shows its screen. */
   readonly activeFile = new Observable<string | undefined>(undefined);
+  /**
+   * The file of the screen the canvas last drew, if any: what its Save button
+   * and a ⌘S with no editor tab save. It changes only when the drawn screen's
+   * file does, never per frame, so the canvas toolbar's Save does not
+   * re-render on a keystroke or a drag.
+   */
+  readonly canvasFile = new Observable<string | undefined>(undefined);
   /** The Problems panel's rows. */
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
@@ -123,6 +134,9 @@ export class Workspace {
     });
     this.wasm = new EditorWasmController(session, (line) => this.log(line));
     this.loop = new EditLoop(this, this.wasm);
+    // The drawn frame's hit targets carry its screen's file. They are replaced
+    // on every run; `canvasFile` notifies only when the file itself moves.
+    this.loop.hitTargets.subscribe(() => this.canvasFile.set(this.loop.hitTargets.get().file));
     this.testRun = new TestRunController({
       session,
       wasmStatus: this.wasm.status,
@@ -156,18 +170,48 @@ export class Workspace {
   }
 
   /**
-   * @brief Saves the active document (⌘S). Explicit only: there is no
-   *        autosave, because a write the author did not ask for, into a file
-   *        their IDE also holds, makes a conflict out of nothing.
+   * @brief Saves one document. Explicit only: there is no autosave, because a
+   *        write the author did not ask for, into a file their IDE also holds,
+   *        makes a conflict out of nothing.
    *
    * A save that fails brings Output to the front, since it holds the reason;
    * a conflict has its own bar on the editor, so it does not.
+   *
+   * @param path A project document; one not open in a model reports `failed`.
+   * @return What the save did.
+   */
+  async save(path: string): Promise<SaveOutcome> {
+    const outcome = await this.documents.save(path);
+    if (outcome === 'failed') this.showOutput();
+    return outcome;
+  }
+
+  /**
+   * @brief Saves what ⌘S means: the active editor tab's document, or, with no
+   *        editor tab active, the document of the screen the canvas draws.
    */
   async saveActive(): Promise<void> {
-    const path = this.activeFile.get();
-    if (path !== undefined && (await this.documents.save(path)) === 'failed') {
-      this.showOutput();
+    const path = saveTarget(this.activeFile.get(), this.canvasFile.get());
+    if (path !== undefined) await this.save(path);
+  }
+
+  /**
+   * @brief Saves every unsaved document (⌘⌥S, and the status bar's Save).
+   *
+   * One at a time, sorted, each through `ProjectDocuments.save`, so every file
+   * gets the same conditional write, conflict and failure handling as a
+   * single save, and Output logs each one's outcome. Output comes to the front
+   * once, after them all, if any failed.
+   *
+   * @return Each path's outcome, in the order saved.
+   */
+  async saveAll(): Promise<ReadonlyMap<string, SaveOutcome>> {
+    const outcomes = new Map<string, SaveOutcome>();
+    for (const path of [...this.documents.dirty.get()].sort()) {
+      outcomes.set(path, await this.documents.save(path));
     }
+    if ([...outcomes.values()].includes('failed')) this.showOutput();
+    return outcomes;
   }
 
   /** @brief Asks the layout to show a file, at a position if given. */

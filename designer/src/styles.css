@@ -60,12 +60,16 @@ button { font: inherit; color: inherit; }
 }
 .activity {
   height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: none;
   color: var(--text-dim);
-  font-size: 18px;
   cursor: pointer;
 }
+.activity:not(:disabled):hover { color: var(--text); }
 .activity.active { color: var(--text); box-shadow: inset 2px 0 var(--accent); }
 .activity:disabled { opacity: 0.35; cursor: default; }
 
@@ -79,7 +83,9 @@ button { font: inherit; color: inherit; }
 .file-group h2 { margin: 6px 0 2px; padding: 0 12px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
 .file-group ul { list-style: none; margin: 0; padding: 0; }
 .file {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   width: 100%;
   padding: 2px 12px 2px 22px;
   border: 0;
@@ -93,7 +99,8 @@ button { font: inherit; color: inherit; }
 .file:hover { background: #2c3036; }
 .file.active { background: #2f3a4d; }
 .file.inert { color: var(--text-dim); cursor: default; }
-.file.dirty::after { content: ' ●'; color: var(--text-dim); }
+.file-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.file .dirty-mark { flex: none; color: var(--accent); }
 
 /* --- Context menu: fixed to the viewport, above Dockview's panels --- */
 .context-menu {
@@ -140,6 +147,8 @@ button { font: inherit; color: inherit; }
 .status-item.wasm { cursor: pointer; border: 0; background: none; padding: 0; }
 .status-item.wasm[data-wasm='failed'] { color: var(--error); }
 .status-item.wasm[data-wasm='none'] { color: var(--warning); }
+.status-item.unsaved-save { cursor: pointer; border: 0; border-radius: 3px; background: var(--accent); color: #fff; padding: 0 8px; }
+.status-item.unsaved-save:hover { filter: brightness(1.15); }
 .status-item.not-saved { cursor: pointer; border: 0; background: none; padding: 0; color: var(--error); }
 .status-spacer { flex: 1; }
 
@@ -187,6 +196,9 @@ button { font: inherit; color: inherit; }
 .test-run { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .canvas-toolbar .run-button, .canvas-toolbar .save-report { cursor: pointer; white-space: nowrap; }
 .canvas-toolbar .run-button:disabled { cursor: not-allowed; opacity: 0.5; }
+.canvas-toolbar .canvas-save { cursor: pointer; }
+.canvas-toolbar .canvas-save:not(:disabled) { border-color: var(--accent); }
+.canvas-toolbar .canvas-save:disabled { cursor: default; opacity: 0.5; }
 .after-pause { display: inline-flex; align-items: center; gap: 3px; color: var(--text-dim); white-space: nowrap; }
 .verdict { white-space: nowrap; color: var(--text-dim); }
 .verdict-parity { color: #7fd17f; }
