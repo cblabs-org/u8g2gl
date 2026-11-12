@@ -18,9 +18,10 @@
  *              A field's help is in a tooltip (`ui/tooltip.tsx`, ui_spec
  *              §9.2), not beneath its control: an ⓘ after the property's name,
  *              there only when the manifest gives help, opens it on focus
- *              and on a click, and hovering the name or the ⓘ opens it too. It shows the help,
- *              then the facts line (`field-facts.ts`). It sits beside the
- *              panel, to its left, level with the field. Its state is the
+ *              and on a click, and hovering the name or the ⓘ opens it too.
+ *              It shows the help, then the facts line (`field-facts.ts`). It
+ *              sits beside the panel, to its left, level with the field. Its
+ *              state is the
  *              field's own, so opening it re-renders that field alone. What
  *              a user must act on stays inline: why a field is disabled, its
  *              problems, and the computed-value note with Detach and Edit in
