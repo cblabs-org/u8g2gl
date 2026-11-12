@@ -8,9 +8,12 @@
  *          triangle's corner handle scales its vertices about the opposite
  *          corner, a vertex handle drags one vertex alone, each as one undo
  *          stop; a circle, boxed by what it draws, is selected and resized by
- *          its radius with its opposite edge kept; an hline is selected and
- *          resized along its width; and an element a handle cannot resize
- *          says why in the property panel as soon as it is selected.
+ *          its radius with its opposite edge kept; and an element a handle
+ *          cannot resize says why in the property panel as soon as it is
+ *          selected. A single selected line, hline or vline has no box
+ *          handles, only a round handle at each end: an hline's or vline's
+ *          end moves along its axis with the other end held, a line's end
+ *          moves that vertex alone, and none of them says "Can't resize".
  * Description: A screen of the test's own beside the departures project,
  *              opened so the canvas draws it. Handles are found from the
  *              selection's box and the frame's on-screen scale, as the
@@ -112,6 +115,8 @@ test('a triangle’s bottom-right handle scales its vertices about the top-left 
   await open(page);
   const before = await bufferText(page, SHAPES);
   // The drawn box: x 20..60, y 10..40. Its bottom-right corner has no vertex on it.
+  // A triangle keeps its box handles: the white fill a line's box lacks.
+  expect(await overlayIsWhite(page, await boxHandle(page, { x: 20, y: 10, width: 41, height: 31 }, 0.5, 0))).toBe(true);
   await dragBy(page, await boxHandle(page, { x: 20, y: 10, width: 41, height: 31 }, 1, 1), 10, 5);
   // x 20..60 becomes 20..70, y 10..40 becomes 10..45.
   await expect.poll(() => triangle(page)).toBe('<u8g2gl_triangle name="tri" x0="20" y0="10" x1="70" y1="10" x2="45" y2="45" />');
@@ -153,10 +158,69 @@ test('a circle is selected by its drawn box, and its side handle changes the rad
   expect(await bufferText(page, SHAPES)).toBe(before);
 });
 
-test('an hline is selected by its one-pixel-thick box, and a right handle resizes its width', async ({ page }) => {
+test('an hline is selected by its one-pixel-thick box, its right end changes its width, and it never says it cannot resize', async ({ page }) => {
   await openScreen(page, shapesScreen('<u8g2gl_hline name="rule" x="10" y="50" width="30" />'), 'rule', [20, 50]);
   await expect(page.locator('.selection-geometry')).toHaveText('sel 10,50 30×1');
-  await dragBy(page, await boxHandle(page, { x: 10, y: 50, width: 30, height: 1 }, 1, 0.5), 6, 0);
+  await expect(page.locator('.property-panel .resize-refusal')).toHaveCount(0);
+  // The right end: the line's last pixel, x = 39.
+  await dragBy(page, await devicePoint(page, 39, 50), 6, 0);
   await expect.poll(() => lineOf(page, 'rule')).toBe('<u8g2gl_hline name="rule" x="10" y="50" width="36" />');
-  await expect(page.locator('.property-panel .resize-refusal')).toHaveText("Can't resize: <u8g2gl_hline> has no height");
+  await expect(page.locator('.property-panel .resize-refusal')).toHaveCount(0);
+});
+
+// overlayIsWhite
+// Whether the overlay is white at a page position: a box handle's fill, which
+// nothing else on the overlay draws.
+async function overlayIsWhite(page: Page, at: { x: number; y: number }): Promise<boolean> {
+  return page.evaluate(({ x, y }) => {
+    const overlay = document.querySelector<HTMLCanvasElement>('.canvas-frame canvas.overlay')!;
+    const box = overlay.getBoundingClientRect();
+    const ratio = overlay.width / box.width;
+    const [r, g, b, a] = overlay.getContext('2d')!.getImageData(Math.floor((x - box.x) * ratio), Math.floor((y - box.y) * ratio), 1, 1).data;
+    return r! > 200 && g! > 200 && b! > 200 && a! > 200;
+  }, at);
+}
+
+test('an hline’s left end moves x and width, holding the right end, as one undo stop, and its box has no handles', async ({ page }) => {
+  await openScreen(page, shapesScreen('<u8g2gl_hline name="rule" x="10" y="50" width="30" />'), 'rule', [20, 50]);
+  const rect = { x: 10, y: 50, width: 30, height: 1 };
+  // Where the box's top and bottom middle handles would be: no handle is drawn there.
+  expect(await overlayIsWhite(page, await boxHandle(page, rect, 0.5, 0))).toBe(false);
+  expect(await overlayIsWhite(page, await boxHandle(page, rect, 0.5, 1))).toBe(false);
+  const before = await bufferText(page, SHAPES);
+  await dragBy(page, await devicePoint(page, 10, 50), -4, 0);
+  // The right end, x + width - 1, stays at 39.
+  await expect.poll(() => lineOf(page, 'rule')).toBe('<u8g2gl_hline name="rule" x="6" y="50" width="34" />');
+  await expect(page.locator('.selection-geometry')).toHaveText('sel 6,50 34×1');
+  await undo(page);
+  expect(await bufferText(page, SHAPES)).toBe(before);
+});
+
+test('a vline’s bottom end changes its height alone, along its axis', async ({ page }) => {
+  await openScreen(page, shapesScreen('<u8g2gl_vline name="post" x="100" y="10" height="30" />'), 'post', [100, 20]);
+  await expect(page.locator('.selection-geometry')).toHaveText('sel 100,10 1×30');
+  await expect(page.locator('.property-panel .resize-refusal')).toHaveCount(0);
+  // The bottom end, y = 39, dragged down and a little sideways: only the height follows.
+  await dragBy(page, await devicePoint(page, 100, 39), 3, 7);
+  await expect.poll(() => lineOf(page, 'post')).toBe('<u8g2gl_vline name="post" x="100" y="10" height="37" />');
+});
+
+test('a horizontal line’s end moves that vertex alone, no box handle is hit, and it never says it cannot resize', async ({ page }) => {
+  await openScreen(page, shapesScreen('<u8g2gl_line name="wire" x1="10" y1="20" x2="50" y2="20" />'), 'wire', [30, 20]);
+  await expect(page.locator('.selection-geometry')).toHaveText('sel 10,20 41×1');
+  await expect(page.locator('.property-panel .resize-refusal')).toHaveCount(0);
+  const rect = { x: 10, y: 20, width: 41, height: 1 };
+  for (const [fx, fy] of [
+    [0.5, 0],
+    [0.5, 1],
+  ] as const) {
+    expect(await overlayIsWhite(page, await boxHandle(page, rect, fx, fy))).toBe(false);
+  }
+  const before = await bufferText(page, SHAPES);
+  // The right end's corner of the box, where a box handle used to sit over the vertex.
+  await dragBy(page, await boxHandle(page, rect, 1, 0.5), 6, 0);
+  await expect.poll(() => lineOf(page, 'wire')).toBe('<u8g2gl_line name="wire" x1="10" y1="20" x2="56" y2="20" />');
+  await expect(page.locator('.property-panel .resize-refusal')).toHaveCount(0);
+  await undo(page);
+  expect(await bufferText(page, SHAPES)).toBe(before);
 });

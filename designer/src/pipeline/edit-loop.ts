@@ -43,6 +43,7 @@
  *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
+ * - selectionOverlay(): The selection's overlay rectangles, with or without box handles
  * - DrawnTargets:     The drawn frame's hit targets
  * - FrameTimings:     One run's milliseconds per stage
  * - CompletedRun:     A run's result and the assets it ran with
@@ -78,6 +79,7 @@ import { loadedMonaco } from '../monaco/monaco';
 import type { CanvasView, OverlayRect } from '../canvas/canvas-view';
 import { countLit } from '../canvas/framebuffer';
 import { outlineRects, readOutlines, writeOutlines } from '../canvas/outlines';
+import { isLineShaped } from '../editing/line-ends';
 import { ProjectAssets } from '../project/project-assets';
 import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
@@ -264,11 +266,10 @@ export class EditLoop {
   private highlightSelection(): void {
     const selection = this.workspace.selection.current.get();
     const drawn = selection.file !== undefined && selection.file === this.hitTargets.get().file;
-    const bounds = this.bounds.get();
-    const rects = drawn ? selection.names.map((name) => bounds.get(name)).filter((rect): rect is Rect => rect !== undefined) : [];
+    const rects = drawn ? selectionOverlay(selection.names, this.bounds.get(), this.drawnPlacements) : [];
     this.selectionRect.set(boundingBox(rects));
     this.selectionCount.set(rects.length);
-    this.selectionRects = rects.map((rect) => ({ ...rect, kind: 'selection' }));
+    this.selectionRects = rects;
     this.showOverlay();
   }
 
@@ -578,6 +579,31 @@ export class EditLoop {
     }
     this.diagnosticFiles = new Set(byFile.keys());
   }
+}
+
+/**
+ * @brief The overlay's `selection` rectangles for the selected names that are
+ *        drawn, in selection order. A single selected line-shaped element
+ *        (`line-ends.ts`) keeps its outline and badge but not its eight box
+ *        handles: its handles are its two ends. Several selected keep every
+ *        box's handles, a line's included.
+ *
+ * @param names      The selected names, in the drawn screen's file.
+ * @param bounds     The drawn elements' rectangles by name.
+ * @param placements The drawn elements' placements by name.
+ */
+export function selectionOverlay(
+  names: readonly string[],
+  bounds: ReadonlyMap<string, Rect>,
+  placements: ReadonlyMap<string, Placement>,
+): OverlayRect[] {
+  const shown = names.filter((name) => bounds.has(name));
+  const [only] = shown;
+  const handles = !(shown.length === 1 && only !== undefined && isLineShaped(placements.get(only)));
+  return shown.flatMap((name) => {
+    const rect = bounds.get(name);
+    return rect === undefined ? [] : [{ ...rect, kind: 'selection' as const, handles }];
+  });
 }
 
 // boundingBox

@@ -33,10 +33,13 @@
  *              or changes a circle's or ellipse's radii, as its box's edge
  *              moves (`shape-resize-rules.ts`). A vertex drag moves one point
  *              of a line or triangle, snapped as a move is, by a box one pixel
- *              square at the vertex.
+ *              square at the vertex. An end drag moves one end of a span, an
+ *              hline or a vline (`line-ends.ts`): a resize by that edge of its
+ *              own axis alone, snapped and clamped as a resize is, and never
+ *              given Shift's ratio, since a line has no other axis to keep.
  *
  * Exports:
- * - DragKind:       A move of the selection, a resize by one handle, or one vertex
+ * - DragKind:       A move of the selection, a resize by one handle, one vertex, or one end
  * - DragFrame:      What one pointer position shows: guides and refusals
  * - DragStart:      What a drag reads when it begins
  * - DragEdit:       One drag
@@ -52,6 +55,7 @@ import type { GuideLine } from '../canvas/canvas-view';
 import type { Rect } from '../pipeline/live-pipeline';
 import type { CanvasEditor, EditGesture } from './canvas-editor';
 import { moveEdits, planMove, refusals, type MovePlan } from './placement-rules';
+import { lineShape, planLineEnd } from './line-ends';
 import { clampResize, type Edge, type Handle } from './resize-rules';
 import { planHandleResize, planVertex, resizeEdits, resizeRefusals, vertexPoints, type ResizePlan } from './shape-resize-rules';
 import { guidesFor, snapAxis, type Guides } from './snapping';
@@ -59,14 +63,16 @@ import { duplicateEdits } from './structure-edits';
 
 /**
  * What is dragged: the selection; a copy of it (an Alt-drag), given the names
- * the project already uses; one element's handle; or one vertex of a line or
- * triangle, by its index in `vertexPoints()` order.
+ * the project already uses; one element's handle; one vertex of a line or
+ * triangle, by its index in `vertexPoints()` order; or one end of a span (an
+ * hline or vline), `start` or `end` along its axis.
  */
 export type DragKind =
   | { readonly kind: 'move' }
   | { readonly kind: 'duplicate'; readonly taken: () => ReadonlySet<string> }
   | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle }
-  | { readonly kind: 'vertex'; readonly name: string; readonly index: number };
+  | { readonly kind: 'vertex'; readonly name: string; readonly index: number }
+  | { readonly kind: 'end'; readonly name: string; readonly end: 'start' | 'end' };
 
 /** What one pointer position shows besides the text: the guides it lies on and why an axis does not follow. */
 export interface DragFrame {
@@ -147,7 +153,7 @@ export class DragEdit {
     this.editor = editor;
     this.start = start;
     this.kind = kind;
-    const dragged = kind.kind === 'resize' || kind.kind === 'vertex' ? [kind.name] : start.names;
+    const dragged = kind.kind === 'resize' || kind.kind === 'vertex' || kind.kind === 'end' ? [kind.name] : start.names;
     if (kind.kind === 'vertex') {
       // A vertex snaps as a move of a one-pixel box at the vertex.
       const vertex = vertexPoints(start.placements.get(kind.name))[kind.index];
@@ -187,6 +193,13 @@ export class DragEdit {
         this.resize ??= this.planResize(cst, kind.name, kind.handle);
         return this.resize === undefined ? [] : resizeEdits(cst, this.resize, dx, dy);
       }
+      if (kind.kind === 'end') {
+        if (this.resize === undefined) {
+          const plan = planLineEnd(cst, kind.name, kind.end, this.start.placements.get(kind.name));
+          this.resize = plan === undefined ? undefined : { kind: 'box', plan };
+        }
+        return this.resize === undefined ? [] : resizeEdits(cst, this.resize, dx, dy);
+      }
       this.plans ??= this.plan(cst);
       return moveEdits(cst, this.plans, dx, dy);
     });
@@ -217,14 +230,17 @@ export class DragEdit {
     if (box === undefined) return { dx: Math.round(rawX), dy: Math.round(rawY), guides: [] };
     const kind = this.kind;
 
-    // --- Step 1: A move, a duplicate or a vertex: each axis snapped on its own, and that is all ---
+    // --- Step 1: An end of a span: its own axis's edge, snapped and clamped; the other axis stays ---
+    if (kind.kind === 'end') return this.endDeltas(box, kind.name, kind.end, rawX, rawY, zoom);
+
+    // --- Step 2: A move, a duplicate or a vertex: each axis snapped on its own, and that is all ---
     if (kind.kind !== 'resize') {
       const x = snapAxis(edgeLines(box.x, box.width, 'move'), rawX, this.guides.vertical, zoom);
       const y = snapAxis(edgeLines(box.y, box.height, 'move'), rawY, this.guides.horizontal, zoom);
       return { dx: x.delta, dy: y.delta, guides: lines(x.lines, y.lines) };
     }
 
-    // --- Step 2: A resize: the moving edges snapped, then kept at least a pixel ---
+    // --- Step 3: A resize: the moving edges snapped, then kept at least a pixel ---
     const edgeX = kind.handle.horizontal;
     const edgeY = kind.handle.vertical;
     const x = snapAxis(edgeLines(box.x, box.width, edgeX), rawX, this.guides.vertical, zoom);
@@ -236,7 +252,7 @@ export class DragEdit {
     // A clamped edge no longer lies on the guide it snapped to.
     if (!shift) return { dx, dy, guides: lines(edgeX !== undefined && dx === x.delta ? x.lines : [], edgeY !== undefined && dy === y.delta ? y.lines : []) };
 
-    // --- Step 3: With Shift, the axis that changed more leads and the other follows ---
+    // --- Step 4: With Shift, the axis that changed more leads and the other follows ---
     const grow = (delta: number, edge: Edge): number => (edge === 'start' ? -delta : edge === 'end' ? delta : 0);
     let width = box.width + grow(dx, edgeX);
     let height = box.height + grow(dy, edgeY);
@@ -249,6 +265,26 @@ export class DragEdit {
     dx = ratioX === 'start' ? box.width - width : width - box.width;
     dy = ratioY === 'start' ? box.height - height : height - box.height;
     return { dx, dy, guides: [] };
+  }
+
+  // endDeltas
+  // An end drag's delta: the end's edge on the span's own axis, snapped to a
+  // guide and clamped so the span keeps at least one pixel, which also keeps
+  // the end from passing the other one. The other axis is always 0.
+  //   box        — the span's drawn box
+  //   name, end  — the span and the end dragged
+  //   rawX, rawY — the pointer's delta; zoom — for the snap threshold
+  private endDeltas(box: Rect, name: string, end: 'start' | 'end', rawX: number, rawY: number, zoom: number): { dx: number; dy: number; guides: GuideLine[] } {
+    const shape = lineShape(this.start.placements.get(name));
+    if (shape?.kind !== 'span') return { dx: 0, dy: 0, guides: [] };
+    if (shape.axis === 'horizontal') {
+      const x = snapAxis(edgeLines(box.x, box.width, end), rawX, this.guides.vertical, zoom);
+      const dx = clampResize(x.delta, end, box.width);
+      return { dx, dy: 0, guides: lines(dx === x.delta ? x.lines : [], []) };
+    }
+    const y = snapAxis(edgeLines(box.y, box.height, end), rawY, this.guides.horizontal, zoom);
+    const dy = clampResize(y.delta, end, box.height);
+    return { dx: 0, dy, guides: lines([], dy === y.delta ? y.lines : []) };
   }
 
   // plan

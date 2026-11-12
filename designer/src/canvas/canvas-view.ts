@@ -15,7 +15,9 @@
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
  *              outline, eight handles and an `x, y, w×h` badge, a round handle
- *              on each vertex of a single selected line or triangle, the marquee
+ *              on each vertex of a single selected line or triangle, or on
+ *              each end of an hline or vline, in place of a line's box
+ *              handles, the marquee
  *              while one is dragged, the alignment guides a drag has
  *              snapped to, the outlines of placeholder widgets, a
  *              dashed box round every drawn element while the Outlines toggle
@@ -71,6 +73,12 @@ export interface OverlayRect {
    * `outline` any drawn element's box, while the Outlines toggle is on.
    */
   readonly kind: 'selection' | 'placeholder' | 'problem' | 'outline';
+  /**
+   * A selection only: whether its eight box handles are drawn. False for a
+   * single selected line, whose handles are its two ends (`setVertices`);
+   * true when absent.
+   */
+  readonly handles?: boolean;
 }
 
 /**
@@ -307,7 +315,7 @@ export class CanvasView {
       context.setLineDash(rect.kind === 'placeholder' ? [3, 3] : []);
       context.strokeRect(box.x, box.y, box.width, box.height);
       if (rect.kind === 'selection') {
-        this.drawHandles(context, box);
+        if (rect.handles !== false) this.drawHandles(context, box);
         this.drawBadge(context, rect, box);
       }
     }

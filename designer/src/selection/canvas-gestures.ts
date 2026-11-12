@@ -14,6 +14,10 @@
  * Description: Gesture ownership, decided at pointer-down:
  *              - on a vertex of a single selected line or triangle: a drag of
  *                that **vertex** alone; vertex handles are hit before the box's;
+ *              - on an end of a single selected hline or vline: a drag of that
+ *                **end** alone, along the line's axis. A single selected
+ *                line-shaped element (`line-ends.ts`) has no box handles at
+ *                all, only its two ends;
  *              - on a selected element's handle: a **resize** by that handle
  *                (Shift keeps the ratio);
  *              - with Shift elsewhere: a toggle on click and an adding marquee
@@ -49,10 +53,10 @@
  *              Pointer positions become device pixels through the frame
  *              canvas's on-screen box, so the answer is right at every zoom.
  *
- *              The vertex handles follow the frame: after every run and every
- *              selection change, the single selected element's vertices
- *              (`vertexPoints()`) are handed to the overlay, which redraws only
- *              when they moved.
+ *              The round handles follow the frame: after every run and every
+ *              selection change, the single selected element's vertices or
+ *              ends (`endPoints()`) are handed to the overlay, which redraws
+ *              only when they moved.
  *
  * Exports:
  * - MARQUEE_THRESHOLD:   Screen pixels a press must move to become a drag
@@ -75,6 +79,7 @@ import { deleteEdits } from '../editing/structure-edits';
 import { signalDragMove } from '../perf/drag-stamp';
 import { moveEdits, planMove, refusals, type MovePlan } from '../editing/placement-rules';
 import type { Handle } from '../editing/resize-rules';
+import { endPoints, lineShape } from '../editing/line-ends';
 import { vertexPoints, type Point } from '../editing/shape-resize-rules';
 import type { DrawnTargets } from '../pipeline/edit-loop';
 import type { Rect } from '../pipeline/live-pipeline';
@@ -135,12 +140,14 @@ type Owner =
   | { readonly kind: 'move'; readonly duplicate: boolean }
   | { readonly kind: 'marquee' }
   | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle }
-  | { readonly kind: 'vertex'; readonly name: string; readonly index: number };
+  | { readonly kind: 'vertex'; readonly name: string; readonly index: number }
+  | { readonly kind: 'end'; readonly name: string; readonly end: 'start' | 'end' };
 
-/** A handle under the pointer: a box handle, or a vertex by its index; and the cursor it shows. */
+/** A handle under the pointer: a box handle, a vertex by its index, or a span's end; and the cursor it shows. */
 type HandleHit =
   | { readonly kind: 'resize'; readonly name: string; readonly handle: Handle; readonly cursor: string }
-  | { readonly kind: 'vertex'; readonly name: string; readonly index: number; readonly cursor: string };
+  | { readonly kind: 'vertex'; readonly name: string; readonly index: number; readonly cursor: string }
+  | { readonly kind: 'end'; readonly name: string; readonly end: 'start' | 'end'; readonly cursor: string };
 
 /** A press in progress. */
 interface Press {
@@ -239,12 +246,17 @@ export class CanvasGestures {
     const { file, targets } = this.host.targets.get();
     const { x, y } = this.toDevice(event.clientX, event.clientY);
 
-    // --- Step 1: A vertex drags alone; a selected element's handle resizes, Shift or not ---
+    // --- Step 1: A vertex or an end drags alone; a selected element's handle resizes, Shift or not ---
     let owner: Owner = { kind: 'marquee' };
     let clickOnRelease = true;
     const handle = file === undefined ? undefined : this.handleAt(file, event.clientX, event.clientY);
     if (handle !== undefined) {
-      owner = handle.kind === 'vertex' ? { kind: 'vertex', name: handle.name, index: handle.index } : { kind: 'resize', name: handle.name, handle: handle.handle };
+      owner =
+        handle.kind === 'vertex'
+          ? { kind: 'vertex', name: handle.name, index: handle.index }
+          : handle.kind === 'end'
+            ? { kind: 'end', name: handle.name, end: handle.end }
+            : { kind: 'resize', name: handle.name, handle: handle.handle };
       clickOnRelease = false;
     } else if (!event.shiftKey && file !== undefined) {
       // --- Step 2: An element moves; an unselected one is selected first ---
@@ -321,7 +333,7 @@ export class CanvasGestures {
       press.drag = new DragEdit(
         this.host.editor,
         { file, names: this.current(file), bounds: this.host.bounds.get(), placements: this.host.placements(), display: this.host.display() },
-        owner.kind === 'resize' || owner.kind === 'vertex'
+        owner.kind === 'resize' || owner.kind === 'vertex' || owner.kind === 'end'
           ? owner
           : owner.kind === 'move' && owner.duplicate
             ? { kind: 'duplicate', taken: this.host.takenNames }
@@ -526,19 +538,21 @@ export class CanvasGestures {
   }
 
   // vertices
-  // The vertex handles to show: those of the one selected element, if it is a
-  // line or triangle on the drawn screen; none for several, or for anything else.
+  // The round handles to show: the vertices or ends of the one selected
+  // element, if it is a line, triangle, hline or vline on the drawn screen;
+  // none for several, or for anything else.
   private vertices(): Point[] {
     const { file } = this.host.targets.get();
     const names = file === undefined ? [] : this.current(file);
     const [name] = names;
-    return names.length === 1 && name !== undefined ? vertexPoints(this.host.placements().get(name)) : [];
+    return names.length === 1 && name !== undefined ? endPoints(this.host.placements().get(name)) : [];
   }
 
   // handleAt
   // The selected element's handle under a client position, if any: first a
-  // vertex's circle, then the box's squares, as the overlay draws them, in
-  // screen pixels, with a little slop.
+  // vertex's or an end's circle, then the box's squares, as the overlay draws
+  // them, in screen pixels, with a little slop. A single selected line-shaped
+  // element has no box handles, so its circles are the only handles it has.
   //   file             — the drawn screen's file
   //   clientX, clientY — the pointer
   private handleAt(file: string, clientX: number, clientY: number): HandleHit | undefined {
@@ -549,14 +563,20 @@ export class CanvasGestures {
     const px = clientX - box.left;
     const py = clientY - box.top;
 
-    // --- Step 1: A vertex of the one selected line or triangle, before the box's handles ---
+    // --- Step 1: A vertex or an end of the one selected element, before the box's handles ---
     const [only] = names;
     if (names.length === 1 && only !== undefined) {
       const reach = VERTEX_SIZE / 2 + HANDLE_SLOP;
-      const vertices = vertexPoints(this.host.placements().get(only));
-      for (const [index, vertex] of vertices.entries()) {
-        if (Math.hypot(px - (vertex.x + 0.5) * scale.x, py - (vertex.y + 0.5) * scale.y) <= reach) return { kind: 'vertex', name: only, index, cursor: 'crosshair' };
+      const placement = this.host.placements().get(only);
+      const shape = lineShape(placement);
+      const points = shape?.kind === 'span' ? endPoints(placement) : vertexPoints(placement);
+      for (const [index, point] of points.entries()) {
+        if (Math.hypot(px - (point.x + 0.5) * scale.x, py - (point.y + 0.5) * scale.y) > reach) continue;
+        if (shape?.kind !== 'span') return { kind: 'vertex', name: only, index, cursor: 'crosshair' };
+        return { kind: 'end', name: only, end: index === 0 ? 'start' : 'end', cursor: shape.axis === 'horizontal' ? 'ew-resize' : 'ns-resize' };
       }
+      // A single line has its ends and nothing else: no box handles.
+      if (shape !== undefined) return undefined;
     }
 
     // --- Step 2: The box's eight handles ---
