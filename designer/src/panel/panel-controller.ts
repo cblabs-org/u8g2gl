@@ -49,7 +49,7 @@ import type { CompletedRun } from '../pipeline/edit-loop';
 import { Observable } from '../state/observable';
 import type { Workspace } from '../workspace';
 import { panelUpdateEnded, panelUpdateStarted } from '../perf/panel-probe';
-import { resizeRefusalReasons } from '../editing/shape-resize-rules';
+import { handleRefusalReasons } from '../editing/line-ends';
 import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
@@ -71,7 +71,8 @@ export interface PanelSummary {
    * "Can't resize: …" when a handle could not resize the one selected element
    * on an axis, with every reason; undefined when every handle works, or for
    * several elements or a screen. Shown before any drag, so the reason is not
-   * only the tip a drag shows (ui_spec §8).
+   * only the tip a drag shows (ui_spec §8). A line is asked only about its
+   * ends, so an axis it has no handle on is never reported.
    */
   readonly resize: string | undefined;
   /** Diagnostics about the element rather than one attribute (a missing required prop). */
@@ -313,7 +314,7 @@ export class PanelController {
     // --- Step 3: The header and each field's state ---
     const project = manifests.some((manifest) => manifest.origin === 'project');
     const [only] = facts;
-    const refused = facts.length === 1 && only !== undefined && cst !== undefined ? resizeRefusalReasons(cst, only.name, run.result.placements.get(only.name)) : [];
+    const refused = facts.length === 1 && only !== undefined && cst !== undefined ? handleRefusalReasons(cst, only.name, run.result.placements.get(only.name)) : [];
     view.summary.set({
       title: facts.length === 1 ? layout.tag : `${facts.length} elements`,
       subtitle: facts.map((fact) => fact.name).join(', '),

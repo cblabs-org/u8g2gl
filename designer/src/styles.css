@@ -199,6 +199,10 @@ button { font: inherit; color: inherit; }
 .canvas-toolbar .canvas-save { cursor: pointer; }
 .canvas-toolbar .canvas-save:not(:disabled) { border-color: var(--accent); }
 .canvas-toolbar .canvas-save:disabled { cursor: default; opacity: 0.5; }
+/* The Outlines toggle keeps one label, so its state shows in the border and the
+   amber of the outlines it draws (canvas-view.ts). */
+.canvas-toolbar .outlines-toggle { cursor: pointer; white-space: nowrap; }
+.canvas-toolbar .outlines-toggle[aria-pressed='true'] { border-color: rgb(255, 191, 0); color: rgb(255, 191, 0); }
 .after-pause { display: inline-flex; align-items: center; gap: 3px; color: var(--text-dim); white-space: nowrap; }
 .verdict { white-space: nowrap; color: var(--text-dim); }
 .verdict-parity { color: #7fd17f; }
