@@ -20,8 +20,6 @@
  *
  * Exports:
  * - EXPANSION_KEY:       Where this browser remembers the state, before the project's name
- * - SettingStorage:      The storage a setting is kept in
- * - browserStorage():    The page's localStorage, or null
  * - ExplorerExpansion:   The state
  *
  *     Reading:
@@ -33,24 +31,10 @@
  */
 
 import { Observable } from '../state/observable';
+import { browserStorage, type SettingStorage } from '../state/setting-storage';
 
 /** Where this browser remembers the expanded screens; the project's name follows. */
 export const EXPANSION_KEY = 'u8g2gl.explorer.expanded:';
-
-/** The storage a setting is kept in; null where there is none. */
-export type SettingStorage = Pick<Storage, 'getItem' | 'setItem'> | null;
-
-/**
- * @brief The page's localStorage, or null where there is none. Reading the
- *        property itself can throw (a sandboxed frame), so it is guarded.
- */
-export function browserStorage(): SettingStorage {
-  try {
-    return globalThis.localStorage ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** The Explorer's expanded screens, remembered per browser and project. */
 export class ExplorerExpansion {

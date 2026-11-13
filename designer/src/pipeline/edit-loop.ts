@@ -56,6 +56,7 @@
  * - FrameState:       What the canvas panel and status bar show about the frame
  * - selectionOverlay(): The selection's overlay rectangles, with or without box handles
  * - DrawnTargets:     The drawn frame's hit targets
+ * - RuntimeHidden:    What a frame left out by the runtime's own rules
  * - FrameTimings:     One run's milliseconds per stage
  * - CompletedRun:     A run's result and the assets it ran with
  * - EditLoop:         The loop

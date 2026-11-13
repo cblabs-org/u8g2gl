@@ -41,7 +41,7 @@
 
 import { descendantNames, findNode, type ElementNode } from '../documents/element-tree';
 import { Observable } from '../state/observable';
-import { browserStorage, type SettingStorage } from '../ui/explorer-expansion';
+import { browserStorage, type SettingStorage } from '../state/setting-storage';
 
 /** Where this browser remembers the hidden names; the project's name follows. */
 export const DESIGN_HIDDEN_KEY = 'u8g2gl.design-hidden:';

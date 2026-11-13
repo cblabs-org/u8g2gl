@@ -42,7 +42,9 @@
  *              first row into view, without taking focus.
  *
  * Exports:
- * - ElementTreeView:  The component
+ * - HIDDEN_BY_DATA:        The "hidden by data" mark's explanation
+ * - HIDING_NEEDS_REBUILD:  Why every eye is disabled on a Wasm that cannot hide
+ * - ElementTreeView:       The component
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';

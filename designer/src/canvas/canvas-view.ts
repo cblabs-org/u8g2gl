@@ -14,7 +14,8 @@
  *              with `image-rendering: pixelated`, so a zoom costs the browser
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
- *              outline, eight handles and an `x, y, w×h` badge; a round handle
+ *              outline, eight handles and an `x, y, w×h` badge (dashed, with
+ *              no handles, for one hidden in the designer); a round handle
  *              on each vertex of a single selected line or triangle, or on
  *              each end of an hline or vline, in place of a line's box
  *              handles; the marquee while one is dragged; the alignment
