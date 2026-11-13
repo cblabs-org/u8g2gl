@@ -27,12 +27,25 @@
  *              focus it gave.
  *              What it holds is `entryMenu()`'s.
  *
+ *              Each screen has a disclosure ▸ that shows its element rows
+ *              nested under it (`element-tree-view.tsx`), built from the
+ *              screen's current buffer (`Workspace.elementTrees`). The label
+ *              still opens the screen; only the disclosure expands. Which
+ *              screens are expanded is remembered per browser
+ *              (`explorer-expansion.ts`), and the screen the canvas shows
+ *              expands when first shown. A row selects its element through
+ *              the `SelectionModel`, opening its screen on the canvas when
+ *              another is drawn; the file rows' menu and keys are unchanged.
+ *
  * Exports:
  * - Explorer:       The component
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { paletteIcon } from '../palette/palette-icons';
 import { ContextMenu } from './context-menu';
+import { ElementTreeView } from './element-tree-view';
+import { ExplorerExpansion } from './explorer-expansion';
 import { groupFiles, type ExplorerEntry, type ExplorerGroup } from './explorer-groups';
 import { entryMenu, type EntryCommands } from './explorer-menu';
 import { FileActions, hostPlatform } from './file-actions';
@@ -58,6 +71,50 @@ export function Explorer(): React.JSX.Element {
   const active = useObservable(workspace.activeFile);
   const name = useObservable(workspace.projectName);
   const dirty = useObservable(workspace.documents.dirty);
+  const trees = useObservable(workspace.elementTrees);
+  const expansion = useMemo(() => new ExplorerExpansion(name), [name]);
+  const expanded = useObservable(expansion.expanded);
+  // The registry, not the run, as the Palette reads it: its identity changes
+  // only when a manifest does, so a keystroke re-renders nothing here.
+  const loop = workspace.loop;
+  const registry = useSyncExternalStore(
+    (onChange) => loop.lastRun.subscribe(onChange),
+    () => loop.lastRun.get()?.result.model.manifests,
+  );
+  const iconOf = useCallback(
+    (tag: string): string => {
+      const api = registry?.get(tag)?.declared.api;
+      return paletteIcon(api?.icon, api?.category);
+    },
+    [registry],
+  );
+  // The screen the canvas shows expands when first shown.
+  useEffect(() => {
+    const show = (): void => {
+      const file = workspace.canvasFile.get();
+      if (file !== undefined) expansion.shown(file);
+    };
+    show();
+    return workspace.canvasFile.subscribe(show);
+  }, [workspace, expansion]);
+  // selectElement
+  // A row's click or Enter: select through the SelectionModel, never an edit.
+  // A toggle adds or removes the row within its screen, as on the canvas; in
+  // another file it starts a new selection, since a selection is one file's.
+  const selectElement = useCallback(
+    (file: string, element: string, toggle: boolean): void => {
+      const current = workspace.selection.current.get();
+      const names =
+        toggle && current.file === file
+          ? current.names.includes(element)
+            ? current.names.filter((n) => n !== element)
+            : [...current.names, element]
+          : [element];
+      if (names.length === 0) workspace.selection.clear();
+      else workspace.selection.select(file, names, 'tree');
+    },
+    [workspace],
+  );
   const [menu, setMenu] = useState<OpenMenu | undefined>(undefined);
   const menuRef = useRef(menu);
   menuRef.current = menu;
@@ -107,8 +164,22 @@ export function Explorer(): React.JSX.Element {
               const { label, path } = entry;
               const openable = workspace.documents.isDocument(path);
               const unsaved = dirty.has(path);
+              const isScreen = group.title === 'Screens';
+              const open = isScreen && expanded.has(path);
               return (
-                <li key={path}>
+                <li key={path} className={isScreen ? 'screen-entry' : undefined}>
+                  {isScreen && (
+                    <button
+                      type="button"
+                      className="disclosure"
+                      aria-expanded={open}
+                      aria-label={`${open ? 'Hide' : 'Show'} the elements of ${label}`}
+                      title={`${open ? 'Hide' : 'Show'} the elements of ${label}`}
+                      onClick={() => expansion.setExpanded(path, !open)}
+                    >
+                      {open ? '▾' : '▸'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`file${path === active ? ' active' : ''}${openable ? '' : ' inert'}${unsaved ? ' dirty' : ''}`}
@@ -131,6 +202,16 @@ export function Explorer(): React.JSX.Element {
                       </span>
                     )}
                   </button>
+                  {open && (
+                    <ElementTreeView
+                      file={path}
+                      label={label}
+                      nodes={trees.get(path) ?? []}
+                      selection={workspace.selection.current}
+                      iconOf={iconOf}
+                      onSelect={(element, toggle) => selectElement(path, element, toggle)}
+                    />
+                  )}
                 </li>
               );
             })}

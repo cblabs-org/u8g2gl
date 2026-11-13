@@ -52,11 +52,11 @@ WO3.
 
 # WO1 — element tree (`u8g2gl-e2j/wo1-element-tree`)
 
-- [ ] Ruling 1: element rows under each Screens entry, nested, in document order, from the
+- [x] Ruling 1: element rows under each Screens entry, nested, in document order, from the
       current buffer, built by a pure unit-tested function; expand state remembered per browser.
-- [ ] Ruling 2: selection both ways through `SelectionModel`; opening another screen on row click.
-- [ ] Ruling 3: tree roles and keyboard; file rows' context menu unchanged.
-- [ ] Ruling 10's WO1 tests (tree builder unit tests; e2e for rows, row → canvas, canvas → row,
+- [x] Ruling 2: selection both ways through `SelectionModel`; opening another screen on row click.
+- [x] Ruling 3: tree roles and keyboard; file rows' context menu unchanged.
+- [x] Ruling 10's WO1 tests (tree builder unit tests; e2e for rows, row → canvas, canvas → row,
       keyboard). Render counts unchanged.
 
 # WO2 — designer-only hiding (`u8g2gl-e2j/wo2-design-hidden`)

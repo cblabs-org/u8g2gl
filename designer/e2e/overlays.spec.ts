@@ -173,11 +173,17 @@ test('a selection change re-renders only what shows the selection: the status ba
       .filter(([, n]) => n > 0),
   );
   console.log(`renders across five selection changes: ${JSON.stringify(rendered)}`);
-  // The property panel shows the selection, so it re-renders for it, and the
-  // align toolbar's buttons are enabled by it, so it re-renders when which
-  // are enabled changes; nothing else in the shell may.
+  // The property panel and the Explorer's element rows show the selection, so
+  // they re-render for it, and the align toolbar's buttons are enabled by it,
+  // so it re-renders when which are enabled changes; nothing else in the
+  // shell may — the Explorer around the rows included.
   const showsSelection = (name: string): boolean =>
-    name === 'SelectionGeometry' || name === 'PropertyPanel' || name === 'PanelHeader' || name === 'AlignToolbar' || name.startsWith('PanelField:');
+    name === 'SelectionGeometry' ||
+    name === 'PropertyPanel' ||
+    name === 'PanelHeader' ||
+    name === 'AlignToolbar' ||
+    name === 'ElementTree' ||
+    name.startsWith('PanelField:');
   expect(Object.keys(rendered).filter((name) => !showsSelection(name))).toEqual([]);
   expect(rendered.SelectionGeometry).toBeGreaterThanOrEqual(5);
   // Only when the enabled buttons change (the marquee's two, then Esc), never per selection.
