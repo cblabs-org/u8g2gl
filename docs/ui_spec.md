@@ -327,7 +327,7 @@ There are two kinds of hidden, and they never mix:
 | Who sets it | The author, with the eye | A binding (`bind_flag_if_eq … flag="hidden"` and its variants) with the sample data, or `hidden="true"` |
 | Where it lives | This browser only. Never in the XML, the buffer, undo, generated code, the scene on disk, a test run or a bug report | The XML; it is part of the exported UI |
 | What the canvas does | Does not draw it, cannot click it | Does not draw it (the device would not either) |
-| How it reads in the tree | Eye shut, row dimmed | A quiet "hidden by data" mark, not the eye: *Hidden by its bindings with the current sample data — the device would not draw it* |
+| How it reads in the tree | Eye shut, row dimmed | A quiet "hidden by data" mark, not the eye: *Hidden on the device: its hidden attribute, or its bindings with the current sample data — the device would not draw it* |
 
 - **Never an edit.** Toggling writes no text, adds no undo step and marks nothing unsaved; Save and `u8g2gl build` are unaffected by construction.
 - **In the renderer, not over it.** The editor Wasm skips a hidden element at draw time, so where elements overlap the pixels beneath are exactly what the rest of the screen draws. It never sets the runtime `hidden` flag, which bindings own and which a shape, having no object, does not have.

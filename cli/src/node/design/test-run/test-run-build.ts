@@ -127,7 +127,7 @@ export async function buildTestRunHarness(options: TestRunBuildOptions): Promise
   const { projectRoot, cacheRoot, toolchain, host } = options;
 
   // --- Step 1: Generate both targets into the cache (prepare-build.ts) ---
-  const prepared = await prepareBuild(projectRoot, cacheRoot);
+  const prepared = await prepareBuild(projectRoot, cacheRoot, options.frameworkRoot);
   if (!prepared.ok) {
     return { status: 'failed', diagnostics: prepared.diagnostics };
   }

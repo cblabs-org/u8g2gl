@@ -212,7 +212,7 @@ test('a row inside a hidden one is hidden by its parent; the device’s own hidi
   // --- Hidden by data: a quiet mark, not the eye, and only while the data hides it ---
   const mark = row(page, 'note').locator('.data-hidden-mark');
   await expect(mark).toBeVisible();
-  await expect(mark).toHaveAttribute('title', 'Hidden by its bindings with the current sample data — the device would not draw it');
+  await expect(mark).toHaveAttribute('title', 'Hidden on the device: its hidden attribute, or its bindings with the current sample data — the device would not draw it');
   await expect(eye(page, 'note')).toHaveAttribute('aria-pressed', 'false');
   await expect(row(page, 'panel').locator('.data-hidden-mark')).toHaveCount(0);
   await openFile(page, 'globals.xml');

@@ -121,7 +121,7 @@ export async function buildEditorWasm(options: EditorWasmBuildOptions): Promise<
   const { projectRoot, cacheRoot, toolchain, host } = options;
 
   // --- Step 1: Generate, check and hash (prepare-build.ts) ---
-  const prepared = await prepareBuild(projectRoot, cacheRoot);
+  const prepared = await prepareBuild(projectRoot, cacheRoot, options.frameworkRoot);
   if (!prepared.ok) {
     return { status: 'failed', diagnostics: prepared.diagnostics };
   }

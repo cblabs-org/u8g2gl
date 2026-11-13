@@ -83,7 +83,7 @@ interface ElementTreeViewProps {
 }
 
 /** The "hidden by data" mark's explanation. */
-export const HIDDEN_BY_DATA = 'Hidden by its bindings with the current sample data — the device would not draw it';
+export const HIDDEN_BY_DATA = 'Hidden on the device: its hidden attribute, or its bindings with the current sample data — the device would not draw it';
 /** Why every eye is disabled when the loaded Wasm cannot hide. */
 export const HIDING_NEEDS_REBUILD = "Hiding needs the project's editor Wasm to be rebuilt";
 /** No names: shared, so an empty snapshot is one object. */
