@@ -41,6 +41,17 @@
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how a keystroke measurement attributes a keystroke's cost.
  *
+ *              The elements the author hid in the designer (`design-hidden.ts`)
+ *              are left out of the frame by the editor Wasm itself, after each
+ *              of this loop's own `applyScene`, which forgets them; a test
+ *              run's fresh apply therefore draws the exported view. A hidden
+ *              element is not a hit target and has no outline, so a click
+ *              lands on what is beneath it; selected from the tree or the XML,
+ *              it is outlined dashed and without handles. After each run the
+ *              elements the runtime's own rules left out (a binding's `hidden`,
+ *              a shape's guards, with the current sample data) are published
+ *              for the Explorer's "hidden by data" marker.
+ *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
  * - selectionOverlay(): The selection's overlay rectangles, with or without box handles
@@ -56,6 +67,9 @@
  *
  *     State:
  *     - frameState, frozen, bounds, hitTargets, selectionRect, selectionCount
+ *     - shownBounds:      `bounds` without what the designer hid, for the gestures
+ *     - shownPlacements:  `placements` without what the designer hid, for the gestures
+ *     - runtimeHidden:    What the last run's frame left out by the runtime's rules
  *     - outlines:         Whether every element's box is outlined (remembered)
  *     - overlay:          The overlay's rectangles as last composed
  *     - placements:       The drawn elements' placements, for canvas edits
@@ -89,6 +103,7 @@ import type { HitTarget } from '../selection/hit-test';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import type { Workspace } from '../workspace';
 import { innermostAt, namedElements } from '../documents/element-at';
+import { effectiveHidden } from '../canvas/design-hidden';
 import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
 import {
@@ -125,6 +140,17 @@ export interface DrawnTargets {
   readonly targets: readonly HitTarget[];
 }
 
+/** The elements a drawn screen's frame left out by the runtime's own rules. */
+export interface RuntimeHidden {
+  /** The drawn screen's file; undefined before a frame. */
+  readonly file: string | undefined;
+  /** Their names, as the scene names them. */
+  readonly names: ReadonlySet<string>;
+}
+
+/** No names: shared, so an empty set is one object. */
+const NO_NAMES: ReadonlySet<string> = new Set();
+
 /** A pipeline run's result and the compiled assets it ran with. */
 export interface CompletedRun {
   readonly result: TextPipelineResult;
@@ -157,6 +183,22 @@ export class EditLoop {
   readonly outlines = new Observable<boolean>(readOutlines());
   /** The selectable element rectangles of the drawn screen, by name. */
   readonly bounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
+  /**
+   * {@link bounds} without the elements the designer hid: what the canvas's
+   * gestures offer handles on and move, since a hidden element cannot be
+   * grabbed on the canvas.
+   */
+  readonly shownBounds = new Observable<ReadonlyMap<string, Rect>>(new Map());
+  /**
+   * The elements the drawn frame left out by the runtime's own rules — a
+   * `hidden` flag, an ancestor's, a shape's guards — with the current sample
+   * data. Published once per run, never per frame, and only when it changes.
+   * Empty when the loaded Wasm does not report it.
+   */
+  readonly runtimeHidden = new Observable<RuntimeHidden>(
+    { file: undefined, names: NO_NAMES },
+    (a, b) => a.file === b.file && a.names.size === b.names.size && [...a.names].every((name) => b.names.has(name)),
+  );
   /** What a click on the drawn frame can hit, and the file its names are in. */
   readonly hitTargets = new Observable<DrawnTargets>({ file: undefined, targets: [] });
   /**
@@ -200,6 +242,8 @@ export class EditLoop {
   private outlineOverlay: readonly OverlayRect[] = [];
   private composedOverlay: readonly OverlayRect[] = [];
   private drawnPlacements: ReadonlyMap<string, Placement> = new Map();
+  /** The drawn screen's effectively hidden names (design-hidden.ts), as of the last frame. */
+  private hiddenNow: ReadonlySet<string> = NO_NAMES;
   private applied: EditorModule | undefined;
   private tickHandle: number | undefined;
   private drawn = 0;
@@ -237,6 +281,8 @@ export class EditLoop {
       this.wasm.module.subscribe(request),
       this.wasm.buildDiagnostics.subscribe(request),
       this.frozen.subscribe(request),
+      // Hiding is applied in the run, after its own applyScene.
+      this.workspace.designHidden.hidden.subscribe(request),
       this.workspace.documents.onDidChangeOnDisk((path) => {
         if (!this.workspace.documents.isDocument(path)) this.assets.assetChanged();
         request();
@@ -266,7 +312,7 @@ export class EditLoop {
   private highlightSelection(): void {
     const selection = this.workspace.selection.current.get();
     const drawn = selection.file !== undefined && selection.file === this.hitTargets.get().file;
-    const rects = drawn ? selectionOverlay(selection.names, this.bounds.get(), this.drawnPlacements) : [];
+    const rects = drawn ? selectionOverlay(selection.names, this.bounds.get(), this.drawnPlacements, this.hiddenNow) : [];
     this.selectionRect.set(boundingBox(rects));
     this.selectionCount.set(rects.length);
     this.selectionRects = rects;
@@ -277,7 +323,7 @@ export class EditLoop {
   // Every drawn element's box while the Outlines toggle is on, none while it
   // is off. Composed only; the caller shows the overlay.
   private composeOutlines(): void {
-    this.outlineOverlay = this.outlines.get() ? outlineRects(this.bounds.get()) : [];
+    this.outlineOverlay = this.outlines.get() ? outlineRects(this.shownBounds.get()) : [];
   }
 
   /**
@@ -287,6 +333,14 @@ export class EditLoop {
    */
   get placements(): ReadonlyMap<string, Placement> {
     return this.drawnPlacements;
+  }
+
+  /**
+   * {@link placements} without the elements the designer hid: what the
+   * gestures read, so a hidden element shows no vertex or end handles.
+   */
+  get shownPlacements(): ReadonlyMap<string, Placement> {
+    return this.hiddenNow.size === 0 ? this.drawnPlacements : without(this.drawnPlacements, this.hiddenNow);
   }
 
   /** @brief Draws into a canvas panel's view from now on (undefined detaches). */
@@ -394,6 +448,7 @@ export class EditLoop {
       ...this.diagnosticSources.flatMap((source) => source.get()),
     ]);
     this.workspace.selection.reconcile();
+    this.workspace.refreshElementTrees();
     this.canvasEditing.set(result.wellFormed);
 
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
@@ -403,8 +458,12 @@ export class EditLoop {
       this.markStale(this.staleReason(result.diagnostics, module, result.screen));
     } else {
       let lap = performance.now();
+      const hidden = this.hiddenFor(result, module);
       const applied =
         module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.subjectValues);
+      // After the apply, which forgets the set. Only this loop sets it: a test
+      // run applies afresh and so renders the exported view.
+      if (applied && hidden.size > 0) module.setDesignHidden(bridgeNames(hidden, result.drawnBy));
       timings.apply = performance.now() - lap;
       performance.mark('u8g2gl:apply');
       lap = performance.now();
@@ -430,9 +489,17 @@ export class EditLoop {
         const placeholders = module.placeholders();
         const hatched = result.errors > 0 ? this.problemElements(result.diagnostics, result.screenFile, result.bounds) : [];
         this.problemRects = hatched.map(({ rect }) => ({ ...rect, kind: 'problem' }));
-        this.hitTargets.set({ file: result.screenFile, targets: result.targets });
+        // A hidden element is not drawn, so it is not hit: a click lands beneath it.
+        this.hiddenNow = hidden;
+        this.hitTargets.set({
+          file: result.screenFile,
+          targets: hidden.size === 0 ? result.targets : result.targets.filter((target) => !hidden.has(target.name)),
+        });
         this.drawnPlacements = result.placements;
+        this.shownBounds.set(hidden.size === 0 ? result.bounds : without(result.bounds, hidden));
         this.bounds.set(result.bounds);
+        const runtime = module.runtimeHidden();
+        this.runtimeHidden.set({ file: result.screenFile, names: runtime === undefined || runtime.length === 0 ? NO_NAMES : new Set(runtime) });
         this.frameState.set({
           frame: this.drawn,
           stale: false,
@@ -453,6 +520,20 @@ export class EditLoop {
     for (const stage of ['frame', ...TEXT_STAGES, ...WASM_STAGES]) performance.clearMarks(`u8g2gl:${stage}`);
     performance.clearMeasures('u8g2gl:run');
     for (const listener of [...this.frameListeners]) listener(timings);
+  }
+
+  // hiddenFor
+  // The drawn screen's effectively hidden names: what the author hid in its
+  // file and everything nested under it. None when the loaded Wasm cannot
+  // hide, so the canvas never treats as hidden what it still draws.
+  //   result — the run's
+  //   module — the loaded editor Wasm
+  private hiddenFor(result: TextPipelineResult, module: EditorModule): ReadonlySet<string> {
+    const file = result.screenFile;
+    if (file === undefined || !module.designHiding) return NO_NAMES;
+    const names = this.workspace.designHidden.namesIn(file);
+    if (names.size === 0) return NO_NAMES;
+    return effectiveHidden(this.workspace.elementTrees.get().get(file) ?? [], names);
   }
 
   // tick
@@ -596,14 +677,37 @@ export function selectionOverlay(
   names: readonly string[],
   bounds: ReadonlyMap<string, Rect>,
   placements: ReadonlyMap<string, Placement>,
+  hidden: ReadonlySet<string> = NO_NAMES,
 ): OverlayRect[] {
   const shown = names.filter((name) => bounds.has(name));
   const [only] = shown;
   const handles = !(shown.length === 1 && only !== undefined && isLineShaped(placements.get(only)));
   return shown.flatMap((name) => {
     const rect = bounds.get(name);
-    return rect === undefined ? [] : [{ ...rect, kind: 'selection' as const, handles }];
+    if (rect === undefined) return [];
+    // Hidden in the designer: where it is, dashed, with nothing to grab.
+    return [hidden.has(name) ? { ...rect, kind: 'selection' as const, handles: false, dashed: true } : { ...rect, kind: 'selection' as const, handles }];
   });
+}
+
+// bridgeNames
+// The scene element names the editor Wasm must leave out for some hidden
+// names: each name, and every element expanded from a hidden composite
+// instance, whose scene names are its parts' own.
+//   hidden  — the effectively hidden names, as written in the screen
+//   drawnBy — the run's scene identifier → written name
+function bridgeNames(hidden: ReadonlySet<string>, drawnBy: ReadonlyMap<string, string>): string[] {
+  const names = new Set(hidden);
+  for (const [identifier, name] of drawnBy) {
+    if (hidden.has(name)) names.add(identifier);
+  }
+  return [...names];
+}
+
+// without
+// A map without some keys.
+function without<T>(map: ReadonlyMap<string, T>, keys: ReadonlySet<string>): Map<string, T> {
+  return new Map([...map].filter(([key]) => !keys.has(key)));
 }
 
 // boundingBox

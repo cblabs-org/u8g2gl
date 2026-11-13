@@ -100,6 +100,8 @@ jobs:
         run: node wasm/test/placeholder.test.mjs
       - name: Wasm last-error test
         run: node wasm/test/last-error.test.mjs
+      - name: Wasm design-hidden test
+        run: node wasm/test/design-hidden.test.mjs
       - name: Install CLI
         run: cd cli && npm ci
       - name: CLI tests that need Emscripten, with Emscripten present

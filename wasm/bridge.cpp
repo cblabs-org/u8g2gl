@@ -46,6 +46,17 @@
  *              Every entry point that can fail clears the last error first,
  *              so getLastError() always describes the call that just failed.
  *
+ *              The designer can hide elements from the frame without touching
+ *              the scene (`setDesignHidden()`): a view setting of the editor
+ *              alone, never the runtime `hidden` flag, which bindings own and
+ *              which a shape, having no object, does not have. renderFrame()
+ *              skips a hidden element as if it were absent, and anything
+ *              inside it. The set is forgotten on teardown(), so a fresh
+ *              applyScene() — a test run's, say — always draws the exported
+ *              view. Separately, getRuntimeHidden() names what the last frame
+ *              left out by the runtime's own rules, which is what the device
+ *              would leave out.
+ *
  * Exported Functions (extern "C"):
  *     Scene lifecycle:
  *     - applyScene():       Parse scene JSON and build the default screen
@@ -59,6 +70,9 @@
  *     - getDisplayHeight(): Height of the virtual display in pixels
  *     - getBufferPtr():     Pointer to the raw U8G2 frame buffer
  *     - getBufferSize():    Byte length of the raw U8G2 frame buffer
+ *     Designer view:
+ *     - setDesignHidden():  Elements the designer hides from the frame
+ *     - getRuntimeHidden(): Elements the last frame left out by runtime rules
  *     Diagnostics:
  *     - getLastError():     The last error message
  *     - getPlaceholders():  JSON list of the active screen's placeholder elements
@@ -82,6 +96,7 @@
 #include <memory>
 #include <new>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -93,6 +108,7 @@
 #include "u8g2gl/u8g2gl_editor.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_subject.h"
+#include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
 
 // The generated editor registry, and its font and image lookup: every font or
@@ -261,6 +277,15 @@ std::vector<uint8_t> s_parents;
 std::vector<placeholder_record> s_placeholders;
 std::string s_placeholders_json;
 
+// The designer's own hiding: element names to leave out of the frame. Kept
+// across selectScreen() (names are per file, and an unknown one is ignored),
+// forgotten by teardown().
+std::unordered_set<std::string> s_design_hidden;
+// The elements the last frame left out by the runtime's rules, in draw order.
+// Pointers into s_scene, so cleared whenever the screen or the scene goes.
+std::vector<const scene_json*> s_runtime_hidden;
+std::string s_runtime_hidden_json;
+
 // fail
 // Records an error and returns false. Only the first is kept, because the
 // first refusal is the cause and later ones are its consequences; each entry
@@ -377,6 +402,7 @@ void destroy_objects() {
     s_classes.clear();
     s_parents.clear();
     s_placeholders.clear();
+    s_runtime_hidden.clear();
     s_arena.clear();
     s_arena_used = 0;
     s_active_screen = nullptr;
@@ -635,7 +661,13 @@ bool evaluate_visibility(const scene_json& element, bool* shown) {
     return true;
 }
 
-bool render_draw_call(U8G2& display, const scene_json& element) {
+// render_draw_call
+// Draws one draw-call element, unless its visibility guards hide it.
+//   display — the virtual display
+//   element — the scene element, realisation "draw_calls"
+//   guarded — set true when the guards hid it, so nothing was drawn
+bool render_draw_call(U8G2& display, const scene_json& element, bool* guarded) {
+    *guarded = false;
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_registry& reg = ui_editor_registry();
     const u8g2gl_editor_drawing* drawing =
@@ -649,6 +681,7 @@ bool render_draw_call(U8G2& display, const scene_json& element) {
         return false;
     }
     if (!shown) {
+        *guarded = true;
         return true;
     }
 
@@ -715,6 +748,29 @@ uint8_t observers_wanted(const std::string& name) {
     return static_cast<uint8_t>(std::min<size_t>(count, std::numeric_limits<uint8_t>::max()));
 }
 
+// design_hidden_draw_call
+// Whether the designer hid a draw-call element: by name, or by hiding the
+// object it is clipped to or guarded by, which it is drawn inside.
+//   element — the scene element, realisation "draw_calls"
+//   objects — per object index, whether the designer hid that object
+bool design_hidden_draw_call(const scene_json& element, const std::vector<bool>& objects) {
+    if (s_design_hidden.count(element.get("name").as_string()) != 0) {
+        return true;
+    }
+    const auto hidden_object = [&objects](int32_t index) {
+        return index >= 0 && static_cast<size_t>(index) < objects.size() && objects[static_cast<size_t>(index)];
+    };
+    if (element.has("clip") && hidden_object(element.get("clip").as_int())) {
+        return true;
+    }
+    for (const scene_json& term : element.get("visibility").items()) {
+        if (term.has("ancestor") && hidden_object(term.get("ancestor").as_int())) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // json_escape
 // A string as the body of a JSON string literal.
 std::string json_escape(const std::string& text) {
@@ -748,6 +804,9 @@ void teardown() {
     s_scene = scene_json{};
     s_last_error.clear();
     s_display.release();
+    // The designer's hiding belongs to the scene it was set on: a fresh scene,
+    // as a test run applies, draws the exported view.
+    s_design_hidden.clear();
 }
 
 /**
@@ -948,19 +1007,55 @@ uint8_t* renderFrame(uint32_t current_ms) {
     // --- Step 2: Clear buffer ---
     U8G2& display = s_display.u8g2();
     display.clearBuffer();
+    s_runtime_hidden.clear();
 
-    // --- Step 3: Render elements in scene order ---
+    // --- Step 3: Which objects the designer hid: by name, or inside one that is ---
+    // A parent always precedes its children in the flat array, so one pass in
+    // object order sees each parent's answer before its children ask for it.
+    std::vector<bool> design_hidden(s_objects.size(), false);
+    if (!s_design_hidden.empty()) {
+        for (const scene_json& element : s_active_screen->get("elements").items()) {
+            if (element.get("realisation").as_string() != "object") {
+                continue;
+            }
+            const int32_t obj_idx = element.get("object").as_int();
+            if (obj_idx < 0 || static_cast<size_t>(obj_idx) >= s_objects.size()) {
+                continue;
+            }
+            const uint8_t parent = s_parents[static_cast<size_t>(obj_idx)];
+            const bool in_hidden = parent != U8G2GL_NO_PARENT && parent < design_hidden.size() && design_hidden[parent];
+            design_hidden[static_cast<size_t>(obj_idx)] = in_hidden || s_design_hidden.count(element.get("name").as_string()) != 0;
+        }
+    }
+
+    // --- Step 4: Render elements in scene order, skipping what the designer hid ---
+    // What the runtime's own rules leave out is recorded for getRuntimeHidden():
+    // an object hidden by its flag or an ancestor's, a shape by its guards.
     for (const scene_json& element : s_active_screen->get("elements").items()) {
         const std::string& realisation = element.get("realisation").as_string();
         if (realisation == "object") {
             const int32_t obj_idx = element.get("object").as_int();
             if (obj_idx >= 0 && static_cast<size_t>(obj_idx) < s_objects.size()) {
-                u8g2gl_render_object(display, s_objects.data(), s_parents.data(),
-                                     static_cast<uint8_t>(obj_idx));
+                const uint8_t index = static_cast<uint8_t>(obj_idx);
+                if (design_hidden[index]) {
+                    continue;
+                }
+                if (!u8g2gl_is_effectively_visible(s_objects.data(), s_parents.data(), index)) {
+                    s_runtime_hidden.push_back(&element);
+                    continue;
+                }
+                u8g2gl_render_object(display, s_objects.data(), s_parents.data(), index);
             }
         } else if (realisation == "draw_calls") {
-            if (!render_draw_call(display, element)) {
+            if (design_hidden_draw_call(element, design_hidden)) {
+                continue;
+            }
+            bool guarded = false;
+            if (!render_draw_call(display, element, &guarded)) {
                 return nullptr;
+            }
+            if (guarded) {
+                s_runtime_hidden.push_back(&element);
             }
         }
     }
@@ -1001,6 +1096,70 @@ uint8_t* getBufferPtr() {
 EMSCRIPTEN_KEEPALIVE
 uint32_t getBufferSize() {
     return s_display.buffer_size();
+}
+
+/**
+ * @brief Hide elements from the frame in the designer only.
+ *
+ * Each later renderFrame() leaves out every named element, and everything
+ * drawn inside one (an object's descendants, a shape clipped to or guarded by
+ * a hidden object), as if absent: the pixels the rest of the screen draws
+ * stay. A name the active screen does not have is ignored. The runtime
+ * `hidden` flag is never touched, so bindings and this set never mix.
+ *
+ * The set replaces the previous one, survives selectScreen(), and is cleared
+ * by teardown() and so by every applyScene().
+ *
+ * @param names_json A JSON array of element names; `[]` shows everything.
+ * @return 1 on success; 0 with getLastError() when the text is not a JSON
+ *         array of strings, leaving the previous set in place.
+ */
+EMSCRIPTEN_KEEPALIVE
+int setDesignHidden(const char* names_json) {
+    s_last_error.clear();
+    if (names_json == nullptr) {
+        s_last_error = "null hidden-names json provided";
+        return 0;
+    }
+    std::string parse_error;
+    const scene_json names = scene_json_parse(names_json, &parse_error);
+    if (!parse_error.empty() || !names.is_array()) {
+        s_last_error = "hidden names must be a JSON array of strings";
+        return 0;
+    }
+    std::unordered_set<std::string> next;
+    for (const scene_json& name : names.items()) {
+        if (!name.is_string()) {
+            s_last_error = "hidden names must be a JSON array of strings";
+            return 0;
+        }
+        next.insert(name.as_string());
+    }
+    s_design_hidden = std::move(next);
+    return 1;
+}
+
+/**
+ * @brief The elements the last frame left out by the runtime's own rules.
+ *
+ * An object hidden by its `hidden` flag or an ancestor's, and a shape hidden by
+ * its visibility guards: what the device would not draw with the current
+ * sample data. Never an element the designer hid (setDesignHidden()), which is
+ * skipped before these rules are asked.
+ *
+ * @return A JSON array of names in draw order, `[]` before the first frame of
+ *         the active screen; a string owned by the bridge, valid until the
+ *         next call.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* getRuntimeHidden() {
+    s_runtime_hidden_json = "[";
+    for (size_t i = 0; i < s_runtime_hidden.size(); ++i) {
+        s_runtime_hidden_json += (i == 0 ? "\"" : ",\"");
+        s_runtime_hidden_json += json_escape(s_runtime_hidden[i]->get("name").as_string()) + "\"";
+    }
+    s_runtime_hidden_json += "]";
+    return s_runtime_hidden_json.c_str();
 }
 
 /**

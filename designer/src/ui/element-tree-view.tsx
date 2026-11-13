@@ -24,6 +24,17 @@
  *              canvas. Which element rows are collapsed is this view's own
  *              state: it is not remembered, and every row starts expanded.
  *
+ *              At the right of every row is an eye, which hides the element in
+ *              the designer only (`design-hidden.ts`): never an edit, never the
+ *              device's `hidden`, and it never changes the selection. A hidden
+ *              row is dimmed with the eye shut; a row inside one is dimmed,
+ *              hidden by its parent, its eye disabled. Separately, a row the
+ *              frame left out by the runtime's own rules with the current
+ *              sample data carries a quiet "hidden by data" mark, which is not
+ *              the eye: the two kinds of hidden never mix. When the loaded
+ *              editor Wasm cannot hide (a project build older than the CLI),
+ *              every eye is disabled and says why.
+ *
  *              The view subscribes to the selection itself, and only to this
  *              screen's part of it, so a selection change re-renders the tree
  *              that shows it and not the Explorer around it; nothing here
@@ -35,11 +46,14 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { effectiveHidden, type DesignHiddenModel } from '../canvas/design-hidden';
 import { findNode, type ElementNode } from '../documents/element-tree';
 import { Icon } from '../icons/icon';
 import { countRender } from '../perf/render-count';
+import type { RuntimeHidden } from '../pipeline/edit-loop';
 import { NO_SELECTION, type Selection } from '../selection/selection-model';
 import type { Observable } from '../state/observable';
+import type { EditorModule } from '../wasm/editor-module';
 
 /** The {@link ElementTreeView}'s properties. */
 interface ElementTreeViewProps {
@@ -51,6 +65,12 @@ interface ElementTreeViewProps {
   readonly nodes: readonly ElementNode[];
   /** The selection; the view shows it when it is in this screen. */
   readonly selection: Observable<Selection>;
+  /** The elements hidden in the designer; the eyes read and change this screen's. */
+  readonly designHidden: DesignHiddenModel;
+  /** What the drawn frame left out by the runtime's rules; shown when it is this screen. */
+  readonly runtimeHidden: Observable<RuntimeHidden>;
+  /** The loaded editor Wasm, which says whether hiding is possible. */
+  readonly module: Observable<EditorModule | undefined>;
   /** A tag's icon name. */
   readonly iconOf: (tag: string) => string;
   /**
@@ -60,13 +80,30 @@ interface ElementTreeViewProps {
   readonly onSelect: (name: string, toggle: boolean) => void;
 }
 
+/** The "hidden by data" mark's explanation. */
+export const HIDDEN_BY_DATA = 'Hidden by its bindings with the current sample data — the device would not draw it';
+/** Why every eye is disabled when the loaded Wasm cannot hide. */
+export const HIDING_NEEDS_REBUILD = "Hiding needs the project's editor Wasm to be rebuilt";
+/** No names: shared, so an empty snapshot is one object. */
+const NO_NAMES: ReadonlySet<string> = new Set();
+
 /** Pixels each nesting level indents a row by. */
 const INDENT_PX = 12;
 /** Pixels before a top-level row's content, matching the Explorer's file rows. */
 const ROW_START_PX = 26;
 
 /** @brief One screen's element rows, as a tree. */
-export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelect }: ElementTreeViewProps): React.JSX.Element {
+export function ElementTreeView({
+  file,
+  label,
+  nodes,
+  selection,
+  designHidden,
+  runtimeHidden,
+  module,
+  iconOf,
+  onSelect,
+}: ElementTreeViewProps): React.JSX.Element {
   countRender('ElementTree');
   // This screen's selection, or none: a selection in another file is the same
   // snapshot here, so it re-renders nothing.
@@ -79,6 +116,24 @@ export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelec
   );
   const selected = shown.names;
   const origin = shown.origin;
+  // This screen's hidden names, and what the frame left out by the data: each
+  // snapshot keeps its identity until this screen's part changes.
+  const authorHidden = useSyncExternalStore(
+    (onChange) => designHidden.hidden.subscribe(onChange),
+    () => designHidden.namesIn(file),
+  );
+  const byData = useSyncExternalStore(
+    (onChange) => runtimeHidden.subscribe(onChange),
+    () => {
+      const current = runtimeHidden.get();
+      return current.file === file ? current.names : NO_NAMES;
+    },
+  );
+  const canHide = useSyncExternalStore(
+    (onChange) => module.subscribe(onChange),
+    () => module.get()?.designHiding !== false,
+  );
+  const hiddenHere = effectiveHidden(nodes, authorHidden);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [focused, setFocused] = useState<string | undefined>(undefined);
   const tree = useRef<HTMLUListElement>(null);
@@ -150,14 +205,51 @@ export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelec
     next?.focus();
   };
 
+  // eye
+  // A row's eye: hides or shows the element in the designer. A click on it is
+  // never a click on the row, so it never changes the selection.
+  //   node     — the row's element
+  //   inHidden — the hidden row it is nested in, if any
+  //   tabbable — whether the row is the tree's tab stop, so Tab reaches its eye
+  const eye = (node: ElementNode, inHidden: string | undefined, tabbable: boolean): React.JSX.Element => {
+    const own = authorHidden.has(node.name);
+    const shut = own || inHidden !== undefined;
+    const accessibleName = inHidden !== undefined ? `${node.name} is hidden with ${inHidden}` : `${own ? 'Show' : 'Hide'} ${node.name}`;
+    const tip = !canHide
+      ? HIDING_NEEDS_REBUILD
+      : inHidden !== undefined
+        ? `Hidden with ${inHidden}: show ${inHidden} to show it`
+        : `${own ? 'Show' : 'Hide'} in the designer only; the device and the XML are unaffected`;
+    return (
+      <button
+        type="button"
+        className="eye"
+        aria-pressed={own}
+        aria-label={accessibleName}
+        title={tip}
+        disabled={!canHide || inHidden !== undefined}
+        tabIndex={tabbable ? 0 : -1}
+        onClick={(event) => {
+          event.stopPropagation();
+          designHidden.setHidden(file, node.name, !own);
+        }}
+      >
+        <Icon name={shut ? 'eye-off' : 'eye'} size={14} />
+      </button>
+    );
+  };
+
   // renderNodes
   // A level of rows, each with its children nested in a group.
-  //   level — 1 for the screen's top-level elements
-  const renderNodes = (list: readonly ElementNode[], level: number): React.JSX.Element[] =>
+  //   level    — 1 for the screen's top-level elements
+  //   inHidden — the nearest enclosing row the author hid, if any
+  const renderNodes = (list: readonly ElementNode[], level: number, inHidden: string | undefined): React.JSX.Element[] =>
     list.map((node) => {
       const hasChildren = node.children.length > 0;
       const open = hasChildren && !collapsed.has(node.name);
       const isSelected = selectedSet.has(node.name);
+      const dimmed = hiddenHere.has(node.name);
+      const hiddenFrom = inHidden ?? (authorHidden.has(node.name) ? node.name : undefined);
       return (
         <li
           key={node.name}
@@ -173,7 +265,7 @@ export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelec
           }}
         >
           <div
-            className={`element-row${isSelected ? ' selected' : ''}`}
+            className={`element-row${isSelected ? ' selected' : ''}${dimmed ? ' design-hidden' : ''}`}
             style={{ paddingLeft: ROW_START_PX + (level - 1) * INDENT_PX }}
             title={`${node.name} <${node.tag}>`}
             onClick={(event) => {
@@ -200,8 +292,14 @@ export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelec
             <Icon name={iconOf(node.tag)} size={14} className="element-icon" />
             <span className="element-name">{node.name}</span>
             <span className="element-tag">{node.tag}</span>
+            {byData.has(node.name) && (
+              <span className="data-hidden-mark" role="img" aria-label="hidden by data" title={HIDDEN_BY_DATA}>
+                <Icon name="circle-slash" size={12} />
+              </span>
+            )}
+            {eye(node, inHidden, node.name === tabStop)}
           </div>
-          {open && <ul role="group">{renderNodes(node.children, level + 1)}</ul>}
+          {open && <ul role="group">{renderNodes(node.children, level + 1, hiddenFrom)}</ul>}
         </li>
       );
     });
@@ -213,7 +311,7 @@ export function ElementTreeView({ file, label, nodes, selection, iconOf, onSelec
           No named elements
         </li>
       ) : (
-        renderNodes(nodes, 1)
+        renderNodes(nodes, 1, undefined)
       )}
     </ul>
   );

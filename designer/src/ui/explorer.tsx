@@ -35,7 +35,9 @@
  *              (`explorer-expansion.ts`), and the screen the canvas shows
  *              expands when first shown. A row selects its element through
  *              the `SelectionModel`, opening its screen on the canvas when
- *              another is drawn; the file rows' menu and keys are unchanged.
+ *              another is drawn; the file rows' menu and keys are unchanged,
+ *              except that a screen's menu also offers "Show all elements",
+ *              for the elements hidden in the designer.
  *
  * Exports:
  * - Explorer:       The component
@@ -125,6 +127,8 @@ export function Explorer(): React.JSX.Element {
       openInEditor: (path) => void actions.openInEditor(path),
       reveal: (path) => void actions.reveal(path),
       copyPath: (path) => void actions.copyPath(path),
+      showAllElements: (path) => workspace.designHidden.showAll(path),
+      anyHidden: (path) => workspace.designHidden.namesIn(path).size > 0,
     }),
     [workspace, actions],
   );
@@ -208,6 +212,9 @@ export function Explorer(): React.JSX.Element {
                       label={label}
                       nodes={trees.get(path) ?? []}
                       selection={workspace.selection.current}
+                      designHidden={workspace.designHidden}
+                      runtimeHidden={workspace.loop.runtimeHidden}
+                      module={workspace.wasm.module}
                       iconOf={iconOf}
                       onSelect={(element, toggle) => selectElement(path, element, toggle)}
                     />

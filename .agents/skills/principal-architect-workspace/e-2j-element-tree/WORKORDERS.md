@@ -61,16 +61,16 @@ WO3.
 
 # WO2 — designer-only hiding (`u8g2gl-e2j/wo2-design-hidden`)
 
-- [ ] Ruling 4: `setDesignHidden` and `getRuntimeHidden` in `wasm/bridge.cpp`, the export list,
+- [x] Ruling 4: `setDesignHidden` and `getRuntimeHidden` in `wasm/bridge.cpp`, the export list,
       the header block, the optional wrapper in `editor-module.ts`, and the Wasm tests (added to
       `ci.yml` beside the existing three).
-- [ ] Ruling 5: framework sources in the build hash, with its unit test; the disabled-eye
+- [x] Ruling 5: framework sources in the build hash, with its unit test; the disabled-eye
       fallback.
-- [ ] Ruling 6: the hidden model, effective set with descendants, persistence, re-applied by the
+- [x] Ruling 6: the hidden model, effective set with descendants, persistence, re-applied by the
       live loop and **never** by the test-run path.
-- [ ] Rulings 7–9: the eye, Show all, hit-testing / marquee / outlines, the dashed selection,
+- [x] Rulings 7–9: the eye, Show all, hit-testing / marquee / outlines, the dashed selection,
       the toolbar badge, the "hidden by data" marker.
-- [ ] Ruling 10's WO2 tests, including: a test run with an element hidden still reports parity,
+- [x] Ruling 10's WO2 tests, including: a test run with an element hidden still reports parity,
       and toggling leaves the file clean.
 
 # WO3 — docs, version, review, evidence (`u8g2gl-e2j/wo3-docs-review`)

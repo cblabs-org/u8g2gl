@@ -98,7 +98,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sMODULARIZE=1"
     "-sEXPORT_NAME='createU8g2glEditor'"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','HEAPU8','lengthBytesUTF8']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders','_setDesignHidden','_getRuntimeHidden']"
     "-sALLOW_MEMORY_GROWTH=1"
 )
 string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})

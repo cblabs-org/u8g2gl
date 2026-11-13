@@ -121,6 +121,13 @@ export interface TextPipelineResult {
   /** What a click on `screen` can hit, in draw order. */
   readonly targets: readonly HitTarget[];
   /**
+   * Each element `screen` draws, by its identifier in the scene, to the name
+   * written in the screen it belongs to: itself, or the outermost composite
+   * instance it was expanded through. How a name the author can see (a row,
+   * a selection) reaches the scene elements drawn for it.
+   */
+  readonly drawnBy: ReadonlyMap<string, string>;
+  /**
    * Each element written in `screen`'s placement — its manifest, its model in
    * device coordinates and its container's corner — by name: what the canvas
    * reads to know which attributes place an element and where a default puts
@@ -195,6 +202,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   let placed: ReadonlyMap<string, Rect> = new Map();
   let targets: readonly HitTarget[] = [];
   let placements: ReadonlyMap<string, Placement> = new Map();
+  let drawnBy: ReadonlyMap<string, string> = new Map();
   if (wellFormed && target !== undefined && input.assets !== undefined) {
     try {
       const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
@@ -220,7 +228,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       const realised = realisation.screens[screenIndex];
       const resolved = pipeline.resolution.screens[screenIndex];
       if (realised !== undefined && resolved !== undefined) {
-        ({ bounds, placed, targets, placements } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
+        ({ bounds, placed, targets, placements, drawnBy } = selectable(realised, placeScreen(realised, resolved, model.manifests).placements));
       }
     } catch (error) {
       // Only a model with errors may be refused: the emitter refusing a valid
@@ -231,6 +239,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       placed = new Map();
       targets = [];
       placements = new Map();
+      drawnBy = new Map();
     }
   }
   lap('scene');
@@ -248,6 +257,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     placed,
     targets,
     placements,
+    drawnBy,
     subjectValues: declaredValues(model.globals),
     timings,
   };
@@ -300,8 +310,9 @@ function declaredValues(globals: Globals): string {
 function selectable(
   realised: RealisedScreen,
   placements: ReadonlyMap<RealisedElement, Placement>,
-): { bounds: Map<string, Rect>; placed: Map<string, Rect>; targets: HitTarget[]; placements: Map<string, Placement> } {
+): { bounds: Map<string, Rect>; placed: Map<string, Rect>; targets: HitTarget[]; placements: Map<string, Placement>; drawnBy: Map<string, string> } {
   const targets: HitTarget[] = [];
+  const drawnBy = new Map<string, string>();
   const own = new Map<string, Rect>();
   const placed = new Map<string, Rect>();
   const placementsOut = new Map<string, Placement>();
@@ -310,6 +321,7 @@ function selectable(
     const placement = placements.get(step.element);
     const rect = placement === undefined ? undefined : rectangleOf(placement);
     const name = step.element.element.instantiation[0]?.identifier ?? step.element.identifier;
+    if (name !== '') drawnBy.set(step.element.identifier, name);
     if (rect === undefined || name === '') continue;
     targets.push({ name, rect });
     if (step.element.element.instantiation.length === 0) {
@@ -326,7 +338,7 @@ function selectable(
   }
   const bounds = new Map(drawn);
   for (const [name, rect] of own) bounds.set(name, rect);
-  return { bounds, placed, targets, placements: placementsOut };
+  return { bounds, placed, targets, placements: placementsOut, drawnBy };
 }
 
 // union

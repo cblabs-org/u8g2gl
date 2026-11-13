@@ -22,4 +22,9 @@ export interface MenuItem {
   readonly items?: readonly MenuItem[];
   /** A stable hook for tests and styles, as `data-item`. */
   readonly id?: string;
+  /**
+   * Shown but not chosen: it keeps its place, and focus can rest on it, so the
+   * menu reads the same whether or not it applies now.
+   */
+  readonly disabled?: boolean;
 }

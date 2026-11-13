@@ -31,6 +31,11 @@
  *     - renderFrame():      Tick and draw; a view of the 1-bit buffer
  *     - displaySize():      The scene's display
  *
+ *     Designer view:
+ *     - designHiding:       Whether the module can hide elements in the designer
+ *     - setDesignHidden():  Elements the designer leaves out of the frame
+ *     - runtimeHidden():    Elements the last frame left out by the runtime's rules
+ *
  *     Reporting:
  *     - lastError():        Why the last call failed
  *     - placeholders():     Elements the module has no class for
@@ -74,6 +79,26 @@ export interface EditorModule {
   placeholders(): readonly Placeholder[];
   /** @brief The build hash a project editor Wasm carries; undefined for the framework's. */
   buildHash(): string | undefined;
+  /**
+   * Whether this module exports the designer's hiding. A project editor Wasm
+   * built by an older CLI does not; the designer then cannot hide, and says why.
+   */
+  readonly designHiding: boolean;
+  /**
+   * @brief Leaves these elements, and anything inside them, out of every later
+   *        frame, until the next `applyScene`, which forgets them. Never the
+   *        runtime `hidden` flag: what is exported is unaffected.
+   *
+   * @param names Scene element names; unknown ones are ignored, `[]` shows all.
+   * @return False with `lastError()` if refused, or when the module cannot hide.
+   */
+  setDesignHidden(names: readonly string[]): boolean;
+  /**
+   * @brief The elements the last frame did not draw because of the runtime's own
+   *        rules — a `hidden` flag, an ancestor's, or a shape's guards — never the
+   *        designer's hiding. Undefined when the module does not report it.
+   */
+  runtimeHidden(): readonly string[] | undefined;
 }
 
 /** The Emscripten module object, as far as the wrapper uses it. */
@@ -94,6 +119,8 @@ interface EmscriptenModule {
   _getLastError(): number;
   _getPlaceholders(): number;
   _getBuildHash?: () => number;
+  _setDesignHidden?: (pointer: number) => number;
+  _getRuntimeHidden?: () => number;
 }
 
 /** The factory a MODULARIZE loader defines. */
@@ -171,5 +198,16 @@ function wrap(module: EmscriptenModule): EditorModule {
     lastError: () => module.UTF8ToString(module._getLastError()),
     placeholders: () => JSON.parse(module.UTF8ToString(module._getPlaceholders())) as Placeholder[],
     buildHash: () => (module._getBuildHash === undefined ? undefined : module.UTF8ToString(module._getBuildHash())),
+    // Optional, like the build hash: a project Wasm cached by an older CLI
+    // lacks them, and must still draw.
+    designHiding: module._setDesignHidden !== undefined,
+    setDesignHidden(names) {
+      const set = module._setDesignHidden;
+      return set !== undefined && withString((p) => set(p), JSON.stringify(names)) === 1;
+    },
+    runtimeHidden() {
+      const get = module._getRuntimeHidden;
+      return get === undefined ? undefined : (JSON.parse(module.UTF8ToString(get())) as string[]);
+    },
   };
 }

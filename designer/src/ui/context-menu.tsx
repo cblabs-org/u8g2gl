@@ -126,7 +126,7 @@ function MenuList(props: MenuListProps): React.JSX.Element {
   // Opens an item's submenu, or closes the menu and runs its action.
   const choose = (index: number, fromKeyboard: boolean): void => {
     const item = items[index];
-    if (item === undefined) return;
+    if (item === undefined || item.disabled === true) return;
     if (item.items !== undefined) {
       setOpen({ index, focus: fromKeyboard });
       return;
@@ -199,6 +199,7 @@ function MenuList(props: MenuListProps): React.JSX.Element {
           tabIndex={-1}
           className="context-menu-item"
           data-item={item.id}
+          aria-disabled={item.disabled === true ? true : undefined}
           aria-haspopup={item.items !== undefined ? 'menu' : undefined}
           aria-expanded={item.items !== undefined ? open?.index === index : undefined}
           onClick={() => choose(index, false)}
