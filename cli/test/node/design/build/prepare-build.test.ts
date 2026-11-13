@@ -7,8 +7,8 @@
  * Purpose: The parts of the project editor Wasm build that need no compiler:
  *          the platform-header rule (one diagnostic, at the `#include`, before
  *          anything compiles) and the build hash (it changes when, and only
- *          when, a widget source, a manifest, a font, an image or the generated
- *          configuration changes). Runs on every machine.
+ *          when, a widget source, a manifest, a font, an image, the generated
+ *          configuration or a framework source changes). Runs on every machine.
  * Description: Each case copies the departures project (a fixture with custom
  *              widgets) into a temp
  *              directory, changes one thing, and prepares it again.
@@ -19,6 +19,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildEditorWasm } from '../../../../src/node/design/build/editor-wasm-build.js';
 import { checkPlatformHeaders, PLATFORM_HEADER_CODE, platformOf } from '../../../../src/node/design/build/platform-headers.js';
+import { stageFramework } from '../../../../src/node/design/build/framework-sources.js';
 import { prepareBuild } from '../../../../src/node/design/build/prepare-build.js';
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
 import { fakeHost } from '../../toolchain/fake-host.js';
@@ -47,8 +48,9 @@ function edit(project: string, path: string, change: (text: string) => string): 
 
 // hashOf
 // The build hash after preparing, failing the test if preparation refuses.
-async function hashOf(project: string, cache: string): Promise<string> {
-  const prepared = await prepareBuild(project, cache);
+//   framework — the framework root to hash; this CLI's own when omitted, none for null
+async function hashOf(project: string, cache: string, framework?: string | null): Promise<string> {
+  const prepared = await prepareBuild(project, cache, framework);
   if (!prepared.ok) {
     throw new Error(JSON.stringify(prepared.diagnostics, null, 2));
   }
@@ -177,4 +179,25 @@ describe('the build hash', () => {
       expect(after !== before, what).toBe(moves);
     });
   }
+
+  // A CLI upgrade changes the framework, not the project: the cached project
+  // editor Wasm must not be reused without the newer bridge or runtime.
+  it('changes when a framework source changes, wherever the framework lives', async () => {
+    const project = departuresCopy();
+    const cache = makeTempDir('build-cache');
+    const staged = join(makeTempDir('framework'), 'framework');
+    stageFramework(FRAMEWORK_ROOT, staged);
+    const fromTree = await hashOf(project, cache, FRAMEWORK_ROOT);
+    // The same files in another place hash the same: labels are relative.
+    expect(await hashOf(project, cache, staged)).toBe(fromTree);
+    edit(staged, 'wasm/bridge.cpp', (t) => `${t}\n// a newer bridge\n`);
+    const newerBridge = await hashOf(project, cache, staged);
+    expect(newerBridge).not.toBe(fromTree);
+    edit(staged, 'include/u8g2gl/u8g2gl_obj.h', (t) => `${t}\n// a newer runtime header\n`);
+    expect(await hashOf(project, cache, staged)).not.toBe(newerBridge);
+    // With no framework, the project's own inputs are still hashed.
+    const projectOnly = await hashOf(project, cache, null);
+    expect(projectOnly).toMatch(/^[0-9a-f]{64}$/);
+    expect(projectOnly).not.toBe(fromTree);
+  });
 });

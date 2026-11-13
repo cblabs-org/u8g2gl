@@ -169,11 +169,11 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       });
       decorations.set(ranges.map((range) => ({ range, options: selected })));
       const first = ranges[0];
-      // Reveal only what the canvas selected: the caret's element is already
-      // where the user is looking. Never focus — the canvas keeps the keyboard.
-      // The element's lines from column 1, so a long line does not scroll the
-      // view sideways to its end.
-      if (selection.origin === 'canvas' && first !== undefined) {
+      // Reveal only what the canvas or the Explorer's tree selected: the
+      // caret's element is already where the user is looking. Never focus —
+      // the canvas or the tree keeps the keyboard. The element's lines from
+      // column 1, so a long line does not scroll the view sideways to its end.
+      if (selection.origin !== 'text' && first !== undefined) {
         const lines = new api.Range(first.startLineNumber, 1, first.endLineNumber, 1);
         editor.revealRangeInCenterIfOutsideViewport(lines, api.editor.ScrollType.Smooth);
       }

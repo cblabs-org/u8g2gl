@@ -14,7 +14,8 @@
  *              with `image-rendering: pixelated`, so a zoom costs the browser
  *              nothing per frame. The overlay canvas carries what is drawn
  *              *about* the frame rather than in it: each selected element's
- *              outline, eight handles and an `x, y, w×h` badge; a round handle
+ *              outline, eight handles and an `x, y, w×h` badge (dashed, with
+ *              no handles, for one hidden in the designer); a round handle
  *              on each vertex of a single selected line or triangle, or on
  *              each end of an hline or vline, in place of a line's box
  *              handles; the marquee while one is dragged; the alignment
@@ -78,6 +79,11 @@ export interface OverlayRect {
    * true when absent.
    */
   readonly handles?: boolean;
+  /**
+   * A selection only: drawn dashed, because the element is hidden in the
+   * designer and so not in the frame. Solid when absent.
+   */
+  readonly dashed?: boolean;
 }
 
 /**
@@ -94,6 +100,9 @@ const OVERLAY_COLOUR: Readonly<Record<OverlayRect['kind'], string>> = {
 
 /** The outline's fill: faint, so the frame's pixels read through it. */
 const OUTLINE_FILL = 'rgba(255, 191, 0, 0.1)';
+
+/** A selected element hidden in the designer: dashed, longer than the placeholder's. */
+const HIDDEN_SELECTION_DASH = [5, 3];
 
 /** The outline's dash, in CSS pixels: shorter than the placeholder's, so the two read apart. */
 const OUTLINE_DASH = [2, 2];
@@ -312,7 +321,7 @@ export class CanvasView {
       }
       context.strokeStyle = OVERLAY_COLOUR[rect.kind];
       context.lineWidth = rect.kind === 'selection' ? 2 : 1;
-      context.setLineDash(rect.kind === 'placeholder' ? [3, 3] : []);
+      context.setLineDash(rect.kind === 'placeholder' ? [3, 3] : rect.dashed === true ? HIDDEN_SELECTION_DASH : []);
       context.strokeRect(box.x, box.y, box.width, box.height);
       if (rect.kind === 'selection') {
         if (rect.handles !== false) this.drawHandles(context, box);

@@ -26,7 +26,9 @@
  *              subscribe to the selection themselves, and Run with the last
  *              test run's verdict (`test-run-controls.tsx`), whose mismatch
  *              legend sits over the stage. The banner says why the frame is
- *              the last good one, or what the renderer cannot draw.
+ *              the last good one, or what the renderer cannot draw. While
+ *              anything on the drawn screen is hidden in the designer, the
+ *              toolbar says so (`design-hidden-badge.tsx`).
  *
  * Exports:
  * - CanvasPanel:  The component
@@ -40,6 +42,7 @@ import { projectNames } from '../documents/element-names';
 import { CanvasGestures } from '../selection/canvas-gestures';
 import { AlignToolbar } from './align-toolbar';
 import { CanvasSaveButton } from './canvas-save-button';
+import { DesignHiddenBadge } from './design-hidden-badge';
 import { TestRunControls, TestRunDiffInfo } from './test-run-controls';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
@@ -77,8 +80,9 @@ export function CanvasPanel(): React.JSX.Element {
       element: container.current,
       frame: frame.current,
       targets: loop.hitTargets,
-      bounds: loop.bounds,
-      placements: () => loop.placements,
+      // Without what the designer hid: a hidden element has nothing to grab.
+      bounds: loop.shownBounds,
+      placements: () => loop.shownPlacements,
       display: () => loop.frameState.get().display,
       canvasEditing: loop.canvasEditing,
       selection: workspace.selection,
@@ -143,6 +147,7 @@ export function CanvasPanel(): React.JSX.Element {
         <AlignToolbar editor={editor} />
         <TestRunControls />
         <span className="spacer" />
+        <DesignHiddenBadge />
         {placeholderNote !== undefined && <span className="placeholder-note">{placeholderNote}</span>}
         <label>
           Zoom{' '}

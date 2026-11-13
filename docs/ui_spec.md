@@ -182,6 +182,7 @@ The CST gives every element a source range and a stable identity.
 
 - **Canvas → XML:** hit-test yields the object; its id maps to a CST node; Monaco reveals and highlights that range.
 - **XML → canvas:** caret offset resolves to the innermost enclosing element; the canvas selects it.
+- **Explorer ↔ canvas:** a row of the Explorer's element tree (§6) selects its element, opening its screen on the canvas when another is drawn, and the XML reveals it as for a canvas selection; a selection made on the canvas or in the XML lights its rows and scrolls the first into view, without taking the keyboard.
 - **Neither direction rewrites the document.** Selection is never an edit.
 
 Hit-testing respects draw order ([D-4]): the topmost element under the cursor wins; repeated clicks at the same point cycle downward through overlaps.
@@ -267,12 +268,21 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 
 **The Explorer** is grouped by what an author edits, not by directory: **Project** (`u8g2gl.xml`, `globals.xml`), **Screens** (one entry per screen file), **Widgets** (one entry per widget, under its own name, opening its manifest; its `.cpp` and `.hpp` travel with the entry rather than being listed) and **Assets** (fonts and images). Anything else is listed under **Other files**, so nothing on disk goes missing; a widget directory with no manifest falls there too. Generated output — `generated/` and the editor target's `generated_editor/` — is not listed, watched or writable from the designer.
 
+**Element rows.** Each Screens entry has a disclosure **▸** that lists the screen's elements under it as a tree: a container's or widget view's children nest under it, an unnamed wrapper (`<view>`, a binding's child tag) adds no row. The label still opens the screen; only the disclosure expands. A row shows the tag's Palette icon, the element's name and, quieter, its tag.
+
+- **Rows are in document order, which is draw order:** a later row draws over an earlier one. The list is not reversed.
+- **From the buffer.** Rows are built from the screen's current, unsaved text after every run, so a rename or an insert shows at once; text that does not parse keeps the last good rows, as the selection keeps its names. Widget manifests are not expanded.
+- **Selecting.** A click selects the row's element through the same selection the canvas uses (§4.3); Shift-, Cmd- or Ctrl-click adds or removes it within one file. Selecting is never an edit.
+- **Keys.** The rows are a WAI-ARIA tree (`tree`, `treeitem`, `aria-level`, `aria-expanded`, `aria-selected`) with one row in the tab order: Up and Down move, Home and End go to the ends, Right expands or enters, Left collapses or goes to the parent, Enter selects (Shift+Enter adds). The file rows' menu and keys are unchanged.
+- **Remembered.** Which screens are expanded is remembered per browser and project; the screen the canvas shows expands the first time it is shown. Where storage is unavailable everything starts collapsed and still works.
+
 Every Explorer entry has a **context menu**, opened by right-click, Shift+F10 or the context-menu key, driven by the arrow keys and closed by Escape or a click outside:
 
 - **View source…** — a widget's files (manifest, `.cpp`, `.hpp`). C++ opens read-only (§10); the manifest opens in its ordinary editor tab.
 - **Open in editor** — hands the file to the author's own editor: `u8g2gl design --editor <command>` or `U8G2GL_EDITOR`, otherwise the application the system associates with the file. `code`, `code-insiders` and `cursor` open at the line. Offered, and accepted by the server, only for source and asset types (`.xml`, `.cpp`, `.cc`, `.c`, `.hpp`, `.h`, `.json`, `.md`, `.txt`, `.bdf`, `.xbm`, `.png`): the system's opener *runs* an executable file type, and the session token can write a file of any name.
 - **Reveal in Finder** (macOS) or **Reveal in file manager** (elsewhere, opening the containing folder).
 - **Copy path** — the project-relative path.
+- **Show all elements** (screens only) — shows every element of the screen hidden in the designer (§6.3); disabled while none is.
 
 The server starts these programs itself, with an argument array and never a shell; the editor command is split once at start-up and never comes from a request.
 
@@ -305,6 +315,28 @@ A served designer tab belongs to one run of `u8g2gl design`. The link carries th
 - **A stale link explains itself.** A browser opening a link the server refuses — the bare address, an old bookmark, a tab from an earlier run — gets a short page, still a 403, saying the link needs a running session and to run `npx u8g2gl design` in the project folder. The page is the same for every refusal and names no project, path or token. The designer's own requests are still refused with JSON.
 
 Running `npx u8g2gl design` again while a session is live reopens that session in the browser rather than starting a second one. A new session is a new port, so unsaved edits in an old tab do not carry into it. The old tab keeps them on screen, and the guard stops a reload from discarding them.
+
+### 6.3 Hiding elements in the designer
+
+Elements layered on top of each other are hard to see and to click. Each element row in the Explorer has an **eye** at its right — always visible, faint until the row is hovered or focused — that hides the element **in the designer only**. The canvas promises to draw what the device draws, and a test run checks exactly that; this hide breaks the promise on purpose, so the break is contained, visible and impossible to export.
+
+There are two kinds of hidden, and they never mix:
+
+| | **Hidden in the designer** (the eye) | **Hidden on the device** |
+|---|---|---|
+| Who sets it | The author, with the eye | A binding (`bind_flag_if_eq … flag="hidden"` and its variants) with the sample data, or `hidden="true"` |
+| Where it lives | This browser only. Never in the XML, the buffer, undo, generated code, the scene on disk, a test run or a bug report | The XML; it is part of the exported UI |
+| What the canvas does | Does not draw it, cannot click it | Does not draw it (the device would not either) |
+| How it reads in the tree | Eye shut, row dimmed | A quiet "hidden by data" mark, not the eye: *Hidden on the device: its hidden attribute, or its bindings with the current sample data — the device would not draw it* |
+
+- **Never an edit.** Toggling writes no text, adds no undo step and marks nothing unsaved; Save and `u8g2gl build` are unaffected by construction.
+- **In the renderer, not over it.** The editor Wasm skips a hidden element at draw time, so where elements overlap the pixels beneath are exactly what the rest of the screen draws. It never sets the runtime `hidden` flag, which bindings own and which a shape, having no object, does not have.
+- **A hidden element takes its contents with it.** A row nested in a hidden one is dimmed, hidden by its parent, its eye disabled. A composite instance hides everything it expands to.
+- **The canvas ignores it.** A hidden element is not a hit target, a marquee does not take it and Outlines do not box it, so a click lands on what is beneath. Selected from the tree or the XML, it is outlined **dashed and without handles**, and the property panel edits it as usual.
+- **The canvas says so.** While anything on the drawn screen is hidden, the canvas toolbar shows **N hidden · Show all**, where N counts the rows the author hid, not their contents. Show all, or the screen's **Show all elements**, brings them back.
+- **A test run draws the exported view.** The hide is forgotten whenever a scene is applied afresh, which a test run always does, so a run with elements hidden still reports parity; the canvas re-applies the hide after each of its own runs.
+- **Remembered** per browser, by project and file. A name no longer in the file is dropped, so renaming an element shows it again. Where storage is unavailable the eye still works and is simply not remembered.
+- **Old project builds.** A project editor Wasm built before the CLI could hide cannot; its eyes are disabled with the reason *Hiding needs the project's editor Wasm to be rebuilt*. The build hash covers the framework sources, so upgrading the CLI rebuilds it.
 
 ---
 
@@ -390,6 +422,8 @@ Every attribute a handle writes must be an integer literal. A binding or an expr
 **Composite instances render inline** but are not editable in place — selecting one selects the instance and offers *Open element*.
 
 **Animation** runs live; the freeze toggle (§4.2) pins t=0.
+
+**Hidden in the designer.** While any element of the drawn screen is hidden with the Explorer's eye (§6.3), the toolbar shows **N hidden · Show all**: the canvas is then not the exported view, and says so.
 
 ---
 

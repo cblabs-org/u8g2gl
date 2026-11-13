@@ -21,6 +21,13 @@
  *              scene, with no rebuild. Generated files are written only when
  *              their content changes.
  *
+ *              The hash also covers every framework file the build compiles or
+ *              includes (`frameworkFiles()`: the runtime, the bridge, U8G2,
+ *              their headers and build files). A project editor Wasm cached
+ *              under one CLI is therefore rebuilt by a CLI whose framework
+ *              differs, rather than reused without the newer bridge's exports
+ *              or the newer runtime's fixes.
+ *
  * Exports:
  * - PreparedBuild:      The generated tree, widget sources and build hash
  * - prepareBuild():     Generate, collect, check and hash
@@ -35,6 +42,7 @@ import { emitEditorFiles } from '../../../core/generator/emit/index.js';
 import { generate } from '../../../core/generator/index.js';
 import type { Diagnostic } from '../../../core/schema/diagnostic.js';
 import { getGeneratorVersion } from '../../generator-version.js';
+import { frameworkFiles, locateFrameworkRoot, readFrameworkSources } from './framework-sources.js';
 import { loadProject } from '../../load-project.js';
 import { writeGenerated } from '../../write-generated.js';
 import { checkPlatformHeaders } from './platform-headers.js';
@@ -88,13 +96,16 @@ export function projectCacheDir(cacheRoot: string, projectRoot: string): string 
  * @brief Generates the project into its cache directory, checks its widgets
  *        and computes the build hash.
  *
- * @param projectRoot The project directory, containing u8g2gl.xml.
- * @param cacheRoot   The editor build cache.
+ * @param projectRoot   The project directory, containing u8g2gl.xml.
+ * @param cacheRoot     The editor build cache.
+ * @param frameworkRoot The framework sources the build compiles; this CLI's
+ *                      own (`locateFrameworkRoot()`) when omitted. `null`, or
+ *                      none found, hashes the project's inputs alone.
  * @return The prepared build, or `ok: false` with the diagnostics that
  *         refused it: a project that does not generate, or a widget that
  *         includes a platform header.
  */
-export async function prepareBuild(projectRoot: string, cacheRoot: string): Promise<PreparedBuild> {
+export async function prepareBuild(projectRoot: string, cacheRoot: string, frameworkRoot?: string | null): Promise<PreparedBuild> {
   const dir = projectCacheDir(cacheRoot, projectRoot);
   const generatedDir = join(dir, 'generated');
   const editorDir = join(dir, 'generated_editor');
@@ -150,10 +161,15 @@ export async function prepareBuild(projectRoot: string, cacheRoot: string): Prom
 
   // --- Step 3: The build hash, over every compiled input in a fixed order ---
   const hash = createHash('sha256');
+  // Framework files are labelled under `framework/`, so none can share a
+  // label with a project file.
+  const root = frameworkRoot === null ? undefined : (frameworkRoot ?? locateFrameworkRoot());
+  const framework = root === undefined ? [] : frameworkFiles(readFrameworkSources(root));
   const hashed: Array<[string, string]> = [
     ...widgetFiles.map((file): [string, string] => [projectRelative(projectRoot, file), file]),
     ...HASHED_GENERATED.map((name): [string, string] => [name, join(dir, name)]),
     ...HASHED_EDITOR.map((name): [string, string] => [name, join(dir, name)]),
+    ...framework.map((file): [string, string] => [`framework/${projectRelative(root as string, file)}`, file]),
   ];
   for (const [label, file] of hashed.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
     // Length-prefixed, so no boundary between two files can be moved

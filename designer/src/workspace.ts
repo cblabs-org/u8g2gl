@@ -26,11 +26,14 @@
  *     - connection:     Whether the design server can be reached
  *     - documents, activeFile, selection, problems, output, projectName
  *     - canvasFile:     The file of the screen the canvas draws
+ *     - elementTrees:   Each screen's element rows, for the Explorer
+ *     - designHidden:   The elements the author hid in the designer (never exported)
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded
+ *     - refreshElementTrees(): Rebuild the element rows from the text (each run)
  *
  *     Requests:
  *     - save():         Save one document; show Output if that fails
@@ -44,9 +47,12 @@
  */
 
 import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
+import { DesignHiddenModel } from './canvas/design-hidden';
+import { nextTrees, type ElementNode } from './documents/element-tree';
 import { ProjectDocuments, type SaveOutcome } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
 import { EditLoop } from './pipeline/edit-loop';
+import { classifyProjectFile } from './project/project-model';
 import type { DesignSession } from './session';
 import { SelectionModel } from './selection/selection-model';
 import { Observable } from './state/observable';
@@ -79,6 +85,19 @@ export class Workspace {
    * re-render on a keystroke or a drag.
    */
   readonly canvasFile = new Observable<string | undefined>(undefined);
+  /**
+   * Each screen's element tree, by project path in listing order, from its
+   * current buffer (ui_spec §6). Rebuilt after every pipeline run, but
+   * replaced only when a row would change, so the Explorer does not re-render
+   * on a keystroke or a drag that moves no row.
+   */
+  readonly elementTrees = new Observable<ReadonlyMap<string, readonly ElementNode[]>>(new Map());
+  /**
+   * The elements the author hid in the designer: a view setting of this
+   * browser, never the XML's or the device's `hidden`. Loaded at `start()`,
+   * once the project's name is known.
+   */
+  readonly designHidden = new DesignHiddenModel();
   /** The Problems panel's rows. */
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
@@ -95,6 +114,8 @@ export class Workspace {
 
   private readonly openListeners = new Set<(request: OpenRequest) => void>();
   private readonly outputListeners = new Set<() => void>();
+  /** The screen texts the element trees were last built from. */
+  private treeTexts: ReadonlyMap<string, string> = new Map();
 
   /** The editor Wasm the canvas draws with. */
   readonly wasm: EditorWasmController;
@@ -125,12 +146,13 @@ export class Workspace {
       }
     });
     this.selection = new SelectionModel((path) => this.documents.textOf(path));
-    // Canvas to XML: a selection made on the canvas shows its file, so the
-    // editor can reveal it. An open request without a position never moves
-    // the caret or takes focus.
+    // Canvas or tree to XML: a selection made on the canvas or in the
+    // Explorer's tree shows its file, so the editor can reveal it, and the
+    // canvas draws that file's screen. An open request without a position
+    // never moves the caret or takes focus.
     this.selection.current.subscribe(() => {
       const selection = this.selection.current.get();
-      if (selection.origin === 'canvas' && selection.file !== undefined) this.openFile({ path: selection.file });
+      if (selection.origin !== 'text' && selection.file !== undefined) this.openFile({ path: selection.file });
     });
     this.wasm = new EditorWasmController(session, (line) => this.log(line));
     this.loop = new EditLoop(this, this.wasm);
@@ -163,10 +185,30 @@ export class Workspace {
    *        the editor Wasm and its rebuilds on source changes.
    */
   start(): void {
+    this.designHidden.load(this.projectName.get());
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
     this.testRun.start();
     void this.wasm.start();
+  }
+
+  /**
+   * @brief Rebuilds each listed screen's element tree from its current text,
+   *        keeping a tree whose text no longer parses (element-tree.ts), and
+   *        drops hidden names the trees no longer have. The edit loop calls it
+   *        in each run, before it draws, so the rows, the hiding and the frame
+   *        all come from the same text.
+   */
+  refreshElementTrees(): void {
+    const texts = new Map<string, string>();
+    for (const path of this.documents.files.get()) {
+      if (classifyProjectFile(path) !== 'screen') continue;
+      const text = this.documents.textOf(path);
+      if (text !== undefined) texts.set(path, text);
+    }
+    this.elementTrees.set(nextTrees(this.elementTrees.get(), texts, this.treeTexts));
+    this.treeTexts = texts;
+    this.designHidden.prune(this.elementTrees.get());
   }
 
   /**

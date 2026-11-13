@@ -102,6 +102,67 @@ button { font: inherit; color: inherit; }
 .file-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .file .dirty-mark { flex: none; color: var(--accent); }
 
+/* --- A screen's disclosure, in the file row's left gutter, and its element rows --- */
+.screen-entry { position: relative; }
+.disclosure {
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  line-height: 18px;
+}
+.disclosure:hover { color: var(--text); }
+.file-group ul.element-tree, .element-tree ul { list-style: none; margin: 0; padding: 0; }
+.element-tree [role='treeitem'] { outline: none; }
+.element-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  padding-right: 8px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.element-row:hover { background: #2c3036; }
+.element-row.selected { background: #2f3a4d; }
+.element-tree [role='treeitem']:focus-visible > .element-row { box-shadow: inset 0 0 0 1px var(--accent); }
+.element-twisty { flex: none; width: 10px; color: var(--text-dim); text-align: center; }
+.element-icon { flex: none; color: var(--text-dim); }
+.element-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.element-tag { flex: none; color: var(--text-dim); font-size: 11px; }
+.element-empty { padding: 1px 12px 1px 38px; color: var(--text-dim); font-style: italic; }
+/* Hidden in the designer: dimmed, so the canvas is visibly not the exported view. */
+.element-row.design-hidden > .element-icon,
+.element-row.design-hidden > .element-name,
+.element-row.design-hidden > .element-tag { opacity: 0.45; }
+/* Hidden by the data: a quiet mark, never the eye. */
+.data-hidden-mark { flex: none; display: inline-flex; color: var(--text-dim); opacity: 0.8; }
+/* The eye: always there and faint, stronger on the row's hover or focus. */
+.element-row .eye {
+  flex: none;
+  display: inline-flex;
+  margin-left: auto;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-dim);
+  opacity: 0.35;
+  cursor: pointer;
+}
+.element-row:hover .eye,
+[role='treeitem']:focus-within > .element-row .eye,
+.element-row .eye[aria-pressed='true'] { opacity: 1; }
+.element-row .eye:hover:not(:disabled) { color: var(--text); }
+.element-row .eye:focus-visible { outline: 1px solid var(--accent); opacity: 1; }
+.element-row .eye:disabled { cursor: default; }
+
 /* --- Context menu: fixed to the viewport, above Dockview's panels --- */
 .context-menu {
   position: fixed;
@@ -127,6 +188,7 @@ button { font: inherit; color: inherit; }
 }
 .context-menu-item:focus { outline: none; background: #2f3a4d; }
 .context-menu-item[aria-expanded='true'] { background: #2c3036; }
+.context-menu-item[aria-disabled='true'] { color: var(--text-dim); cursor: default; }
 .context-menu-arrow { color: var(--text-dim); }
 
 .editor-area { grid-row: 1; min-width: 0; min-height: 0; }
@@ -182,6 +244,8 @@ button { font: inherit; color: inherit; }
 .canvas-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-raised); font-size: 12px; }
 .canvas-toolbar select, .canvas-toolbar button { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; }
 .canvas-toolbar .spacer { flex: 1; }
+.design-hidden-badge { white-space: nowrap; color: var(--warning); }
+.canvas-toolbar .design-hidden-badge .show-all { border-color: var(--warning); color: var(--text); }
 .canvas-stage { flex: 1; overflow: auto; display: grid; place-items: center; position: relative; }
 .canvas-frame { position: relative; padding: 10px; background: #050505; border: 1px solid #2a2a2a; border-radius: 4px; box-shadow: 0 0 0 6px #0a0a0a; }
 .canvas-frame canvas { display: block; image-rendering: pixelated; }

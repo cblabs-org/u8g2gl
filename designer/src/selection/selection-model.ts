@@ -28,7 +28,7 @@
  *              Selection is never an edit: nothing here writes text.
  *
  * Exports:
- * - SelectionOrigin:   Who made a selection: the canvas or the text
+ * - SelectionOrigin:   Who made a selection: the canvas, the text or the Explorer's tree
  * - Selection:         The selected names, their file and origin
  * - NO_SELECTION:      Nothing selected
  * - TextChange:        One replaced span, in the text before the change
@@ -52,8 +52,12 @@
 import { namedElements, type ElementSpan } from '../documents/element-at';
 import { Observable } from '../state/observable';
 
-/** Who made a selection: a canvas gesture, or the caret in the XML. */
-export type SelectionOrigin = 'canvas' | 'text';
+/**
+ * Who made a selection: a canvas gesture, the caret in the XML, or a row of
+ * the Explorer's element tree. Only a selection the XML did not make is
+ * revealed in the XML, and only one the tree did not make scrolls the tree.
+ */
+export type SelectionOrigin = 'canvas' | 'text' | 'tree';
 
 /** The selected element names, the file they are written in, and who chose them. */
 export interface Selection {

@@ -95,6 +95,8 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
   const canvas = new Observable<{ placeholders: readonly unknown[]; stale: boolean }>({ placeholders: [], stale: false });
   const wellFormed = new Observable<boolean>(true);
   const live = frame([1, 1]);
+  // A test run must draw the exported view, so it never sets the designer's hiding.
+  let designHiddenCalls = 0;
   const module: EditorModule = {
     applyScene: () => true,
     selectScreen: () => true,
@@ -104,6 +106,12 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     lastError: () => '',
     placeholders: () => [],
     buildHash: () => 'h',
+    designHiding: true,
+    setDesignHidden: () => {
+      designHiddenCalls += 1;
+      return true;
+    },
+    runtimeHidden: () => [],
   };
   const editListeners = new Set<() => void>();
   const posted: unknown[] = [];
@@ -167,7 +175,18 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
   };
-  return { controller, status, canvas, wellFormed, posted, restored, logs, until, edit: () => editListeners.forEach((l) => l()) };
+  return {
+    controller,
+    status,
+    canvas,
+    wellFormed,
+    posted,
+    restored,
+    logs,
+    until,
+    edit: () => editListeners.forEach((l) => l()),
+    designHiddenCalls: () => designHiddenCalls,
+  };
 }
 
 test('a run posts the dirty text, restores the canvas, and shows parity; each edit after makes it one edit staler', async () => {
@@ -180,6 +199,8 @@ test('a run posts the dirty text, restores the canvas, and shows parity; each ed
     { screen: 'home', documents: [{ path: 'screens/screen_home.xml', content: '<screen/>', version: '3' }], times: TEST_RUN_TIMES },
   ]);
   expect(h.restored).toEqual([1]);
+  // Its live frames are the exported view: the designer's hiding is never set.
+  expect(h.designHiddenCalls()).toBe(0);
   h.edit();
   h.edit();
   expect(h.controller.view.get()).toMatchObject({ kind: 'parity', editsSince: 2 });
