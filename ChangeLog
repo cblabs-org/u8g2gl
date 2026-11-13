@@ -17,6 +17,18 @@ history is in git. See docs/RELEASING.md.
     exactly while the major is 0.
     Built and tested against U8G2 2.36.18.
 2026-11-10	cli v0.16.xx	U8G2GL
+  * 0.16.5: The designer's Explorer lists each screen's elements under it,
+    nested as written and in draw order, from the unsaved buffer. A row
+    selects its element (opening its screen when another is drawn), and a
+    canvas or XML selection lights its row; the tree has the usual keys.
+    Each row has an eye that hides the element in the designer only:
+    never in the XML, undo, generated code or a test run, which still
+    draws the exported view. A hidden element is not drawn, hit or
+    outlined; the canvas toolbar shows "N hidden · Show all" and a
+    screen's menu offers Show all elements. Rows the sample data hides on
+    the device carry a separate mark. The project editor Wasm is rebuilt
+    when the CLI's framework sources change. No change to generated
+    output.
   * 0.16.4: The designer's property panel puts each property's help in a
     tooltip, as the Palette does for elements, instead of beneath its
     control. An ⓘ after the name opens it on hover, click or keyboard
