@@ -45,6 +45,7 @@
  * - InputProbe:           The samples, and a reset
  * - InputProbes:          The keystroke probe and the drag probe
  * - installInputProbes(): Start measuring both
+ * - LONGEST_PERIOD_MS:    The longest frame period the counter learns
  */
 
 import type { EditLoop, FrameTimings } from '../pipeline/edit-loop';
@@ -105,6 +106,14 @@ const ENTRIES: Readonly<Record<InputKind, { readonly input: string; readonly edi
 const LIMIT = 5000;
 
 /**
+ * The longest frame period the counter learns, in milliseconds (a 20 Hz
+ * display); a longer gap is a stall, not a period. The gates' self-tests stall
+ * a run for three of these, so it counts as late however slow the machine's
+ * frames are.
+ */
+export const LONGEST_PERIOD_MS = 50;
+
+/**
  * The display's frame intervals. Frame k is the interval [T_k, T_k + period)
  * that begins at an animation frame's timestamp T_k. Any moment, an input
  * event's or the end of a blit, is numbered by the interval it falls in,
@@ -127,7 +136,7 @@ class FrameCounter {
         const period = time - this.lastFrameTime;
         // Only plausible display periods (a 20-200 Hz display) teach the
         // estimate: the gap after a stall, or the first frame, is not one.
-        if (this.lastFrameTime >= 0 && period >= 5 && period <= 50) {
+        if (this.lastFrameTime >= 0 && period >= 5 && period <= LONGEST_PERIOD_MS) {
           this.periods.push(period);
           if (this.periods.length > 30) this.periods.shift();
         }

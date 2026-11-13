@@ -42,7 +42,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { emscriptenOnPath, startDesign, type DesignSession } from './support/design-session';
-import { BUDGET_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
+import { BUDGET_MS, FORCED_STALL_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
 import { openFile, openShell, placeCaret } from './support/shell';
 import type { TestHandle } from '../src/test-hooks';
 
@@ -217,7 +217,7 @@ test('keystrokes reach the canvas in their first frame (at most 1% miss) and the
 // to miss its frame by a hook the test
 // injects into the page through the existing `window.__u8g2gl` handle: the
 // loaded editor Wasm's `renderFrame` is wrapped to block the main thread for
-// three frame periods inside the pipeline run that draws that keystroke,
+// FORCED_STALL_MS inside the pipeline run that draws that keystroke,
 // before its blit, and then unwrapped.
 // The hook exists only in this file. It needs the `window.__u8g2gl` handle,
 // which only the end-to-end test build has (`src/test-hooks.ts`).
@@ -234,7 +234,7 @@ test('self-test of the frame gate: keystrokes forced to miss their frame are eac
   const FORCED = [1, 3, 5, 7];
   const result = await measure(page, 'departures, four keys forced late', '2', 10, async (i) => {
     if (!FORCED.includes(i)) return;
-    await page.evaluate(() => {
+    await page.evaluate((stallMs) => {
       type Module = { renderFrame(ms: number): Uint8Array | undefined };
       const workspace = (window as unknown as TestHandle).__u8g2gl;
       const module = workspace.wasm.module.get();
@@ -251,14 +251,14 @@ test('self-test of the frame gate: keystrokes forced to miss their frame are eac
       const __u8g2glForceMissedFrame = (ms: number): Uint8Array | undefined => {
         if (!armed) return original(ms);
         module.renderFrame = original;
-        const until = performance.now() + 50;
+        const until = performance.now() + stallMs;
         while (performance.now() < until) {
-          // Block the main thread for three frame periods, inside the run.
+          // Block the main thread for three of the longest frame periods, inside the run.
         }
         return original(ms);
       };
       module.renderFrame = __u8g2glForceMissedFrame;
-    });
+    }, FORCED_STALL_MS);
   });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   console.log(`frame gate self-test: frames per keystroke ${JSON.stringify(result.frames.histogram)}, worst ${result.frames.worst}; gate: ${JSON.stringify(gateFailures(result))}`);

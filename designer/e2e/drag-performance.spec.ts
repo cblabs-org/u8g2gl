@@ -40,7 +40,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { startDesign, type DesignSession } from './support/design-session';
-import { BUDGET_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
+import { BUDGET_MS, FORCED_STALL_MS, MAX_MISSED_SHARE, percentile, round, SAMPLES, spread, type Spread, THROTTLE, twentyElementScreen, WARMUP } from './support/latency';
 import { devicePoint, openFile, openShell } from './support/shell';
 import type { TestHandle } from '../src/test-hooks';
 
@@ -251,7 +251,7 @@ test('a 300-frame drag paints each move in its first frame (at most 1% miss) wit
 // Four moves of twenty — more than the 1% allowed — are each forced to miss their
 // frame by a hook the test injects through the `window.__u8g2gl` handle (only
 // the end-to-end build has it): the editor Wasm's `renderFrame` is wrapped to
-// block the main thread for three frame periods inside the run that draws each
+// block the main thread for FORCED_STALL_MS inside the run that draws each
 // of those moves. The hook exists only in this file.
 test('self-test of the drag gate: moves forced to miss their frame are each counted 2 or more, and over 1% the gate fails', async ({ page, browserName }) => {
   test.skip(browserName !== 'chromium', 'CPU throttling is a Chromium DevTools feature');
@@ -267,7 +267,7 @@ test('self-test of the drag gate: moves forced to miss their frame are each coun
   const MOVES = 20;
   const TARGETS = [1, 5, 9, 13];
   await page.evaluate(
-    (forcedAt) => {
+    ({ forcedAt, stallMs }) => {
       type Module = { renderFrame(ms: number): Uint8Array | undefined };
       const forced = window as unknown as { __u8g2glForced?: number[] };
       const workspace = (window as unknown as TestHandle).__u8g2gl;
@@ -285,9 +285,9 @@ test('self-test of the drag gate: moves forced to miss their frame are each coun
         const sample = probe.samples.length;
         if (edited && forcedAt.includes(sample)) {
           forced.__u8g2glForced?.push(sample);
-          const until = performance.now() + 50;
+          const until = performance.now() + stallMs;
           while (performance.now() < until) {
-            // Block the main thread for three frame periods, inside the run.
+            // Block the main thread for three of the longest frame periods, inside the run.
           }
         }
         edited = false;
@@ -295,7 +295,7 @@ test('self-test of the drag gate: moves forced to miss their frame are each coun
       };
       module.renderFrame = __u8g2glForceMissedFrame;
     },
-    TARGETS.map((t) => WARMUP + t),
+    { forcedAt: TARGETS.map((t) => WARMUP + t), stallMs: FORCED_STALL_MS },
   );
   const result = await drag(page, cdp, 'departures, four moves forced late', [2, 10], MOVES);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
