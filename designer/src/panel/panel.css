@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/panel/panel.css
- * Purpose: The property panel's look (ui_spec §9): compact rows, help text
- *          always visible beneath its control (§9.2: never only on hover),
- *          defaults greyed, problems in the Problems panel's colours.
+ * Purpose: The property panel's look (ui_spec §9): compact rows, each
+ *          property's help behind a quiet ⓘ after its name (§9.2), defaults
+ *          greyed, problems in the Problems panel's colours.
  */
 
 .property-panel {
@@ -37,10 +37,14 @@
 .field-label .reset { padding: 0 4px; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
 .field-label .reset:hover { color: var(--text); }
 .field-label .required { color: var(--warning); }
+.field-name { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
+.field-info { display: inline-flex; padding: 0; border: 0; background: none; color: var(--text-dim); cursor: help; }
+.field-info:hover,
+.field-info:focus-visible { color: var(--text); }
+.field-info:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; border-radius: 50%; }
 .field-value { font-family: ui-monospace, Menlo, monospace; }
 .field-value.default,
 .field-control.default { color: var(--text-dim); }
-.field-help { margin: 2px 0 0; color: var(--text-dim); font-size: 11px; line-height: 1.35; }
 .field-reason { margin: 2px 0 0; color: var(--info); font-size: 11px; line-height: 1.35; }
 .field-problem { margin: 2px 0 0; font-size: 11px; line-height: 1.35; }
 .field-problem.error { color: var(--error); }
@@ -72,6 +76,8 @@
 .field-controls .stepper { width: 22px; padding: 1px 0; }
 .field-actions { display: flex; gap: 6px; margin-top: 3px; }
 .field-actions .action { padding: 1px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.field-tooltip-help { color: var(--text); line-height: 1.35; }
+.field-tooltip-facts { color: var(--text-dim); font: 11px ui-monospace, Menlo, monospace; }
 .field-reason code { font: 11px ui-monospace, Menlo, monospace; color: var(--text); }
 
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }

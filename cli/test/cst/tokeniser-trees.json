@@ -14571,11 +14571,11 @@
   },
   {
    "file": "include/u8g2gl/manifests/u8g2gl_label.xml",
-   "sha256": "ca44455db4f9b552936b71252d515f783a549f6c485a999ffed752e2bad98f35",
+   "sha256": "4c17f0808bdf1a8c4429084b3820bf238c0585a7cb352b4c3b491e7cbfe77ffb",
    "root": {
     "name": "widget",
     "loc": "2:1",
-    "endLoc": "36:1",
+    "endLoc": "34:1",
     "attributes": [
      [
       "name",
@@ -14595,7 +14595,7 @@
      {
       "name": "api",
       "loc": "3:3",
-      "endLoc": "35:3",
+      "endLoc": "33:3",
       "attributes": [
        [
         "label",
@@ -14756,7 +14756,7 @@
        {
         "name": "prop",
         "loc": "12:5",
-        "endLoc": "20:69",
+        "endLoc": "18:63",
         "attributes": [
          [
           "name",
@@ -14796,7 +14796,7 @@
          ],
          [
           "help",
-          "Overflow behaviour when text exceeds the widget width ([D-19]).\n                clip hard-clips at the bounds; dots truncates with an\n                ellipsis; scroll and scroll_circular marquee the text.\n                wrap is not offered — U8G2GL labels are single-line, so a\n                user arriving from LVGL Pro will meet this omission\n                deliberately rather than find it missing silently.",
+          "Overflow behaviour when text exceeds the widget width:\n                clip hard-clips at the bounds; dots truncates with an\n                ellipsis; scroll and scroll_circular marquee the text.\n                Labels are single-line, so there is no wrap.",
           "15:17",
           "15:11"
          ]
@@ -14806,38 +14806,38 @@
        },
        {
         "name": "prop",
-        "loc": "21:5",
-        "endLoc": "23:58",
+        "loc": "19:5",
+        "endLoc": "21:58",
         "attributes": [
          [
           "name",
           "scroll_px_per_sec",
-          "21:17",
-          "21:11"
+          "19:17",
+          "19:11"
          ],
          [
           "type",
           "int",
-          "21:42",
-          "21:36"
+          "19:42",
+          "19:36"
          ],
          [
           "setter",
           "set_scroll_px_per_sec",
-          "21:55",
-          "21:47"
+          "19:55",
+          "19:47"
          ],
          [
           "default",
           "25",
-          "21:87",
-          "21:78"
+          "19:87",
+          "19:78"
          ],
          [
           "help",
-          "Marquee scroll speed in pixels per second. Meaningless unless\n                long_mode is scroll or scroll_circular.",
-          "22:17",
-          "22:11"
+          "Marquee scroll speed in pixels per second. Used only when\n                long_mode is scroll or scroll_circular.",
+          "20:17",
+          "20:11"
          ]
         ],
         "comments": [],
@@ -14845,38 +14845,38 @@
        },
        {
         "name": "prop",
-        "loc": "24:5",
-        "endLoc": "26:77",
+        "loc": "22:5",
+        "endLoc": "24:73",
         "attributes": [
          [
           "name",
           "initial_delay_ms",
-          "24:17",
-          "24:11"
+          "22:17",
+          "22:11"
          ],
          [
           "type",
           "int",
-          "24:41",
-          "24:35"
+          "22:41",
+          "22:35"
          ],
          [
           "setter",
           "set_initial_delay_ms",
-          "24:54",
-          "24:46"
+          "22:54",
+          "22:46"
          ],
          [
           "default",
           "3000",
-          "24:85",
-          "24:76"
+          "22:85",
+          "22:76"
          ],
          [
           "help",
-          "Initial pause delay in milliseconds before scrolling starts.\n                Meaningless unless long_mode is scroll or scroll_circular.",
-          "25:17",
-          "25:11"
+          "Initial pause delay in milliseconds before scrolling starts.\n                Used only when long_mode is scroll or scroll_circular.",
+          "23:17",
+          "23:11"
          ]
         ],
         "comments": [],
@@ -14884,38 +14884,71 @@
        },
        {
         "name": "prop",
-        "loc": "27:5",
-        "endLoc": "30:58",
+        "loc": "25:5",
+        "endLoc": "28:58",
         "attributes": [
          [
           "name",
           "static_dwell_ms",
-          "27:17",
-          "27:11"
+          "25:17",
+          "25:11"
          ],
          [
           "type",
           "int",
-          "27:40",
-          "27:34"
+          "25:40",
+          "25:34"
          ],
          [
           "setter",
           "set_static_dwell_ms",
-          "27:53",
-          "27:45"
+          "25:53",
+          "25:45"
          ],
          [
           "default",
           "5000",
-          "27:83",
-          "27:74"
+          "25:83",
+          "25:74"
          ],
          [
           "help",
-          "Dwell duration in milliseconds for text that fits within\n                bounds before signalling completion. Meaningless unless\n                long_mode is scroll or scroll_circular.",
-          "28:17",
-          "28:11"
+          "Dwell duration in milliseconds for text that fits within\n                bounds before signalling completion. Used only when\n                long_mode is scroll or scroll_circular.",
+          "26:17",
+          "26:11"
+         ]
+        ],
+        "comments": [],
+        "children": []
+       },
+       {
+        "name": "bind",
+        "loc": "29:5",
+        "endLoc": "30:31",
+        "attributes": [
+         [
+          "name",
+          "bind_text",
+          "29:17",
+          "29:11"
+         ],
+         [
+          "type",
+          "string",
+          "29:34",
+          "29:28"
+         ],
+         [
+          "setter",
+          "bind_text",
+          "29:50",
+          "29:42"
+         ],
+         [
+          "fmt",
+          "bind_text_fmt",
+          "30:16",
+          "30:11"
          ]
         ],
         "comments": [],
@@ -14934,54 +14967,21 @@
          ],
          [
           "type",
-          "string",
+          "int",
           "31:34",
           "31:28"
          ],
          [
           "setter",
           "bind_text",
-          "31:50",
-          "31:42"
+          "31:47",
+          "31:39"
          ],
          [
           "fmt",
           "bind_text_fmt",
           "32:16",
           "32:11"
-         ]
-        ],
-        "comments": [],
-        "children": []
-       },
-       {
-        "name": "bind",
-        "loc": "33:5",
-        "endLoc": "34:31",
-        "attributes": [
-         [
-          "name",
-          "bind_text",
-          "33:17",
-          "33:11"
-         ],
-         [
-          "type",
-          "int",
-          "33:34",
-          "33:28"
-         ],
-         [
-          "setter",
-          "bind_text",
-          "33:47",
-          "33:39"
-         ],
-         [
-          "fmt",
-          "bind_text_fmt",
-          "34:16",
-          "34:11"
          ]
         ],
         "comments": [],

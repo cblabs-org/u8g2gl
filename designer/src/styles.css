@@ -259,8 +259,9 @@ button { font: inherit; color: inherit; }
 /* Cut short with an ellipsis: the full label is in the tooltip. */
 .palette-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .palette-label.is-tag { font-family: ui-monospace, Menlo, monospace; }
-/* Fixed, so the sidebar's scrolling box does not clip it. */
-.palette-tooltip {
+/* The one tooltip (ui/tooltip.tsx), the Palette's and the property panel's.
+   Fixed, so a sidebar's scrolling box does not clip it. */
+.tooltip {
   position: fixed;
   z-index: 1000;
   display: flex;

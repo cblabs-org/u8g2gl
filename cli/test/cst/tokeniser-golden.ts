@@ -33,8 +33,9 @@
  *
  *              Where a recorded file was later edited, its entry carries the
  *              same edit applied to the record, and the new hash, rather than
- *              a fresh recording, which nothing could make. Only edits that
- *              move no recorded location are applied this way. Schema 0.5's
+ *              a fresh recording, which nothing could make. Such an edit is
+ *              worked out from the change to the file, never copied from the
+ *              CST, so the record stays an independent reference. Schema 0.5's
  *              move of the fixtures from `schema="0.4"` to `"0.5"` is one: a
  *              same-length value, so the record changes in that value alone.
  *              Its palette metadata is another: `label`, `category` and
@@ -44,6 +45,12 @@
  *              Schema 0.6's move from `"0.5"` to `"0.6"` is a third, of the
  *              same kind (a same-length value), and its `icon`, added after
  *              `description` on the same `<api>` lines, a fourth.
+ *
+ *              The first edit that moves locations is `u8g2gl_label.xml`'s
+ *              help rewording: four `help` values change, the `long_mode`
+ *              help is two lines shorter, so every location after it moves up
+ *              two lines, and the two props whose closing line changed get
+ *              their new end column.
  *
  * Exports:
  *   Golden shapes:
