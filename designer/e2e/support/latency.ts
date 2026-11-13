@@ -16,10 +16,13 @@
  * - SAMPLES, WARMUP:        Inputs measured per screen, and discarded first
  * - MAX_MISSED_SHARE:       The share that may miss its first frame
  * - BUDGET_MS, THROTTLE:    The p95 budget, and DevTools' CPU throttle
+ * - FORCED_STALL_MS:        How long a self-test stalls a run to make it late
  * - twentyElementScreen():  The 20-element screen of framework elements
  * - Spread, spread():       Median, p95 and maximum of some milliseconds
  * - percentile(), round():  Nearest-rank percentile; two decimals
  */
+
+import { LONGEST_PERIOD_MS } from '../../src/perf/input-probe';
 
 /** Inputs measured per screen, after the warm-up. */
 export const SAMPLES = 300;
@@ -34,6 +37,14 @@ export const MAX_MISSED_SHARE = 0.01;
 export const BUDGET_MS = 16;
 /** DevTools' CPU throttling factor. */
 export const THROTTLE = 4;
+/**
+ * How long the gates' self-tests block the main thread inside a run, in
+ * milliseconds: three of the longest frame periods the probe's counter learns.
+ * The counter numbers time in its learned period, so a stall of three 60 Hz
+ * frames (50 ms) counts as one frame where the throttled page's frames run
+ * near 50 ms, as on CI; three of the longest counts as at least three anywhere.
+ */
+export const FORCED_STALL_MS = 3 * LONGEST_PERIOD_MS;
 
 /** @brief A 20-element screen of framework elements: labels, boxes and rules. */
 export function twentyElementScreen(): string {
