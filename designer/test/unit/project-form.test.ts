@@ -116,13 +116,15 @@ test('adding a subject to the fixture appends one line with a fresh name; removi
   expect(change('globals.xml', after, { kind: 'remove', item: last })).toBe(GLOBALS);
 });
 
-test('a new target carries its required display, seeded from the caller', () => {
+test('a new target carries its required display, seeded from the caller and indented by the file\'s own step', () => {
   const after = change('u8g2gl.xml', PROJECT, { kind: 'add', list: 'u8g2gl.xml>targets', itemKind: 'target', values: { setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C' } });
   const targets = parseProjectFile(after, 'u8g2gl.xml').value?.targets ?? [];
   expect(targets.map((t) => [t.name, t.setup])).toEqual([
     ['primary', 'U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI'],
     ['target_1', 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C'],
   ]);
+  // The fixture indents by four spaces, so the display sits four inside its target.
+  expect(after).toContain('\n        <target name="target_1">\n            <display setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />\n        </target>\n');
 });
 
 test('moving an item swaps it with its neighbour, layout kept; a move past an item in another element is refused', () => {

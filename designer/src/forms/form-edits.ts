@@ -43,6 +43,7 @@
 import {
   applyEdits,
   encodeAttributeValue,
+  indentStep,
   insertAttribute,
   insertElement,
   parseCst,
@@ -264,8 +265,10 @@ function seedValue(list: FormList, kind: VocabularyElement, attribute: Vocabular
 // itemFragment
 // A new item as XML: its tag and every required attribute, seeded; a value the
 // caller gives for an optional one is written too. A required part (a target's
-// display, which carries its required `setup`) is written inside it.
-function itemFragment(list: FormList, kind: VocabularyElement, values: Readonly<Record<string, string>>): string {
+// display, which carries its required `setup`) is written inside it, indented
+// by the document's own step.
+//   step — the document's indentation step (indentStep)
+function itemFragment(list: FormList, kind: VocabularyElement, values: Readonly<Record<string, string>>, step: string): string {
   const attributes = (element: VocabularyElement): string =>
     element.attributes
       .filter((attribute) => attribute.required || values[attribute.name] !== undefined)
@@ -275,7 +278,7 @@ function itemFragment(list: FormList, kind: VocabularyElement, values: Readonly<
     (child) => child.parent === kind.id && !child.repeats && child.canonical && child.attributes.some((a) => a.required),
   );
   if (parts.length === 0) return `<${kind.tag}${attributes(kind)} />`;
-  return [`<${kind.tag}${attributes(kind)}>`, ...parts.map((part) => `  <${part.tag}${attributes(part)} />`), `</${kind.tag}>`].join('\n');
+  return [`<${kind.tag}${attributes(kind)}>`, ...parts.map((part) => `${step}<${part.tag}${attributes(part)} />`), `</${kind.tag}>`].join('\n');
 }
 
 // addItem
@@ -287,7 +290,7 @@ function addItem(file: FormFile, text: string, key: string, kindId: string, valu
   const list = findList(model, key);
   const kind = vocabularyElement(kindId);
   if (list === undefined || kind === undefined) throw new Error(`no list ${key} of ${kindId}`);
-  const fragment = itemFragment(list, kind, values);
+  const fragment = itemFragment(list, kind, values, indentStep(model.cst));
   const last = list.items.at(-1);
   if (last?.cst !== undefined && last.parentStart !== undefined) {
     const parent = elementAtStart(model.cst, last.parentStart);

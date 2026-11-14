@@ -98,14 +98,17 @@ export function useProjectEditor(workspace: Workspace): ProjectEditorHooks {
         return undefined;
       },
       // --- Bus fields follow the family; one written for another family stays, flagged ---
-      fieldShown: (field, node) => field.value !== undefined || busFieldApplies(field.attribute, setupOf(node).record?.bus.family),
+      fieldShown: (field, node) => {
+        const bus = setupOf(node).record?.bus;
+        return field.value !== undefined || busFieldApplies(field.attribute, bus?.family, bus?.wiring);
+      },
       fieldNote: (field, node) => {
         const { record } = setupOf(node);
-        if (field.value !== undefined && record !== undefined && !busFieldApplies(field.attribute, record.bus.family)) {
+        if (field.value !== undefined && record !== undefined && !busFieldApplies(field.attribute, record.bus.family, record.bus.wiring)) {
           return (
             <p className="field-problem warning" data-flag="not-applicable">
-              {field.attribute.name} applies to {field.attribute.busFamilies?.map(familyLabel).join(' and ')}, and this display is {familyLabel(record.bus.family)} (
-              {record.bus.raw}). It is kept in the file; remove it if it no longer applies.
+              This display ({familyLabel(record.bus.family)}, {record.bus.raw}) has no {field.attribute.name}. It is kept in the file; remove it if it no
+              longer applies.
             </p>
           );
         }

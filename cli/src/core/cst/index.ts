@@ -29,6 +29,7 @@ export { printCst } from './print-cst.js';
 export { BOM, LineIndex, type LineColumn } from './line-index.js';
 export { decodeEntities, encodeAttributeValue } from './entities.js';
 export {
+  indentStep,
   insertAttribute,
   insertElement,
   removeAttribute,

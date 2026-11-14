@@ -153,7 +153,7 @@ test('an I²C address is flagged, not dropped, when the wiring changes to SPI; S
   await pickDisplay(page, 'ssd1306 128x64 noname 4w_hw_spi', 'U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI');
   await form(page).getByRole('button', { name: 'Use this display' }).click();
   await expect.poll(() => bufferText(page, 'u8g2gl.xml')).toContain('setup="U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI" address="0x3C"');
-  await expect(field('display/address').locator('[data-flag="not-applicable"]')).toContainText('this display is SPI');
+  await expect(field('display/address').locator('[data-flag="not-applicable"]')).toContainText('has no address');
   await expect(field('display/cs')).toBeVisible();
   await expect(field('display/dc')).toBeVisible();
 });

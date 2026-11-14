@@ -129,13 +129,19 @@ export function familyLabel(family: BusFamily): string {
 }
 
 /**
- * @brief Whether a bus attribute applies to a family: the vocabulary's
- *        `busFamilies` says (address for I²C; cs, dc, reset for SPI and
- *        parallel). Any attribute that is not a bus attribute applies.
+ * @brief Whether a bus attribute applies to a display's bus: the vocabulary's
+ *        `busFamilies` says which families (address for I²C; reset for every
+ *        bus; cs and dc for SPI and parallel), and `busWiringsWithout` which of
+ *        their wirings lack the pin (3-wire SPI has no dc). Any attribute that
+ *        is not a bus attribute applies.
+ * @param attribute  The attribute.
+ * @param family     The display's bus family; undefined when not known.
+ * @param wiring     The display's wiring (the catalogue's `bus.wiring`), if known.
  */
-export function busFieldApplies(attribute: VocabularyAttribute, family: BusFamily | undefined): boolean {
+export function busFieldApplies(attribute: VocabularyAttribute, family: BusFamily | undefined, wiring?: string): boolean {
   if (attribute.busFamilies === undefined || family === undefined) return true;
-  return attribute.busFamilies.includes(family);
+  if (!attribute.busFamilies.includes(family)) return false;
+  return wiring === undefined || !(attribute.busWiringsWithout ?? []).includes(wiring);
 }
 
 /** @brief A rotation as written, with its angle: `R1 · 90°`. */

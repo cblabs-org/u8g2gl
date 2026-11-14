@@ -48,16 +48,20 @@ test('the search matches every word in the setup name, shortest first; failing t
   expect(fuzzy.matches.length + fuzzy.notes.length).toBeGreaterThan(0);
 });
 
-test('bus fields follow the family: address for I²C, cs, dc and reset for SPI and parallel', () => {
+test("bus fields follow U8G2's constructors: address and reset for I²C; cs, dc and reset for SPI and parallel; no dc on 3-wire SPI", () => {
   const display = vocabularyElement('display');
   const attribute = (name: string) => display?.attributes.find((a) => a.name === name);
-  const applies = (name: string, family: 'spi' | 'i2c' | 'parallel') => {
+  const applies = (name: string, family: 'spi' | 'i2c' | 'parallel', wiring?: string) => {
     const found = attribute(name);
-    return found !== undefined && busFieldApplies(found, family);
+    return found !== undefined && busFieldApplies(found, family, wiring);
   };
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'i2c'))).toEqual(['address']);
+  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'i2c'))).toEqual(['address', 'reset']);
   expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi'))).toEqual(['cs', 'dc', 'reset']);
+  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi', '4w_hardware'))).toEqual(['cs', 'dc', 'reset']);
+  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi', '3w_software'))).toEqual(['cs', 'reset']);
   expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'parallel'))).toEqual(['cs', 'dc', 'reset']);
+  // Every bus field says that generate does not use it yet.
+  for (const name of ['address', 'cs', 'dc', 'reset']) expect(attribute(name)?.help).toContain('does not use it yet');
   // Not a bus field, or no known family: shown.
   const setup = attribute('setup');
   expect(setup !== undefined && busFieldApplies(setup, 'i2c')).toBe(true);

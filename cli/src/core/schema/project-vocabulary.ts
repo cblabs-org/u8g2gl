@@ -106,6 +106,8 @@ export interface VocabularyAttribute {
   readonly help: string;
   /** For a bus pin or address: the bus families (§5.2) it applies to. */
   readonly busFamilies?: readonly BusFamily[];
+  /** For a bus pin: wirings of those families that have no such pin (3-wire SPI has no `dc`). */
+  readonly busWiringsWithout?: readonly string[];
   /** Shown, never edited in a form: changing it is a migration, not an edit (§15.4). */
   readonly readOnly?: boolean;
   /**
@@ -191,14 +193,26 @@ function nameAttribute(what: string, referredAs: string): VocabularyAttribute {
 
 // --- u8g2gl.xml (§5.1) -------------------------------------------------------
 
+// What every bus field's help ends with: the CLI reads these values but
+// nothing uses them yet, and saying so is better than a field that implies
+// it configures the display.
+const BUS_NOT_YET_USED =
+  'It is recorded in the project for your firmware: U8G2GL does not construct the display, so `generate` does not use it yet.';
+
 /** The bus attributes, at their canonical place on `<display>`, with every place the parser reads them. */
-function busAttribute(name: 'cs' | 'dc' | 'reset' | 'address', families: readonly BusFamily[], help: string): VocabularyAttribute {
+function busAttribute(
+  name: 'cs' | 'dc' | 'reset' | 'address',
+  families: readonly BusFamily[],
+  help: string,
+  wiringsWithout?: readonly string[],
+): VocabularyAttribute {
   return {
     name,
     type: { kind: 'string' },
     required: false,
-    help,
+    help: `${help} ${BUS_NOT_YET_USED}`,
     busFamilies: families,
+    ...(wiringsWithout !== undefined ? { busWiringsWithout: wiringsWithout } : {}),
     // parse-project.ts reads a `<bus>` child, if written, for all four; else
     // the attributes on `<display>`, if written; else those on `<target>`.
     unlessPresent: ['bus'],
@@ -318,8 +332,8 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
         alternatives: [{ element: 'target', name: 'rotation' }],
       },
       busAttribute('cs', ['spi', 'parallel'], 'The chip-select pin, for an SPI or parallel display.'),
-      busAttribute('dc', ['spi', 'parallel'], 'The data/command pin, for an SPI or parallel display.'),
-      busAttribute('reset', ['spi', 'parallel'], "The display's reset pin."),
+      busAttribute('dc', ['spi', 'parallel'], 'The data/command pin, for a 4-wire SPI or parallel display.', ['3w_hardware', '3w_software']),
+      busAttribute('reset', ['spi', 'i2c', 'parallel'], "The display's reset pin, for any bus."),
       busAttribute('address', ['i2c'], 'The I²C device address, such as 0x3C. U8G2 cannot know it, so it is yours to set.'),
     ],
   },
