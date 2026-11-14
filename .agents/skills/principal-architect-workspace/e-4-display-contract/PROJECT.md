@@ -296,3 +296,18 @@ amend the rulings and the table above; where they disagree, these win.
 - 2026-11-14 — **Corrections C1–C3 approved by the owner.** Asked "Do you
   approve E-4b with these three corrections?", the owner replied, in their own
   words: **"Approve corrections"**. E-4b's work orders are written against them.
+- 2026-11-14 — **E-4b verified by the PA** on `f028534`, suites one at a time:
+  - Wasm 4/4; host ctest 520/520 (the new snippet compile-and-link target
+    included); CLI 2994; lint, tsc and designer typecheck clean; designer
+    unit 262; e2e 125/125; production 3.
+  - Goldens: empty diff. check-package PASS at 0.19.0. Home-path guard clean.
+  - Built CLI: `display` and `--snippet`, near-miss suggestions, each pin
+    refused at its line, a mirror at 0.6 told to declare 0.7, and
+    `U8G2_MIRROR_VERTICAL` with schema 0.7 / runtime floor 0.13.0 in output.
+  - PA fix `8c45f74`: a refused pin withheld the parsed project, so
+    validation also reported a false "schema version ''" and "No <target>
+    declared". The model is now kept for `U8G2GL_REMOVED_ATTRIBUTE` alone;
+    CLI 2997 after it.
+  - Browser check on the production build: the snippet panel, the mirror
+    options and help at 0.7, a mirror applying with the canvas still
+    256×64, a pin written on disk shown as the one refusal, then cleared.
