@@ -65,15 +65,31 @@ copy of the setup and rotation, with nothing to say when the two disagreed.
 
 ## Prior art
 
-The tools this one is closest to draw the same line between the UI and the
-board, though each in its own way:
+A tool owns the pins only when it owns the whole firmware. UI tools that plug
+into someone else's firmware declare the panel and leave construction to the
+board layer:
 
-- **LVGL's editors and SquareLine Studio** generate the screens and their
-  widgets. The display driver, its bus and its pins are the board's port
-  layer, written once per board and outside the exported UI.
-- **ESPHome** declares the bus and its pins on its bus components (`spi:`,
-  `i2c:`) and the display's own pins in its `display:` configuration; what is
-  drawn is written against the display, not against its pins.
+- **LVGL Pro.** A project's `project.xml` declares each target's display
+  (`<display width height color_format>`, plus optional `<memory>`) and no
+  pins. The hardware is the ecosystem's: a Zephyr board's devicetree, a
+  desktop backend, or the user's own driver code.
+- **SquareLine Studio.** Project settings hold the resolution, colour depth and
+  rotation. The driver and pins live in the exported template project (for
+  example TFT_eSPI's `User_Setup.h`), not in the UI it exports.
+- **ESPHome** is the exception that proves the rule. Its YAML does own
+  `cs_pin`, `dc_pin` and `reset_pin` on the display, and the bus on an `spi:`
+  block, because ESPHome generates and constructs the entire firmware.
+  U8G2GL is a library inside the firmware, so it is in LVGL Pro's position.
+- **The foundation itself.** `esp32-app-foundation` already has a hardware
+  owner: `hardware/<board>/board.h` defines `U8G2_DISPLAY_TYPE` and the
+  display pins, and `board_contract.h` checks them at compile time. One UI
+  project per panel serves both `esp32dev` and `esp32s3nano`, whose display
+  pins differ (chip select is 26 on one and 10 on the other).
+
+Sources: [LVGL Pro Quick Start](https://docs.pro.lvgl.io/quick_start.html),
+[SquareLine project settings](https://docs.squareline.io/docs/dev_env/project_settings),
+[SquareLine Open Board Platform](https://docs.squareline.io/docs/obp),
+[ESPHome SSD1322](https://esphome.io/components/display/ssd1322/).
 
 ## Consequences
 
