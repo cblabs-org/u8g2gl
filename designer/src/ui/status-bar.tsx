@@ -38,6 +38,8 @@ import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
 import { describeNotSaved } from './session-status';
 import { describeUnsaved } from './save-status';
+import { orientedNote } from '../forms/display-picker-model';
+import type { DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
 
 /**
  * @brief The indicator's text: a glyph, the state, and the hash or reason.
@@ -154,6 +156,16 @@ interface TargetsShown {
   readonly display: string | undefined;
 }
 
+// describePanel
+// A target's panel as the switcher names it: controller and own size, and the
+// size its rotation shows it at when the two differ.
+//   record   — the panel's catalogue record
+//   rotation — the target's rotation as written
+function describePanel(record: DisplayRecord, rotation: string | undefined): string {
+  const shown = orientedNote(record, rotation);
+  return `${record.controller} ${record.width}×${record.height}${shown === undefined ? '' : ` · ${shown}`}`;
+}
+
 // targetsKey
 // The switcher's snapshot as one string, so a run that changed no target,
 // which is nearly every run, re-renders nothing.
@@ -164,7 +176,9 @@ function targetsKey(workspace: ReturnType<typeof useWorkspace>): string {
   const shown: TargetsShown = {
     names: result.model.project.targets.map((target) => target.name),
     active: result.target?.name,
-    display: record === undefined ? undefined : `${record.controller} ${record.width}×${record.height}`,
+    // The panel at its own size, as the picker names it, then the size a quarter
+    // turn shows it at, which is the canvas's (design_spec §5.1).
+    display: record === undefined ? undefined : describePanel(record, result.target?.rotation),
   };
   return JSON.stringify(shown);
 }

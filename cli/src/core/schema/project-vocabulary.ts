@@ -36,6 +36,8 @@
  * - VocabularyElement:      One element
  * - ROTATION_VALUES:        The rotations a target accepts, as written
  * - ROTATION_DEGREES:       Each rotation's angle in degrees
+ * - Rotation:               A rotation in U8G2's spelling, R0…R3
+ * - normaliseRotation():    The U8G2 rotation any accepted spelling means
  * - MAX_STRING_LEN_DEFAULT: A string subject's capacity when `max_len` is absent
  * - PROJECT_VOCABULARY:     Every element of both files
  * - vocabularyElement():    One element by id
@@ -168,6 +170,43 @@ export const ROTATION_DEGREES: Readonly<Record<string, number>> = {
   '180': 180,
   '270': 270,
 };
+
+/** A rotation in U8G2's own spelling: `U8G2_R0`…`U8G2_R3` without the prefix. */
+export type Rotation = 'R0' | 'R1' | 'R2' | 'R3';
+
+/**
+ * Each written spelling's U8G2 rotation. The one table that equates `90` with
+ * `R1`, so no consumer of a rotation compares spellings for itself.
+ */
+const ROTATION_BY_SPELLING: ReadonlyMap<string, Rotation> = new Map<string, Rotation>([
+  ['R0', 'R0'],
+  ['R1', 'R1'],
+  ['R2', 'R2'],
+  ['R3', 'R3'],
+  ['0', 'R0'],
+  ['90', 'R1'],
+  ['180', 'R2'],
+  ['270', 'R3'],
+]);
+
+/**
+ * @brief The U8G2 rotation a target's `rotation` attribute means.
+ *
+ * The parser keeps the text as written, so the form still shows what the author
+ * wrote; everything that *acts* on a rotation reads it through here instead.
+ *
+ * @param rotation The attribute's text, or undefined when it is absent.
+ * @return `R0`…`R3` for any of the eight accepted spellings, `R0` when the
+ *         attribute is absent (U8G2's own default), and undefined for anything
+ *         else. Pass 1 reports an invalid value, so a caller given undefined
+ *         need not say so again.
+ */
+export function normaliseRotation(rotation: string | undefined): Rotation | undefined {
+  if (rotation === undefined) {
+    return 'R0';
+  }
+  return ROTATION_BY_SPELLING.get(rotation);
+}
 
 /**
  * A string subject's usable characters when `max_len` is absent (§5.3): the

@@ -82,6 +82,7 @@
  *   - VocabularyElement, VocabularyAttribute, VocabularyValueType: Its shapes
  *   - AttributeSpelling, ReferenceKind, VocabularyFile: Its parts
  *   - ROTATION_VALUES, ROTATION_DEGREES, MAX_STRING_LEN_DEFAULT: Values it offers
+ *   - Rotation, normaliseRotation(): A rotation in U8G2's spelling, from any accepted one
  *   - vocabularyElement(), vocabularyChildren(), vocabularyRoots(), attributeSpellings(): Lookups
  *
  * - Display catalogue (§5.2):
@@ -134,6 +135,7 @@ export {
   PROJECT_VOCABULARY,
   ROTATION_VALUES,
   ROTATION_DEGREES,
+  normaliseRotation,
   MAX_STRING_LEN_DEFAULT,
   vocabularyElement,
   vocabularyChildren,
@@ -145,6 +147,7 @@ export {
   type AttributeSpelling,
   type VocabularyAttribute,
   type VocabularyElement,
+  type Rotation,
 } from './project-vocabulary.js';
 
 export type {

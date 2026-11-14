@@ -19,6 +19,7 @@ import { parseScreenFile, parseWidgetManifestFile } from '../../src/core/parser/
 import {
   createResolverContext,
   displayContainer,
+  orientedDisplay,
   expandScreens,
   resolveElements,
   type ExpandedElement,
@@ -84,7 +85,11 @@ function expand(body: string, composites: readonly WidgetManifest[]) {
 
 /** Resolves one expanded screen against a 256-wide display. */
 function resolve(elements: readonly ExpandedElement[], composites: readonly WidgetManifest[]) {
-  const context = createResolverContext(GLOBALS, frameworkRegistry(composites), CATALOGUE.find((r) => r.setup === WIDE));
+  const context = createResolverContext(
+    GLOBALS,
+    frameworkRegistry(composites),
+    orientedDisplay(CATALOGUE.find((r) => r.setup === WIDE)!, undefined),
+  );
   return resolveElements(
     elements.map((element) => element.node),
     displayContainer(context),

@@ -29,7 +29,7 @@
  *              by the stub's setters — then the U8G2 class: draw calls with
  *              per-call counters and last-argument fields, draw colour / font /
  *              mode / position / direction / height-mode state, clip-window
- *              recording, and configurable text metrics.
+ *              recording, and configurable text metrics and display size.
  *
  *              Every call that draws or changes draw state is also appended, in
  *              order, to a fixed-capacity call log (PR-04 WO11). Counters and
@@ -198,6 +198,11 @@ public:
     int utf8_width_val = 0;
     int ascent_val = 0;
     int descent_val = 0;
+    // The size getDisplayWidth/Height() report: the 128x64 the runtime's clip
+    // tests assume, unless a test stands the stub in for another panel or
+    // rotation (as the display-contract test does).
+    int display_width_val = 128;
+    int display_height_val = 64;
 
     int draw_xbmp_count = 0;
     int last_draw_xbmp_x = 0;
@@ -584,11 +589,11 @@ public:
     }
 
     u8g2_uint_t getDisplayWidth() const {
-        return 128;
+        return static_cast<u8g2_uint_t>(display_width_val);
     }
 
     u8g2_uint_t getDisplayHeight() const {
-        return 64;
+        return static_cast<u8g2_uint_t>(display_height_val);
     }
 
     // Tile coordinates are uint8_t in real U8G2, not u8g2_uint_t.

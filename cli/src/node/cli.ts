@@ -745,6 +745,9 @@ function reportFor(
   if (realised === undefined || capacities === undefined || target === undefined) {
     throw new Error('A build that generated carries its realisation, capacities and target.');
   }
+  // The record, not its oriented size: §18 reports what the hardware costs, and
+  // a rotation changes neither the framebuffer nor the panel's own size
+  // (design_spec §5.1). Layout geometry is oriented in the pipeline instead.
   const display = findTargetDisplay(target, loaded.model.catalogue);
   return buildGenerateReport({
     globals: loaded.model.globals,

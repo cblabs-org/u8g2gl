@@ -26,7 +26,9 @@
  * - cppValue, cppStringLiteral, cppEnumerator (value.ts) — §13.2's type mapping
  * - drawCallFor, DrawCall, DrawCallInput, SUBJECT_READ_SUFFIX (draw-args.ts)
  * - parseXbm, XbmImage (images/xbm.ts)
- * - EmittedUnit, ProjectEmitInput, section, includeBlock (unit.ts)
+ * - EmittedUnit, ProjectEmitInput, DisplayContract, section, includeBlock (unit.ts)
+ * - The display contract's macro names and UI_DISPLAY_MATCHES_FUNCTION (ui-hpp.ts),
+ *   design_spec §16
  * - The per-unit emitters and their file names, including the screen unit
  *   (screen.ts), `ui.cpp` (ui-init.ts) and the coordinate translation they share
  *   with WO11 (placement.ts)
@@ -54,7 +56,7 @@ import { emitSubjectsUnit, SUBJECTS_UNIT } from './subjects.js';
 import { emitScreenUnit, screenUnitPath } from './screen.js';
 import { emitUiHeader, UI_HEADER } from './ui-hpp.js';
 import { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
-import type { EmittedUnit, ProjectEmitInput } from './unit.js';
+import type { DisplayContract, EmittedUnit, ProjectEmitInput } from './unit.js';
 import { EDITOR_REGISTRY_UNIT, editorAssetsOf, emitEditorRegistryUnit } from './editor-registry.js';
 import { emitSceneFile, SCENE_FILE } from './scene.js';
 
@@ -70,6 +72,7 @@ export {
   declarationError,
   includeBlock,
   section,
+  type DisplayContract,
   type EmittedUnit,
   type ProjectEmitInput,
 } from './unit.js';
@@ -90,7 +93,17 @@ export {
   SUBJECTS_UNIT,
   type SubjectDeclaration,
 } from './subjects.js';
-export { emitUiHeader, screenDescriptorIdentifier, UI_HEADER, UI_INIT_FUNCTION } from './ui-hpp.js';
+export {
+  emitUiHeader,
+  screenDescriptorIdentifier,
+  TARGET_HEIGHT_MACRO,
+  TARGET_ROTATION_MACRO,
+  TARGET_SETUP_MACRO,
+  TARGET_WIDTH_MACRO,
+  UI_DISPLAY_MATCHES_FUNCTION,
+  UI_HEADER,
+  UI_INIT_FUNCTION,
+} from './ui-hpp.js';
 export { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
 export { emitScreenUnit, screenUnitPath, type ScreenEmitInput } from './screen.js';
 export { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
@@ -126,6 +139,8 @@ export interface ProjectEmissionInput {
   readonly generatorVersion: string;
   /** The `<target>` being built, for the stamp. */
   readonly target: string;
+  /** That target's display contract, which `ui.hpp` states (design_spec §16). */
+  readonly contract: DisplayContract;
 }
 
 /** What emission produced. */
@@ -204,6 +219,7 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
       compiledFonts: input.compiledFonts,
       bdfLicenceFiles: input.bdfLicenceFiles,
       stamp: stampFor(plan.source === 'project' ? projectSource : globalsSource),
+      contract: input.contract,
     });
     diagnostics.push(...unit.diagnostics);
     // A unit that raised an error has no usable content; the build is refused
@@ -261,11 +277,12 @@ export const TARGET_KINDS: readonly TargetKind[] = ['firmware', 'editor'];
  * build whose firmware emission produced no errors: the scene describes what
  * firmware would draw, and a model firmware refuses has nothing to describe.
  *
- * @param input As for {@link emitProjectFiles}; `assets` is not read.
+ * @param input As for {@link emitProjectFiles}, less the display contract:
+ *              neither file states one. `assets` is not read.
  * @return The two files, registry first. No diagnostics: every refusal is
  *         firmware emission's, which has already run.
  */
-export function emitEditorFiles(input: ProjectEmissionInput): ProjectEmission {
+export function emitEditorFiles(input: Omit<ProjectEmissionInput, 'contract'>): ProjectEmission {
   const projectSource = input.project.loc?.file ?? 'u8g2gl.xml';
   const generated = {
     source: projectSource,

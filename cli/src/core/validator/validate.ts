@@ -46,7 +46,7 @@ import { validateDisplay } from './validate-display.js';
 import { validateWidgetProps } from './validate-widget-props.js';
 import { validateTypes } from './validate-types.js';
 import { validateGeometry } from './validate-geometry.js';
-import { findTargetDisplay } from '../resolver/index.js';
+import { findOrientedDisplay } from '../resolver/index.js';
 import { validateIdentifiers } from './validate-identifiers.js';
 import {
   validateNotYetSupported,
@@ -243,9 +243,10 @@ export function validate(input: ValidateInput): ValidateResult {
     }
   }
 
-  // Say which target geometry was checked against, so a caller can report it.
+  // Say which target geometry was checked against, so a caller can report it:
+  // the oriented size, because that is what the bounds were judged against.
   const target = checkedTarget(input);
-  const display = findTargetDisplay(target, input.catalogue ?? []);
+  const display = findOrientedDisplay(target, input.catalogue ?? []);
   return {
     diagnostics: allDiagnostics,
     errors,

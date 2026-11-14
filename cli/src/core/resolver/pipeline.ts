@@ -38,7 +38,6 @@
  */
 
 import type { Diagnostic } from '../schema/diagnostic.js';
-import type { DisplayRecord } from '../schema/display-record.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { WidgetNode } from '../schema/widget-node.js';
@@ -48,6 +47,7 @@ import {
   createResolverContext,
   displayContainer,
   resolveElements,
+  type OrientedDisplay,
   type ResolvedScreen,
   type ResolverContext,
 } from './resolve.js';
@@ -95,12 +95,15 @@ export interface PipelineInput {
   readonly screens: readonly Screen[];
   readonly manifests: ManifestRegistry;
   /**
-   * The display to resolve against — the selected target's catalogue record.
-   * Absent when the target has no record, or the project declares no target:
-   * `#screen_*` and screen-level anchors then stay deferred rather than guessed,
-   * and Pass 3 reports the display.
+   * The display to resolve against — the selected target's catalogue record,
+   * oriented by its rotation (`orientedDisplay()`, design_spec §5.1). Typed as
+   * the oriented size rather than the record so a caller cannot hand the
+   * pipeline a native size by forgetting the rotation: a record does not
+   * type-check here. Absent when the target has no record, or the project
+   * declares no target: `#screen_*` and screen-level anchors then stay
+   * deferred rather than guessed, and Pass 3 reports the display.
    */
-  readonly display?: DisplayRecord;
+  readonly display?: OrientedDisplay;
 }
 
 /**
@@ -116,7 +119,7 @@ export interface PipelineInput {
  * be a defect, not a saving: `generate` builds its own for the target it is
  * generating, and hands that same one to validation.
  *
- * @param input Globals, screens, the registry and the target's display record.
+ * @param input Globals, screens, the registry and the target's oriented display.
  * @return The pipeline.
  */
 export function createScreenPipeline(input: PipelineInput): ScreenPipeline {

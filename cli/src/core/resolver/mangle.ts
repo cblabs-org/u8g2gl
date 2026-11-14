@@ -52,7 +52,7 @@
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
  * - OBJECT_IDENTIFIER_PREFIX:         `ui_obj_`, the emitted objects' family
- * - EDITOR_REGISTRY_FUNCTION, UI_INIT_FUNCTION, SUBJECTS_INIT_FUNCTION,
+ * - EDITOR_REGISTRY_FUNCTION, UI_INIT_FUNCTION, UI_DISPLAY_MATCHES_FUNCTION, SUBJECTS_INIT_FUNCTION,
  *   STYLES_INIT_FUNCTION, RUNTIME_HANDLER_FUNCTION: the fixed names in the `ui_`
  *   namespace, each spelled once and each in the collision table
  * - screenFunctionIdentifier(), screenTableIdentifier(), screenDescriptorIdentifier(), subjectIdentifier(),
@@ -192,6 +192,9 @@ export const EDITOR_REGISTRY_FUNCTION = 'ui_editor_registry';
 /** `ui_init()`, the application's one entry point (§13.7). */
 export const UI_INIT_FUNCTION = 'ui_init';
 
+/** `ui_display_matches()`, the board's check against the display contract (§16). */
+export const UI_DISPLAY_MATCHES_FUNCTION = 'ui_display_matches';
+
 /** `ui_subjects_init()`, which applies string subjects' initial values (§8.2). */
 export const SUBJECTS_INIT_FUNCTION = 'ui_subjects_init';
 
@@ -214,6 +217,7 @@ export const RUNTIME_HANDLER_FUNCTION = 'ui_handler';
  */
 const FIXED_IDENTIFIERS: readonly { readonly identifier: string; readonly description: string }[] = [
   { identifier: UI_INIT_FUNCTION, description: 'the generated ui_init()' },
+  { identifier: UI_DISPLAY_MATCHES_FUNCTION, description: 'the generated ui_display_matches()' },
   { identifier: SUBJECTS_INIT_FUNCTION, description: 'the generated ui_subjects_init()' },
   { identifier: STYLES_INIT_FUNCTION, description: 'the generated ui_styles_init()' },
   { identifier: EDITOR_REGISTRY_FUNCTION, description: 'the editor registry' },

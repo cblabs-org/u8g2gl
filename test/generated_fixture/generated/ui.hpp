@@ -32,6 +32,34 @@
 #endif
 #endif
 
+// --- Display contract (design_spec §16) ---
+// The panel this layout was resolved against. The board constructs the
+// display; these say what it must construct. Not #ifndef-guarded: a
+// contract that could be overridden would check nothing.
+
+// Width after rotation: what getDisplayWidth() returns once constructed.
+#define U8G2GL_TARGET_WIDTH 128
+// Height after rotation: what getDisplayHeight() returns once constructed.
+#define U8G2GL_TARGET_HEIGHT 64
+// The rotation to pass to the U8G2 constructor (U8G2's own macro, from U8g2lib.h).
+#define U8G2GL_TARGET_ROTATION U8G2_R0
+// For diagnostics only, never compared: the bus is part of the name.
+#define U8G2GL_TARGET_SETUP "U8G2_SSD1306_128X64_NONAME_F_HW_I2C"
+
+/**
+ * @brief Whether a constructed display is the one this UI was laid out for.
+ *
+ * Compares the display's own width and height, after the rotation it was
+ * constructed with, against U8G2GL_TARGET_WIDTH and U8G2GL_TARGET_HEIGHT. Call it
+ * after begin(). It catches the wrong panel size and the wrong rotation; it
+ * cannot catch a same-size panel on a different controller.
+ *
+ * @param display The board's constructed display.
+ * @return true when the sizes match. Allocates and logs nothing: what to do
+ *         on a mismatch is the firmware's decision.
+ */
+bool ui_display_matches(U8G2& display);
+
 // --- Subjects (§8) ---
 
 // station_name (string)

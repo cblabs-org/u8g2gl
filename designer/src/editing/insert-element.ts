@@ -45,7 +45,7 @@
 
 import { applyEdits, encodeAttributeValue, insertElement, parseCst, type CstElement, type TextEdit } from '@u8g2gl/core/cst/index.js';
 import type { EffectiveManifest, ManifestRegistry } from '@u8g2gl/core/manifest/index.js';
-import { createScreenPipeline, findTargetDisplay, type ResolvedElement } from '@u8g2gl/core/resolver/index.js';
+import { createScreenPipeline, findOrientedDisplay, type ResolvedElement } from '@u8g2gl/core/resolver/index.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
 import type { PropDef } from '@u8g2gl/core/schema/widget-manifest.js';
 import BUILTIN_FONTS from '@u8g2gl/data/u8g2-fonts.json' with { type: 'json' };
@@ -199,7 +199,7 @@ function findResolved(elements: readonly ResolvedElement[], name: string): Resol
 //   seeded   — the attributes written as 0 that may be seeded; rewritten in place
 function seedExtras(texts: ReadonlyMap<string, string>, targetName: string | undefined, name: string, x: number, y: number, seeded: [string, string][]): void {
   const model = new ProjectModelCache().build(texts);
-  const display = findTargetDisplay(pickTarget(model.project.targets, targetName), model.catalogue);
+  const display = findOrientedDisplay(pickTarget(model.project.targets, targetName), model.catalogue);
   const pipeline = createScreenPipeline({ globals: model.globals, screens: model.screens, manifests: model.manifests, ...(display !== undefined ? { display } : {}) });
   const resolved = pipeline.resolution.screens.map((screen) => findResolved(screen.elements, name)).find((element) => element !== undefined);
   const index = { horizontal: 0, vertical: 0 };

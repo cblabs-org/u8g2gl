@@ -97,6 +97,7 @@ import {
   withInstantiation,
   type AxisExtent,
   type AxisOutcome,
+  type Container,
   type ExtentEdge,
   type DeferredCoordinate,
   type ExpandedElement,
@@ -455,6 +456,19 @@ function checkRepresentable(element: ResolvedElement, axis: GeometryAxis, emit: 
 // Check 3 — inside the container ([D-20])
 // ---------------------------------------------------------------------------
 
+// describeRange
+// The container's extent along one axis, as a bounds message states it. A
+// rotated display also names how it came by that size, so an author who wrote a
+// 256×64 panel is told "display 64×256 (256×64 rotated 90°) is 64px wide"
+// rather than a width they never wrote (design_spec §5.1).
+//   container — the element's container
+//   limit     — its size along the axis (known)
+//   axis      — names for this axis
+function describeRange(container: Container, limit: number, axis: GeometryAxis): string {
+  const label = container.orientation === undefined ? container.label : `${container.label} ${container.orientation}`;
+  return `${label} is ${limit}px ${axis.extent} (0..${limit - 1})`;
+}
+
 // checkAxisBounds
 // Checks one axis of one element against its container's size along that axis.
 //   element — resolved element
@@ -473,7 +487,7 @@ function checkAxisBounds(
   if (start === undefined || size === undefined) {
     return;
   }
-  const range = `${container.label} is ${limit}px ${axis.extent} (0..${limit - 1})`;
+  const range = describeRange(container, limit, axis);
 
   // --- Step 1: A negative size — only an anchor rule or a negative expression gives one ---
   if (size.value < 0) {
@@ -639,7 +653,7 @@ function checkDrawnAxis(
   emit: ElementDiagnosticSink,
 ): void {
   const { node, container } = element;
-  const range = `${container.label} is ${limit}px ${axis.extent} (0..${limit - 1})`;
+  const range = describeRange(container, limit, axis);
   const report = (edge: ExtentEdge, before: boolean): void => {
     // Located at the coordinate that carries the edge past the container: the
     // length for a centre's reach, otherwise the one coordinate.
