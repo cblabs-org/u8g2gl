@@ -36,7 +36,10 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
     execFile(
       process.execPath,
       [cliPath, ...args],
-      { env: { ...process.env, NO_COLOR: '1' } },
+      // execFile's default 1 MiB stdout cap is below `catalogue --json`, whose
+      // records carry each constructor's pins (1.4 MB at U8G2 2.36.18); over
+      // the cap the child is killed and the output arrives cut short.
+      { env: { ...process.env, NO_COLOR: '1' }, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const exitCode = error && typeof error.code === 'number' ? error.code : 0;
         res({

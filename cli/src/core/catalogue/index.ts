@@ -5,14 +5,17 @@
  *
  * File: src/core/catalogue/index.ts
  * Purpose: Public entry point for the isomorphic U8G2 display catalogue query API (§5.2).
- * Description: Re-exports Levenshtein distance matching and the four catalogue query
- *              modes (identify, source, compare, enumerate).
+ * Description: Re-exports Levenshtein distance matching, the four catalogue query
+ *              modes (identify, source, compare, enumerate), and the board-side
+ *              constructor snippet a record's wiring implies.
  *
  * Exports:
  * - editDistance, findClosest from ./edit-distance.js
  * - identifyDisplay, sourceDisplay, compareDisplays, enumerateDisplays from ./query.js
  * - All query parameter and result interfaces
+ * - PIN_PLACEHOLDER, pinMacro, constructorSnippet from ./snippet.js
  */
 
 export * from './edit-distance.js';
 export * from './query.js';
+export * from './snippet.js';

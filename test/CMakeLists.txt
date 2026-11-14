@@ -776,6 +776,63 @@ target_compile_options(test_clock_baseline PRIVATE
 )
 u8g2gl_discover_tests(test_clock_baseline)
 
+# --- Real U8G2: the constructor snippets compile and link (design_spec §16) ---
+# `u8g2gl display <setup> --snippet` and the designer print board-side code
+# that constructs the display ([D-22]). Three of its committed goldens (HW SPI,
+# SW SPI, HW I2C, in cli/test/catalogue/snippets/) are compiled here against the
+# pinned U8G2's real headers, with their pin placeholder defined to a stub
+# value and a stub ui.hpp, and linked against U8G2's C sources, so the text the
+# tool shows is code a board can build.
+#
+#   - U8G2's C library is compiled whole, as a static archive with ARDUINO
+#     defined (the struct layout the C++ wrapper needs, as for
+#     u8g2gl_u8g2_csrc_arduino), because each constructor calls a setup
+#     function in u8g2_d_setup.c, which references every display driver. The
+#     archive lets the linker take only what is reached. Globbed, unlike the
+#     lists above, because "all of it" is the point; only the two font tables,
+#     which no constructor reaches, are left out to keep the build quick.
+#   - U8G2's Arduino transports (cppsrc/U8x8lib.cpp) need the Arduino core, so
+#     the three callbacks the snippets reach are stubbed in the test directory.
+#   - Built, not run: a build failure is the failure. Registered with CTest as
+#     RealU8g2.RuntimeCompilesAgainstRealHeaders is, so it shows in every run.
+file(GLOB U8G2GL_U8G2_ALL_CSRC ${U8G2GL_U8G2_DIR}/csrc/*.c)
+list(REMOVE_ITEM U8G2GL_U8G2_ALL_CSRC
+    ${U8G2GL_U8G2_DIR}/csrc/u8g2_fonts.c
+    ${U8G2GL_U8G2_DIR}/csrc/u8x8_fonts.c
+)
+add_library(u8g2gl_u8g2_csrc_all_arduino STATIC ${U8G2GL_U8G2_ALL_CSRC})
+target_include_directories(u8g2gl_u8g2_csrc_all_arduino PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2)
+target_include_directories(u8g2gl_u8g2_csrc_all_arduino SYSTEM PUBLIC ${U8G2GL_U8G2_DIR}/csrc)
+target_compile_definitions(u8g2gl_u8g2_csrc_all_arduino PUBLIC ARDUINO=10819)
+target_compile_options(u8g2gl_u8g2_csrc_all_arduino PRIVATE -w)
+
+set(U8G2GL_SNIPPET_DIR ${CMAKE_CURRENT_SOURCE_DIR}/snippet_compile)
+add_executable(test_snippet_compile
+    ${U8G2GL_SNIPPET_DIR}/main.cpp
+    ${U8G2GL_SNIPPET_DIR}/snippet_4w_hw_spi.cpp
+    ${U8G2GL_SNIPPET_DIR}/snippet_4w_sw_spi.cpp
+    ${U8G2GL_SNIPPET_DIR}/snippet_hw_i2c.cpp
+    ${U8G2GL_SNIPPET_DIR}/ui_stub.cpp
+    ${U8G2GL_SNIPPET_DIR}/arduino_byte_stubs.cpp
+)
+target_include_directories(test_snippet_compile PRIVATE
+    ${U8G2GL_SNIPPET_DIR}
+    ${PROJECT_SOURCE_DIR}/cli/test/catalogue/snippets
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_snippet_compile SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_snippet_compile PRIVATE
+    u8g2gl_u8g2_csrc_all_arduino
+)
+target_compile_options(test_snippet_compile PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+add_test(NAME RealU8g2.ConstructorSnippetsCompileAndLink
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target test_snippet_compile
+)
+
 # --- Generated fixture: the compile layer (design_spec §17.1, PR-04 WO10) ---
 # test/generated_fixture/ is a small project whose generated/ directory is
 # committed output of `u8g2gl generate` (cli/test/generator/compile-fixture.test.ts

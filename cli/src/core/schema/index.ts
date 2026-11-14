@@ -88,6 +88,7 @@
  * - Display catalogue (§5.2):
  *   - BusFamily: Normalized bus protocol family ('spi' | 'i2c' | 'parallel')
  *   - DisplayBus: Physical bus interface configuration
+ *   - DisplayPin: One pin parameter of a display's U8G2 constructor
  *   - DisplayTiles: Framebuffer dimensions in 8-pixel tiles
  *   - DisplayXOffset: Horizontal column shift offsets
  *   - DisplayRecord: Catalogued display record derived from U8G2 tables
@@ -182,6 +183,7 @@ export type {
 export type {
   BusFamily,
   DisplayBus,
+  DisplayPin,
   DisplayTiles,
   DisplayXOffset,
   DisplayRecord,

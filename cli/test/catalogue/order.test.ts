@@ -89,7 +89,7 @@ describe("find's result order is code-unit (§5.2, [D-16])", () => {
       height: 32,
       tiles: { width: 13, height: 4 },
       framebufferBytes: 416,
-      bus: { family: 'parallel', wiring: '6800', raw: '6800' },
+      bus: { family: 'parallel', wiring: '6800', raw: '6800', pins: [] },
       xOffset: { default: 0, flipmode: 0 },
       driver: 'u8x8_d_s1d15300_100x32',
     };

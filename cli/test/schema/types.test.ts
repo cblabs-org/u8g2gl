@@ -495,7 +495,12 @@ describe('Schema Types', () => {
 
   describe('Display Record types (display catalogue, §5.2)', () => {
     it('creates valid DisplayRecord matching design_spec §5.2', () => {
-      const bus: DisplayBus = { family: 'i2c' as BusFamily, wiring: 'hardware', raw: 'HW_I2C' };
+      const bus: DisplayBus = {
+        family: 'i2c' as BusFamily,
+        wiring: 'hardware',
+        raw: 'HW_I2C',
+        pins: [{ name: 'reset', optional: true }, { name: 'clock', optional: true }, { name: 'data', optional: true }],
+      };
       const tiles: DisplayTiles = { width: 16, height: 8 };
       const xOffset: DisplayXOffset = { default: 0, flipmode: 0 };
 
