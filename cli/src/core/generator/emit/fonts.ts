@@ -26,6 +26,7 @@
  *
  * Exports:
  * - FONTS_UNIT:       The unit's file name
+ * - U8G2_HEADER:      U8G2's own header, as generated units include it
  * - fontDeclarations(): The `ui_font_*` pointers, for `ui.hpp`
  * - emitFontsUnit():  Emit `ui_fonts.cpp`
  */
@@ -47,7 +48,7 @@ export const FONTS_UNIT = 'ui_fonts.cpp';
  * the font arrays are data the generated units name, and nothing here
  * constructs a `U8G2`.
  */
-const U8G2_HEADER = '#include <U8g2lib.h>';
+export const U8G2_HEADER = '#include <U8g2lib.h>';
 
 /** How many bytes go on one line of a compiled font's emitted array. */
 const BYTES_PER_LINE = 16;

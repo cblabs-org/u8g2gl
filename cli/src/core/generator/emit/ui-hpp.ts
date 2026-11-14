@@ -13,10 +13,21 @@
  *          failure mode [D-21] exists to remove.
  * Description: Declares, in a fixed order: the generated capacities (by
  *              including them first), the runtime headers with sorted includes
- *              (§13.9), the `U8G2GL_PROGMEM` shim the images unit needs, every
- *              subject and its `ui_set_*` setter, the styles, fonts and images,
- *              each screen's five §13.7 functions, and the project's own
- *              entry points.
+ *              (§13.9), the `U8G2GL_PROGMEM` shim the images unit needs, the
+ *              display contract, every subject and its `ui_set_*` setter, the
+ *              styles, fonts and images, each screen's five §13.7 functions,
+ *              and the project's own entry points.
+ *
+ *              **The display contract** (design_spec §16) is here because this
+ *              is the one file an application includes, and not in
+ *              `u8g2gl_generated_config.h`, which the runtime library's own
+ *              build also includes: the runtime's sizing must not depend on
+ *              which target was built. It states the panel the layout was
+ *              resolved against — the oriented size, the rotation to construct
+ *              with and the setup — and `ui_display_matches()` (defined in
+ *              `ui.cpp`) checks a constructed display against it. The board
+ *              owns construction and wiring; U8G2GL states only what its layout
+ *              depends on.
  *
  *              Declarations are spelled by the same functions that emit the
  *              definitions — `subjectDeclarations()`, `styleIdentifiers()`,
@@ -37,23 +48,99 @@
  * Exports:
  * - UI_HEADER:        The header's file name
  * - UI_INIT_FUNCTION: The application's entry point
+ * - UI_DISPLAY_MATCHES_FUNCTION: The board's check against the display contract
+ * - TARGET_WIDTH_MACRO, TARGET_HEIGHT_MACRO, TARGET_ROTATION_MACRO,
+ *   TARGET_SETUP_MACRO: The display contract's macro names
+ * - contractOf():     The contract a unit states, or a thrown programmer error
  * - screenDescriptorIdentifier(): A screen's `u8g2gl_screen` descriptor name
  * - emitUiHeader():   Emit `ui.hpp`
  */
 
-import { UI_INIT_FUNCTION, screenDescriptorIdentifier, screenFunctionIdentifier, SCREEN_FUNCTIONS } from '../../resolver/index.js';
+import {
+  UI_DISPLAY_MATCHES_FUNCTION,
+  UI_INIT_FUNCTION,
+  screenDescriptorIdentifier,
+  screenFunctionIdentifier,
+  SCREEN_FUNCTIONS,
+} from '../../resolver/index.js';
 import { GENERATED_CONFIG_HEADER } from './generated-config.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations, PROGMEM_MACRO } from './images.js';
 import { STYLES_INIT_FUNCTION, styleIdentifiers } from './styles.js';
 import { SUBJECTS_INIT_FUNCTION, subjectDeclarations } from './subjects.js';
-import { includeBlock, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
+import { includeBlock, section, type DisplayContract, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 
 /** §13.7's umbrella header. */
 export const UI_HEADER = 'ui.hpp';
 
 /** The one call an application makes at boot (§13.7). Defined in `ui.cpp`. */
 export { UI_INIT_FUNCTION }; // Spelled once, in mangle.ts, which collision-checks it (PR-04 WO11b).
+
+/** The board's check against the display contract (§16). Defined in `ui.cpp`. */
+export { UI_DISPLAY_MATCHES_FUNCTION }; // Spelled once, in mangle.ts, beside ui_init.
+
+/** The display contract's macros (design_spec §16). */
+export const TARGET_WIDTH_MACRO = 'U8G2GL_TARGET_WIDTH';
+export const TARGET_HEIGHT_MACRO = 'U8G2GL_TARGET_HEIGHT';
+export const TARGET_ROTATION_MACRO = 'U8G2GL_TARGET_ROTATION';
+export const TARGET_SETUP_MACRO = 'U8G2GL_TARGET_SETUP';
+
+/**
+ * @brief The display contract a unit must state.
+ *
+ * @param input The unit's input.
+ * @return Its contract.
+ * @throws Error when the input has none: `generate` refuses a target with no
+ *         catalogue record before emission (Pass 3's U8G2GL_UNKNOWN_DISPLAY, or
+ *         a missing `setup`), so reaching here without one is a broken
+ *         pipeline. Emitting the macros with no value instead would compile
+ *         into a firmware whose check means nothing.
+ */
+export function contractOf(input: ProjectEmitInput): DisplayContract {
+  if (input.contract === undefined) {
+    throw new Error('ui.hpp and ui.cpp state the display contract, and were emitted without one.');
+  }
+  return input.contract;
+}
+
+// contractLines
+// The display contract's macros and the check's declaration, as `ui.hpp`
+// states them. The rotation is spelled as U8G2's own `U8G2_Rn` macro, so it is
+// usable only where U8g2lib.h is included — at the board's constructor, which
+// includes it anyway — and this header adds no include for it.
+//   contract — the target's setup and oriented display
+function contractLines(contract: DisplayContract): readonly string[] {
+  const { display, setup } = contract;
+  return [
+    section('Display contract (design_spec §16)'),
+    '// The panel this layout was resolved against. The board constructs the',
+    '// display; these say what it must construct. Not #ifndef-guarded: a',
+    '// contract that could be overridden would check nothing.',
+    '',
+    '// Width after rotation: what getDisplayWidth() returns once constructed.',
+    `#define ${TARGET_WIDTH_MACRO} ${display.width}`,
+    '// Height after rotation: what getDisplayHeight() returns once constructed.',
+    `#define ${TARGET_HEIGHT_MACRO} ${display.height}`,
+    "// The rotation to pass to the U8G2 constructor (U8G2's own macro, from U8g2lib.h).",
+    `#define ${TARGET_ROTATION_MACRO} U8G2_${display.rotation}`,
+    '// For diagnostics only, never compared: the bus is part of the name.',
+    `#define ${TARGET_SETUP_MACRO} "${setup}"`,
+    '',
+    '/**',
+    ' * @brief Whether a constructed display is the one this UI was laid out for.',
+    ' *',
+    ` * Compares the display's own width and height, after the rotation it was`,
+    ` * constructed with, against ${TARGET_WIDTH_MACRO} and ${TARGET_HEIGHT_MACRO}. Call it`,
+    ' * after begin(). It catches the wrong panel size and the wrong rotation; it',
+    ' * cannot catch a same-size panel on a different controller.',
+    ' *',
+    " * @param display The board's constructed display.",
+    ' * @return true when the sizes match. Allocates and logs nothing: what to do',
+    " *         on a mismatch is the firmware's decision.",
+    ' */',
+    `bool ${UI_DISPLAY_MATCHES_FUNCTION}(U8G2& display);`,
+  ];
+}
 
 /**
  * The runtime headers `ui.hpp` needs for the declarations it makes: the screen
@@ -90,9 +177,12 @@ const SCREEN_SIGNATURES: Readonly<Record<string, { readonly returns: string; rea
 /**
  * @brief Emits `ui.hpp` (§13.7).
  *
- * @param input Project, globals, screens, capacities and this file's stamp.
- * @return The header. Never raises: everything it declares was checked by
- *         validation, and the units that define them report anything else.
+ * @param input Project, globals, screens, capacities, the display contract and
+ *              this file's stamp.
+ * @return The header. Never raises a diagnostic: everything it declares was
+ *         checked by validation, and the units that define them report
+ *         anything else.
+ * @throws Error when the input carries no display contract ({@link contractOf}).
  */
 export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
   const guard = 'UI_HPP';
@@ -129,6 +219,8 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
     `#define ${PROGMEM_MACRO}`,
     '#endif',
     '#endif',
+    '',
+    ...contractLines(contractOf(input)),
   ];
 
   // --- Subjects, and the setters an application drives them through (§8) ---

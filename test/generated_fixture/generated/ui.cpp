@@ -6,6 +6,8 @@
 
 #include "ui.hpp"
 
+#include <U8g2lib.h>
+
 // --- ui_init: the one call an application makes at boot (§13.7) ---
 void ui_init() {
     // --- Step 1: Subjects take their initial values, before anything binds ---
@@ -30,4 +32,13 @@ void ui_init() {
     ui_subject_wifi_connected.add_observer(nullptr, u8g2gl_frame_dirty_observer);
     ui_subject_level.add_observer(nullptr, u8g2gl_frame_dirty_observer);
     ui_subject_knob_x.add_observer(nullptr, u8g2gl_frame_dirty_observer);
+}
+
+// --- ui_display_matches: the board's check against the display contract (§16) ---
+// The size U8G2 reports already includes the rotation the display was
+// constructed with, so one comparison catches the wrong panel and the
+// wrong rotation alike.
+bool ui_display_matches(U8G2& display) {
+    return display.getDisplayWidth() == U8G2GL_TARGET_WIDTH &&
+           display.getDisplayHeight() == U8G2GL_TARGET_HEIGHT;
 }

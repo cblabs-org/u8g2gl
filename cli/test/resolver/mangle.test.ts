@@ -100,6 +100,7 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       ['ui_screen_home', 'screen_descriptor'],
       // ...and every fixed name in the ui_ namespace (WO11b follow-up).
       ['ui_init', 'fixed'],
+      ['ui_display_matches', 'fixed'],
       ['ui_subjects_init', 'fixed'],
       ['ui_styles_init', 'fixed'],
       ['ui_editor_registry', 'fixed'],

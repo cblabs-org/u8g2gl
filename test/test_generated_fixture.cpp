@@ -27,6 +27,9 @@
  *          - a label the generator bound with bind_text draws its subject's
  *            text, and a new value (PR-04 WO10b; before it, a bound label drew
  *            nothing at all).
+ *          - the display contract ui.hpp states is the fixture's target, and
+ *            ui_display_matches() accepts that size and nothing else — not the
+ *            same panel turned a quarter, nor another panel (design_spec §16).
  *
  * Description: GoogleTest cases driving the generated ui_init(), subject setters
  *              and screen descriptors through ui_handler(), asserting on the
@@ -529,4 +532,48 @@ TEST(GeneratedFixture, ElementsOwnAttributesWinOverANamedStyle) {
     const drawn_label overridden = drawn_with(display, "Ovr");
     EXPECT_EQ(overridden.x, 64 + 60);
     EXPECT_EQ(overridden.font, static_cast<const void*>(ui_font_u8g2_font_6x10_mr));
+}
+
+// --- The display contract (design_spec §16) ---
+// The fixture's target is the 128x64 SSD1306 at R0, so ui.hpp states 128x64.
+// The stub stands in for whatever the board constructed: its reported size is
+// what U8G2 would report after the rotation it was built with.
+
+// The contract's values, spelled as written: the rotation is U8G2's own macro,
+// which the stub does not define, so it is compared as text.
+#define FIXTURE_STRINGIFY(x) #x
+#define FIXTURE_EXPANDED(x) FIXTURE_STRINGIFY(x)
+
+TEST(GeneratedDisplayContract, StatesTheTargetItWasGeneratedFor) {
+    static_assert(U8G2GL_TARGET_WIDTH == 128, "width after rotation");
+    static_assert(U8G2GL_TARGET_HEIGHT == 64, "height after rotation");
+    EXPECT_STREQ(FIXTURE_EXPANDED(U8G2GL_TARGET_ROTATION), "U8G2_R0");
+    EXPECT_STREQ(U8G2GL_TARGET_SETUP, "U8G2_SSD1306_128X64_NONAME_F_HW_I2C");
+}
+
+TEST(GeneratedDisplayContract, MatchesTheDisplayItWasLaidOutFor) {
+    U8G2 display;
+    display.display_width_val = 128;
+    display.display_height_val = 64;
+    EXPECT_TRUE(ui_display_matches(display));
+}
+
+TEST(GeneratedDisplayContract, RefusesTheSamePanelConstructedAtAQuarterTurn) {
+    // A board that built the panel with U8G2_R1 would report 64x128.
+    U8G2 display;
+    display.display_width_val = 64;
+    display.display_height_val = 128;
+    EXPECT_FALSE(ui_display_matches(display));
+}
+
+TEST(GeneratedDisplayContract, RefusesAnotherPanel) {
+    U8G2 wide;
+    wide.display_width_val = 256;
+    wide.display_height_val = 64;
+    EXPECT_FALSE(ui_display_matches(wide));
+
+    U8G2 short_panel;
+    short_panel.display_width_val = 128;
+    short_panel.display_height_val = 32;
+    EXPECT_FALSE(ui_display_matches(short_panel));
 }

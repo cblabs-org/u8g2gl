@@ -23,6 +23,7 @@
  *
  * Exports:
  * - EmittedUnit:      One emitted file's text and diagnostics
+ * - DisplayContract:  The panel the build targets, as `ui.hpp` states it (§16)
  * - ProjectEmitInput: What every project-level emitter reads
  * - section():        A section banner, spelled one way
  * - includeBlock():   A sorted, deduplicated include block (§13.9)
@@ -38,6 +39,7 @@ import type { SourceLocation } from '../../schema/source-location.js';
 import type { Capacities } from '../../realise/index.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import type { XbmImage } from '../../images/index.js';
+import type { OrientedDisplay } from '../../resolver/index.js';
 import { compareCodeUnits } from '../../order.js';
 
 /** One emitted file. */
@@ -49,6 +51,19 @@ export interface EmittedUnit {
    * validation error does — `generate()` produces no files at all.
    */
   readonly diagnostics: readonly Diagnostic[];
+}
+
+/**
+ * The panel the build targets, which `ui.hpp` states as the display contract
+ * (design_spec §16): the setup the board must construct, and the size and
+ * rotation layout was resolved against. Taken from the same oriented display
+ * the pipeline resolved with, so the contract and the layout cannot disagree.
+ */
+export interface DisplayContract {
+  /** The target's U8G2 constructor, as written (`U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI`). */
+  readonly setup: string;
+  /** Its catalogue record oriented by the target's rotation (`orientedDisplay()`). */
+  readonly display: OrientedDisplay;
 }
 
 /** Everything a project-level emitter reads. */
@@ -97,6 +112,13 @@ export interface ProjectEmitInput {
   readonly bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>;
   /** This file's header stamp, already rendered (`header.ts`). */
   readonly stamp: string;
+  /**
+   * The display contract, for `ui.hpp` and `ui.cpp`, which throw without it.
+   * Optional because only the firmware file set emits those two; the editor
+   * target and the scene description read this same input and have no
+   * contract to state.
+   */
+  readonly contract?: DisplayContract;
 }
 
 /**

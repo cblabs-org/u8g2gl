@@ -346,6 +346,11 @@ describe('fontDeclarations() — both kinds share one declared form', () => {
       manifests: frameworkRegistry(),
       images: new Map(),
       stamp: '',
+      // ui.hpp states a display contract, so its input must carry one.
+      contract: {
+        setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
+        display: { width: 128, height: 64, rotation: 'R0', native: { width: 128, height: 64 } },
+      },
     };
     const declarations = fontDeclarations(input);
     expect(declarations.map((d) => d.identifier)).toEqual(['ui_font_small_9', 'ui_font_u8g2_font_6x10_mr']);

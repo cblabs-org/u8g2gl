@@ -362,7 +362,14 @@ export function generate(input: GenerateInput): GenerateResult {
   // --- Step 6: Emit every file (§13.7) ---
   // The screens are emitted from the very realisation Pass 9 judged and the very
   // resolution Pass 6 judged — the pipeline built for this target — so what is
-  // written is what was validated (PR-04 WO10).
+  // written is what was validated (PR-04 WO10). The display contract `ui.hpp`
+  // states is that pipeline's own oriented display, so the contract and the
+  // layout cannot disagree (design_spec §16). Validation refuses a target with
+  // no catalogue record (U8G2GL_UNKNOWN_DISPLAY, or a missing `setup`), so a
+  // build that reaches here without one is a broken pipeline, not an author error.
+  if (pipeline !== undefined && display === undefined) {
+    throw new Error(`Target '${target.name}' passed validation with no catalogue record for '${target.setup}'.`);
+  }
   const emitted =
     capacities === undefined || realisation === undefined || pipeline === undefined
       ? { files: [] as readonly GeneratedFile[], diagnostics: [] }
@@ -379,6 +386,7 @@ export function generate(input: GenerateInput): GenerateResult {
           bdfLicenceFiles: input.bdfLicenceFiles ?? new Map<string, readonly string[]>(),
           generatorVersion: input.generatorVersion,
           target: target.name,
+          contract: { setup: target.setup, display: display! },
         });
 
   // Emission sees a defect validation cannot: a subject's declared `value`,

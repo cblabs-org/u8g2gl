@@ -17,6 +17,11 @@
  *              frame-dirty observers — last, like every other registration, so
  *              no observer fires against a half-built UI (§13.7).
  *
+ *              `ui_display_matches()` is defined here too, beside the other
+ *              project-level function `ui.hpp` declares. It compares U8G2's own
+ *              getters with the contract's macros, so it needs nothing from the
+ *              runtime and allocates nothing (design_spec §16).
+ *
  *              Which subjects get one is **read from WO8b's capacities**
  *              (`SubjectObservers.frameDirty`), never recomputed, so the
  *              observers registered are by construction the observers counted.
@@ -27,9 +32,17 @@
  */
 
 import { screenFunctionIdentifier, subjectIdentifier } from '../../resolver/index.js';
+import { U8G2_HEADER } from './fonts.js';
 import { STYLES_INIT_FUNCTION } from './styles.js';
 import { SUBJECTS_INIT_FUNCTION } from './subjects.js';
-import { UI_HEADER, UI_INIT_FUNCTION } from './ui-hpp.js';
+import {
+  contractOf,
+  TARGET_HEIGHT_MACRO,
+  TARGET_WIDTH_MACRO,
+  UI_DISPLAY_MATCHES_FUNCTION,
+  UI_HEADER,
+  UI_INIT_FUNCTION,
+} from './ui-hpp.js';
 import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 
 /** The unit defining `ui_init()`, beside the `ui.hpp` that declares it. */
@@ -38,16 +51,25 @@ export const UI_INIT_UNIT = 'ui.cpp';
 /**
  * @brief Emits `ui.cpp`: `ui_init()` and the frame-dirty observers (§13.5, §13.7).
  *
- * @param input Screens in load order, the capacities and this file's stamp.
- * @return The unit. Never raises.
+ * @param input Screens in load order, the capacities, the display contract
+ *              and this file's stamp.
+ * @return The unit. Never raises a diagnostic.
+ * @throws Error when the input carries no display contract (`contractOf()`).
  */
 export function emitUiInitUnit(input: ProjectEmitInput): EmittedUnit {
+  // The contract's values are ui.hpp's macros; this unit only requires one exists.
+  contractOf(input);
   const frameDirty = input.capacities.subjects.filter((subject) => subject.frameDirty);
 
   const lines: string[] = [
     input.stamp.trimEnd(),
     '',
     `#include "${UI_HEADER}"`,
+    '',
+    // U8G2's own header, for the getters ui_display_matches() calls: ui.hpp
+    // only forward-declares U8G2, and adds no include so an application that
+    // includes it is not made to pull in U8G2 (§13.10).
+    U8G2_HEADER,
     '',
     section('ui_init: the one call an application makes at boot (§13.7)'),
     `void ${UI_INIT_FUNCTION}() {`,
@@ -76,6 +98,15 @@ export function emitUiInitUnit(input: ProjectEmitInput): EmittedUnit {
           (subject) =>
             `    ${subjectIdentifier(subject.subject.name)}.add_observer(nullptr, u8g2gl_frame_dirty_observer);`,
         )),
+    '}',
+    '',
+    section('ui_display_matches: the board\'s check against the display contract (§16)'),
+    '// The size U8G2 reports already includes the rotation the display was',
+    '// constructed with, so one comparison catches the wrong panel and the',
+    '// wrong rotation alike.',
+    `bool ${UI_DISPLAY_MATCHES_FUNCTION}(U8G2& display) {`,
+    `    return display.getDisplayWidth() == ${TARGET_WIDTH_MACRO} &&`,
+    `           display.getDisplayHeight() == ${TARGET_HEIGHT_MACRO};`,
     '}',
     '',
   ];
