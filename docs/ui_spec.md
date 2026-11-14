@@ -39,13 +39,14 @@ Monochrome UI work is **pixel work**. On a 128×64 panel an element one pixel ou
 
 ## 2. Design Principles
 
-1. **Lean, not comprehensive.** A monochrome screen has 5–20 elements. The tool should feel proportionate to that.
+1. **Lean in machinery, complete in reach.** A monochrome screen has 5–20 elements and the tool should feel proportionate to that: no machinery the job does not need. But nothing the schema can express is out of reach.
 2. **Familiar layout, minimal machinery.** Adopt the VS Code *paradigm* — activity bar, sidebars, tabbed editor, bottom panel, status bar — because it is instantly legible. Do not adopt an IDE platform to get it ([UD-1]).
 3. **Two views of one document.** Canvas and XML are the same thing seen differently. Selection, edits and errors are shared, live and bidirectional. This is the defining behaviour.
 4. **Pixel-exact by default.** Every position is an integer, always visible, always nudgeable.
 5. **The XML stays authored.** Round-trip preserves comments, ordering and formatting. The editor is a *co-author*, not the file's owner.
 6. **The property panel teaches.** Every property carries its description, its consequence and its constraints where it is edited: its help one step away behind an ⓘ (§9.2), its reasons and problems inline. This is the gap in the incumbent tools and the main reason to build another.
 7. **One editing surface, three contexts, four supporting panels.** Beyond that needs a case (§14).
+8. **Everything is discoverable.** Every capability the schema offers has a visible, editable home in the UI. People learn a tool by looking at it, not by reading its manual, so a feature the UI does not show is a feature that does not exist for them. An incomplete editor is the incumbent tools' central failure; this one is complete by construction, and a test holds it there.
 
 ---
 

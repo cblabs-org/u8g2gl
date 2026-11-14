@@ -77,6 +77,13 @@
  *   - ElementDef: Child collection element descriptor
  *   - ElementArgDef: Collection element argument descriptor
  *
+ * - Project-file vocabulary (§5.1, §5.3), for forms and coverage tests:
+ *   - PROJECT_VOCABULARY: Every element and attribute of u8g2gl.xml and globals.xml
+ *   - VocabularyElement, VocabularyAttribute, VocabularyValueType: Its shapes
+ *   - AttributeSpelling, ReferenceKind, VocabularyFile: Its parts
+ *   - ROTATION_VALUES, ROTATION_DEGREES, MAX_STRING_LEN_DEFAULT: Values it offers
+ *   - vocabularyElement(), vocabularyChildren(), vocabularyRoots(), attributeSpellings(): Lookups
+ *
  * - Display catalogue (§5.2):
  *   - BusFamily: Normalized bus protocol family ('spi' | 'i2c' | 'parallel')
  *   - DisplayBus: Physical bus interface configuration
@@ -122,6 +129,23 @@ export type {
   XbmImageDecl,
   ConvertImageDecl,
 } from './globals.js';
+
+export {
+  PROJECT_VOCABULARY,
+  ROTATION_VALUES,
+  ROTATION_DEGREES,
+  MAX_STRING_LEN_DEFAULT,
+  vocabularyElement,
+  vocabularyChildren,
+  vocabularyRoots,
+  attributeSpellings,
+  type VocabularyFile,
+  type ReferenceKind,
+  type VocabularyValueType,
+  type AttributeSpelling,
+  type VocabularyAttribute,
+  type VocabularyElement,
+} from './project-vocabulary.js';
 
 export type {
   Screen,

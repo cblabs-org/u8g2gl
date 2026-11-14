@@ -17,9 +17,9 @@
  * - SubjectType: Scalar subject data type ('int' | 'string' | 'bool' | 'time')
  * - SubjectDecl: Reactive observable subject declaration
  * - COLOR_VALUES, DrawColor: §10's draw colours, the one list, and the type derived from it
- * - TextAlign: Horizontal text alignment ('left' | 'center' | 'right')
- * - FontMode: Font rendering background mode ('solid' | 'transparent')
- * - BitmapMode: Bitmap rendering background mode ('solid' | 'transparent')
+ * - TEXT_ALIGN_VALUES, TextAlign: §10's alignments, the list and the type derived from it
+ * - FONT_MODE_VALUES, FontMode: §10's font background modes, the list and its type
+ * - BITMAP_MODE_VALUES, BitmapMode: §10's bitmap background modes, the list and its type
  * - StyleDecl: Named style properties definition
  * - StylePropertyKey, StyleProperty, STYLE_PROPERTIES: §10's style properties, the one list
  * - STYLE_ATTRIBUTES: The nine canonical attributes, derived from STYLE_PROPERTIES
@@ -115,21 +115,30 @@ export const COLOR_VALUES = ['0', '1', 'xor'] as const;
 export type DrawColor = (typeof COLOR_VALUES)[number];
 
 /**
- * Text alignment options (§10).
+ * The text alignments (§10), in order, as `align` and `u8g2gl_obj`'s `align`
+ * prop accept them. A list beside the type, as {@link COLOR_VALUES} is, so the
+ * project-file vocabulary can offer them without restating them.
  */
-export type TextAlign = 'left' | 'center' | 'right';
+export const TEXT_ALIGN_VALUES = ['left', 'center', 'right'] as const;
+
+/** Text alignment options (§10), derived from {@link TEXT_ALIGN_VALUES}. */
+export type TextAlign = (typeof TEXT_ALIGN_VALUES)[number];
 
 /**
- * Font background rendering mode (§10).
+ * The font background modes (§10), in order:
  * - 'solid': Overwrites background pixels with complementary colour
  * - 'transparent': Leaves underlying framebuffer pixels intact
  */
-export type FontMode = 'solid' | 'transparent';
+export const FONT_MODE_VALUES = ['solid', 'transparent'] as const;
 
-/**
- * Bitmap background rendering mode (§10).
- */
-export type BitmapMode = 'solid' | 'transparent';
+/** Font background rendering mode (§10), derived from {@link FONT_MODE_VALUES}. */
+export type FontMode = (typeof FONT_MODE_VALUES)[number];
+
+/** The bitmap background modes (§10), in order. */
+export const BITMAP_MODE_VALUES = ['solid', 'transparent'] as const;
+
+/** Bitmap background rendering mode (§10), derived from {@link BITMAP_MODE_VALUES}. */
+export type BitmapMode = (typeof BITMAP_MODE_VALUES)[number];
 
 /**
  * Named style declaration for monochrome UI elements (§10).
