@@ -361,6 +361,12 @@ export function formEdit(file: FormFile, text: string, change: FormChange): Form
       const model = read(file, text);
       const item = findNode(model, change.item);
       if (item?.cst === undefined) return { edits: [] };
+      // The vocabulary's minimum: the last target is never removed.
+      const list = findList(model, parentKeyOf(change.item));
+      const minimum = item.element.minimum ?? 0;
+      if (list !== undefined && list.items.filter((other) => other.element.id === item.element.id).length <= minimum) {
+        return { edits: [], refused: item.element.minimumReason ?? `At least ${minimum} ${item.element.label} is needed.` };
+      }
       return { edits: minimalEdit(text, applyEdits(text, removeElement(model.cst, item.cst))) };
     }
     case 'move': {

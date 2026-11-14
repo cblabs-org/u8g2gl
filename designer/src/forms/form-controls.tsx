@@ -73,6 +73,7 @@ export function FieldControl({
   readOnly,
   problems,
   note,
+  control,
   commit,
 }: {
   readonly field: FormField;
@@ -82,6 +83,8 @@ export function FieldControl({
   readonly problems: readonly ProblemRow[];
   /** A note shown beneath the control, such as a value that no longer applies. */
   readonly note?: ReactNode;
+  /** A control in place of the type's own (the display picker); undefined for the type's. */
+  readonly control?: ReactNode;
   readonly commit: (value: string | undefined) => void;
 }): React.JSX.Element {
   const attribute = field.attribute;
@@ -123,7 +126,7 @@ export function FieldControl({
           </span>
         </div>
       ) : (
-        <Control field={field} options={options} disabled={disabled} commit={commit} />
+        (control ?? <Control field={field} options={options} disabled={disabled} commit={commit} />)
       )}
       {field.at !== undefined && field.at.name !== attribute.name && (
         <p className="field-reason">

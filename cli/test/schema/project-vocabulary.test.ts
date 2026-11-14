@@ -180,6 +180,14 @@ describe('the project-file vocabulary: shape', () => {
     }
   });
 
+  it('gives a minimum only to a repeating element, with its reason', () => {
+    for (const element of PROJECT_VOCABULARY.filter((e) => e.minimum !== undefined)) {
+      expect(element.repeats, element.id).toBe(true);
+      expect(element.minimumReason?.trim(), element.id).toBeTruthy();
+    }
+    expect(vocabularyElement('target')?.minimum).toBe(1);
+  });
+
   it('gives every element and every attribute help', () => {
     for (const element of PROJECT_VOCABULARY) {
       expect(element.help.trim(), element.id).not.toBe('');

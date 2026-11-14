@@ -51,6 +51,7 @@ import type { PropDef } from '@u8g2gl/core/schema/widget-manifest.js';
 import BUILTIN_FONTS from '@u8g2gl/data/u8g2-fonts.json' with { type: 'json' };
 import { nextElementName, projectNames } from '../documents/element-names';
 import { runTextPipeline, type CompiledAssets, type Rect, type TextPipelineResult } from '../pipeline/live-pipeline';
+import { pickTarget } from '../project/active-target';
 import { ProjectModelCache } from '../project/project-model';
 
 /**
@@ -191,13 +192,14 @@ function findResolved(elements: readonly ResolvedElement[], name: string): Resol
 // first at the drop point, the next at the far corner, the third back under
 // the first, so a line runs corner to corner and a triangle is not collinear —
 // and lengths at half the size along the axes they span.
-//   texts    — the project with the draft
-//   name     — the new element
+//   texts      — the project with the draft
+//   targetName — the active target, whose display the extras are spread over
+//   name       — the new element
 //   x, y     — its position in its container
 //   seeded   — the attributes written as 0 that may be seeded; rewritten in place
-function seedExtras(texts: ReadonlyMap<string, string>, name: string, x: number, y: number, seeded: [string, string][]): void {
+function seedExtras(texts: ReadonlyMap<string, string>, targetName: string | undefined, name: string, x: number, y: number, seeded: [string, string][]): void {
   const model = new ProjectModelCache().build(texts);
-  const display = findTargetDisplay(model.project.targets[0], model.catalogue);
+  const display = findTargetDisplay(pickTarget(model.project.targets, targetName), model.catalogue);
   const pipeline = createScreenPipeline({ globals: model.globals, screens: model.screens, manifests: model.manifests, ...(display !== undefined ? { display } : {}) });
   const resolved = pipeline.resolution.screens.map((screen) => findResolved(screen.elements, name)).find((element) => element !== undefined);
   const index = { horizontal: 0, vertical: 0 };
@@ -268,11 +270,13 @@ export function planInsert(request: InsertRequest): InsertPlan {
     insertElement(cst, container, index, `<${tag} ${attributes.map(([attribute, value]) => `${attribute}="${encodeAttributeValue(value, '"')}"`).join(' ')} />`);
   const textsWith = (edits: readonly TextEdit[]): Map<string, string> => new Map([...request.texts, [file, applyEdits(text, edits)]]);
   const required = attributes.filter(([attribute]) => manifest.api.props.some((prop) => prop.name === attribute && prop.required === true && prop.type === 'int' && prop.default === undefined));
-  if (required.length > 0) seedExtras(textsWith(editsFor()), name, x, y, required);
+  // The active target: the one the base run, and so the canvas, was resolved against.
+  const targetName = base.target?.name;
+  if (required.length > 0) seedExtras(textsWith(editsFor()), targetName, name, x, y, required);
   const edits = editsFor();
 
   // --- Step 4: Refused if the project with it has an error it does not have now ---
-  const after = runTextPipeline({ texts: textsWith(edits), cache: new ProjectModelCache(), assets: request.assets, activeFile: file });
+  const after = runTextPipeline({ texts: textsWith(edits), cache: new ProjectModelCache(), assets: request.assets, activeFile: file, targetName });
   const before = errorKeys(base);
   for (const [key, count] of errorKeys(after)) {
     if (count > (before.get(key) ?? 0)) return { kind: 'refused', reason: key.slice(key.indexOf('\n') + 1) };

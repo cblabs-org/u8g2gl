@@ -136,6 +136,10 @@ export interface VocabularyElement {
   readonly alternativeParents?: readonly string[];
   /** Whether a parent may hold more than one. */
   readonly repeats: boolean;
+  /** For a repeating element: the fewest a project may have, when that is more than none. */
+  readonly minimum?: number;
+  /** Why it has that minimum, for a refused removal to say. */
+  readonly minimumReason?: string;
   /**
    * False for a place the parser reads but a form never writes into new
    * (`<bus>`): its values are alternatives of attributes declared elsewhere.
@@ -258,6 +262,8 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     parent: 'targets',
     alternativeParents: ['project'],
     repeats: true,
+    minimum: 1,
+    minimumReason: 'A project needs at least one target: it is what generate builds for and what the designer draws.',
     canonical: true,
     help:
       'One display the project can be built for. Its geometry, controller and bus all come from the display setup, never ' +

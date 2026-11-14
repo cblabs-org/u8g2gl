@@ -18,7 +18,9 @@
  *              and so is the Save button, which shows while anything is
  *              unsaved and saves it all: it reads only the dirty set, which
  *              changes when a file becomes dirty or clean, not on every
- *              keystroke.
+ *              keystroke. The active target (D1) is its own component as
+ *              well: it re-renders only when the project's targets or the
+ *              choice change, never on a keystroke that changes neither.
  *
  * Exports:
  * - StatusBar:          The component
@@ -26,9 +28,11 @@
  * - SelectionGeometry:  Its selection readout
  * - NotSaved:           Its failed-save item
  * - UnsavedSave:        Its "● N unsaved · Save" button
+ * - TargetSwitcher:     The active target, and the switch between targets
  */
 
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
+import { useSyncExternalStore } from 'react';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -81,6 +85,7 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
       <NotSaved onShowOutput={onShowOutput} />
       <span className="status-spacer" />
       <SelectionGeometry />
+      <TargetSwitcher />
       {frame.display !== undefined && (
         <span className="status-item">
           {frame.screen} · {frame.display.width}×{frame.display.height}
@@ -139,5 +144,67 @@ export function SelectionGeometry(): React.JSX.Element | null {
       sel {count > 1 ? `${count} · ` : ''}
       {rect.x},{rect.y} {rect.width}×{rect.height}
     </span>
+  );
+}
+
+/** What the switcher shows: the targets' names, the active one, and its display. */
+interface TargetsShown {
+  readonly names: readonly string[];
+  readonly active: string | undefined;
+  readonly display: string | undefined;
+}
+
+// targetsKey
+// The switcher's snapshot as one string, so a run that changed no target,
+// which is nearly every run, re-renders nothing.
+function targetsKey(workspace: ReturnType<typeof useWorkspace>): string {
+  const result = workspace.loop.lastRun.get()?.result;
+  if (result === undefined) return '';
+  const record = result.target === undefined ? undefined : result.model.catalogue.find((d) => d.setup === result.target?.setup);
+  const shown: TargetsShown = {
+    names: result.model.project.targets.map((target) => target.name),
+    active: result.target?.name,
+    display: record === undefined ? undefined : `${record.controller} ${record.width}×${record.height}`,
+  };
+  return JSON.stringify(shown);
+}
+
+/**
+ * @brief The active target ([U-3], D1): always named, as ui_spec §6's status
+ *        bar lists it, with its controller and size; with more than one target,
+ *        a switch between them. Switching is never an edit: the choice is this
+ *        browser's (`project/active-target.ts`), and the canvas redraws at the
+ *        chosen target's display.
+ */
+export function TargetSwitcher(): React.JSX.Element | null {
+  countRender('TargetSwitcher');
+  const workspace = useWorkspace();
+  const key = useSyncExternalStore(
+    (onChange) => workspace.loop.lastRun.subscribe(onChange),
+    () => targetsKey(workspace),
+  );
+  if (key === '') return null;
+  const shown = JSON.parse(key) as TargetsShown;
+  if (shown.active === undefined) return null;
+  const display = shown.display === undefined ? '' : ` · ${shown.display}`;
+  if (shown.names.length < 2) {
+    return (
+      <span className="status-item target" data-target={shown.active} title="The target the canvas shows">
+        {shown.active}
+        {display}
+      </span>
+    );
+  }
+  return (
+    <label className="status-item target" data-target={shown.active} title="The target the canvas shows; switching it changes no file">
+      <select aria-label="Target" value={shown.active} onChange={(event) => workspace.activeTarget.choose(event.target.value)}>
+        {shown.names.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </select>
+      {display}
+    </label>
   );
 }

@@ -80,6 +80,8 @@ interface Context {
   readonly fieldNote?: (field: FormField, node: FormNode) => ReactNode;
   /** Whether a field is shown; all are by default. */
   readonly fieldShown?: (field: FormField, node: FormNode) => boolean;
+  /** A control to use in place of a field's generic one (the display picker); undefined for the generic. */
+  readonly fieldControl?: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
 }
 
 // NodeProblems
@@ -113,6 +115,7 @@ function NodeBody({ node, context }: { readonly node: FormNode; readonly context
             readOnly={readOnly}
             problems={state.problems.byField.get(field.key) ?? NONE}
             note={context.fieldNote?.(field, node)}
+            control={context.fieldControl?.(field, node, (value) => actions.set(field.key, value))}
             commit={(value) => actions.set(field.key, value)}
           />
         ))}
@@ -144,6 +147,14 @@ function NodeBody({ node, context }: { readonly node: FormNode; readonly context
 // What an item's header calls it: its name, if it has one.
 function itemName(item: FormNode): string | undefined {
   return item.fields.find((field) => field.attribute.name === 'name')?.value;
+}
+
+// atMinimum
+// Whether removing an item would leave fewer of its kind than the vocabulary's
+// minimum: the last target.
+function atMinimum(list: FormList, item: FormNode): boolean {
+  const minimum = item.element.minimum ?? 0;
+  return minimum > 0 && list.items.filter((other) => other.element.id === item.element.id).length <= minimum;
 }
 
 // ListBody
@@ -194,7 +205,13 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
               >
                 ↓
               </button>
-              <button type="button" aria-label={`Remove ${label}`} title="Remove" disabled={readOnly} onClick={() => actions.remove(item.key)}>
+              <button
+                type="button"
+                aria-label={`Remove ${label}`}
+                title={atMinimum(list, item) ? (item.element.minimumReason ?? 'It cannot be removed') : 'Remove'}
+                disabled={readOnly || atMinimum(list, item)}
+                onClick={() => actions.remove(item.key)}
+              >
                 ✕
               </button>
             </div>
@@ -219,6 +236,7 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
  * @param renderSection Replaces a section's generic body, for a richer editor.
  * @param fieldNote     Extra content beneath a field.
  * @param fieldShown    Whether a field is shown (a bus pin its wiring does not use is not).
+ * @param fieldControl  A control in place of a field's generic one (the display picker).
  */
 export function FormView({
   file,
@@ -227,6 +245,7 @@ export function FormView({
   renderSection,
   fieldNote,
   fieldShown,
+  fieldControl,
 }: {
   readonly file: string;
   readonly state: FormViewState;
@@ -234,9 +253,17 @@ export function FormView({
   readonly renderSection?: SectionRenderer;
   readonly fieldNote?: Context['fieldNote'];
   readonly fieldShown?: Context['fieldShown'];
+  readonly fieldControl?: Context['fieldControl'];
 }): React.JSX.Element {
   const readOnly = state.unreadable !== undefined;
-  const context: Context = { state, actions, readOnly, ...(fieldNote !== undefined ? { fieldNote } : {}), ...(fieldShown !== undefined ? { fieldShown } : {}) };
+  const context: Context = {
+    state,
+    actions,
+    readOnly,
+    ...(fieldNote !== undefined ? { fieldNote } : {}),
+    ...(fieldShown !== undefined ? { fieldShown } : {}),
+    ...(fieldControl !== undefined ? { fieldControl } : {}),
+  };
   return (
     <div className="project-form" data-form-file={file} data-readonly={readOnly} aria-label={`${file} form`}>
       {state.unreadable !== undefined && (

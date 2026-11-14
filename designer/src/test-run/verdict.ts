@@ -157,6 +157,12 @@ export interface RunInputs {
   readonly wellFormed: boolean;
   /** Whether the canvas is drawing the current text (false: the last good frame). */
   readonly live: boolean;
+  /**
+   * The project's first target, when the canvas shows another: a test run
+   * builds the firmware for the first, so its frames would not be the
+   * canvas's. Undefined when the canvas shows the first.
+   */
+  readonly defaultTarget?: string | undefined;
 }
 
 /** Whether Run can be pressed: now, after a rebuild, or not, and why. */
@@ -193,6 +199,9 @@ export function runAvailability(inputs: RunInputs): RunAvailability {
   }
   if (!inputs.live) {
     return { state: 'unavailable', reason: 'the canvas shows the last good frame: fix the errors first' };
+  }
+  if (inputs.defaultTarget !== undefined) {
+    return { state: 'unavailable', reason: `a test run builds the first target: switch the canvas to ${inputs.defaultTarget} to run it` };
   }
   return { state: 'ready' };
 }

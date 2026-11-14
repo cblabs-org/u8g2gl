@@ -29,6 +29,7 @@
  *     - elementTrees:   Each screen's element rows, for the Explorer
  *     - projectSections: Each project file's section rows, for the Explorer
  *     - designHidden:   The elements the author hid in the designer (never exported)
+ *     - activeTarget:   The target the designer shows (per browser, never exported)
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
  *     - formHighlight:  The range of the project-file form's focused section, for the XML
@@ -53,6 +54,7 @@
 
 import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import { DesignHiddenModel } from './canvas/design-hidden';
+import { ActiveTarget } from './project/active-target';
 import { nextTrees, type ElementNode } from './documents/element-tree';
 import { isFormFile } from './forms/form-model';
 import { nextSectionRows, type SectionRow } from './forms/form-sections';
@@ -111,6 +113,12 @@ export class Workspace {
    * once the project's name is known.
    */
   readonly designHidden = new DesignHiddenModel();
+  /**
+   * The target the canvas, inserts and the impact preview resolve against:
+   * the status bar's switcher (D1). A view setting of this browser, never
+   * written to the XML. Loaded at `start()`, with the project's name.
+   */
+  readonly activeTarget = new ActiveTarget();
   /** The Problems panel's rows. */
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
@@ -214,6 +222,7 @@ export class Workspace {
    */
   start(): void {
     this.designHidden.load(this.projectName.get());
+    this.activeTarget.load(this.projectName.get());
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
     this.testRun.start();

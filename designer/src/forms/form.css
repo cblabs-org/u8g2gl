@@ -13,7 +13,8 @@
 .canvas-panel { position: relative; }
 .project-form-host { position: absolute; inset: 0; z-index: 5; background: var(--bg); display: flex; flex-direction: column; }
 .project-form-scroll { flex: 1; overflow: auto; padding: 8px 16px 24px; font-size: 12px; }
-.project-form { max-width: 720px; }
+.project-form { max-width: 720px; min-width: 0; }
+.project-form-scroll { overflow-x: hidden; }
 .project-form[data-readonly='true'] .form-section { opacity: 0.6; }
 
 .form-banner { margin: 0 0 8px; padding: 6px 10px; border: 1px solid var(--error); border-radius: 3px; color: var(--text); background: #3a1d1d; }
@@ -43,3 +44,39 @@
 .form-field .field-value[data-readonly='true'] { color: var(--text-dim); }
 .form-field .field-problem code,
 .form-field .field-reason code { font: 11px ui-monospace, Menlo, monospace; }
+
+/* --- The display picker (u8g2gl.xml) --- */
+.display-picker { margin-top: 2px; }
+.display-current { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.display-setup { font: 12px ui-monospace, Menlo, monospace; color: var(--text); }
+.display-facts { color: var(--text-dim); font-size: 11px; }
+.display-picker .action { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.display-picker .action.primary { color: var(--text); border-color: var(--accent); }
+.display-steps { margin-top: 6px; padding: 6px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-sunken); }
+.display-search { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: var(--text-dim); }
+.display-search input { flex: 1; padding: 2px 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font: 12px ui-monospace, Menlo, monospace; }
+.display-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.display-column { min-width: 0; }
+.display-column h4 { margin: 0 0 3px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.display-column select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font: 11px ui-monospace, Menlo, monospace; }
+.display-wiki { display: inline-block; margin-top: 3px; color: var(--info); font-size: 11px; }
+.display-options { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; }
+.display-option { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 3px 6px; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.display-option[aria-selected='true'] { border-color: var(--accent); }
+.display-option code { font: 11px ui-monospace, Menlo, monospace; word-break: break-all; }
+.display-setup, .display-candidate code { word-break: break-all; }
+.display-candidate { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.display-candidate > p { margin: 0 0 4px; }
+
+/* --- The impact preview: each screen at the candidate size, outside elements outlined --- */
+.impact-screens { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px; max-width: 100%; overflow-x: auto; }
+.impact-screen { margin: 0; }
+.impact-frame { position: relative; overflow: hidden; background: #141414; outline: 1px solid var(--border); }
+.impact-frame canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.impact-outside { position: absolute; box-sizing: border-box; border: 1px dashed var(--error); pointer-events: auto; }
+.impact-screen figcaption { margin-top: 2px; color: var(--text-dim); font-size: 11px; }
+
+.output-example { margin-top: 4px; }
+
+/* --- The status bar's target switcher --- */
+.status-item.target select { background: transparent; border: 1px solid var(--border); border-radius: 3px; color: inherit; font: inherit; padding: 0 2px; }

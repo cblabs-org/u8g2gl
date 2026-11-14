@@ -279,6 +279,8 @@ export class EditLoop {
         request();
       }),
       this.workspace.activeFile.subscribe(request),
+      // Switching the target re-resolves every screen at its display (D1).
+      this.workspace.activeTarget.name.subscribe(request),
       this.wasm.module.subscribe(request),
       this.wasm.buildDiagnostics.subscribe(request),
       this.frozen.subscribe(request),
@@ -441,6 +443,7 @@ export class EditLoop {
       cache: this.cache,
       assets: this.assets.current,
       activeFile: this.workspace.activeFile.get(),
+      targetName: this.workspace.activeTarget.name.get(),
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
     this.publishDiagnostics([

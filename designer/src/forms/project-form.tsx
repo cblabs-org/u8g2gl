@@ -28,12 +28,22 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { countRender } from '../perf/render-count';
+import type { Workspace } from '../workspace';
 import { useObservable } from '../ui/use-observable';
 import { useWorkspace } from '../ui/workspace-context';
 import { ProjectFormController } from './form-controller';
 import { isFormFile, type FormFile } from './form-model';
 import { FormView, type FormActions, type SectionRenderer } from './form-view';
+import { useProjectEditor } from './project-editor';
 import './form.css';
+
+// seedFor
+// What a new item starts with beyond its required name: a new target copies
+// the first target's display, so it draws from the moment it is added.
+function seedFor(workspace: Workspace, kind: string): Readonly<Record<string, string>> {
+  const setup = workspace.loop.lastRun.get()?.result.model.project.targets[0]?.setup;
+  return kind === 'target' && setup !== undefined && setup !== '' ? { setup } : {};
+}
 
 /** @brief The form, over the canvas, while a project file is the active one. */
 export function ProjectFormHost(): React.JSX.Element | null {
@@ -86,7 +96,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const actions = useMemo<FormActions>(
     () => ({
       set: (field, value) => void controller.apply({ kind: 'set', field, value }),
-      add: (list, kind) => void controller.apply({ kind: 'add', list, itemKind: kind }),
+      add: (list, kind) => void controller.apply({ kind: 'add', list, itemKind: kind, values: seedFor(workspace, kind) }),
       remove: (item) => void controller.apply({ kind: 'remove', item }),
       move: (item, delta) => void controller.apply({ kind: 'move', item, delta }),
       focusRange: (range) => workspace.formHighlight.set(range === undefined ? undefined : { path: file, ...range }),
@@ -94,10 +104,21 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
     [controller, workspace, file],
   );
 
+  // u8g2gl.xml's own editors: the display picker, bus fields, the output example.
+  const project = useProjectEditor(workspace);
+  const hooks = file === 'u8g2gl.xml' ? project : undefined;
+  const sections = renderSection ?? hooks?.renderSection;
+
   return (
     <div className="project-form-scroll" ref={root}>
       {children}
-      <FormView file={file} state={state} actions={actions} {...(renderSection !== undefined ? { renderSection } : {})} />
+      <FormView
+        file={file}
+        state={state}
+        actions={actions}
+        {...(sections !== undefined ? { renderSection: sections } : {})}
+        {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, fieldShown: hooks.fieldShown, fieldNote: hooks.fieldNote } : {})}
+      />
     </div>
   );
 }
