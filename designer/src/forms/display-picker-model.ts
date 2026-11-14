@@ -10,7 +10,8 @@
  *          the full setup name for those who know the part. Every option
  *          carries what the catalogue knows and nothing it does not. Also the
  *          rules the u8g2gl.xml editor applies around it: which bus fields a
- *          family uses, and how a rotation reads in degrees.
+ *          family uses, how a rotation reads in degrees, and what a rotation
+ *          does to the size the layout is drawn at.
  * Description: Pure functions over `DisplayRecord`s, so the picker's grouping,
  *              filtering and the bus-field rules are unit-tested without a
  *              browser. The search matches every word of the query inside the
@@ -30,10 +31,13 @@
  * - familyLabel():        A bus family as people write it
  * - busFieldApplies():    Whether a bus attribute applies to a family
  * - rotationLabel():      A rotation with its angle
+ * - orientedNote():       The size a rotation shows a panel at, when it differs
+ * - rotationResizes():    Whether changing a rotation changes the layout's size
  */
 
 import { identifyDisplay } from '@u8g2gl/core/catalogue/index.js';
 import type { BusFamily, DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
+import { orientedDisplay } from '@u8g2gl/core/resolver/index.js';
 import { ROTATION_DEGREES, type VocabularyAttribute } from '@u8g2gl/core/schema/index.js';
 
 /**
@@ -142,6 +146,43 @@ export function busFieldApplies(attribute: VocabularyAttribute, family: BusFamil
   if (attribute.busFamilies === undefined || family === undefined) return true;
   if (!attribute.busFamilies.includes(family)) return false;
   return wiring === undefined || !(attribute.busWiringsWithout ?? []).includes(wiring);
+}
+
+/**
+ * @brief The size a rotation shows a panel at, beside its own: `shown 64×256 at R1`.
+ *
+ * The picker lists every panel at the size the catalogue records, because that
+ * is the part being chosen; this says what the canvas will be drawn at instead
+ * when the target's rotation turns it a quarter (design_spec §5.1).
+ *
+ * @param record   The panel.
+ * @param rotation The target's rotation as written, or undefined when absent.
+ * @return The note, or undefined when the rotation leaves the size alone (R0,
+ *         R2, unset or invalid).
+ */
+export function orientedNote(record: DisplayRecord, rotation: string | undefined): string | undefined {
+  const oriented = orientedDisplay(record, rotation);
+  if (oriented.width === record.width && oriented.height === record.height) return undefined;
+  return `shown ${oriented.width}×${oriented.height} at ${oriented.rotation}`;
+}
+
+/**
+ * @brief Whether changing a target's rotation changes the size its layout is
+ *        resolved at, so the change should go through the impact preview.
+ *
+ * R0↔R2 and R1↔R3 keep the size, and apply directly; a quarter turn swaps it,
+ * which can push elements off the panel (ui_spec §6.4).
+ *
+ * @param record The target's panel; undefined when the catalogue has none, and
+ *               then nothing can be previewed, so the change applies directly.
+ * @param from   The rotation as written now.
+ * @param to     The candidate.
+ */
+export function rotationResizes(record: DisplayRecord | undefined, from: string | undefined, to: string | undefined): boolean {
+  if (record === undefined) return false;
+  const before = orientedDisplay(record, from);
+  const after = orientedDisplay(record, to);
+  return before.width !== after.width || before.height !== after.height;
 }
 
 /** @brief A rotation as written, with its angle: `R1 · 90°`. */

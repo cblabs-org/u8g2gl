@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/forms/impact-preview.ts
- * Purpose: What a new display would do to the project, before it is chosen
- *          (ui_spec §6.4): every screen drawn at the candidate's geometry, with the
- *          elements that would fall outside it named. A display change moves
- *          every anchored element and can push others off the panel, which is
- *          otherwise discovered only after the edit.
+ * Purpose: What a new display, or a new rotation, would do to the project,
+ *          before it is chosen (ui_spec §6.4): every screen drawn at the
+ *          candidate's geometry, with the elements that would fall outside it
+ *          named. A display change, or a quarter turn that swaps the panel's
+ *          width and height, moves every anchored element and can push others
+ *          off the panel, which is otherwise discovered only after the edit.
  * Description: The candidate exists in memory only: the project's texts with
- *              the target's setup replaced through the form's own edit
+ *              one of the target's fields — `setup` or `rotation` — replaced
+ *              through the form's own edit
  *              (`formEdit`), run through the same text pipeline the canvas
  *              uses, against that target, and drawn by a second instance of
  *              the editor module (`EditorWasmController.spareInstance`), so
@@ -28,7 +30,7 @@
  * - ScreenPreview:      One screen at the candidate geometry
  * - ImpactPreview:      Every screen, how long it took, and whether it stopped early
  * - outsideElements():  The elements of a run whose box leaves the display
- * - candidateTexts():   The project's texts with a target's setup replaced
+ * - candidateTexts():   The project's texts with one target field replaced
  * - renderImpact():     Draw the preview
  */
 
@@ -62,7 +64,8 @@ export interface ScreenPreview {
 
 /** A whole preview. */
 export interface ImpactPreview {
-  readonly setup: string;
+  /** What is previewed, as the preview names it: a setup, or a rotation. */
+  readonly candidate: string;
   readonly screens: readonly ScreenPreview[];
   /** Milliseconds from start to the last screen drawn. */
   readonly ms: number;
@@ -83,16 +86,16 @@ export function outsideElements(bounds: ReadonlyMap<string, Rect>, width: number
 }
 
 /**
- * @brief The project's texts with one target's setup replaced, written where
- *        the form would write it, in memory only.
+ * @brief The project's texts with one target field replaced, written where the
+ *        form would write it, in memory only.
  *
  * @param texts    Every project document's current text.
- * @param setupKey The form field key of the target's `display/setup`.
- * @param setup    The candidate setup.
+ * @param fieldKey The form field key: the target's `display/setup` or `display/rotation`.
+ * @param value    The candidate value; undefined removes the attribute.
  */
-export function candidateTexts(texts: ReadonlyMap<string, string>, setupKey: string, setup: string): Map<string, string> {
+export function candidateTexts(texts: ReadonlyMap<string, string>, fieldKey: string, value: string | undefined): Map<string, string> {
   const project = texts.get('u8g2gl.xml') ?? '';
-  const edited = applyEdits(project, formEdit('u8g2gl.xml', project, { kind: 'set', field: setupKey, value: setup }).edits);
+  const edited = applyEdits(project, formEdit('u8g2gl.xml', project, { kind: 'set', field: fieldKey, value }).edits);
   return new Map([...texts, ['u8g2gl.xml', edited]]);
 }
 
@@ -121,7 +124,7 @@ function drawScreen(module: EditorModule, texts: ReadonlyMap<string, string>, fi
 }
 
 /**
- * @brief Draws every screen at a candidate setup, the active one first.
+ * @brief Draws every screen at a candidate setup or rotation, the active one first.
  *
  * @param module      A spare editor module, never the canvas's.
  * @param texts       The candidate's texts (`candidateTexts`).
@@ -129,6 +132,7 @@ function drawScreen(module: EditorModule, texts: ReadonlyMap<string, string>, fi
  * @param activeFile  The screen the canvas shows, drawn first.
  * @param targetName  The target being changed.
  * @param assets      The canvas's compiled assets.
+ * @param candidate   What is previewed, as the preview names it.
  */
 export function renderImpact(
   module: EditorModule,
@@ -137,12 +141,12 @@ export function renderImpact(
   activeFile: string | undefined,
   targetName: string,
   assets: CompiledAssets | undefined,
-  setup: string,
+  candidate: string,
 ): ImpactPreview {
   // --- Step 1: The active screen first, timed ---
   const started = performance.now();
   const first = activeFile !== undefined && screenFiles.includes(activeFile) ? activeFile : screenFiles[0];
-  if (first === undefined) return { setup, screens: [], ms: 0, activeOnly: false };
+  if (first === undefined) return { candidate, screens: [], ms: 0, activeOnly: false };
   const screens = [drawScreen(module, texts, first, targetName, assets)];
   const each = performance.now() - started;
 
@@ -150,7 +154,7 @@ export function renderImpact(
   const rest = screenFiles.filter((file) => file !== first);
   if (rest.length > 0 && each * screenFiles.length > PREVIEW_BUDGET_MS) {
     return {
-      setup,
+      candidate,
       screens,
       ms: each,
       activeOnly: true,
@@ -158,5 +162,5 @@ export function renderImpact(
     };
   }
   for (const file of rest) screens.push(drawScreen(module, texts, file, targetName, assets));
-  return { setup, screens, ms: performance.now() - started, activeOnly: false };
+  return { candidate, screens, ms: performance.now() - started, activeOnly: false };
 }

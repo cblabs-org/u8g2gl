@@ -7,7 +7,9 @@
  * Purpose: What the `u8g2gl.xml` form adds to the generic one (ui_spec §6.4):
  *          the display picker in place of the bare `setup` field, with the
  *          impact preview before a new display is chosen; bus fields that
- *          follow the display's bus family; rotation shown with its angle;
+ *          follow the display's bus family; rotation shown with its angle,
+ *          and previewed like a display when a quarter turn would resize the
+ *          layout;
  *          the display's framebuffer beside `ram_budget`; and a live example
  *          of what `<output>` produces. Everything else in the file is the
  *          generic form's, so nothing is left without a control.
@@ -16,7 +18,12 @@
  *              size and variant → bus wiring, or searches the setup name; each
  *              option shows what the catalogue knows. Choosing a candidate
  *              shows the impact preview (`ImpactPreviewView`); only "Use this
- *              display" writes, as one edit and one undo stop. A bus field the
+ *              display" writes, as one edit and one undo stop. Every display
+ *              is listed at its own size, with the size the target's rotation
+ *              shows it at beside it when the two differ. A rotation that
+ *              swaps the layout's width and height (`RotationField`) goes
+ *              through the same preview and writes only on "Use this
+ *              rotation"; one that keeps the size applies at once. A bus field the
  *              wiring does not use is hidden, unless the file writes it, when
  *              it is shown and flagged: it is never dropped.
  *
@@ -32,7 +39,19 @@ import { ROTATION_VALUES } from '@u8g2gl/core/schema/index.js';
 import type { DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
 import { blitFrame } from '../canvas/framebuffer';
 import type { Workspace } from '../workspace';
-import { busFieldApplies, controllerOptions, familyLabel, rotationLabel, searchSetups, U8G2_SETUP_WIKI, variantKey, variantOptions, wiringOptions } from './display-picker-model';
+import {
+  busFieldApplies,
+  controllerOptions,
+  familyLabel,
+  orientedNote,
+  rotationLabel,
+  rotationResizes,
+  searchSetups,
+  U8G2_SETUP_WIKI,
+  variantKey,
+  variantOptions,
+  wiringOptions,
+} from './display-picker-model';
 import { candidateTexts, renderImpact, type ImpactPreview, type ScreenPreview } from './impact-preview';
 import type { FormField, FormNode, FormSection } from './form-model';
 import type { SectionRenderer } from './form-view';
@@ -49,10 +68,16 @@ export interface ProjectEditorHooks {
 }
 
 // setupOf
-// The setup a display node reads, and its record when the catalogue has one.
-function setupOf(node: FormNode): { readonly setup: string | undefined; readonly record: DisplayRecord | undefined } {
+// The setup a display node reads, its record when the catalogue has one, and
+// the rotation written beside it (as written; the layout reads it normalised).
+function setupOf(node: FormNode): {
+  readonly setup: string | undefined;
+  readonly record: DisplayRecord | undefined;
+  readonly rotation: string | undefined;
+} {
   const setup = node.fields.find((field) => field.attribute.name === 'setup')?.value;
-  return { setup, record: setup === undefined ? undefined : BY_SETUP.get(setup) };
+  const rotation = node.fields.find((field) => field.attribute.name === 'rotation')?.value;
+  return { setup, record: setup === undefined ? undefined : BY_SETUP.get(setup), rotation };
 }
 
 // targetIndexOf
@@ -62,9 +87,13 @@ function targetIndexOf(node: FormNode): number | undefined {
   return match?.[1] === undefined ? undefined : Number(match[1]);
 }
 
-/** @brief A record's facts, as every option shows them. */
-function recordFacts(record: DisplayRecord): string {
-  return `${record.width}×${record.height} · ${record.framebufferBytes} B framebuffer · ${familyLabel(record.bus.family)} ${record.bus.raw} · ${record.driver} · ${record.tiles.width}×${record.tiles.height} tiles`;
+/**
+ * @brief A record's facts, as every option shows them: its own size first, then
+ *        the size the target's rotation shows it at when that differs.
+ */
+function recordFacts(record: DisplayRecord, rotation: string | undefined): string {
+  const shown = orientedNote(record, rotation);
+  return `${record.width}×${record.height}${shown === undefined ? '' : ` · ${shown}`} · ${record.framebufferBytes} B framebuffer · ${familyLabel(record.bus.family)} ${record.bus.raw} · ${record.driver} · ${record.tiles.width}×${record.tiles.height} tiles`;
 }
 
 /**
@@ -80,21 +109,7 @@ export function useProjectEditor(workspace: Workspace): ProjectEditorHooks {
       fieldControl: (field, node, commit) => {
         const name = `${field.elementId}/${field.attribute.name}`;
         if (name === 'display/setup') return <DisplayPicker workspace={workspace} field={field} node={node} commit={commit} />;
-        if (name === 'display/rotation') {
-          const written = field.value;
-          return (
-            <div className="field-controls">
-              <select aria-label="rotation" className={written === undefined ? 'default' : ''} value={written ?? ''} onChange={(event) => commit(event.target.value === '' ? undefined : event.target.value)}>
-                <option value="">not set ({rotationLabel(field.attribute.default ?? 'R0')})</option>
-                {[...ROTATION_VALUES, ...(written !== undefined && !ROTATION_VALUES.includes(written) ? [written] : [])].map((value) => (
-                  <option key={value} value={value}>
-                    {rotationLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          );
-        }
+        if (name === 'display/rotation') return <RotationField workspace={workspace} field={field} node={node} commit={commit} />;
         return undefined;
       },
       // --- Bus fields follow the family; one written for another family stays, flagged ---
@@ -170,6 +185,7 @@ export function DisplayPicker({
 }): React.JSX.Element {
   const current = field.value;
   const record = current === undefined ? undefined : BY_SETUP.get(current);
+  const { rotation } = setupOf(node);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [controller, setController] = useState<string | undefined>(record?.controller);
@@ -195,7 +211,7 @@ export function DisplayPicker({
       <div className="display-current">
         <code className="display-setup">{current ?? 'no display'}</code>
         {record !== undefined ? (
-          <span className="display-facts">{recordFacts(record)}</span>
+          <span className="display-facts">{recordFacts(record, rotation)}</span>
         ) : current !== undefined ? (
           <span className="field-problem warning">The catalogue has no setup of this name.</span>
         ) : null}
@@ -212,7 +228,7 @@ export function DisplayPicker({
           {query.trim() !== '' ? (
             <div className="display-options" role="listbox" aria-label="Matching displays">
               {found.matches.map((match) => (
-                <SetupOption key={match.setup} record={match} selected={match.setup === (candidate ?? current)} onChoose={choose} />
+                <SetupOption key={match.setup} record={match} rotation={rotation} selected={match.setup === (candidate ?? current)} onChoose={choose} />
               ))}
               {found.matches.length === 0 && <p className="form-empty">No setup matches.</p>}
               {found.notes.map((note) => (
@@ -255,7 +271,7 @@ export function DisplayPicker({
                 <h4>3 · Bus wiring</h4>
                 <div className="display-options" role="listbox" aria-label="Bus wirings">
                   {wirings.map((option) => (
-                    <SetupOption key={option.setup} record={option} selected={option.setup === (candidate ?? current)} onChoose={choose} />
+                    <SetupOption key={option.setup} record={option} rotation={rotation} selected={option.setup === (candidate ?? current)} onChoose={choose} />
                   ))}
                   {wirings.length === 0 && <p className="form-empty">Choose a controller and a size.</p>}
                 </div>
@@ -265,9 +281,9 @@ export function DisplayPicker({
           {chosen !== undefined && (
             <div className="display-candidate" data-candidate={chosen.setup}>
               <p>
-                <code>{chosen.setup}</code>: {recordFacts(chosen)}
+                <code>{chosen.setup}</code>: {recordFacts(chosen, rotation)}
               </p>
-              <ImpactPreviewView workspace={workspace} field={field} node={node} setup={chosen.setup} />
+              <ImpactPreviewView workspace={workspace} field={field} node={node} value={chosen.setup} candidate={chosen.setup} />
               <div className="form-add">
                 <button
                   type="button"
@@ -293,30 +309,46 @@ export function DisplayPicker({
 }
 
 /** @brief One setup as an option: its name and every fact the catalogue holds. */
-function SetupOption({ record, selected, onChoose }: { readonly record: DisplayRecord; readonly selected: boolean; readonly onChoose: (setup: string) => void }): React.JSX.Element {
+function SetupOption({
+  record,
+  rotation,
+  selected,
+  onChoose,
+}: {
+  readonly record: DisplayRecord;
+  readonly rotation: string | undefined;
+  readonly selected: boolean;
+  readonly onChoose: (setup: string) => void;
+}): React.JSX.Element {
   return (
     <button type="button" role="option" aria-selected={selected} className="display-option" data-setup={record.setup} onClick={() => onChoose(record.setup)}>
       <code>{record.setup}</code>
-      <span className="display-facts">{recordFacts(record)}</span>
+      <span className="display-facts">{recordFacts(record, rotation)}</span>
     </button>
   );
 }
 
 /**
- * @brief The impact preview of a candidate setup: every screen drawn at its
- *        geometry in a spare editor module, the elements it would not hold
- *        marked and named, and how long it took.
+ * @brief The impact preview of a candidate setup or rotation: every screen
+ *        drawn at its geometry in a spare editor module, the elements it would
+ *        not hold marked and named, and how long it took.
+ *
+ * @param field     The field the candidate would be written to.
+ * @param value     The candidate value; undefined removes the attribute.
+ * @param candidate What is previewed, as the preview names it.
  */
 function ImpactPreviewView({
   workspace,
   field,
   node,
-  setup,
+  value,
+  candidate,
 }: {
   readonly workspace: Workspace;
   readonly field: FormField;
   readonly node: FormNode;
-  readonly setup: string;
+  readonly value: string | undefined;
+  readonly candidate: string;
 }): React.JSX.Element {
   const [preview, setPreview] = useState<ImpactPreview | { readonly problem: string } | undefined>(undefined);
   // The target by position, not the node: the node is read afresh on every
@@ -335,10 +367,10 @@ function ImpactPreviewView({
     spare
       .then((module) => {
         if (cancelled) return;
-        const texts = candidateTexts(workspace.documents.texts(), field.key, setup);
+        const texts = candidateTexts(workspace.documents.texts(), field.key, value);
         const screenFiles = run.result.model.screens.flatMap((screen) => (screen.loc?.file === undefined ? [] : [screen.loc.file]));
-        const result = renderImpact(module, texts, screenFiles, workspace.canvasFile.get(), targetName, run.assets, setup);
-        workspace.log(`impact preview: ${setup}, ${result.screens.length} screen${result.screens.length === 1 ? '' : 's'} in ${Math.round(result.ms)} ms${result.activeOnly ? ' (active screen only)' : ''}`);
+        const result = renderImpact(module, texts, screenFiles, workspace.canvasFile.get(), targetName, run.assets, candidate);
+        workspace.log(`impact preview: ${candidate}, ${result.screens.length} screen${result.screens.length === 1 ? '' : 's'} in ${Math.round(result.ms)} ms${result.activeOnly ? ' (active screen only)' : ''}`);
         setPreview(result);
       })
       .catch((error: unknown) => {
@@ -347,14 +379,14 @@ function ImpactPreviewView({
     return () => {
       cancelled = true;
     };
-  }, [workspace, field.key, index, setup]);
+  }, [workspace, field.key, index, value, candidate]);
 
   if (preview === undefined) return <p className="form-empty">Drawing the preview…</p>;
   if ('problem' in preview) return <p className="field-reason">{preview.problem}</p>;
   return (
     <div className="impact-preview" data-preview-ms={Math.round(preview.ms)} data-active-only={preview.activeOnly}>
       <p className="field-reason">
-        Every screen at {setup}: {preview.screens.length} drawn in {Math.round(preview.ms)} ms. Nothing is written until you use this display.
+        Every screen at {candidate}: {preview.screens.length} drawn in {Math.round(preview.ms)} ms. Nothing is written until you use it.
       </p>
       {preview.note !== undefined && <p className="field-reason">{preview.note}</p>}
       <div className="impact-screens">
@@ -362,6 +394,80 @@ function ImpactPreviewView({
           <ScreenThumbnail key={screen.screen} preview={screen} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * @brief The rotation select. A rotation that keeps the layout's size applies
+ *        at once; one that swaps width and height is previewed first, as a
+ *        new display is, and written only on "Use this rotation" — one edit,
+ *        one undo stop (ui_spec §6.4).
+ */
+function RotationField({
+  workspace,
+  field,
+  node,
+  commit,
+}: {
+  readonly workspace: Workspace;
+  readonly field: FormField;
+  readonly node: FormNode;
+  readonly commit: (value: string | undefined) => void;
+}): React.JSX.Element {
+  const written = field.value;
+  const { record } = setupOf(node);
+  // Pending is the candidate awaiting confirmation; `{ value: undefined }` is
+  // a pending "not set", distinct from nothing pending.
+  const [pending, setPending] = useState<{ readonly value: string | undefined } | undefined>(undefined);
+
+  const choose = (value: string | undefined): void => {
+    if (value === written) {
+      setPending(undefined);
+    } else if (rotationResizes(record, written, value)) {
+      setPending({ value });
+    } else {
+      setPending(undefined);
+      commit(value);
+    }
+  };
+  const label = (value: string | undefined): string => (value === undefined ? `not set (${rotationLabel(field.attribute.default ?? 'R0')})` : rotationLabel(value));
+  const shown = pending === undefined || record === undefined ? undefined : orientedNote(record, pending.value);
+
+  return (
+    <div className="field-controls rotation-field">
+      <select aria-label="rotation" className={written === undefined ? 'default' : ''} value={written ?? ''} onChange={(event) => choose(event.target.value === '' ? undefined : event.target.value)}>
+        <option value="">{label(undefined)}</option>
+        {[...ROTATION_VALUES, ...(written !== undefined && !ROTATION_VALUES.includes(written) ? [written] : [])].map((value) => (
+          <option key={value} value={value}>
+            {rotationLabel(value)}
+          </option>
+        ))}
+      </select>
+      {pending !== undefined && (
+        <div className="display-candidate rotation-candidate" data-candidate={pending.value ?? ''}>
+          <p>
+            Rotation {label(pending.value)}
+            {record !== undefined ? `: the ${record.width}×${record.height} panel is ${shown ?? `shown ${record.width}×${record.height}`}.` : '.'}
+          </p>
+          <ImpactPreviewView workspace={workspace} field={field} node={node} value={pending.value} candidate={`rotation ${label(pending.value)}`} />
+          <div className="form-add">
+            <button
+              type="button"
+              className="action primary"
+              onClick={() => {
+                commit(pending.value);
+                setPending(undefined);
+              }}
+            >
+              Use this rotation
+            </button>
+            <button type="button" className="action" onClick={() => setPending(undefined)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
