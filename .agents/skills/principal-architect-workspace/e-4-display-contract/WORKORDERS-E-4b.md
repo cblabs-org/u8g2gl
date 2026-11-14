@@ -221,3 +221,125 @@ rework it.
 # Completion report
 
 *(worker: append here)*
+
+## Report — 2026-11-14, Tier-3 worker
+
+Provenance checked before starting: this file names `e-4-display-contract` as its parent, and
+PROJECT.md's status log records the owner's "Approve E-4" and "Approve corrections". Worked in
+`../U8G2GL-e4`, four stacked branches, nothing pushed, tagged or published; no network beyond
+`npm ci` from the lockfiles (it printed npm's "install-scripts not run" notice for esbuild and
+fsevents; nothing failed).
+
+### Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-e4b/wo1-catalogue-pins` | `8b51101` feat(catalogue): constructor pins in the catalogue; constructorSnippet() |
+| WO2 | `u8g2gl-e4b/wo2-schema-07` | `11aa357` feat(schema): schema 0.7 — pins and `<bus>` removed, U8G2's mirrors added |
+| WO3 | `u8g2gl-e4b/wo3-designer-cli` | `6bc6e5d` feat(designer,cli): constructor snippet panel, mirror rotations, u8g2gl display |
+| WO4 | `u8g2gl-e4b/wo4-docs-review` | `4541e09` docs(e4b): schema 0.7, the constructor snippet, u8g2gl display; CLI 0.19.0, then this report |
+
+### Suites (one at a time), baseline on `1959d24` → final on `4541e09`
+
+| Suite | Baseline | Final |
+|---|---|---|
+| Wasm build + `node wasm/test/*.test.mjs` | 4/4 | 4/4 |
+| Host ctest | 519/519 (1 skipped: SizeOfReport.ThirtyTwoBitTarget) | 520/520, same skip; the new one is `RealU8g2.ConstructorSnippetsCompileAndLink` |
+| CLI vitest | 2871 passed, 23 skipped (2894) | 2971 passed, 23 skipped (2994) |
+| lint + tsc | clean | clean |
+| Designer typecheck | clean | clean |
+| Designer unit | 258 | 262 (3 bus tests deleted, 7 added) |
+| e2e (`build:e2e`) | 114 passed, 10 skipped | 115 passed, 10 skipped (1 bus case deleted, 2 added) |
+| Production (`build`, `test:e2e:production`) | 3 | 3 |
+| `refresh-goldens.mjs` (and `refresh-snippets.mjs`) | — | empty diff |
+| `check-home-paths.mjs` | clean | clean |
+| `check-package.mjs` | — | PASS: u8g2gl-0.19.0.tgz, 15.4 MB tarball, 56.3 MB unpacked, 779 files |
+
+No flake fired. One real failure on the way, fixed, not weakened: WO1's
+`catalogue --json` outgrew `execFile`'s 1 MiB stdout cap in `cli.test.ts` (the child was killed
+at byte 1048576); the helper's `maxBuffer` is raised to 16 MiB with a comment. And one e2e
+expectation (`project-form.spec.ts:69`, the demo's schema shown as 0.6) followed the demo to 0.7
+in WO3, because WO2 ran no e2e.
+
+### Catalogue diff (WO1)
+
+`catalogue.json` regenerated from `extern/u8g2` at `d66b49a` (2.36.18): 1637 records, every one
+gaining `bus.pins` and nothing else (checked by stripping `pins` and comparing each record with
+the old file: 0 differences; the only removed lines are the 1637 `"raw"` lines that gained a
+trailing comma). Fourteen distinct `bus.raw`, `?` marking `optional`:
+
+| `bus.raw` | Pins |
+|---|---|
+| `HW_I2C` | reset?, clock?, data? |
+| `SW_I2C` | clock, data, reset? |
+| `2ND_HW_I2C` | reset? |
+| `4W_HW_SPI`, `2ND_4W_HW_SPI` | cs, dc, reset? |
+| `4W_SW_SPI` | clock, data, cs, dc, reset? |
+| `3W_HW_SPI`, `HW_SPI`, `2ND_HW_SPI` | cs, reset? |
+| `3W_SW_SPI`, `SW_SPI` | clock, data, cs, reset? |
+| `6800`, `8080` | d0–d7, enable, cs, dc, reset? |
+| `PARALLEL` (bus-less) | KS0108, HD44102, T7932: d0–d7, enable, dc, cs0, cs1, cs2, reset? · SED1520, SBN1661: d0–d7, dc, e1, e2, reset (not optional) |
+
+### Golden lines that moved (WO2 only; WO1, WO3 and WO4 moved none)
+
+All version stamps, each one `-`/`+` pair, checked line by line:
+
+- `// schema: 0.6` → `0.7`: the eight emit-project goldens, ten `test/generated_fixture/generated`
+  files, `generated_editor/ui_editor_registry.cpp`, and the eight files of each xtensa corpus.
+- `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 6)` → `(0, 7)`: the emit-project and generated_fixture
+  configs, both xtensa corpora.
+- `#error "… runtime 0.12.0 or newer …"` → `0.13.0` and `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 12, 0)`
+  → `(0, 13, 0)`: the emit-project and generated_fixture configs.
+- `#error "… runtime 0.12 or newer …"` → `0.13` and `U8G2GL_REQUIRE_RUNTIME_VERSION(0, 12)` →
+  `(0, 13)`: the xtensa corpus (its ctl_corpus keeps its frozen 0.7 floor, as at 0.6).
+- `ui_scene.json` `"schema": "0.6"` → `"0.7"`.
+
+The input that moved with them is emit-project's `u8g2gl.xml` (`schema="0.7"`), so the §13.9
+condition is met by an input change as well as by CLI 0.19.0.
+
+### Deviations, and why
+
+1. **WO2 deleted three designer unit tests** (`project-form.test.ts`'s absent-display/`address`
+   and `<bus>`-first cases, `project-targets.test.ts`'s bus-field case) rather than WO3, because
+   WO2's vocabulary change broke them and the designer typecheck; WO3 deleted the code and the
+   e2e case as written. `BUS_NOT_YET_USED` went in WO2 too: it lived in core's vocabulary and
+   only `busAttribute()` used it. WO3 also deleted the vocabulary's `busFamilies` and
+   `busWiringsWithout` fields, which only `busFieldApplies()` read.
+2. **The placeholder is an identifier.** Each pin is `#define DISPLAY_CS FILL_IN_PIN // GPIO
+   wired to the panel's CS`: `FILL_IN_PIN` is declared nowhere, so an unfilled sample fails with
+   "use of undeclared identifier 'FILL_IN_PIN'" (checked), and the compile test defines it to a
+   stub value before including each golden.
+3. **The compile test links U8G2's C library whole** (all of `csrc/*.c` but the two font tables,
+   as a static archive, globbed): each constructor calls a setup in `u8g2_d_setup.c`, which
+   references every driver. The stubs cover the three Arduino transports *and* the three C++
+   `u8x8_SetPin_*` helpers the constructors call, both from `cppsrc/U8x8lib.cpp`. Stubs only;
+   nothing vendored.
+4. **The removal is made in the parser**, so `parseProjectFile()` returns no model for a file
+   that writes a pin, as for an unknown element in `<u8g2gl>`: `validate` then reports only the
+   parse-level diagnostics. There was no generic unknown-attribute check on `<target>` or
+   `<display>` to suppress.
+5. **The mirror gate is located at the target** (`Target` carries one location), reusing
+   `U8G2GL_NEWER_SCHEMA_REQUIRED` as palette metadata and icons do.
+6. **Small additions to place things:** `FormView` lost `fieldShown` (only the bus fields used it)
+   and gained `nodeExtra`, which renders the snippet at the end of each target; `useProjectEditor`
+   takes the project's schema, read from the form, for the rotation options;
+   `exitWithUsageError()` takes the command its hint names; `u8g2gl display` also names a
+   page-mode setup's full-buffer twin; snippet goldens are listed in `snippets/cases.json` and
+   rewritten only by `test/catalogue/refresh-snippets.mjs`, as the generator's are.
+7. **Docs beyond the sections named:** design_spec §5.2 (the record's `bus.pins`, query mode (e)
+   `display`) and §15.3's table, which would otherwise be stale.
+
+### Found outside scope
+
+- **`catalogue.json` nearly doubled**, 752 KB → 1.42 MB, because the builder pretty-prints and
+  each pin is four lines. The designer bundles it and the package carries it. A compact pin form
+  (one line per pin, or `pins` as `"cs,dc,reset?"`) would win most of it back; a format choice
+  for the PA.
+- **The vocabulary's `beforeCanonical`, `unlessPresent` and `canonical: false`** existed for
+  `<bus>` and the target-level pins, and no entry uses them now. The forms still honour them, so
+  they were left, with their docs made generic; they are candidates for deletion.
+- **PROJECT.md says no project in the repo writes a pin.** `cli/test/parser/fixtures/valid-project.xml`
+  did (`<bus cs dc reset>` and `address="0x3C"`). WO2 removed them, with the tokeniser records
+  edited to match (the `<bus>` node gone, later locations up a line).
+- design_spec §5.2 still says "The 13 bus variants"; the catalogue has 14 `bus.raw`, counting the
+  bus-less `PARALLEL`. Pre-existing, not changed.
