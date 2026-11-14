@@ -238,6 +238,13 @@ export function parseProject(
 
 /**
  * Parses a project XML file from raw text into a ParseResult<U8g2glProject>.
+ *
+ * Any error withholds the model, except U8G2GL_REMOVED_ATTRIBUTE: a pin or
+ * `<bus>` never shaped the model, so it is complete without them. Keeping it
+ * lets validation go on to the project's real schema and targets, instead of
+ * reporting the empty placeholder a withheld model leaves (a schema version
+ * '' the file never wrote, and no targets). The refusal is still an error, so
+ * `generate` still writes nothing.
  */
 export function parseProjectFile(
   xml: string,
@@ -251,7 +258,9 @@ export function parseProjectFile(
   }
 
   const project = parseProject(rawDoc.root, filename, diagnostics);
-  const hasError = diagnostics.some((d) => d.severity === 'error');
+  const hasError = diagnostics.some(
+    (d) => d.severity === 'error' && d.code !== DIAGNOSTIC_CODES.REMOVED_ATTRIBUTE,
+  );
 
   if (hasError || !project) {
     return { diagnostics };

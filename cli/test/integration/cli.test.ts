@@ -13,7 +13,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -133,6 +133,30 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(codes).toContain('U8G2GL_UNKNOWN_DISPLAY');
     expect(codes).toContain('U8G2GL_MISSING_REQUIRED');
     expect(codes).toContain('U8G2GL_INVALID_NAME');
+  });
+
+  it('u8g2gl validate on a project writing a pin reports only the refusal, against its real target', async () => {
+    // A refused pin keeps the project model, so validation reads the file's
+    // own schema and target rather than an empty placeholder's.
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/removed-pin-'));
+    try {
+      cpSync(validProjectDir, dir, { recursive: true });
+      const xmlPath = join(dir, 'u8g2gl.xml');
+      writeFileSync(xmlPath, readFileSync(xmlPath, 'utf8').replace('rotation="R0" />', 'rotation="R0" cs="5" />'));
+
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      expect(res.code).toBe(1);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; severity: string }>;
+        target?: { name: string };
+      };
+      const errors = parsed.diagnostics.filter((d) => d.severity === 'error').map((d) => d.code);
+      expect(errors).toEqual(['U8G2GL_REMOVED_ATTRIBUTE']);
+      expect(parsed.target?.name).toBe('primary');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   // --- PR-04 WO1: the framework manifests reach the CLI ---

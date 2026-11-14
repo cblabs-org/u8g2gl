@@ -117,6 +117,22 @@ describe('a removed pin attribute is refused at its line, once (schema 0.7)', ()
   });
 });
 
+describe('a refused pin keeps the project model', () => {
+  it('returns the targets as written, so validation sees the real schema', () => {
+    const result = parseProjectFile(project(`    <target name="main" setup="${SETUP}" rotation="R1" cs="5" />`), 'u8g2gl.xml');
+    expect(result.diagnostics.map((d) => d.code)).toEqual([DIAGNOSTIC_CODES.REMOVED_ATTRIBUTE]);
+    expect(result.value?.schema).toBe('0.7');
+    expect(result.value?.targets.map((t) => [t.name, t.setup, t.rotation])).toEqual([['main', SETUP, 'R1']]);
+  });
+
+  it('still withholds it when another error is present', () => {
+    const xml = project(`    <target name="main" setup="${SETUP}" cs="5" />`).replace('  <targets>', '  <wibble />\n  <targets>');
+    const result = parseProjectFile(xml, 'u8g2gl.xml');
+    expect(result.diagnostics.map((d) => d.code)).toContain(DIAGNOSTIC_CODES.MALFORMED_XML);
+    expect(result.value).toBeUndefined();
+  });
+});
+
 describe('a project that writes no pin parses at every accepted version', () => {
   it.each(['0.4', '0.5', '0.6', '0.7'])('schema %s', (schema) => {
     const result = parseProjectFile(project(`    <target name="main" setup="${SETUP}" rotation="R1" />`, schema), 'u8g2gl.xml');
