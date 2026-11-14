@@ -259,3 +259,11 @@ stacked. The worker doesn't push. The PA verifies, pushes and opens each PR.
     still accepted;
   - O4: E-4b takes 0.7 and E-3 adds to it later.
   E-4a is worked first; E-4b's work orders are written after E-4a merges.
+- 2026-11-14 — **E-4a verified by the PA** on `ece6d93`, suites one at a time:
+  - Wasm 4/4; host ctest 519/519; CLI 2894 on two full runs (one load
+    timeout on a first run, 0.9 s alone); lint, tsc and designer typecheck
+    clean; designer unit 258; e2e 124/124; production 3.
+  - Goldens: empty diff. check-package PASS at 0.18.0. Home-path guard clean.
+  - Browser check on the production build: the R1 preview, the apply, the
+    portrait canvas, the rotated-size diagnostics and one-step undo.
+  - PA fix: [D-22]'s prior art rewritten to match the investigation.
