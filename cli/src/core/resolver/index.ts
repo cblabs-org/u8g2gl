@@ -21,6 +21,8 @@
  *   AxisOutcome, ResolvedExtra, ResolvedProperty, ResolvedElement, ResolvedScreen,
  *   ResolverContext, ResolveInput,
  *   ResolveResult, DiagnosticAnnotator, isCentringOn, isRectangular, findTargetDisplay,
+ *   DisplaySize, OrientedDisplay, orientedDisplay, findOrientedDisplay (the one
+ *   place a rotation's size swap is computed, design_spec §5.1),
  *   createResolverContext, displayContainer,
  *   resolveElements, resolveScreens (resolve.ts)
  * - InstantiationSite, formatLocation, formatInstantiation, withInstantiation (provenance.ts)
@@ -33,6 +35,7 @@
  * - GeometryAttribute, GeometryBinding, GEOMETRY_BINDINGS, geometryBindingNamed,
  *   geometryBindingFor, isPositionBinding, PositionBinding, boundGeometryOf (geometry-bindings.ts) — [D-20]'s one table
  * - RESERVED_IDENTIFIER_PREFIXES, CPP_KEYWORDS, SCREEN_FUNCTIONS, SCREEN_TABLES,
+ *   the fixed `ui_` names (UI_INIT_FUNCTION, UI_DISPLAY_MATCHES_FUNCTION, …),
  *   IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput, the per-kind spelling helpers and
  *   mangleIdentifiers (mangle.ts)

@@ -283,6 +283,16 @@ A generated per-container `layout()` function was considered and rejected — it
 
 *Consequences:* a generated config header included ahead of `u8g2gl_config.h`, whose `#ifndef` defaults survive for hand-written use; a hard validator error at **254** objects per screen, which is where `uint8_t` parent indices run out ([A-3]); capacities reported in the §18 budget. Generated code need not check binding returns, because the pool was sized from the very bindings being added — the failure stops existing rather than moving earlier.
 
+### [D-22] The board owns the wiring; U8G2GL owns the panel
+
+**`u8g2gl.xml` describes what the UI depends on: the panel (`setup`) and its orientation (`rotation`). The firmware's board layer owns constructing the display and wiring it. The two are tied by a generated, checked contract in `ui.hpp` (§16) rather than a hand-kept copy.**
+
+*Full record:* [decisions/d22-board-owns-the-wiring.md](decisions/d22-board-owns-the-wiring.md).
+
+*Rationale:* One UI project serves every board that carries the same panel, whatever pins each board uses; pins written into the UI project would tie it to one board's wiring, and U8G2GL never constructs the display, so they had no effect. What the layout does depend on — the panel's size after rotation — is generated into the contract, and `ui_display_matches()` lets the board check that what it constructed is what the UI was laid out for. UI design tools for embedded displays draw the same line: LVGL's editors and SquareLine Studio generate the UI and leave the display driver to the board's port, and ESPHome declares the bus and pins in its bus and display configuration, while what is drawn is written against the display, not its pins.
+
+*Consequences:* `rotation` is honoured in every layout reader (§5.1), and the contract states it for the constructor; the pin attributes (`cs`, `dc`, `reset`, `address`) and `<bus>` are to be removed with schema 0.7 (E-4b), each with an error that says where it belongs.
+
 ### [D-10] The CLI is TypeScript on Node, distributed via npm
 
 *Rationale:* `npx u8g2gl generate` is the lowest-friction install for the target audience and works identically on macOS, Linux, and Windows. It shares the schema, the XML parser, and the Wasm host with the browser preview — one codebase, not two. The alternative (Python) has a worse Windows story and cannot share code with the preview.
@@ -346,6 +356,15 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 **The first target is the default.** `generate` builds it unless `--target` names another, and the designer shows it until the author switches; there is no `default` attribute. Which target the designer shows is its own view state, kept per browser and never written to the project (ui_spec §6.4).
 
 Per **[D-14]** `setup` is the U8G2 constructor name and is the single source of truth for the target. `width`, `height`, controller, and bus are all *derived* from U8G2's own tables, never typed by hand — so they cannot drift from the hardware. `rotation` and bus parameters such as `address` remain the user's to set, since U8G2 cannot know them.
+
+**`rotation` is honoured.** It takes U8G2's `R0`…`R3` or the angle `0`, `90`, `180` or `270` (`90` is `R1`), and is unset as `R0`. The layout is resolved against the display as the board constructs it at that rotation:
+
+- **`R1` and `R3` swap the width and height.** A 256×64 panel at `R1` lays out 64 wide and 256 tall: `#screen_width` is 64, bounds are judged against 64×256, and a bounds diagnostic names the size and how it came by it (`display 64×256 (256×64 rotated 90°) is 64px wide`), so the author is not left comparing against a size they never wrote. The designer draws the canvas, the impact preview and a test run at that size.
+- **`R0` and `R2` are layout-neutral.** A half turn draws the same layout upside down, so nothing about it is resolved differently.
+- **The panel itself is never rotated.** Its own size, framebuffer, tiles, bus and driver are the hardware's at every rotation, so §18's framebuffer line and the catalogue record do not change. One function, `orientedDisplay()` in `core/resolver`, computes the swap, and every layout reader takes its size from it.
+- **The generated contract carries it to the board** (§16): `U8G2GL_TARGET_ROTATION` is the `U8G2_Rn` to construct with, and `ui_display_matches()` checks the size the constructed display reports.
+
+*Rotation is not the controller's flip mode.* U8G2's `U8G2_R0`…`U8G2_R3` are software transforms in the u8g2 layer: `u8g2_SetDisplayRotation()` (`u8g2_setup.c`) swaps the drawing callback and recomputes the width and height `getDisplayWidth()` and `getDisplayHeight()` report. `setFlipMode()` (`u8x8_display.c`) is a controller command instead, 180° only, applying the controller's own column offset (for the SSD1322, `u8x8_d_ssd1322.c`), and changes no dimension. U8G2GL emits the rotation the board constructs with; a firmware's own `setFlipMode()` at runtime is a controller-level flip on top of it, which U8G2GL neither sees nor needs to.
 
 ### 5.2 The Display Catalogue
 
@@ -2122,6 +2141,36 @@ The generated header carries the same text, and the forms are the ones built: th
 Only runtime sources and generated code include `u8g2gl_config.h`, so the definition is inert in every other unit; on the measured build each unrelated compile line gained the `-D` and nothing else. **A project-wide forced `-include` of the header is not a substitute**: it reaches every unit in the build, and on that `esp32dev` build stopped in the first unrelated library — Arduino `SPI` and `Wire` — with `u8g2gl/u8g2gl_version.h: No such file or directory`. It would also reach C units, where `static_assert` is not a keyword before C23. Build middleware that adds the `-include` to the runtime's sources alone works, but it matches the library by its installed directory name, which a `symlink://` or renamed dependency changes, and it misses silently: a pattern that matches nothing leaves the defaults in place and the build green.
 
 **A native PlatformIO environment builds the runtime** (`library.json` declares `"frameworks": "*"`): a `platform = native` environment with no framework finds and compiles it. The consumer still supplies what U8G2 needs off Arduino. U8G2 is an Arduino-format library, which the finder treats as framework-incompatible there and ignores as the runtime's dependency, so the consumer adds its `src/` and `src/clib/` to the include path and compiles `src/clib/` itself (for example `build_src_filter = +<../.pio/libdeps/native/U8g2/src/clib/>`). `U8g2lib.h` includes `Arduino.h` and `Print.h`, so the consumer supplies those too: a minimal `Arduino.h` with `<stdint.h>` and `<stddef.h>`, and a `Print` class with the two `write()` virtuals, as the C++ suite's `test/real_u8g2/` does. Nothing else was needed on a macOS host build that linked and ran the generated UI. An Arduino build is unaffected.
+
+**The display contract** ([D-22]). The firmware's board layer constructs and wires the display; U8G2GL describes the panel its layout depends on. The two are tied by a generated contract in `ui.hpp`, the one file an application includes (§13.7), for the target `generate` built (`--target`, or the first):
+
+```cpp
+#define U8G2GL_TARGET_WIDTH 64       // after rotation
+#define U8G2GL_TARGET_HEIGHT 256     // after rotation
+#define U8G2GL_TARGET_ROTATION U8G2_R1
+#define U8G2GL_TARGET_SETUP "U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI"
+
+bool ui_display_matches(U8G2& display);
+```
+
+- **Width and height are after rotation** (§5.1), from the same oriented display the resolver laid the screens out against, so the contract and the layout cannot disagree.
+- **`U8G2GL_TARGET_ROTATION` expands to U8G2's own `U8G2_Rn` macro**, so it is usable only where `U8g2lib.h` is included: at the board's constructor, which includes it anyway. `ui.hpp` adds no include for it and keeps its forward-declared `U8G2`.
+- **`U8G2GL_TARGET_SETUP` is for diagnostics only**, never compared at compile time: the bus is part of the name, so the same panel on another bus would fail when it should not.
+- **The macros are not `#ifndef`-guarded.** A contract that could be overridden would check nothing.
+- **Not in `u8g2gl_generated_config.h`**, which the runtime library's own build includes: the runtime's sizing must not depend on which target was built.
+- **`ui_display_matches()`**, defined in `ui.cpp`, returns whether the constructed display's `getDisplayWidth()` and `getDisplayHeight()` equal the contract's. U8G2 reports those after the rotation it was constructed with, so one comparison catches the wrong panel size and the wrong rotation alike. It cannot catch a same-size panel on a different controller. It allocates and logs nothing: what to do on a mismatch is the firmware's call.
+
+On the board side that is two lines — construct with the rotation, check after `begin()`:
+
+```cpp
+U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI display(U8G2GL_TARGET_ROTATION, DISPLAY_CS, DISPLAY_DC, DISPLAY_RESET);
+
+display.begin();
+if (!ui_display_matches(display)) { /* the firmware's call: report it, refuse to start the UI */ }
+ui_init();
+```
+
+A target whose `setup` has no catalogue record is refused by validation before emission (`U8G2GL_UNKNOWN_DISPLAY`, or `U8G2GL_MISSING_REQUIRED` for no `setup`), so the contract is never emitted without values.
 
 **The runtime and the CLI are versioned independently.** They are two of the four independently versioned artefacts in `rules/03-versioning.md`, and the runtime changes far less often than the tool. A generated file records the schema version and the generator version that produced it. Generated code carries **two** version requirements.
 

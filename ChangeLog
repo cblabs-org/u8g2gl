@@ -8,6 +8,26 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-14	cli v0.18.xx	U8G2GL
+  * 0.18.0: rotation is honoured. R1 and R3 (90, 270) swap the panel's
+    width and height for layout: validation, generation, the scene, the
+    designer's canvas, insertion and hit-testing, and a test run all lay
+    out and draw a 256x64 panel at R1 as 64x256. R0 and R2 are
+    layout-neutral. The panel itself is never rotated, so the §18
+    framebuffer line is unchanged. Bounds messages on a turned target say
+    "display 64×256 (256×64 rotated 90°) is 64px wide". In the designer a
+    rotation that swaps the size goes through the impact preview, as a
+    new display does, and applies as one undo step; the picker shows each
+    panel at its own size with "shown 64×256 at R1" beside it. ui.hpp now
+    carries the display contract (design_spec §16, [D-22]):
+    U8G2GL_TARGET_WIDTH and _HEIGHT (after rotation),
+    U8G2GL_TARGET_ROTATION (U8G2's own U8G2_Rn) and U8G2GL_TARGET_SETUP
+    (diagnostics only), and declares bool ui_display_matches(U8G2&),
+    defined in ui.cpp, which now includes <U8g2lib.h>. Generated output
+    changes by those lines only; regenerate. On the board side, construct
+    with the rotation and check after begin():
+        U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI display(U8G2GL_TARGET_ROTATION, DISPLAY_CS, DISPLAY_DC, DISPLAY_RESET);
+        display.begin(); if (!ui_display_matches(display)) { /* report it */ }
 2026-11-14	cli v0.17.xx	U8G2GL
   * 0.17.0: The designer edits u8g2gl.xml and globals.xml through forms,
     beside the XML. The forms are built from a new declarative vocabulary

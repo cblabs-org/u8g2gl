@@ -99,9 +99,9 @@ export interface PipelineInput {
    * oriented by its rotation (`orientedDisplay()`, design_spec §5.1). Typed as
    * the oriented size rather than the record so a caller cannot hand the
    * pipeline a native size by forgetting the rotation: a record does not
-   * type-check here. Absent when the target has no record, or the project declares no target:
-   * `#screen_*` and screen-level anchors then stay deferred rather than guessed,
-   * and Pass 3 reports the display.
+   * type-check here. Absent when the target has no record, or the project
+   * declares no target: `#screen_*` and screen-level anchors then stay
+   * deferred rather than guessed, and Pass 3 reports the display.
    */
   readonly display?: OrientedDisplay;
 }

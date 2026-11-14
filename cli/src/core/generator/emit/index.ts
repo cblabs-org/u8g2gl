@@ -26,7 +26,9 @@
  * - cppValue, cppStringLiteral, cppEnumerator (value.ts) — §13.2's type mapping
  * - drawCallFor, DrawCall, DrawCallInput, SUBJECT_READ_SUFFIX (draw-args.ts)
  * - parseXbm, XbmImage (images/xbm.ts)
- * - EmittedUnit, ProjectEmitInput, section, includeBlock (unit.ts)
+ * - EmittedUnit, ProjectEmitInput, DisplayContract, section, includeBlock (unit.ts)
+ * - The display contract's macro names and UI_DISPLAY_MATCHES_FUNCTION (ui-hpp.ts),
+ *   design_spec §16
  * - The per-unit emitters and their file names, including the screen unit
  *   (screen.ts), `ui.cpp` (ui-init.ts) and the coordinate translation they share
  *   with WO11 (placement.ts)
