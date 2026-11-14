@@ -199,7 +199,7 @@ describe('the project-file vocabulary: shape', () => {
     }
   });
 
-  it('keeps defaults among an enum\'s values, bus families real, and every spelling read from one attribute only', () => {
+  it('keeps defaults among an enum\'s values, and every spelling read from one attribute only', () => {
     const seen = new Map<string, string>();
     for (const element of PROJECT_VOCABULARY) {
       const names = element.attributes.map((attribute) => attribute.name);
@@ -209,7 +209,6 @@ describe('the project-file vocabulary: shape', () => {
           expect(attribute.type.values.length).toBeGreaterThan(0);
           if (attribute.default !== undefined) expect(attribute.type.values).toContain(attribute.default);
         }
-        for (const family of attribute.busFamilies ?? []) expect(['spi', 'i2c', 'parallel']).toContain(family);
         for (const spelling of attributeSpellings(element, attribute)) {
           expect(vocabularyElement(spelling.element)?.file, `${element.id}/${attribute.name} → ${spelling.element}`).toBe(element.file);
           const at = key(spelling.element, spelling.name);

@@ -50,7 +50,6 @@
 
 import { CONVERT_MODES } from '../images/convert-decl.js';
 import { DEFAULT_THRESHOLD } from '../images/png-to-xbm.js';
-import type { BusFamily } from './display-record.js';
 import {
   BITMAP_MODE_VALUES,
   COLOR_VALUES,
@@ -108,10 +107,6 @@ export interface VocabularyAttribute {
   readonly default?: string;
   /** What it means, in plain words (design_spec §5.1–§5.3, §8, §10, §14). */
   readonly help: string;
-  /** For a bus pin or address: the bus families (§5.2) it applies to. */
-  readonly busFamilies?: readonly BusFamily[];
-  /** For a bus pin: wirings of those families that have no such pin (3-wire SPI has no `dc`). */
-  readonly busWiringsWithout?: readonly string[];
   /** Shown, never edited in a form: changing it is a migration, not an edit (§15.4). */
   readonly readOnly?: boolean;
   /**

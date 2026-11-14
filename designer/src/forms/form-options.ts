@@ -39,6 +39,5 @@ export function fieldFacts(attribute: VocabularyAttribute): string {
   else parts.push(type.kind);
   if (attribute.required) parts.push('required');
   if (attribute.default !== undefined) parts.push(`default ${attribute.default}`);
-  if (attribute.busFamilies !== undefined) parts.push(`bus ${attribute.busFamilies.join(' | ')}`);
   return parts.join(' · ');
 }

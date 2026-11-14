@@ -66,7 +66,7 @@ test('opening u8g2gl.xml shows its form beside the XML; an edit is one line in t
   await expect(name).toHaveValue('probe');
 
   // The schema is shown, never edited.
-  await expect(field(page, 'u8g2gl.xml', 'project/schema').locator('[data-readonly="true"]')).toHaveText('0.6');
+  await expect(field(page, 'u8g2gl.xml', 'project/schema').locator('[data-readonly="true"]')).toHaveText('0.7');
   await expect(field(page, 'u8g2gl.xml', 'project/schema').getByRole('textbox')).toHaveCount(0);
 });
 

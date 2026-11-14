@@ -9,11 +9,11 @@
  *          and variants, then each variant's bus wirings, and a search over
  *          the full setup name for those who know the part. Every option
  *          carries what the catalogue knows and nothing it does not. Also the
- *          rules the u8g2gl.xml editor applies around it: which bus fields a
- *          family uses, how a rotation reads in degrees, and what a rotation
+ *          rules the u8g2gl.xml editor applies around it: which rotations a
+ *          project's schema offers, how a rotation reads, and what a rotation
  *          does to the size the layout is drawn at.
  * Description: Pure functions over `DisplayRecord`s, so the picker's grouping,
- *              filtering and the bus-field rules are unit-tested without a
+ *              filtering and the rotation rules are unit-tested without a
  *              browser. The search matches every word of the query inside the
  *              setup name, shortest names first; with no such match it falls
  *              back to the CLI's own `u8g2gl find` (`identifyDisplay`), which
@@ -29,8 +29,9 @@
  * - searchSetups():       Setups whose name matches a query
  * - variantKey():         The key a setup's variant is grouped by
  * - familyLabel():        A bus family as people write it
- * - busFieldApplies():    Whether a bus attribute applies to a family
- * - rotationLabel():      A rotation with its angle
+ * - MIRRORS_SINCE:        The schema version the mirror rotations arrived in
+ * - rotationOptions():    The rotations the select offers at a schema version
+ * - rotationLabel():      A rotation with its angle, or a mirror with its axis
  * - orientedNote():       The size a rotation shows a panel at, when it differs
  * - rotationResizes():    Whether changing a rotation changes the layout's size
  */
@@ -38,7 +39,7 @@
 import { identifyDisplay } from '@u8g2gl/core/catalogue/index.js';
 import type { BusFamily, DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
 import { orientedDisplay } from '@u8g2gl/core/resolver/index.js';
-import { ROTATION_DEGREES, type VocabularyAttribute } from '@u8g2gl/core/schema/index.js';
+import { MIRROR_ROTATIONS, ROTATION_DEGREES, ROTATION_VALUES } from '@u8g2gl/core/schema/index.js';
 
 /**
  * U8G2's wiki page listing every setup constructor. No anchor: its format
@@ -133,22 +134,6 @@ export function familyLabel(family: BusFamily): string {
 }
 
 /**
- * @brief Whether a bus attribute applies to a display's bus: the vocabulary's
- *        `busFamilies` says which families (address for I²C; reset for every
- *        bus; cs and dc for SPI and parallel), and `busWiringsWithout` which of
- *        their wirings lack the pin (3-wire SPI has no dc). Any attribute that
- *        is not a bus attribute applies.
- * @param attribute  The attribute.
- * @param family     The display's bus family; undefined when not known.
- * @param wiring     The display's wiring (the catalogue's `bus.wiring`), if known.
- */
-export function busFieldApplies(attribute: VocabularyAttribute, family: BusFamily | undefined, wiring?: string): boolean {
-  if (attribute.busFamilies === undefined || family === undefined) return true;
-  if (!attribute.busFamilies.includes(family)) return false;
-  return wiring === undefined || !(attribute.busWiringsWithout ?? []).includes(wiring);
-}
-
-/**
  * @brief The size a rotation shows a panel at, beside its own: `shown 64×256 at R1`.
  *
  * The picker lists every panel at the size the catalogue records, because that
@@ -170,8 +155,8 @@ export function orientedNote(record: DisplayRecord, rotation: string | undefined
  * @brief Whether changing a target's rotation changes the size its layout is
  *        resolved at, so the change should go through the impact preview.
  *
- * R0↔R2 and R1↔R3 keep the size, and apply directly; a quarter turn swaps it,
- * which can push elements off the panel (ui_spec §6.4).
+ * R0↔R2, R1↔R3 and the two mirrors keep the size, and apply directly; a
+ * quarter turn swaps it, which can push elements off the panel (ui_spec §6.4).
  *
  * @param record The target's panel; undefined when the catalogue has none, and
  *               then nothing can be previewed, so the change applies directly.
@@ -185,8 +170,50 @@ export function rotationResizes(record: DisplayRecord | undefined, from: string 
   return before.width !== after.width || before.height !== after.height;
 }
 
-/** @brief A rotation as written, with its angle: `R1 · 90°`. */
+/**
+ * The schema version whose `rotation` may be a mirror (design_spec §15.4). The
+ * validator refuses one in an older project, so the select does not offer it.
+ */
+export const MIRRORS_SINCE = { major: 0, minor: 7 } as const;
+
+// schemaHasMirrors
+// Whether a project's declared schema has the mirrors: 0.7 or later, compared
+// as numbers so 0.10 is later than 0.7. An unreadable version offers them, as
+// the validator has already said what is wrong with it.
+//   schema — the project's `schema` attribute
+function schemaHasMirrors(schema: string | undefined): boolean {
+  const match = /^(\d+)\.(\d+)$/.exec(schema ?? '');
+  if (match === null) return true;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > MIRRORS_SINCE.major || (major === MIRRORS_SINCE.major && minor >= MIRRORS_SINCE.minor);
+}
+
+/**
+ * @brief The rotations the rotation select offers, in the vocabulary's order.
+ *
+ * Every turning rotation, and the mirrors only where the project's schema has
+ * them; a value already written is always offered, so it is shown rather than
+ * silently replaced, whatever it is.
+ *
+ * @param schema  The project's declared schema version.
+ * @param written The target's rotation as written, or undefined.
+ */
+export function rotationOptions(schema: string | undefined, written: string | undefined): readonly string[] {
+  const offered = schemaHasMirrors(schema) ? ROTATION_VALUES : ROTATION_VALUES.filter((value) => !MIRROR_ROTATIONS.includes(value));
+  return written === undefined || offered.includes(written) ? offered : [...offered, written];
+}
+
+/** Each mirror's axis, as the select names it. */
+const MIRROR_LABELS: Readonly<Record<string, string>> = {
+  MIRROR: 'mirrored left–right',
+  MIRROR_VERTICAL: 'mirrored top–bottom',
+};
+
+/** @brief A rotation as written, with its angle (`R1 · 90°`), or a mirror with its axis (`MIRROR · mirrored left–right`). */
 export function rotationLabel(rotation: string): string {
+  const mirror = MIRROR_LABELS[rotation];
+  if (mirror !== undefined) return `${rotation} · ${mirror}`;
   const degrees = ROTATION_DEGREES[rotation];
   return degrees === undefined || String(degrees) === rotation ? `${rotation}°` : `${rotation} · ${degrees}°`;
 }

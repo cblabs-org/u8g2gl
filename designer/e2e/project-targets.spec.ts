@@ -8,9 +8,10 @@
  *          picker changes the canvas's size and undo restores it; its impact
  *          preview marks an element the new display would not hold, before
  *          anything is written; a second target is switched to from the status
- *          bar with the file left clean, and the choice survives a reload; an
- *          I²C address is flagged, not dropped, when the wiring becomes SPI;
- *          the last target cannot be removed.
+ *          bar with the file left clean, and the choice survives a reload; the
+ *          target section shows the board-side constructor snippet where the
+ *          pin fields were, follows the display, and copies it; a mirror
+ *          applies without resizing; the last target cannot be removed.
  * Description: Against the real `u8g2gl design` on a copy of the departures
  *              project, in the end-to-end test build. The canvas's size is
  *              read from its toolbar, which stays in the page while the form
@@ -84,7 +85,7 @@ test('a second target is switched to from the status bar: the canvas follows, th
     <targets>
         <target name="primary" setup="${SPI}" rotation="R0" />
         <target name="compact">
-            <display setup="${I2C}" address="0x3C" />
+            <display setup="${I2C}" />
         </target>
     </targets>
     <output dir="generated" />
@@ -134,28 +135,53 @@ test('targets are added, renamed and reordered in the form; the last one cannot 
   await expect.poll(async () => (await bufferText(page, 'u8g2gl.xml')).indexOf('bench') < (await bufferText(page, 'u8g2gl.xml')).indexOf('primary')).toBe(true);
 });
 
-test('an I²C address is flagged, not dropped, when the wiring changes to SPI; SPI pins appear', async ({ page }) => {
-  const project = `<u8g2gl schema="0.7" name="probe" version="1.0.0">
-    <targets>
-        <target name="primary">
-            <display setup="${I2C}" address="0x3C" />
-        </target>
-    </targets>
-</u8g2gl>
-`;
-  session = await startDesign({ files: { 'u8g2gl.xml': project } });
+test('the target section shows the constructor snippet, which follows the display and copies; no pin field exists', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  session = await startDesign();
   await openShell(page, session.url);
   await openFile(page, 'u8g2gl.xml');
-  const field = (id: string) => form(page).locator(`.form-field[data-field="${id}"]`);
-  await expect(field('display/address')).toBeVisible();
-  await expect(field('display/cs')).toHaveCount(0);
+  const panel = form(page).locator('.constructor-snippet').first();
+  const text = panel.getByLabel('Constructor snippet');
 
-  await pickDisplay(page, 'ssd1306 128x64 noname 4w_hw_spi', 'U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI');
+  // --- The demo's SSD1322, with a placeholder per pin, and the lead line ---
+  await expect(panel).toHaveAttribute('data-snippet-setup', SPI);
+  await expect(panel).toContainText("Pins and bus are configured by your firmware's board");
+  for (const pin of ['DISPLAY_CS', 'DISPLAY_DC', 'DISPLAY_RESET']) await expect(text).toContainText(`#define ${pin}`);
+  await expect(text).toContainText(`${SPI} display(U8G2GL_TARGET_ROTATION, DISPLAY_CS, DISPLAY_DC, DISPLAY_RESET);`);
+  // No pin field and no <bus> exist any more.
+  for (const id of ['display/cs', 'display/dc', 'display/reset', 'display/address']) await expect(form(page).locator(`.form-field[data-field="${id}"]`)).toHaveCount(0);
+  await expect(form(page).locator('[data-element="bus"]')).toHaveCount(0);
+
+  // --- Copy puts exactly the shown text on the clipboard, and says so ---
+  await panel.getByRole('button', { name: 'Copy' }).click();
+  await expect(panel.getByRole('status')).toHaveText('Copied to the clipboard.');
+  const shown = await text.textContent();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shown);
+
+  // --- A HW I²C SSD1306 changes it: its own pins and the address line ---
+  await pickDisplay(page, 'ssd1306 128x64 noname hw_i2c', I2C);
   await form(page).getByRole('button', { name: 'Use this display' }).click();
-  await expect.poll(() => bufferText(page, 'u8g2gl.xml')).toContain('setup="U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI" address="0x3C"');
-  await expect(field('display/address').locator('[data-flag="not-applicable"]')).toContainText('has no address');
-  await expect(field('display/cs')).toBeVisible();
-  await expect(field('display/dc')).toBeVisible();
+  await expect(panel).toHaveAttribute('data-snippet-setup', I2C);
+  await expect(text).toContainText('// display.setI2CAddress(0x3C * 2);');
+  await expect(text).toContainText('#define DISPLAY_CLOCK');
+  await expect(text).not.toContainText('DISPLAY_CS');
+  // The project was edited only by the picker, never by the panel.
+  expect(await bufferText(page, 'u8g2gl.xml')).not.toContain('DISPLAY_');
+});
+
+test('choosing "mirrored left–right" applies at once and leaves the canvas 256×64', async ({ page }) => {
+  session = await startDesign();
+  await openShell(page, session.url);
+  await expect(canvasSize(page)).toHaveText('256×64');
+  await openFile(page, 'u8g2gl.xml');
+  const rotation = form(page).locator('.form-field[data-field="display/rotation"]');
+  await rotation.getByRole('combobox', { name: 'rotation' }).selectOption({ label: 'MIRROR · mirrored left–right' });
+  // No impact preview: a mirror keeps the size, as R0↔R2 does.
+  await expect.poll(() => bufferText(page, 'u8g2gl.xml')).toContain('rotation="MIRROR"');
+  await expect(rotation.locator('.rotation-candidate')).toHaveCount(0);
+  await expect(canvasSize(page)).toHaveText('256×64');
+  await expect(rotation.locator('[data-help="rotation"]')).toContainText('setFlipMode()');
+  await expect(form(page).getByLabel('Constructor snippet').first()).toContainText('it is U8G2_MIRROR.');
 });
 
 test('the Output section shows what generate would write, from the fields as they are', async ({ page }) => {
