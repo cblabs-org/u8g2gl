@@ -84,14 +84,15 @@ export interface AttributeSpelling {
   /** The attribute name as written there. */
   readonly name: string;
   /**
-   * True where the parser reads this place before the canonical one: a
-   * `<bus>` child, when present, supplies every bus value.
+   * True where the parser reads this place before the canonical one. No entry
+   * uses it since schema 0.7 removed `<bus>`, the place that was read first;
+   * the forms still honour it, so a later such place needs no form change.
    */
   readonly beforeCanonical?: boolean;
   /**
-   * The ids of elements whose presence hides this place from the parser: bus
-   * values on `<target>` are read only when the target has neither a
-   * `<bus>` nor a `<display>`, since the parser reads those instead.
+   * The ids of elements whose presence hides this place from the parser, for a
+   * value read from one place only while another element is absent. No entry
+   * uses it since schema 0.7 removed the pins, which were read that way.
    */
   readonly unlessPresent?: readonly string[];
 }
@@ -111,8 +112,8 @@ export interface VocabularyAttribute {
   readonly readOnly?: boolean;
   /**
    * The ids of elements whose presence hides the canonical place from the
-   * parser: a `<bus>` child, when written, supplies every bus value, and the
-   * display's own are not read.
+   * parser. As with a spelling's `unlessPresent`, no entry uses it since
+   * schema 0.7.
    */
   readonly unlessPresent?: readonly string[];
   /**
@@ -142,8 +143,9 @@ export interface VocabularyElement {
   /** Why it has that minimum, for a refused removal to say. */
   readonly minimumReason?: string;
   /**
-   * False for a place the parser reads but a form never writes into new
-   * (`<bus>`): its values are alternatives of attributes declared elsewhere.
+   * False for a place the parser reads but a form never writes into new: its
+   * values are alternatives of attributes declared elsewhere. Every element is
+   * canonical since schema 0.7 removed `<bus>`, the one that was not.
    */
   readonly canonical: boolean;
   readonly help: string;
@@ -685,7 +687,7 @@ export function vocabularyRoots(): ReadonlyMap<VocabularyFile, VocabularyElement
 /**
  * @brief Every place an attribute is read from, in the order the parser
  *        prefers them: the canonical one first unless an alternative is read
- *        before it (`<bus>`), then the rest.
+ *        before it (`beforeCanonical`), then the rest.
  *
  * @param element   The element the attribute is declared on.
  * @param attribute One of its attributes.

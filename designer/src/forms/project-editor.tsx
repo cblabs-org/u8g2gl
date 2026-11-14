@@ -148,7 +148,7 @@ export function useProjectEditor(workspace: Workspace, schema: string | undefine
 const COPIED_MS = 1500;
 
 /**
- * @brief A target's constructor snippet, with Copy (ruling 13, ui_spec §6.4).
+ * @brief A target's constructor snippet, with Copy (ui_spec §6.4, [D-22]).
  *
  * Shows nothing for a node that is not a target, or whose setup the catalogue
  * does not have (the setup field already says why). The text is selectable as

@@ -18,6 +18,7 @@ install it as a development dependency.
 npx u8g2gl validate            # check the project against the schema
 npx u8g2gl generate            # validate, then write the generated C++
 npx u8g2gl design              # open the project in the designer
+npx u8g2gl display <setup> --snippet   # the board code that constructs a display
 ```
 
 - **`validate [path]`** checks every file and reports each problem with its
@@ -36,6 +37,13 @@ npx u8g2gl design              # open the project in the designer
   in your own editor: `--editor <command>` (or `U8G2GL_EDITOR`) names it,
   such as `code`; otherwise the application your system associates with
   the file is used.
+- **`display <setup>`** prints one catalogued display: its controller, size,
+  bus and wiring, the pins its constructor takes and its framebuffer. Pins
+  and bus are configured by your firmware's board; U8G2GL describes the
+  panel. `--snippet` prints the board-side code that constructs it instead,
+  with a `FILL_IN_PIN` placeholder per pin and the generated rotation macro;
+  `--rotation` and `--target` fill in its comments. The designer's target
+  section shows the same text. `u8g2gl find` searches for a setup.
 
 `u8g2gl --help` lists every command and option, including `--json` output.
 

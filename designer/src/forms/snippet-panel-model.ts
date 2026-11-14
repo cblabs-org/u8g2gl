@@ -28,7 +28,7 @@ import type { DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
 import { CATALOGUE } from '@u8g2gl/data/catalogue.js';
 import type { FormModel, FormNode } from './form-model';
 
-/** The panel's first line: where the pins went (ruling 13). */
+/** The panel's first line: where the pins went ([D-22]). */
 export const SNIPPET_LEAD = "Pins and bus are configured by your firmware's board (e.g. board.h); U8G2GL describes the panel.";
 
 /** Each setup's record, by name. */

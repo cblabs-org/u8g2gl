@@ -291,7 +291,7 @@ A generated per-container `layout()` function was considered and rejected — it
 
 *Rationale:* One UI project serves every board that carries the same panel, whatever pins each board uses; pins written into the UI project would tie it to one board's wiring, and U8G2GL never constructs the display, so they had no effect. What the layout does depend on — the panel's size after rotation — is generated into the contract, and `ui_display_matches()` lets the board check that what it constructed is what the UI was laid out for. A tool owns the pins only when it owns the whole firmware, as ESPHome does. LVGL Pro's `project.xml` declares each target's display size and colour format and no pins, and SquareLine Studio leaves the driver and pins to the exported template project. U8G2GL is a library inside the firmware, so it is in their position.
 
-*Consequences:* `rotation` is honoured in every layout reader (§5.1), and the contract states it for the constructor; the pin attributes (`cs`, `dc`, `reset`, `address`) and `<bus>` are to be removed with schema 0.7 (E-4b), each with an error that says where it belongs.
+*Consequences:* `rotation` is honoured in every layout reader (§5.1), and the contract states it for the constructor. The pin attributes (`cs`, `dc`, `reset`, `address`) and `<bus>` are removed in schema 0.7, each written one refused at every version with `U8G2GL_REMOVED_ATTRIBUTE`, which says where it belongs (§15.4). In their place the constructor snippet (`u8g2gl display <setup> --snippet`, and the designer's target section) shows the board what to write, with a named placeholder for every pin (§16).
 
 ### [D-10] The CLI is TypeScript on Node, distributed via npm
 
@@ -337,14 +337,14 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 ### 5.1 `u8g2gl.xml`
 
 ```xml
-<u8g2gl schema="0.6" name="departures-board" version="1.0">
+<u8g2gl schema="0.7" name="departures-board" version="1.0">
     <targets>
         <!-- setup names a U8G2 full-buffer constructor; geometry is derived -->
         <target name="default">
             <display setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" rotation="0" />
         </target>
         <target name="compact">
-            <display setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" address="0x3C" />
+            <display setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" />
         </target>
     </targets>
 
@@ -355,16 +355,19 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 
 **The first target is the default.** `generate` builds it unless `--target` names another, and the designer shows it until the author switches; there is no `default` attribute. Which target the designer shows is its own view state, kept per browser and never written to the project (ui_spec §6.4).
 
-Per **[D-14]** `setup` is the U8G2 constructor name and is the single source of truth for the target. `width`, `height`, controller, and bus are all *derived* from U8G2's own tables, never typed by hand — so they cannot drift from the hardware. `rotation` and bus parameters such as `address` remain the user's to set, since U8G2 cannot know them.
+Per **[D-14]** `setup` is the U8G2 constructor name and is the single source of truth for the target. `width`, `height`, controller, and bus are all *derived* from U8G2's own tables, never typed by hand — so they cannot drift from the hardware. `rotation` remains the user's to set, since U8G2 cannot know how the panel is mounted.
 
-**`rotation` is honoured.** It takes U8G2's `R0`…`R3` or the angle `0`, `90`, `180` or `270` (`90` is `R1`), and is unset as `R0`. The layout is resolved against the display as the board constructs it at that rotation:
+**The pins are the board's, not the project's** ([D-22]). Schema 0.7 removed `cs`, `dc`, `reset`, `address` and the `<bus>` element. They never had any effect: U8G2GL does not construct the display (§13.10), so it could only record them, and one UI project serves every board that carries the same panel, whatever pins each uses. The firmware's board layer (`board.h` in the foundation) constructs and wires the display. A pin attribute or `<bus>` written in any schema version is refused, once per occurrence at its line, with `U8G2GL_REMOVED_ATTRIBUTE`, whose message says where the wiring belongs and names `u8g2gl display <setup> --snippet` (§15.4). That command, and the designer's target section, print the board-side code that constructs the display, with a named placeholder for each pin the wiring takes (§16).
+
+**`rotation` is honoured.** It takes U8G2's `R0`…`R3` or the angle `0`, `90`, `180` or `270` (`90` is `R1`), or, from schema 0.7, one of U8G2's two mirrors, `MIRROR` and `MIRROR_VERTICAL`. Unset is `R0`. Six rotations in all, with the four angles as alternative spellings. The layout is resolved against the display as the board constructs it at that rotation:
 
 - **`R1` and `R3` swap the width and height.** A 256×64 panel at `R1` lays out 64 wide and 256 tall: `#screen_width` is 64, bounds are judged against 64×256, and a bounds diagnostic names the size and how it came by it (`display 64×256 (256×64 rotated 90°) is 64px wide`), so the author is not left comparing against a size they never wrote. The designer draws the canvas, the impact preview and a test run at that size.
 - **`R0` and `R2` are layout-neutral.** A half turn draws the same layout upside down, so nothing about it is resolved differently.
+- **The mirrors are layout-neutral too.** `MIRROR` flips the panel left–right and `MIRROR_VERTICAL` top–bottom, without changing its size, for a panel seen through reflective or head-up-display glass. The designer draws the layout the right way round, as it does for `R2`, and the contract passes `U8G2_MIRROR` or `U8G2_MIRROR_VERTICAL` to the constructor. They are additive: a 0.4–0.6 project writing one is told it needs `schema="0.7"` (`U8G2GL_NEWER_SCHEMA_REQUIRED`).
 - **The panel itself is never rotated.** Its own size, framebuffer, tiles, bus and driver are the hardware's at every rotation, so §18's framebuffer line and the catalogue record do not change. One function, `orientedDisplay()` in `core/resolver`, computes the swap, and every layout reader takes its size from it.
-- **The generated contract carries it to the board** (§16): `U8G2GL_TARGET_ROTATION` is the `U8G2_Rn` to construct with, and `ui_display_matches()` checks the size the constructed display reports.
+- **The generated contract carries it to the board** (§16): `U8G2GL_TARGET_ROTATION` is the `U8G2_Rn` (or mirror) to construct with, and `ui_display_matches()` checks the size the constructed display reports.
 
-*Rotation is not the controller's flip mode.* U8G2's `U8G2_R0`…`U8G2_R3` are software transforms in the u8g2 layer: `u8g2_SetDisplayRotation()` (`u8g2_setup.c`) swaps the drawing callback and recomputes the width and height `getDisplayWidth()` and `getDisplayHeight()` report. `setFlipMode()` (`u8x8_display.c`) is a controller command instead, 180° only, applying the controller's own column offset (for the SSD1322, `u8x8_d_ssd1322.c`), and changes no dimension. U8G2GL emits the rotation the board constructs with; a firmware's own `setFlipMode()` at runtime is a controller-level flip on top of it, which U8G2GL neither sees nor needs to.
+*Rotation is not the controller's flip mode.* U8G2's `U8G2_R0`…`U8G2_R3`, `U8G2_MIRROR` and `U8G2_MIRROR_VERTICAL` are software transforms in the u8g2 layer: `u8g2_SetDisplayRotation()` (`u8g2_setup.c`) swaps the drawing callback and recomputes the width and height `getDisplayWidth()` and `getDisplayHeight()` report. `setFlipMode()` (`u8x8_display.c`) is a controller command instead, 180° only, applying the controller's own column offset (for the SSD1322, `u8x8_d_ssd1322.c`), and changes no dimension. U8G2GL emits the rotation the board constructs with; a firmware's own `setFlipMode()` at runtime is a controller-level flip on top of it, which U8G2GL neither sees nor needs to.
 
 ### 5.2 The Display Catalogue
 
@@ -384,11 +387,16 @@ Every field is derived from U8G2's own tables — nothing is hand-entered:
   "width": 128, "height": 64,
   "tiles": { "w": 16, "h": 8 },
   "framebuffer_bytes": 1024,
-  "bus": { "family": "i2c", "wiring": "hardware", "raw": "HW_I2C" },
+  "bus": {
+    "family": "i2c", "wiring": "hardware", "raw": "HW_I2C",
+    "pins": [{ "name": "reset", "optional": true }, { "name": "clock", "optional": true }, { "name": "data", "optional": true }]
+  },
   "x_offset": { "default": 0, "flipmode": 0 },
   "driver": "u8x8_d_ssd1306_128x64_noname"
 }
 ```
+
+`bus.pins` lists the constructor's pin parameters in U8G2's order, without the leading `rotation`, read from `U8g2lib.h` when the catalogue is built; `optional` marks a parameter U8G2 defaults to `U8X8_PIN_NONE`. U8G2GL never knows a pin's value ([D-22]); the list exists so the constructor snippet (§16) can name every argument, and a constructor of any other shape fails the catalogue build rather than being skipped.
 
 `framebuffer_bytes` is exact, taken from the buffer allocator (`u8g2_m_16_8_f` → 16×8 tiles × 8 = 1024), not estimated. Across the catalogue these range from **8 bytes to 25,600 bytes** (80×40 tiles, a 640×320 panel) over 73 distinct sizes — a 3200× spread, which is why the figure has to be reported rather than assumed.
 
@@ -441,6 +449,8 @@ $ u8g2gl find --min-width 240 --fits esp32dev
 **(c) Compare — "which of these variants?"** Tabulates candidates with only the differing fields, which is the useful view when disambiguating `NONAME` vs `VCOMH0` vs a vendor variant.
 
 **(d) Enumerate — the whole catalogue**, for a skill or agent to index locally: `u8g2gl catalogue --json`.
+
+**(e) One display — "what does my board write?"** `u8g2gl display <setup>` prints one record, with the pins its constructor takes; `--snippet` prints the board-side constructor code for it (§16). An unknown setup exits 1 naming the nearest catalogued setups, and a page-mode one its full-buffer twin.
 
 #### Mode (a) in detail — variant disambiguation and useful failure
 
@@ -2078,6 +2088,7 @@ error: screens/screen_home.xml:14:32
 | `validate` | Diagnostics with file, line, column, severity, code, message, suggestions |
 | `generate` | Files written, plus the §18 budget as structured figures |
 | `find` / `catalogue` | Display records per §5.2 |
+| `display` | One record per §5.2, and its constructor snippet (§16) |
 | `fonts` | Declared and built-in fonts with ranges and sizes |
 
 Two properties make this useful rather than decorative:
@@ -2091,13 +2102,19 @@ This is the mechanism by which "diagnostics are the product" (§1.2) actually pa
 
 ### 15.4 Schema Versioning
 
-`u8g2gl.xml` declares `schema="0.6"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
+`u8g2gl.xml` declares `schema="0.7"`. The CLI refuses unknown versions and, for known-older ones, prints the specific changes required. Pre-1.0 breaking changes are expected; the requirement is that they are *diagnosable*, never silent.
 
 **0.4 → 0.5 is additive**, so it has no migration table. 0.5 adds only the palette metadata on `<api>` (§13.1); a 0.4 document means exactly what it meant, and the CLI still accepts `0.4`. What a 0.4 project may not do is use 0.5's additions: each `label`, `category` or `description` in one of its own manifests is `U8G2GL_NEWER_SCHEMA_REQUIRED`, naming `schema="0.5"` as the fix, never silently accepted. The framework's own manifests carry the metadata and are not held to the project's version, because the project did not write them.
 
 **0.5 → 0.6 is additive** in the same way. 0.6 adds only `icon` on `<api>` (§13.1), and the CLI accepts `0.4`, `0.5` and `0.6`. An `icon` in one of a 0.4 or 0.5 project's own manifests is one `U8G2GL_NEWER_SCHEMA_REQUIRED`, naming `schema="0.6"` as the fix; the value is not judged until the project declares 0.6. The framework's own manifests carry icons and, as with the metadata, are not held to the project's version.
 
-**0.4 and 0.5 projects keep working unchanged.** The generated schema guard asserts the schema the generator wrote for, not the one the project declares (§16, `rules/03-versioning.md`): every version the CLI accepts is the current schema or an older minor that 0.6 only adds to, so code generated from a 0.4 or 0.5 project asserts `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 6)` and builds against the 0.6 runtime (runtime 0.12). Each generated file's `// schema:` stamp still records the version the project declared. Code generated by an earlier CLI asserts the schema that CLI wrote for, so it must be regenerated to build against a newer runtime.
+**0.6 → 0.7 adds the mirrors and removes the pins.** The CLI accepts `0.4`, `0.5`, `0.6` and `0.7`.
+
+- *Added:* `MIRROR` and `MIRROR_VERTICAL` for `rotation` (§5.1). A mirror in a 0.4–0.6 project is one `U8G2GL_NEWER_SCHEMA_REQUIRED` on its target, naming `schema="0.7"` as the fix.
+- *Removed:* `cs`, `dc`, `reset` and `address` on `<display>`, `<target>` and `<bus>`, and the `<bus>` element ([D-22]). Each written one is `U8G2GL_REMOVED_ATTRIBUTE`, an error **at every schema version**, once per occurrence at its own line, saying that pins and bus are configured by the firmware's board and naming `u8g2gl display <setup> --snippet` with the target's setup. Never the generic unknown-attribute message.
+- *Why older versions stay accepted.* The removal is breaking surface, and the letter of `rules/03-versioning.md` would refuse every pre-0.7 project with a migration table. The owner weighed that and rejected it (2026-11-14): a pin never had any effect, so the only files the removal breaks are the ones that write one, and each of those gets the exact fix at the exact line. Refusing every 0.4–0.6 project to remove an attribute none of them needs would make every project edit its version string for nothing. The break is still diagnosable, never silent, which is what this section requires.
+
+**0.4, 0.5 and 0.6 projects keep working unchanged**, provided they write no pin. The generated schema guard asserts the schema the generator wrote for, not the one the project declares (§16, `rules/03-versioning.md`): every version the CLI accepts is the current schema or an older minor that 0.7 only adds to, once the pins are gone, so code generated from a 0.4, 0.5 or 0.6 project asserts `U8G2GL_REQUIRE_SCHEMA_VERSION(0, 7)` and builds against the 0.7 runtime (runtime 0.13). Each generated file's `// schema:` stamp still records the version the project declared. Code generated by an earlier CLI asserts the schema that CLI wrote for, so it must be regenerated to build against a newer runtime.
 
 **0.3 → 0.4 is breaking**, and the CLI must refuse 0.3 naming each change rather than failing obscurely:
 
@@ -2169,6 +2186,8 @@ display.begin();
 if (!ui_display_matches(display)) { /* the firmware's call: report it, refuse to start the UI */ }
 ui_init();
 ```
+
+**The constructor snippet is the board-side reference.** `u8g2gl display <setup> --snippet [--rotation <r>] [--target <name>]` prints the whole of that code for a catalogued display, and the designer's target section shows the same text, byte for byte, with Copy: both come from one core function, `constructorSnippet()`. It has the two includes (`<U8g2lib.h>` and the generated `ui.hpp`); a `#define DISPLAY_<NAME>` for every pin the wiring takes, each set to `FILL_IN_PIN`, an identifier nothing declares, so an unfilled sample fails to compile by name rather than building against an invented pin (an optional pin says `U8X8_PIN_NONE` is allowed); the constructor with `U8G2GL_TARGET_ROTATION` and the pins in U8G2's own parameter order (from the catalogue's `bus.pins`, §5.2); and `setup()` with `begin()`, the `ui_display_matches()` check naming the target, then `ui_init()`. An I²C wiring adds a commented `setI2CAddress()`, because U8G2 cannot know the panel's address. The rotation appears only as the macro, so the code stays right when the project's rotation changes; the comment beside it names what the macro expands to. **It is never written to `generated/`**: generated code is compiled and committed, and a sample there would go stale or be compiled a second time beside the board's real constructor. The C++ suite compiles and links three of its goldens (HW SPI, SW SPI, HW I²C) against the pinned U8G2 (`test/snippet_compile/`).
 
 A target whose `setup` has no catalogue record is refused by validation before emission (`U8G2GL_UNKNOWN_DISPLAY`, or `U8G2GL_MISSING_REQUIRED` for no `setup`), so the contract is never emitted without values.
 

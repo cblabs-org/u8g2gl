@@ -23,7 +23,7 @@
  *              Where a new value goes, in order:
  *              1. where the parser reads it now, if it is written;
  *              2. a place the parser reads first, if that element is written
- *                 (a `<bus>` child supplies every bus value);
+ *                 (`beforeCanonical`; none since schema 0.7 removed `<bus>`);
  *              3. the canonical place, if its element is written;
  *              4. when the canonical element is absent, beside the values of
  *                 that element that are written elsewhere (a target that
