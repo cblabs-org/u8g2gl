@@ -27,19 +27,25 @@
  *     - documents, activeFile, selection, problems, output, projectName
  *     - canvasFile:     The file of the screen the canvas draws
  *     - elementTrees:   Each screen's element rows, for the Explorer
+ *     - projectSections: Each project file's section rows, for the Explorer
  *     - designHidden:   The elements the author hid in the designer (never exported)
+ *     - activeTarget:   The target the designer shows (per browser, never exported)
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
+ *     - formHighlight:  The range of the project-file form's focused section, for the XML
+ *     - formCaret:      Where the XML caret is in a project file, for its form
+ *     - formReveal:     The form section the Explorer last asked to show
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded
- *     - refreshElementTrees(): Rebuild the element rows from the text (each run)
+ *     - refreshElementTrees(): Rebuild the element and section rows from the text (each run)
  *
  *     Requests:
  *     - save():         Save one document; show Output if that fails
  *     - saveActive():   ⌘S: the active document, else the canvas's
  *     - saveAll():      ⌘⌥S: every unsaved document, one at a time
  *     - openFile():     Ask the layout to show a file
+ *     - revealFormSection(): Open a project file at a section of its form
  *     - onOpenFile():   The layout's subscription to those requests
  *     - showOutput():   Ask the layout to bring Output to the front
  *     - onShowOutput(): The layout's subscription to those requests
@@ -48,7 +54,10 @@
 
 import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import { DesignHiddenModel } from './canvas/design-hidden';
+import { ActiveTarget } from './project/active-target';
 import { nextTrees, type ElementNode } from './documents/element-tree';
+import { isFormFile } from './forms/form-model';
+import { nextSectionRows, type SectionRow } from './forms/form-sections';
 import { ProjectDocuments, type SaveOutcome } from './documents/project-documents';
 import type { ProblemRow } from './pipeline/diagnostics';
 import { EditLoop } from './pipeline/edit-loop';
@@ -93,11 +102,23 @@ export class Workspace {
    */
   readonly elementTrees = new Observable<ReadonlyMap<string, readonly ElementNode[]>>(new Map());
   /**
+   * The section rows of `u8g2gl.xml` and `globals.xml`, from their current
+   * buffers (ui_spec §6), rebuilt with the element trees and replaced only when
+   * a row would change.
+   */
+  readonly projectSections = new Observable<ReadonlyMap<string, readonly SectionRow[]>>(new Map());
+  /**
    * The elements the author hid in the designer: a view setting of this
    * browser, never the XML's or the device's `hidden`. Loaded at `start()`,
    * once the project's name is known.
    */
   readonly designHidden = new DesignHiddenModel();
+  /**
+   * The target the canvas, inserts and the impact preview resolve against:
+   * the status bar's switcher ([U-3]). A view setting of this browser, never
+   * written to the XML. Loaded at `start()`, with the project's name.
+   */
+  readonly activeTarget = new ActiveTarget();
   /** The Problems panel's rows. */
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
@@ -111,6 +132,21 @@ export class Workspace {
   readonly projectName = new Observable<string>('');
   /** Whether the design server can be reached: the session banner shows while it is `lost`. */
   readonly connection: Observable<ConnectionState>;
+  /**
+   * The text range of the project-file form's focused section, item or part:
+   * the XML editor highlights it, without taking focus. Never an edit.
+   */
+  readonly formHighlight = new Observable<{ readonly path: string; readonly start: number; readonly end: number } | undefined>(undefined);
+  /**
+   * Where the caret was last put in a project file's XML: its form scrolls to
+   * the section, item or part it is in, without taking focus.
+   */
+  readonly formCaret = new Observable<{ readonly path: string; readonly offset: number } | undefined>(undefined);
+  /**
+   * The form section the Explorer last asked to show, with a count so the
+   * same section asked for twice is shown twice.
+   */
+  readonly formReveal = new Observable<{ readonly path: string; readonly key: string; readonly seq: number } | undefined>(undefined);
 
   private readonly openListeners = new Set<(request: OpenRequest) => void>();
   private readonly outputListeners = new Set<() => void>();
@@ -186,6 +222,7 @@ export class Workspace {
    */
   start(): void {
     this.designHidden.load(this.projectName.get());
+    this.activeTarget.load(this.projectName.get());
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
     this.testRun.start();
@@ -195,7 +232,8 @@ export class Workspace {
   /**
    * @brief Rebuilds each listed screen's element tree from its current text,
    *        keeping a tree whose text no longer parses (element-tree.ts), and
-   *        drops hidden names the trees no longer have. The edit loop calls it
+   *        drops hidden names the trees no longer have; and the project
+   *        files' section rows, under the same rule (form-sections.ts). The edit loop calls it
    *        in each run, before it draws, so the rows, the hiding and the frame
    *        all come from the same text.
    */
@@ -209,6 +247,13 @@ export class Workspace {
     this.elementTrees.set(nextTrees(this.elementTrees.get(), texts, this.treeTexts));
     this.treeTexts = texts;
     this.designHidden.prune(this.elementTrees.get());
+    const projectTexts = new Map<string, string>();
+    for (const path of this.documents.files.get()) {
+      if (!isFormFile(path)) continue;
+      const text = this.documents.textOf(path);
+      if (text !== undefined) projectTexts.set(path, text);
+    }
+    this.projectSections.set(nextSectionRows(this.projectSections.get(), projectTexts));
   }
 
   /**
@@ -259,6 +304,18 @@ export class Workspace {
   /** @brief Asks the layout to show a file, at a position if given. */
   openFile(request: OpenRequest): void {
     for (const listener of [...this.openListeners]) listener(request);
+  }
+
+  /**
+   * @brief Opens a project file and shows a section of its form: an Explorer
+   *        section row's click.
+   *
+   * @param path `u8g2gl.xml` or `globals.xml`.
+   * @param key  The form section's (or item's) key.
+   */
+  revealFormSection(path: string, key: string): void {
+    this.openFile({ path });
+    this.formReveal.set({ path, key, seq: (this.formReveal.get()?.seq ?? 0) + 1 });
   }
 
   /** @brief The layout's subscription to open requests; returns the unsubscribe. */

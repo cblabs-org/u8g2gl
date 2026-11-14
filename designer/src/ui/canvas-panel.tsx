@@ -28,7 +28,9 @@
  *              legend sits over the stage. The banner says why the frame is
  *              the last good one, or what the renderer cannot draw. While
  *              anything on the drawn screen is hidden in the designer, the
- *              toolbar says so (`design-hidden-badge.tsx`).
+ *              toolbar says so (`design-hidden-badge.tsx`). While a project
+ *              file is the active file, its form covers the panel
+ *              (`forms/project-form.tsx`), with the canvas still beneath.
  *
  * Exports:
  * - CanvasPanel:  The component
@@ -47,6 +49,7 @@ import { TestRunControls, TestRunDiffInfo } from './test-run-controls';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
+import { ProjectFormHost } from '../forms/project-form';
 
 /** Zoom choices; 0 means fit to the panel. */
 const ZOOMS = [0, 1, 2, 3, 4, 6, 8] as const;
@@ -174,6 +177,9 @@ export function CanvasPanel(): React.JSX.Element {
           <canvas className="overlay" ref={overlay} />
         </div>
       </div>
+      {/* While u8g2gl.xml or globals.xml is active, its form covers the canvas
+          half; the canvas stays mounted beneath, so the loop keeps its view. */}
+      <ProjectFormHost />
     </div>
   );
 }

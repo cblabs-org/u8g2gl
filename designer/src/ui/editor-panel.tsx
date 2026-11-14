@@ -26,7 +26,9 @@
  *              decorated here, and one selected on the canvas is revealed —
  *              scrolled into view only if it is outside it — **without taking
  *              focus**, so the next key still goes to the canvas. Neither
- *              direction edits the text.
+ *              direction edits the text. For `u8g2gl.xml` and `globals.xml`
+ *              the same holds with their form: the caret's place scrolls the
+ *              form to it, and the form's focused part is highlighted here.
  *
  * Exports:
  * - EditorPanelParams:  Which document the tab shows
@@ -36,6 +38,7 @@
 import type { IDockviewPanelProps } from 'dockview-react';
 import { useEffect, useRef, useState } from 'react';
 import { elementAt } from '../documents/element-at';
+import { isFormFile } from '../forms/form-model';
 import type * as monaco from 'monaco-editor/editor/editor.api';
 import { loadMonaco, monacoReady, THEME, type Monaco } from '../monaco/monaco';
 import type { OpenRequest } from '../workspace';
@@ -150,9 +153,13 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
       if (found === 'unparsed') return;
       workspace.selection.caretMoved(path, found?.name, explicit);
     };
-    const caretListener = editor.onDidChangeCursorPosition((event) =>
-      select(event.reason === api.editor.CursorChangeReason.Explicit),
-    );
+    const caretListener = editor.onDidChangeCursorPosition((event) => {
+      const explicit = event.reason === api.editor.CursorChangeReason.Explicit;
+      select(explicit);
+      // A project file's caret moves its form to the same place; only a move
+      // the author made, so an edit landing from the form never jumps it.
+      if (explicit && isFormFile(path)) workspace.formCaret.set({ path, offset: model.getOffsetAt(event.position) });
+    });
 
     // --- Step 4: The selection decorated, and revealed when the canvas chose it ---
     const decorations = editor.createDecorationsCollection();
@@ -181,6 +188,22 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
     showSelection();
     const unsubscribeSelection = workspace.selection.current.subscribe(showSelection);
 
+    // --- Step 4b: The project-file form's focused part, highlighted, never focused ---
+    const formDecorations = editor.createDecorationsCollection();
+    const showFormHighlight = (): void => {
+      const highlight = workspace.formHighlight.get();
+      if (highlight === undefined || highlight.path !== path) {
+        formDecorations.clear();
+        return;
+      }
+      const start = model.getPositionAt(highlight.start);
+      const end = model.getPositionAt(highlight.end);
+      formDecorations.set([{ range: new api.Range(start.lineNumber, start.column, end.lineNumber, end.column), options: selected }]);
+      editor.revealRangeInCenterIfOutsideViewport(new api.Range(start.lineNumber, 1, end.lineNumber, 1), api.editor.ScrollType.Smooth);
+    };
+    showFormHighlight();
+    const unsubscribeFormHighlight = workspace.formHighlight.subscribe(showFormHighlight);
+
     // --- Step 5: Activity: the active tab's file is the one the canvas shows ---
     // Activation selects the caret's element only when the selection is in
     // another file: a tab brought forward to show a canvas selection must not
@@ -198,7 +221,9 @@ export function EditorPanel(props: IDockviewPanelProps<EditorPanelParams>): Reac
     return () => {
       unsubscribeOpen();
       unsubscribeSelection();
+      unsubscribeFormHighlight();
       decorations.clear();
+      formDecorations.clear();
       caretListener.dispose();
       activeListener.dispose();
       focusListener.dispose();

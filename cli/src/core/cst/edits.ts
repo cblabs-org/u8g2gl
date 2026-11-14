@@ -105,11 +105,15 @@ function lineBreak(cst: CstDocument): string {
   return match ? match[0] : '\n';
 }
 
-// indentStep
-// The document's own indentation step: the first place, in document order,
-// where an element's line is indented beyond its parent element's line by a
-// whitespace suffix. Two spaces when nothing is nested on separate lines.
-function indentStep(cst: CstDocument): string {
+/**
+ * The document's own indentation step: the first place, in document order,
+ * where an element's line is indented beyond its parent element's line by a
+ * whitespace suffix. Two spaces when nothing is nested on separate lines.
+ *
+ * @param cst  The document to learn the step from.
+ * @returns    The step, as the whitespace the document uses.
+ */
+export function indentStep(cst: CstDocument): string {
   const search = (parent: CstElement): string | undefined => {
     const parentIndent = indentAt(cst, parent.start);
     for (const child of parent.children) {

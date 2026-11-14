@@ -38,6 +38,9 @@
  *              composite's children are targets of the instance written in
  *              the screen, never of their own names.
  *
+ *              It resolves against the active target (`pickTarget`): the one
+ *              the status bar chose, else the first.
+ *
  *              It also returns the subjects' declared values, which the
  *              caller applies after every scene, since a rebuild clears them.
  *
@@ -61,6 +64,8 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnosti
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
 import type { ProjectModelCache } from '../project/project-model';
+import { pickTarget } from '../project/active-target';
+import type { Target } from '@u8g2gl/core/schema/project.js';
 import type { HitTarget } from '../selection/hit-test';
 
 /** A device-space rectangle. */
@@ -84,12 +89,20 @@ export interface TextPipelineInput {
   readonly assets: CompiledAssets | undefined;
   /** The file whose screen the canvas shows, if it is a screen. */
   readonly activeFile: string | undefined;
+  /**
+   * The name of the target to resolve against, as the status bar's switcher
+   * chose it (`project/active-target.ts`); the first target when absent or
+   * not declared.
+   */
+  readonly targetName?: string | undefined;
 }
 
 /** One run's outcome. */
 export interface TextPipelineResult {
   /** The project model the run was of. */
   readonly model: ProjectModel;
+  /** The target the run was resolved and validated against; undefined when the project declares none. */
+  readonly target: Target | undefined;
   /** Every diagnostic, deduplicated and sorted (`checkProject`'s order). */
   readonly diagnostics: readonly Diagnostic[];
   readonly errors: number;
@@ -171,7 +184,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   lap('parse');
 
   // --- Step 2: Expand and resolve once, against the target's display ---
-  const target = model.project.targets[0];
+  const target = pickTarget(model.project.targets, input.targetName);
   const display = findTargetDisplay(target, model.catalogue);
   const pipeline = createScreenPipeline({
     globals: model.globals,
@@ -246,6 +259,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
 
   return {
     model,
+    target,
     diagnostics: diagnostics.diagnostics,
     errors: diagnostics.errors,
     scene,

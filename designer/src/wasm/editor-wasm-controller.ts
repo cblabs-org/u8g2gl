@@ -41,6 +41,7 @@
  *     - isFramework:          Whether the module is the framework's
  *     - buildDiagnostics:     A failed build's diagnostics, for Problems
  *     - start():              Load the framework module and request a build
+ *     - spareInstance():      A second instance of the loaded module, for previews
  *     - fileChanged():        Note a project file change
  *     - dispose():            Stop polling
  */
@@ -120,6 +121,10 @@ export class EditorWasmController {
   private readonly session: DesignSession;
   private readonly log: (line: string) => void;
   private loadedHash: string | undefined;
+  /** Where the module the canvas draws with was loaded from, for a spare instance. */
+  private source: { readonly loader: string; readonly wasm: string; readonly headers: Readonly<Record<string, string>> } | undefined;
+  /** A second instance of that module, for previews; replaced when the source changes. */
+  private spare: { readonly from: string; readonly module: Promise<EditorModule> } | undefined;
   private building = false;
   private rebuildWanted = false;
   private disposed = false;
@@ -138,6 +143,7 @@ export class EditorWasmController {
     try {
       const framework = await loadEditorModule(`${FRAMEWORK_DIR}/u8g2gl_editor.js`, `${FRAMEWORK_DIR}/u8g2gl_editor.wasm`);
       if (this.module.get() === undefined) {
+        this.source = { loader: `${FRAMEWORK_DIR}/u8g2gl_editor.js`, wasm: `${FRAMEWORK_DIR}/u8g2gl_editor.wasm`, headers: {} };
         this.module.set(framework);
       }
       this.log('editor Wasm: the framework renderer is loaded');
@@ -146,6 +152,29 @@ export class EditorWasmController {
     }
     this.status.set({ kind: 'building' });
     this.requestBuild();
+  }
+
+  /**
+   * @brief A second instance of the module the canvas draws with, for drawing
+   *        something the canvas must not: the display picker's impact preview
+   *        renders a candidate display in it, leaving the canvas's own scene
+   *        untouched. Loaded once per module and kept.
+   *
+   * @return The instance, or undefined while no module is loaded.
+   * @throws Error if it cannot be fetched or started.
+   */
+  spareInstance(): Promise<EditorModule> | undefined {
+    const source = this.source;
+    if (source === undefined) return undefined;
+    if (this.spare === undefined || this.spare.from !== source.wasm) {
+      const module = loadEditorModule(source.loader, source.wasm, source.headers);
+      // A failed load is not kept, so the next request tries again.
+      module.catch(() => {
+        if (this.spare?.module === module) this.spare = undefined;
+      });
+      this.spare = { from: source.wasm, module };
+    }
+    return this.spare.module;
   }
 
   /** @brief Notes a project file change; rebuilds if it can change the build. */
@@ -228,6 +257,7 @@ export class EditorWasmController {
     }
     const base = `${this.session.origin}/api/editor-wasm/${encodeURIComponent(record.id)}`;
     const module = await loadEditorModule(`${base}/u8g2gl_editor.js`, `${base}/u8g2gl_editor.wasm`, this.headers());
+    this.source = { loader: `${base}/u8g2gl_editor.js`, wasm: `${base}/u8g2gl_editor.wasm`, headers: this.headers() };
     this.loadedHash = module.buildHash() ?? hash;
     this.module.set(module);
     this.isFramework.set(false);
