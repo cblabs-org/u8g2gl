@@ -86,11 +86,11 @@ export interface AttributeSpelling {
    */
   readonly beforeCanonical?: boolean;
   /**
-   * The id of an element whose presence hides this place from the parser:
-   * bus values on `<target>` are read only when the target has no
-   * `<display>`, since the parser reads the display instead.
+   * The ids of elements whose presence hides this place from the parser: bus
+   * values on `<target>` are read only when the target has neither a
+   * `<bus>` nor a `<display>`, since the parser reads those instead.
    */
-  readonly unlessPresent?: string;
+  readonly unlessPresent?: readonly string[];
 }
 
 /** One attribute, at its canonical place. */
@@ -108,6 +108,12 @@ export interface VocabularyAttribute {
   readonly busFamilies?: readonly BusFamily[];
   /** Shown, never edited in a form: changing it is a migration, not an edit (§15.4). */
   readonly readOnly?: boolean;
+  /**
+   * The ids of elements whose presence hides the canonical place from the
+   * parser: a `<bus>` child, when written, supplies every bus value, and the
+   * display's own are not read.
+   */
+  readonly unlessPresent?: readonly string[];
   /**
    * Every other place and spelling the parser accepts for it, in the order
    * the parser prefers them after the canonical one. A form reads all of them
@@ -189,11 +195,12 @@ function busAttribute(name: 'cs' | 'dc' | 'reset' | 'address', families: readonl
     required: false,
     help,
     busFamilies: families,
-    // parse-project.ts reads a `<bus>` child first, else the attributes on
-    // `<display>`, else on `<target>`.
+    // parse-project.ts reads a `<bus>` child, if written, for all four; else
+    // the attributes on `<display>`, if written; else those on `<target>`.
+    unlessPresent: ['bus'],
     alternatives: [
       { element: 'bus', name, beforeCanonical: true },
-      { element: 'target', name, unlessPresent: 'display' },
+      { element: 'target', name, unlessPresent: ['bus', 'display'] },
     ],
   };
 }
@@ -656,7 +663,7 @@ export function attributeSpellings(element: VocabularyElement, attribute: Vocabu
   const alternatives = attribute.alternatives ?? [];
   return [
     ...alternatives.filter((spelling) => spelling.beforeCanonical === true),
-    { element: element.id, name: attribute.name },
+    { element: element.id, name: attribute.name, ...(attribute.unlessPresent !== undefined ? { unlessPresent: attribute.unlessPresent } : {}) },
     ...alternatives.filter((spelling) => spelling.beforeCanonical !== true),
   ];
 }

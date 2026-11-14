@@ -258,13 +258,13 @@ describe('the project-file vocabulary: the parsers read all of it', () => {
           ]);
           // A place read only while another element is absent: every value
           // of that element moves to this place, and the element goes.
-          if (spelling.unlessPresent !== undefined) {
-            const absent = vocabularyElement(spelling.unlessPresent);
-            values.set(omit(spelling.unlessPresent), undefined);
+          for (const hidden of spelling.unlessPresent ?? []) {
+            const absent = vocabularyElement(hidden);
+            values.set(omit(hidden), undefined);
             for (const moved of absent?.attributes ?? []) {
               if (moved === attribute) continue;
               const there = moved.alternatives?.find((a) => a.element === spelling.element);
-              values.set(key(absent?.id ?? '', moved.name), undefined);
+              values.set(key(hidden, moved.name), undefined);
               if (there !== undefined) values.set(key(there.element, there.name), sampleValue(element, moved, 0));
             }
           }

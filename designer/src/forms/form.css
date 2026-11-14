@@ -1,0 +1,45 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/forms/form.css
+ * Purpose: The project-file form's look: laid over the canvas half of the
+ *          editor area, sections and list items as compact groups, fields in
+ *          the property panel's style (it reuses panel.css's field classes),
+ *          so a project setting reads like an element property.
+ */
+
+.canvas-panel { position: relative; }
+.project-form-host { position: absolute; inset: 0; z-index: 5; background: var(--bg); display: flex; flex-direction: column; }
+.project-form-scroll { flex: 1; overflow: auto; padding: 8px 16px 24px; font-size: 12px; }
+.project-form { max-width: 720px; }
+.project-form[data-readonly='true'] .form-section { opacity: 0.6; }
+
+.form-banner { margin: 0 0 8px; padding: 6px 10px; border: 1px solid var(--error); border-radius: 3px; color: var(--text); background: #3a1d1d; }
+.form-banner.refusal { border-color: var(--warning); background: #3a311d; }
+
+.form-section { margin: 0 0 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-raised); scroll-margin-top: 8px; }
+.form-section > h3 { margin: 0 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); }
+.form-section[data-current='true'] { border-color: var(--accent); }
+.form-section .form-field { margin-bottom: 8px; }
+
+.form-list { display: flex; flex-direction: column; gap: 6px; }
+.form-item { padding: 6px 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); scroll-margin-top: 8px; }
+.form-item[data-current='true'],
+.form-part[data-current='true'] { border-color: var(--accent); }
+.form-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.form-item-header .spacer { flex: 1; }
+.form-item-kind { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.form-item-name { font-family: ui-monospace, Menlo, monospace; color: var(--text); }
+.form-item-header button { padding: 0 6px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+.form-item-header button:disabled { opacity: 0.35; cursor: default; }
+.form-part { margin: 6px 0 2px; padding: 4px 8px 2px; border: 1px solid var(--border); border-radius: 3px; }
+.form-part > legend { padding: 0 4px; color: var(--text-dim); font-size: 11px; }
+.form-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.form-add .action { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.form-add .action:disabled { opacity: 0.4; cursor: default; }
+.form-empty { margin: 0; color: var(--text-dim); font-style: italic; }
+.form-field .field-value[data-readonly='true'] { color: var(--text-dim); }
+.form-field .field-problem code,
+.form-field .field-reason code { font: 11px ui-monospace, Menlo, monospace; }

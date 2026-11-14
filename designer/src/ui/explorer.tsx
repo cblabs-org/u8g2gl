@@ -39,6 +39,12 @@
  *              except that a screen's menu also offers "Show all elements",
  *              for the elements hidden in the designer.
  *
+ *              `u8g2gl.xml` and `globals.xml` have a disclosure too, which
+ *              shows their form's sections (`section-tree-view.tsx`, from
+ *              `Workspace.projectSections`): a click opens the file with the
+ *              form scrolled to that section. Their expansion is remembered
+ *              with the screens'.
+ *
  * Exports:
  * - Explorer:       The component
  */
@@ -47,6 +53,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { paletteIcon } from '../palette/palette-icons';
 import { ContextMenu } from './context-menu';
 import { ElementTreeView } from './element-tree-view';
+import { SectionTreeView } from './section-tree-view';
+import { isFormFile } from '../forms/form-model';
 import { ExplorerExpansion } from './explorer-expansion';
 import { groupFiles, type ExplorerEntry, type ExplorerGroup } from './explorer-groups';
 import { entryMenu, type EntryCommands } from './explorer-menu';
@@ -74,6 +82,7 @@ export function Explorer(): React.JSX.Element {
   const name = useObservable(workspace.projectName);
   const dirty = useObservable(workspace.documents.dirty);
   const trees = useObservable(workspace.elementTrees);
+  const sections = useObservable(workspace.projectSections);
   const expansion = useMemo(() => new ExplorerExpansion(name), [name]);
   const expanded = useObservable(expansion.expanded);
   // The registry, not the run, as the Palette reads it: its identity changes
@@ -169,16 +178,20 @@ export function Explorer(): React.JSX.Element {
               const openable = workspace.documents.isDocument(path);
               const unsaved = dirty.has(path);
               const isScreen = group.title === 'Screens';
-              const open = isScreen && expanded.has(path);
+              // u8g2gl.xml and globals.xml disclose their form's sections, as
+              // a screen discloses its elements (ruling 2).
+              const hasSections = group.title === 'Project' && isFormFile(path);
+              const expandable = isScreen || hasSections;
+              const open = expandable && expanded.has(path);
               return (
-                <li key={path} className={isScreen ? 'screen-entry' : undefined}>
-                  {isScreen && (
+                <li key={path} className={expandable ? 'screen-entry' : undefined}>
+                  {expandable && (
                     <button
                       type="button"
                       className="disclosure"
                       aria-expanded={open}
-                      aria-label={`${open ? 'Hide' : 'Show'} the elements of ${label}`}
-                      title={`${open ? 'Hide' : 'Show'} the elements of ${label}`}
+                      aria-label={`${open ? 'Hide' : 'Show'} the ${isScreen ? 'elements' : 'sections'} of ${label}`}
+                      title={`${open ? 'Hide' : 'Show'} the ${isScreen ? 'elements' : 'sections'} of ${label}`}
                       onClick={() => expansion.setExpanded(path, !open)}
                     >
                       {open ? '▾' : '▸'}
@@ -206,7 +219,10 @@ export function Explorer(): React.JSX.Element {
                       </span>
                     )}
                   </button>
-                  {open && (
+                  {open && hasSections && (
+                    <SectionTreeView file={path} rows={sections.get(path) ?? []} onOpen={(key) => workspace.revealFormSection(path, key)} />
+                  )}
+                  {open && isScreen && (
                     <ElementTreeView
                       file={path}
                       label={label}
