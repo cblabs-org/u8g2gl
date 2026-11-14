@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="home">
+    <view>
+        <u8g2gl_label name="lbl_title" x="0" y="0" width="64" height="12"
+                      font="u8g2_font_6x10_mr" bind_text="title" align="center" />
+        <u8g2gl_box name="box_body" x="0" y="16" width="64" height="224" />
+        <u8g2gl_box name="box_footer" x="0" y="244" width="64" height="12" />
+    </view>
+</screen>

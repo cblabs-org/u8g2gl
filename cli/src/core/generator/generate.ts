@@ -44,7 +44,7 @@ import type { BdfFontDecl, ImageDecl } from '../schema/globals.js';
 import type { Target } from '../schema/project.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import type { RefusalPolicy } from '../validator/validate-not-yet-supported.js';
-import { createScreenPipeline, findTargetDisplay, type ResolvedScreen } from '../resolver/index.js';
+import { createScreenPipeline, findOrientedDisplay, type ResolvedScreen } from '../resolver/index.js';
 import { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
 import { emitProjectFiles } from './emit/index.js';
 import { computeCapacities, realiseScreens, type Capacities, type RealisedScreen } from '../realise/index.js';
@@ -297,7 +297,8 @@ export function generate(input: GenerateInput): GenerateResult {
   // composite interiors at all (WO7 F2) and the first target was resolved twice
   // (WO6 finding 11). An unresolved target has no display to build for; the
   // refusal below reports it, and validation falls back to the first target.
-  const display = 'code' in target ? undefined : findTargetDisplay(target, input.catalogue);
+  // The display is oriented by the target's rotation: R1/R3 lay out portrait.
+  const display = 'code' in target ? undefined : findOrientedDisplay(target, input.catalogue);
   const pipeline =
     'code' in target
       ? undefined

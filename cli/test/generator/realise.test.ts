@@ -26,7 +26,7 @@ import {
   parseScreenFile,
   parseWidgetManifestFile,
 } from '../../src/core/parser/index.js';
-import { createScreenPipeline } from '../../src/core/resolver/index.js';
+import { createScreenPipeline, orientedDisplay } from '../../src/core/resolver/index.js';
 import {
   computeCapacities,
   generate,
@@ -97,7 +97,8 @@ function composite(name: string, props: string, view: string, attrs = ''): Widge
  */
 function realise(body: string, composites: readonly WidgetManifest[] = []): RealisationResult {
   const manifests = frameworkRegistry(composites);
-  const display = CATALOGUE.find((record) => record.setup === WIDE);
+  const record = CATALOGUE.find((entry) => entry.setup === WIDE);
+  const display = record === undefined ? undefined : orientedDisplay(record, undefined);
   const pipeline = createScreenPipeline({
     globals: globals(),
     screens: [screen(body)],

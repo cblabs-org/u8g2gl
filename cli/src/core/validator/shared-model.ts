@@ -27,7 +27,7 @@
  */
 
 import type { Target } from '../schema/project.js';
-import { createScreenPipeline, findTargetDisplay, type ScreenPipeline } from '../resolver/index.js';
+import { createScreenPipeline, findOrientedDisplay, type ScreenPipeline } from '../resolver/index.js';
 import { realiseScreens, type RealisationResult } from '../realise/index.js';
 import type { ValidateInput } from './validate.js';
 
@@ -56,7 +56,7 @@ export function pipelineOf(input: ValidateInput): ScreenPipeline {
   if (input.pipeline !== undefined) {
     return input.pipeline;
   }
-  const display = findTargetDisplay(checkedTarget(input), input.catalogue ?? []);
+  const display = findOrientedDisplay(checkedTarget(input), input.catalogue ?? []);
   return createScreenPipeline({
     globals: input.globals,
     screens: input.screens ?? [],

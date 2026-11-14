@@ -59,7 +59,7 @@ import { checkProject, finaliseDiagnostics, GENERATE_REFUSAL_POLICY } from '@u8g
 import { describeScenes } from '@u8g2gl/core/generator/emit/scene.js';
 import { placeScreen, type Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import { computeCapacities, realiseScreens, type RealisedElement, type RealisedScreen } from '@u8g2gl/core/realise/index.js';
-import { createScreenPipeline, drawnExtent, findTargetDisplay } from '@u8g2gl/core/resolver/index.js';
+import { createScreenPipeline, drawnExtent, findOrientedDisplay } from '@u8g2gl/core/resolver/index.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
@@ -117,7 +117,7 @@ export interface TextPipelineResult {
   readonly screen: string | undefined;
   /** The file `screen` is written in, where its elements' names are. */
   readonly screenFile: string | undefined;
-  /** The target display's size, if the catalogue knows it. */
+  /** The target display's size after its rotation, if the catalogue knows it. */
   readonly display: { readonly width: number; readonly height: number } | undefined;
   /**
    * Each selectable element's rectangle on `screen`, by the name written in
@@ -184,8 +184,10 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   lap('parse');
 
   // --- Step 2: Expand and resolve once, against the target's display ---
+  // Oriented by the target's rotation (design_spec §5.1): an R1 panel lays
+  // out, and is drawn, portrait.
   const target = pickTarget(model.project.targets, input.targetName);
-  const display = findTargetDisplay(target, model.catalogue);
+  const display = findOrientedDisplay(target, model.catalogue);
   const pipeline = createScreenPipeline({
     globals: model.globals,
     screens: model.screens,

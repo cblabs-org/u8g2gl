@@ -51,10 +51,14 @@
  * - ResolvedElement:         One element, its container, geometry, axis outcomes and children
  * - ResolvedScreen:          One screen resolved against a display
  * - ResolverContext:         Constants, registry and display shared by one resolution
+ * - DisplaySize:             A display's size as layout sees it, and how a rotation gave it
+ * - OrientedDisplay:         A display record's size after its target's rotation
  * - ResolveInput, ResolveResult
  * - isCentringOn():          Whether an `hcenter` / `vcenter` value centres
  * - isRectangular():         Whether a manifest declares x, y, width and height
  * - findTargetDisplay():     A target's display record from the catalogue
+ * - orientedDisplay():       A record's layout size under a rotation (R1/R3 swap)
+ * - findOrientedDisplay():   A target's display, oriented by the target's rotation
  * - createResolverContext(): Build a context for one target
  * - displayContainer():      The screen-level container for a context
  * - resolveElements():       Resolve a view subtree inside a given container
@@ -65,6 +69,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { DisplayRecord } from '../schema/display-record.js';
 import type { ConstDecl, Globals } from '../schema/globals.js';
 import type { Target } from '../schema/project.js';
+import { normaliseRotation, ROTATION_DEGREES, type Rotation } from '../schema/project-vocabulary.js';
 import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
@@ -124,9 +129,41 @@ export interface ResolvedGeometry {
  * composite's top level before WO7 supplies the instantiation size, or a parent
  * whose own size did not resolve.
  */
-export interface Container extends ContainerSize {
+export interface Container extends DisplaySize {
   /** Names the container in diagnostics: "display", or "containing element '<tag>'". */
   readonly label: string;
+}
+
+/**
+ * A size as layout measures against it. For a display whose rotation swapped
+ * its width and height it also says so, because an author who wrote a 256×64
+ * panel and is told "64px wide" would otherwise be comparing against a size
+ * they never wrote (design_spec §5.1).
+ */
+export interface DisplaySize extends ContainerSize {
+  /**
+   * How a rotated display came by its size, for diagnostics:
+   * `64×256 (256×64 rotated 90°)`. Absent when no rotation changed the size —
+   * an element's container, or a display at R0/R2.
+   */
+  readonly orientation?: string;
+}
+
+/**
+ * A display's size as layout sees it: the catalogue record's native size after
+ * the target's rotation. Only `orientedDisplay()` makes one, so a pipeline
+ * typed to take it cannot be handed a raw record by mistake — a record has no
+ * `rotation`, and would not type-check.
+ */
+export interface OrientedDisplay {
+  /** Width after rotation: the native height at R1/R3. */
+  readonly width: number;
+  /** Height after rotation: the native width at R1/R3. */
+  readonly height: number;
+  /** The rotation applied, normalised (`90` → `R1`). */
+  readonly rotation: Rotation;
+  /** The panel's own size, as the catalogue records it. */
+  readonly native: { readonly width: number; readonly height: number };
 }
 
 /** A coordinate attribute that was written but has no value here. */
@@ -254,8 +291,11 @@ export interface ResolverContext {
   readonly constants: ReadonlyMap<string, ConstDecl>;
   /** Effective manifests, to find which geometry properties an element has. */
   readonly manifests: ManifestRegistry;
-  /** The target's display; sizes are absent when the target has no catalogue record. */
-  readonly display: ContainerSize;
+  /**
+   * The target's display, oriented by its rotation; sizes are absent when the
+   * target has no catalogue record.
+   */
+  readonly display: DisplaySize;
 }
 
 /** Everything {@link resolveScreens} needs. */
@@ -263,8 +303,8 @@ export interface ResolveInput {
   readonly globals: Globals;
   readonly screens: readonly Screen[];
   readonly manifests: ManifestRegistry;
-  /** The selected target's display record, if the catalogue has one. */
-  readonly display?: DisplayRecord;
+  /** The selected target's display, oriented, if the catalogue has one. */
+  readonly display?: OrientedDisplay;
 }
 
 /** Resolved screens and the diagnostics resolution raised. */
@@ -384,20 +424,90 @@ export function findTargetDisplay(
 }
 
 /**
+ * @brief A display's size as layout sees it under a rotation (design_spec §5.1).
+ *
+ * U8G2's `U8G2_R1` and `U8G2_R3` are software transforms that swap the
+ * dimensions `getDisplayWidth()` and `getDisplayHeight()` report
+ * (`u8g2_SetDisplayRotation()`); `R0` and `R2` leave them alone. This is the
+ * one place that swap is computed: every layout consumer — validation, the
+ * resolver, the scene, the designer's canvas — takes its size from here.
+ *
+ * **The record itself is never rotated.** Its framebuffer, tiles, bus and
+ * driver describe the hardware, which a rotation does not change: the buffer
+ * U8G2 allocates is the same bytes at R1 as at R0. So the caller keeps the
+ * record for hardware facts (§18's framebuffer line) and takes only layout
+ * geometry from the result.
+ *
+ * @param record   The target's catalogue record.
+ * @param rotation The target's `rotation` as written, or undefined when absent.
+ *                 An invalid value is laid out as R0: Pass 1 reports it, and
+ *                 judging bounds against a guessed swap would add errors about
+ *                 a rotation that does not exist.
+ * @return The oriented width and height, the normalised rotation, and the
+ *         native size.
+ */
+export function orientedDisplay(record: DisplayRecord, rotation: string | undefined): OrientedDisplay {
+  const normalised = normaliseRotation(rotation) ?? 'R0';
+  const swapped = normalised === 'R1' || normalised === 'R3';
+  return {
+    width: swapped ? record.height : record.width,
+    height: swapped ? record.width : record.height,
+    rotation: normalised,
+    native: { width: record.width, height: record.height },
+  };
+}
+
+/**
+ * @brief A target's display, oriented by that target's rotation.
+ *
+ * {@link findTargetDisplay} then {@link orientedDisplay}, for the layout
+ * consumers that need both, so none of them can find the record and forget to
+ * orient it.
+ *
+ * @return The oriented display, or undefined when there is no target or its
+ *         setup has no catalogue record.
+ */
+export function findOrientedDisplay(
+  target: Target | undefined,
+  catalogue: readonly DisplayRecord[],
+): OrientedDisplay | undefined {
+  const record = findTargetDisplay(target, catalogue);
+  return record === undefined ? undefined : orientedDisplay(record, target?.rotation);
+}
+
+// describeOrientation
+// How a rotation gave a display its size, or undefined when it did not change
+// it — R0/R2 are layout-neutral, so their messages stay as they always were.
+//   display — the oriented display
+function describeOrientation(display: OrientedDisplay): string | undefined {
+  if (display.width === display.native.width && display.height === display.native.height) {
+    return undefined;
+  }
+  return (
+    `${display.width}×${display.height} ` +
+    `(${display.native.width}×${display.native.height} rotated ${ROTATION_DEGREES[display.rotation]}°)`
+  );
+}
+
+/**
  * @brief Builds the context for resolving against one display.
  *
- * @param display The target's display record, or undefined — `#screen_*` and
+ * @param display The target's oriented display, or undefined — `#screen_*` and
  *                screen-level anchors then stay unresolved, without diagnostics.
  */
 export function createResolverContext(
   globals: Globals,
   manifests: ManifestRegistry,
-  display: DisplayRecord | undefined,
+  display: OrientedDisplay | undefined,
 ): ResolverContext {
+  const orientation = display === undefined ? undefined : describeOrientation(display);
   return {
     constants: buildConstantTable(globals),
     manifests,
-    display: display ? { width: display.width, height: display.height } : {},
+    display:
+      display === undefined
+        ? {}
+        : { width: display.width, height: display.height, ...(orientation !== undefined ? { orientation } : {}) },
   };
 }
 
@@ -842,7 +952,7 @@ export function resolveElements(
 /**
  * @brief Resolves every screen against one display.
  *
- * @param input Globals, screens, registry and the target's display record.
+ * @param input Globals, screens, registry and the target's oriented display.
  * @return Screens in input order, and every diagnostic raised.
  */
 export function resolveScreens(input: ResolveInput): ResolveResult {

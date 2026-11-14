@@ -16,6 +16,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createResolverContext,
+  orientedDisplay,
   resolveElements,
   resolveScreens,
   type Container,
@@ -52,7 +53,7 @@ function resolveOne(
   element: WidgetNode,
   container: Container = DISPLAY_128,
 ): { element: ResolvedElement; diagnostics: readonly Diagnostic[] } {
-  const context = createResolverContext(GLOBALS, REGISTRY, NARROW);
+  const context = createResolverContext(GLOBALS, REGISTRY, orientedDisplay(NARROW!, undefined));
   const { elements, diagnostics } = resolveElements([element], container, context);
   return { element: elements[0]!, diagnostics };
 }
@@ -270,7 +271,7 @@ describe('resolveScreens (PR-04 WO6, §7.3)', () => {
   const screen: Screen = parsed.value!;
 
   function resolveAgainst(display: typeof NARROW) {
-    return resolveScreens({ globals: GLOBALS, screens: [screen], manifests: frameworkRegistry([statusBar]), display: display! });
+    return resolveScreens({ globals: GLOBALS, screens: [screen], manifests: frameworkRegistry([statusBar]), display: orientedDisplay(display!, undefined) });
   }
 
   it('resolves the same screen differently against a 128-wide and a 256-wide target', () => {
