@@ -194,3 +194,86 @@ Read `.agents/rules/03-versioning.md` before WO4.
 # Completion report
 
 *(Worker appends here.)*
+
+## Worker report — 2026-11-14
+
+Authorisation checked from the committed files before starting: this file
+names its parent project, and PROJECT.md's status log records the owner's
+own words, "Approve E-2k". All work in the worktree `../U8G2GL-e2k1`, on the
+four branches named here, each cut from the previous tip. Nothing pushed,
+tagged or published. `wasm/bridge.cpp`, the runtime, the schema and
+generated output are untouched.
+
+### Commits
+
+| WO | Branch | Commit | What |
+|---|---|---|---|
+| WO1 | `u8g2gl-e2k1/wo1-vocabulary` | `85ed4f6` | `cli/src/core/schema/project-vocabulary.ts` (every element and attribute of both files: type, default, bus families, help, accepted spellings with their canonical place; STYLE_PROPERTIES folded in by reference; exported from the schema index); parser-side coverage test; `TEXT_ALIGN_VALUES`, `FONT_MODE_VALUES`, `BITMAP_MODE_VALUES` beside their types in `globals.ts` (types now derived from them); ui_spec §2 principle 1 reworded and principle 8 added, verbatim |
+| WO2 | `u8g2gl-e2k1/wo2-form-shell` | `c98f64e` | `designer/src/forms/` (form model, edits, controls, view, controller, problem placement, section rows); form ∥ XML in the canvas half; Explorer section rows; inline diagnostics; selection sync both ways; UI-side coverage test; unit and e2e tests. The vocabulary also records that a `<bus>` child hides the display's and target's bus values (the parser's real precedence) |
+| WO3 | `u8g2gl-e2k1/wo3-targets` | `1475245` | Display picker, bus fields by family with flagging, rotation in degrees, framebuffer beside `ram_budget`, impact preview in a spare editor-module instance, add/rename/reorder/remove targets (last refused, via a `minimum` on `<target>` in the vocabulary), Output example; D1 target switcher (`designer/src/project/active-target.ts`), with `live-pipeline.ts` and `insert-element.ts` both routed through `pickTarget` |
+| WO4 | `u8g2gl-e2k1/wo4-docs-review` | `9ecc18b` | ui_spec: Explorer section rows, new §6.4 (project-file editors, coverage guarantee, spellings, picker, impact preview, switcher), status-bar row, §16 closes U-3 with D1 and the date; design_spec §5.1 drops `default="true"` and states the rule; ChangeLog `cli v0.17.xx` entry; CLI 0.16.5 → 0.17.0 in `package.json` and the lock; readability fixes |
+| WO4 | same | (this commit) | This report |
+
+### Suite results (final, one at a time, on `9ecc18b`)
+
+| Suite | Result |
+|---|---|
+| Framework editor Wasm build (Emscripten 5.0.3) | built |
+| Wasm tests: snapshot, placeholder, last-error, design-hidden | 4/4 pass |
+| CLI `npm test` | 129 files passed, 2 skipped; 2812 tests passed, 23 skipped (baseline: 2751 passed, same skips) |
+| CLI lint (eslint + `tsc -p tsconfig.test.json`), `npm run build`, `tsc --noEmit` | clean |
+| Designer typecheck | clean |
+| Designer unit | 252 passed (baseline 226) |
+| Designer e2e (`build:e2e`, then `test:e2e`) | 119 passed, 1 failed: `design-hidden.spec.ts:144` (canvas pixel hash after hiding). Re-run alone: passed. **The same test failed the same way in the baseline run before any change** (108 passed, 1 failed; passed alone), so it is a pre-existing flake, not this PR's. New e2e: `project-form.spec.ts` (6), `project-targets.spec.ts` (5) |
+| Production build, no-test-hook grep, `test:e2e:production` | built, no hooks, 3 passed |
+| `refresh-goldens.mjs` | empty diff |
+| `check-package` | PASS: packed in a throwaway clone tagged `cli-v0.17.0-dev.1` there (this repository untagged); tarball 15.4 MB, unpacked 55.0 MB, 775 files; validate, generate (stamped 0.17.0-dev.1), design, editor-wasm build and test run all succeeded |
+| Home-path guard | clean |
+
+### Impact preview measurement
+
+On the departures fixture (one screen), drawing the candidate
+`U8G2_SSD1306_128X64_NONAME_F_HW_I2C` (pipeline run plus render in the
+spare module) took **1–2 ms** across three e2e runs (2, 1, 1 ms). That is
+far under the ~1 s budget, so every screen is previewed. The adaptive rule
+is implemented anyway (`impact-preview.ts`, `PREVIEW_BUDGET_MS = 1000`): the
+active screen is drawn first, and if all screens would exceed the budget at
+that rate only the active one is shown, with the reason. The figure
+excludes the one-off load of the spare module instance, which happens once
+per loaded module. Each preview is also logged to Output.
+
+### Open, and found outside the boundary (reported, not fixed)
+
+1. **Test runs build the first target only** (`cli/src/node/design/test-run`,
+   outside this PR). With another target active, Run is made unavailable
+   with the reason "a test run builds the first target: switch the canvas to
+   <name>", so no false mismatch can be shown. Making Run follow the active
+   target needs a server change.
+2. **No budget figure in the designer.** The WO asks for the current budget
+   "wherever the designer already has one"; it has none. `ram_budget` shows
+   the display's framebuffer bytes (exact, from the catalogue, and a §18
+   line), and says the rest is in the generate report.
+3. **Bus families as ruled vs U8G2.** Per ruling 6, I²C shows only
+   `address`; but U8G2's I²C constructors also take a reset pin, and 3-wire
+   SPI has no `dc`. The vocabulary follows the ruling; widening `reset` to
+   I²C is a one-line vocabulary change if the owner wants it.
+4. **`ram_budget`'s canonical place** is written as `<target ram_budget>`:
+   the parser reads it there first, and it describes the target, not the
+   display. Ruling 3's `<display setup rotation …>` could be read otherwise.
+5. **Silent precedence in the parser.** Bus values on `<target>` are ignored
+   when a `<display>` exists, and the display's when a `<bus>` exists. The
+   form flags such a value as "written but not read"; the validator says
+   nothing. A validator warning would be a separate change.
+6. **`designer/tsconfig.node.json` has no JSX setting**, so the UI coverage
+   test loads the form component by dynamic import rather than a static
+   one. Adding `"jsx": "react-jsx"` there (outside the boundary) would allow
+   the plain import.
+7. **U8G2 wiki link** has no anchor: the anchor format could not be confirmed
+   offline, and the page was never fetched.
+8. The form shows in the canvas panel, whose Dockview tab keeps the title
+   "Canvas" while the form covers it.
+9. The CI `wasm-tests` job's Emscripten-dependent CLI subset
+   (`test/node/design/build`, `test-run`, `toolchain`) was not run
+   separately with the toolchain on PATH; this PR changes no code those
+   tests cover, and `check-package` exercises the editor-Wasm build and a
+   test run end to end.
