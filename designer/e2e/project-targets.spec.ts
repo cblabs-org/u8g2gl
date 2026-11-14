@@ -80,7 +80,7 @@ test('the display picker changes the canvas size, as one undo stop; the preview 
 
 test('a second target is switched to from the status bar: the canvas follows, the file stays clean, and the choice survives a reload', async ({ page }) => {
   const project = `<?xml version="1.0" encoding="UTF-8"?>
-<u8g2gl schema="0.6" name="probe" version="1.0.0">
+<u8g2gl schema="0.7" name="probe" version="1.0.0">
     <targets>
         <target name="primary" setup="${SPI}" rotation="R0" />
         <target name="compact">
@@ -135,7 +135,7 @@ test('targets are added, renamed and reordered in the form; the last one cannot 
 });
 
 test('an I²C address is flagged, not dropped, when the wiring changes to SPI; SPI pins appear', async ({ page }) => {
-  const project = `<u8g2gl schema="0.6" name="probe" version="1.0.0">
+  const project = `<u8g2gl schema="0.7" name="probe" version="1.0.0">
     <targets>
         <target name="primary">
             <display setup="${I2C}" address="0x3C" />

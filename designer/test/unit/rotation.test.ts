@@ -33,7 +33,7 @@ const NO_ASSETS = { fonts: new Map(), images: new Map(), diagnostics: [], failed
 function project(rotation: string | undefined): Map<string, string> {
   const written = rotation === undefined ? '' : ` rotation="${rotation}"`;
   return new Map([
-    ['u8g2gl.xml', `<u8g2gl schema="0.6" name="turned" version="1.0.0">\n  <targets>\n    <target name="portrait" setup="${SSD1322}"${written} />\n  </targets>\n</u8g2gl>\n`],
+    ['u8g2gl.xml', `<u8g2gl schema="0.7" name="turned" version="1.0.0">\n  <targets>\n    <target name="portrait" setup="${SSD1322}"${written} />\n  </targets>\n</u8g2gl>\n`],
     ['globals.xml', '<globals>\n</globals>\n'],
     [
       'screens/screen_home.xml',

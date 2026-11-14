@@ -7776,7 +7776,7 @@
   },
   {
    "file": "cli/test/generator/fixtures/emit-project/u8g2gl.xml",
-   "sha256": "d70db7db922e892de996b43a13737cd5b0bf14242dfe183c397d6bba4d1cc31f",
+   "sha256": "ba221b4578a25cf1cd0e1500f0d2014194a155946a572fa86341883ead39c650",
    "root": {
     "name": "u8g2gl",
     "loc": "9:1",
@@ -7784,7 +7784,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "9:17",
       "9:9"
      ],
@@ -8134,7 +8134,7 @@
   },
   {
    "file": "cli/test/integration/fixtures/broken-project/u8g2gl.xml",
-   "sha256": "43e1208b715056cd22820c01ea14e9ce64d16d3aea23472e7997dd2c78198c34",
+   "sha256": "3acadde5402db7af9f624be5ec3366418cc7c3c24ae1d442d78358e900d5e57d",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -8142,7 +8142,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "2:17",
       "2:9"
      ],
@@ -9101,7 +9101,7 @@
   },
   {
    "file": "cli/test/parser/fixtures/unknown-elements.xml",
-   "sha256": "5c033e8766b58843ff651e84e61e6bb361ddb789407f313456b27755ef8628e7",
+   "sha256": "c2076cbda34c7d41ea0e57461a503da3368b05ab0b24dfc798df215bd3c5378d",
    "root": {
     "name": "u8g2gl",
     "loc": "3:1",
@@ -9109,7 +9109,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "3:17",
       "3:9"
      ],
@@ -10102,15 +10102,15 @@
   },
   {
    "file": "cli/test/parser/fixtures/valid-project.xml",
-   "sha256": "29affe5b06fe87db7c0d793eca0326bc3eec7adfb3338028b30ea34390960dd0",
+   "sha256": "b92b4bd11251749d5cee7b56c5278d9f3c8a4fb759b004bf3e5f0edac3de1ac2",
    "root": {
     "name": "u8g2gl",
     "loc": "3:1",
-    "endLoc": "17:1",
+    "endLoc": "16:1",
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "3:17",
       "3:9"
      ],
@@ -10134,7 +10134,7 @@
      {
       "name": "targets",
       "loc": "4:5",
-      "endLoc": "13:5",
+      "endLoc": "12:5",
       "attributes": [],
       "comments": [
        " setup names a U8G2 full-buffer constructor; geometry is derived "
@@ -10143,7 +10143,7 @@
        {
         "name": "target",
         "loc": "6:9",
-        "endLoc": "9:9",
+        "endLoc": "8:9",
         "attributes": [
          [
           "name",
@@ -10186,66 +10186,33 @@
           ],
           "comments": [],
           "children": []
-         },
-         {
-          "name": "bus",
-          "loc": "8:13",
-          "endLoc": "8:43",
-          "attributes": [
-           [
-            "cs",
-            "10",
-            "8:22",
-            "8:18"
-           ],
-           [
-            "dc",
-            "9",
-            "8:30",
-            "8:26"
-           ],
-           [
-            "reset",
-            "8",
-            "8:40",
-            "8:33"
-           ]
-          ],
-          "comments": [],
-          "children": []
          }
         ]
        },
        {
         "name": "target",
-        "loc": "10:9",
-        "endLoc": "12:9",
+        "loc": "9:9",
+        "endLoc": "11:9",
         "attributes": [
          [
           "name",
           "compact",
-          "10:23",
-          "10:17"
+          "9:23",
+          "9:17"
          ]
         ],
         "comments": [],
         "children": [
          {
           "name": "display",
-          "loc": "11:13",
-          "endLoc": "11:81",
+          "loc": "10:13",
+          "endLoc": "10:66",
           "attributes": [
            [
             "setup",
             "U8G2_SSD1306_128X64_NONAME_F_HW_I2C",
-            "11:29",
-            "11:22"
-           ],
-           [
-            "address",
-            "0x3C",
-            "11:75",
-            "11:66"
+            "10:29",
+            "10:22"
            ]
           ],
           "comments": [],
@@ -10257,20 +10224,20 @@
      },
      {
       "name": "output",
-      "loc": "16:5",
-      "endLoc": "16:42",
+      "loc": "15:5",
+      "endLoc": "15:42",
       "attributes": [
        [
         "dir",
         "generated",
-        "16:18",
-        "16:13"
+        "15:18",
+        "15:13"
        ],
        [
         "prefix",
         "ui_",
-        "16:37",
-        "16:29"
+        "15:37",
+        "15:29"
        ]
       ],
       "comments": [],
@@ -11646,7 +11613,7 @@
   },
   {
    "file": "cli/test/validator/fixtures/invalid/page-mode-display.xml",
-   "sha256": "548d6d6e41634ea3df8a3169424ca41144934963aaa61d59acdccd5a8e230e66",
+   "sha256": "cbcdeff3fe167995dd8094d66e2cde06da8397f45c4db0481ec1b6d17d4f4ab7",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -11654,7 +11621,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "2:17",
       "2:9"
      ],
@@ -11708,7 +11675,7 @@
   },
   {
    "file": "cli/test/validator/fixtures/invalid/unknown-display.xml",
-   "sha256": "75903cb38e7e41a29f650a433874a4a7624e37c39ef6a8c26fa7d320e44daa07",
+   "sha256": "50a3fc210cf133a917e959e3920c4014e95dc78cfac20124740c680f24f55b47",
    "root": {
     "name": "u8g2gl",
     "loc": "2:1",
@@ -11716,7 +11683,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "2:17",
       "2:9"
      ],
@@ -18669,7 +18636,7 @@
   },
   {
    "file": "test/generated_fixture/u8g2gl.xml",
-   "sha256": "d9d749f59c1d06e6695252dd12d6d3e1bf1acb3c1c80ba18b9f3d88cfefaeff6",
+   "sha256": "d9777243b6a4ececce25ddea468ed076509d35028ffd4050ee3f907cf0e33cda",
    "root": {
     "name": "u8g2gl",
     "loc": "14:1",
@@ -18677,7 +18644,7 @@
     "attributes": [
      [
       "schema",
-      "0.6",
+      "0.7",
       "14:17",
       "14:9"
      ],

@@ -115,7 +115,7 @@ test('the Explorer lists each project file’s sections from the buffer; a row o
 
 test('a comment and the layout survive a form edit: the diff is the one value', async ({ page }) => {
   const text =
-    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- the project -->\n<u8g2gl schema="0.6" name="probe" version="1.0.0">\n    <targets>\n        <!-- the board on the bench -->\n        <target name="primary" setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" rotation="R0" />\n    </targets>\n    <output dir="generated" />\n</u8g2gl>\n';
+    '<?xml version="1.0" encoding="UTF-8"?>\n<!-- the project -->\n<u8g2gl schema="0.7" name="probe" version="1.0.0">\n    <targets>\n        <!-- the board on the bench -->\n        <target name="primary" setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" rotation="R0" />\n    </targets>\n    <output dir="generated" />\n</u8g2gl>\n';
   session = await startDesign({ files: { 'u8g2gl.xml': text } });
   await openShell(page, session.url);
   await openFile(page, 'u8g2gl.xml');

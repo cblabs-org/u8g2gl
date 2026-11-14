@@ -6,8 +6,10 @@
  * File: test/parser/parse-project.test.ts
  * Purpose: Verification tests for parsing root u8g2gl.xml project descriptors.
  * Description: Asserts that valid-project.xml is transformed into a typed U8g2glProject
- *              with populated schema, identity, hardware targets, bus pin configurations,
- *              output parameters, and accurate source coordinate positions.
+ *              with populated schema, identity, hardware targets, output
+ *              parameters, and accurate source coordinate positions. Pins
+ *              and `<bus>` are refused (removed-wiring.test.ts), so the
+ *              model has no place for them.
  */
 
 import { readFileSync } from 'node:fs';
@@ -30,7 +32,7 @@ describe('parseProjectFile', () => {
     expect(result.value).toBeDefined();
 
     const project = result.value!;
-    expect(project.schema).toBe('0.6');
+    expect(project.schema).toBe('0.7');
     expect(project.name).toBe('departures-board');
     expect(project.version).toBe('1.0');
 
@@ -42,15 +44,11 @@ describe('parseProjectFile', () => {
     expect(defaultTarget.setup).toBe('U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI');
     expect(defaultTarget.rotation).toBe('0');
     expect(defaultTarget.ramBudget).toBe(4800);
-    expect(defaultTarget.bus).toBeDefined();
-    expect(defaultTarget.bus?.cs).toBe('10');
-    expect(defaultTarget.bus?.dc).toBe('9');
-    expect(defaultTarget.bus?.reset).toBe('8');
+    expect(Object.keys(defaultTarget).sort()).toEqual(['loc', 'name', 'ramBudget', 'rotation', 'setup']);
 
     const compactTarget = project.targets[1]!;
     expect(compactTarget.name).toBe('compact');
     expect(compactTarget.setup).toBe('U8G2_SSD1306_128X64_NONAME_F_HW_I2C');
-    expect(compactTarget.bus?.address).toBe('0x3C');
 
     // Output config verification
     expect(project.output).toBeDefined();
@@ -76,6 +74,6 @@ describe('parseProjectFile', () => {
     const compactTarget = project.targets[1]!;
     expect(compactTarget.loc).toBeDefined();
     expect(compactTarget.loc?.file).toBe('u8g2gl.xml');
-    expect(compactTarget.loc?.line).toBe(10);
+    expect(compactTarget.loc?.line).toBe(9);
   });
 });

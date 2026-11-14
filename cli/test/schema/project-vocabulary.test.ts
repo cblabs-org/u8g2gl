@@ -31,6 +31,7 @@ import { parseGlobalsFile, parseProjectFile } from '../../src/core/parser/index.
 import {
   PROJECT_VOCABULARY,
   ROTATION_DEGREES,
+  MIRROR_ROTATIONS,
   ROTATION_VALUES,
   attributeSpellings,
   vocabularyChildren,
@@ -81,8 +82,8 @@ function sampleValue(element: VocabularyElement, attribute: VocabularyAttribute,
 // writeElement
 // One element and its subtree as XML: every canonical attribute with its
 // variant-0 value unless `values` says otherwise, an alternative spelling only
-// where `values` names it. A non-canonical place (`<bus>`) is written only
-// when `values` puts something on it.
+// where `values` names it. A non-canonical place is written only when `values`
+// puts something on it.
 function writeElement(element: VocabularyElement, values: Values, depth: number): string {
   const pad = '  '.repeat(depth);
   const attributes: string[] = [];
@@ -230,10 +231,12 @@ describe('the project-file vocabulary: shape', () => {
     expect(style?.attributes.length).toBe(STYLE_PROPERTIES.length + 1);
   });
 
-  it('puts a <bus> child before the display in reading order, as the parser does', () => {
-    const display = vocabularyElement('display');
-    const cs = display?.attributes.find((a) => a.name === 'cs');
-    expect(display !== undefined && cs !== undefined ? attributeSpellings(display, cs).map((s) => s.element) : []).toEqual(['bus', 'display', 'target']);
+  it('has no pin attribute and no <bus>, which schema 0.7 removed and the parser refuses', () => {
+    expect(vocabularyElement('bus')).toBeUndefined();
+    const names = PROJECT_VOCABULARY.filter((element) => element.file === 'u8g2gl.xml').flatMap((element) =>
+      element.attributes.flatMap((attribute) => [attribute.name, ...(attribute.alternatives ?? []).map((a) => a.name)]),
+    );
+    for (const pin of ['cs', 'dc', 'reset', 'address']) expect(names, pin).not.toContain(pin);
   });
 });
 
@@ -276,13 +279,6 @@ describe('the project-file vocabulary: the parsers read all of it', () => {
               if (there !== undefined) values.set(key(there.element, there.name), sampleValue(element, moved, 0));
             }
           }
-          // A <bus> child supplies every bus value, so the others move with it.
-          if (spelling.element === 'bus') {
-            for (const sibling of element.attributes.filter((a) => a.busFamilies !== undefined && a !== attribute)) {
-              values.set(key(element.id, sibling.name), undefined);
-              values.set(key('bus', sibling.name), sampleValue(element, sibling, 0));
-            }
-          }
           expect(parseFile(element.file, writeFile(element.file, values)), `${spelling.element}/${spelling.name}`).toEqual(reference);
         }
       });
@@ -294,7 +290,7 @@ describe('the project-file vocabulary: the parsers read all of it', () => {
     expect(target?.alternativeParents).toEqual(['project']);
     const nested = parseProjectFile(writeFile('u8g2gl.xml'), 'u8g2gl.xml').value;
     const direct = parseProjectFile(
-      '<u8g2gl schema="0.6" name="p" version="1"><target name="t" setup="S" /></u8g2gl>',
+      '<u8g2gl schema="0.7" name="p" version="1"><target name="t" setup="S" /></u8g2gl>',
       'u8g2gl.xml',
     ).value;
     expect(nested?.targets).toHaveLength(1);
@@ -323,7 +319,7 @@ describe('the project-file vocabulary: its value lists agree with the validator 
   const registry = frameworkRegistry();
   const projectWithRotation = (rotation: string): readonly string[] => {
     const project = parseProjectFile(
-      `<u8g2gl schema="0.6" name="p" version="1"><targets><target name="t"><display setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="${rotation}" /></target></targets></u8g2gl>`,
+      `<u8g2gl schema="0.7" name="p" version="1"><targets><target name="t"><display setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="${rotation}" /></target></targets></u8g2gl>`,
       'u8g2gl.xml',
     ).value;
     if (project === undefined) throw new Error('did not parse');
@@ -332,12 +328,20 @@ describe('the project-file vocabulary: its value lists agree with the validator 
     return validateSchema({ project, globals, screens: [], manifests: registry, catalogue: CATALOGUE }).map((d) => d.code);
   };
 
-  it('offers exactly the rotations the validator accepts, each with its angle', () => {
+  it('offers exactly the rotations the validator accepts, each turning one with its angle', () => {
     for (const rotation of ROTATION_VALUES) {
-      expect(projectWithRotation(rotation), rotation).not.toContain(DIAGNOSTIC_CODES.INVALID_ENUM_VALUE);
-      expect(ROTATION_DEGREES[rotation], rotation).toBeDefined();
+      expect(projectWithRotation(rotation), rotation).toEqual([]);
+      if (!MIRROR_ROTATIONS.includes(rotation)) expect(ROTATION_DEGREES[rotation], rotation).toBeDefined();
     }
     expect(projectWithRotation('R4')).toContain(DIAGNOSTIC_CODES.INVALID_ENUM_VALUE);
+  });
+
+  it('offers both of U8G2\'s mirrors, which have no angle', () => {
+    expect(MIRROR_ROTATIONS).toEqual(['MIRROR', 'MIRROR_VERTICAL']);
+    for (const mirror of MIRROR_ROTATIONS) {
+      expect(ROTATION_VALUES).toContain(mirror);
+      expect(ROTATION_DEGREES[mirror]).toBeUndefined();
+    }
   });
 
   it("offers each enumerated style property the values u8g2gl_obj's prop of that name declares", () => {

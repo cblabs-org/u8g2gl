@@ -10,7 +10,7 @@
  *          older, additive minor of it, so a project still declaring 0.4 or
  *          0.5 must generate code the current runtime accepts — otherwise an
  *          additive bump breaks every project that has not re-declared.
- * Description: Generates the emit-project fixture declared as 0.4, 0.5 and 0.6:
+ * Description: Generates the emit-project fixture declared as 0.4, 0.5, 0.6 and 0.7:
  *              both guards read the current schema, and each file's
  *              `// schema` stamp keeps the declared version. Also checks the
  *              CLI's current schema against the runtime header in the same
@@ -41,14 +41,15 @@ async function generateAs(schema: string): Promise<ReturnType<typeof generate>> 
 }
 
 describe('the generated schema guard is the generator’s schema', () => {
-  it.each(['0.4', '0.5', '0.6'])('a project declaring %s generates REQUIRE_SCHEMA_VERSION(0, 6), and stamps what it declared', async (schema) => {
+  it.each(['0.4', '0.5', '0.6', '0.7'])('a project declaring %s generates REQUIRE_SCHEMA_VERSION(0, 7), and stamps what it declared', async (schema) => {
     const result = await generateAs(schema);
     expect(result.errors, JSON.stringify(result.diagnostics.slice(0, 2))).toBe(0);
 
     const config = result.files.find((file) => file.path === 'u8g2gl_generated_config.h')?.content ?? '';
-    expect(config).toContain('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 6);');
+    expect(config).toContain('U8G2GL_REQUIRE_SCHEMA_VERSION(0, 7);');
     expect(config).not.toContain(`U8G2GL_REQUIRE_SCHEMA_VERSION(0, 4);`);
     expect(config).not.toContain(`U8G2GL_REQUIRE_SCHEMA_VERSION(0, 5);`);
+    expect(config).not.toContain(`U8G2GL_REQUIRE_SCHEMA_VERSION(0, 6);`);
     // Provenance is still the document's: every file records what it was generated from.
     for (const file of result.files.filter((f) => f.path.endsWith('.cpp') || f.path.endsWith('.h') || f.path.endsWith('.hpp'))) {
       expect(file.content, file.path).toContain(`// schema: ${schema}\n`);
@@ -62,6 +63,6 @@ describe('the generated schema guard is the generator’s schema', () => {
       major: macro('U8G2GL_SCHEMA_VERSION_MAJOR'),
       minor: macro('U8G2GL_SCHEMA_VERSION_MINOR'),
     });
-    expect(CURRENT_SCHEMA_VERSION).toBe('0.6');
+    expect(CURRENT_SCHEMA_VERSION).toBe('0.7');
   });
 });

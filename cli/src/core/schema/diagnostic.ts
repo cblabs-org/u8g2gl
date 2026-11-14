@@ -397,13 +397,26 @@ export const DIAGNOSTIC_CODES = {
    * A project's own manifest uses vocabulary newer than the schema version the
    * project declares — `label`, `category` or `description` on `<api>`, which
    * arrived in 0.5, in a `schema="0.4"` project, or `icon`, which arrived in
-   * 0.6, in a 0.4 or 0.5 one (§15.4). One diagnostic per attribute, located at
+   * 0.6, in a 0.4 or 0.5 one; or a `MIRROR` / `MIRROR_VERTICAL` rotation,
+   * which arrived in 0.7, in a 0.4–0.6 project, located at its target (§15.4).
+   * One diagnostic per attribute, located at
    * the attribute's name, the message naming the version that has it as the
    * fix. Never silently accepted: an older version is a promise about which
    * vocabulary the files use. No suggestion is carried, because the fix is in
    * `u8g2gl.xml`, not at the attribute reported.
    */
   NEWER_SCHEMA_REQUIRED: 'U8G2GL_NEWER_SCHEMA_REQUIRED',
+  /**
+   * A pin attribute (`cs`, `dc`, `reset`, `address`) on `<display>`, `<target>`
+   * or `<bus>`, or a `<bus>` element itself, in `u8g2gl.xml`. Removed in schema
+   * 0.7 and refused at every schema version, because a pin never had any
+   * effect: the firmware's board owns the wiring and U8G2GL describes the panel
+   * ([D-22]). One diagnostic per occurrence, at the attribute's name or the
+   * element's tag, the message saying where the value belongs and naming
+   * `u8g2gl display <setup> --snippet`. Never the generic unknown-attribute
+   * message: the author is owed the reason and the replacement.
+   */
+  REMOVED_ATTRIBUTE: 'U8G2GL_REMOVED_ATTRIBUTE',
 } as const;
 
 /**

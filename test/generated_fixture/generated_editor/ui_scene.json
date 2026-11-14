@@ -4,7 +4,7 @@
   "version": 3,
   "generated": {
     "source": "u8g2gl.xml",
-    "schema": "0.6",
+    "schema": "0.7",
     "generator": "0.0.0-golden",
     "target": "host"
   },

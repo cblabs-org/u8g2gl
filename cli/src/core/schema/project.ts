@@ -6,14 +6,15 @@
  * File: src/core/schema/project.ts
  * Purpose: Defines the document model for the root project descriptor (u8g2gl.xml).
  *          Per §5.1, the project file defines the schema version, application identity,
- *          compilation targets, hardware display constructors, and output paths.
+ *          compilation targets, their display setup and rotation, and output paths.
+ *          It holds no pins or bus: the firmware's board owns the wiring and
+ *          U8G2GL describes the panel ([D-22]).
  * Description: Immutable interfaces for U8g2glProject, Target display configurations,
- *              bus pin mappings, and code generation output parameters.
+ *              and code generation output parameters.
  *
  * Exports:
  * - U8g2glProject: Root project configuration representation for u8g2gl.xml
  * - Target: Hardware target display definition
- * - BusConfig: Hardware pin and address mappings for display bus interfaces
  * - OutputConfig: Generation output directory and symbol prefix settings
  */
 
@@ -49,27 +50,9 @@ export interface Target {
   readonly setup: string;
   /** Optional display rotation: "R0", "R1", "R2", "R3", or "0", "90", "180", "270". */
   readonly rotation?: string;
-  /** Optional bus pin assignment or device address configuration. */
-  readonly bus?: BusConfig;
   /** Optional target RAM budget limit in bytes for capacity verification. */
   readonly ramBudget?: number;
   /** Source location where this target was declared. */
-  readonly loc?: SourceLocation;
-}
-
-/**
- * Hardware bus pin mappings and device address parameters.
- */
-export interface BusConfig {
-  /** Chip Select pin identifier (SPI). */
-  readonly cs?: string;
-  /** Data/Command pin identifier (SPI / Parallel). */
-  readonly dc?: string;
-  /** Hardware reset pin identifier. */
-  readonly reset?: string;
-  /** I2C device address string (e.g. "0x3C"). */
-  readonly address?: string;
-  /** Source location where this bus configuration was declared. */
   readonly loc?: SourceLocation;
 }
 
