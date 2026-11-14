@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/forms/form-sections.ts
- * Purpose: The Explorer's section rows for the two project files (ruling 2):
+ * Purpose: The Explorer's section rows for the two project files (ui_spec §6):
  *          `u8g2gl.xml ▸ Project · Targets ▸ <each target> · Output` and
  *          `globals.xml ▸ Subjects (n) · Fonts (n) · Images (n) · Styles (n) ·
  *          Consts (n)`, so the parts of a project file are visible, and one
@@ -32,7 +32,7 @@ export interface SectionRow {
   readonly children: readonly SectionRow[];
 }
 
-/** The sections whose label carries their count: the globals' kinds, as ruling 2 writes them. */
+/** The sections whose label carries their count: the globals' kinds, as ui_spec §6 writes them. */
 const COUNTED: ReadonlySet<string> = new Set(['globals.xml']);
 
 // rowsOf

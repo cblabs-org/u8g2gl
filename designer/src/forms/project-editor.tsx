@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/forms/project-editor.tsx
- * Purpose: What the `u8g2gl.xml` form adds to the generic one (rulings 5–9):
+ * Purpose: What the `u8g2gl.xml` form adds to the generic one (ui_spec §6.4):
  *          the display picker in place of the bare `setup` field, with the
  *          impact preview before a new display is chosen; bus fields that
  *          follow the display's bus family; rotation shown with its angle;

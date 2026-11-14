@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/project/active-target.ts
- * Purpose: Which of the project's targets the designer shows ([U-3], closed by
- *          D1): one canvas, with a switcher in the status bar. The canvas, an
- *          insert, the display picker's impact preview and the budget figure
- *          all read the target from here, so nothing in the designer takes
- *          the first target behind the author's back.
+ * Purpose: Which of the project's targets the designer shows ([U-3], closed
+ *          in ui_spec §16): one canvas, with a switcher in the status bar.
+ *          The canvas, an insert, the display picker's impact preview and the
+ *          budget figure all read the target from here, so nothing in the
+ *          designer takes the first target behind the author's back.
  * Description: The choice is per-browser view state, like the elements hidden
  *              in the designer: kept in localStorage by project, never in the
  *              XML, the buffer or undo, so switching is never an edit. The

@@ -330,7 +330,7 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
 <u8g2gl schema="0.6" name="departures-board" version="1.0">
     <targets>
         <!-- setup names a U8G2 full-buffer constructor; geometry is derived -->
-        <target name="default" default="true">
+        <target name="default">
             <display setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" rotation="0" />
         </target>
         <target name="compact">
@@ -342,6 +342,8 @@ The project file is named `u8g2gl.xml` rather than `project.xml` so it is unambi
     <output dir="generated" prefix="ui_" />
 </u8g2gl>
 ```
+
+**The first target is the default.** `generate` builds it unless `--target` names another, and the designer shows it until the author switches; there is no `default` attribute. Which target the designer shows is its own view state, kept per browser and never written to the project (ui_spec §6.4).
 
 Per **[D-14]** `setup` is the U8G2 constructor name and is the single source of truth for the target. `width`, `height`, controller, and bus are all *derived* from U8G2's own tables, never typed by hand — so they cannot drift from the hardware. `rotation` and bus parameters such as `address` remain the user's to set, since U8G2 cannot know them.
 

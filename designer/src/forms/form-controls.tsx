@@ -37,6 +37,7 @@ import type { ProblemRow } from '../pipeline/diagnostics';
 import { leftOf, Tooltip, tooltipTriggers, useTooltip, type TooltipAt } from '../ui/tooltip';
 import type { FormField } from './form-model';
 import { fieldFacts, type FormOptions } from './form-options';
+import { SEGMENTED_MAX } from '../panel/editors';
 import { vocabularyElement } from '@u8g2gl/core/schema/index.js';
 
 // tagOf
@@ -45,9 +46,6 @@ import { vocabularyElement } from '@u8g2gl/core/schema/index.js';
 function tagOf(id: string): string {
   return vocabularyElement(id)?.tag ?? id;
 }
-
-/** The most values a segmented control shows before a dropdown is used (ui_spec §9.1). */
-const SEGMENTED_MAX = 3;
 
 /** What a field's control is given. */
 interface ControlProps {

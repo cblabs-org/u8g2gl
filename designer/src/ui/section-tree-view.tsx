@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/ui/section-tree-view.tsx
- * Purpose: A project file's section rows in the Explorer (ruling 2): the parts
+ * Purpose: A project file's section rows in the Explorer (ui_spec §6): the parts
  *          of `u8g2gl.xml` and `globals.xml`, nested under the file as a
  *          screen's element rows are, so what a project file holds is seen
  *          without opening it, and each part is one click away.

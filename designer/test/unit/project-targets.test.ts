@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/test/unit/project-targets.test.ts
- * Purpose: The rules behind the u8g2gl.xml editor (rulings 6–8, D1): the
+ * Purpose: The rules behind the u8g2gl.xml editor (ui_spec §6.4, [U-3]): the
  *          display picker's grouping and search, which bus fields a family
  *          uses, rotations read as angles, the impact preview's outside test,
  *          the active target's fallback and storage, Run refusing a canvas on

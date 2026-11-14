@@ -8,7 +8,7 @@
  *          from the document's current buffer whenever the buffer changes,
  *          places the Problems rows on it, offers what the project declares,
  *          and lands each change as a text edit on the document's own model,
- *          as one undo stop of that document ([UD-3], ruling 1). The form
+ *          as one undo stop of that document ([UD-3], ui_spec §6.4). The form
  *          never holds the document: the text is the model.
  * Description: The edit goes through `CanvasEditor.apply`, the path the
  *              canvas's commands use, so a form change and a canvas command

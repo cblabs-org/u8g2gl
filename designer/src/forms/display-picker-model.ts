@@ -5,7 +5,7 @@
  *
  * File: designer/src/forms/display-picker-model.ts
  * Purpose: What the display picker offers, from the display catalogue alone
- *          ([D-14], ruling 6): the controllers, then each controller's sizes
+ *          ([D-14], ui_spec §6.4): the controllers, then each controller's sizes
  *          and variants, then each variant's bus wirings, and a search over
  *          the full setup name for those who know the part. Every option
  *          carries what the catalogue knows and nothing it does not. Also the

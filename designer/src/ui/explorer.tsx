@@ -179,7 +179,7 @@ export function Explorer(): React.JSX.Element {
               const unsaved = dirty.has(path);
               const isScreen = group.title === 'Screens';
               // u8g2gl.xml and globals.xml disclose their form's sections, as
-              // a screen discloses its elements (ruling 2).
+              // a screen discloses its elements (ui_spec §6).
               const hasSections = group.title === 'Project' && isFormFile(path);
               const expandable = isScreen || hasSections;
               const open = expandable && expanded.has(path);

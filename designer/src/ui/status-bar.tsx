@@ -18,7 +18,7 @@
  *              and so is the Save button, which shows while anything is
  *              unsaved and saves it all: it reads only the dirty set, which
  *              changes when a file becomes dirty or clean, not on every
- *              keystroke. The active target (D1) is its own component as
+ *              keystroke. The active target ([U-3]) is its own component as
  *              well: it re-renders only when the project's targets or the
  *              choice change, never on a keystroke that changes neither.
  *
@@ -170,7 +170,7 @@ function targetsKey(workspace: ReturnType<typeof useWorkspace>): string {
 }
 
 /**
- * @brief The active target ([U-3], D1): always named, as ui_spec §6's status
+ * @brief The active target ([U-3]): always named, as ui_spec §6's status
  *        bar lists it, with its controller and size; with more than one target,
  *        a switch between them. Switching is never an edit: the choice is this
  *        browser's (`project/active-target.ts`), and the canvas redraws at the

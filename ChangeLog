@@ -8,6 +8,24 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-14	cli v0.17.xx	U8G2GL
+  * 0.17.0: The designer edits u8g2gl.xml and globals.xml through forms,
+    beside the XML. The forms are built from a new declarative vocabulary
+    of the two files (every element and attribute, its type, default,
+    help and accepted spellings), and tests hold the parsers and the forms
+    to it, so every attribute has a control. Each form change is one text
+    edit and one undo stop, written where the value is, comments kept; new
+    values are written in §5.1's canonical form. Problems show on their
+    field, and the Explorer lists each file's sections. In u8g2gl.xml the
+    display setup is chosen with a picker (controller, size and variant,
+    bus wiring, or search), with a preview of every screen at the new size
+    before it is used; bus fields follow the bus family, and a value for
+    another family is flagged, not dropped. Targets are added, renamed,
+    reordered and removed. The status bar names the active target and
+    switches between them: a per-browser view setting, never written to
+    the XML. ui_spec §2 gains principle 8, "everything is discoverable",
+    and design_spec §5.1 drops the default="true" it never honoured: the
+    first target is the default. No change to generated output.
 2026-11-10	runtime v0.12.xx	U8G2GL
   * 0.12.0: Implements schema 0.6 (U8G2GL_SCHEMA_VERSION_MINOR 6). Schema
     0.6 adds only an optional icon on <api>, which the designer's Palette

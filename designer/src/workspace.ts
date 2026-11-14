@@ -103,7 +103,7 @@ export class Workspace {
   readonly elementTrees = new Observable<ReadonlyMap<string, readonly ElementNode[]>>(new Map());
   /**
    * The section rows of `u8g2gl.xml` and `globals.xml`, from their current
-   * buffers (ruling 2), rebuilt with the element trees and replaced only when
+   * buffers (ui_spec §6), rebuilt with the element trees and replaced only when
    * a row would change.
    */
   readonly projectSections = new Observable<ReadonlyMap<string, readonly SectionRow[]>>(new Map());
@@ -115,7 +115,7 @@ export class Workspace {
   readonly designHidden = new DesignHiddenModel();
   /**
    * The target the canvas, inserts and the impact preview resolve against:
-   * the status bar's switcher (D1). A view setting of this browser, never
+   * the status bar's switcher ([U-3]). A view setting of this browser, never
    * written to the XML. Loaded at `start()`, with the project's name.
    */
   readonly activeTarget = new ActiveTarget();

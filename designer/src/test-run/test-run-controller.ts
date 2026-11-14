@@ -421,7 +421,7 @@ export class TestRunController {
   private updateAvailability(): void {
     const status = this.target.wasmStatus.get();
     const canvas = this.target.canvas.get();
-    // The canvas may show another target than the first (D1); the test run
+    // The canvas may show another target than the first ([U-3]); the test run
     // builds the first, so the two frames would be of different displays.
     // A switch redraws the canvas, whose subscription brings this here.
     // A run that carries no project (a stand-in run) has no target to compare.

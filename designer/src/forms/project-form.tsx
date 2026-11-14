@@ -5,7 +5,7 @@
  *
  * File: designer/src/forms/project-form.tsx
  * Purpose: Shows the project-file form in the canvas half of the editor area
- *          while `u8g2gl.xml` or `globals.xml` is the active file (ruling 1),
+ *          while `u8g2gl.xml` or `globals.xml` is the active file (ui_spec §6.4),
  *          so those two files read as form ∥ XML in the split, ratio and
  *          collapse the canvas already has. The XML beside it stays live, and
  *          every form change is a text edit on that same buffer.

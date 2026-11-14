@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/project-targets.spec.ts
- * Purpose: The u8g2gl.xml editor end to end (rulings 5–9, D1): the display
+ * Purpose: The u8g2gl.xml editor end to end (ui_spec §6.4, [U-3]): the display
  *          picker changes the canvas's size and undo restores it; its impact
  *          preview marks an element the new display would not hold, before
  *          anything is written; a second target is switched to from the status

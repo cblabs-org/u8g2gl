@@ -279,7 +279,7 @@ export class EditLoop {
         request();
       }),
       this.workspace.activeFile.subscribe(request),
-      // Switching the target re-resolves every screen at its display (D1).
+      // Switching the target re-resolves every screen at its display ([U-3]).
       this.workspace.activeTarget.name.subscribe(request),
       this.wasm.module.subscribe(request),
       this.wasm.buildDiagnostics.subscribe(request),

@@ -4,7 +4,7 @@
 
 **Version**: 1.1
 **Date**: September 2026
-**Status**: Settled. All seven editor decisions are closed; three questions remain open (§16) after `[U-1]` closed in PR-03 (§16.1). §15's schema requirements gate PR-04 — 'editor-target generation' is named there as PR-04 scope.
+**Status**: Settled. All seven editor decisions are closed; two questions remain open (§16) after `[U-1]` closed in PR-03 (§16.1) and `[U-3]` in E-2k1. §15's schema requirements gate PR-04 — 'editor-target generation' is named there as PR-04 scope.
 **Companion documents**: [design_spec.md](design_spec.md) (the framework) · [concept.md](concept.md) (why) · [implementation_plan.md](implementation_plan.md) (sequencing)
 
 > **[UD-n]** marks a binding editor decision with its rationale. **[U-n]** marks an open question. Where this document and `design_spec.md` disagree on framework behaviour, the design spec wins; on editor behaviour, this document wins.
@@ -265,7 +265,7 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 | **Editor area** | Tabs per document. Default split: canvas ∥ XML. Either pane collapsible; ratio draggable and remembered |
 | **Property panel** | Selection properties, grouped. With nothing selected, shows screen-level properties |
 | **Bottom panel** | Problems · Output · Budget. Collapsible; auto-opens to Problems on a failed build |
-| **Status bar** | Build state and duration · active target · selection geometry · zoom · RAM total · while anything is unsaved, **● N unsaved · Save** |
+| **Status bar** | Build state and duration · active target (a switch between targets when there are several, §6.4) · selection geometry · zoom · RAM total · while anything is unsaved, **● N unsaved · Save** |
 
 **The Explorer** is grouped by what an author edits, not by directory: **Project** (`u8g2gl.xml`, `globals.xml`), **Screens** (one entry per screen file), **Widgets** (one entry per widget, under its own name, opening its manifest; its `.cpp` and `.hpp` travel with the entry rather than being listed) and **Assets** (fonts and images). Anything else is listed under **Other files**, so nothing on disk goes missing; a widget directory with no manifest falls there too. Generated output — `generated/` and the editor target's `generated_editor/` — is not listed, watched or writable from the designer.
 
@@ -276,6 +276,8 @@ Eight flows define the tool. **F2 runs dozens of times a session and must be the
 - **Selecting.** A click selects the row's element through the same selection the canvas uses (§4.3); Shift-, Cmd- or Ctrl-click adds or removes it within one file. Selecting is never an edit.
 - **Keys.** The rows are a WAI-ARIA tree (`tree`, `treeitem`, `aria-level`, `aria-expanded`, `aria-selected`) with one row in the tab order: Up and Down move, Home and End go to the ends, Right expands or enters, Left collapses or goes to the parent, Enter selects (Shift+Enter adds). The file rows' menu and keys are unchanged.
 - **Remembered.** Which screens are expanded is remembered per browser and project; the screen the canvas shows expands the first time it is shown. Where storage is unavailable everything starts collapsed and still works.
+
+**Section rows.** `u8g2gl.xml` and `globals.xml` have the same disclosure, which lists the parts of each file's form (§6.4): `u8g2gl.xml ▸ Project · Targets ▸ <each target, by name> · Output`, and `globals.xml ▸ Subjects (n) · Fonts (n) · Images (n) · Styles (n) · Consts (n)`. They are built from the current buffer after every run, as element rows are, so a count changes as an item is added, before any save; text that does not parse keeps the last rows. They use the element rows' tree roles and keys, Enter and a click opening the file with its form scrolled to that section, and their expansion is remembered with the screens'. Opening a section is never an edit.
 
 Every Explorer entry has a **context menu**, opened by right-click, Shift+F10 or the context-menu key, driven by the arrow keys and closed by Escape or a click outside:
 
@@ -338,6 +340,31 @@ There are two kinds of hidden, and they never mix:
 - **A test run draws the exported view.** The hide is forgotten whenever a scene is applied afresh, which a test run always does, so a run with elements hidden still reports parity; the canvas re-applies the hide after each of its own runs.
 - **Remembered** per browser, by project and file. A name no longer in the file is dropped, so renaming an element shows it again. Where storage is unavailable the eye still works and is simply not remembered.
 - **Old project builds.** A project editor Wasm built before the CLI could hide cannot; its eyes are disabled with the reason *Hiding needs the project's editor Wasm to be rebuilt*. The build hash covers the framework sources, so upgrading the CLI rebuilds it.
+
+### 6.4 The project-file editors
+
+*2026-11-14 (E-2k1).* `u8g2gl.xml` and `globals.xml` are edited through forms as well as XML, because principle 8 asks that everything they can say be visible: a setting nobody knows is there does not exist for them.
+
+**Form ∥ XML.** Opening either file shows its form in the canvas half of the editor area, beside the XML, in the split, ratio and collapse the canvas has. The XML stays live. Every form change is a text edit on that buffer through the CST, one edit and one undo stop of that file's own undo (§10's round-trip rules apply: comments, order and layout survive). Selecting a screen's tab again shows the canvas.
+
+**Complete by construction.** The form is not written per file. It is generated from the **project-file vocabulary** (`cli/src/core/schema/project-vocabulary.ts`), one declarative entry per element and attribute: type, default, the bus families a bus attribute applies to, every spelling the parser accepts and **help**, which every field shows behind an ⓘ as the property panel does (§9.2). Repeating elements are lists with add, remove and reorder; attributes are fields of their type (text, number, toggle, choice, or a picker of what the project declares). Two tests hold it there: the CLI's fails when a parser reads an attribute the vocabulary lacks, or an entry has no help; the designer's fails when a vocabulary entry has no control. Later editors replace a section with a richer one; until then the generic section is shown, so nothing is XML-only.
+
+**Reading and writing.** The form reads every spelling the parser accepts: `setup` and `rotation` on `<target>` or `<display>`, bus pins on `<bus>`, `<display>` or `<target>`, `max_len` or `maxLen`, and so on, in the parser's own order (a `<bus>` child, when written, supplies every bus value). An edit to an existing value is written where that value is. A new value is written canonically, as design_spec §5.1 shows it, `<target name>` holding `<display setup rotation …>`, except where the target already writes its display's values on itself, when the new one joins them so the parser keeps reading them together. A spelling written but not read, because another wins, is flagged on its field. Text that cannot be read keeps the last good form, read-only, under a banner naming the problem, as the canvas keeps its last frame.
+
+**Problems where they are fixed.** A Problems row on a project file shows on the field it is about, with its code and the Problems panel's words: the field whose value it points at, else the attribute its message names.
+
+**Selection, both ways.** Focusing a section, item or part highlights its element in the XML, scrolling it into view if need be; moving the XML caret into an element marks its form section and scrolls the form to it. Neither takes focus, and neither is an edit.
+
+**`u8g2gl.xml`.** *Project:* `name` and `version` are edited; `schema` is shown, never edited, and its ⓘ says why (a schema change is a migration, §15.4). *Targets* are added (a new one starts with the first target's display, so it draws at once), renamed, reordered and removed, never the last. *Output:* `dir` and `prefix`, with a live example of the file names and symbols they produce.
+
+**The display picker** replaces the bare `setup` field. It steps **controller**, then **size and variant**, then **bus wiring**, or searches the setup name (every word of the query in the name, falling back to `u8g2gl find`'s matching). Every option shows what the catalogue knows: pixels, framebuffer bytes, bus family and wiring, driver and tiles, and nothing it does not. The controller links to U8G2's setup reference. Choosing a setup shows it as a **candidate**; only *Use this display* writes it, as one edit.
+
+- **Bus fields follow the bus family.** I²C shows `address`; SPI and parallel show `cs`, `dc` and `reset`. A field that does not apply is hidden, unless the file writes it: then it is shown and flagged, never dropped.
+- `rotation` shows each value with its angle (`R1 · 90°`); `ram_budget` shows the display's framebuffer beside it, which the §18 budget counts.
+
+**The impact preview.** A candidate is previewed before it is used: every screen drawn at the candidate's geometry, with each element that would fall outside it outlined and named. It renders the candidate in memory, through the same pipeline the canvas uses, in a second editor-module instance, so neither the document nor the canvas changes until the author confirms. It is measured: if drawing every screen would take more than about a second at the rate the active screen took, only the active screen is shown, and the preview says why. *Measured on the departures project:* one screen, 1–2 ms.
+
+**The target switcher** ([U-3], closed below). One canvas, and a control in the status bar naming the active target with its controller and size; with more than one target it switches between them. The canvas, an insert from the Palette and the impact preview follow the active target. The choice is a view setting of this browser, kept by project: never written to the XML, never an undo step, never unsaved. A target no longer declared, as after a rename, falls back to the first, which stays the project's default (design_spec §5.1). A test run builds the first target, so Run says so while the canvas shows another.
 
 ---
 
@@ -571,11 +598,12 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 | ID | Question | Blocks |
 |---|---|---|
-| **U-3** | Multi-target — one canvas per target, or a switcher on one canvas? Depends on [Q-1] | Phase 3 |
 | **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation *E-D, 2026-10-26 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §7):* E-3's to decide. Leaning only: a project file outside the schema (`samples/*.json`), read by the designer and ignored by `generate`. Sample data for collections waits on PR-08 (EDITOR-DESIGN §9). | PR-02 |
 | **U-7** | Does the palette support user-authored categories, or is the taxonomy fixed? | Phase 3 |
 
-*(**U-1** closed in PR-03 — see §16.1.)*
+*(**U-1** closed in PR-03 — see §16.1. **U-3** closed 2026-11-14, E-2k1: a switcher on one canvas, see below.)*
+
+**`[U-3]` Multi-target — closed 2026-11-14 (E-2k1, the owner's decision D1).** One canvas with a target switcher in the status bar (§6.4). The canvas, inserts, the impact preview and any budget figure follow the active target, which is per-browser view state and never written to the XML; a missing or renamed target falls back to the first. [Q-1], per-target overrides in the screen files, is unaffected: the switcher shows each target as its display resolves it.
 
 ### 16.1 `[U-1]` Element identity — closed, PR-03
 

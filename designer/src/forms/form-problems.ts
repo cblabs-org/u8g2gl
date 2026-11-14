@@ -5,7 +5,7 @@
  *
  * File: designer/src/forms/form-problems.ts
  * Purpose: Puts each Problems row about a project file on the form field it
- *          is about, so a problem is shown where it is fixed (ruling 4,
+ *          is about, so a problem is shown where it is fixed (ui_spec §6.4,
  *          ui_spec §9.2 "what needs acting on stays inline"), with the same
  *          code and words the Problems panel uses: the rows are the panel's
  *          own, never reworded.

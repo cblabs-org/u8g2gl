@@ -5,7 +5,7 @@
  *
  * File: designer/src/forms/impact-preview.ts
  * Purpose: What a new display would do to the project, before it is chosen
- *          (ruling 7): every screen drawn at the candidate's geometry, with the
+ *          (ui_spec §6.4): every screen drawn at the candidate's geometry, with the
  *          elements that would fall outside it named. A display change moves
  *          every anchored element and can push others off the panel, which is
  *          otherwise discovered only after the edit.
