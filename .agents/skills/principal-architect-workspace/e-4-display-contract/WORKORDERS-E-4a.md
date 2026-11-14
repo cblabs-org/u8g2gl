@@ -185,3 +185,154 @@ recorded in its status log (rule 00). Read `.agents/rules/03-versioning.md` befo
 # Completion report
 
 *(Worker appends here.)*
+
+## 2026-11-14 — Tier-3 worker, WO1–WO4
+
+**Authorisation.** This file names its parent `e-4-display-contract`, and that
+project's status log records the owner's own words, "Approve E-4" (rule 00).
+All work was on the four named branches in `../U8G2GL-e4`, each cut from the
+previous tip. Nothing was pushed, tagged or published. `check-package` tagged
+only its own throwaway clone (`cli-v0.18.0-dev.1`); this repository has no new
+tag.
+
+### Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-e4a/wo1-core-geometry` | `ded6000` feat(cli): lay out against the rotated display |
+| WO2 | `u8g2gl-e4a/wo2-contract` | `532b90e` feat(cli): emit the display contract in ui.hpp; CLI 0.18.0 |
+| WO3 | `u8g2gl-e4a/wo3-designer` | `e357aba` feat(designer): show and preview the oriented panel |
+| WO4 | `u8g2gl-e4a/wo4-docs-review` | `9490694` docs: rotation, the display contract and [D-22]; readability fixes |
+
+This report is a further commit on `u8g2gl-e4a/wo4-docs-review`.
+
+### Suites, baseline (at `e981756`) → final (at `9490694`), one at a time
+
+| Suite | Baseline | Final |
+|---|---|---|
+| Framework Wasm build | OK, 0 warnings | OK, 0 warnings |
+| Wasm tests (4) | 4 pass | 4 pass |
+| Host C++ build, ctest | 515/515 pass (1 skipped: `SizeOfReport.ThirtyTwoBitTarget`) | 519/519 pass (same skip), 0 warnings |
+| CLI `npm test` (no Emscripten on PATH) | 2812 pass, 23 skipped | 2871 pass, 23 skipped |
+| CLI `npm test` (Emscripten on PATH) | not run | first run: 2893 pass, **1 timeout** (`generate-editor.test.ts` "is up to date under --check…", 5168 ms against vitest's 5000 ms, suite at 55 s under the toolchain tests' load); the test alone: 5/5 pass; the whole suite again: **2894/2894 pass** |
+| CLI lint (eslint + test tsc), tsc | clean | clean |
+| Designer typecheck | clean | clean |
+| Designer unit | 252 pass | 258 pass |
+| Designer e2e (after `build:e2e`) | 118 pass, **2 fail**: `performance.spec.ts:168` and `:224` (frame gates) while I ran tsc and lint alongside; both pass alone (2/2) | **124 pass**, 0 fail (run with nothing else on the machine) |
+| `design-hidden.spec.ts:144` (known flake) | pass | pass |
+| Designer production build, `test:e2e:production` | 3 pass | 3 pass |
+| `refresh-goldens.mjs` after the last change | — | empty diff |
+| `check-home-paths.mjs` | clean | clean |
+| `check-package.mjs` | — | **PASS** at 0.18.0: generate stamps `0.18.0-dev.1`, design served, editor-wasm and test-run succeeded; tarball 15.4 MB, unpacked 55.0 MB, 775 files |
+
+Determinism (§13.9): the goldens that moved are
+`emit-project/expected/ui.hpp` and `ui.cpp` only; no file of that fixture
+outside `expected/` changed; `cli/package.json` is 0.18.0 against 0.17.0 at
+`021ba54`. Lockfile bumped with it (root and `packages[""]` only).
+
+### What was built, and the choices made inside the box
+
+**WO1.** `normaliseRotation()` and the `Rotation` type beside `ROTATION_VALUES`;
+`orientedDisplay()` beside `findTargetDisplay()`, plus `findOrientedDisplay()`
+(find, then orient) so no consumer can find a record and forget to orient it.
+*Where the orientation is applied:* `PipelineInput.display` and
+`createResolverContext()` now take an `OrientedDisplay`, not a `DisplayRecord`.
+`OrientedDisplay` carries `rotation` and `native` as well as ruling 1's
+`{ width, height }`, so a raw record does not type-check there; forgetting the
+rotation is a compile error, not a review item. The native size and rotation
+also give ruling 10's wording without a second lookup. Consumers switched:
+validator (`validate.ts` `checkedTarget.display`, `shared-model.ts`), generator
+(`generate.ts`; the scene's `display` follows, since it reads the resolved
+container). `node/cli.ts:748` is the §18 budget, so it **stays native**, with a
+comment saying why; a test shows the framebuffer line identical at R0 and R1.
+Messages: `display 64×256 (256×64 rotated 90°) is 64px wide (0..63).` (R0/R2
+unchanged). Fixture `cli/test/validator/fixtures/rotated-r1/`. No golden moved.
+
+The type change made the designer's two pipeline callers
+(`live-pipeline.ts`, `insert-element.ts`) fail to type-check, so WO1 switched
+them to `findOrientedDisplay()` too, to keep each commit building. WO3's canvas
+orientation therefore landed in WO1's commit; WO3 added the rest.
+
+**WO2.**
+- *The four macros* are emitted from the pipeline's own `OrientedDisplay`
+  (rotation already normalised), each with a one-line comment, not
+  `#ifndef`-guarded. No existing generated header gives a reason to guard
+  them.
+- *No include in `ui.hpp`.* It keeps the forward-declared `U8G2` from
+  `u8g2gl_core.h`.
+- *A target not in the catalogue:* validation refuses it before emission
+  (`U8G2GL_UNKNOWN_DISPLAY`, or `U8G2GL_MISSING_REQUIRED` with no `setup`;
+  checked through the CLI). `ui.hpp`/`ui.cpp` throw without a contract, and
+  `generate` throws if a pipeline passes validation with no display, so empty
+  macros cannot be written.
+- *Editor emission:* `emitEditorFiles` takes the input without the contract.
+- *The name is reserved:* `ui_display_matches` is in mangle.ts's fixed table.
+
+**WO3.** The rotation select goes through the impact preview when the size
+swaps, and is written only on *Use this rotation*, as one edit (Cancel writes
+nothing). R0↔R2 and R1↔R3 apply directly. The picker reads
+`256×64 · shown 64×256 at R1`. The impact preview now takes any target field,
+not just `setup`. Ruling 8 held: `wasm/bridge.cpp` and `wasm/harness.cpp` are
+untouched, and the Run e2e gets a 64×256 frame (2048 bytes) at parity.
+
+### Designer readers of a display's size
+
+| Reader | Decision |
+|---|---|
+| `pipeline/live-pipeline.ts` (canvas size, scene, bounds, `run.display`) | **Oriented** (`findOrientedDisplay`) |
+| `editing/insert-element.ts` (seeding a draft's points and radii) | **Oriented** |
+| Hit-testing (`selection/hit-test.ts`, reads `run.targets`/`bounds`) | Oriented by construction: device boxes from the oriented resolution |
+| `editing/snapping.ts` display guides (`run.display`) | Oriented by construction |
+| `ui/canvas-panel.tsx` fit and `.dim` (`run.display`) | Oriented by construction |
+| `panel/panel-controller.ts` "Display W×H" note (`run.result.display`) | Oriented by construction |
+| `ui/status-bar.tsx:91` frame size (Wasm `displaySize()`) | Oriented by construction (the scene sizes the module) |
+| `forms/impact-preview.ts` outside test and thumbnails | Oriented (its own pipeline run on the candidate texts) |
+| `forms/project-editor.tsx` `recordFacts` (picker current/options/candidate) | **Native**, plus the oriented size beside it when they differ |
+| `forms/display-picker-model.ts` variant list (`option.width/height`, framebuffer, tiles) | **Native**: catalogue facts of the part being chosen |
+| `ui/status-bar.tsx:167` target switcher (`controller W×H`) | **Native**, plus `· shown 64×256 at R1` when they differ (same helper as the picker) |
+| `ram_budget` note (framebuffer bytes) | **Native**: hardware |
+
+### Left open, or found outside the boundary (not fixed)
+
+1. **`ui.cpp` gained `#include <U8g2lib.h>`.** It is the one golden line that
+   is neither a contract macro nor `ui_display_matches()`. The function calls
+   `getDisplayWidth()`/`getDisplayHeight()` on what `ui.hpp` only
+   forward-declares, so it needs the complete type, and the include goes in
+   `ui.cpp`, not `ui.hpp`. I took it as part of the function rather than stop.
+   Please confirm. Scratch-compiled against the vendored real U8G2 (not
+   committed): the fixture's `ui.cpp`, and a board file constructing
+   `U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2GL_TARGET_ROTATION,
+   U8X8_PIN_NONE)` and calling `ui_display_matches()`, both compile clean under
+   `-Wall -Wextra -Wpedantic`.
+2. **The WO describes `test/generated_fixture` as 256×64; it is 128×64**
+   (SSD1306, sized to the stub). The C++ test checks that it matches at
+   128×64, and refuses 64×128 (the same panel at R1), 256×64 and 128×32.
+   - *Stub change:* the stub's size is now settable through
+     `display_width_val`/`display_height_val`, defaulting to 128×64, after
+     `ascent_val`'s pattern.
+   - *R1:* covered by `cli/test/generator/display-contract.test.ts` (R1, 90,
+     R3, 270), not by a second compiled fixture.
+3. **The investigation `display-ownership.md` is not committed anywhere**, so
+   [D-22]'s prior-art lines (LVGL's editors, SquareLine, ESPHome) are written
+   from general knowledge, in deliberately general terms. Please check them
+   against the investigation.
+4. **The readability review was done inline**, against `u8g2gl-standards`,
+   not by the `readability-reviewer` agent. It found and fixed:
+   - export lists missing from the `resolver/index.ts` and `emit/index.ts`
+     headers;
+   - a changed comment line citing `PR-04 WO10`;
+   - an unwrapped doc comment in `pipeline.ts`;
+   - a `display!` non-null assertion, replaced by narrowing.
+
+   Every new non-exported function has a banner, and every new file has a
+   header and SPDX.
+5. *Outside the boundary:*
+   - `cli/test/fixtures/departures-project/generated/` has been stale since
+     0.13.1 (schema 0.4 stamp). Nothing regenerates or checks it, and this PR
+     moves it further from current output. Not refreshed.
+   - `validator/validate-schema.ts` keeps its own `VALID_ROTATIONS` set, a
+     second copy of `ROTATION_VALUES`. It computes no swap, so I left it. It
+     is a candidate for E-4b, which edits that list anyway.
+   - With Emscripten on PATH the CLI suite runs two more test files (+23
+     tests), and the run takes about 5× as long. Under that load one 5 s
+     vitest timeout was missed once (above).
