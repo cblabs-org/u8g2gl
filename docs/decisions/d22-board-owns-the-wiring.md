@@ -37,9 +37,13 @@ copy of the setup and rotation, with nothing to say when the two disagreed.
    driver stay the hardware's.
 2. **The wiring belongs to the board.** One UI project serves every board that
    carries the same panel, whatever pins each uses. The pin attributes and
-   `<bus>` are removed with schema 0.7 (E-4b), each written one refused with an
-   error that names the board as their place; a constructor snippet with named
-   placeholders for the pins shows the board what to write.
+   `<bus>` are removed in schema 0.7, each written one refused at every schema
+   version with `U8G2GL_REMOVED_ATTRIBUTE`, an error that names the board as
+   their place. In their place a constructor snippet with named placeholders
+   for the pins shows the board what to write: `u8g2gl display <setup>
+   --snippet`, and the designer's target section, print the same text from one
+   core function (design_spec §16). Its argument lists come from U8G2's own
+   `U8g2lib.h`, recorded in the catalogue as `bus.pins`, never typed by hand.
 3. **A generated contract ties the two** (design_spec §16). `ui.hpp` states
    `U8G2GL_TARGET_WIDTH` and `U8G2GL_TARGET_HEIGHT` (after rotation),
    `U8G2GL_TARGET_ROTATION` (U8G2's own `U8G2_Rn`, to construct with) and
@@ -103,8 +107,13 @@ Sources: [LVGL Pro Quick Start](https://docs.pro.lvgl.io/quick_start.html),
   a check U8G2 does not offer.
 - The contract is per build: it describes the target `generate` built, so a
   project with several targets has one contract per generated tree.
-- Removing the pins is breaking schema surface. It lands as its own schema
+- Removing the pins is breaking schema surface. It landed as its own schema
   minor (0.7) with a specific error per attribute, never silently (§15.4).
+  0.4–0.6 projects that write no pin stay accepted: a pin never had any effect,
+  so only a file that writes one breaks, and it is told the fix at the line.
+- The snippet is never generated code: it is shown and copied, not written to
+  `generated/`, so it cannot go stale in the tree or be compiled beside the
+  board's own constructor.
 
 ## Trigger to revisit
 

@@ -10,7 +10,9 @@
  *          size swap is computed; a consumer that spelled either out for itself
  *          could disagree with the rest, so both are checked over every
  *          accepted spelling, an absent attribute and an invalid one.
- * Description: Table-driven over the eight spellings. Also checks that the
+ * Description: Table-driven over the ten spellings: the eight turning ones
+ *              and U8G2's two mirrors, which are layout-neutral as R0 and R2
+ *              are. Also checks that the
  *              record handed to `orientedDisplay()` comes back untouched, since
  *              the framebuffer and tiles must stay native, and that
  *              `findOrientedDisplay()` reads the target's own rotation.
@@ -35,6 +37,8 @@ const SPELLINGS: readonly (readonly [string, Rotation, boolean])[] = [
   ['90', 'R1', true],
   ['180', 'R2', false],
   ['270', 'R3', true],
+  ['MIRROR', 'MIRROR', false],
+  ['MIRROR_VERTICAL', 'MIRROR_VERTICAL', false],
 ];
 
 describe('normaliseRotation()', () => {

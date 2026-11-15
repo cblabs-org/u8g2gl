@@ -5,8 +5,7 @@
  *
  * File: designer/test/unit/project-targets.test.ts
  * Purpose: The rules behind the u8g2gl.xml editor (ui_spec §6.4, [U-3]): the
- *          display picker's grouping and search, which bus fields a family
- *          uses, rotations read as angles, the impact preview's outside test,
+ *          display picker's grouping and search, rotations read as angles, the impact preview's outside test,
  *          the active target's fallback and storage, Run refusing a canvas on
  *          another target, and the last target never being removed.
  * Description: Pure functions on the shipped catalogue and small texts; the
@@ -16,9 +15,8 @@
 import { expect, test } from '@playwright/test';
 import { CATALOGUE } from '@u8g2gl/data/catalogue.js';
 import { applyEdits } from '@u8g2gl/core/cst/index.js';
-import { vocabularyElement } from '@u8g2gl/core/schema/index.js';
 import type { Target } from '@u8g2gl/core/schema/project.js';
-import { busFieldApplies, controllerOptions, rotationLabel, searchSetups, variantOptions, wiringOptions } from '../../src/forms/display-picker-model';
+import { controllerOptions, rotationLabel, searchSetups, variantOptions, wiringOptions } from '../../src/forms/display-picker-model';
 import { formEdit } from '../../src/forms/form-edits';
 import { candidateTexts, outsideElements } from '../../src/forms/impact-preview';
 import { ACTIVE_TARGET_KEY, ActiveTarget, pickTarget } from '../../src/project/active-target';
@@ -48,27 +46,6 @@ test('the search matches every word in the setup name, shortest first; failing t
   expect(fuzzy.matches.length + fuzzy.notes.length).toBeGreaterThan(0);
 });
 
-test("bus fields follow U8G2's constructors: address and reset for I²C; cs, dc and reset for SPI and parallel; no dc on 3-wire SPI", () => {
-  const display = vocabularyElement('display');
-  const attribute = (name: string) => display?.attributes.find((a) => a.name === name);
-  const applies = (name: string, family: 'spi' | 'i2c' | 'parallel', wiring?: string) => {
-    const found = attribute(name);
-    return found !== undefined && busFieldApplies(found, family, wiring);
-  };
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'i2c'))).toEqual(['address', 'reset']);
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi'))).toEqual(['cs', 'dc', 'reset']);
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi', '4w_hardware'))).toEqual(['cs', 'dc', 'reset']);
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'spi', '3w_software'))).toEqual(['cs', 'reset']);
-  expect(['address', 'cs', 'dc', 'reset'].filter((name) => applies(name, 'parallel'))).toEqual(['cs', 'dc', 'reset']);
-  // Every bus field says that generate does not use it yet.
-  for (const name of ['address', 'cs', 'dc', 'reset']) expect(attribute(name)?.help).toContain('does not use it yet');
-  // Not a bus field, or no known family: shown.
-  const setup = attribute('setup');
-  expect(setup !== undefined && busFieldApplies(setup, 'i2c')).toBe(true);
-  const address = attribute('address');
-  expect(address !== undefined && busFieldApplies(address, undefined)).toBe(true);
-});
-
 test('a rotation reads with its angle', () => {
   expect(['R0', 'R1', 'R2', 'R3', '90'].map(rotationLabel)).toEqual(['R0 · 0°', 'R1 · 90°', 'R2 · 180°', 'R3 · 270°', '90°']);
 });
@@ -82,11 +59,11 @@ test('the impact preview names an element whose box leaves the display, and its 
   ]);
   expect(outsideElements(bounds, 128, 64).map((e) => e.name)).toEqual(['right', 'below', 'left']);
   const texts = new Map([
-    ['u8g2gl.xml', '<u8g2gl schema="0.6" name="p" version="1"><targets><target name="a" setup="OLD" /></targets></u8g2gl>'],
+    ['u8g2gl.xml', '<u8g2gl schema="0.7" name="p" version="1"><targets><target name="a" setup="OLD" /></targets></u8g2gl>'],
     ['globals.xml', '<globals />'],
   ]);
   const candidate = candidateTexts(texts, 'u8g2gl.xml>targets#0>display|display/setup', 'NEW');
-  expect(candidate.get('u8g2gl.xml')).toBe('<u8g2gl schema="0.6" name="p" version="1"><targets><target name="a" setup="NEW" /></targets></u8g2gl>');
+  expect(candidate.get('u8g2gl.xml')).toBe('<u8g2gl schema="0.7" name="p" version="1"><targets><target name="a" setup="NEW" /></targets></u8g2gl>');
   expect(candidate.get('globals.xml')).toBe('<globals />');
   expect(texts.get('u8g2gl.xml')).toContain('OLD');
 });
@@ -130,7 +107,7 @@ test('Run is unavailable while the canvas shows another target than the first, a
 });
 
 test('the last target cannot be removed; one of two can', () => {
-  const one = '<u8g2gl schema="0.6" name="p" version="1"><targets><target name="a" setup="S" /></targets></u8g2gl>';
+  const one = '<u8g2gl schema="0.7" name="p" version="1"><targets><target name="a" setup="S" /></targets></u8g2gl>';
   const refused = formEdit('u8g2gl.xml', one, { kind: 'remove', item: 'u8g2gl.xml>targets#0' });
   expect(refused.edits).toEqual([]);
   expect(refused.refused).toContain('at least one target');

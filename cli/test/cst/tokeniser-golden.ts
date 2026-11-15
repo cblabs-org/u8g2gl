@@ -44,7 +44,14 @@
  *              record gains those three attributes and nothing else moves.
  *              Schema 0.6's move from `"0.5"` to `"0.6"` is a third, of the
  *              same kind (a same-length value), and its `icon`, added after
- *              `description` on the same `<api>` lines, a fourth.
+ *              `description` on the same `<api>` lines, a fourth. Schema
+ *              0.7's move from `"0.6"` to `"0.7"` is a fifth, again a
+ *              same-length value. Its removal of the pins is a sixth, in
+ *              `parser/fixtures/valid-project.xml` alone: the `<bus>` line
+ *              is deleted, so its element leaves the record and every location
+ *              after it moves up one line, and ` address="0x3C"` leaves the
+ *              second `<display>`, so that attribute goes and the element's
+ *              end column moves left by its 15 characters.
  *
  *              The first edit that moves locations is `u8g2gl_label.xml`'s
  *              help rewording: four `help` values change, the `long_mode`

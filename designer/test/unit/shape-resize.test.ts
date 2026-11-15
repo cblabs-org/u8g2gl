@@ -33,7 +33,7 @@ const SCREEN = 'screens/screen_home.xml';
 const PROJECT: readonly [string, string][] = [
   [
     'u8g2gl.xml',
-    '<u8g2gl schema="0.6" name="shapes" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
+    '<u8g2gl schema="0.7" name="shapes" version="1.0.0">\n  <targets>\n    <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />\n  </targets>\n</u8g2gl>\n',
   ],
   ['globals.xml', '<globals>\n  <subjects>\n    <int name="level" value="5" />\n  </subjects>\n</globals>\n'],
 ];

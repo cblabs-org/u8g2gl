@@ -97,9 +97,9 @@ export interface FieldCandidate {
   readonly host: CstElement | undefined;
   /** The canonical place: where a value is written new. */
   readonly canonical: boolean;
-  /** Read before the canonical place (`<bus>`). */
+  /** Read before the canonical place (`beforeCanonical`; no vocabulary entry has one since schema 0.7). */
   readonly beforeCanonical: boolean;
-  /** Not read while another element is written (a target's bus pins, while it has a display). */
+  /** Not read while another element is written (`unlessPresent`; no vocabulary entry has one since schema 0.7). */
   readonly shadowed: boolean;
 }
 

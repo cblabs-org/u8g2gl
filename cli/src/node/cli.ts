@@ -7,11 +7,14 @@
  * File: src/node/cli.ts
  * Purpose: Command-line interface entry point for U8G2GL. Dispatches subcommands
  *          for XML validation, code generation, display queries, display
- *          catalogue enumeration, the design server, and the Emscripten
+ *          catalogue enumeration, one display's record and board-side
+ *          constructor snippet, the design server, and the Emscripten
  *          toolchain the design server builds with.
  * Description: Command parser and subcommand router supporting global flags
  *              (--json, --no-color, --version, --help) and subcommands (validate,
- *              generate, find, catalogue, design, toolchain). `design` lives in
+ *              generate, find, catalogue, display, design, toolchain).
+ *              `display <setup> --snippet` prints `constructorSnippet()`'s
+ *              text byte for byte, the same the designer shows ([D-22]). `design` lives in
  *              `design/design-command.ts` and `toolchain` in
  *              `toolchain/toolchain-command.ts`; this file only parses and
  *              dispatches them. `validate` and `generate` share one load
@@ -35,6 +38,7 @@
 import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
+import pageModeMapData from '../data/page-mode-map.json' with { type: 'json' };
 import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
 import { compileProjectAssets, type CompileProjectAssetsResult } from '../core/assets/index.js';
 import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
@@ -51,13 +55,18 @@ import {
   type SourceConstraints,
   type FitsTarget,
 } from '../core/catalogue/query.js';
-import type { BusFamily } from '../core/schema/display-record.js';
+import { constructorSnippet } from '../core/catalogue/snippet.js';
+import { findClosest } from '../core/catalogue/edit-distance.js';
+import { DIAGNOSTIC_CODES } from '../core/schema/diagnostic.js';
+import { ROTATION_VALUES } from '../core/schema/project-vocabulary.js';
+import type { BusFamily, DisplayRecord } from '../core/schema/display-record.js';
 import { formatDiagnostics } from './format-diagnostic.js';
 import {
   formatIdentifyResult,
   formatSourceResult,
   formatCompareResult,
   formatCatalogueSummary,
+  formatDisplayRecord,
 } from './format-display.js';
 import { parseDesignArgs, runDesignCommand } from './design/design-command.js';
 import { nodeToolchainHost } from './toolchain/toolchain-host.js';
@@ -69,7 +78,7 @@ import { loadProject, type LoadedProject } from './load-project.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
-const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'generate', 'design', 'toolchain'] as const;
+const KNOWN_COMMANDS = ['validate', 'find', 'catalogue', 'display', 'generate', 'design', 'toolchain'] as const;
 
 /** Output directory `generate` uses when neither `--out` nor `<output dir>` names one. */
 const DEFAULT_OUTPUT_DIR = 'generated';
@@ -151,6 +160,7 @@ Commands:
   generate   Validate a project and write its generated C++ files
   find       Query the display catalogue for matching displays
   catalogue  Display summary from the display catalogue
+  display    One display's record, or the board-side code that constructs it
   design     Serve the project to the designer in your browser
   toolchain  Show, locate or install the Emscripten the designer builds with
 
@@ -223,6 +233,22 @@ Toolchain Options:
   --json: status { "required", "selected", "path", "managed", "notes" };
           path { "source", "version", "emxx", "envScript"? };
           install { "outcome": "already" | "installed" | "declined" | "failed", ... }
+
+Display Options:
+  u8g2gl display <setup>                       The record: controller, native size, bus and
+                                               wiring, the pins its constructor takes
+                                               (optional ones marked), framebuffer
+    --snippet          Print only the board-side code that constructs the
+                       display: includes, a FILL_IN_PIN placeholder per pin,
+                       the constructor with U8G2GL_TARGET_ROTATION, and setup().
+                       The same text the designer's target section shows.
+    --rotation <r>     The rotation its comment names (default R0; any
+                       spelling the schema accepts)
+    --target <name>    The target its mismatch comment names (default main)
+  Pins and bus are configured by your firmware's board; U8G2GL describes the
+  panel. An unknown setup exits 1 with the nearest catalogued names.
+  --json: { "display": {...}, "snippet": "..." }; unknown setup:
+          { "display": null, "snippet": null, "diagnostics": [...], "errors": 1, "warnings": 0 }
 
 Find Options:
   u8g2gl find <query>                          Free-text search (identify mode)
@@ -420,6 +446,123 @@ function handleFindCommand(args: readonly string[], json: boolean, useColor: boo
   console.log(formatIdentifyResult(result, { color: useColor }));
 }
 
+/** The full-buffer equivalent of each page-mode setup, for a near miss. */
+const PAGE_MODE_MAP: Readonly<Record<string, string>> = pageModeMapData as Record<string, string>;
+
+/** What `display` was asked for. */
+interface DisplayArgs {
+  readonly setup: string;
+  readonly snippet: boolean;
+  readonly rotation: string | undefined;
+  readonly target: string;
+}
+
+// parseDisplayArgs
+// Parses `display <setup> [--snippet] [--rotation <r>] [--target <name>]`,
+// or reports a usage error and exits 2. Strict, as generate is: a mistyped
+// flag would otherwise print a snippet for the wrong rotation without a word.
+//   args — subcommand arguments, global flags already removed
+//   json — whether --json was given
+function parseDisplayArgs(args: readonly string[], json: boolean): DisplayArgs {
+  const usage = (message: string): never => exitWithUsageError(json, message, 'display');
+  let setup: string | undefined;
+  let snippet = false;
+  let rotation: string | undefined;
+  let target = 'main';
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? '';
+    const value = (): string => {
+      const next = args[++i];
+      if (next === undefined || next.startsWith('--')) usage(`${arg} needs a value.`);
+      return next as string;
+    };
+    if (arg === '--snippet') {
+      snippet = true;
+    } else if (arg === '--rotation') {
+      rotation = value();
+      if (!ROTATION_VALUES.includes(rotation)) {
+        usage(`Unknown rotation '${rotation}'. Expected one of: ${ROTATION_VALUES.join(', ')}.`);
+      }
+    } else if (arg === '--target') {
+      target = value();
+    } else if (arg.startsWith('-')) {
+      usage(`Unknown option '${arg}' for display.`);
+    } else if (setup === undefined) {
+      setup = arg;
+    } else {
+      usage(`display takes one setup; got '${setup}' and '${arg}'.`);
+    }
+  }
+  if (setup === undefined) {
+    usage('display needs a setup, e.g. u8g2gl display U8G2_SSD1306_128X64_NONAME_F_HW_I2C.');
+  }
+  return { setup: setup as string, snippet, rotation, target };
+}
+
+// unknownSetupDiagnostic
+// The refusal of a setup the catalogue does not have, with the nearest names
+// the catalogue does: a page-mode setup's full-buffer twin, else the setups
+// within the validator's edit distance, as U8G2GL_UNKNOWN_DISPLAY gives them.
+//   setup — the setup as typed
+function unknownSetupDiagnostic(setup: string): Diagnostic {
+  const fullBuffer = PAGE_MODE_MAP[setup];
+  const suggestions = fullBuffer !== undefined ? [fullBuffer] : findClosest(setup, CATALOGUE.map((record) => record.setup));
+  const why =
+    fullBuffer !== undefined
+      ? ` It is a page-mode setup; U8G2GL needs the full-buffer one, ${fullBuffer}.`
+      : suggestions.length > 0
+        ? ` Did you mean: ${suggestions.join(', ')}?`
+        : " Search with 'u8g2gl find'.";
+  return {
+    code: DIAGNOSTIC_CODES.UNKNOWN_DISPLAY,
+    severity: 'error',
+    file: '',
+    line: 1,
+    column: 1,
+    message: `Unknown display setup '${setup}': not in the U8G2 display catalogue.${why}`,
+    offendingText: setup,
+    suggestions,
+  };
+}
+
+/**
+ * @brief Handles the `display` subcommand: one record, or its constructor snippet.
+ *
+ * The snippet is `constructorSnippet()`'s text written unchanged, so it is
+ * byte for byte what the designer's target section shows ([D-22]).
+ *
+ * @param args     Subcommand argument array.
+ * @param json     Whether to output JSON.
+ * @param useColor Whether ANSI colouring is enabled.
+ */
+function handleDisplayCommand(args: readonly string[], json: boolean, useColor: boolean): void {
+  // --- Step 1: Parse, and find the record ---
+  const parsed = parseDisplayArgs(args, json);
+  const record: DisplayRecord | undefined = CATALOGUE.find((candidate) => candidate.setup === parsed.setup);
+
+  // --- Step 2: An unknown setup is refused with the near misses ---
+  if (record === undefined) {
+    const diagnostic = unknownSetupDiagnostic(parsed.setup);
+    if (json) {
+      console.log(JSON.stringify({ display: null, snippet: null, diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
+    } else {
+      console.error(`Error: ${diagnostic.message}`);
+    }
+    process.exit(1);
+  }
+
+  // --- Step 3: The record, the snippet, or both as JSON ---
+  const snippet = constructorSnippet(record, parsed.rotation, parsed.target);
+  if (json) {
+    console.log(JSON.stringify({ display: record, snippet }, null, 2));
+  } else if (parsed.snippet) {
+    // Written as is: console.log would add a newline the designer's text lacks.
+    process.stdout.write(snippet);
+  } else {
+    console.log(formatDisplayRecord(record, { color: useColor }));
+  }
+}
+
 // exitWithFatal
 // Reports a failure that stops a command before any diagnostics exist — a
 // missing path, a project the loader cannot read — in the command's own JSON
@@ -599,14 +742,15 @@ function isTargetKind(value: string): value is TargetKind {
 }
 
 // exitWithUsageError
-// A `generate` usage error — a mistyped flag, a missing value, two paths — in the
+// A usage error — a mistyped flag, a missing value, two paths — in the
 // command's own JSON shape under `--json`, or two lines on stderr without it.
 // Exits 2 either way, which is the status a usage error has always had; only the
 // *shape* of the report changes, so a caller reading the status is unaffected
 // ([D-16], PR-04 WO5b carry closed in WO12).
 //   json    — whether --json was given
 //   message — what was wrong with the command line
-function exitWithUsageError(json: boolean, message: string): never {
+//   command — the command whose options the second line points at
+function exitWithUsageError(json: boolean, message: string, command = 'generate'): never {
   if (json) {
     const diagnostic: Diagnostic = {
       code: USAGE_ERROR_CODE,
@@ -621,7 +765,7 @@ function exitWithUsageError(json: boolean, message: string): never {
     console.log(JSON.stringify({ files: [], diagnostics: [diagnostic], errors: 1, warnings: 0 }, null, 2));
   } else {
     console.error(`Error: ${message}`);
-    console.error("Run 'u8g2gl --help' for generate's options.");
+    console.error(`Run 'u8g2gl --help' for ${command}'s options.`);
   }
   process.exit(2);
 }
@@ -997,6 +1141,11 @@ export async function runCli(rawArgs: readonly string[]): Promise<void> {
 
   if (subcommand === 'catalogue') {
     handleCatalogueCommand(json, useColor);
+    return;
+  }
+
+  if (subcommand === 'display') {
+    handleDisplayCommand(subcommandArgs, json, useColor);
     return;
   }
 

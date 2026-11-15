@@ -22,7 +22,6 @@ import {
   type Located,
   type U8g2glProject,
   type Target,
-  type BusConfig,
   type OutputConfig,
   type Globals,
   type ConstDecl,
@@ -175,28 +174,16 @@ describe('Schema Types', () => {
 
   describe('Project types (u8g2gl.xml)', () => {
     it('creates a valid U8g2glProject matching design_spec §5.1', () => {
-      const defaultBus: BusConfig = {
-        cs: '10',
-        dc: '9',
-        reset: '8',
-      };
-
-      const compactBus: BusConfig = {
-        address: '0x3C',
-      };
-
       const targets: readonly Target[] = [
         {
           name: 'default',
           setup: 'U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI',
           rotation: '0',
-          bus: defaultBus,
           ramBudget: 4800,
         },
         {
           name: 'compact',
           setup: 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C',
-          bus: compactBus,
         },
       ];
 
@@ -206,7 +193,7 @@ describe('Schema Types', () => {
       };
 
       const project: U8g2glProject = {
-        schema: '0.6',
+        schema: '0.7',
         name: 'departures-board',
         version: '1.0',
         targets,
@@ -214,7 +201,7 @@ describe('Schema Types', () => {
         loc: { file: 'u8g2gl.xml', line: 1, column: 1 },
       };
 
-      expect(project.schema).toBe('0.6');
+      expect(project.schema).toBe('0.7');
       expect(project.name).toBe('departures-board');
       expect(project.targets).toHaveLength(2);
       expect(project.targets[0]?.setup).toBe('U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI');
@@ -495,7 +482,12 @@ describe('Schema Types', () => {
 
   describe('Display Record types (display catalogue, §5.2)', () => {
     it('creates valid DisplayRecord matching design_spec §5.2', () => {
-      const bus: DisplayBus = { family: 'i2c' as BusFamily, wiring: 'hardware', raw: 'HW_I2C' };
+      const bus: DisplayBus = {
+        family: 'i2c' as BusFamily,
+        wiring: 'hardware',
+        raw: 'HW_I2C',
+        pins: [{ name: 'reset', optional: true }, { name: 'clock', optional: true }, { name: 'data', optional: true }],
+      };
       const tiles: DisplayTiles = { width: 16, height: 8 };
       const xOffset: DisplayXOffset = { default: 0, flipmode: 0 };
 
@@ -536,7 +528,7 @@ describe('Schema Types', () => {
       expect(loc.file).toBe('test.xml');
 
       const project: U8g2glProject = {
-        schema: '0.6',
+        schema: '0.7',
         name: 'test',
         version: '1.0',
         targets: [],
@@ -546,7 +538,7 @@ describe('Schema Types', () => {
         project.schema = '0.6';
       };
       expect(typeof reassignProject).toBe('function');
-      expect(project.schema).toBe('0.6');
+      expect(project.schema).toBe('0.7');
 
       const diag: Diagnostic = {
         code: DIAGNOSTIC_CODES.MISSING_REQUIRED,

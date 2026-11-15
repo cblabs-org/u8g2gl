@@ -51,16 +51,19 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 12 ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 13 ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
 // Schemas 0.5 and 0.6 add only Palette metadata on <api> (0.5 the label,
 // category and description, 0.6 the icon), which the designer reads and no
-// generated file carries, so the runtime's behaviour is unchanged. The minor
+// generated file carries. Schema 0.7 adds U8G2's two mirror rotations, which
+// generated code passes to the board's constructor as U8G2's own U8G2_MIRROR
+// macros, and removes the pin attributes, which no generated file ever
+// carried. So the runtime's behaviour is unchanged by all three. The minor
 // still moves with them: while the major is 0, U8G2GL_REQUIRE_SCHEMA_VERSION()
-// compares the minor exactly, and code generated for 0.6 must compile here.
+// compares the minor exactly, and code generated for 0.7 must compile here.
 #define U8G2GL_SCHEMA_VERSION_MAJOR 0  ///< Schema major this runtime implements
-#define U8G2GL_SCHEMA_VERSION_MINOR 6  ///< Schema minor this runtime implements
+#define U8G2GL_SCHEMA_VERSION_MINOR 7  ///< Schema minor this runtime implements
 
 /// @cond INTERNAL
 // Two-level stringification so a macro argument is expanded before # applies:

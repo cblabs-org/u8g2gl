@@ -35,6 +35,7 @@ import { ProjectFormController } from './form-controller';
 import { isFormFile, type FormFile } from './form-model';
 import { FormView, type FormActions, type SectionRenderer } from './form-view';
 import { useProjectEditor } from './project-editor';
+import { projectSchema } from './snippet-panel-model';
 import './form.css';
 
 // seedFor
@@ -104,8 +105,8 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
     [controller, workspace, file],
   );
 
-  // u8g2gl.xml's own editors: the display picker, bus fields, the output example.
-  const project = useProjectEditor(workspace);
+  // u8g2gl.xml's own editors: the display picker, the constructor snippet, the output example.
+  const project = useProjectEditor(workspace, projectSchema(state.model));
   const hooks = file === 'u8g2gl.xml' ? project : undefined;
   const sections = renderSection ?? hooks?.renderSection;
 
@@ -117,7 +118,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
         state={state}
         actions={actions}
         {...(sections !== undefined ? { renderSection: sections } : {})}
-        {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, fieldShown: hooks.fieldShown, fieldNote: hooks.fieldNote } : {})}
+        {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, nodeExtra: hooks.nodeExtra, fieldNote: hooks.fieldNote } : {})}
       />
     </div>
   );

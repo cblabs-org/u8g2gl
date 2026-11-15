@@ -6,8 +6,8 @@
  * File: src/core/schema/project-vocabulary.ts
  * Purpose: The vocabulary of the two project files, `u8g2gl.xml` (§5.1) and
  *          `globals.xml` (§5.3), as data: every element and every attribute
- *          the parsers read, with its type, its default, the bus families it
- *          applies to, every spelling the parser accepts, and help in plain
+ *          the parsers read, with its type, its default, every spelling the
+ *          parser accepts, and help in plain
  *          words. Before this table the vocabulary existed only as parser code
  *          and TypeScript interfaces, which nothing else could enumerate.
  *          The designer builds its project-file forms from it, and tests hold
@@ -22,10 +22,11 @@
  *              id, and whether it repeats. Each attribute is written once, on
  *              the element where a new value is written (the canonical place,
  *              design_spec §5.1); every other place and spelling the parser
- *              also reads is listed as an alternative of it. `<bus>` is such a
- *              place: read, never written new, so it carries no attributes of
- *              its own. Isomorphic and dependency-free apart from the schema's
- *              own tables and the `<convert>` modes.
+ *              also reads is listed as an alternative of it. The pin
+ *              attributes and `<bus>` are not here: schema 0.7 removed them,
+ *              and the parser refuses them ([D-22]). Isomorphic and
+ *              dependency-free apart from the schema's own tables and the
+ *              `<convert>` modes.
  *
  * Exports:
  * - VocabularyFile:         The two project files
@@ -36,7 +37,8 @@
  * - VocabularyElement:      One element
  * - ROTATION_VALUES:        The rotations a target accepts, as written
  * - ROTATION_DEGREES:       Each rotation's angle in degrees
- * - Rotation:               A rotation in U8G2's spelling, R0…R3
+ * - Rotation:               A rotation in U8G2's spelling, R0…R3 or a mirror
+ * - MIRROR_ROTATIONS:       The two mirror rotations, which schema 0.7 added
  * - normaliseRotation():    The U8G2 rotation any accepted spelling means
  * - MAX_STRING_LEN_DEFAULT: A string subject's capacity when `max_len` is absent
  * - PROJECT_VOCABULARY:     Every element of both files
@@ -48,7 +50,6 @@
 
 import { CONVERT_MODES } from '../images/convert-decl.js';
 import { DEFAULT_THRESHOLD } from '../images/png-to-xbm.js';
-import type { BusFamily } from './display-record.js';
 import {
   BITMAP_MODE_VALUES,
   COLOR_VALUES,
@@ -83,14 +84,15 @@ export interface AttributeSpelling {
   /** The attribute name as written there. */
   readonly name: string;
   /**
-   * True where the parser reads this place before the canonical one: a
-   * `<bus>` child, when present, supplies every bus value.
+   * True where the parser reads this place before the canonical one. No entry
+   * uses it since schema 0.7 removed `<bus>`, the place that was read first;
+   * the forms still honour it, so a later such place needs no form change.
    */
   readonly beforeCanonical?: boolean;
   /**
-   * The ids of elements whose presence hides this place from the parser: bus
-   * values on `<target>` are read only when the target has neither a
-   * `<bus>` nor a `<display>`, since the parser reads those instead.
+   * The ids of elements whose presence hides this place from the parser, for a
+   * value read from one place only while another element is absent. No entry
+   * uses it since schema 0.7 removed the pins, which were read that way.
    */
   readonly unlessPresent?: readonly string[];
 }
@@ -106,16 +108,12 @@ export interface VocabularyAttribute {
   readonly default?: string;
   /** What it means, in plain words (design_spec §5.1–§5.3, §8, §10, §14). */
   readonly help: string;
-  /** For a bus pin or address: the bus families (§5.2) it applies to. */
-  readonly busFamilies?: readonly BusFamily[];
-  /** For a bus pin: wirings of those families that have no such pin (3-wire SPI has no `dc`). */
-  readonly busWiringsWithout?: readonly string[];
   /** Shown, never edited in a form: changing it is a migration, not an edit (§15.4). */
   readonly readOnly?: boolean;
   /**
    * The ids of elements whose presence hides the canonical place from the
-   * parser: a `<bus>` child, when written, supplies every bus value, and the
-   * display's own are not read.
+   * parser. As with a spelling's `unlessPresent`, no entry uses it since
+   * schema 0.7.
    */
   readonly unlessPresent?: readonly string[];
   /**
@@ -145,8 +143,9 @@ export interface VocabularyElement {
   /** Why it has that minimum, for a refused removal to say. */
   readonly minimumReason?: string;
   /**
-   * False for a place the parser reads but a form never writes into new
-   * (`<bus>`): its values are alternatives of attributes declared elsewhere.
+   * False for a place the parser reads but a form never writes into new: its
+   * values are alternatives of attributes declared elsewhere. Every element is
+   * canonical since schema 0.7 removed `<bus>`, the one that was not.
    */
   readonly canonical: boolean;
   readonly help: string;
@@ -154,12 +153,21 @@ export interface VocabularyElement {
 }
 
 /**
- * The rotations a target accepts as written (§5.1): U8G2's `U8G2_R0`…`R3`, or
- * the angle in degrees. Pass 1 refuses anything else.
+ * U8G2's two mirror rotations, `U8G2_MIRROR` (left–right) and
+ * `U8G2_MIRROR_VERTICAL` (top–bottom), which schema 0.7 added. Like R0 and R2
+ * they leave the display's size alone, so layout is unchanged; they exist for
+ * panels seen through reflective or head-up-display glass.
  */
-export const ROTATION_VALUES: readonly string[] = ['R0', 'R1', 'R2', 'R3', '0', '90', '180', '270'];
+export const MIRROR_ROTATIONS: readonly string[] = ['MIRROR', 'MIRROR_VERTICAL'];
 
-/** Each rotation's clockwise angle in degrees, for showing `R1` as 90°. */
+/**
+ * The rotations a target accepts as written (§5.1): U8G2's `U8G2_R0`…`R3`, the
+ * angle in degrees, or one of the mirrors (schema 0.7 and later). Pass 1
+ * refuses anything else, and a mirror under an older schema.
+ */
+export const ROTATION_VALUES: readonly string[] = ['R0', 'R1', 'R2', 'R3', '0', '90', '180', '270', ...MIRROR_ROTATIONS];
+
+/** Each turning rotation's clockwise angle in degrees, for showing `R1` as 90°. A mirror has none. */
 export const ROTATION_DEGREES: Readonly<Record<string, number>> = {
   R0: 0,
   R1: 90,
@@ -171,8 +179,11 @@ export const ROTATION_DEGREES: Readonly<Record<string, number>> = {
   '270': 270,
 };
 
-/** A rotation in U8G2's own spelling: `U8G2_R0`…`U8G2_R3` without the prefix. */
-export type Rotation = 'R0' | 'R1' | 'R2' | 'R3';
+/**
+ * A rotation in U8G2's own spelling without the `U8G2_` prefix: `R0`…`R3`, or
+ * `MIRROR` / `MIRROR_VERTICAL`, so `U8G2_${rotation}` is always U8G2's macro.
+ */
+export type Rotation = 'R0' | 'R1' | 'R2' | 'R3' | 'MIRROR' | 'MIRROR_VERTICAL';
 
 /**
  * Each written spelling's U8G2 rotation. The one table that equates `90` with
@@ -187,6 +198,8 @@ const ROTATION_BY_SPELLING: ReadonlyMap<string, Rotation> = new Map<string, Rota
   ['90', 'R1'],
   ['180', 'R2'],
   ['270', 'R3'],
+  ['MIRROR', 'MIRROR'],
+  ['MIRROR_VERTICAL', 'MIRROR_VERTICAL'],
 ]);
 
 /**
@@ -196,7 +209,8 @@ const ROTATION_BY_SPELLING: ReadonlyMap<string, Rotation> = new Map<string, Rota
  * wrote; everything that *acts* on a rotation reads it through here instead.
  *
  * @param rotation The attribute's text, or undefined when it is absent.
- * @return `R0`…`R3` for any of the eight accepted spellings, `R0` when the
+ * @return `R0`…`R3` for any of the eight turning spellings, a mirror
+ *         unchanged, `R0` when the
  *         attribute is absent (U8G2's own default), and undefined for anything
  *         else. Pass 1 reports an invalid value, so a caller given undefined
  *         need not say so again.
@@ -231,36 +245,6 @@ function nameAttribute(what: string, referredAs: string): VocabularyAttribute {
 }
 
 // --- u8g2gl.xml (§5.1) -------------------------------------------------------
-
-// What every bus field's help ends with: the CLI reads these values but
-// nothing uses them yet, and saying so is better than a field that implies
-// it configures the display.
-const BUS_NOT_YET_USED =
-  'It is recorded in the project for your firmware: U8G2GL does not construct the display, so `generate` does not use it yet.';
-
-/** The bus attributes, at their canonical place on `<display>`, with every place the parser reads them. */
-function busAttribute(
-  name: 'cs' | 'dc' | 'reset' | 'address',
-  families: readonly BusFamily[],
-  help: string,
-  wiringsWithout?: readonly string[],
-): VocabularyAttribute {
-  return {
-    name,
-    type: { kind: 'string' },
-    required: false,
-    help: `${help} ${BUS_NOT_YET_USED}`,
-    busFamilies: families,
-    ...(wiringsWithout !== undefined ? { busWiringsWithout: wiringsWithout } : {}),
-    // parse-project.ts reads a `<bus>` child, if written, for all four; else
-    // the attributes on `<display>`, if written; else those on `<target>`.
-    unlessPresent: ['bus'],
-    alternatives: [
-      { element: 'bus', name, beforeCanonical: true },
-      { element: 'target', name, unlessPresent: ['bus', 'display'] },
-    ],
-  };
-}
 
 const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
   {
@@ -351,7 +335,7 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     parent: 'target',
     repeats: false,
     canonical: true,
-    help: 'The display the target drives, and how it is wired.',
+    help: "The display the target drives, and how it is mounted. Its pins and bus are your firmware's board's to set, not U8G2GL's.",
     attributes: [
       {
         name: 'setup',
@@ -367,25 +351,15 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
         type: { kind: 'enum', values: ROTATION_VALUES },
         required: false,
         default: 'R0',
-        help: "How the display is mounted: R0 to R3, or 0, 90, 180 or 270 degrees clockwise. U8G2 cannot know it, so it is yours to set.",
+        help:
+          'How the display is mounted: R0 to R3, or 0, 90, 180 or 270 degrees clockwise; R1 and R3 swap its width and height. ' +
+          'MIRROR and MIRROR_VERTICAL (schema 0.7) flip it left–right or top–bottom without changing its size, for a panel ' +
+          'seen through reflective or head-up-display glass. U8G2 cannot know it, so it is yours to set. It is the rotation ' +
+          "the board constructs the display with (U8G2GL_TARGET_ROTATION), not the controller's flip mode (setFlipMode()), " +
+          "which is the firmware's to use at run time.",
         alternatives: [{ element: 'target', name: 'rotation' }],
       },
-      busAttribute('cs', ['spi', 'parallel'], 'The chip-select pin, for an SPI or parallel display.'),
-      busAttribute('dc', ['spi', 'parallel'], 'The data/command pin, for a 4-wire SPI or parallel display.', ['3w_hardware', '3w_software']),
-      busAttribute('reset', ['spi', 'i2c', 'parallel'], "The display's reset pin, for any bus."),
-      busAttribute('address', ['i2c'], 'The I²C device address, such as 0x3C. U8G2 cannot know it, so it is yours to set.'),
     ],
-  },
-  {
-    id: 'bus',
-    file: 'u8g2gl.xml',
-    tag: 'bus',
-    label: 'Bus',
-    parent: 'target',
-    repeats: false,
-    canonical: false,
-    help: 'An older place for the bus pins and address. It is still read; new values are written on the display.',
-    attributes: [],
   },
   {
     id: 'output',
@@ -713,7 +687,7 @@ export function vocabularyRoots(): ReadonlyMap<VocabularyFile, VocabularyElement
 /**
  * @brief Every place an attribute is read from, in the order the parser
  *        prefers them: the canonical one first unless an alternative is read
- *        before it (`<bus>`), then the rest.
+ *        before it (`beforeCanonical`), then the rest.
  *
  * @param element   The element the attribute is declared on.
  * @param attribute One of its attributes.

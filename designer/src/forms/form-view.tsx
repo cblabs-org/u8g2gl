@@ -78,8 +78,8 @@ interface Context {
   readonly readOnly: boolean;
   /** Extra content for a field, such as a note; undefined for none. */
   readonly fieldNote?: (field: FormField, node: FormNode) => ReactNode;
-  /** Whether a field is shown; all are by default. */
-  readonly fieldShown?: (field: FormField, node: FormNode) => boolean;
+  /** Content after a node's fields, parts and lists (a target's constructor snippet); undefined for none. */
+  readonly nodeExtra?: (node: FormNode) => ReactNode;
   /** A control to use in place of a field's generic one (the display picker); undefined for the generic. */
   readonly fieldControl?: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
 }
@@ -100,25 +100,24 @@ function NodeProblems({ rows }: { readonly rows: readonly ProblemRow[] }): React
 }
 
 // NodeBody
-// A node's fields, then each of its parts as a group, then its lists.
+// A node's fields, then each of its parts as a group, then its lists, then
+// anything the file's own editor adds after them.
 function NodeBody({ node, context }: { readonly node: FormNode; readonly context: Context }): React.JSX.Element {
   const { state, actions, readOnly } = context;
   return (
     <>
-      {node.fields
-        .filter((field) => context.fieldShown?.(field, node) ?? true)
-        .map((field) => (
-          <FieldControl
-            key={field.key}
-            field={field}
-            options={state.options}
-            readOnly={readOnly}
-            problems={state.problems.byField.get(field.key) ?? NONE}
-            note={context.fieldNote?.(field, node)}
-            control={context.fieldControl?.(field, node, (value) => actions.set(field.key, value))}
-            commit={(value) => actions.set(field.key, value)}
-          />
-        ))}
+      {node.fields.map((field) => (
+        <FieldControl
+          key={field.key}
+          field={field}
+          options={state.options}
+          readOnly={readOnly}
+          problems={state.problems.byField.get(field.key) ?? NONE}
+          note={context.fieldNote?.(field, node)}
+          control={context.fieldControl?.(field, node, (value) => actions.set(field.key, value))}
+          commit={(value) => actions.set(field.key, value)}
+        />
+      ))}
       <NodeProblems rows={state.problems.byNode.get(node.key) ?? NONE} />
       {node.parts.map((part) => (
         <fieldset
@@ -139,6 +138,7 @@ function NodeBody({ node, context }: { readonly node: FormNode; readonly context
       {node.lists.map((list) => (
         <ListBody key={list.key} list={list} context={context} />
       ))}
+      {context.nodeExtra?.(node)}
     </>
   );
 }
@@ -235,7 +235,7 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
  *
  * @param renderSection Replaces a section's generic body, for a richer editor.
  * @param fieldNote     Extra content beneath a field.
- * @param fieldShown    Whether a field is shown (a bus pin its wiring does not use is not).
+ * @param nodeExtra     Content after a node's body (a target's constructor snippet).
  * @param fieldControl  A control in place of a field's generic one (the display picker).
  */
 export function FormView({
@@ -244,7 +244,7 @@ export function FormView({
   actions,
   renderSection,
   fieldNote,
-  fieldShown,
+  nodeExtra,
   fieldControl,
 }: {
   readonly file: string;
@@ -252,7 +252,7 @@ export function FormView({
   readonly actions: FormActions;
   readonly renderSection?: SectionRenderer;
   readonly fieldNote?: Context['fieldNote'];
-  readonly fieldShown?: Context['fieldShown'];
+  readonly nodeExtra?: Context['nodeExtra'];
   readonly fieldControl?: Context['fieldControl'];
 }): React.JSX.Element {
   const readOnly = state.unreadable !== undefined;
@@ -261,7 +261,7 @@ export function FormView({
     actions,
     readOnly,
     ...(fieldNote !== undefined ? { fieldNote } : {}),
-    ...(fieldShown !== undefined ? { fieldShown } : {}),
+    ...(nodeExtra !== undefined ? { nodeExtra } : {}),
     ...(fieldControl !== undefined ? { fieldControl } : {}),
   };
   return (

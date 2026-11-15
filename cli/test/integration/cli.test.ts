@@ -13,7 +13,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -36,7 +36,10 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
     execFile(
       process.execPath,
       [cliPath, ...args],
-      { env: { ...process.env, NO_COLOR: '1' } },
+      // execFile's default 1 MiB stdout cap is below `catalogue --json`, whose
+      // records carry each constructor's pins (1.4 MB at U8G2 2.36.18); over
+      // the cap the child is killed and the output arrives cut short.
+      { env: { ...process.env, NO_COLOR: '1' }, maxBuffer: 16 * 1024 * 1024 },
       (error, stdout, stderr) => {
         const exitCode = error && typeof error.code === 'number' ? error.code : 0;
         res({
@@ -63,7 +66,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
   });
 
   it('valid-project is kept at schema 0.5, so the run above proves 0.5 still validates (§15.4)', () => {
-    // The one fixture left at 0.5 when the rest moved to 0.6, which is additive.
+    // The one fixture left at 0.5 when the rest moved to 0.6 and then 0.7, which are additive.
     const project = readFileSync(join(validProjectDir, 'u8g2gl.xml'), 'utf-8');
     expect(project).toContain('<u8g2gl schema="0.5"');
   });
@@ -132,6 +135,30 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(codes).toContain('U8G2GL_INVALID_NAME');
   });
 
+  it('u8g2gl validate on a project writing a pin reports only the refusal, against its real target', async () => {
+    // A refused pin keeps the project model, so validation reads the file's
+    // own schema and target rather than an empty placeholder's.
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/removed-pin-'));
+    try {
+      cpSync(validProjectDir, dir, { recursive: true });
+      const xmlPath = join(dir, 'u8g2gl.xml');
+      writeFileSync(xmlPath, readFileSync(xmlPath, 'utf8').replace('rotation="R0" />', 'rotation="R0" cs="5" />'));
+
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      expect(res.code).toBe(1);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; severity: string }>;
+        target?: { name: string };
+      };
+      const errors = parsed.diagnostics.filter((d) => d.severity === 'error').map((d) => d.code);
+      expect(errors).toEqual(['U8G2GL_REMOVED_ATTRIBUTE']);
+      expect(parsed.target?.name).toBe('primary');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // --- PR-04 WO1: the framework manifests reach the CLI ---
   describe('framework manifests (PR-04 WO1)', () => {
     const tempDirs: string[] = [];
@@ -144,7 +171,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
       mkdirSync(join(dir, 'screens'), { recursive: true });
       writeFileSync(
         join(dir, 'u8g2gl.xml'),
-        `<u8g2gl schema="0.6" name="label_only" version="1.0.0">
+        `<u8g2gl schema="0.7" name="label_only" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
     </targets>
@@ -296,7 +323,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
 
 describe('WO9: validate --fix-names end-to-end', () => {
   const projectXml = `<?xml version="1.0" encoding="UTF-8"?>
-<u8g2gl schema="0.6" name="fix_names_demo" version="1.0.0">
+<u8g2gl schema="0.7" name="fix_names_demo" version="1.0.0">
     <targets>
         <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
     </targets>

@@ -25,7 +25,6 @@
  * - Project configuration (§5.1):
  *   - U8g2glProject: Document model for u8g2gl.xml
  *   - Target: Hardware target display specification
- *   - BusConfig: Hardware bus pin and address mappings
  *   - OutputConfig: Emitted C++ directory and prefix settings
  *
  * - Global declarations (§5.3):
@@ -81,13 +80,14 @@
  *   - PROJECT_VOCABULARY: Every element and attribute of u8g2gl.xml and globals.xml
  *   - VocabularyElement, VocabularyAttribute, VocabularyValueType: Its shapes
  *   - AttributeSpelling, ReferenceKind, VocabularyFile: Its parts
- *   - ROTATION_VALUES, ROTATION_DEGREES, MAX_STRING_LEN_DEFAULT: Values it offers
+ *   - ROTATION_VALUES, MIRROR_ROTATIONS, ROTATION_DEGREES, MAX_STRING_LEN_DEFAULT: Values it offers
  *   - Rotation, normaliseRotation(): A rotation in U8G2's spelling, from any accepted one
  *   - vocabularyElement(), vocabularyChildren(), vocabularyRoots(), attributeSpellings(): Lookups
  *
  * - Display catalogue (§5.2):
  *   - BusFamily: Normalized bus protocol family ('spi' | 'i2c' | 'parallel')
  *   - DisplayBus: Physical bus interface configuration
+ *   - DisplayPin: One pin parameter of a display's U8G2 constructor
  *   - DisplayTiles: Framebuffer dimensions in 8-pixel tiles
  *   - DisplayXOffset: Horizontal column shift offsets
  *   - DisplayRecord: Catalogued display record derived from U8G2 tables
@@ -109,7 +109,6 @@ export {
 export type {
   U8g2glProject,
   Target,
-  BusConfig,
   OutputConfig,
 } from './project.js';
 
@@ -134,6 +133,7 @@ export type {
 export {
   PROJECT_VOCABULARY,
   ROTATION_VALUES,
+  MIRROR_ROTATIONS,
   ROTATION_DEGREES,
   normaliseRotation,
   MAX_STRING_LEN_DEFAULT,
@@ -182,6 +182,7 @@ export type {
 export type {
   BusFamily,
   DisplayBus,
+  DisplayPin,
   DisplayTiles,
   DisplayXOffset,
   DisplayRecord,

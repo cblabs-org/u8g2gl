@@ -428,7 +428,8 @@ export function findTargetDisplay(
  *
  * U8G2's `U8G2_R1` and `U8G2_R3` are software transforms that swap the
  * dimensions `getDisplayWidth()` and `getDisplayHeight()` report
- * (`u8g2_SetDisplayRotation()`); `R0` and `R2` leave them alone. This is the
+ * (`u8g2_SetDisplayRotation()`); `R0`, `R2` and the two mirrors (`MIRROR`,
+ * `MIRROR_VERTICAL`, schema 0.7) leave them alone. This is the
  * one place that swap is computed: every layout consumer — validation, the
  * resolver, the scene, the designer's canvas — takes its size from here.
  *

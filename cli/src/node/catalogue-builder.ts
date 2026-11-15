@@ -24,11 +24,12 @@
  * - ParsedSetupFunction: Setup function metadata from u8g2_d_setup.c
  * - ParsedConstructor: Class metadata from U8g2lib.h
  * - BuildCatalogueResult: Complete output containing catalogue and page-mode map
- * - classifyBus(raw): Helper normalizing raw bus suffix into DisplayBus
+ * - classifyBus(raw, pins): Helper normalizing raw bus suffix into DisplayBus
+ * - parseConstructorPins(className, params): A constructor's parameter list as DisplayPin[]
  * - parseDisplayInfoStructs(clibDir): Extracts all 206 u8x8_display_info_t structs
  * - parseDriverFunctionMap(clibDir): Maps driver functions to authoritative struct info
  * - parseSetupFunctions(clibDir): Extracts setup function definitions
- * - parseConstructors(u8g2Path): Extracts U8G2 constructor class declarations
+ * - parseConstructors(u8g2Path): Extracts U8G2 constructor classes and their pins
  * - buildCatalogue(u8g2Path): End-to-end catalogue and page-mode builder
  */
 
@@ -39,6 +40,7 @@ import { compareCodeUnits } from '../core/order.js';
 import type {
   BusFamily,
   DisplayBus,
+  DisplayPin,
   DisplayRecord,
   DisplayTiles,
   DisplayXOffset,
@@ -73,6 +75,8 @@ export interface ParsedSetupFunction {
 export interface ParsedConstructor {
   readonly className: string;
   readonly setupFunction: string;
+  /** The constructor's pin parameters, in order, without `rotation`. */
+  readonly pins: readonly DisplayPin[];
 }
 
 /**
@@ -200,10 +204,11 @@ export function readU8g2Source(u8g2Path: string): U8g2Source {
  * Maps U8G2 bus strings (e.g. "HW_I2C", "4W_HW_SPI", "8080") to normalized
  * bus families ('i2c', 'spi', 'parallel') and standardized wiring descriptors (§5.2).
  *
- * @param raw Raw bus string extracted from constructor class name.
+ * @param raw  Raw bus string extracted from constructor class name.
+ * @param pins The constructor's pin parameters (`parseConstructorPins()`).
  * @return Fully populated DisplayBus structure.
  */
-export function classifyBus(raw: string): DisplayBus {
+export function classifyBus(raw: string, pins: readonly DisplayPin[]): DisplayBus {
   // --- Step 1: Classify normalized bus family ---
   let family: BusFamily;
   if (raw.includes('I2C')) {
@@ -255,7 +260,7 @@ export function classifyBus(raw: string): DisplayBus {
       break;
   }
 
-  return { family, wiring, raw };
+  return { family, wiring, raw, pins };
 }
 
 /**
@@ -457,13 +462,66 @@ export function parseSetupFunctions(clibDir: string): Map<string, ParsedSetupFun
   return setupMap;
 }
 
+/** The first constructor parameter of every U8G2 display class. */
+const ROTATION_PARAMETER = /^const\s+u8g2_cb_t\s*\*\s*rotation$/;
+
+/** A pin parameter: `uint8_t <name>`, optionally defaulted to U8X8_PIN_NONE. */
+const PIN_PARAMETER = /^uint8_t\s+([a-z][a-z0-9_]*)(\s*=\s*U8X8_PIN_NONE)?$/;
+
+/**
+ * @brief Turns one constructor's parameter list into the pins it takes.
+ *
+ * Every U8G2 display constructor takes `const u8g2_cb_t *rotation` first, then
+ * one `uint8_t` per pin, some defaulted to `U8X8_PIN_NONE`. That shape is what
+ * the constructor snippet relies on, so anything else is refused here rather
+ * than skipped: a future U8G2 that changes it must fail the catalogue build
+ * loudly, not ship a snippet with a missing or mistyped argument.
+ *
+ * @param className The class the list belongs to, named in any error.
+ * @param params    The text between the constructor's parentheses.
+ * @return The pins after `rotation`, in order; `optional` where U8G2 defaults one.
+ * @throws Error naming the class when the first parameter is not `rotation`, or
+ *         any later one is not `uint8_t <name>` with an optional
+ *         `= U8X8_PIN_NONE`. A build script's precondition, not a user diagnostic.
+ */
+export function parseConstructorPins(className: string, params: string): DisplayPin[] {
+  // --- Step 1: Split, normalising the whitespace U8g2lib.h happens to use ---
+  const parts = params.split(',').map((part) => part.trim().replace(/\s+/g, ' '));
+  const [first, ...rest] = parts;
+
+  // --- Step 2: The rotation every constructor takes first ---
+  if (first === undefined || !ROTATION_PARAMETER.test(first)) {
+    throw new Error(
+      `${className}: the first constructor parameter is '${first ?? ''}', expected ` +
+        "'const u8g2_cb_t *rotation'. U8g2lib.h has changed shape; update the catalogue builder."
+    );
+  }
+
+  // --- Step 3: Each pin, refusing anything that is not a plain uint8_t pin ---
+  return rest.map((param) => {
+    const match = PIN_PARAMETER.exec(param);
+    const name = match?.[1];
+    if (match === null || name === undefined) {
+      throw new Error(
+        `${className}: constructor parameter '${param}' is not 'uint8_t <name>' with an ` +
+          "optional '= U8X8_PIN_NONE'. U8g2lib.h has changed shape; update the catalogue builder."
+      );
+    }
+    return { name, optional: match[2] !== undefined };
+  });
+}
+
 /**
  * @brief Parses C++ constructor classes from U8g2lib.h.
  *
- * Extracts class name and the setup function invoked in the constructor initializer.
+ * Extracts each class's name, the setup function its constructor calls, and
+ * the pins its constructor takes.
  *
  * @param u8g2Path Root path to the U8G2 library, in either layout.
  * @return Array of ParsedConstructor objects.
+ * @throws Error naming the class when a constructor's declaration cannot be
+ *         found or its parameters are not the shape `parseConstructorPins()`
+ *         accepts.
  */
 export function parseConstructors(u8g2Path: string): ParsedConstructor[] {
   const { headerPath } = resolveU8g2Layout(u8g2Path);
@@ -477,7 +535,14 @@ export function parseConstructors(u8g2Path: string): ParsedConstructor[] {
     const className = match[1];
     const setupFunction = match[2];
     if (className && setupFunction) {
-      constructors.push({ className, setupFunction });
+      // The class body up to the setup call holds the constructor's own
+      // declaration, `public: <class>(<params>) : U8G2() {`.
+      const declaration = new RegExp(`\\b${className}\\s*\\(([^)]*)\\)`).exec(match[0]);
+      const params = declaration?.[1];
+      if (params === undefined) {
+        throw new Error(`${className}: no constructor declaration found in U8g2lib.h; update the catalogue builder.`);
+      }
+      constructors.push({ className, setupFunction, pins: parseConstructorPins(className, params) });
     }
   }
 
@@ -568,7 +633,7 @@ export function buildCatalogue(u8g2Path: string): BuildCatalogueResult {
       }
 
       const { controller, variant, rawBus } = parseClassNameTokens(ctor.className);
-      const bus = classifyBus(rawBus);
+      const bus = classifyBus(rawBus, ctor.pins);
 
       const tiles: DisplayTiles = {
         width: info.tileWidth,

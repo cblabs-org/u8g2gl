@@ -9,10 +9,11 @@
  *          providing exact pixel dimensions, tile sizes, buffer byte requirements,
  *          bus families, and driver function names.
  * Description: Immutable interfaces and union types for DisplayRecord, DisplayBus,
- *              DisplayTiles, DisplayXOffset, and BusFamily.
+ *              DisplayPin, DisplayTiles, DisplayXOffset, and BusFamily.
  *
  * Exports:
  * - BusFamily: Normalized bus communication family ('spi' | 'i2c' | 'parallel')
+ * - DisplayPin: One constructor parameter the bus wiring takes
  * - DisplayBus: Bus interface connection descriptor
  * - DisplayTiles: Display dimensions measured in 8-pixel tiles
  * - DisplayXOffset: Horizontal column shift offsets for normal and flipped orientations
@@ -25,6 +26,21 @@
 export type BusFamily = 'spi' | 'i2c' | 'parallel';
 
 /**
+ * One pin a display's U8G2 constructor takes. The board passes it; U8G2GL never
+ * knows its value ([D-22]), and records it only so the constructor snippet can
+ * name every argument.
+ */
+export interface DisplayPin {
+  /** U8G2's own parameter name in U8g2lib.h (e.g. "cs", "dc", "reset", "d0"). */
+  readonly name: string;
+  /**
+   * True when U8G2 gives the parameter a default (`= U8X8_PIN_NONE`), so a board
+   * may leave it unwired: `reset` on most wirings, `clock` and `data` on HW I²C.
+   */
+  readonly optional: boolean;
+}
+
+/**
  * Physical communication bus metadata for a display constructor.
  */
 export interface DisplayBus {
@@ -34,6 +50,12 @@ export interface DisplayBus {
   readonly wiring: string;
   /** Full raw constructor suffix extracted from U8G2 source. */
   readonly raw: string;
+  /**
+   * The constructor's pin parameters, in U8G2's parameter order, without the
+   * leading `rotation`. Extracted from U8g2lib.h when the catalogue is built,
+   * never typed by hand.
+   */
+  readonly pins: readonly DisplayPin[];
 }
 
 /**

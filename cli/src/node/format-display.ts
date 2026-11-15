@@ -9,7 +9,10 @@
  * Description: Renders tabular output for all four catalogue search modes: identify (free-text
  *              part search with electrical variant disambiguation), source (constraint filtering
  *              with MCU internal SRAM headroom classification), compare (side-by-side differing
- *              fields across constructors), and enumerate (catalogue summary by controller).
+ *              fields across constructors), and enumerate (catalogue summary by controller);
+ *              and one record as `u8g2gl display <setup>` prints it, with the
+ *              pins its constructor takes, since U8G2GL no longer reads any
+ *              ([D-22]).
  *
  * Exports:
  * - FormatDisplayOptions: Configuration options for display formatting
@@ -17,6 +20,7 @@
  * - formatSourceResult(result, options?): Renders source mode candidate table with RAM budgets
  * - formatCompareResult(result, options?): Renders compare mode difference table
  * - formatCatalogueSummary(displays, options?): Renders catalogue summary by controller family
+ * - formatDisplayRecord(record, options?): Renders one record, pins included
  */
 
 import type { DisplayRecord } from '../core/schema/display-record.js';
@@ -303,5 +307,39 @@ export function formatCatalogueSummary(
     );
   }
 
+  return lines.join('\n');
+}
+
+/**
+ * @brief Formats one catalogue record as `u8g2gl display <setup>` prints it.
+ *
+ * Every fact the record holds a board needs: the controller, the panel's own
+ * size (before any rotation), the bus family and wiring, each pin the
+ * constructor takes in U8G2's order with the optional ones marked, and the
+ * framebuffer. The last line names `--snippet`, which writes the board-side
+ * code from the same record.
+ *
+ * @param record  The record.
+ * @param options Display formatting options.
+ * @return The formatted text, without a trailing newline.
+ */
+export function formatDisplayRecord(record: DisplayRecord, options?: FormatDisplayOptions): string {
+  const useColor = options?.color ?? false;
+  const label = (text: string): string => (useColor ? `${ANSI.dim}${text.padEnd(12)}${ANSI.reset}` : text.padEnd(12));
+  const pins =
+    record.bus.pins.length === 0
+      ? 'none'
+      : record.bus.pins.map((pin) => (pin.optional ? `${pin.name} (optional: U8X8_PIN_NONE)` : pin.name)).join(', ');
+  const lines = [
+    useColor ? `${ANSI.bold}${record.setup}${ANSI.reset}` : record.setup,
+    `${label('controller')} ${record.controller}`,
+    `${label('size')} ${record.width}x${record.height} (native, before rotation)`,
+    `${label('bus')} ${record.bus.family}, ${record.bus.raw} (${record.bus.wiring})`,
+    `${label('pins')} ${pins}`,
+    `${label('framebuffer')} ${record.framebufferBytes} bytes (${record.tiles.width}x${record.tiles.height} tiles)`,
+    '',
+    `Pins and bus are configured by your firmware's board; U8G2GL describes the panel.`,
+    `Board-side code: u8g2gl display ${record.setup} --snippet [--rotation <r>] [--target <name>]`,
+  ];
   return lines.join('\n');
 }

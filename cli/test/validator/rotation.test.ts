@@ -56,6 +56,12 @@ describe('validation honours the target rotation (design_spec §5.1)', () => {
     expect(loaded.model.project.targets[0]?.rotation).toBe('R1');
   });
 
+  it('is kept at schema 0.6, so its clean validation below proves 0.6 still validates (§15.4)', () => {
+    // The one real project fixture left at 0.6 when the rest moved to 0.7,
+    // which is additive for a project that writes no pin.
+    expect(loaded.model.project.schema).toBe('0.6');
+  });
+
   it('validates the portrait layout clean at R1, and says it checked 64×256', () => {
     const result = validate(loaded.model);
     expect(summary(result.diagnostics)).toEqual([]);

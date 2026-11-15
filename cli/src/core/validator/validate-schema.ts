@@ -9,15 +9,19 @@
  * Description: Checks that all required attributes are present across project,
  *              globals, screens, components, and widget manifests. Validates that
  *              attribute values match expected primitive types and enum sets.
- *              Accepts schema versions "0.4", "0.5" and "0.6", refusing the
- *              superseded "0.3" with a specific migration diagnostic rather
- *              than a generic mismatch (§15.4). 0.5 and 0.6 are additive. 0.5
+ *              Accepts schema versions "0.4", "0.5", "0.6" and "0.7", refusing
+ *              the superseded "0.3" with a specific migration diagnostic rather
+ *              than a generic mismatch (§15.4). 0.5, 0.6 and 0.7 are additive. 0.5
  *              adds palette metadata (`label`, `category`, `description`) to
  *              `<api>`, which this pass holds to its limits, and which a
  *              project still declaring 0.4 is told it may not use until it
  *              says 0.5. 0.6 adds `icon` to `<api>`, which must name an icon
  *              in the vendored set (`icon-rules.ts`), and which a 0.4 or 0.5
- *              project is told it may not use until it says 0.6.
+ *              project is told it may not use until it says 0.6. 0.7 adds
+ *              the `MIRROR` and `MIRROR_VERTICAL` rotations, which a 0.4–0.6
+ *              project is told it may not use until it says 0.7. (0.7 also
+ *              removes the pin attributes and `<bus>`; the parser refuses
+ *              those at every version, so nothing here sees them.)
  *
  *              The 254-object ceiling is **not** checked here. This pass used to
  *              count objects structurally, and that count predated [D-18]: it
@@ -69,16 +73,17 @@ import { convertDeclProblems } from '../images/convert-decl.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { booleanValueError, enumValueError } from './value-rules.js';
 import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
+import { MIRROR_ROTATIONS, ROTATION_VALUES } from '../schema/project-vocabulary.js';
 import { iconValueProblem } from './icon-rules.js';
 
 
 /**
  * Every schema version this CLI accepts. Each only adds to the one before it
- * (§15.4), so a 0.4 or 0.5 project means exactly what it meant before and
+ * (§15.4), so a 0.4, 0.5 or 0.6 project means exactly what it meant before and
  * still validates; what it may not do is use a later version's additions,
  * which sections 7 and 8 report.
  */
-const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', '0.5', CURRENT_SCHEMA_VERSION]);
+const ACCEPTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['0.4', '0.5', '0.6', CURRENT_SCHEMA_VERSION]);
 
 /** The first schema version whose `<api>` may carry palette metadata. */
 const PALETTE_METADATA_SINCE = '0.5';
@@ -99,6 +104,15 @@ const ICON_SINCE = '0.6';
  * the same rule as BEFORE_PALETTE_METADATA.
  */
 const BEFORE_ICON: ReadonlySet<string> = new Set(['0.4', '0.5']);
+
+/** The first schema version whose `rotation` may be `MIRROR` or `MIRROR_VERTICAL`. */
+const MIRROR_SINCE = '0.7';
+
+/**
+ * The accepted schema versions that predate the mirrors, kept with
+ * MIRROR_SINCE on the same rule as BEFORE_PALETTE_METADATA.
+ */
+const BEFORE_MIRROR: ReadonlySet<string> = new Set(['0.4', '0.5', '0.6']);
 
 /**
  * The palette metadata rules (schema 0.5): each attribute's length limit in
@@ -180,16 +194,9 @@ const VALID_SUBJECT_TYPES: ReadonlySet<SubjectType> = new Set([
   'time',
 ]);
 
-const VALID_ROTATIONS: ReadonlySet<string> = new Set([
-  'R0',
-  'R1',
-  'R2',
-  'R3',
-  '0',
-  '90',
-  '180',
-  '270',
-]);
+// The one list of rotations, the vocabulary's, so the form and this check
+// cannot offer different sets.
+const VALID_ROTATIONS: ReadonlySet<string> = new Set(ROTATION_VALUES);
 
 function createDiagnostic(
   code: string,
@@ -639,6 +646,19 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
               target.loc,
               target.rotation,
               Array.from(VALID_ROTATIONS),
+            ),
+          );
+        } else if (target.rotation && MIRROR_ROTATIONS.includes(target.rotation) && BEFORE_MIRROR.has(project.schema)) {
+          // A mirror arrived in 0.7: an older project is told to declare it,
+          // as palette metadata and icons are (§15.4).
+          diagnostics.push(
+            createDiagnostic(
+              DIAGNOSTIC_CODES.NEWER_SCHEMA_REQUIRED,
+              `Rotation '${target.rotation}' on target '${target.name}' needs schema "${MIRROR_SINCE}": ` +
+                `schema '${project.schema}' does not have it, because the mirrors arrived in '${MIRROR_SINCE}'. ` +
+                `Declare schema="${MIRROR_SINCE}" in u8g2gl.xml, or use R0–R3 (§15.4).`,
+              target.loc,
+              target.rotation,
             ),
           );
         }

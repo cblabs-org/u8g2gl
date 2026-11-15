@@ -6,13 +6,14 @@
  * File: designer/src/forms/project-editor.tsx
  * Purpose: What the `u8g2gl.xml` form adds to the generic one (ui_spec §6.4):
  *          the display picker in place of the bare `setup` field, with the
- *          impact preview before a new display is chosen; bus fields that
- *          follow the display's bus family; rotation shown with its angle,
- *          and previewed like a display when a quarter turn would resize the
- *          layout;
- *          the display's framebuffer beside `ram_budget`; and a live example
- *          of what `<output>` produces. Everything else in the file is the
- *          generic form's, so nothing is left without a control.
+ *          impact preview before a new display is chosen; rotation shown with
+ *          its angle or mirror axis, and previewed like a display when a
+ *          quarter turn would resize the layout; the board-side constructor
+ *          snippet, with Copy, where the pin fields were before schema 0.7
+ *          removed them ([D-22]); the display's framebuffer beside
+ *          `ram_budget`; and a live example of what `<output>` produces.
+ *          Everything else in the file is the generic form's, so nothing is
+ *          left without a control.
  * Description: `useProjectEditor` returns the hooks `FormView` takes for
  *              `u8g2gl.xml`. The picker (`DisplayPicker`) steps controller →
  *              size and variant → bus wiring, or searches the setup name; each
@@ -23,9 +24,11 @@
  *              shows it at beside it when the two differ. A rotation that
  *              swaps the layout's width and height (`RotationField`) goes
  *              through the same preview and writes only on "Use this
- *              rotation"; one that keeps the size applies at once. A bus field the
- *              wiring does not use is hidden, unless the file writes it, when
- *              it is shown and flagged: it is never dropped.
+ *              rotation"; one that keeps the size, a mirror included, applies
+ *              at once. The mirrors are offered only at schema 0.7 or later,
+ *              unless one is already written. Each target ends with its
+ *              constructor snippet (`SnippetPanel`), which follows the display
+ *              and rotation as they change and never writes to the project.
  *
  * Exports:
  * - ProjectEditorHooks:  The hooks the u8g2gl.xml form takes
@@ -35,16 +38,15 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CATALOGUE } from '@u8g2gl/data/catalogue.js';
-import { ROTATION_VALUES } from '@u8g2gl/core/schema/index.js';
 import type { DisplayRecord } from '@u8g2gl/core/schema/display-record.js';
 import { blitFrame } from '../canvas/framebuffer';
 import type { Workspace } from '../workspace';
 import {
-  busFieldApplies,
   controllerOptions,
   familyLabel,
   orientedNote,
   rotationLabel,
+  rotationOptions,
   rotationResizes,
   searchSetups,
   U8G2_SETUP_WIKI,
@@ -55,6 +57,7 @@ import {
 import { candidateTexts, renderImpact, type ImpactPreview, type ScreenPreview } from './impact-preview';
 import type { FormField, FormNode, FormSection } from './form-model';
 import type { SectionRenderer } from './form-view';
+import { SNIPPET_LEAD, targetSnippet } from './snippet-panel-model';
 
 /** Each setup's record, by name. */
 const BY_SETUP: ReadonlyMap<string, DisplayRecord> = new Map(CATALOGUE.map((record) => [record.setup, record]));
@@ -62,7 +65,7 @@ const BY_SETUP: ReadonlyMap<string, DisplayRecord> = new Map(CATALOGUE.map((reco
 /** The hooks the u8g2gl.xml form takes. */
 export interface ProjectEditorHooks {
   readonly fieldControl: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
-  readonly fieldShown: (field: FormField, node: FormNode) => boolean;
+  readonly nodeExtra: (node: FormNode) => ReactNode;
   readonly fieldNote: (field: FormField, node: FormNode) => ReactNode;
   readonly renderSection: SectionRenderer;
 }
@@ -101,32 +104,22 @@ function recordFacts(record: DisplayRecord, rotation: string | undefined): strin
  *
  * @param workspace The session: its documents, its last run and the spare
  *                  editor module the impact preview draws with.
+ * @param schema    The schema the project declares, which decides whether the
+ *                  rotation select offers the mirrors.
  */
-export function useProjectEditor(workspace: Workspace): ProjectEditorHooks {
+export function useProjectEditor(workspace: Workspace, schema: string | undefined): ProjectEditorHooks {
   return useMemo<ProjectEditorHooks>(
     () => ({
       // --- The display picker for setup, and rotation with its angle ---
       fieldControl: (field, node, commit) => {
         const name = `${field.elementId}/${field.attribute.name}`;
         if (name === 'display/setup') return <DisplayPicker workspace={workspace} field={field} node={node} commit={commit} />;
-        if (name === 'display/rotation') return <RotationField workspace={workspace} field={field} node={node} commit={commit} />;
+        if (name === 'display/rotation') return <RotationField workspace={workspace} field={field} node={node} commit={commit} schema={schema} />;
         return undefined;
       },
-      // --- Bus fields follow the family; one written for another family stays, flagged ---
-      fieldShown: (field, node) => {
-        const bus = setupOf(node).record?.bus;
-        return field.value !== undefined || busFieldApplies(field.attribute, bus?.family, bus?.wiring);
-      },
+      // --- Each target ends with the board-side code for its display ---
+      nodeExtra: (node) => <SnippetPanel node={node} />,
       fieldNote: (field, node) => {
-        const { record } = setupOf(node);
-        if (field.value !== undefined && record !== undefined && !busFieldApplies(field.attribute, record.bus.family, record.bus.wiring)) {
-          return (
-            <p className="field-problem warning" data-flag="not-applicable">
-              This display ({familyLabel(record.bus.family)}, {record.bus.raw}) has no {field.attribute.name}. It is kept in the file; remove it if it no
-              longer applies.
-            </p>
-          );
-        }
         if (field.elementId === 'target' && field.attribute.name === 'ram_budget') {
           const display = node.parts.find((part) => part.element.id === 'display');
           const shown = display === undefined ? undefined : setupOf(display).record;
@@ -147,7 +140,59 @@ export function useProjectEditor(workspace: Workspace): ProjectEditorHooks {
           </>
         ) : undefined,
     }),
-    [workspace],
+    [workspace, schema],
+  );
+}
+
+/** How long the Copy button says "Copied" before it reads "Copy" again. */
+const COPIED_MS = 1500;
+
+/**
+ * @brief A target's constructor snippet, with Copy (ui_spec §6.4, [D-22]).
+ *
+ * Shows nothing for a node that is not a target, or whose setup the catalogue
+ * does not have (the setup field already says why). The text is selectable as
+ * well as copied, and is never written to the project.
+ */
+function SnippetPanel({ node }: { readonly node: FormNode }): React.JSX.Element | null {
+  const snippet = targetSnippet(node);
+  const [copied, setCopied] = useState<'copied' | 'refused' | undefined>(undefined);
+  // The confirmation is for the text that was copied: a new snippet clears it.
+  const text = snippet?.text;
+  useEffect(() => setCopied(undefined), [text]);
+  useEffect(() => {
+    if (copied !== 'copied') return undefined;
+    const timer = setTimeout(() => setCopied(undefined), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  if (snippet === undefined) return null;
+
+  const copy = (): void => {
+    // The clipboard can refuse (no focus, no permission); say so rather than
+    // claim a copy that did not happen.
+    navigator.clipboard.writeText(snippet.text).then(
+      () => setCopied('copied'),
+      () => setCopied('refused'),
+    );
+  };
+  return (
+    <div className="constructor-snippet" data-snippet-setup={snippet.setup}>
+      <p className="field-reason">{SNIPPET_LEAD}</p>
+      <div className="snippet-head">
+        <span className="field-reason">
+          Board-side code for <code>{snippet.setup}</code>, also printed by <code>u8g2gl display {snippet.setup} --snippet</code>:
+        </span>
+        <button type="button" className="action" data-action="copy-snippet" onClick={copy}>
+          {copied === 'copied' ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <span className="snippet-status" role="status">
+        {copied === 'copied' ? 'Copied to the clipboard.' : copied === 'refused' ? 'The clipboard refused the copy; select the text instead.' : ''}
+      </span>
+      <pre className="snippet-text" aria-label="Constructor snippet">
+        {snippet.text}
+      </pre>
+    </div>
   );
 }
 
@@ -399,21 +444,24 @@ function ImpactPreviewView({
 }
 
 /**
- * @brief The rotation select. A rotation that keeps the layout's size applies
- *        at once; one that swaps width and height is previewed first, as a
- *        new display is, and written only on "Use this rotation" — one edit,
- *        one undo stop (ui_spec §6.4).
+ * @brief The rotation select. A rotation that keeps the layout's size, a
+ *        mirror included, applies at once; one that swaps width and height is
+ *        previewed first, as a new display is, and written only on "Use this
+ *        rotation" — one edit, one undo stop (ui_spec §6.4). The mirrors are
+ *        offered from schema 0.7 (`rotationOptions()`).
  */
 function RotationField({
   workspace,
   field,
   node,
   commit,
+  schema,
 }: {
   readonly workspace: Workspace;
   readonly field: FormField;
   readonly node: FormNode;
   readonly commit: (value: string | undefined) => void;
+  readonly schema: string | undefined;
 }): React.JSX.Element {
   const written = field.value;
   const { record } = setupOf(node);
@@ -438,12 +486,17 @@ function RotationField({
     <div className="field-controls rotation-field">
       <select aria-label="rotation" className={written === undefined ? 'default' : ''} value={written ?? ''} onChange={(event) => choose(event.target.value === '' ? undefined : event.target.value)}>
         <option value="">{label(undefined)}</option>
-        {[...ROTATION_VALUES, ...(written !== undefined && !ROTATION_VALUES.includes(written) ? [written] : [])].map((value) => (
+        {rotationOptions(schema, written).map((value) => (
           <option key={value} value={value}>
             {rotationLabel(value)}
           </option>
         ))}
       </select>
+      <p className="field-reason" data-help="rotation">
+        Mirrored left–right or top–bottom is for a panel seen through reflective or head-up-display glass, and needs schema 0.7. Rotation is how the board
+        constructs the display (<code>U8G2GL_TARGET_ROTATION</code>), not the controller's flip mode (<code>setFlipMode()</code>), which is your
+        firmware's to use at run time.
+      </p>
       {pending !== undefined && (
         <div className="display-candidate rotation-candidate" data-candidate={pending.value ?? ''}>
           <p>

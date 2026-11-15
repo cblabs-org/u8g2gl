@@ -78,5 +78,11 @@
 
 .output-example { margin-top: 4px; }
 
+/* --- A target's constructor snippet, where the pin fields were ([D-22]) --- */
+.constructor-snippet { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+.constructor-snippet .snippet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.constructor-snippet .snippet-status { display: block; min-height: 1em; color: var(--text-dim); font-size: 11px; }
+.snippet-text { margin: 4px 0 0; padding: 6px 8px; max-height: 320px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font: 11px ui-monospace, Menlo, monospace; white-space: pre; user-select: text; }
+
 /* --- The status bar's target switcher --- */
 .status-item.target select { background: transparent; border: 1px solid var(--border); border-radius: 3px; color: inherit; font: inherit; padding: 0 2px; }

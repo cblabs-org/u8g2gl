@@ -16,7 +16,7 @@ Two PRs, in order:
 | PR | What | Schema | Runtime | CLI | Goldens |
 |---|---|---|---|---|---|
 | **E-4a** | Rotation honoured everywhere + the generated display contract | none | none | 0.17.0 → **0.18.0** | move (new emitted contract) |
-| **E-4b** | Pin attributes and `<bus>` removed, with a specific error; a copyable constructor snippet takes their place; U8G2's two mirror orientations added | **0.6 → 0.7** (owner) | none | 0.18.0 → **0.19.0** | none expected |
+| **E-4b** | Pin attributes and `<bus>` removed, with a specific error; a copyable constructor snippet takes their place; U8G2's two mirror orientations added | **0.6 → 0.7** (owner) | 0.12.0 → **0.13.0** (schema minor only; correction C1) | 0.18.0 → **0.19.0** | version-stamp lines only (C1) |
 
 *Revised 2026-11-14 after owner review:*
 - *With no clients yet, the pins are **removed** rather than deprecated. The
@@ -220,6 +220,31 @@ stacked. The worker doesn't push. The PA verifies, pushes and opens each PR.
 | **WO3** designer and CLI | The bus fields and their code are deleted; the snippet panel with Copy; rotation select gains the mirrors, with flip-mode help; `display --snippet`. | Unit and e2e: the target section shows the snippet for the demo's SSD1322 and updates when the display or rotation changes; Copy puts it on the clipboard; choosing a mirror leaves the canvas size alone. The CLI snippet matches the designer's. |
 | **WO4** docs and review | design_spec §5.1, §15.4, [D-n]; ui_spec; ChangeLog; CLI 0.19.0; readability review. | All suites pass sequentially; check-package PASS at 0.19.0. |
 
+## Corrections before E-4b (owner-approved 2026-11-14)
+
+Found by the PA while writing E-4b's work orders on main at `bd88e30`. They
+amend the rulings and the table above; where they disagree, these win.
+
+- **C1. Schema 0.7 moves the runtime and the goldens' stamps.** The runtime's
+  `include/u8g2gl/u8g2gl_version.h` defines `U8G2GL_SCHEMA_VERSION_MINOR 6`,
+  and the generated config asserts the schema exactly while the major is 0
+  (`U8G2GL_REQUIRE_SCHEMA_VERSION`). So schema 0.7 needs runtime **0.13.0**
+  (header, `CMakeLists.txt`, `library.json`; no behaviour change), and the
+  CLI restamps `runtime-version.json`. This follows the 0.6 bump exactly
+  (`da220c7`): fixtures and inline test projects move to `schema="0.7"`; one
+  fixture stays at 0.6, with a test saying so, to prove older projects still
+  validate. Goldens move in their version-stamp lines only. CLI stays 0.19.0.
+- **C2. `u8g2gl display` is a new command.** There is none today. E-4b adds
+  `u8g2gl display <setup>`, which prints the record (size, bus, the pins the
+  wiring takes, framebuffer), and `--snippet [--rotation <r>]`, which prints
+  `constructorSnippet()`'s text, the same as the designer's. `--json` as
+  the other commands do.
+- **C3. Pins record whether they're optional.** U8G2 defaults some constructor
+  parameters to `U8X8_PIN_NONE` (`reset` everywhere; `clock` and `data` on HW
+  I²C). Ruling 13's `bus.pins: readonly string[]` becomes
+  `readonly DisplayPin[]`, `{ name: string; optional: boolean }`, so the
+  snippet can note `U8X8_PIN_NONE` where U8G2 allows it.
+
 ## For the owner to decide
 
 - **O1. The macro names.** `U8G2GL_TARGET_WIDTH/HEIGHT/ROTATION/SETUP` as above,
@@ -267,3 +292,22 @@ stacked. The worker doesn't push. The PA verifies, pushes and opens each PR.
   - Browser check on the production build: the R1 preview, the apply, the
     portrait canvas, the rotated-size diagnostics and one-step undo.
   - PA fix: [D-22]'s prior art rewritten to match the investigation.
+- 2026-11-14 — **E-4a merged** as PR #57 (merge commit `bd88e30`).
+- 2026-11-14 — **Corrections C1–C3 approved by the owner.** Asked "Do you
+  approve E-4b with these three corrections?", the owner replied, in their own
+  words: **"Approve corrections"**. E-4b's work orders are written against them.
+- 2026-11-14 — **E-4b verified by the PA** on `f028534`, suites one at a time:
+  - Wasm 4/4; host ctest 520/520 (the new snippet compile-and-link target
+    included); CLI 2994; lint, tsc and designer typecheck clean; designer
+    unit 262; e2e 125/125; production 3.
+  - Goldens: empty diff. check-package PASS at 0.19.0. Home-path guard clean.
+  - Built CLI: `display` and `--snippet`, near-miss suggestions, each pin
+    refused at its line, a mirror at 0.6 told to declare 0.7, and
+    `U8G2_MIRROR_VERTICAL` with schema 0.7 / runtime floor 0.13.0 in output.
+  - PA fix `8c45f74`: a refused pin withheld the parsed project, so
+    validation also reported a false "schema version ''" and "No <target>
+    declared". The model is now kept for `U8G2GL_REMOVED_ATTRIBUTE` alone;
+    CLI 2997 after it.
+  - Browser check on the production build: the snippet panel, the mirror
+    options and help at 0.7, a mirror applying with the canvas still
+    256×64, a pin written on disk shown as the one refusal, then cleared.

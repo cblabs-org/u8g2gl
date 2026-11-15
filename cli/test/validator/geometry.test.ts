@@ -24,7 +24,7 @@ import type { WidgetNode } from '../../src/core/schema/widget-node.js';
 describe('validateGeometry', () => {
   const baseInput: ValidateInput = {
     project: {
-      schema: '0.6',
+      schema: '0.7',
       name: 'geom_test',
       version: '1.0.0',
       targets: [
@@ -49,7 +49,12 @@ describe('validateGeometry', () => {
         height: 64,
         tiles: { width: 16, height: 8 },
         framebufferBytes: 1024,
-        bus: { family: 'i2c', wiring: 'HW_I2C', raw: 'HW_I2C' },
+        bus: {
+          family: 'i2c',
+          wiring: 'HW_I2C',
+          raw: 'HW_I2C',
+          pins: [{ name: 'reset', optional: true }, { name: 'clock', optional: true }, { name: 'data', optional: true }],
+        },
         xOffset: { default: 0, flipmode: 0 },
         driver: 'u8x8_d_ssd1306_128x64_noname',
       },

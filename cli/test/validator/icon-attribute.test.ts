@@ -237,8 +237,8 @@ describe('validating icon (schema 0.6)', () => {
 });
 
 describe('schema versions and icon (§15.4)', () => {
-  it('accepts 0.4, 0.5 and 0.6 alike for a project that uses no newer vocabulary', () => {
-    for (const schema of ['0.4', '0.5', '0.6']) {
+  it('accepts 0.4, 0.5, 0.6 and 0.7 alike for a project that uses no newer vocabulary', () => {
+    for (const schema of ['0.4', '0.5', '0.6', '0.7']) {
       const result = validate(projectWith(schema, [meter('')]));
       expect(result.diagnostics.map((d) => d.code), schema).toEqual([]);
     }

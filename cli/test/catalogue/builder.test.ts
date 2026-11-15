@@ -11,6 +11,11 @@
  *              driver symbol resolution, constructor class matching, page-mode
  *              mapping, both U8G2 source layouts, and that the committed
  *              catalogue-source.json names the commit of the pinned submodule.
+ *              Each record's constructor pins are checked against U8G2's own
+ *              U8g2lib.h, read here by plain string slicing rather than the
+ *              builder's regex, so the two cannot share a mistake; and a
+ *              constructor of any other shape is a builder error naming its
+ *              class.
  *              Reads U8G2 from extern/u8g2 only, so the suite behaves the same on
  *              every machine; it skips when the submodule is not initialised.
  *              The Arduino release layout is exercised with a synthetic tree.
@@ -21,8 +26,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { CATALOGUE } from '../../src/data/catalogue.js';
 import {
   buildCatalogue,
+  parseConstructorPins,
+  parseConstructors,
   parseDisplayInfoStructs,
   readU8g2Source,
   resolveU8g2Layout,
@@ -135,5 +143,141 @@ describe('U8G2 Arduino release layout', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * @brief A class's constructor parameters as U8g2lib.h writes them, found by
+ *        plain string search: the text between `public: <class>(` and `)`.
+ *
+ * Deliberately independent of the builder's regular expressions, so a fault
+ * in those cannot hide behind a test that reuses them.
+ */
+function headerParameters(header: string, className: string): string[] {
+  const opener = `public: ${className}(`;
+  const start = header.indexOf(opener);
+  if (start < 0) {
+    throw new Error(`${className} has no constructor in U8g2lib.h`);
+  }
+  const from = start + opener.length;
+  return header
+    .slice(from, header.indexOf(')', from))
+    .split(',')
+    .map((param) => param.trim());
+}
+
+describe.runIf(isSubmoduleAvailable)("Constructor pins match U8G2's U8g2lib.h", () => {
+  const header = readFileSync(resolveU8g2Layout(u8g2Path).headerPath, 'utf8');
+
+  it('the committed catalogue gives every record its pins', () => {
+    expect(CATALOGUE.length).toBeGreaterThan(0);
+    for (const record of CATALOGUE) {
+      expect(Array.isArray(record.bus.pins), record.setup).toBe(true);
+    }
+  });
+
+  it('the committed catalogue is what the builder makes from extern/u8g2', () => {
+    expect(buildCatalogue(u8g2Path).catalogue).toEqual(CATALOGUE);
+  });
+
+  // Every distinct wiring, so a wiring the catalogue gains is checked without
+  // this list being edited: at U8G2 2.36.18 that is fourteen, from HW_I2C to
+  // the bus-less PARALLEL.
+  const wirings = [...new Set(CATALOGUE.map((record) => record.bus.raw))].sort();
+
+  it('covers the fourteen wirings U8G2 2.36.18 has', () => {
+    expect(wirings).toHaveLength(14);
+  });
+
+  it.each(wirings)('every %s record lists its constructor parameters in order', (raw) => {
+    for (const record of CATALOGUE.filter((r) => r.bus.raw === raw)) {
+      const [rotation, ...params] = headerParameters(header, record.setup);
+      expect(rotation, record.setup).toBe('const u8g2_cb_t *rotation');
+      const expected = params.map((param) => {
+        const [declaration = '', defaulted] = param.split('=').map((part) => part.trim());
+        expect(declaration.startsWith('uint8_t '), `${record.setup}: ${param}`).toBe(true);
+        if (defaulted !== undefined) {
+          expect(defaulted, `${record.setup}: ${param}`).toBe('U8X8_PIN_NONE');
+        }
+        return { name: declaration.slice('uint8_t '.length).trim(), optional: defaulted !== undefined };
+      });
+      expect(record.bus.pins, record.setup).toEqual(expected);
+    }
+  });
+
+  it("names the demo's SSD1322 pins, and marks only reset optional", () => {
+    const record = CATALOGUE.find((r) => r.setup === 'U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI');
+    expect(record?.bus.pins).toEqual([
+      { name: 'cs', optional: false },
+      { name: 'dc', optional: false },
+      { name: 'reset', optional: true },
+    ]);
+  });
+
+  it('marks clock and data optional on HW I2C, where U8G2 defaults them', () => {
+    const record = CATALOGUE.find((r) => r.setup === 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C');
+    expect(record?.bus.pins).toEqual([
+      { name: 'reset', optional: true },
+      { name: 'clock', optional: true },
+      { name: 'data', optional: true },
+    ]);
+  });
+});
+
+describe('A constructor of any other shape is a builder error naming its class', () => {
+  /** Builds a synthetic release-layout tree whose U8g2lib.h holds one class. */
+  function withHeader(classText: string, body: (root: string) => void): void {
+    const root = mkdtempSync(join(tmpdir(), 'u8g2gl-ctor-shape-'));
+    try {
+      mkdirSync(join(root, 'src', 'clib'), { recursive: true });
+      writeFileSync(join(root, 'src', 'U8g2lib.h'), classText, 'utf8');
+      body(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  /** One U8G2 display class with the given constructor parameters. */
+  function displayClass(params: string): string {
+    return [
+      'class U8G2_TEST_128X64_F_4W_HW_SPI : public U8G2 {',
+      `  public: U8G2_TEST_128X64_F_4W_HW_SPI(${params}) : U8G2() {`,
+      '    u8g2_Setup_test_128x64_f(&u8g2, rotation, u8x8_byte_arduino_hw_spi, u8x8_gpio_and_delay_arduino);',
+      '  }',
+      '};',
+      '',
+    ].join('\n');
+  }
+
+  it('reads a well-formed constructor into its pins', () => {
+    withHeader(displayClass('const u8g2_cb_t *rotation, uint8_t cs, uint8_t reset = U8X8_PIN_NONE'), (root) => {
+      expect(parseConstructors(root)).toEqual([
+        {
+          className: 'U8G2_TEST_128X64_F_4W_HW_SPI',
+          setupFunction: 'u8g2_Setup_test_128x64_f',
+          pins: [
+            { name: 'cs', optional: false },
+            { name: 'reset', optional: true },
+          ],
+        },
+      ]);
+    });
+  });
+
+  it.each([
+    ['a pin of another type', 'const u8g2_cb_t *rotation, uint16_t cs, uint8_t dc'],
+    ['a default other than U8X8_PIN_NONE', 'const u8g2_cb_t *rotation, uint8_t cs, uint8_t reset = 5'],
+    ['no rotation first', 'uint8_t cs, uint8_t dc'],
+    ['a pointer parameter', 'const u8g2_cb_t *rotation, TwoWire *wire'],
+  ])('refuses %s', (_label, params) => {
+    withHeader(displayClass(params), (root) => {
+      expect(() => parseConstructors(root)).toThrow(/^U8G2_TEST_128X64_F_4W_HW_SPI: /);
+    });
+  });
+
+  it('parseConstructorPins names the class in its error', () => {
+    expect(() => parseConstructorPins('U8G2_X_F_HW_I2C', 'const u8g2_cb_t *rotation, int reset')).toThrow(
+      "U8G2_X_F_HW_I2C: constructor parameter 'int reset'"
+    );
   });
 });
