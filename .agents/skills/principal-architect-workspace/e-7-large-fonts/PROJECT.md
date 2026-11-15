@@ -122,3 +122,16 @@ stacked. The worker doesn't push. The PA verifies, pushes and opens the PR.
   - L1: no validator warning;
   - L2: large fonts shown in the picker, marked, with "Hide large fonts" off;
   - L3: CLI 0.22.0.
+- 2026-11-15 — **E-7 verified by the PA** on `4319572`, suites one at a time:
+  - Wasm 4/4; host ctest 522/522, the two `large_font_guard` cases included;
+    CLI 3070; lint, tsc and designer typecheck clean; designer unit 285; e2e
+    135/135; production 3.
+  - Goldens: empty diff. check-package PASS at 0.22.0. Home-path guard clean.
+  - Built CLI: a project adding `u8g2_font_b10_b_t_japanese2` generates the
+    `#ifndef U8G2_USE_LARGE_FONTS` / `#error` naming it; the same project
+    without it generates no guard.
+  - Browser, production build: "japanese2" lists 13 fonts, each with the
+    large badge; "Hide large fonts" (off by default) removes all 13 and
+    restores them.
+  - Not verifiable here: the compile-fail case on Linux, where `u8g2.h`
+    defines the macro itself. CI's ctest runs on Linux and is that check.
