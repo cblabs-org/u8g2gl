@@ -7,8 +7,7 @@
  * Purpose: The vocabulary of the two project files, `u8g2gl.xml` (§5.1) and
  *          `globals.xml` (§5.3), as data: every element and every attribute
  *          the parsers read, with its type, its default, every spelling the
- *          parser accepts, and help in plain
- *          words. Before this table the vocabulary existed only as parser code
+ *          parser accepts, and help in plain words. Before this table the vocabulary existed only as parser code
  *          and TypeScript interfaces, which nothing else could enumerate.
  *          The designer builds its project-file forms from it, and tests hold
  *          the parsers and those forms to it, so a schema addition cannot

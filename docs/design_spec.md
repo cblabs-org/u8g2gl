@@ -359,6 +359,8 @@ Per **[D-14]** `setup` is the U8G2 constructor name and is the single source of 
 
 **The pins are the board's, not the project's** ([D-22]). Schema 0.7 removed `cs`, `dc`, `reset`, `address` and the `<bus>` element. They never had any effect: U8G2GL does not construct the display (§13.10), so it could only record them, and one UI project serves every board that carries the same panel, whatever pins each uses. The firmware's board layer (`board.h` in the foundation) constructs and wires the display. A pin attribute or `<bus>` written in any schema version is refused, once per occurrence at its line, with `U8G2GL_REMOVED_ATTRIBUTE`, whose message says where the wiring belongs and names `u8g2gl display <setup> --snippet` (§15.4). That command, and the designer's target section, print the board-side code that constructs the display, with a named placeholder for each pin the wiring takes (§16).
 
+**Every attribute and child element is checked against the vocabulary** (CLI 0.20). The project vocabulary (`core/schema/project-vocabulary.ts`), the table the designer's project form is built from, lists every attribute of `<u8g2gl>`, `<targets>`, `<target>`, `<display>` and `<output>` and every spelling the parser reads, `ramBudget` beside `ram_budget` among them, so the parser and the form cannot disagree about what the file may say. An attribute the vocabulary does not spell on that element is `U8G2GL_UNKNOWN_ATTRIBUTE`, an **error** as on a widget or a `<style>`, at its name, with the nearest spellings as suggestions; `xmlns` gets no exemption, since U8G2GL declares no namespace. An unknown child of `<u8g2gl>`, `<targets>`, `<target>`, `<display>` or `<output>` is `U8G2GL_MALFORMED_XML` at its tag. A removed pin or `<bus>` keeps its own refusal and is never also reported as unknown. An unknown attribute was never read into the model, so the parsed project is kept beside it and validation goes on to the file's real schema and targets; an unknown element, a missing required attribute or an unreadable value withholds it, and then the parse error is the whole report: nothing is said about the placeholder left in its place (no schema version `''`, no "No `<target>` declared").
+
 **`rotation` is honoured.** It takes U8G2's `R0`…`R3` or the angle `0`, `90`, `180` or `270` (`90` is `R1`), or, from schema 0.7, one of U8G2's two mirrors, `MIRROR` and `MIRROR_VERTICAL`. Unset is `R0`. Six rotations in all, with the four angles as alternative spellings. The layout is resolved against the display as the board constructs it at that rotation:
 
 - **`R1` and `R3` swap the width and height.** A 256×64 panel at `R1` lays out 64 wide and 256 tall: `#screen_width` is 64, bounds are judged against 64×256, and a bounds diagnostic names the size and how it came by it (`display 64×256 (256×64 rotated 90°) is 64px wide`), so the author is not left comparing against a size they never wrote. The designer draws the canvas, the impact preview and a test run at that size.
@@ -2093,7 +2095,14 @@ error: screens/screen_home.xml:14:32
 
 Two properties make this useful rather than decorative:
 
-1. **Diagnostics carry a stable machine code** (`U8G2GL_UNKNOWN_FONT`) alongside the human message, so a consumer can branch on the failure kind without parsing prose that will be reworded.
+1. **Diagnostics carry a stable machine code** (`U8G2GL_UNKNOWN_FONT`) alongside the human message, so a consumer can branch on the failure kind without parsing prose that will be reworded. The codes `u8g2gl.xml` reports (§5.1):
+
+   | Code | When |
+   |---|---|
+   | `U8G2GL_UNKNOWN_ATTRIBUTE` | An attribute the project vocabulary does not spell on that element (CLI 0.20; before, it was ignored). Error, at the name, with suggestions. The project is still validated |
+   | `U8G2GL_MALFORMED_XML` | An unknown child of `<u8g2gl>`, or of `<targets>`, `<target>`, `<display>` or `<output>` (CLI 0.20), at its tag; also a file that is not well-formed. The project is withheld, and nothing else is reported about it |
+   | `U8G2GL_REMOVED_ATTRIBUTE` | A pin or `<bus>` ([D-22], §15.4). Never also `U8G2GL_UNKNOWN_ATTRIBUTE`. The project is still validated |
+   | `U8G2GL_UNKNOWN_SCHEMA_VERSION` | A `schema` the CLI does not accept, `""` included. Not reported for a project the parser withheld (CLI 0.20) |
 2. **Suggestions are structured** — the near-miss candidates behind "did you mean 'small_09'?" appear as a list, so a caller can apply a fix programmatically rather than regex the sentence.
 
 This is the mechanism by which "diagnostics are the product" (§1.2) actually pays off. A model that receives `{"code":"U8G2GL_UNKNOWN_FONT","suggestions":["small_09"],"line":14}` converges in one iteration. One that receives `Error: invalid XML` does not converge at all.

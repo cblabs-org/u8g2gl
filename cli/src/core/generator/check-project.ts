@@ -76,7 +76,7 @@ export function hasProjectModel(model: Pick<ProjectModel, 'hasProjectManifest' |
  * Without a project model ({@link hasProjectModel}), the placeholder project's
  * empty schema is not reported: a single screen, globals or widget file
  * declares no schema, so `U8G2GL_UNKNOWN_SCHEMA_VERSION ''` described nothing
- * the author wrote (PR-04 WO5a finding 6). The same holds for a `u8g2gl.xml`
+ * the author wrote. The same holds for a `u8g2gl.xml`
  * the parser withheld: its own parse error is the one report, not a schema
  * version the file never wrote beside it.
  *

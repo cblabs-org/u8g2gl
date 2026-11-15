@@ -28,6 +28,7 @@ import { checkProject, hasProjectModel, type ProjectModel } from '../../src/core
 import type { U8g2glProject } from '../../src/core/schema/project.js';
 import { buildManifestRegistry } from '../../src/core/manifest/manifest-registry.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
+import { PROJECT_VOCABULARY } from '../../src/core/schema/project-vocabulary.js';
 
 const SETUP = 'U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI';
 
@@ -118,6 +119,11 @@ describe('an unknown attribute on a u8g2gl.xml element is one error at its name,
     expect(parseProjectFile(xml, 'u8g2gl.xml').diagnostics.every((d) => d.severity === 'error')).toBe(true);
   });
 
+  it('covers every u8g2gl.xml element the vocabulary has, so a new one cannot go unchecked', () => {
+    const vocabulary = PROJECT_VOCABULARY.filter((element) => element.file === 'u8g2gl.xml').map((element) => element.tag);
+    expect(cases.map((c) => c.element).sort()).toEqual([...vocabulary].sort());
+  });
+
   it('does not report an alias the vocabulary lists: ramBudget on <target> and <display>', () => {
     expect(reported(project({ target: 'ramBudget="9000"' }))).toEqual([]);
     expect(reported(project({ display: 'ramBudget="9000"' }))).toEqual([]);
@@ -151,6 +157,14 @@ describe('an unknown child of a u8g2gl.xml element is one error at its tag', () 
     const at = locate(xml, '<wibble/>');
     expect(reported(xml)).toEqual([
       { code: DIAGNOSTIC_CODES.MALFORMED_XML, line: at.line, column: at.column, message: `Unknown element '<wibble>' in <${parent}>` },
+    ]);
+  });
+
+  it('<wibble/> in <output>', () => {
+    const xml = project({}).replace('<output dir="generated" />', '<output dir="generated"><wibble/></output>');
+    const at = locate(xml, '<wibble/>');
+    expect(reported(xml)).toEqual([
+      { code: DIAGNOSTIC_CODES.MALFORMED_XML, line: at.line, column: at.column, message: "Unknown element '<wibble>' in <output>" },
     ]);
   });
 

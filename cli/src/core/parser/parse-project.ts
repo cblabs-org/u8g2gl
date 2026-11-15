@@ -76,7 +76,10 @@ const MODEL_PRESERVING_CODES: ReadonlySet<string> = new Set([
 /**
  * The ids of the `u8g2gl.xml` elements the parser reads, as the vocabulary
  * keys them. Each element's known attributes and children come from the
- * vocabulary under this id.
+ * vocabulary under this id. It must name every `u8g2gl.xml` element of
+ * PROJECT_VOCABULARY, or a new one would go unchecked;
+ * `project-unknown-vocabulary.test.ts` writes an unknown attribute on each
+ * vocabulary element and fails if one is not reported.
  */
 type ProjectElementId = 'project' | 'targets' | 'target' | 'display' | 'output';
 

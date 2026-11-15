@@ -542,6 +542,8 @@ An element bound to a subject with no sample value renders a visible placeholder
 **Continuous validation** as you type; **build** on demand.
 
 - **Problems** — severity, file, line, column, message, suggestion. Click to navigate. Sorted by severity then position; filterable by severity and file.
+  - *Each fault once.* The project's editor build and a test run both run `generate`, so their failure repeats errors the live pipeline already shows. A build or test-run problem (`U8G2GL_EDITOR_BUILD`, `U8G2GL_TEST_RUN_BUILD`) with the same file, line, column and message as a live one is dropped; one with no live twin, a compiler error in a widget's C++ say, is shown.
+  - *A failed test run's problems are about the text it ran.* They clear at the next edit, as its mismatch overlay does, and a run that fails after an edit made while it ran adds none. The verdict line keeps the result, with its "n edits since".
 - **Output** — the CLI's raw output, for when something goes genuinely wrong.
 - **Budget** — the §18 memory report per target, over-budget items highlighted. Visible during design rather than after.
 
