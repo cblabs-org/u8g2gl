@@ -17,8 +17,6 @@
  *              parser's order of preference (`attributeSpellings`); the first
  *              one written supplies the value, and any other one written is
  *              kept as `ignored`, because the parser does not read it either.
- *              A place read only while an element is absent (`unlessPresent`)
- *              counts as unread while that element is there.
  *
  *              Nodes have keys built from vocabulary ids and list positions
  *              (`u8g2gl.xml>targets#1>display`), so a key computed from one
@@ -97,10 +95,6 @@ export interface FieldCandidate {
   readonly host: CstElement | undefined;
   /** The canonical place: where a value is written new. */
   readonly canonical: boolean;
-  /** Read before the canonical place (`beforeCanonical`; no vocabulary entry has one since schema 0.7). */
-  readonly beforeCanonical: boolean;
-  /** Not read while another element is written (`unlessPresent`; no vocabulary entry has one since schema 0.7). */
-  readonly shadowed: boolean;
 }
 
 /** One element's form: its own fields, the parts shown inside it, and its lists. */
@@ -218,18 +212,15 @@ function readField(nodeKey: string, element: VocabularyElement, attribute: Vocab
   const places: FieldCandidate[] = [];
   for (const spelling of attributeSpellings(element, attribute)) {
     const host = locate(spelling.element, scope);
-    const shadowed = (spelling.unlessPresent ?? []).some((id) => locate(id, scope) !== undefined);
     places.push({
       elementId: spelling.element,
       name: spelling.name,
       host,
       canonical: spelling.element === element.id && spelling.name === attribute.name,
-      beforeCanonical: spelling.beforeCanonical === true,
-      shadowed,
     });
     const written = host?.attributes.find((a) => a.name === spelling.name);
     if (written === undefined) continue;
-    if (at === undefined && !shadowed) {
+    if (at === undefined) {
       value = written.value;
       at = placeOf(spelling.element, written);
     } else {
@@ -252,14 +243,14 @@ function repeatingKinds(id: string): VocabularyElement[] {
 }
 
 // readNode
-// One element's node: its fields, its non-repeating canonical children as
-// parts, and a list per container child.
+// One element's node: its fields, its non-repeating children as parts, and a
+// list per container child.
 function readNode(element: VocabularyElement, cst: CstElement | undefined, key: string, parent: Scope | undefined, extra: Partial<FormNode> = {}): FormNode {
   const scope: Scope = { elementId: element.id, cst, parent };
   const parts: FormNode[] = [];
   const lists: FormList[] = [];
   for (const child of vocabularyChildren(element.id).filter((c) => c.parent === element.id)) {
-    if (child.repeats || !child.canonical) continue;
+    if (child.repeats) continue;
     if (repeatingKinds(child.id).length > 0) {
       lists.push(readList(child, scope, `${key}>${child.id}`));
     } else {

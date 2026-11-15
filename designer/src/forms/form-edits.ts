@@ -22,15 +22,13 @@
  *
  *              Where a new value goes, in order:
  *              1. where the parser reads it now, if it is written;
- *              2. a place the parser reads first, if that element is written
- *                 (`beforeCanonical`; none since schema 0.7 removed `<bus>`);
- *              3. the canonical place, if its element is written;
- *              4. when the canonical element is absent, beside the values of
+ *              2. the canonical place, if its element is written;
+ *              3. when the canonical element is absent, beside the values of
  *                 that element that are written elsewhere (a target that
  *                 writes `setup` on itself, with no `<display>`, gets its
  *                 `rotation` there too, so the parser keeps reading them
  *                 together);
- *              5. otherwise the canonical place, creating its element.
+ *              4. otherwise the canonical place, creating its element.
  *
  * Exports:
  * - FormChange:      What the form asks for
@@ -200,20 +198,16 @@ function setField(file: FormFile, text: string, key: string, value: string | und
   }
   if (value === undefined) return text;
 
-  // --- Step 2: A place read before the canonical one, if written ---
-  const first = field.places.find((place) => place.beforeCanonical && place.host !== undefined);
-  if (first?.host !== undefined) return applyEdits(text, insertAttribute(cst, first.host, first.name, value));
-
-  // --- Step 3: The canonical place, if written ---
+  // --- Step 2: The canonical place, if written ---
   const canonical = field.places.find((place) => place.canonical);
   if (canonical?.host !== undefined) return applyEdits(text, insertAttribute(cst, canonical.host, canonical.name, value));
 
-  // --- Step 4: Beside this element's other values, where they are written instead ---
+  // --- Step 3: Beside this element's other values, where they are written instead ---
   const beside = node.fields.flatMap((other) => (other.at !== undefined && other.at.elementId !== node.element.id ? [other.at.elementId] : []))[0];
-  const there = field.places.find((place) => place.elementId === beside && place.host !== undefined && !place.shadowed);
+  const there = field.places.find((place) => place.elementId === beside && place.host !== undefined);
   if (there?.host !== undefined) return applyEdits(text, insertAttribute(cst, there.host, there.name, value));
 
-  // --- Step 5: Create the canonical element, then write it there ---
+  // --- Step 4: Create the canonical element, then write it there ---
   const created = ensureWritten(file, text, node.key);
   return setField(file, created, key, value);
 }
@@ -275,7 +269,7 @@ function itemFragment(list: FormList, kind: VocabularyElement, values: Readonly<
       .map((attribute) => ` ${attribute.name}="${encodeAttributeValue(seedValue(list, kind, attribute, values), '"')}"`)
       .join('');
   const parts = vocabularyChildren(kind.id).filter(
-    (child) => child.parent === kind.id && !child.repeats && child.canonical && child.attributes.some((a) => a.required),
+    (child) => child.parent === kind.id && !child.repeats && child.attributes.some((a) => a.required),
   );
   if (parts.length === 0) return `<${kind.tag}${attributes(kind)} />`;
   return [`<${kind.tag}${attributes(kind)}>`, ...parts.map((part) => `${step}<${part.tag}${attributes(part)} />`), `</${kind.tag}>`].join('\n');

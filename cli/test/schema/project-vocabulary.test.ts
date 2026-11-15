@@ -105,8 +105,7 @@ function writeElement(element: VocabularyElement, values: Values, depth: number)
   }
   const children = vocabularyChildren(element.id)
     // Each child once, under its canonical parent only.
-    .filter((child) => child.parent === element.id && !values.has(omit(child.id)))
-    .filter((child) => child.canonical || [...values.keys()].some((k) => k.startsWith(`${child.id}/`) && values.get(k) !== undefined));
+    .filter((child) => child.parent === element.id && !values.has(omit(child.id)));
   const open = `${pad}<${element.tag}${attributes.length > 0 ? ` ${attributes.join(' ')}` : ''}`;
   if (children.length === 0) return `${open} />`;
   return [`${open}>`, ...children.map((child) => writeElement(child, values, depth + 1)), `${pad}</${element.tag}>`].join('\n');
@@ -266,18 +265,6 @@ describe('the project-file vocabulary: the parsers read all of it', () => {
             [canonical, undefined],
             [key(spelling.element, spelling.name), sampleValue(element, attribute, 1)],
           ]);
-          // A place read only while another element is absent: every value
-          // of that element moves to this place, and the element goes.
-          for (const hidden of spelling.unlessPresent ?? []) {
-            const absent = vocabularyElement(hidden);
-            values.set(omit(hidden), undefined);
-            for (const moved of absent?.attributes ?? []) {
-              if (moved === attribute) continue;
-              const there = moved.alternatives?.find((a) => a.element === spelling.element);
-              values.set(key(hidden, moved.name), undefined);
-              if (there !== undefined) values.set(key(there.element, there.name), sampleValue(element, moved, 0));
-            }
-          }
           expect(parseFile(element.file, writeFile(element.file, values)), `${spelling.element}/${spelling.name}`).toEqual(reference);
         }
       });

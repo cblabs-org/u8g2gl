@@ -164,7 +164,7 @@ The CLI ingests U8G2's source at build time and generates its display catalogue 
 
 | Source | Yields |
 |---|---|
-| `U8g2lib.h` | 4913 constructor classes — 76 controllers, 13 bus variants. **1631 are full-buffer (`_F_`)**, which is exactly the set [D-2] admits |
+| `U8g2lib.h` | 4913 constructor classes — 4911 display constructors plus `U8G2_NULL` and `U8G2_BITMAP` — across 81 controllers and 13 bus suffixes; 18 classes, six parallel displays in three buffer modes, have no bus suffix. **1637 are full-buffer (`_F`)**, which is exactly the set [D-2] admits and the catalogue's 1637 records |
 | `u8x8_d_*.c` | 206 `u8x8_display_info_t` structs across 90 drivers, each with authoritative `pixel_width` / `pixel_height` |
 | `u8g2_d_setup.c` | Links constructor → driver → buffer allocator, e.g. `u8g2_Setup_ssd1306_128x64_noname_f` → `u8x8_d_ssd1306_128x64_noname` + `u8g2_m_16_8_f` |
 
@@ -400,13 +400,13 @@ Every field is derived from U8G2's own tables — nothing is hand-entered:
 
 `framebuffer_bytes` is exact, taken from the buffer allocator (`u8g2_m_16_8_f` → 16×8 tiles × 8 = 1024), not estimated. Across the catalogue these range from **8 bytes to 25,600 bytes** (80×40 tiles, a 640×320 panel) over 73 distinct sizes — a 3200× spread, which is why the figure has to be reported rather than assumed.
 
-The 13 bus variants normalise to three families:
+The 13 bus suffixes U8G2 writes normalise to three families. A constructor with no bus suffix (six parallel displays, such as `U8G2_KS0108_128X64_F`) gets the raw label `PARALLEL` from the catalogue builder, not from U8G2, so the catalogue's `bus.raw` has 14 values:
 
 | Family | Raw suffixes |
 |---|---|
 | `spi` | `4W_HW_SPI`, `4W_SW_SPI`, `2ND_4W_HW_SPI`, `3W_HW_SPI`, `3W_SW_SPI`, `HW_SPI`, `SW_SPI`, `2ND_HW_SPI` |
 | `i2c` | `HW_I2C`, `SW_I2C`, `2ND_HW_I2C` |
-| `parallel` | `6800`, `8080` |
+| `parallel` | `6800`, `8080`, and `PARALLEL` for the bus-less classes |
 
 #### Query modes
 
