@@ -173,4 +173,201 @@ owner's approval, with E1–E3, is recorded in its status log (rule 00). Read
 
 # Completion report
 
-*(worker: append here)*
+*Worker, 2026-11-15. Provenance checked before starting: this work order names `e-5-loose-ends`,
+and its PROJECT.md status log records the owner's "Approve E-5". Nothing pushed, tagged or
+published. No network except `npm ci` from the lockfiles.*
+
+## Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-e5/wo1-project-attributes` | `3d60eba` feat(parser): u8g2gl.xml is checked against the project vocabulary |
+| WO2 | `u8g2gl-e5/wo2-problems` | `c342d7e` fix(designer): Problems says a fault once, and a failed run's only until the next edit |
+| WO3 | `u8g2gl-e5/wo3-cleanup` | `b1d5589` refactor(vocabulary): delete the mechanisms nothing uses; recount §5.2 |
+| WO4 | `u8g2gl-e5/wo4-docs-review` | `3c96f72` docs: u8g2gl.xml vocabulary checks and Problems; CLI 0.20.0; then this report |
+
+## Suite results (one at a time)
+
+| Suite | Baseline (`cf82556`+plan) | Final (`3c96f72`) |
+|---|---|---|
+| Framework Wasm build | OK | OK |
+| Wasm tests (4, `node wasm/test/*.test.mjs`) | 4/4 pass | 4/4 pass |
+| Host C++ (`ctest`) | 520/520 pass (1 skipped: `SizeOfReport.ThirtyTwoBitTarget`), 0 warnings | same |
+| CLI `vitest run` | 2974 passed, 23 skipped | 3006 passed, 23 skipped (+32 new) |
+| CLI lint + tsc | clean | clean |
+| Designer typecheck | clean | clean |
+| Designer unit | 262 passed | 266 passed (+4 new) |
+| e2e (`build:e2e`, no Emscripten on PATH, as baseline) | 114 passed, 10 skipped, **1 failed: `design-hidden.spec.ts:144`** (known flake; passed when re-run alone) | 115 passed, 12 skipped (the 2 new specs need the toolchain), 0 failed |
+| e2e with Emscripten 5.0.3 on PATH | not run at baseline | **127 passed, 0 skipped** |
+| Production (`npm run build`, `test:e2e:production`) | 3 passed | 3 passed |
+| `refresh-goldens.mjs` | n/a | empty diff |
+| `check-home-paths.mjs` | n/a | clean |
+| `check-package.mjs` | n/a | **PASS** `u8g2gl-0.20.0.tgz`, reports and stamps `0.20.0-dev.1` (it packs HEAD, so it was run after the version commit) |
+
+## WO1 notes
+
+- **The known set comes from the vocabulary.** `KNOWN_ATTRIBUTES` is built once from
+  `PROJECT_VOCABULARY` × `attributeSpellings()`, crediting each spelling to the element it is
+  written on, so `setup`/`rotation` on `<target>` and `ram_budget`/`ramBudget` on `<display>`
+  are known. Children come from `vocabularyChildren()`. Suggestions use `findClosest`, as
+  `validate-widget-props.ts` does.
+- **`xmlns`, `xml:` and `<?xml?>`.** The tokeniser hands `xmlns`, `xmlns:a`, `xml:lang` and `a:b`
+  over as ordinary attributes. The declaration is neither an element nor an attribute. Widgets
+  and `<style>` don't exempt namespace attributes, no file in the repository writes one, and
+  U8G2GL declares no namespace, so there's **no exemption**. `xmlns` on `<u8g2gl>` is
+  unknown, and a test pins that.
+- **The removed pins** are exempt only where `reportRemovedWiring` refuses them (`<target>`,
+  `<display>`), so each pin gets one diagnostic. `<bus>` under `<target>` keeps its removal
+  message alone, and its non-pin attributes aren't reported.
+- **The model survives** an error in `MODEL_PRESERVING_CODES` (`REMOVED_ATTRIBUTE`,
+  `UNKNOWN_ATTRIBUTE`). An unknown element still withholds it.
+- **Where the placeholder fix lives.** The placeholder is made in `node/load-project.ts`
+  (`loadProject`) and in `designer/src/project/project-model.ts` (`ProjectModelCache.build`).
+  Each now sets a new optional `ProjectModel.projectWithheld`. The behaviour itself is in one place:
+  `hasProjectModel()` in `core/generator/check-project.ts`. `checkProject()` uses it to drop the
+  placeholder's schema diagnostic, so both journeys get it, and the CLI's
+  `describeCheckedTarget` uses it to skip "No <target> declared". A missing `u8g2gl.xml`
+  (directory: "Project file 'u8g2gl.xml' not found"; lone file: no schema error) and
+  `schema=""` (still `U8G2GL_UNKNOWN_SCHEMA_VERSION` at `u8g2gl.xml`) behave as before, and
+  tests cover both.
+- **Every committed fixture still validates.** `project-unknown-vocabulary.test.ts` parses every
+  committed `u8g2gl.xml` under `cli/test` and `test/generated_fixture` and expects no
+  diagnostic. The workspace evidence projects under `.agents/` parse clean too (checked by
+  hand, not in a test).
+- **A fixture change the check forced.** `cli/test/parser/fixtures/valid-project.xml` wrote
+  `default="true"` on `<target>`, which nothing ever read (§5.1: "there is no `default`
+  attribute"). I removed it. That file is hashed in the CST tokeniser record, so
+  `tokeniser-trees.json` and `tokeniser-diagnostics.json` got the same edit by hand, plus the
+  new hash: the attribute leaves the record and `ram_budget` moves left 15 columns. The edit is
+  documented in `tokeniser-golden.ts`'s header, as that file's convention requires.
+
+## WO2 notes
+
+- **Matching.** `parseBuildFailure()` keeps the file, line and column exactly as
+  `formatDiagnostic` printed them, and it keeps only the message's **first line, trimmed**. So
+  `withoutBuildRepeats()` matches on file, line, column and the live message's first line, trimmed.
+  A multi-line live message, such as the 0.3 migration error, still finds its twin. Paths match:
+  the build's `generate` labels project files project-relative, as the designer does.
+- **One addition beyond the literal text.** `fail()` gives Problems nothing if an edit was made
+  while the run was in flight, matching the overlay rule (`editsSince === 0 ? detail :
+  undefined`). Ruling 4 says "as its mismatch overlay does". Without this, such a run's
+  diagnostics would appear already stale and stay until the next edit. A unit test pins it.
+  Revert that one line if the PA prefers the literal reading.
+- **e2e.** `designer/e2e/build-problems.spec.ts` has two tests, both gated on Emscripten like
+  `test-run.spec.ts`:
+  - a real editor build failing on a pin written on disk;
+  - a refused run whose record is served in the page, since no valid project makes the real
+    server refuse a run the canvas can draw.
+
+  I checked both against the fixes: with `withoutBuildRepeats` and the `edited()` clearing
+  disabled, both fail. Then I restored the code and rebuilt.
+- Both build codes now live in `pipeline/diagnostics.ts`. The controller imports
+  `TEST_RUN_BUILD_CODE` from there instead of defining its own.
+
+## WO3 notes
+
+- **Deviation: the departures fixture's `generated/` and `generated_editor/` were not
+  deleted.** The work order said to stop and report if anything reads them, and something does:
+  `cli/test/node/design/build/prepare-build.test.ts:114` ("generates into the cache, never
+  into the project, and is stable") copies the fixture and reads
+  `generated/ui_fonts.cpp` before and after the build, as a sentinel that the build leaves the
+  project's own output alone. PROJECT.md's "No test reads them" is therefore wrong in this one
+  place. I deleted them and wrote the guard test, saw that test fail, and then **reverted all of
+  it**: the directories, the guard test, and an edit to `designer/e2e/support/design-session.ts`.
+  The suggested fix, for the PA to rule on: have that test plant its own sentinel in the copy's
+  `generated/`, or assert that the build creates no `generated/`. Then the deletion, the guard
+  (`test/node/design/build/departures-project.test.ts`, which fails if either directory exists)
+  and the now-dead `rmSync(generated_editor)` in `design-session.ts` can land as planned. Nothing
+  else in `scripts/`, `.github/`, `wasm/`, `cli/` or `designer/` reads them:
+  - `check-package.mjs` regenerates before reading;
+  - `panel-layout.test.ts` and `pipeline-allocation.test.ts` skip `generated*`;
+  - `wasm/CMakeLists.txt` and the wasm tests read `test/generated_fixture`.
+- **The mechanisms are gone**: `beforeCanonical`, both `unlessPresent`s and
+  `VocabularyElement.canonical`, from `project-vocabulary.ts`, `attributeSpellings()`,
+  `form-model.ts` (`FieldCandidate.beforeCanonical`/`shadowed`, and the `!child.canonical`
+  skip) and `form-edits.ts`. `form-edits.ts` steps 2–5 were renumbered 2–4.
+  `FieldCandidate.canonical` stays: it marks the canonical *place*, which step 2 uses, and isn't
+  the removed flag.
+  - Test edits are removals only: the `unlessPresent` loop and a `child.canonical ||` filter in
+    `cli/test/schema/project-vocabulary.test.ts`, and three `canonical` filters in
+    `designer/test/unit/project-form-coverage.test.ts`.
+  - The form's unit suite, `project-form.spec.ts` and `project-targets.spec.ts` (12 tests) pass
+    unchanged.
+
+### §5.2 recount, from `extern/u8g2` at `d66b49a` (`git describe --tags`: `2.36.18`)
+
+Run from `extern/u8g2`. `H=cppsrc/U8g2lib.h`, and `CLS` is the class-name list:
+
+```sh
+H=cppsrc/U8g2lib.h
+CLS() { grep -oE '^class U8G2_[A-Z0-9_]+ : public U8G2 \{' $H | sed -E 's/^class U8G2_([A-Z0-9_]+) : .*/\1/'; }
+CLS | wc -l                                                    # 4913  constructor classes
+CLS | grep -xE 'NULL|BITMAP'                                   # NULL, BITMAP: the two that are not displays
+CLS | grep -vxE 'NULL|BITMAP' | cut -d_ -f1 | sort -u | wc -l   # 81    controllers
+CLS | grep -vxE 'NULL|BITMAP' | sed -nE 's/^.*_[12F]_(.+)$/\1/p' | sort | uniq -c | sort -rn
+    # 13 distinct bus suffixes: 4W_SW_SPI 588, 4W_HW_SPI 588, 2ND_4W_HW_SPI 588, 8080 561,
+    # 6800 552, 3W_SW_SPI 441, 3W_HW_SPI 441, SW_I2C 360, HW_I2C 360, 2ND_HW_I2C 360,
+    # SW_SPI 18, HW_SPI 18, 2ND_HW_SPI 18   (sum 4893)
+CLS | grep -cE '_[12F]$'                                       # 18    with no bus suffix
+    # SBN1661_122X32, SED1520_122X32, KS0108_128X64, KS0108_ERM19264, T7932_150X32,
+    # HD44102_100X64, each _1 _2 _F   (4893 + 18 + 2 = 4913)
+CLS | grep -cE '_F(_|$)'                                       # 1637  full-buffer (1631 with a bus suffix + 6 without)
+```
+
+Catalogue, from the worktree root:
+
+```sh
+node -e 'const c=require("./cli/src/data/catalogue.json");console.log(c.length,
+  new Set(c.map(r=>r.controller)).size, new Set(c.map(r=>r.bus.raw)).size,
+  c.filter(r=>r.bus.raw==="PARALLEL").map(r=>r.setup).join(" "))'
+# 1637 81 14 U8G2_HD44102_100X64_F U8G2_KS0108_128X64_F U8G2_KS0108_ERM19264_F
+#            U8G2_SBN1661_122X32_F U8G2_SED1520_122X32_F U8G2_T7932_150X32_F
+```
+
+`PARALLEL` comes from `cli/src/node/catalogue-builder.ts:570/588`, the builder's label for a
+name with no bus suffix.
+
+What changed in design_spec:
+
+- **Line 167.** "76 controllers" becomes **81**, and "1631 full-buffer" becomes **1637**. The old
+  figure counted `_F_` with a trailing underscore, so it missed the 6 bus-less `_F` classes.
+  4913 and 13 were already right; the row now says 4913 includes `U8G2_NULL` and `U8G2_BITMAP`.
+- **Line 403.** It now says "13 bus suffixes U8G2 writes", and `PARALLEL` is named as the
+  builder's label for the bus-less classes, with its own entry in the `parallel` row.
+
+No other figure was changed. I haven't recounted the 221 displays, the 206 structs across 90
+drivers, or the 73 framebuffer sizes. As an observation only: the catalogue has 227 distinct
+`driver` values, which may or may not be the same thing as "90 drivers" (driver files).
+
+## WO4 notes
+
+- **design_spec.**
+  - §5.1 gains a paragraph: every attribute and child is checked against the vocabulary, an
+    unknown one is an error, and a withheld project reports only its parse error.
+  - **§15.3 had no table of codes to add rows to**, only a table of commands. I added a small
+    table under its "stable machine code" point. It lists the four codes `u8g2gl.xml` reports
+    and how each changed in 0.20.
+- **ui_spec §13 (Problems).** Two sub-bullets: each fault is shown once, and a failed run's
+  problems are about the text it ran.
+- **ChangeLog.** `cli v0.20.xx`, 0.20.0. Neither foundation repository was touched.
+- **CLI 0.20.0** in `cli/package.json` and `cli/package-lock.json`, via
+  `npm version --no-git-tag-version`.
+- **Readability review.** The house `readability-reviewer` agent covered the whole
+  `cf82556..` diff and found no P1/P2. All four P3/P4 findings are fixed:
+  - the parser's element-id union is tied to the vocabulary by a new test, and a comment says
+    so;
+  - an unknown child of `<output>` (already an error in code) is added to the docs and the
+    ChangeLog, with a test;
+  - a touched comment's "PR-04 WO5a" pointer is dropped;
+  - a ragged wrap in the vocabulary header is re-flowed.
+
+## Found outside scope (ruling 11: not fixed)
+
+- **`globals.xml` and screen files ignore stray attributes**, as `u8g2gl.xml` did before this PR.
+  Through the built CLI, `validate` on a copy of `valid-project` with `foo="1"` on `<globals>`,
+  `bar="1"` on an `<int>` subject, `baz="1"` on an `<int>` const and `qux="1"` on `<screen>`
+  reports none of them. The parser alone also ignores a stray attribute on `<builtin>` and
+  `<xbm>`. Unknown *children* of `<globals>` and `<subjects>` are already errors. Only `<style>`
+  (validator) and widget elements (Pass 4) report unknown attributes. The same vocabulary-driven
+  check would cover `globals.xml`, since the vocabulary already lists its elements.
+- **`prepare-build.test.ts`** depends on the committed fixture output (WO3 above).
