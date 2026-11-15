@@ -17,7 +17,8 @@
  *
  *              `globals.xml` takes its own editor's hooks
  *              (`useGlobalsEditor`): the font picker on a `<builtin>`'s name
- *              and on "+ Built-in font".
+ *              and on "+ Built-in font", and the file chooser on a `<bdf>`,
+ *              `<xbm>` or `<convert>` `src` and on adding one.
  *
  *              It scrolls, never focuses: to the section the Explorer asks
  *              for (`Workspace.formReveal`), and to the node the XML caret is
@@ -114,8 +115,8 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const project = useProjectEditor(workspace, projectSchema(state.model));
   const hooks = file === 'u8g2gl.xml' ? project : undefined;
   const sections = renderSection ?? hooks?.renderSection;
-  // globals.xml's: the font picker, on a <builtin>'s name and on adding one.
-  const globalsHooks = useGlobalsEditor(state.model);
+  // globals.xml's: the font picker and the file chooser, on a field and on adding.
+  const globalsHooks = useGlobalsEditor(workspace, state.model);
   const globals = file === 'globals.xml' ? globalsHooks : undefined;
 
   return (

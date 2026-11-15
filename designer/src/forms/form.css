@@ -86,6 +86,17 @@
 .font-declared { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; color: var(--text-dim); font-size: 10px; }
 .font-sample { display: block; flex: none; image-rendering: pixelated; }
 
+/* --- The file chooser (globals.xml): the font picker's frame, a path per row --- */
+.file-chooser { margin-top: 6px; padding: 6px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg-sunken); }
+.file-chooser .action { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.file-chooser .action.primary { color: var(--text); border-color: var(--accent); }
+.file-chooser .action:disabled { opacity: 0.4; cursor: default; }
+.file-option { flex: none; padding: 3px 6px; text-align: left; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.file-option[aria-selected='true'] { border-color: var(--accent); }
+.file-option code { font: 11px ui-monospace, Menlo, monospace; word-break: break-all; }
+.file-import { margin-top: 6px; }
+.file-import-path { margin-top: 4px; }
+
 /* --- The impact preview: each screen at the candidate size, outside elements outlined --- */
 .impact-screens { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 0 6px; max-width: 100%; overflow-x: auto; }
 .impact-screen { margin: 0; }

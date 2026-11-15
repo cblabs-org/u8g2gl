@@ -333,6 +333,22 @@ export function runProjectFsContract(name: string, factory: ProjectFsFactory, op
         expect(refused).toMatchObject({ ok: false, code: 'conflict', currentVersion: existing.ok ? existing.version : 'x' });
       });
 
+      it('writes bytes exactly, BOM option ignored, and with expectedVersion null never replaces a file', async () => {
+        const { fs } = await setup();
+        const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xef, 0xbb, 0xbf]);
+        const written = await fs.writeBytes('images/new.png', bytes, { expectedVersion: null, bom: true });
+        expect(written).toMatchObject({ ok: true, path: 'images/new.png', created: true });
+        const read = await fs.readBytes('images/new.png');
+        expect(read.ok && [...read.bytes]).toEqual([...bytes]);
+        expect(written.ok && read.ok && written.version === read.version).toBe(true);
+
+        const refused = await fs.writeBytes('images/new.png', new Uint8Array([1, 2, 3]), { expectedVersion: null });
+        expect(refused).toMatchObject({ ok: false, code: 'conflict' });
+        const after = await fs.readBytes('images/new.png');
+        expect(after.ok && [...after.bytes]).toEqual([...bytes]);
+        expect(await fs.writeBytes('../outside.png', bytes)).toMatchObject({ ok: false, code: 'invalid-path' });
+      });
+
       it('refuses an expected version for a file that does not exist, with currentVersion null', async () => {
         const { fs } = await setup();
         const read = await fs.read('globals.xml');
