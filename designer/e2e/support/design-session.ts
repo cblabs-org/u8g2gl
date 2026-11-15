@@ -102,9 +102,6 @@ export async function startDesign(options: StartOptions = {}): Promise<DesignSes
   const project = join(root, 'project');
   const home = join(root, 'home');
   cpSync(PROJECT_FIXTURE, project, { recursive: true });
-  // The fixture keeps its generated output for other tests; a designer session
-  // on a real project has none of the editor's, so drop it from the copy.
-  rmSync(join(project, 'generated_editor'), { recursive: true, force: true });
   mkdirSync(home);
   for (const [path, text] of Object.entries(options.files ?? {})) {
     mkdirSync(dirname(join(project, path)), { recursive: true });
