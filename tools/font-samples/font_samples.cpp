@@ -54,6 +54,9 @@ constexpr int BASELINE_Y = 160;
 // such as an icon font.
 constexpr int FALLBACK_GLYPHS = 8;
 
+// The canvas's frame buffer, its geometry as U8X8 is told it, and the packed
+// output of one sample. Static, as the runtime's buffers are: one program, one
+// canvas, reused for every font.
 uint8_t s_buffer[CANVAS_TILES_W * 8 * CANVAS_TILES_H];
 u8x8_display_info_t s_info;
 uint8_t s_packed[(CANVAS_W * CANVAS_H + 7) / 8];

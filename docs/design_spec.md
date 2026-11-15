@@ -2023,6 +2023,13 @@ The CLI and the designer load the same artefact, so font compilation has one imp
 
 `<builtin name="u8g2_font_6x10_mr" />` references U8G2's bundled fonts with no compilation step — it emits a reference to a symbol U8G2 already provides, so it needs no `bdfconv`, no packaging, and no licensing consideration beyond what the user accepted by linking U8G2 (§22.1). **This is the default path** and covers several hundred fonts; `<bdf>` exists for when a project genuinely needs its own typeface.
 
+**What a built-in font's name says, and what it looks like.** *2026-11-15 (E-6).* The designer helps an author choose among U8G2's 2039 bundled fonts (ui_spec §6.4) with two pieces of data, both derived from the pinned U8G2 as the catalogue is ([D-14]):
+
+- **The facts in the name.** U8G2's font build tool names every font `u8g2_font_<name>_<box><set>` (`extern/u8g2/tools/font/build/build.c`, `gen_font()`; the wiki's `fntlistall` documents the same scheme). The box is `t` transparent, `h` common height, `m` monospace or `8` 8×8; the set is `f` full (32–255), `r` reduced (32–127), `u` uppercase (32–95), `n` numbers, `e` extended, or a font's own named postfix (`_cyrillic`, `_all`, or none). Core's `fontFacts()` (`cli/src/core/catalogue/font-facts.ts`) decodes them from one table. A postfix that is only a number (`_72_73`, `_1`) means a different map file or Unicode block per font, so the 19 fonts that use one are reported as unknown rather than guessed, and a test lists them, so a U8G2 upgrade that adds another is a visible diff. The heights come from each font's own header, as before (`u8g2-font-heights.json`).
+- **A sample drawn by U8G2 itself.** The editor Wasm links only the fonts a project declares, so it cannot draw one the author has not chosen yet. Instead, `npm run build:font-samples` in `cli/` builds `tools/font-samples/` — a host program, outside the root build and ctest, that links the vendored `u8g2_fonts.c` — and draws `AaBbGg 0123` (the digits, for an `n` font; the first glyphs, for a font that has neither) in each font at its own size, cropped to the drawn width and the font's own height, one bit per pixel. Its font table is generated from `u8g2-fonts.json`, so no list is typed by hand and a font U8G2 does not have is a compile error naming it. The output, `cli/src/data/u8g2-font-samples.json`, is committed: 2039 samples, 1.25 MB (295 kB gzipped), byte-identical across a clean rebuild. The designer imports it dynamically, so it is a chunk of its own, fetched when a picker first opens and never part of the initial page; it needs no server route. It ships inside the CLI package's designer, and the CLI itself never reads it.
+
+**How the designer adds a font.** *+ Built-in font* opens the font picker and adds `<builtin name="…"/>` for the font chosen. *+ BDF font* opens the file chooser over the project's `.bdf` files, or imports one into `fonts/` through the design server's existing `PUT /api/file` with "must not exist", so nothing is overwritten, and adds `<bdf name="…" src="…"/>` with the name derived from the file. Each is one edit of `globals.xml` and one undo stop; the import itself is a file write, which undo does not remove.
+
 **Provenance.** For `<bdf>` fonts the CLI records the source path and any adjacent licence file in the generated header. This is a convenience so the user can audit what ended up in their firmware — not an obligation U8G2GL incurs. A user-supplied font is the user's asset on the user's terms; see §22.1.
 
 ### 14.2 Images
@@ -2047,6 +2054,8 @@ The CLI and the designer load the same artefact, so font compilation has one imp
 - **Adam7-interlaced PNGs are refused**, rather than silently de-interlaced.
 
 All bitmap data is emitted `PROGMEM` and drawn with `drawXBMP`.
+
+**How the designer adds an image.** *2026-11-15 (E-6).* *+ XBM image* and *+ Converted image* open the file chooser over the project's `.xbm` or `.png` files, or import one into `images/` as a font is imported (§14.1), and add the element with its `src` and a name derived from the file. A `<convert>` also gets its `width` and `height`, read from the PNG's IHDR chunk, so the declared size is the file's own and the refusal above never fires for a new image; if the header cannot be read, both are left empty for the author, and the validator flags them.
 
 ---
 

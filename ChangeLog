@@ -8,6 +8,26 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-15	cli v0.21.xx	U8G2GL
+  * 0.21.0: Pickers for fonts and asset files in the designer's
+    globals.xml form. "+ Built-in font" opens a font picker over U8G2's
+    2039 fonts instead of adding an empty <builtin>: a search, filters for
+    height, character set and glyph box, and each font's height, decoded
+    set and a sample U8G2 itself drew; declared fonts are marked, and
+    U8G2's font gallery is linked. A <builtin>'s name keeps it behind
+    "Change font...". "+ BDF font", "+ XBM image" and "+ Converted image"
+    open a file chooser over the project's .bdf, .xbm or .png files, with
+    "Import from your computer..." writing one into fonts/ or images/ and
+    never over an existing file; the element gets a name derived from the
+    file and, for <convert>, the PNG's width and height. Each src keeps it
+    behind "Choose file...". Choosing is one edit and one undo stop;
+    Cancel adds nothing. Core gains fontFacts(), which decodes a built-in
+    font's box and set from U8G2's naming scheme (19 fonts with
+    bare-number suffixes are reported unknown), and
+    ProjectFileSystem.writeBytes(). The samples are u8g2-font-samples.json
+    (1.25 MB), drawn natively from the pinned U8G2 by npm run
+    build:font-samples and loaded only when a picker opens. Generated
+    output is unchanged; no schema or runtime change.
 2026-11-15	cli v0.20.xx	U8G2GL
   * 0.20.0: u8g2gl.xml is checked against the project vocabulary, the
     table the designer's form is built from. An attribute it does not
