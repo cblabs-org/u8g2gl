@@ -15,6 +15,11 @@
  *              canvas re-renders when the form shows or goes. `ProjectForm`
  *              owns one file's controller for as long as it is shown.
  *
+ *              `globals.xml` takes its own editor's hooks
+ *              (`useGlobalsEditor`): the font picker on a `<builtin>`'s name
+ *              and on "+ Built-in font", and the file chooser on a `<bdf>`,
+ *              `<xbm>` or `<convert>` `src` and on adding one.
+ *
  *              It scrolls, never focuses: to the section the Explorer asks
  *              for (`Workspace.formReveal`), and to the node the XML caret is
  *              in (`Workspace.formCaret`). A focused section, item or part
@@ -34,6 +39,7 @@ import { useWorkspace } from '../ui/workspace-context';
 import { ProjectFormController } from './form-controller';
 import { isFormFile, type FormFile } from './form-model';
 import { FormView, type FormActions, type SectionRenderer } from './form-view';
+import { useGlobalsEditor } from './globals-editor';
 import { useProjectEditor } from './project-editor';
 import { projectSchema } from './snippet-panel-model';
 import './form.css';
@@ -97,7 +103,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const actions = useMemo<FormActions>(
     () => ({
       set: (field, value) => void controller.apply({ kind: 'set', field, value }),
-      add: (list, kind) => void controller.apply({ kind: 'add', list, itemKind: kind, values: seedFor(workspace, kind) }),
+      add: (list, kind, values) => void controller.apply({ kind: 'add', list, itemKind: kind, values: { ...seedFor(workspace, kind), ...values } }),
       remove: (item) => void controller.apply({ kind: 'remove', item }),
       move: (item, delta) => void controller.apply({ kind: 'move', item, delta }),
       focusRange: (range) => workspace.formHighlight.set(range === undefined ? undefined : { path: file, ...range }),
@@ -109,6 +115,9 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const project = useProjectEditor(workspace, projectSchema(state.model));
   const hooks = file === 'u8g2gl.xml' ? project : undefined;
   const sections = renderSection ?? hooks?.renderSection;
+  // globals.xml's: the font picker and the file chooser, on a field and on adding.
+  const globalsHooks = useGlobalsEditor(workspace, state.model);
+  const globals = file === 'globals.xml' ? globalsHooks : undefined;
 
   return (
     <div className="project-form-scroll" ref={root}>
@@ -119,6 +128,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
         actions={actions}
         {...(sections !== undefined ? { renderSection: sections } : {})}
         {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, nodeExtra: hooks.nodeExtra, fieldNote: hooks.fieldNote } : {})}
+        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser } : {})}
       />
     </div>
   );

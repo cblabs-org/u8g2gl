@@ -23,7 +23,7 @@
  *              programmer error.
  *
  * Exports:
- * - ProjectFileSystem:         read / readBytes / write / list / watch
+ * - ProjectFileSystem:         read / readBytes / write / writeBytes / list / watch
  *
  *     Results:
  *     - ProjectFsErrorCode:    Why an operation failed
@@ -159,6 +159,13 @@ export interface ProjectFileSystem {
    * left untouched — unless the file is still at that version.
    */
   write(path: string, text: string, options?: WriteOptions): Promise<ProjectFsResult<WriteOutcome>>;
+  /**
+   * @brief Writes bytes to a file, as `write` writes text: for a file that is
+   *        not text, such as a font or an image imported into the project.
+   *
+   * `options.bom` is ignored: the bytes are written exactly as given.
+   */
+  writeBytes(path: string, bytes: Uint8Array, options?: WriteOptions): Promise<ProjectFsResult<WriteOutcome>>;
   /** @brief Lists every project file. */
   list(): Promise<ProjectFsResult<FileListing>>;
   /**
@@ -214,6 +221,15 @@ export abstract class GuardedProjectFileSystem implements ProjectFileSystem {
       return invalidPath(path, check.reason);
     }
     return this.writeChecked(check.path, encodeText(text, options.bom === true), options);
+  }
+
+  /** {@inheritDoc ProjectFileSystem.writeBytes} */
+  async writeBytes(path: string, bytes: Uint8Array, options: WriteOptions = {}): Promise<ProjectFsResult<WriteOutcome>> {
+    const check = checkProjectPath(path);
+    if (!check.ok) {
+      return invalidPath(path, check.reason);
+    }
+    return this.writeChecked(check.path, bytes, options);
   }
 
   /** {@inheritDoc ProjectFileSystem.list} */

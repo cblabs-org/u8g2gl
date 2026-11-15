@@ -108,8 +108,11 @@ test('the Explorer lists each project file’s sections from the buffer; a row o
   await page.keyboard.press('ArrowDown');
   await expect(globals.getByRole('treeitem', { name: 'Images (0)' })).toBeFocused();
 
-  // Counts follow the buffer, before any save.
+  // Counts follow the buffer, before any save. "+ Built-in font" opens the
+  // font picker, and the font chosen there is what adds the item.
   await form(page, 'globals.xml').getByRole('button', { name: '+ Built-in font' }).click();
+  await form(page, 'globals.xml').getByRole('textbox', { name: 'Search fonts' }).fill('helvB08_tr');
+  await form(page, 'globals.xml').locator('.font-option[data-font="u8g2_font_helvB08_tr"]').click();
   await expect(globals.getByRole('treeitem', { name: 'Fonts (3)' })).toBeVisible();
 });
 

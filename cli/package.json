@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "CLI and schema toolkit for U8G2GL",
   "license": "MIT",
   "author": "Matt McNeill (CB Labs)",
@@ -35,6 +35,7 @@
     "build:manifests": "tsx src/node/build-manifests.ts",
     "build:runtime-version": "tsx src/node/build-runtime-version.ts",
     "build:bdfconv": "tsx src/node/build-bdfconv.ts",
+    "build:font-samples": "tsx src/node/build-font-samples.ts",
     "test": "vitest run",
     "lint": "eslint . && tsc -p tsconfig.test.json"
   },
