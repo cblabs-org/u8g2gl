@@ -25,8 +25,20 @@
  *              The legacy `u8g_font_*` macros `u8g2.h` also defines are aliases,
  *              not symbols U8G2 bundles, and are not included.
  *
+ *              The same file also says which fonts are **large**: U8G2 wraps the
+ *              definition of every font over 32 KB in
+ *              `#ifdef U8G2_USE_LARGE_FONTS` … `#endif`, a macro `u8g2.h` defines
+ *              only on some platforms, while their declarations stay ungated. A
+ *              project naming one therefore compiles everywhere and fails only at
+ *              link time where the macro is missing. The generator guards each
+ *              use with an `#error` (§14.1), so the set is read from those blocks
+ *              here rather than listed by hand.
+ *
  * Exports:
- * - parseFontSymbols(clibDir): Every font U8G2 declares and defines, sorted
+ * - parseFontSymbols(clibDir):       Every font U8G2 declares and defines, sorted
+ * - findLargeFonts(source, fonts):   The fonts defined under U8G2_USE_LARGE_FONTS
+ *                                    in a `u8g2_fonts.c` text, sorted
+ * - parseLargeFonts(clibDir, fonts): The same, read from a U8G2 tree
  */
 
 import { readFileSync } from 'node:fs';
@@ -40,6 +52,18 @@ import { compareCodeUnits } from '../core/order.js';
  */
 const DECLARATION = /^extern const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\] U8(?:G2|X8)_FONT_SECTION\(/gm;
 const DEFINITION = /^const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\d+\] U8(?:G2|X8)_FONT_SECTION\(/gm;
+
+/** One font definition, as a single line (the non-global form of DEFINITION). */
+const DEFINITION_LINE = /^const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\d+\] U8(?:G2|X8)_FONT_SECTION\(/;
+
+/** The macro U8G2 gates its large fonts on (`u8g2.h`). */
+const LARGE_FONTS_MACRO = 'U8G2_USE_LARGE_FONTS';
+
+/** A preprocessor directive: its keyword and the rest of the line. */
+const DIRECTIVE = /^[ \t]*#[ \t]*([A-Za-z]+)(.*)$/;
+
+/** The directives that open, continue or close a conditional block. */
+const CONDITIONALS: ReadonlySet<string> = new Set(['if', 'ifdef', 'ifndef', 'elif', 'elifdef', 'elifndef', 'else', 'endif']);
 
 // matchesOf
 // Every first capture of a global pattern, in order.
@@ -88,4 +112,97 @@ export function parseFontSymbols(clibDir: string): string[] {
   // --- Step 3: A deterministic order ---
   // core/order.ts's compareCodeUnits, never locale: §13.9 (see that module).
   return [...declaredSet].sort(compareCodeUnits);
+}
+
+/**
+ * @brief The fonts a `u8g2_fonts.c` text defines inside an
+ *        `#ifdef U8G2_USE_LARGE_FONTS` … `#endif` block.
+ *
+ * Reads the blocks as U8G2 writes them: each opens with exactly
+ * `#ifdef U8G2_USE_LARGE_FONTS`, holds one or more font definitions, and closes
+ * with `#endif`. Anything else the builder does not understand is refused
+ * rather than guessed at, because a misread block would put a font on the
+ * wrong side of the generated `#error`.
+ *
+ * @param source The text of `u8g2_fonts.c`, read as Latin-1.
+ * @param fonts  Every font U8G2 bundles (`parseFontSymbols()`).
+ * @return The large fonts, unique and sorted.
+ * @throws Error on any other conditional directive, a nested or unterminated
+ *         block, an `#endif` with no block open, a block that defines no font,
+ *         or a large font missing from `fonts` — a build-script precondition,
+ *         not a user diagnostic.
+ */
+export function findLargeFonts(source: string, fonts: readonly string[]): string[] {
+  const large: string[] = [];
+  // The line the open block started on (1-based), or 0 outside a block.
+  let openedAt = 0;
+  let definedInBlock = 0;
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index] ?? '';
+    const lineNumber = index + 1;
+
+    // --- Step 1: Inside a block, collect each font it defines ---
+    // Only a line starting `const uint8_t` can be a definition; the far more
+    // numerous string-literal lines are skipped without running a pattern.
+    if (line.startsWith('const uint8_t ')) {
+      const name = DEFINITION_LINE.exec(line)?.[1];
+      if (name !== undefined && openedAt > 0) {
+        large.push(name);
+        definedInBlock += 1;
+      }
+      continue;
+    }
+    if (!line.includes('#')) continue;
+
+    // --- Step 2: Track the blocks, refusing any shape U8G2 does not write ---
+    const directive = DIRECTIVE.exec(line);
+    const keyword = directive?.[1];
+    if (keyword === undefined || !CONDITIONALS.has(keyword)) continue;
+    const argument = (directive?.[2] ?? '').trim();
+    if (keyword === 'ifdef' && argument === LARGE_FONTS_MACRO) {
+      if (openedAt > 0) {
+        throw new Error(`u8g2_fonts.c line ${lineNumber}: a ${LARGE_FONTS_MACRO} block nested in the one opened at line ${openedAt}.`);
+      }
+      openedAt = lineNumber;
+      definedInBlock = 0;
+    } else if (keyword === 'endif' && openedAt > 0) {
+      if (definedInBlock === 0) {
+        throw new Error(`u8g2_fonts.c line ${openedAt}: a ${LARGE_FONTS_MACRO} block that defines no font.`);
+      }
+      openedAt = 0;
+    } else {
+      throw new Error(
+        `u8g2_fonts.c line ${lineNumber}: unexpected #${keyword}${argument === '' ? '' : ` ${argument}`}; ` +
+          `only #ifdef ${LARGE_FONTS_MACRO} … #endif blocks are understood.`,
+      );
+    }
+  }
+
+  // --- Step 3: Every block closed, every large font one U8G2 bundles ---
+  if (openedAt > 0) {
+    throw new Error(`u8g2_fonts.c line ${openedAt}: a ${LARGE_FONTS_MACRO} block with no #endif.`);
+  }
+  const known = new Set(fonts);
+  const unknown = large.filter((name) => !known.has(name));
+  if (unknown.length > 0) {
+    throw new Error(`Large fonts missing from the font list: [${unknown.slice(0, 5).join(', ')}].`);
+  }
+  const unique = new Set(large);
+  if (unique.size !== large.length) {
+    throw new Error('A large font is defined twice in u8g2_fonts.c.');
+  }
+  return [...unique].sort(compareCodeUnits);
+}
+
+/**
+ * @brief The fonts U8G2 compiles only where `U8G2_USE_LARGE_FONTS` is defined.
+ *
+ * @param clibDir As for parseFontSymbols().
+ * @param fonts   Every font U8G2 bundles (`parseFontSymbols(clibDir)`).
+ * @return The large fonts, unique and sorted.
+ * @throws Error as findLargeFonts() does.
+ */
+export function parseLargeFonts(clibDir: string, fonts: readonly string[]): string[] {
+  return findLargeFonts(readFileSync(join(clibDir, 'u8g2_fonts.c'), 'latin1'), fonts);
 }
