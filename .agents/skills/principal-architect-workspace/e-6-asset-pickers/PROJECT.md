@@ -144,3 +144,20 @@ WO, stacked. The worker doesn't push. The PA verifies, pushes and opens the PR.
   - F3: CLI 0.21.0.
   Work starts from main once #59 has merged, as planned.
 - 2026-11-15 — #59 merged (`dd5454e`). Worktree branched from it.
+- 2026-11-15 — **E-6 verified by the PA** on `69a0bdd`, suites one at a time:
+  - Wasm 4/4; host ctest 520/520; CLI 3046; lint, tsc and designer typecheck
+    clean; designer unit 283; e2e 134/134; production 3.
+  - Goldens: empty diff. check-package PASS at 0.21.0 (tarball 15.7 MB, up
+    0.3 MB). Home-path guard clean.
+  - Samples: a clean rebuild of `tools/font-samples` regenerates
+    `u8g2-font-samples.json` byte for byte (1.19 MiB, under the 2 MB cap).
+  - Browser, production build on a scratch demo:
+    - opening `globals.xml` didn't fetch the samples, and "+ Built-in font"
+      fetched them once;
+    - "profont 12" listed six fonts with decoded facts and drawn samples;
+      choosing one added a `<builtin>`, and one undo in the editor removed it;
+    - "+ BDF font" listed only the project's `.bdf`, with the import note;
+      choosing it added `<bdf name="font_4x6" src="assets/4x6.bdf">` with no
+      problems, and one undo removed it;
+    - nothing reached the disk. Import itself is covered by e2e (Playwright's
+      file chooser); no OS dialog was opened.
