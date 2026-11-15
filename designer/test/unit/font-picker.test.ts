@@ -8,7 +8,9 @@
  *          font is a row with its height and decoded facts; the search
  *          matches as the display search does; the height, character-set and
  *          box filters keep what they say; the fonts a form declares are
- *          marked; and an undecoded font says so rather than guessing.
+ *          marked; U8G2's large fonts are marked, and "Hide large fonts"
+ *          leaves out exactly them; and an undecoded font says so rather
+ *          than guessing.
  * Description: The picker model's pure functions over the shipped font list
  *              and heights, and `declaredBuiltins()` over small `globals.xml`
  *              texts read as the form reads them.
@@ -17,8 +19,9 @@
 import { expect, test } from '@playwright/test';
 import FONT_NAMES from '@u8g2gl/data/u8g2-fonts.json' with { type: 'json' };
 import FONT_HEIGHTS from '@u8g2gl/data/u8g2-font-heights.json' with { type: 'json' };
+import LARGE_FONTS from '@u8g2gl/data/u8g2-large-fonts.json' with { type: 'json' };
 import { buildFormModel } from '../../src/forms/form-model';
-import { declaredBuiltins, factsLine, filterFonts, fontRows, heightRange, NO_FILTER, setOptions } from '../../src/forms/font-picker-model';
+import { declaredBuiltins, factsLine, filterFonts, fontRows, heightRange, LARGE_FONT_BADGE, LARGE_FONT_TOOLTIP, NO_FILTER, setOptions } from '../../src/forms/font-picker-model';
 import { decodeSampleBits, samplePixel } from '../../src/forms/font-samples';
 
 const HEIGHTS: Readonly<Record<string, number>> = FONT_HEIGHTS;
@@ -104,6 +107,29 @@ test('filters combine with the search', () => {
     expect(row.set?.code).toBe('n');
     expect(row.height).toBeGreaterThanOrEqual(50);
   }
+});
+
+test('U8G2’s large fonts are marked, and only they are', () => {
+  expect(ROWS.filter((row) => row.large).map((row) => row.name)).toEqual(FONT_NAMES.filter((name) => LARGE_FONTS.includes(name)));
+  expect(ROWS.filter((row) => row.large)).toHaveLength(63);
+  expect(ROWS.find((row) => row.name === 'u8g2_font_unifont_t_gb2312')?.large).toBe(true);
+  expect(ROWS.find((row) => row.name === 'u8g2_font_helvR08_tr')?.large).toBe(false);
+  expect(LARGE_FONT_BADGE).toBe('large (over 32 KB): needs U8G2_USE_LARGE_FONTS');
+  expect(LARGE_FONT_TOOLTIP).toMatch(/unix, ARM and ESP targets \(see u8g2\.h\)/);
+  expect(LARGE_FONT_TOOLTIP).toMatch(/error naming this font/);
+});
+
+test('"Hide large fonts" is off by default, and on leaves out exactly the large fonts', () => {
+  expect(NO_FILTER.hideLarge).toBeUndefined();
+  expect(filterFonts(ROWS, 'gb2312', NO_FILTER, 5000).rows.some((row) => row.large)).toBe(true);
+  const hidden = filterFonts(ROWS, '', { hideLarge: true }, 5000);
+  expect(hidden.total).toBe(FONT_NAMES.length - 63);
+  expect(hidden.rows.some((row) => row.large)).toBe(false);
+  expect(filterFonts(ROWS, '', { hideLarge: false }, 5000).total).toBe(FONT_NAMES.length);
+  // Combined with a search: the small gb2312 fonts stay, the large ones go.
+  const search = filterFonts(ROWS, 'unifont gb2312', { hideLarge: true }, 5000);
+  expect(search.rows.map((row) => row.name)).not.toContain('u8g2_font_unifont_t_gb2312');
+  expect(search.total).toBe(filterFonts(ROWS, 'unifont gb2312', NO_FILTER, 5000).rows.filter((row) => !row.large).length);
 });
 
 test('the declared fonts are read from the form, wherever the <builtin> is', () => {

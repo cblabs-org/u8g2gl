@@ -84,6 +84,8 @@
 .font-option-name { display: flex; align-items: baseline; gap: 6px; }
 .font-option code { font: 11px ui-monospace, Menlo, monospace; word-break: break-all; }
 .font-declared { padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; color: var(--text-dim); font-size: 10px; }
+/* A large font is marked, not hidden: usable on the boards U8G2 enables it on. */
+.font-large { padding: 0 4px; border: 1px solid var(--warning); border-radius: 3px; color: var(--warning); font-size: 10px; cursor: help; }
 .font-sample { display: block; flex: none; image-rendering: pixelated; }
 
 /* --- The file chooser (globals.xml): the font picker's frame, a path per row --- */

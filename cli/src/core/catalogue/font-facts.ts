@@ -19,7 +19,9 @@
  *              font table), usually `_<word>` and sometimes empty. The same
  *              scheme is the one U8G2's wiki documents beside its gallery,
  *              https://github.com/olikraus/u8g2/wiki/fntlistall, which the
- *              designer's picker links. Pure data and string matching: no
+ *              designer's picker links. Whether a font is large is the one
+ *              fact a name cannot carry, so it is read from the extracted
+ *              list (`large-fonts.ts`). Pure data and string matching: no
  *              Node imports, because the designer bundles it.
  *
  * Exports:
@@ -27,8 +29,10 @@
  * - FontFacts:               What fontFacts() returns
  * - FONT_BOXES:              The four glyph boxes, in U8G2's order
  * - FONT_SETS:               Every character set the table knows
- * - fontFacts():             Decode one built-in font's name
+ * - fontFacts():             Decode one built-in font's name, and say if it is large
  */
+
+import { isLargeFont } from './large-fonts.js';
 
 /** How a font's glyphs are boxed: U8G2's build mode, the letter after the name. */
 export interface FontBox {
@@ -60,6 +64,11 @@ export interface FontFacts {
   readonly box: FontBox | undefined;
   /** The character set, or undefined when the suffix is not one the table knows. */
   readonly set: FontSet | undefined;
+  /**
+   * True when U8G2 compiles the font only where `U8G2_USE_LARGE_FONTS` is
+   * defined (over 32 KB; `isLargeFont()`). Known whether or not the name decodes.
+   */
+  readonly large: boolean;
 }
 
 /** The four glyph boxes, in `build_font()`'s order (`BM_T`, `BM_H`, `BM_M`, `BM_8`). */
@@ -149,18 +158,22 @@ const CUSTOM_SUFFIX = /_([thm8])(?:_([A-Za-z0-9]+))?$/;
  * because a box read from a suffix whose shape is not understood would be a
  * guess.
  *
+ * Whether the font is large is not decoded from the name but looked up in the
+ * extracted list, so it is reported even when the suffix is not understood.
+ *
  * @param name  A font symbol such as `u8g2_font_helvR08_tr`.
  * @return The decoded facts. Never throws.
  */
 export function fontFacts(name: string): FontFacts {
+  const large = isLargeFont(name);
   // --- Step 1: Only U8G2 font symbols follow this scheme ---
-  if (!name.startsWith(U8G2_FONT_PREFIX)) return { box: undefined, set: undefined };
+  if (!name.startsWith(U8G2_FONT_PREFIX)) return { box: undefined, set: undefined, large };
   const tail = name.slice(U8G2_FONT_PREFIX.length);
 
   // --- Step 2: A standard suffix carries both facts in one token ---
   const standard = STANDARD_SUFFIX.exec(tail);
   if (standard) {
-    return { box: BOX_BY_CODE.get(standard[1] ?? ''), set: STANDARD_BY_CODE.get(standard[2] ?? '') };
+    return { box: BOX_BY_CODE.get(standard[1] ?? ''), set: STANDARD_BY_CODE.get(standard[2] ?? ''), large };
   }
 
   // --- Step 3: A custom suffix counts only when its postfix is known ---
@@ -168,6 +181,6 @@ export function fontFacts(name: string): FontFacts {
   // (`b10_b_t_japanese1`) still yields the box nearest the postfix.
   const custom = CUSTOM_SUFFIX.exec(tail);
   const set = custom ? CUSTOM_BY_CODE.get(custom[2] ?? '') : undefined;
-  if (!custom || !set) return { box: undefined, set: undefined };
-  return { box: BOX_BY_CODE.get(custom[1] ?? ''), set };
+  if (!custom || !set) return { box: undefined, set: undefined, large };
+  return { box: BOX_BY_CODE.get(custom[1] ?? ''), set, large };
 }
