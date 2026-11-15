@@ -8,6 +8,22 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-15	cli v0.22.xx	U8G2GL
+  * 0.22.0: U8G2's large fonts are named before the linker fails. U8G2
+    compiles its 63 fonts over 32 KB only where U8G2_USE_LARGE_FONTS is
+    defined (u8g2.h), but declares them everywhere, so a <builtin> naming
+    one failed on a platform without the macro only at link time, with a
+    bare undefined reference. ui_fonts.cpp now emits, after <U8g2lib.h>,
+    an #error for each large <builtin> that names the font and both
+    fixes: choose a smaller font, or define U8G2_USE_LARGE_FONTS. Generated
+    output changes only for a project that uses a large font. The list is
+    extracted from u8g2_fonts.c's #ifdef blocks by the catalogue build
+    into u8g2-large-fonts.json, and core gains isLargeFont(); fontFacts()
+    gains `large`. The designer's font picker marks each large font
+    "large (over 32 KB): needs U8G2_USE_LARGE_FONTS", in its row and in
+    the current font's facts, and a "Hide large fonts" filter, off by
+    default, leaves them out. The validator does not warn, because it
+    cannot see the platform. No schema or runtime change.
 2026-11-15	cli v0.21.xx	U8G2GL
   * 0.21.0: Pickers for fonts and asset files in the designer's
     globals.xml form. "+ Built-in font" opens a font picker over U8G2's
