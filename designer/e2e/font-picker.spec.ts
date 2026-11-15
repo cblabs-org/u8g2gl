@@ -8,8 +8,9 @@
  *          it instead of adding an empty font; a search and a choice add one
  *          `<builtin>` as one undo stop; Cancel adds nothing; "Change font…"
  *          on an existing font swaps its name; each row's sample is drawn;
- *          and the samples file is fetched only when a picker first opens,
- *          never by the page load.
+ *          the samples file is fetched only when a picker first opens,
+ *          never by the page load; and a large font carries its badge, which
+ *          "Hide large fonts" takes out of the results and puts back.
  * Description: Against the real `u8g2gl design` on a copy of the departures
  *              project, in the end-to-end test build. Undo is the Monaco
  *              model's own, through the test handle, as project-form.spec.ts
@@ -18,6 +19,7 @@
  */
 
 import { expect, test, type Page, type Request } from '@playwright/test';
+import LARGE_FONTS from '@u8g2gl/data/u8g2-large-fonts.json' with { type: 'json' };
 import type { TestHandle } from '../src/test-hooks';
 import { startDesign, type DesignSession } from './support/design-session';
 import { bufferText, openFile, openShell } from './support/shell';
@@ -146,4 +148,46 @@ test('"Change font…" swaps a <builtin>’s name, filtered by height and set, a
   await name.fill('u8g2_font_helvB08_tr');
   await name.press('Enter');
   await expect.poll(() => bufferText(page, 'globals.xml')).toBe(before.replace('u8g2_font_6x10_mr', 'u8g2_font_helvB08_tr'));
+});
+
+test('a large font shows its badge, in its row and its facts, and "Hide large fonts" removes it from the results and brings it back', async ({ page }) => {
+  // A large font taken from the extracted data, not typed here.
+  const large = LARGE_FONTS.find((name) => name === 'u8g2_font_unifont_t_gb2312') ?? LARGE_FONTS[0] ?? '';
+  session = await startDesign();
+  await openShell(page, session.url);
+  await openFile(page, 'globals.xml');
+  await globalsForm(page).getByRole('button', { name: '+ Built-in font' }).click();
+  const picker = globalsForm(page).getByRole('group', { name: 'Add a built-in font' });
+  await picker.getByRole('textbox', { name: 'Search fonts' }).fill(large.replace(/^u8g2_font_/, ''));
+
+  // --- The large font's row carries the badge, with its reason; a small one has none ---
+  const row = picker.locator(`.font-option[data-font="${large}"]`);
+  await expect(row).toBeVisible();
+  await expect(row).toHaveAttribute('data-large', 'true');
+  const badge = row.locator('.font-large');
+  await expect(badge).toHaveText('large (over 32 KB): needs U8G2_USE_LARGE_FONTS');
+  await expect(badge).toHaveAttribute('title', /unix, ARM and ESP targets \(see u8g2\.h\).*error naming this font/);
+  const hide = picker.getByRole('checkbox', { name: 'Hide large fonts' });
+  await expect(hide).not.toBeChecked();
+
+  // --- Ticking the filter removes it; unticking brings it back ---
+  await hide.check();
+  await expect(row).toHaveCount(0);
+  await expect(picker.locator('.font-option[data-large="true"]')).toHaveCount(0);
+  await hide.uncheck();
+  await expect(row).toBeVisible();
+  await expect(row.locator('.font-large')).toBeVisible();
+
+  // --- A small font has no badge ---
+  await picker.getByRole('textbox', { name: 'Search fonts' }).fill('6x10_mr');
+  await expect(picker.locator('.font-option[data-font="u8g2_font_6x10_mr"] .font-large')).toHaveCount(0);
+
+  // --- Chosen, the large font's current-font facts carry the badge too ---
+  await picker.getByRole('textbox', { name: 'Search fonts' }).fill(large.replace(/^u8g2_font_/, ''));
+  await row.click();
+  await expect(picker).toHaveCount(0);
+  await expect(globalsForm(page).locator(`.font-field[data-font="${large}"] .display-current .font-large`)).toHaveText(
+    'large (over 32 KB): needs U8G2_USE_LARGE_FONTS',
+  );
+  await expect(globalsForm(page).locator('.font-field[data-font="u8g2_font_6x10_mr"] .font-large')).toHaveCount(0);
 });

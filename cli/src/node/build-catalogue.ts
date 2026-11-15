@@ -7,17 +7,19 @@
  * File: src/node/build-catalogue.ts
  * Purpose: CLI script entry point to parse U8G2 source code and build the
  *          display catalogue and page-mode replacement map data files (§5.2),
- *          the list of fonts U8G2 bundles (§14.1) and each one's
- *          pixel height (so the designer can show it), and to record
+ *          the list of fonts U8G2 bundles (§14.1), each one's
+ *          pixel height (so the designer can show it) and which of them
+ *          are large (so the generator can guard them), and to record
  *          which U8G2 commit they were built from, so each can be reproduced and
  *          diffed across a U8G2 upgrade (Q-11).
  * Description: Reads U8G2 from the pinned submodule (extern/u8g2) unless
  *              `--u8g2-path` or U8G2_PATH names another tree, invokes the
  *              catalogue builder, the font-symbol builder and the font-height
  *              builder, writes catalogue.json, page-mode-map.json,
- *              u8g2-fonts.json, u8g2-font-heights.json and
- *              catalogue-source.json to src/data/, and logs the extraction
- *              metrics and the source commit. One run, one U8G2 tree, one
+ *              u8g2-fonts.json, u8g2-font-heights.json,
+ *              u8g2-large-fonts.json and catalogue-source.json to
+ *              src/data/, and logs the extraction metrics and the source
+ *              commit. One run, one U8G2 tree, one
  *              source record: the fonts and the displays cannot come from two
  *              different U8G2 commits.
  *
@@ -32,7 +34,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCatalogue, readU8g2Source, resolveU8g2Layout } from './catalogue-builder.js';
 import { parseFontHeights } from './font-height-builder.js';
-import { parseFontSymbols } from './font-symbol-builder.js';
+import { parseFontSymbols, parseLargeFonts } from './font-symbol-builder.js';
 
 /**
  * @brief Resolves a path string, expanding `~` to the user's home directory.
@@ -95,6 +97,7 @@ function main(): void {
   const clibDir = resolveU8g2Layout(resolvedPath).clibDir;
   const fonts = parseFontSymbols(clibDir);
   const fontHeights = parseFontHeights(clibDir, fonts);
+  const largeFonts = parseLargeFonts(clibDir, fonts);
 
   // --- Step 5: Determine output target directory ---
   const dataDir = resolve(scriptDir, '..', 'data');
@@ -107,6 +110,9 @@ function main(): void {
   // Beside the font list, not inside it: u8g2-fonts.json is the array the
   // validator imports, and a table of heights is what only the designer reads.
   const fontHeightsPath = resolve(dataDir, 'u8g2-font-heights.json');
+  // Beside the font list for the same reason: the generator and the designer
+  // read it, the validator does not.
+  const largeFontsPath = resolve(dataDir, 'u8g2-large-fonts.json');
 
   // --- Step 6: Write JSON data files ---
   // The source is recorded in a sibling file rather than inside catalogue.json:
@@ -118,6 +124,7 @@ function main(): void {
   writeFileSync(pageModeMapPath, JSON.stringify(result.pageModeMap, null, 2) + '\n', 'utf8');
   writeFileSync(fontsPath, JSON.stringify(fonts, null, 2) + '\n', 'utf8');
   writeFileSync(fontHeightsPath, JSON.stringify(fontHeights, null, 2) + '\n', 'utf8');
+  writeFileSync(largeFontsPath, JSON.stringify(largeFonts, null, 2) + '\n', 'utf8');
   const sourceRecord = { u8g2: { tag: source.tag, commit: source.commit } };
   writeFileSync(sourcePath, JSON.stringify(sourceRecord, null, 2) + '\n', 'utf8');
 
@@ -128,11 +135,13 @@ function main(): void {
   console.log(`[u8g2gl] Compiled ${result.fullBufferCount} full-buffer display records`);
   console.log(`[u8g2gl] Mapped ${result.pageModeCount} page-mode constructors to full-buffer equivalents`);
   console.log(`[u8g2gl] Listed ${fonts.length} bundled fonts, declared in u8g2.h and defined in u8g2_fonts.c`);
+  console.log(`[u8g2gl] Found ${largeFonts.length} large fonts, defined only under U8G2_USE_LARGE_FONTS`);
   console.log(`[u8g2gl] Output written to:`);
   console.log(`  - ${cataloguePath}`);
   console.log(`  - ${pageModeMapPath}`);
   console.log(`  - ${fontsPath}`);
   console.log(`  - ${fontHeightsPath}`);
+  console.log(`  - ${largeFontsPath}`);
   console.log(`  - ${sourcePath}`);
 }
 

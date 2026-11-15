@@ -9,7 +9,10 @@
  *          set, glyph box — and a search and filters over them, so an author
  *          can find "a 10-pixel monospace font with digits" among 2039 names
  *          without knowing U8G2's naming scheme. Fonts the project already
- *          declares are marked.
+ *          declares are marked, and so are U8G2's large fonts, which a build
+ *          without `U8G2_USE_LARGE_FONTS` refuses (§14.1): marked rather than
+ *          hidden, because the ESP and ARM boards U8G2 enables them on can use
+ *          them, with a filter to hide them for a board that cannot.
  * Description: Pure functions over the font list (`u8g2-fonts.json`), the
  *              height table (`u8g2-font-heights.json`) and core's
  *              `fontFacts()`, so the search and filters are unit-tested
@@ -19,6 +22,8 @@
  *
  * Exports:
  * - U8G2_FONT_LIST_WIKI:  U8G2's gallery of every font, which the picker links
+ * - LARGE_FONT_BADGE:     What a large font's row and facts say
+ * - LARGE_FONT_TOOLTIP:   The badge's explanation
  * - FontRow:              One font as the picker lists it
  * - FontFilter:           The picker's filters
  * - NO_FILTER:            Filters that keep every font
@@ -36,6 +41,18 @@ import type { FormModel, FormNode } from './form-model';
 /** U8G2's gallery of every font, rendered: linked for the full picture. */
 export const U8G2_FONT_LIST_WIKI = 'https://github.com/olikraus/u8g2/wiki/fntlistall';
 
+/** What a large font's row and current-font facts say. */
+export const LARGE_FONT_BADGE = 'large (over 32 KB): needs U8G2_USE_LARGE_FONTS';
+
+/**
+ * The badge's explanation. It names the platforms in the broad terms U8G2's
+ * own comment does and points at `u8g2.h`, so it stays true as U8G2's exact
+ * list changes.
+ */
+export const LARGE_FONT_TOOLTIP =
+  'U8G2 enables U8G2_USE_LARGE_FONTS itself on unix, ARM and ESP targets (see u8g2.h). ' +
+  'A build without it stops with an error naming this font.';
+
 /** One font as the picker lists it. */
 export interface FontRow {
   readonly name: string;
@@ -45,6 +62,8 @@ export interface FontRow {
   readonly set: FontSet | undefined;
   /** True when the project's globals already declare it. */
   readonly declared: boolean;
+  /** True for one of U8G2's large fonts (`fontFacts().large`). */
+  readonly large: boolean;
 }
 
 /** The picker's filters. A bound or choice left undefined filters nothing. */
@@ -55,6 +74,8 @@ export interface FontFilter {
   readonly set?: string;
   /** `'monospace'` for boxes `m` and `8`, `'proportional'` for `t` and `h`, or one box's code. */
   readonly box?: 'monospace' | 'proportional' | FontBox['code'];
+  /** True to leave out U8G2's large fonts ("Hide large fonts", off by default). */
+  readonly hideLarge?: boolean;
 }
 
 /** Filters that keep every font. */
@@ -70,7 +91,7 @@ export const NO_FILTER: FontFilter = {};
 export function fontRows(fonts: readonly string[], heights: Readonly<Record<string, number>>, declared: ReadonlySet<string>): FontRow[] {
   return fonts.map((name) => {
     const facts = fontFacts(name);
-    return { name, height: heights[name], box: facts.box, set: facts.set, declared: declared.has(name) };
+    return { name, height: heights[name], box: facts.box, set: facts.set, declared: declared.has(name), large: facts.large };
   });
 }
 
@@ -83,6 +104,7 @@ function keeps(row: FontRow, filter: FontFilter): boolean {
   if (filter.box === 'monospace' && row.box?.monospace !== true) return false;
   if (filter.box === 'proportional' && row.box?.monospace !== false) return false;
   if (filter.box !== undefined && filter.box !== 'monospace' && filter.box !== 'proportional' && row.box?.code !== filter.box) return false;
+  if (filter.hideLarge === true && row.large) return false;
   return true;
 }
 

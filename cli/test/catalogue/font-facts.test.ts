@@ -10,7 +10,8 @@
  *          upgrade that brings a new suffix shows up as a diff to this file
  *          rather than as a font the picker silently mislabels.
  * Description: Pins the standard and custom suffix shapes on known names,
- *              the unknown list over `u8g2-fonts.json`, and — with
+ *              the unknown list over `u8g2-fonts.json`, the large flag against
+ *              the extracted large-font list for every bundled font, and — with
  *              `extern/u8g2` checked out — that every custom postfix in the
  *              table is one U8G2's font build tool actually writes.
  */
@@ -20,6 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { FONT_SETS, fontFacts } from '../../src/core/catalogue/font-facts.js';
+import { LARGE_FONTS } from '../../src/core/catalogue/large-fonts.js';
 
 const CLI_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BUILD_C = resolve(CLI_ROOT, '..', 'extern', 'u8g2', 'tools', 'font', 'build', 'build.c');
@@ -70,10 +72,10 @@ describe('fontFacts', () => {
   });
 
   it('reports an unknown suffix, or a name outside the scheme, as unknown rather than guessing', () => {
-    expect(fontFacts('u8g2_font_unifont_t_72_73')).toEqual({ box: undefined, set: undefined });
-    expect(fontFacts('u8g2_font_siji_t_6x10')).toEqual({ box: undefined, set: undefined });
-    expect(fontFacts('u8x8_font_8x13_1x2_r')).toEqual({ box: undefined, set: undefined });
-    expect(fontFacts('my_font')).toEqual({ box: undefined, set: undefined });
+    expect(fontFacts('u8g2_font_unifont_t_72_73')).toEqual({ box: undefined, set: undefined, large: false });
+    expect(fontFacts('u8g2_font_siji_t_6x10')).toEqual({ box: undefined, set: undefined, large: false });
+    expect(fontFacts('u8x8_font_8x13_1x2_r')).toEqual({ box: undefined, set: undefined, large: false });
+    expect(fontFacts('my_font')).toEqual({ box: undefined, set: undefined, large: false });
   });
 
   it('decodes every bundled font except the listed unknowns', () => {
@@ -82,6 +84,16 @@ describe('fontFacts', () => {
       return facts.box === undefined || facts.set === undefined;
     });
     expect(unknown).toEqual(EXPECTED_UNKNOWN);
+  });
+
+  it('says a font is large exactly for the 63 in the extracted list, for every bundled font', () => {
+    const large = new Set(LARGE_FONTS);
+    expect(large.size).toBe(63);
+    for (const name of FONTS) expect(fontFacts(name).large, name).toBe(large.has(name));
+    expect(FONTS.filter((name) => fontFacts(name).large)).toHaveLength(63);
+    // Read from the list, not the name: a large font's facts still decode as usual.
+    expect(fontFacts('u8g2_font_unifont_t_gb2312')).toMatchObject({ box: { code: 't' }, set: { code: 'gb2312' }, large: true });
+    expect(fontFacts('u8g2_font_6x10_mr').large).toBe(false);
   });
 });
 

@@ -12,8 +12,10 @@
  * Description: `FontPicker` lists the fonts `font-picker-model.ts` offers,
  *              searched and filtered, each with its height, character set and
  *              a sample U8G2 itself drew (`FontSampleCanvas`, from the samples
- *              file `font-samples.ts` fetches when a picker first opens).
- *              Choosing a font calls `onChoose` once, and the caller makes it
+ *              file `font-samples.ts` fetches when a picker first opens). One
+ *              of U8G2's large fonts carries a badge saying it needs
+ *              `U8G2_USE_LARGE_FONTS`, here and in the current font's facts,
+ *              and a "Hide large fonts" filter leaves them out. Choosing a font calls `onChoose` once, and the caller makes it
  *              one edit. `BuiltinFontField` is the `name` field's control:
  *              the current font, its facts, a text box that stays typeable,
  *              and the picker behind "Change font…".
@@ -31,7 +33,19 @@ import { fontFacts } from '@u8g2gl/core/catalogue/index.js';
 import { FieldTextControl } from './form-controls';
 import type { FormField } from './form-model';
 import { decodeSampleBits, loadedFontSamples, loadFontSamples, samplePixel, type FontSamples } from './font-samples';
-import { factsLine, filterFonts, fontRows, heightRange, NO_FILTER, setOptions, U8G2_FONT_LIST_WIKI, type FontFilter, type FontRow } from './font-picker-model';
+import {
+  factsLine,
+  filterFonts,
+  fontRows,
+  heightRange,
+  LARGE_FONT_BADGE,
+  LARGE_FONT_TOOLTIP,
+  NO_FILTER,
+  setOptions,
+  U8G2_FONT_LIST_WIKI,
+  type FontFilter,
+  type FontRow,
+} from './font-picker-model';
 
 /** The heights table, typed. */
 const HEIGHTS: Readonly<Record<string, number>> = FONT_HEIGHTS;
@@ -101,6 +115,16 @@ export function FontSampleCanvas({ name, samples, scale }: { readonly name: stri
   );
 }
 
+// LargeFontBadge
+// The mark on one of U8G2's large fonts, its reason in the tooltip.
+function LargeFontBadge(): React.JSX.Element {
+  return (
+    <span className="font-large" title={LARGE_FONT_TOOLTIP}>
+      {LARGE_FONT_BADGE}
+    </span>
+  );
+}
+
 // parseBound
 // A height bound as typed: a whole number, or undefined for none.
 function parseBound(text: string): number | undefined {
@@ -108,8 +132,8 @@ function parseBound(text: string): number | undefined {
 }
 
 /**
- * @brief The font picker: a search, filters for height, set and box, and the
- *        matching fonts, each with its facts and sample.
+ * @brief The font picker: a search, filters for height, set, box and size,
+ *        and the matching fonts, each with its facts and sample.
  *
  * @param current   The font chosen now, marked in the list.
  * @param declared  The `<builtin>` fonts the project declares, marked.
@@ -139,6 +163,7 @@ export function FontPicker({
   const [maxText, setMaxText] = useState('');
   const [set, setSet] = useState('');
   const [box, setBox] = useState('');
+  const [hideLarge, setHideLarge] = useState(false);
   const filter = useMemo<FontFilter>(() => {
     const min = parseBound(minText);
     const max = parseBound(maxText);
@@ -148,8 +173,9 @@ export function FontPicker({
       ...(max !== undefined ? { maxHeight: max } : {}),
       ...(set !== '' ? { set } : {}),
       ...(box !== '' ? { box: box as NonNullable<FontFilter['box']> } : {}),
+      ...(hideLarge ? { hideLarge } : {}),
     };
-  }, [minText, maxText, set, box]);
+  }, [minText, maxText, set, box, hideLarge]);
   const found = useMemo(() => filterFonts(rows, query, filter), [rows, query, filter]);
 
   return (
@@ -198,6 +224,9 @@ export function FontPicker({
             <option value="8">8×8 (8)</option>
           </select>
         </label>
+        <label title={LARGE_FONT_TOOLTIP}>
+          <input type="checkbox" checked={hideLarge} onChange={(event) => setHideLarge(event.target.checked)} /> Hide large fonts
+        </label>
       </div>
       {failed && <p className="field-problem warning">The font samples could not be loaded; the names and facts are still shown.</p>}
       <p className="field-reason" role="status">
@@ -214,8 +243,8 @@ export function FontPicker({
 }
 
 // FontOption
-// One font as a row: its name, whether the project declares it, its facts and
-// its sample. A click chooses it.
+// One font as a row: its name, whether the project declares it, whether it is
+// one of U8G2's large fonts, its facts and its sample. A click chooses it.
 function FontOption({
   row,
   samples,
@@ -228,10 +257,11 @@ function FontOption({
   readonly onChoose: (name: string) => void;
 }): React.JSX.Element {
   return (
-    <button type="button" role="option" className="font-option" aria-selected={selected} data-font={row.name} data-declared={row.declared} onClick={() => onChoose(row.name)}>
+    <button type="button" role="option" className="font-option" aria-selected={selected} data-font={row.name} data-declared={row.declared} data-large={row.large} onClick={() => onChoose(row.name)}>
       <span className="font-option-name">
         <code>{row.name}</code>
         {row.declared && <span className="font-declared">declared</span>}
+        {row.large && <LargeFontBadge />}
       </span>
       <span className="display-facts">{factsLine(row)}</span>
       <FontSampleCanvas name={row.name} samples={samples} />
@@ -266,7 +296,10 @@ export function BuiltinFontField({
       <FieldTextControl field={field} disabled={false} commit={commit} />
       <div className="display-current">
         {known && facts !== undefined ? (
-          <span className="display-facts">{factsLine({ height: HEIGHTS[current], set: facts.set, box: facts.box })}</span>
+          <>
+            <span className="display-facts">{factsLine({ height: HEIGHTS[current], set: facts.set, box: facts.box })}</span>
+            {facts.large && <LargeFontBadge />}
+          </>
         ) : current !== undefined && current !== '' ? (
           <span className="field-problem warning">U8G2 bundles no font of this name.</span>
         ) : null}

@@ -600,6 +600,60 @@ add_test(NAME RealU8g2.RuntimeCompilesAgainstRealHeaders
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target u8g2gl_real_u8g2
 )
 
+# --- Large-font guard: proven by real compiles (§14.1) ---
+# U8G2 compiles its fonts over 32 KB only where U8G2_USE_LARGE_FONTS is defined,
+# which u8g2.h decides from the platform, but declares them everywhere. So the
+# generator emits an #error for each large <builtin>, after U8G2's header. As
+# with the version guard, a refusal to compile is tested by building a throwaway
+# target from CTest and matching the guard's own message, which names the font,
+# so an unrelated break fails the test instead of passing it.
+#
+#   without — the committed generated ui_fonts.cpp, against U8G2's real headers,
+#             with no U8G2_USE_LARGE_FONTS: must be refused, naming the font
+#   with    — the same file with -DU8G2_USE_LARGE_FONTS: must compile (the control)
+#
+# The "without" case must mean the same on every host. u8g2.h defines the macro
+# itself when any of unix, __unix__, __arm__, __arc__, ESP8266, ESP_PLATFORM or
+# __LUATOS__ is defined, and Linux compilers predefine unix and __unix__ (and,
+# on 32-bit ARM, __arm__), while Apple's predefine none of them. So both cases
+# undefine all seven: -U of a name never defined is harmless, and removing them
+# all is what makes the test independent of which ones a host predefines. The
+# control carries the same -U flags, so it also proves they break nothing else.
+# Compile-only OBJECT libraries: the fonts unit is never linked here.
+set(_large_font_generated_dir ${CMAKE_CURRENT_SOURCE_DIR}/large_font_guard/generated)
+set(_large_font_platform_undefines
+    -Uunix -U__unix__ -U__arm__ -U__arc__ -UESP8266 -UESP_PLATFORM -U__LUATOS__
+)
+foreach(_guard_case without with)
+    add_library(large_font_guard_${_guard_case} OBJECT EXCLUDE_FROM_ALL
+        ${_large_font_generated_dir}/ui_fonts.cpp
+    )
+    target_include_directories(large_font_guard_${_guard_case} PRIVATE
+        ${_large_font_generated_dir}
+        ${PROJECT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    )
+    target_include_directories(large_font_guard_${_guard_case} SYSTEM PRIVATE
+        ${U8G2GL_U8G2_DIR}/cppsrc
+        ${U8G2GL_U8G2_DIR}/csrc
+    )
+    target_compile_definitions(large_font_guard_${_guard_case} PRIVATE ARDUINO=10819)
+    target_compile_options(large_font_guard_${_guard_case} PRIVATE
+        -Wall -Wextra -Wpedantic ${_large_font_platform_undefines}
+    )
+endforeach()
+target_compile_definitions(large_font_guard_with PRIVATE U8G2_USE_LARGE_FONTS)
+
+add_test(NAME LargeFontGuard.WithoutMacroFailsNamingTheFont
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target large_font_guard_without
+)
+set_tests_properties(LargeFontGuard.WithoutMacroFailsNamingTheFont PROPERTIES
+    PASS_REGULAR_EXPRESSION "u8g2_font_unifont_t_gb2312 is one of U8G2's large fonts \\(over 32 KB\\)"
+)
+add_test(NAME LargeFontGuard.WithMacroCompiles
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target large_font_guard_with
+)
+
 # --- Real U8G2: the rounded-box radius bound, measured (PR-4R WO3) ---
 # u8g2gl_coord_corner_radius() clamps to 2r <= min(w, h) because that is where
 # U8G2's own drawRBox/drawRFrame stop drawing outside the box. This executable
