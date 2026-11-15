@@ -193,6 +193,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
   const projectManifests: WidgetManifest[] = [];
   let frameworkStandIn: { readonly filename: string; readonly manifest: WidgetManifest } | undefined;
   let hasProjectManifest = false;
+  let projectWithheld = false;
   let projectRoot: string | undefined;
 
   if (statSync(targetPath).isDirectory()) {
@@ -209,6 +210,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     const projRes = parseProjectFile(files.projectXml, 'u8g2gl.xml');
     loadDiagnostics.push(...projRes.diagnostics);
     project = projRes.value ?? project;
+    projectWithheld = projRes.value === undefined;
 
     if (files.globalsXml) {
       const globRes = parseGlobalsFile(files.globalsXml, 'globals.xml');
@@ -244,6 +246,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
       const res = parseProjectFile(xml, label);
       loadDiagnostics.push(...res.diagnostics);
       project = res.value ?? project;
+      projectWithheld = res.value === undefined;
     } else if (rootTag === 'globals') {
       const res = parseGlobalsFile(xml, label);
       loadDiagnostics.push(...res.diagnostics);
@@ -315,6 +318,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
       catalogue: CATALOGUE,
       loadDiagnostics,
       hasProjectManifest,
+      projectWithheld,
     },
     projectRoot,
     fileContents,

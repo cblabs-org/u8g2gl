@@ -10,7 +10,7 @@
  * Description: Re-exports check-project.ts, header.ts and generate.ts.
  *
  * Exports:
- * - checkProject, finaliseDiagnostics, ProjectModel (check-project.ts)
+ * - checkProject, finaliseDiagnostics, hasProjectModel, ProjectModel (check-project.ts)
  * - GENERATED_MARKER, HeaderStamp, formatHeaderStamp, isGeneratedContent (header.ts)
  * - generate, GenerateInput, GenerateResult, GeneratedFile,
  *   GENERATE_REFUSAL_POLICY (generate.ts)
@@ -24,7 +24,7 @@
  *   ([D-16]): a contract a consumer cannot import is not typed.
  */
 
-export { checkProject, finaliseDiagnostics, type ProjectModel } from './check-project.js';
+export { checkProject, finaliseDiagnostics, hasProjectModel, type ProjectModel } from './check-project.js';
 export {
   GENERATED_MARKER,
   formatHeaderStamp,

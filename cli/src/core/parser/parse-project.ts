@@ -10,7 +10,13 @@
  *              options, attaching source locations to all nodes. The pin
  *              attributes and `<bus>`, removed in schema 0.7, are refused at
  *              every version with U8G2GL_REMOVED_ATTRIBUTE, which says where
- *              the wiring belongs instead ([D-22]).
+ *              the wiring belongs instead ([D-22]). Every other attribute
+ *              and child element is checked against the project vocabulary,
+ *              the table the designer's forms are built from, so the parser
+ *              and the forms cannot disagree about what `u8g2gl.xml` may
+ *              say: an attribute the vocabulary does not spell on that
+ *              element is U8G2GL_UNKNOWN_ATTRIBUTE, an unknown child is
+ *              U8G2GL_MALFORMED_XML, both errors.
  *
  * Exports:
  * - parseProject: Transform a parsed RawXmlElement into a U8g2glProject model
@@ -23,6 +29,12 @@ import type {
   U8g2glProject,
 } from '../schema/project.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import {
+  attributeSpellings,
+  PROJECT_VOCABULARY,
+  vocabularyChildren,
+} from '../schema/project-vocabulary.js';
+import { findClosest } from '../catalogue/edit-distance.js';
 import {
   getAttribute,
   getAttributeValue,
@@ -44,6 +56,137 @@ const REMOVED_PIN_ATTRIBUTES: ReadonlySet<string> = new Set(['cs', 'dc', 'reset'
 
 /** The element schema 0.7 removed, which only ever held those attributes. */
 const REMOVED_BUS_ELEMENT = 'bus';
+
+/** For an element on which every unknown attribute is reported. */
+const NO_EXEMPTION: ReadonlySet<string> = new Set();
+
+/**
+ * The parser's errors that leave the model's shape intact, so the model is
+ * kept beside them. A removed pin or `<bus>` and an unknown attribute were
+ * never read into the model, so it is complete without them; keeping it lets
+ * validation go on to the project's real schema and targets. An unknown
+ * element, a missing required attribute or an unreadable value is not here:
+ * the model would be missing what the file meant, so it is withheld.
+ */
+const MODEL_PRESERVING_CODES: ReadonlySet<string> = new Set([
+  DIAGNOSTIC_CODES.REMOVED_ATTRIBUTE,
+  DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+]);
+
+/**
+ * The ids of the `u8g2gl.xml` elements the parser reads, as the vocabulary
+ * keys them. Each element's known attributes and children come from the
+ * vocabulary under this id.
+ */
+type ProjectElementId = 'project' | 'targets' | 'target' | 'display' | 'output';
+
+/**
+ * Every attribute name the parser accepts on each `u8g2gl.xml` element, built
+ * once from the vocabulary: each attribute's canonical spelling and every
+ * alternative, credited to the element it is written on. `ramBudget` on
+ * `<target>` is an alternative of `ram_budget`, so it is known there; nothing
+ * here is typed a second time ([D-17]).
+ */
+const KNOWN_ATTRIBUTES: ReadonlyMap<string, readonly string[]> = (() => {
+  const known = new Map<string, string[]>();
+  for (const element of PROJECT_VOCABULARY) {
+    if (element.file !== 'u8g2gl.xml') {
+      continue;
+    }
+    for (const attribute of element.attributes) {
+      for (const spelling of attributeSpellings(element, attribute)) {
+        const names = known.get(spelling.element) ?? [];
+        if (!names.includes(spelling.name)) {
+          names.push(spelling.name);
+        }
+        known.set(spelling.element, names);
+      }
+    }
+  }
+  return known;
+})();
+
+// reportUnknownAttributes
+// U8G2GL_UNKNOWN_ATTRIBUTE for each attribute on `element` that the vocabulary
+// does not spell on that element, at the attribute's name, with the closest
+// known spellings suggested as a widget's unknown attribute is. An error: an
+// attribute the parser never reads silently does nothing, which is how the
+// pins went unnoticed. `xmlns` and `xml:` attributes get no exemption, as on a
+// widget or a `<style>`: the tokeniser hands them over as ordinary attributes
+// and U8G2GL declares no namespace.
+//   element     — the raw element
+//   id          — its vocabulary id
+//   exempt      — names another check already reports (the removed pins)
+//   filename    — the project file
+//   diagnostics — where the reports are appended
+function reportUnknownAttributes(
+  element: RawXmlElement,
+  id: ProjectElementId,
+  exempt: ReadonlySet<string>,
+  filename: string,
+  diagnostics: Diagnostic[],
+): void {
+  const known = KNOWN_ATTRIBUTES.get(id) ?? [];
+  for (const attribute of element.attributes) {
+    if (known.includes(attribute.name) || exempt.has(attribute.name)) {
+      continue;
+    }
+    const suggestions = findClosest(attribute.name, known);
+    diagnostics.push({
+      code: DIAGNOSTIC_CODES.UNKNOWN_ATTRIBUTE,
+      severity: 'error',
+      file: filename,
+      line: attribute.nameLoc.line,
+      column: attribute.nameLoc.column,
+      message: `Unknown attribute '${attribute.name}' on <${element.name}>.`,
+      offendingText: attribute.name,
+      ...(suggestions.length > 0 ? { suggestions } : {}),
+    });
+  }
+}
+
+// unknownElementDiagnostic
+// The U8G2GL_MALFORMED_XML an element the vocabulary does not allow where it
+// is written gets, at its tag. One wording for every parent, the one an
+// unknown child of `<u8g2gl>` has always had.
+//   child    — the unknown element
+//   parent   — the tag it was written in
+//   filename — the project file
+function unknownElementDiagnostic(child: RawXmlElement, parent: string, filename: string): Diagnostic {
+  return {
+    code: DIAGNOSTIC_CODES.MALFORMED_XML,
+    severity: 'error',
+    file: filename,
+    line: child.loc.line,
+    column: child.loc.column,
+    message: `Unknown element '<${child.name}>' in <${parent}>`,
+    offendingText: child.name,
+  };
+}
+
+// reportUnknownChildren
+// An unknown-element error for each child of `element` whose tag the
+// vocabulary does not list among that element's children. `<bus>` is skipped
+// under `<target>`: it was a child there until schema 0.7, and
+// reportRemovedWiring() refuses it with the removal message alone.
+//   element     — the raw element
+//   id          — its vocabulary id
+//   filename    — the project file
+//   diagnostics — where the reports are appended
+function reportUnknownChildren(
+  element: RawXmlElement,
+  id: ProjectElementId,
+  filename: string,
+  diagnostics: Diagnostic[],
+): void {
+  const allowed = vocabularyChildren(id).map((child) => child.tag);
+  for (const child of element.children) {
+    if (allowed.includes(child.name) || (id === 'target' && child.name === REMOVED_BUS_ELEMENT)) {
+      continue;
+    }
+    diagnostics.push(unknownElementDiagnostic(child, element.name, filename));
+  }
+}
 
 // removedDiagnostic
 // One U8G2GL_REMOVED_ATTRIBUTE, saying where the wiring belongs and how to
@@ -156,6 +299,15 @@ function parseTarget(
   // The pins and <bus> are refused, never read (schema 0.7, [D-22]).
   reportRemovedWiring(targetEl, setupAttr?.value, filename, diagnostics);
 
+  // Everything else the vocabulary does not have is refused too. The pins are
+  // exempt here because the refusal above already names each one.
+  reportUnknownAttributes(targetEl, 'target', REMOVED_PIN_ATTRIBUTES, filename, diagnostics);
+  reportUnknownChildren(targetEl, 'target', filename, diagnostics);
+  for (const display of getChildren(targetEl, 'display')) {
+    reportUnknownAttributes(display, 'display', REMOVED_PIN_ATTRIBUTES, filename, diagnostics);
+    reportUnknownChildren(display, 'display', filename, diagnostics);
+  }
+
   return {
     name,
     setup,
@@ -193,6 +345,7 @@ export function parseProject(
   const schema = schemaAttr?.value ?? '';
   const name = nameAttr?.value ?? '';
   const version = versionAttr?.value ?? '';
+  reportUnknownAttributes(root, 'project', NO_EXEMPTION, filename, diagnostics);
 
   // Check known child elements
   const targetsList: Target[] = [];
@@ -200,6 +353,8 @@ export function parseProject(
 
   for (const child of root.children) {
     if (child.name === 'targets') {
+      reportUnknownAttributes(child, 'targets', NO_EXEMPTION, filename, diagnostics);
+      reportUnknownChildren(child, 'targets', filename, diagnostics);
       const targets = getChildren(child, 'target');
       for (const targetEl of targets) {
         targetsList.push(parseTarget(targetEl, filename, diagnostics));
@@ -208,21 +363,15 @@ export function parseProject(
       // Direct child target
       targetsList.push(parseTarget(child, filename, diagnostics));
     } else if (child.name === 'output') {
+      reportUnknownAttributes(child, 'output', NO_EXEMPTION, filename, diagnostics);
+      reportUnknownChildren(child, 'output', filename, diagnostics);
       outputConfig = {
         dir: getAttributeValue(child, 'dir'),
         prefix: getAttributeValue(child, 'prefix'),
         loc: child.loc,
       };
     } else {
-      diagnostics.push({
-        code: DIAGNOSTIC_CODES.MALFORMED_XML,
-        severity: 'error',
-        file: filename,
-        line: child.loc.line,
-        column: child.loc.column,
-        message: `Unknown element '<${child.name}>' in <u8g2gl>`,
-        offendingText: child.name,
-      });
+      diagnostics.push(unknownElementDiagnostic(child, root.name, filename));
     }
   }
 
@@ -239,12 +388,12 @@ export function parseProject(
 /**
  * Parses a project XML file from raw text into a ParseResult<U8g2glProject>.
  *
- * Any error withholds the model, except U8G2GL_REMOVED_ATTRIBUTE: a pin or
- * `<bus>` never shaped the model, so it is complete without them. Keeping it
- * lets validation go on to the project's real schema and targets, instead of
- * reporting the empty placeholder a withheld model leaves (a schema version
- * '' the file never wrote, and no targets). The refusal is still an error, so
- * `generate` still writes nothing.
+ * Any error withholds the model, except those in MODEL_PRESERVING_CODES — a
+ * removed pin or `<bus>`, and an unknown attribute — which never shaped the
+ * model, so it is complete without them. Keeping it lets validation go on to
+ * the project's real schema and targets. The kept errors are still errors, so
+ * `generate` still writes nothing. A withheld model leaves its consumer a
+ * placeholder; `checkProject()` reports nothing about that placeholder.
  */
 export function parseProjectFile(
   xml: string,
@@ -259,7 +408,7 @@ export function parseProjectFile(
 
   const project = parseProject(rawDoc.root, filename, diagnostics);
   const hasError = diagnostics.some(
-    (d) => d.severity === 'error' && d.code !== DIAGNOSTIC_CODES.REMOVED_ATTRIBUTE,
+    (d) => d.severity === 'error' && !MODEL_PRESERVING_CODES.has(d.code),
   );
 
   if (hasError || !project) {

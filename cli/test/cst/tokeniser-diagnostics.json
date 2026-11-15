@@ -315,7 +315,7 @@
     },
     {
       "file": "cli/test/parser/fixtures/valid-project.xml",
-      "sha256": "b92b4bd11251749d5cee7b56c5278d9f3c8a4fb759b004bf3e5f0edac3de1ac2",
+      "sha256": "f4bf4d85793dc6c652b682dd7f1ff7418fea24b41d00bb0b7045d7a31390e654",
       "diagnostics": []
     },
     {

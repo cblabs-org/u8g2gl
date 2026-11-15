@@ -19,6 +19,7 @@
  *
  * Exports:
  * - ProjectModel:     A loaded project, ready to validate or generate
+ * - hasProjectModel(): Whether a model's `project` is a parsed u8g2gl.xml, not the placeholder
  * - checkProject():   Validate a model under a not-yet-supported policy
  * - finaliseDiagnostics(): Deduplicate, sort and count a diagnostic list
  */
@@ -47,15 +48,37 @@ export interface ProjectModel extends Omit<ValidateInput, 'refusalPolicy' | 'tar
    * placeholder with no schema to check.
    */
   readonly hasProjectManifest: boolean;
+  /**
+   * True when a `u8g2gl.xml` was read but its parse withheld the model, because
+   * of an error that leaves the model incomplete (an unknown element, a
+   * missing required attribute). `project` is then the loader's placeholder,
+   * as with no manifest at all, and the parse error is in `loadDiagnostics`.
+   * Absent means false: the project, if any, was parsed.
+   */
+  readonly projectWithheld?: boolean;
+}
+
+/**
+ * @brief Whether a model's `project` is one a `u8g2gl.xml` actually wrote.
+ *
+ * False for a lone screen, globals or widget file, and for a `u8g2gl.xml`
+ * whose model the parser withheld. Either way `project` is a placeholder, so
+ * nothing about it — its empty schema, its lack of targets — describes
+ * anything the author wrote, and nothing about it is reported.
+ */
+export function hasProjectModel(model: Pick<ProjectModel, 'hasProjectManifest' | 'projectWithheld'>): boolean {
+  return model.hasProjectManifest && model.projectWithheld !== true;
 }
 
 /**
  * @brief Validates a loaded project, merging load and validation diagnostics.
  *
- * With no project manifest loaded, the placeholder project's empty schema is not
- * reported: a single screen, globals or widget file declares no schema, so
- * `U8G2GL_UNKNOWN_SCHEMA_VERSION ''` described nothing the author wrote (PR-04
- * WO5a finding 6).
+ * Without a project model ({@link hasProjectModel}), the placeholder project's
+ * empty schema is not reported: a single screen, globals or widget file
+ * declares no schema, so `U8G2GL_UNKNOWN_SCHEMA_VERSION ''` described nothing
+ * the author wrote (PR-04 WO5a finding 6). The same holds for a `u8g2gl.xml`
+ * the parser withheld: its own parse error is the one report, not a schema
+ * version the file never wrote beside it.
  *
  * @param model  The loaded project.
  * @param policy Severity for not-yet-supported constructs — `'warning'` for
@@ -96,8 +119,9 @@ export function checkProject(
   });
 
   // --- Step 2: Merge, dropping the placeholder project's schema diagnostic ---
+  const parsed = hasProjectModel(model);
   const merged = [...model.loadDiagnostics, ...validation.diagnostics].filter(
-    (d) => model.hasProjectManifest || d.code !== DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
+    (d) => parsed || d.code !== DIAGNOSTIC_CODES.UNKNOWN_SCHEMA_VERSION,
   );
 
   // --- Step 3: Deduplicate, sort and count ---

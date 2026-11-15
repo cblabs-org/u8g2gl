@@ -96,6 +96,7 @@ export class ProjectModelCache {
     let project: U8g2glProject = { schema: '', name: 'unnamed', version: '1.0.0', targets: [] };
     let globals: Globals = { consts: [], subjects: [], styles: [], fonts: [], images: [] };
     let hasProjectManifest = false;
+    let projectWithheld = false;
     const screens: Screen[] = [];
     const manifests: WidgetManifest[] = [];
     // Sorted by code unit, as `read-project.ts` sorts: load order reaches the
@@ -114,6 +115,7 @@ export class ProjectModelCache {
         loadDiagnostics.push(...result.diagnostics);
         project = result.value ?? project;
         hasProjectManifest = true;
+        projectWithheld = result.value === undefined;
       } else if (kind === 'globals') {
         const result = this.parse(path, text, () => parseGlobalsFile(text, path));
         loadDiagnostics.push(...result.diagnostics);
@@ -143,7 +145,7 @@ export class ProjectModelCache {
         : buildManifestRegistry({ framework: FRAMEWORK.manifests, project: manifests });
     this.registry = { key: manifests, value: registry };
 
-    return { project, globals, screens, manifests: registry, catalogue: CATALOGUE, loadDiagnostics, hasProjectManifest };
+    return { project, globals, screens, manifests: registry, catalogue: CATALOGUE, loadDiagnostics, hasProjectManifest, projectWithheld };
   }
 
   // parse

@@ -10102,7 +10102,7 @@
   },
   {
    "file": "cli/test/parser/fixtures/valid-project.xml",
-   "sha256": "b92b4bd11251749d5cee7b56c5278d9f3c8a4fb759b004bf3e5f0edac3de1ac2",
+   "sha256": "f4bf4d85793dc6c652b682dd7f1ff7418fea24b41d00bb0b7045d7a31390e654",
    "root": {
     "name": "u8g2gl",
     "loc": "3:1",
@@ -10152,16 +10152,10 @@
           "6:17"
          ],
          [
-          "default",
-          "true",
-          "6:41",
-          "6:32"
-         ],
-         [
           "ram_budget",
           "4800",
-          "6:59",
-          "6:47"
+          "6:44",
+          "6:32"
          ]
         ],
         "comments": [],
