@@ -5,7 +5,7 @@
  *
  * File: test/generator/refresh-goldens.mjs
  * Purpose: Rewrites every committed generator expectation: the WO9 golden files
- *          from the `emit-project` fixture, the WO10 compile-layer fixture's
+ *          from the `emit-project` fixture, the compile-layer fixture's
  *          `generated/` directory, which the C++ test suite builds, and the
  *          large-font guard fixture's, whose fonts unit it compiles. A golden is
  *          only worth having if refreshing it is deliberate, so this is a script

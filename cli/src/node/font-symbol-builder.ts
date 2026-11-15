@@ -43,6 +43,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { LARGE_FONTS_MACRO } from '../core/catalogue/large-fonts.js';
 import { compareCodeUnits } from '../core/order.js';
 
 /**
@@ -53,11 +54,8 @@ import { compareCodeUnits } from '../core/order.js';
 const DECLARATION = /^extern const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\] U8(?:G2|X8)_FONT_SECTION\(/gm;
 const DEFINITION = /^const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\d+\] U8(?:G2|X8)_FONT_SECTION\(/gm;
 
-/** One font definition, as a single line (the non-global form of DEFINITION). */
-const DEFINITION_LINE = /^const uint8_t (u8g2_font_[A-Za-z0-9_]+)\[\d+\] U8(?:G2|X8)_FONT_SECTION\(/;
-
-/** The macro U8G2 gates its large fonts on (`u8g2.h`). */
-const LARGE_FONTS_MACRO = 'U8G2_USE_LARGE_FONTS';
+/** One font definition, as a single line: DEFINITION's own pattern, without its flags. */
+const DEFINITION_LINE = new RegExp(DEFINITION.source);
 
 /** A preprocessor directive: its keyword and the rest of the line. */
 const DIRECTIVE = /^[ \t]*#[ \t]*([A-Za-z]+)(.*)$/;

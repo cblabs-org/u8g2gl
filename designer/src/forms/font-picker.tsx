@@ -12,8 +12,10 @@
  * Description: `FontPicker` lists the fonts `font-picker-model.ts` offers,
  *              searched and filtered, each with its height, character set and
  *              a sample U8G2 itself drew (`FontSampleCanvas`, from the samples
- *              file `font-samples.ts` fetches when a picker first opens).
- *              Choosing a font calls `onChoose` once, and the caller makes it
+ *              file `font-samples.ts` fetches when a picker first opens). One
+ *              of U8G2's large fonts carries a badge saying it needs
+ *              `U8G2_USE_LARGE_FONTS`, here and in the current font's facts,
+ *              and a "Hide large fonts" filter leaves them out. Choosing a font calls `onChoose` once, and the caller makes it
  *              one edit. `BuiltinFontField` is the `name` field's control:
  *              the current font, its facts, a text box that stays typeable,
  *              and the picker behind "Change font…".

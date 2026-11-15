@@ -17,8 +17,9 @@
  *              catalogue builder, the font-symbol builder and the font-height
  *              builder, writes catalogue.json, page-mode-map.json,
  *              u8g2-fonts.json, u8g2-font-heights.json,
- *              u8g2-large-fonts.json and catalogue-source.json to src/data/, and logs the extraction
- *              metrics and the source commit. One run, one U8G2 tree, one
+ *              u8g2-large-fonts.json and catalogue-source.json to
+ *              src/data/, and logs the extraction metrics and the source
+ *              commit. One run, one U8G2 tree, one
  *              source record: the fonts and the displays cannot come from two
  *              different U8G2 commits.
  *
