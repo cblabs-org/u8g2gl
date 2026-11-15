@@ -51,7 +51,12 @@
  *              is deleted, so its element leaves the record and every location
  *              after it moves up one line, and ` address="0x3C"` leaves the
  *              second `<display>`, so that attribute goes and the element's
- *              end column moves left by its 15 characters.
+ *              end column moves left by its 15 characters. The project-file
+ *              vocabulary check is a seventh, in the same file: ` default="true"`,
+ *              which nothing ever read, leaves the first `<target>`, so that
+ *              attribute goes and `ram_budget` after it moves left by its 15
+ *              characters; the element ends on another line, so nothing else
+ *              moves.
  *
  *              The first edit that moves locations is `u8g2gl_label.xml`'s
  *              help rewording: four `help` values change, the `long_mode`

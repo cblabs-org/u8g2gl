@@ -11,7 +11,7 @@
  *          schema addition cannot leave the editor behind.
  * Description: A document with one item of every kind is written from the
  *              vocabulary itself, read into a form, and rendered to markup
- *              with React's server renderer, in Node. Every canonical
+ *              with React's server renderer, in Node. Every
  *              element's every attribute must be a field of the model and a
  *              `data-field` control in the markup, every repeating kind an
  *              Add button, and every field an ⓘ.
@@ -36,7 +36,7 @@ const { FormView } = (await import(VIEW_MODULE)) as { readonly FormView: Functio
 // An element with every attribute written, and one of each child kind.
 function writeElement(element: VocabularyElement): string {
   const attributes = element.attributes.map((attribute) => ` ${attribute.name}="${attribute.type.kind === 'int' ? '1' : attribute.type.kind === 'bool' ? 'true' : attribute.type.kind === 'enum' ? (attribute.type.values[0] ?? '') : 'x'}"`).join('');
-  const children = vocabularyChildren(element.id).filter((child) => child.parent === element.id && child.canonical);
+  const children = vocabularyChildren(element.id).filter((child) => child.parent === element.id);
   if (children.length === 0) return `<${element.tag}${attributes} />`;
   return `<${element.tag}${attributes}>${children.map(writeElement).join('')}</${element.tag}>`;
 }
@@ -61,7 +61,7 @@ for (const file of ['u8g2gl.xml', 'globals.xml'] as const) {
     const fields = new Set(allNodes(model).flatMap((node) => node.fields.map((field) => `${field.elementId}/${field.attribute.name}`)));
     const missingFromModel: string[] = [];
     const missingFromMarkup: string[] = [];
-    for (const element of PROJECT_VOCABULARY.filter((e) => e.file === file && e.canonical)) {
+    for (const element of PROJECT_VOCABULARY.filter((e) => e.file === file)) {
       for (const attribute of element.attributes) {
         const id = `${element.id}/${attribute.name}`;
         if (!fields.has(id)) missingFromModel.push(id);
@@ -84,7 +84,7 @@ test('every section the vocabulary gives a file is in its form, in order', () =>
     const root = vocabularyRoots().get(file);
     const expected = [
       ...(root !== undefined && root.attributes.length > 0 ? [root.label] : []),
-      ...vocabularyChildren(root?.id ?? '').filter((c) => !c.repeats && c.canonical).map((c) => c.label),
+      ...vocabularyChildren(root?.id ?? '').filter((c) => !c.repeats).map((c) => c.label),
     ];
     expect(everything(file).sections.map((s) => s.title)).toEqual(expected);
   }

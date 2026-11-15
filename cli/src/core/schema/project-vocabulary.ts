@@ -7,8 +7,7 @@
  * Purpose: The vocabulary of the two project files, `u8g2gl.xml` (§5.1) and
  *          `globals.xml` (§5.3), as data: every element and every attribute
  *          the parsers read, with its type, its default, every spelling the
- *          parser accepts, and help in plain
- *          words. Before this table the vocabulary existed only as parser code
+ *          parser accepts, and help in plain words. Before this table the vocabulary existed only as parser code
  *          and TypeScript interfaces, which nothing else could enumerate.
  *          The designer builds its project-file forms from it, and tests hold
  *          the parsers and those forms to it, so a schema addition cannot
@@ -83,18 +82,6 @@ export interface AttributeSpelling {
   readonly element: string;
   /** The attribute name as written there. */
   readonly name: string;
-  /**
-   * True where the parser reads this place before the canonical one. No entry
-   * uses it since schema 0.7 removed `<bus>`, the place that was read first;
-   * the forms still honour it, so a later such place needs no form change.
-   */
-  readonly beforeCanonical?: boolean;
-  /**
-   * The ids of elements whose presence hides this place from the parser, for a
-   * value read from one place only while another element is absent. No entry
-   * uses it since schema 0.7 removed the pins, which were read that way.
-   */
-  readonly unlessPresent?: readonly string[];
 }
 
 /** One attribute, at its canonical place. */
@@ -110,12 +97,6 @@ export interface VocabularyAttribute {
   readonly help: string;
   /** Shown, never edited in a form: changing it is a migration, not an edit (§15.4). */
   readonly readOnly?: boolean;
-  /**
-   * The ids of elements whose presence hides the canonical place from the
-   * parser. As with a spelling's `unlessPresent`, no entry uses it since
-   * schema 0.7.
-   */
-  readonly unlessPresent?: readonly string[];
   /**
    * Every other place and spelling the parser accepts for it, in the order
    * the parser prefers them after the canonical one. A form reads all of them
@@ -142,12 +123,6 @@ export interface VocabularyElement {
   readonly minimum?: number;
   /** Why it has that minimum, for a refused removal to say. */
   readonly minimumReason?: string;
-  /**
-   * False for a place the parser reads but a form never writes into new: its
-   * values are alternatives of attributes declared elsewhere. Every element is
-   * canonical since schema 0.7 removed `<bus>`, the one that was not.
-   */
-  readonly canonical: boolean;
   readonly help: string;
   readonly attributes: readonly VocabularyAttribute[];
 }
@@ -254,7 +229,6 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Project',
     parent: undefined,
     repeats: false,
-    canonical: true,
     help: "The project file: the project's identity, the displays it targets, and where generated code goes.",
     attributes: [
       {
@@ -287,7 +261,6 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Targets',
     parent: 'project',
     repeats: false,
-    canonical: true,
     help: 'The hardware this project can be built for. The first target is the default.',
     attributes: [],
   },
@@ -301,7 +274,6 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     repeats: true,
     minimum: 1,
     minimumReason: 'A project needs at least one target: it is what generate builds for and what the designer draws.',
-    canonical: true,
     help:
       'One display the project can be built for. Its geometry, controller and bus all come from the display setup, never ' +
       'typed by hand (§5.1, [D-14]). The first target is the default; the designer can show any of them.',
@@ -334,7 +306,6 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Display',
     parent: 'target',
     repeats: false,
-    canonical: true,
     help: "The display the target drives, and how it is mounted. Its pins and bus are your firmware's board's to set, not U8G2GL's.",
     attributes: [
       {
@@ -368,7 +339,6 @@ const PROJECT_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Output',
     parent: 'project',
     repeats: false,
-    canonical: true,
     help: 'Where `generate` writes the C++ it produces.',
     attributes: [
       {
@@ -479,7 +449,6 @@ function subjectElement(tag: 'int' | 'string' | 'bool' | 'time', label: string, 
     label,
     parent: 'subjects',
     repeats: true,
-    canonical: true,
     help: `A ${tag} subject (§8.1): a value the firmware sets at run time, which bound elements redraw from.`,
     attributes,
   };
@@ -495,7 +464,6 @@ function constElement(tag: 'int' | 'string', label: string, valueType: Vocabular
     label,
     parent: 'consts',
     repeats: true,
-    canonical: true,
     help: `A ${tag} constant (§7.2), resolved at build time. Nothing of it ships to the device.`,
     attributes: [
       nameAttribute('constant', 'Any attribute refers to it as #name.'),
@@ -507,7 +475,7 @@ function constElement(tag: 'int' | 'string', label: string, valueType: Vocabular
 // groupElement
 // A container directly under `<globals>`.
 function groupElement(tag: string, label: string, help: string): VocabularyElement {
-  return { id: tag, file: 'globals.xml', tag, label, parent: 'globals', repeats: false, canonical: true, help, attributes: [] };
+  return { id: tag, file: 'globals.xml', tag, label, parent: 'globals', repeats: false, help, attributes: [] };
 }
 
 const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
@@ -518,7 +486,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Globals',
     parent: undefined,
     repeats: false,
-    canonical: true,
     help: 'What every screen shares: subjects, fonts, images, styles and constants.',
     attributes: [],
   },
@@ -535,7 +502,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Built-in font',
     parent: 'fonts',
     repeats: true,
-    canonical: true,
     help: "One of U8G2's own fonts, linked by name with no compilation step: the default way to get a font (§14.1).",
     attributes: [
       {
@@ -553,7 +519,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'BDF font',
     parent: 'fonts',
     repeats: true,
-    canonical: true,
     help: "A font of your own, compiled from a BDF file by U8G2's bdfconv (§14.1).",
     attributes: [
       nameAttribute('font', 'Styles and elements refer to it by this name.'),
@@ -581,7 +546,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'XBM image',
     parent: 'images',
     repeats: true,
-    canonical: true,
     help: 'A 1-bit XBM bitmap, used as it is (§14.2).',
     attributes: [
       nameAttribute('image', 'Elements refer to it by this name.'),
@@ -595,7 +559,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Converted image',
     parent: 'images',
     repeats: true,
-    canonical: true,
     help: 'A PNG converted to 1-bit at build time, by threshold or by dithering (§14.2).',
     attributes: [
       nameAttribute('image', 'Elements refer to it by this name.'),
@@ -636,7 +599,6 @@ const GLOBALS_ELEMENTS: readonly VocabularyElement[] = [
     label: 'Style',
     parent: 'styles',
     repeats: true,
-    canonical: true,
     help: "A named style. An element's own attributes win over it (§10).",
     attributes: [
       nameAttribute('style', 'Elements apply it with a <style name> child.'),
@@ -686,17 +648,11 @@ export function vocabularyRoots(): ReadonlyMap<VocabularyFile, VocabularyElement
 
 /**
  * @brief Every place an attribute is read from, in the order the parser
- *        prefers them: the canonical one first unless an alternative is read
- *        before it (`beforeCanonical`), then the rest.
+ *        prefers them: the canonical one first, then its alternatives.
  *
  * @param element   The element the attribute is declared on.
  * @param attribute One of its attributes.
  */
 export function attributeSpellings(element: VocabularyElement, attribute: VocabularyAttribute): readonly AttributeSpelling[] {
-  const alternatives = attribute.alternatives ?? [];
-  return [
-    ...alternatives.filter((spelling) => spelling.beforeCanonical === true),
-    { element: element.id, name: attribute.name, ...(attribute.unlessPresent !== undefined ? { unlessPresent: attribute.unlessPresent } : {}) },
-    ...alternatives.filter((spelling) => spelling.beforeCanonical !== true),
-  ];
+  return [{ element: element.id, name: attribute.name }, ...(attribute.alternatives ?? [])];
 }

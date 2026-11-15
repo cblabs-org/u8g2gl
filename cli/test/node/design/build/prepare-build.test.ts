@@ -14,7 +14,7 @@
  *              directory, changes one thing, and prepares it again.
  */
 
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildEditorWasm } from '../../../../src/node/design/build/editor-wasm-build.js';
@@ -111,12 +111,17 @@ describe('the build hash', () => {
   it('generates into the cache, never into the project, and is stable', async () => {
     const project = departuresCopy();
     const cache = makeTempDir('build-cache');
-    const before = readFileSync(join(project, 'generated', 'ui_fonts.cpp'), 'utf8');
+    // The project's own generated/ is the user's firmware build's. A file
+    // planted there stands for it: the build must leave it, and add nothing.
+    const sentinel = '// the firmware build\'s own output\n';
+    mkdirSync(join(project, 'generated'));
+    writeFileSync(join(project, 'generated', 'ui_fonts.cpp'), sentinel);
     const first = await hashOf(project, cache);
     expect(await hashOf(project, cache)).toBe(first);
     expect(first).toMatch(/^[0-9a-f]{64}$/);
-    // The project's own generated/ is the user's firmware build's: untouched.
-    expect(readFileSync(join(project, 'generated', 'ui_fonts.cpp'), 'utf8')).toBe(before);
+    expect(readdirSync(join(project, 'generated'))).toEqual(['ui_fonts.cpp']);
+    expect(readFileSync(join(project, 'generated', 'ui_fonts.cpp'), 'utf8')).toBe(sentinel);
+    expect(existsSync(join(project, 'generated_editor'))).toBe(false);
   });
 
   // Each change is made to a fresh copy and compared with that copy's own hash.

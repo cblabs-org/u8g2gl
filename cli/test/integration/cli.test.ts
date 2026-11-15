@@ -159,6 +159,96 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     }
   });
 
+  // withEditedProject
+  // A copy of valid-project under the package's tmp/, its u8g2gl.xml passed
+  // through `edit`, for a test to validate and then remove.
+  //   prefix — the temporary directory's name prefix
+  //   edit   — rewrites the project file's text
+  function withEditedProject(prefix: string, edit: (xml: string) => string): string {
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, `../../tmp/${prefix}-`));
+    cpSync(validProjectDir, dir, { recursive: true });
+    const xmlPath = join(dir, 'u8g2gl.xml');
+    writeFileSync(xmlPath, edit(readFileSync(xmlPath, 'utf8')));
+    return dir;
+  }
+
+  it('u8g2gl validate on a stray attribute reports it, with the real schema and target still checked', async () => {
+    // An unknown attribute keeps the model, so the file's own schema — here
+    // one the CLI does not accept — is what validation reports on.
+    const dir = withEditedProject('stray-attribute', (xml) =>
+      xml.replace('schema="0.5"', 'schema="0.99"').replace('rotation="R0" />', 'rotation="R0" wibble="1" />'),
+    );
+    try {
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      expect(res.code).toBe(1);
+      const parsed = JSON.parse(res.stdout) as {
+        diagnostics: Array<{ code: string; severity: string; file: string; message: string }>;
+        target?: { name: string };
+      };
+      const errors = parsed.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors.map((d) => d.code).sort()).toEqual(['U8G2GL_UNKNOWN_ATTRIBUTE', 'U8G2GL_UNKNOWN_SCHEMA_VERSION']);
+      expect(errors.find((d) => d.code === 'U8G2GL_UNKNOWN_ATTRIBUTE')?.message).toBe("Unknown attribute 'wibble' on <target>.");
+      expect(errors.find((d) => d.code === 'U8G2GL_UNKNOWN_SCHEMA_VERSION')?.message).toContain("'0.99'");
+      expect(errors.every((d) => d.file === 'u8g2gl.xml')).toBe(true);
+      expect(parsed.target?.name).toBe('primary');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('u8g2gl validate on an unknown element under <u8g2gl> gives that one error and nothing about a placeholder', async () => {
+    const dir = withEditedProject('unknown-element', (xml) => xml.replace('<targets>', '<foo/>\n    <targets>'));
+    try {
+      const json = await runCliSubprocess(['validate', dir, '--json']);
+      expect(json.code).toBe(1);
+      const parsed = JSON.parse(json.stdout) as {
+        diagnostics: Array<{ code: string; severity: string; message: string }>;
+        errors: number;
+      };
+      // valid-project's one known warning (its <focus_ring>) is unaffected.
+      const errors = parsed.diagnostics.filter((d) => d.severity === 'error');
+      expect(errors.map((d) => `${d.code} ${d.message}`)).toEqual([
+        "U8G2GL_MALFORMED_XML Unknown element '<foo>' in <u8g2gl>",
+      ]);
+      expect(parsed.errors).toBe(1);
+
+      // The human report: one error, and no "No <target> declared" line for
+      // the placeholder the withheld model leaves.
+      const human = await runCliSubprocess(['validate', dir]);
+      expect(human.code).toBe(1);
+      expect(human.stderr).not.toContain('No <target> declared');
+      expect(human.stderr).not.toContain('schema version');
+      expect(human.stderr).toContain('Validation failed: 1 error(s), 1 warning(s).');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('u8g2gl validate on schema="" still reports the empty schema the file wrote', async () => {
+    const dir = withEditedProject('empty-schema', (xml) => xml.replace('schema="0.5"', 'schema=""'));
+    try {
+      const res = await runCliSubprocess(['validate', dir, '--json']);
+      expect(res.code).toBe(1);
+      const parsed = JSON.parse(res.stdout) as { diagnostics: Array<{ code: string; file: string }> };
+      expect(parsed.diagnostics.filter((d) => d.code === 'U8G2GL_UNKNOWN_SCHEMA_VERSION').map((d) => d.file)).toEqual(['u8g2gl.xml']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('u8g2gl validate on a directory with no u8g2gl.xml still says the file is missing', async () => {
+    mkdirSync(resolve(__dirname, '../../tmp'), { recursive: true });
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/no-project-'));
+    try {
+      const res = await runCliSubprocess(['validate', dir]);
+      expect(res.code).toBe(1);
+      expect(res.stderr).toContain("Project file 'u8g2gl.xml' not found");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // --- PR-04 WO1: the framework manifests reach the CLI ---
   describe('framework manifests (PR-04 WO1)', () => {
     const tempDirs: string[] = [];

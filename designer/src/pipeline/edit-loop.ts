@@ -105,7 +105,7 @@ import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
 import type { Workspace } from '../workspace';
 import { innermostAt, namedElements } from '../documents/element-at';
 import { effectiveHidden } from '../canvas/design-hidden';
-import { markersByFile, sameProblems, toProblemRows } from './diagnostics';
+import { markersByFile, sameProblems, toProblemRows, withoutBuildRepeats } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
 import {
   runTextPipeline,
@@ -446,11 +446,15 @@ export class EditLoop {
       targetName: this.workspace.activeTarget.name.get(),
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
-    this.publishDiagnostics([
-      ...result.diagnostics,
-      ...this.wasm.buildDiagnostics.get(),
-      ...this.diagnosticSources.flatMap((source) => source.get()),
-    ]);
+    // A build's or a test run's diagnostics that repeat a live one are dropped:
+    // both run `generate`, which fails on the errors already reported here.
+    this.publishDiagnostics(
+      withoutBuildRepeats([
+        ...result.diagnostics,
+        ...this.wasm.buildDiagnostics.get(),
+        ...this.diagnosticSources.flatMap((source) => source.get()),
+      ]),
+    );
     this.workspace.selection.reconcile();
     this.workspace.refreshElementTrees();
     this.canvasEditing.set(result.wellFormed);

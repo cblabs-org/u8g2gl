@@ -9,7 +9,8 @@
  *          in every state, the staleness count, the reasons Run is
  *          unavailable, and the controller's state machine — waiting for a
  *          rebuild, queueing at most one run, the overlay clearing at the
- *          next edit, a failed run's diagnostics for Problems, and *Run after
+ *          next edit, a failed run's diagnostics for Problems until the next
+ *          edit, and *Run after
  *          a pause*: off by default, kept per browser, 2 s after the last edit.
  * Description: The controller is driven through a fake target and a fake
  *              `fetch` that answers the job's records; the live frames come
@@ -225,6 +226,26 @@ test('a failed run reports its located diagnostics for Problems', async () => {
   expect(h.controller.diagnostics.get()).toEqual([
     { code: 'U8G2GL_TEST_RUN_BUILD', severity: 'error', file: 'widgets/w/w.cpp', line: 12, column: 5, message: 'expected expression' },
   ]);
+});
+
+test("a failed run's diagnostics clear at the first edit; its verdict stays, marked stale", async () => {
+  const h = harness({ fail: 'error: widgets/w/w.cpp:12:5\n  expected expression' });
+  h.controller.run();
+  await h.until(() => h.controller.view.get().kind === 'failed');
+  expect(h.controller.diagnostics.get()).toHaveLength(1);
+  h.edit();
+  expect(h.controller.diagnostics.get()).toEqual([]);
+  expect(h.controller.view.get()).toMatchObject({ kind: 'failed', editsSince: 1 });
+});
+
+test('a run that fails after an edit made while it ran gives Problems nothing, as the overlay gets nothing', async () => {
+  const h = harness({ fail: 'error: widgets/w/w.cpp:12:5\n  expected expression' });
+  h.controller.run();
+  await h.until(() => h.posted.length === 1);
+  h.edit();
+  await h.until(() => h.controller.view.get().kind === 'failed');
+  expect(h.controller.diagnostics.get()).toEqual([]);
+  expect(h.controller.view.get()).toMatchObject({ kind: 'failed', editsSince: 1 });
 });
 
 test('Run during a rebuild waits for it, then runs; Run while unavailable does nothing', async () => {

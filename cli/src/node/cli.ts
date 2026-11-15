@@ -39,7 +39,7 @@ import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
 import { CATALOGUE } from '../data/catalogue.js';
 import pageModeMapData from '../data/page-mode-map.json' with { type: 'json' };
-import { checkProject, generate, type GenerateResult } from '../core/generator/index.js';
+import { checkProject, generate, hasProjectModel, type GenerateResult } from '../core/generator/index.js';
 import { compileProjectAssets, type CompileProjectAssetsResult } from '../core/assets/index.js';
 import { emitEditorFiles, TARGET_KINDS, type TargetKind } from '../core/generator/emit/index.js';
 import { buildGenerateReport, type GenerateReport } from '../core/generator/report/index.js';
@@ -691,7 +691,7 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   }
 
   const formatted = formatDiagnostics(diagnostics, (f) => loaded.fileContents.get(f), { color: useColor });
-  const targetLine = describeCheckedTarget(checkedTarget, loaded.model.hasProjectManifest);
+  const targetLine = describeCheckedTarget(checkedTarget, hasProjectModel(loaded.model));
   const withTarget = (summary: string): string => (targetLine ? `${targetLine}\n${summary}` : summary);
   if (errors > 0) {
     console.error(formatted);
@@ -710,12 +710,14 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
 // describeCheckedTarget
 // The line `validate` prints naming the target geometry was checked against
 // (PR-04 WO7b): `generate --target` checks another, so the author must be able
-// to see which one `validate` meant. Undefined for a lone file, which has no target.
-//   target              — from checkProject
-//   hasProjectManifest  — whether a u8g2gl.xml was loaded
-function describeCheckedTarget(target: CheckedTarget | undefined, hasProjectManifest: boolean): string | undefined {
+// to see which one `validate` meant. Undefined for a lone file, which has no
+// target, and for a u8g2gl.xml the parser withheld: its parse error is the
+// report, and "no <target> declared" would describe the placeholder instead.
+//   target       — from checkProject
+//   projectModel — whether a parsed u8g2gl.xml model was loaded (hasProjectModel)
+function describeCheckedTarget(target: CheckedTarget | undefined, projectModel: boolean): string | undefined {
   if (target === undefined) {
-    return hasProjectManifest ? 'No <target> declared: geometry bounds were not checked.' : undefined;
+    return projectModel ? 'No <target> declared: geometry bounds were not checked.' : undefined;
   }
   if (target.display === undefined) {
     return `Target '${target.name}' (${target.setup}) has no display in the catalogue: geometry bounds were not checked.`;

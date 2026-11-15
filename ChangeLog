@@ -8,6 +8,23 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-15	cli v0.20.xx	U8G2GL
+  * 0.20.0: u8g2gl.xml is checked against the project vocabulary, the
+    table the designer's form is built from. An attribute it does not
+    spell on <u8g2gl>, <targets>, <target>, <display> or <output>
+    (aliases such as ramBudget are spelled) is now U8G2GL_UNKNOWN_ATTRIBUTE,
+    an error at its name with the nearest spelling suggested, where it was
+    ignored; an unknown child of <targets>, <target>, <display> or
+    <output> is an error at its tag, as under <u8g2gl>. A project that wrote a stray
+    attribute and validated before now fails. The removed pins keep their
+    own refusal. An unknown attribute keeps the parsed project, so its real
+    schema and targets are still checked; when a parse error withholds the
+    project, that error is the whole report, with no schema version '' and
+    no "No <target> declared" about the placeholder. In the designer,
+    Problems shows a fault once: an editor build or test run problem that
+    repeats a live one is dropped, and a failed run's problems clear at
+    the next edit. Generated output is unchanged; no schema or runtime
+    change.
 2026-11-14	runtime v0.13.xx	U8G2GL
   * 0.13.0: Implements schema 0.7 (U8G2GL_SCHEMA_VERSION_MINOR 7). Schema
     0.7 adds U8G2's two mirror rotations, which generated code passes to
