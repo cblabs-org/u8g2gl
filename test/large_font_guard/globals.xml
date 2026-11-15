@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <fonts>
+        <!-- A small font, which must get no guard. -->
+        <builtin name="u8g2_font_6x10_mr" />
+        <!-- One of U8G2's large fonts (304 KB): guarded. -->
+        <builtin name="u8g2_font_unifont_t_gb2312" />
+    </fonts>
+</globals>

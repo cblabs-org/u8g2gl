@@ -5,8 +5,9 @@
  *
  * File: test/generator/refresh-goldens.mjs
  * Purpose: Rewrites every committed generator expectation: the WO9 golden files
- *          from the `emit-project` fixture, and the WO10 compile-layer fixture's
- *          `generated/` directory, which the C++ test suite builds. A golden is
+ *          from the `emit-project` fixture, the WO10 compile-layer fixture's
+ *          `generated/` directory, which the C++ test suite builds, and the
+ *          large-font guard fixture's, whose fonts unit it compiles. A golden is
  *          only worth having if refreshing it is deliberate, so this is a script
  *          to run and review rather than a flag on the test run — an `--update`
  *          mode that rewrites expectations on failure is how a golden stops
@@ -49,6 +50,12 @@ const FIXTURES = [
     expected: resolve(here, '../../../test/generated_fixture/generated'),
     // The editor target (PR-04 WO11), built into the C++ parity test.
     editor: resolve(here, '../../../test/generated_fixture/generated_editor'),
+  },
+  // A large <builtin> font, whose ui_fonts.cpp the C++ suite compiles with and
+  // without U8G2_USE_LARGE_FONTS (§14.1).
+  {
+    project: resolve(here, '../../../test/large_font_guard'),
+    expected: resolve(here, '../../../test/large_font_guard/generated'),
   },
 ];
 

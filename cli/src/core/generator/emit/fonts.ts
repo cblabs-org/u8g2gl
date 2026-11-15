@@ -24,9 +24,20 @@
  *              `generate.ts` — so finding one here is a programmer error, not
  *              an author's, and this module throws rather than guess at bytes.
  *
+ *              **A large `<builtin>` is guarded.** U8G2 compiles its fonts
+ *              over 32 KB only where `U8G2_USE_LARGE_FONTS` is defined, a
+ *              platform decision `u8g2.h` makes, yet declares them everywhere.
+ *              Without a guard the alias compiles and the board's build fails
+ *              at link time with a bare undefined reference. So for each large
+ *              `<builtin>`, after U8G2's header (where the macro is decided),
+ *              this unit emits an `#error` naming the font and both fixes. The
+ *              check runs on the real platform, which the validator cannot
+ *              see; a project with no large font emits no guard at all.
+ *
  * Exports:
  * - FONTS_UNIT:       The unit's file name
  * - U8G2_HEADER:      U8G2's own header, as generated units include it
+ * - LARGE_FONT_ERROR: The guard's message, after the font's name
  * - fontDeclarations(): The `ui_font_*` pointers, for `ui.hpp`
  * - emitFontsUnit():  Emit `ui_fonts.cpp`
  */
@@ -35,6 +46,7 @@ import bdfconvSource from '../../../data/bdfconv/bdfconv-source.json' with { typ
 import type { BdfFontDecl, FontDecl } from '../../schema/globals.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import { fontDataIdentifier, fontIdentifier } from '../../resolver/index.js';
+import { isLargeFont, LARGE_FONTS_MACRO } from '../../catalogue/large-fonts.js';
 import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 
 /** §13.7's fonts unit. */
@@ -49,6 +61,16 @@ export const FONTS_UNIT = 'ui_fonts.cpp';
  * constructs a `U8G2`.
  */
 export const U8G2_HEADER = '#include <U8g2lib.h>';
+
+/**
+ * What a large font's `#error` says after the font's name: both fixes, and
+ * where U8G2 decides the macro. It cites `u8g2.h` rather than listing
+ * platforms, so it cannot go stale when U8G2 changes that list.
+ */
+export const LARGE_FONT_ERROR =
+  `is one of U8G2's large fonts (over 32 KB), which U8G2 compiles only where ${LARGE_FONTS_MACRO} ` +
+  `is defined (see u8g2.h). Choose a smaller font, or define ${LARGE_FONTS_MACRO} if this platform ` +
+  'supports arrays over 32 KB.';
 
 /** How many bytes go on one line of a compiled font's emitted array. */
 const BYTES_PER_LINE = 16;
@@ -95,6 +117,25 @@ function sanitiseCommentField(text: string): string {
   }
   out = out.replace(/\*\//g, '*\\/').replace(/\s+/g, ' ').trim();
   return out.length > MAX_COMMENT_FIELD_LENGTH ? `${out.slice(0, MAX_COMMENT_FIELD_LENGTH)}...` : out;
+}
+
+// largeFontGuards
+// The preprocessor guard for each large <builtin>, in declaration order
+// (§13.9), with a comment saying why; none at all when there is none, so a
+// project with no large font emits exactly what it did before.
+//   declarations — every font alias this unit emits
+function largeFontGuards(declarations: readonly FontDeclaration[]): string[] {
+  const large = declarations.filter(({ font }) => font.kind === 'builtin' && isLargeFont(font.name));
+  if (large.length === 0) return [];
+  const lines = [
+    `// U8G2 compiles its large fonts only where ${LARGE_FONTS_MACRO} is defined (u8g2.h):`,
+    '// stop here, naming the font, rather than at link time (§14.1).',
+  ];
+  for (const { font } of large) {
+    lines.push(`#ifndef ${LARGE_FONTS_MACRO}`, `#error "${font.name} ${LARGE_FONT_ERROR}"`, '#endif');
+  }
+  lines.push('');
+  return lines;
 }
 
 // rangeDescription
@@ -191,7 +232,16 @@ export function emitFontsUnit(input: ProjectEmitInput): EmittedUnit {
   const compiledFonts = input.compiledFonts ?? new Map<string, CompiledFont>();
   const bdfLicenceFiles = input.bdfLicenceFiles ?? new Map<string, readonly string[]>();
 
-  const lines: string[] = [input.stamp.trimEnd(), '', '#include "ui.hpp"', '', U8G2_HEADER, ''];
+  // The guards follow U8G2's header, because that header decides the macro.
+  const lines: string[] = [
+    input.stamp.trimEnd(),
+    '',
+    '#include "ui.hpp"',
+    '',
+    U8G2_HEADER,
+    '',
+    ...largeFontGuards(declarations),
+  ];
 
   lines.push(section('Fonts (§14.1)'));
   if (declarations.length === 0) {
