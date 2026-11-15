@@ -122,3 +122,21 @@ stacked. The worker doesn't push. The PA verifies, pushes and opens the PR.
   - E1: an unknown attribute in `u8g2gl.xml` is an error;
   - E2: the departures fixture's generated folders are deleted, with a guard;
   - E3: CLI 0.20.0.
+- 2026-11-15 — **Ruling 6 corrected by the PA.** Its premise "No test reads
+  them" was wrong: `prepare-build.test.ts` read the fixture's committed
+  `generated/ui_fonts.cpp` as its sentinel, so the worker stopped, as the work
+  order required. The PA made that test plant its own sentinel, then made
+  the deletion and the guard as ruled (`3d4c828`). The ruling's outcome is
+  unchanged.
+- 2026-11-15 — **E-5 verified by the PA** on `3d4c828`, suites one at a time:
+  - Wasm 4/4; host ctest 520/520; CLI 3031; lint, tsc and designer typecheck
+    clean; designer unit 266; e2e 126/127, the one failure the known
+    `design-hidden.spec.ts:144` flake, which passed alone; production 3.
+  - Goldens: empty diff. check-package PASS at 0.20.0. Home-path guard clean.
+  - Built CLI: `rotaton` on `<target>` is one error with "did you mean
+    'rotation'"; `ramBudget` isn't reported; `<wibble/>` and `<foo/>` give one
+    error each, with no placeholder schema error; a pin gives its refusal
+    alone; `schema=""` is reported as before.
+  - Browser, production build: a pin and a misspelt attribute written on disk
+    show as two problems, not four, once the editor build has failed; both
+    clear when the file is restored.
