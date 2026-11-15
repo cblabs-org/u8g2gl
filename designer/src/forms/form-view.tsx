@@ -22,14 +22,21 @@
  *              the XML highlights; `current` marks the node the XML caret is
  *              in. Neither moves focus.
  *
+ *              Adding a kind that names a file or a font can open a chooser
+ *              first (`AddChooser`, ui_spec §6.4): its "+" shows the file's
+ *              own chooser below the list, choosing adds the item with the
+ *              chosen values as one edit, and cancelling adds nothing. A kind
+ *              with no chooser is added at once, as before.
+ *
  * Exports:
  * - FormActions:     What the form asks of its host
  * - FormViewState:   What the form draws
  * - SectionRenderer: A replacement for one section's generic body
+ * - AddChooser:      A chooser that runs before an item of a kind is added
  * - FormView:        The component
  */
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { ProblemRow } from '../pipeline/diagnostics';
 import { FieldControl } from './form-controls';
 import type { FormOptions } from './form-options';
@@ -40,8 +47,8 @@ import type { FormProblems } from './form-problems';
 export interface FormActions {
   /** Sets a field, or removes it for undefined. */
   readonly set: (field: string, value: string | undefined) => void;
-  /** Adds an item of a kind at the end of a list. */
-  readonly add: (list: string, kind: string) => void;
+  /** Adds an item of a kind at the end of a list, with any values a chooser picked. */
+  readonly add: (list: string, kind: string, values?: Readonly<Record<string, string>>) => void;
   readonly remove: (item: string) => void;
   readonly move: (item: string, delta: -1 | 1) => void;
   /** A section, item or part took focus: its range, for the XML to highlight. */
@@ -68,6 +75,25 @@ export interface FormViewState {
  */
 export type SectionRenderer = (section: FormSection, generic: ReactNode, readOnly: boolean) => ReactNode | undefined;
 
+/**
+ * A chooser that runs before an item is added: the file's own editor supplies
+ * one per kind (the font picker for `font-builtin`), and the generic list
+ * calls it in place of adding at once.
+ */
+export interface AddChooser {
+  /** Whether adding an item of this kind opens a chooser first. */
+  readonly has: (kind: string) => boolean;
+  /**
+   * The chooser for a kind, drawn below the list's "+" buttons.
+   *
+   * @param list    The list the item will join.
+   * @param kind    The kind's vocabulary id.
+   * @param choose  Adds the item with these values, as one edit, and closes.
+   * @param cancel  Closes, adding nothing.
+   */
+  readonly render: (list: FormList, kind: string, choose: (values: Readonly<Record<string, string>>) => void, cancel: () => void) => ReactNode;
+}
+
 /** No rows. */
 const NONE: readonly ProblemRow[] = [];
 
@@ -82,6 +108,8 @@ interface Context {
   readonly nodeExtra?: (node: FormNode) => ReactNode;
   /** A control to use in place of a field's generic one (the display picker); undefined for the generic. */
   readonly fieldControl?: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
+  /** Choosers that run before an item of a kind is added; undefined for none. */
+  readonly addChooser?: AddChooser;
 }
 
 // NodeProblems
@@ -158,9 +186,16 @@ function atMinimum(list: FormList, item: FormNode): boolean {
 }
 
 // ListBody
-// A list's items, each with move and remove, then an Add per kind.
+// A list's items, each with move and remove, then an Add per kind, and the
+// chooser of the kind being added while one is open.
 function ListBody({ list, context }: { readonly list: FormList; readonly context: Context }): React.JSX.Element {
   const { state, actions, readOnly } = context;
+  const [choosing, setChoosing] = useState<string | undefined>(undefined);
+  const chooser = context.addChooser;
+  const startAdd = (kind: string): void => {
+    if (chooser?.has(kind) === true) setChoosing(kind);
+    else actions.add(list.key, kind);
+  };
   return (
     <div className="form-list" data-list={list.key} data-element={list.container.id}>
       {list.items.length === 0 && <p className="form-empty">None yet.</p>}
@@ -221,11 +256,30 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
       })}
       <div className="form-add">
         {list.kinds.map((kind) => (
-          <button key={kind.id} type="button" className="action" disabled={readOnly} title={kind.help} onClick={() => actions.add(list.key, kind.id)}>
+          <button
+            key={kind.id}
+            type="button"
+            className="action"
+            disabled={readOnly}
+            title={kind.help}
+            aria-expanded={chooser?.has(kind.id) === true ? choosing === kind.id : undefined}
+            onClick={() => startAdd(kind.id)}
+          >
             + {kind.label}
           </button>
         ))}
       </div>
+      {choosing !== undefined &&
+        !readOnly &&
+        chooser?.render(
+          list,
+          choosing,
+          (values) => {
+            setChoosing(undefined);
+            actions.add(list.key, choosing, values);
+          },
+          () => setChoosing(undefined),
+        )}
     </div>
   );
 }
@@ -237,6 +291,7 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
  * @param fieldNote     Extra content beneath a field.
  * @param nodeExtra     Content after a node's body (a target's constructor snippet).
  * @param fieldControl  A control in place of a field's generic one (the display picker).
+ * @param addChooser    Choosers that run before an item of a kind is added (the font picker).
  */
 export function FormView({
   file,
@@ -246,6 +301,7 @@ export function FormView({
   fieldNote,
   nodeExtra,
   fieldControl,
+  addChooser,
 }: {
   readonly file: string;
   readonly state: FormViewState;
@@ -254,6 +310,7 @@ export function FormView({
   readonly fieldNote?: Context['fieldNote'];
   readonly nodeExtra?: Context['nodeExtra'];
   readonly fieldControl?: Context['fieldControl'];
+  readonly addChooser?: AddChooser;
 }): React.JSX.Element {
   const readOnly = state.unreadable !== undefined;
   const context: Context = {
@@ -263,6 +320,7 @@ export function FormView({
     ...(fieldNote !== undefined ? { fieldNote } : {}),
     ...(nodeExtra !== undefined ? { nodeExtra } : {}),
     ...(fieldControl !== undefined ? { fieldControl } : {}),
+    ...(addChooser !== undefined ? { addChooser } : {}),
   };
   return (
     <div className="project-form" data-form-file={file} data-readonly={readOnly} aria-label={`${file} form`}>

@@ -22,6 +22,7 @@
  * - FontSample:          One font's sample: width, height and base64 bits
  * - FontSamples:         Every sample, by font name
  * - loadFontSamples():   The samples, fetched on first call
+ * - loadedFontSamples(): The samples if they have already arrived, without fetching
  * - samplePixel():       Whether one pixel of a decoded sample is lit
  * - decodeSampleBits():  A sample's bits as bytes
  */
@@ -37,6 +38,7 @@ export interface FontSample {
 export type FontSamples = Readonly<Record<string, FontSample>>;
 
 let pending: Promise<FontSamples> | undefined;
+let loaded: FontSamples | undefined;
 
 /**
  * @brief The samples, fetched the first time any caller asks.
@@ -47,7 +49,10 @@ let pending: Promise<FontSamples> | undefined;
 export function loadFontSamples(): Promise<FontSamples> {
   if (pending === undefined) {
     pending = import('@u8g2gl/data/u8g2-font-samples.json').then(
-      (module) => module.default as FontSamples,
+      (module) => {
+        loaded = module.default as FontSamples;
+        return loaded;
+      },
       (error: unknown) => {
         pending = undefined;
         throw error;
@@ -55,6 +60,16 @@ export function loadFontSamples(): Promise<FontSamples> {
     );
   }
   return pending;
+}
+
+/**
+ * @brief The samples if an earlier call has fetched them, else undefined.
+ *
+ * Lets a field show its font's sample once any picker has opened, without
+ * being the thing that fetches 1.2 MB for a form that only displays a name.
+ */
+export function loadedFontSamples(): FontSamples | undefined {
+  return loaded;
 }
 
 /** @brief A sample's bits as bytes. */

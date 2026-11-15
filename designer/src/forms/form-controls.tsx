@@ -29,14 +29,15 @@
  *              them in Node.
  *
  * Exports:
- * - FieldControl:   One field
+ * - FieldControl:      One field
+ * - FieldTextControl:  A field's plain text box, for a richer control to keep
  */
 
 import { useState, type ReactNode } from 'react';
 import type { ProblemRow } from '../pipeline/diagnostics';
 import { leftOf, Tooltip, tooltipTriggers, useTooltip, type TooltipAt } from '../ui/tooltip';
 import type { FormField } from './form-model';
-import { fieldFacts, type FormOptions } from './form-options';
+import { fieldFacts, NO_OPTIONS, type FormOptions } from './form-options';
 import { SEGMENTED_MAX } from '../panel/editors';
 import { vocabularyElement } from '@u8g2gl/core/schema/index.js';
 
@@ -195,6 +196,26 @@ function Control(props: ControlProps): React.JSX.Element {
     case 'string':
       return <TextControl {...props} check={() => undefined} />;
   }
+}
+
+/**
+ * @brief A field's plain text box, for a richer control that keeps the value
+ *        typeable (the font picker and the file chooser, ui_spec §6.4).
+ *
+ * @param suggestions  Values the box's list offers, if any.
+ */
+export function FieldTextControl({
+  field,
+  disabled,
+  commit,
+  suggestions,
+}: {
+  readonly field: FormField;
+  readonly disabled: boolean;
+  readonly commit: (value: string | undefined) => void;
+  readonly suggestions?: readonly string[];
+}): React.JSX.Element {
+  return <TextControl field={field} options={NO_OPTIONS} disabled={disabled} commit={commit} check={() => undefined} {...(suggestions !== undefined ? { suggestions } : {})} />;
 }
 
 /**
