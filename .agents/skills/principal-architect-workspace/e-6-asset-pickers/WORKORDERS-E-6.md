@@ -179,4 +179,93 @@ in its status log (rule 00). Read `.agents/rules/03-versioning.md` before WO4.
 
 # Completion report
 
-*(worker: append here)*
+*Worker report, 2026-11-15.* Authorization checked from the committed files: this work order
+names `e-6-asset-pickers`, and its PROJECT.md status log records the owner's "Approve E-6".
+Nothing pushed, tagged or published.
+
+## Commits per WO
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-e6/wo1-font-facts` | `6d55666` feat(catalogue): font facts and pre-rendered samples of every built-in font |
+| WO2 | `u8g2gl-e6/wo2-font-picker` | `ecfe555` feat(designer): font picker on adding or changing a built-in font |
+| WO3 | `u8g2gl-e6/wo3-file-chooser` | `72eb1f3` feat(designer): file chooser with import for BDF fonts and images |
+| WO4 | `u8g2gl-e6/wo4-docs-review` | `b6f1148` docs: font picker and file chooser; CLI 0.21.0; this report on top |
+
+## Suites, with baselines (each run alone)
+
+| Suite | Baseline (main `dd5454e`) | Final (WO4) |
+|---|---|---|
+| Framework Wasm build + 4 Wasm tests | pass, 4/4 | pass, 4/4 |
+| Host build + ctest | 520/520 (1 skipped: `SizeOfReport.ThirtyTwoBitTarget`), 0 warnings | 520/520 (same skip), 0 warnings |
+| CLI vitest | 3008 passed, 23 skipped | 3023 passed, 23 skipped (+13 font facts/samples, +2 writeBytes contract) |
+| CLI lint, tsc | pass | pass |
+| Designer typecheck | pass | pass |
+| Designer unit | 266 | 283 (+10 font picker, +7 file chooser) |
+| e2e (`build:e2e`) | 127 | 133 passed, 1 failed, see below; 134 with the rerun (+3 font picker, +4 file chooser) |
+| Production (`build`, `test:e2e:production`) | 3 | 3 |
+| `refresh-goldens.mjs` | — | no diff |
+| `check-home-paths.mjs` | clean | clean |
+| `check-package.mjs` | PASS 0.20.0, 15,426,399 B | PASS **0.21.0, 15,730,169 B** (+303,770 B; unpacked +1,283,781 B) |
+
+**Flake, reported:** the final full e2e run failed the known `design-hidden.spec.ts:144` (canvas
+pixels after a reload, `256x64:1b0189bd` for `b64b7798`). Re-run alone it passed. It passed in
+the baseline and in the full WO2 (130/130) and WO3 (134/134) runs; it touches no form code.
+
+## The samples file
+
+- `cli/src/data/u8g2-font-samples.json`: **1,248,291 bytes (1.19 MiB), 294,560 bytes gzipped**,
+  under the 2 MB cap. 2039 samples; largest `logisoso92_tn` (577×111).
+- Reproducible: a clean rebuild (`rm -rf build/font-samples`) gives a byte-identical file, checked
+  twice, the second after WO4's comment edit to the renderer. The renderer builds with 0 warnings.
+- **Loading: a dynamic `import()`**, not a server route. Vite emits it as its own chunk
+  (`u8g2-font-samples-*.js`, 1.22 MB, 294 kB gzip), absent from `index.html`; the e2e checks the
+  page load fetches nothing and the first picker fetches it once.
+- Sample text: `AaBbGg 0123`, `0123456789` for an `n` font, else the font's first 8 glyphs from
+  33 up when it has no glyph of the text (icon fonts). Cropped to the lit width and to the font's
+  own box height (widened only if a glyph overhangs).
+
+## The suffix unknowns
+
+19 of 2039, all bare-number postfixes whose meaning is a per-font map file or Unicode block:
+`gb16st_t_1/2/3`, `gb24st_t_1/2/3`, `siji_t_6x10`, and `unifont_t_` + `0_72_73`, `0_75`, `0_76`,
+`0_77`, `0_78_79`, `0_86`, `72_73`, `75`, `76`, `77`, `78_79`, `86`. Listed in
+`cli/test/catalogue/font-facts.test.ts`. A second test checks every custom postfix in the table
+is one `build.c` writes.
+
+## Deviations, and why
+
+1. **Core gains `ProjectFileSystem.writeBytes()`.** The interface wrote only text, and an imported
+   PNG is binary. It is the bytes twin of `write()`, reaching the same `writeChecked()` and the
+   same `PUT /api/file`; no server change, no new route. Covered by the shared contract test.
+2. **`tools/font-samples` defines `U8G2_USE_LARGE_FONTS`.** `u8g2.h` enables it for unix, ARM
+   and ESP targets, not for a macOS host, and 63 of the listed fonts compile only under it.
+3. **`project-form.spec.ts` changed one test.** Its Explorer-count step clicked
+   "+ Built-in font" and expected Fonts (3); that button now opens the picker, so the test chooses
+   a font. Not weakened: the count is still asserted.
+4. **`FieldTextControl` exported from `form-controls.tsx`**, so the pickers keep the plain text
+   box ("the text stays editable").
+5. **Add hook:** `FormView` takes an `AddChooser` (`has(kind)`, `render(...)`), supplied per kind
+   by the new `globals-editor.tsx`; `FormActions.add` carries the chosen values into the one add
+   edit. Documented in form-view.tsx's header.
+6. **A `<convert>` whose PNG header cannot be read** is added with `width=""` and `height=""`, so
+   the validator flags both fields, rather than a seeded `0`.
+7. **The readability review was done by me against `u8g2gl-standards`** (headers, Purpose,
+   Doxygen, banners checked with the skill's awk, why-comments, no workspace pointers), not by
+   spawning the `readability-reviewer` agent. One fix: the renderer's static buffers were
+   undocumented.
+
+## Found outside scope
+
+- **63 `<builtin>` fonts exist only under `U8G2_USE_LARGE_FONTS`** (`u8g2_fonts.c`). The
+  validator and the picker offer them on every target, but on a target where `u8g2.h` does not
+  enable the macro (AVR, or any host that is not unix/ARM/ESP) they fail to link. The picker could
+  mark them, and the validator could warn, but that needs a per-target rule.
+- **Custom field controls ignore the form's read-only state.** The display picker, and now the
+  font picker and file chooser, stay enabled while the text cannot be read; the controller still
+  refuses the change, so nothing is written.
+- **Changing a `<convert>`'s `src` with "Choose file…" does not update `width`/`height`**; a PNG
+  of another size is then refused by the validator, as before. Doing both would be two field
+  edits or a new change kind.
+- `/api/files` carries no sizes, so the file chooser shows none, as the WO allowed.
+- The worktree's local `main` ref is behind `dd5454e`; diffs here are against `dd5454e`.
