@@ -16,7 +16,9 @@
  *              `monaco.editor.setModelMarkers` unchanged. A marker spans the
  *              diagnostic's own range when it has one, otherwise the word at
  *              its start, which the caller measures. `parseBuildFailure` reads
- *              the compiler-style text a failed editor Wasm build reports.
+ *              the compiler-style text a failed editor Wasm build or test run
+ *              reports, and `withoutBuildRepeats` drops what it read when the
+ *              live pipeline already says the same thing at the same place.
  *
  * Exports:
  * - MARKER_SEVERITY:        Monaco's MarkerSeverity values
@@ -24,7 +26,10 @@
  * - ProblemRow:             One row of the Problems panel
  * - toProblemRows():        Diagnostics as sorted, keyed rows
  * - markersByFile():        Diagnostics grouped into markers per file
+ * - EDITOR_BUILD_CODE:      The code of a failed editor Wasm build's diagnostics
+ * - TEST_RUN_BUILD_CODE:    The code of a failed test run's diagnostics
  * - parseBuildFailure():    A failed build's text as diagnostics
+ * - withoutBuildRepeats():  Diagnostics with each build one that repeats a live one dropped
  * - sameProblems():         Whether two row lists show the same thing
  */
 
@@ -124,6 +129,15 @@ export function markersByFile(
   return byFile;
 }
 
+/** The Problems code of a failed editor Wasm build's located diagnostics. */
+export const EDITOR_BUILD_CODE = 'U8G2GL_EDITOR_BUILD';
+
+/** The Problems code of a failed test run's located diagnostics. */
+export const TEST_RUN_BUILD_CODE = 'U8G2GL_TEST_RUN_BUILD';
+
+/** The codes {@link parseBuildFailure} gives: diagnostics read back from a build's text. */
+const BUILD_CODES: ReadonlySet<string> = new Set([EDITOR_BUILD_CODE, TEST_RUN_BUILD_CODE]);
+
 /** A header line of the CLI's compiler-style block: `error: file:line:column`. */
 const BLOCK_HEADER = /^(error|warning|info): (.+):(\d+):(\d+)$/;
 
@@ -140,7 +154,7 @@ const BLOCK_HEADER = /^(error|warning|info): (.+):(\d+):(\d+)$/;
  * @param text The failed build record's `error`.
  * @param code The code to give each diagnostic: which build failed.
  */
-export function parseBuildFailure(text: string, code = 'U8G2GL_EDITOR_BUILD'): Diagnostic[] {
+export function parseBuildFailure(text: string, code = EDITOR_BUILD_CODE): Diagnostic[] {
   const lines = text.split('\n');
   const found: Diagnostic[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -159,6 +173,38 @@ export function parseBuildFailure(text: string, code = 'U8G2GL_EDITOR_BUILD'): D
     });
   }
   return found;
+}
+
+// placeKey
+// What a build diagnostic and its live twin reliably share: the file, line and
+// column as written, and the message's first line, trimmed. The block format
+// prints the message on one indented line, and parseBuildFailure() keeps only
+// that line, trimmed, so a multi-line live message is compared by its first.
+//   d — a diagnostic, live or read back from a build
+function placeKey(d: Diagnostic): string {
+  const firstLine = (d.message.split('\n')[0] ?? '').trim();
+  return `${d.file}:${d.line}:${d.column}:${firstLine}`;
+}
+
+/**
+ * @brief The diagnostics to publish, with each build diagnostic that repeats a
+ *        live one dropped.
+ *
+ * An editor build or a test run runs `generate`, which fails on the very
+ * errors the live pipeline has already reported; read back from the build's
+ * text they arrive again under {@link EDITOR_BUILD_CODE} or
+ * {@link TEST_RUN_BUILD_CODE}, so Problems would say each twice. A build
+ * diagnostic is dropped when a live one (any other code) has the same file,
+ * line, column and message (its first line, which is all the build's text
+ * carries). A build diagnostic with no live twin — a compiler error in a
+ * widget's C++, say — is kept, since nothing else reports it.
+ *
+ * @param diagnostics Live and build diagnostics together, in any order.
+ * @return The same list in the same order, less the repeats.
+ */
+export function withoutBuildRepeats(diagnostics: readonly Diagnostic[]): Diagnostic[] {
+  const live = new Set(diagnostics.filter((d) => !BUILD_CODES.has(d.code)).map(placeKey));
+  return diagnostics.filter((d) => !BUILD_CODES.has(d.code) || !live.has(placeKey(d)));
 }
 
 /** @brief Whether two row lists are the same rows in the same order (by key). */

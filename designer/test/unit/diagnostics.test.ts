@@ -12,7 +12,14 @@
 
 import { expect, test } from '@playwright/test';
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
-import { MARKER_SEVERITY, markersByFile, parseBuildFailure, sameProblems, toProblemRows } from '../../src/pipeline/diagnostics';
+import {
+  MARKER_SEVERITY,
+  markersByFile,
+  parseBuildFailure,
+  sameProblems,
+  toProblemRows,
+  withoutBuildRepeats,
+} from '../../src/pipeline/diagnostics';
 
 const font: Diagnostic = {
   code: 'U8G2GL_UNKNOWN_FONT',
@@ -83,4 +90,32 @@ test('a failed build reads back into located diagnostics; other text yields none
     { code: 'U8G2GL_EDITOR_BUILD', severity: 'warning', file: 'globals.xml', line: 3, column: 5, message: 'something minor' },
   ]);
   expect(parseBuildFailure("no Emscripten 5.0.3: run 'u8g2gl toolchain install'")).toEqual([]);
+});
+
+test('a build diagnostic that repeats a live one is dropped; one with no live twin is kept', () => {
+  const live: Diagnostic = {
+    code: 'U8G2GL_REMOVED_ATTRIBUTE',
+    severity: 'error',
+    file: 'u8g2gl.xml',
+    line: 4,
+    column: 60,
+    message: "'cs' is not a U8G2GL attribute: pins and bus are configured by your firmware's board.",
+  };
+  // What the build's text reads back as: the same place and message, the build's code.
+  const [twin] = parseBuildFailure(`error: u8g2gl.xml:4:60\n   ${live.message}`);
+  const compiler = parseBuildFailure("error: widgets/wd_x/wd_x.cpp:12:10\n   expected ';'", 'U8G2GL_TEST_RUN_BUILD')[0];
+  expect(twin).toBeDefined();
+  expect(compiler).toBeDefined();
+  expect(withoutBuildRepeats([live, twin as Diagnostic, compiler as Diagnostic])).toEqual([live, compiler]);
+
+  // A test run's repeat is dropped too, and a build diagnostic at another column is not a twin.
+  const runTwin: Diagnostic = { ...(twin as Diagnostic), code: 'U8G2GL_TEST_RUN_BUILD' };
+  const elsewhere: Diagnostic = { ...(twin as Diagnostic), column: 61 };
+  expect(withoutBuildRepeats([runTwin, live, elsewhere])).toEqual([live, elsewhere]);
+});
+
+test("a multi-line live message is matched by its first line, which is all a build's text carries", () => {
+  const live: Diagnostic = { ...warning, code: 'U8G2GL_DEPRECATED_SCHEMA_VERSION', severity: 'error', message: "Schema version '0.3' is no longer supported.\n  1. a change" };
+  const [repeat] = parseBuildFailure(`error: ${live.file}:${live.line}:${live.column}\n   Schema version '0.3' is no longer supported.\n  1. a change`);
+  expect(withoutBuildRepeats([live, repeat as Diagnostic])).toEqual([live]);
 });

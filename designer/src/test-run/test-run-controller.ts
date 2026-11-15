@@ -48,7 +48,7 @@
  *     - view:              What the toolbar shows
  *     - availability:      Whether Run can be pressed, and why not
  *     - mismatch:          The last mismatch's detail, for the overlay
- *     - diagnostics:       A failed run's diagnostics, for Problems
+ *     - diagnostics:       A failed run's diagnostics, for Problems until the next edit
  *     - reportPath:        Where the last bug report was written
  *     - afterPause:        The *Run after a pause* setting
  *     - setAfterPause():   Change it, and remember it for this browser
@@ -64,7 +64,7 @@
 /// <reference path="../build-flags.d.ts" />
 
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
-import { parseBuildFailure } from '../pipeline/diagnostics';
+import { parseBuildFailure, TEST_RUN_BUILD_CODE } from '../pipeline/diagnostics';
 import type { CompletedRun } from '../pipeline/edit-loop';
 import type { DesignSession } from '../session';
 import { Observable } from '../state/observable';
@@ -100,9 +100,6 @@ const POLL_MS = 200;
  * else in the designer's source.
  */
 const SELF_TEST_FLIP = 'u8g2gl:flip-harness-pixel';
-
-/** The Problems code of a failed run's located diagnostics. */
-const TEST_RUN_BUILD_CODE = 'U8G2GL_TEST_RUN_BUILD';
 
 /** A value the controller reads and is told about: an Observable, read-only. */
 export interface Source<T> {
@@ -173,7 +170,7 @@ export class TestRunController {
   );
   /** The last mismatch while its overlay is shown; cleared at the next edit. */
   readonly mismatch = new Observable<MismatchDetail | undefined>(undefined);
-  /** A failed run's diagnostics, located, for Problems. */
+  /** A failed run's diagnostics, located, for Problems; cleared at the next edit. */
   readonly diagnostics = new Observable<readonly Diagnostic[]>([]);
   /** Where the last bug report was written, once saved. */
   readonly reportPath = new Observable<string | undefined>(undefined);
@@ -388,17 +385,23 @@ export class TestRunController {
   }
 
   // fail
-  // A run that produced no verdict: the reason in Output, located diagnostics in Problems.
+  // A run that produced no verdict: the reason in Output, located diagnostics
+  // in Problems. Like the mismatch overlay, the diagnostics are about the text
+  // the run checked, so an edit made while the server worked means Problems
+  // gets none: they would describe text the editor no longer holds.
   private fail(reason: string, diagnostics: readonly Diagnostic[]): void {
+    const editsSince = this.edits - this.editsAtSnapshot;
     this.target.log(`test run: ${reason}`);
-    this.diagnostics.set(diagnostics);
+    this.diagnostics.set(editsSince === 0 ? diagnostics : []);
     this.lastMismatch = undefined;
     this.mismatch.set(undefined);
-    this.view.set({ kind: 'failed', finishedAt: performance.now(), editsSince: this.edits - this.editsAtSnapshot });
+    this.view.set({ kind: 'failed', finishedAt: performance.now(), editsSince });
   }
 
   // edited
-  // One content change: the verdict is one edit staler and the overlay goes.
+  // One content change: the verdict is one edit staler, and the overlay and a
+  // failed run's Problems go. Both describe the text the run checked; the
+  // verdict line keeps the result visible, with its count of edits since.
   private edited(): void {
     this.edits += 1;
     if (this.afterPause.get()) {
@@ -409,6 +412,7 @@ export class TestRunController {
       }, PAUSE_MS);
     }
     this.mismatch.set(undefined);
+    if (this.diagnostics.get().length > 0) this.diagnostics.set([]);
     const view = this.view.get();
     if (view.kind === 'parity' || view.kind === 'mismatch' || view.kind === 'failed') {
       this.view.set({ ...view, editsSince: this.edits - this.editsAtSnapshot });
