@@ -93,7 +93,7 @@ jobs:
           source "$HOME/emsdk/emsdk_env.sh"
           emcc --version | head -1
           emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor
+          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor u8g2gl_editor_collections
       - name: Wasm snapshot test (D-9 parity golden)
         run: node wasm/test/snapshot.test.mjs
       - name: Wasm placeholder test
@@ -102,6 +102,8 @@ jobs:
         run: node wasm/test/last-error.test.mjs
       - name: Wasm design-hidden test
         run: node wasm/test/design-hidden.test.mjs
+      - name: Wasm collection-data test (fill by name matches hand-written calls)
+        run: node wasm/test/collection-data.test.mjs
       - name: Install CLI
         run: cd cli && npm ci
       - name: CLI tests that need Emscripten, with Emscripten present
