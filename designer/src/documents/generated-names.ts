@@ -12,9 +12,9 @@
  *          are identical.
  * Description: Parses the text under the `'generate'` missing-name policy,
  *              knowing the manifests' static child names so a `<column>` is
- *              never named, and applies the insertions it returns. Only screens and widget
- *              manifests have element names; other documents come back
- *              unchanged.
+ *              never named, and applies the insertions it returns. Only
+ *              screens and widget manifests have element names; other
+ *              documents come back unchanged.
  *
  * Exports:
  * - withGeneratedNames():  A document's text with its missing names inserted

@@ -7,8 +7,9 @@
  * Purpose: Pins the validator changes PR-04 WO7 makes on top of composite
  *          expansion: binding types checked inside composite interiors (WO3
  *          carry); flag values checked (WO5a carry); a composite's top level
- *          bounds-checked against each instance's size; declared collection
- *          children known to Pass 2 (WO5b carry); and the parser keeping
+ *          bounds-checked against each instance's size; a declared static
+ *          child (`<column>`) is not an element, and validates cleanly
+ *          (§6.5); and the parser keeping
  *          `extends` on a manifest with a `<view>` (WO5b carry).
  * Description: Parses real XML so locations are real; runs single passes against
  *              the bundled framework manifests.

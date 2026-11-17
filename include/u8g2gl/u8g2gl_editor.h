@@ -10,8 +10,9 @@
  * Purpose: The editor target's side of the runtime ([UD-4], design_spec §13.1).
  *          The designer must render arbitrary XML without a C++ compiler in the
  *          browser, so its Wasm build constructs objects by name, sets their
- *          properties by name and draws class-less elements by name from a
- *          scene description (ui_spec §4.1 steps 6-7). This header declares the
+ *          properties by name, adds their static children by name, fills
+ *          their `<data>` rows by name and draws class-less elements by name
+ *          from a scene description (ui_spec §4.1 steps 6-7). This header declares the
  *          shapes of that registry and the lookups over it; the registry itself
  *          is generated from the same `<api>` manifests the firmware setters are
  *          (`ui_editor_registry.cpp`, PR-04 WO11), so both targets reach the
@@ -26,9 +27,10 @@
  *          every table is `const` data.
  *
  * Description: A value type the host fills from the scene description; the
- *              class, property, binding, drawing, directive and flag entry types
- *              the generated registry is made of; and the by-name operations —
- *              construct, set, bind, draw — that check what the host hands them
+ *              class, property, binding, static child, fill, drawing, directive
+ *              and flag entry types the generated registry is made of; and the
+ *              by-name operations — construct, set, bind, add a static child,
+ *              fill `<data>` rows, draw — that check what the host hands them
  *              before calling a generated thunk.
  *
  * Exported Classes:
@@ -41,6 +43,7 @@
  * - u8g2gl_editor_field:     One `<field>` of a `<data>` row, with its declared rules
  * - u8g2gl_editor_cell:      One field's value(s) in one row, as the host parsed it
  * - u8g2gl_editor_data:      Fill-by-name entry for one `<data>` (§9.2)
+ * - u8g2gl_editor_element_fn, u8g2gl_editor_fill_fn: The add and fill thunk types
  * - u8g2gl_editor_param:     One argument of a draw-by-name entry
  * - u8g2gl_editor_drawing:   Draw-by-name entry for one drawing element
  * - u8g2gl_editor_directive: A `bind_flag_if_*` directive, per subject type (§8.4)

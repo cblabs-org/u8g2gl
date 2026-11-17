@@ -31,7 +31,7 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import { CPP_KEYWORDS } from '../schema/cpp-keywords.js';
-import type { ElementArgDef, ElementDef, PropType, WidgetManifest } from '../schema/widget-manifest.js';
+import { DATA_FIELD_TYPES, type ElementArgDef, type ElementDef, type PropType, type WidgetManifest } from '../schema/widget-manifest.js';
 import { staticChildrenOf, type WidgetNode } from '../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, isDrawingElement } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
@@ -40,9 +40,10 @@ import { booleanValueError, enumValueError } from './value-rules.js';
 /**
  * The `<arg>` types a static child can write: those whose value is a literal
  * in the screen XML. A font, image, subject or style names a project
- * declaration, and colour is a drawing mode, so none is an argument here.
+ * declaration, and colour is a drawing mode, so none is an argument here. The
+ * same four a `<data>` field can carry, so the one list is used.
  */
-export const STATIC_ARG_TYPES: readonly PropType[] = ['int', 'bool', 'string', 'enum'];
+export const STATIC_ARG_TYPES: readonly PropType[] = DATA_FIELD_TYPES;
 
 /** Every `PropType`, so an arg type outside them is unknown rather than merely refused. */
 const PROP_TYPES: readonly PropType[] = ['int', 'bool', 'string', 'enum', 'font', 'image', 'subject', 'style', 'color'];

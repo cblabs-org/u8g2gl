@@ -142,8 +142,8 @@ function parseStaticChild(el: RawXmlElement, filename: string, diagnostics: Diag
  * @brief The static child tags each manifest declares (`<element>`, §6.5), by
  *        the manifest's tag, for {@link ParseOptions.staticChildren}.
  *
- * Declared manifests, not effective ones: collection elements are the
- * element's own and are not inherited (PR-04 WO1 F8). A manifest declaring
+ * Declared manifests, not effective ones: an `<element>` describes one
+ * class's own access method and is not inherited (§6.5). A manifest declaring
  * none is left out, so the map is empty for a project with none.
  *
  * @param manifests Every declared manifest, framework and project.

@@ -7,7 +7,6 @@
  * SPDX-License-Identifier: MIT
  *
  * File: test/test_static_children.cpp
- *
  * Purpose: Static children made real (design_spec §6.5). A service list's
  *          columns are written in the screen XML as `<column>` children, and
  *          both targets must configure the widget exactly as a hand-written

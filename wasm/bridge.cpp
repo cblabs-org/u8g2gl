@@ -865,6 +865,7 @@ size_t count_strings(const scene_json& rows) {
 //   cell    — receives the value
 bool parse_cell(collection_fill& fill, const u8g2gl_editor_field& field, const scene_json& json, int32_t repeat,
                 const std::string& where, u8g2gl_editor_cell* cell) {
+    // --- Step 1: A repeated field: an array of texts, no longer than its repeat ---
     if (field.repeated) {
         // Left out, a repeated field is an empty array: every cell blank.
         if (json.is_null()) {
@@ -890,6 +891,7 @@ bool parse_cell(collection_fill& fill, const u8g2gl_editor_field& field, const s
         cell->count = static_cast<uint16_t>(fill.arrays.back().size());
         return true;
     }
+    // --- Step 2: A single field: present, and a value of its type ---
     if (json.is_null()) {
         return fail(where + ": missing");
     }

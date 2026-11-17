@@ -425,9 +425,11 @@ export const DIAGNOSTIC_CODES = {
    * the widget declares; a field's type is one no row can carry (`font`,
    * `image`, `subject`, `style`, `color`); or a field has a bound its type does
    * not take (`repeat` is a string field's only), a non-integer `min`/`max`,
-   * `min` above `max`, or is an enum with no values. Located at the attribute at fault. An unknown field type is
-   * `U8G2GL_INVALID_ENUM_VALUE`, and a repeated name `U8G2GL_DUPLICATE_NAME`,
-   * as for a `<prop>`.
+   * `min` above `max`, or is an enum with no values. The same code for an
+   * `<element>` with no class, a non-identifier `access`, or an `<arg>` whose
+   * type no literal can be or an enum with no values. Located at the attribute
+   * at fault. An unknown field or arg type is `U8G2GL_INVALID_ENUM_VALUE`, and
+   * a repeated name `U8G2GL_DUPLICATE_NAME`, as for a `<prop>`.
    */
   INVALID_DATA_DECLARATION: 'U8G2GL_INVALID_DATA_DECLARATION',
 } as const;

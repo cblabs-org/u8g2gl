@@ -18,7 +18,8 @@
  *
  * Description: Value constructors, linear lookups over the generated tables
  *              (a scene has tens of elements, so a search beats any index), and
- *              the construct / set / bind / draw operations. The whole file is
+ *              the construct / set / bind / add-static-child / fill / draw
+ *              operations. The whole file is
  *              under `U8G2GL_EDITOR`: a firmware build compiles it to nothing,
  *              which is how firmware pays nothing for the editor.
  */

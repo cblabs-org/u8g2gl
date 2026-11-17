@@ -13,9 +13,10 @@
  * Description: Reads a project directory (u8g2gl.xml, globals.xml, screens/,
  *              widgets/) or a single XML file dispatched by its root tag, parses
  *              every document, and builds the registry from the bundled framework
- *              manifests plus the project's. Manifests are parsed before screens,
- *              so a screen's parse knows which children are static (§6.5). A single file that *is* a bundled
- *              framework manifest stands in for its bundled copy (WO5a, WO1 F5).
+ *              manifests plus the project's. Manifests are parsed before
+ *              screens, so a screen's parse knows which children are static
+ *              (§6.5). A single file that *is* a bundled framework manifest
+ *              stands in for its bundled copy (WO5a, WO1 F5).
  *              The file map it returns holds every source text a diagnostic can
  *              point into — project files and the bundled framework manifests
  *              (WO1 F9) — so human output can always print the source line.
@@ -296,7 +297,7 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
     }
   }
 
-  // --- Step 2: Framework manifests — parsed, and their text kept for diagnostics ---
+  // --- Step 2: Framework manifests — their diagnostics and text kept (parsed up front, above) ---
   // The framework manifests come from the bundle, not from include/: an
   // npm-installed CLI has no include/ to read ([D-17]). Their text joins the
   // file map so a diagnostic located in one prints its source line (WO1 F9);

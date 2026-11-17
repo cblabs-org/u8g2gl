@@ -71,7 +71,7 @@ export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 // The PR that delivers each deferred construct. Named once so the messages
 // cannot disagree with each other, and so each PR finds its own entries here.
 const FOCUS_AND_EVENTS_PR = 'PR-09';
-const COLLECTIONS_AND_CLASSED_COMPOSITES_PR = 'PR-08';
+const CLASSED_COMPOSITES_PR = 'PR-08';
 
 // deferredDiagnostic
 // Builds one NOT_YET_SUPPORTED diagnostic at the caller's policy severity.
@@ -181,7 +181,7 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
         deferredDiagnostic(
           severity,
           `Composite <${composite.name}> also extends C++ class '${composite.extends}': a composite ` +
-            `with a C++ class of its own — ${refusalClause(COLLECTIONS_AND_CLASSED_COMPOSITES_PR)}.`,
+            `with a C++ class of its own — ${refusalClause(CLASSED_COMPOSITES_PR)}.`,
           composite.loc,
           composite.name,
         ),

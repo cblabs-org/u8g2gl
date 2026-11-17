@@ -14,8 +14,9 @@
  *              covers composites too, per [D-18] — PR-3R WO9 retired the
  *              separate `<component>` root) under the `'generate'` missing-name
  *              policy, knowing every manifest's static child names (§6.5), so
- *              a `<column>` is never named; applies the resulting insertions to their source files,
- *              and reports which names landed in which file. It never
+ *              a `<column>` is never named; applies the resulting insertions
+ *              to their source files, and reports which names landed in which
+ *              file. It never
  *              re-serialises XML — every change is a text insertion at a
  *              recorded source location, so comments, attribute order and
  *              indentation are preserved by construction.
