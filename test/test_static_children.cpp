@@ -31,6 +31,7 @@
 #include "editor_host.h"
 #include "fixture_u8g2_fonts.h"
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_editor.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "wd_service_list.hpp"
@@ -174,4 +175,50 @@ TEST(StaticChildren, TheDefaultCellHoldsTwentyFourCharacters) {
     const std::vector<std::string> cells = drawn_cells(rendered(&list));
     ASSERT_EQ(cells.size(), 1u);
     EXPECT_EQ(cells[0], "ABCDEFGHIJKLMNOPQRSTUVWX");
+}
+
+// --- The fill entry: the widget's own refusal stops the fill (Q-19) ---
+
+TEST(StaticChildren, FillStopsWhereTheWidgetRefusesARowAndKeepsTheRowsItTook) {
+    editor_host host(ui_editor_registry());
+    ASSERT_TRUE(host.load(U8G2GL_STATIC_CHILDREN_SCENE_PATH)) << host.error();
+    host.provide_font("u8g2_font_6x10_mr", u8g2_font_6x10_mr);
+    ASSERT_TRUE(host.build("board")) << host.error();
+    const u8g2gl_editor_class* cls = u8g2gl_editor_find_class(ui_editor_registry(), "wd_service_list");
+    ASSERT_NE(cls, nullptr);
+    auto* list = static_cast<wd_service_list*>(host.object(0));
+
+    // Five rows, one more than the board's max_rows of 4. The bridge refuses
+    // that before calling anything; called directly, the fill reaches
+    // add_row()'s own false at the fifth, as a device controller would.
+    const char* const texts[] = {"a"};
+    u8g2gl_editor_cell cell{};
+    cell.texts = texts;
+    cell.count = 1;
+    const u8g2gl_editor_cell* const rows[] = {&cell, &cell, &cell, &cell, &cell};
+    size_t accepted = 0;
+    EXPECT_FALSE(u8g2gl_editor_fill(*cls, list, "rows", rows, 5, &accepted));
+    EXPECT_EQ(accepted, 4u);
+    EXPECT_EQ(list->row_count(), 4u);
+}
+
+TEST(StaticChildren, FillRefusesACellThatIsNotItsFieldAndCallsNothing) {
+    editor_host host(ui_editor_registry());
+    ASSERT_TRUE(host.load(U8G2GL_STATIC_CHILDREN_SCENE_PATH)) << host.error();
+    host.provide_font("u8g2_font_6x10_mr", u8g2_font_6x10_mr);
+    ASSERT_TRUE(host.build("board")) << host.error();
+    const u8g2gl_editor_class* cls = u8g2gl_editor_find_class(ui_editor_registry(), "wd_service_list");
+    ASSERT_NE(cls, nullptr);
+    auto* list = static_cast<wd_service_list*>(host.object(0));
+    fill(*list);
+
+    // A repeated field with a null text in its array: refused before begin().
+    const char* const texts[] = {"a", nullptr};
+    u8g2gl_editor_cell cell{};
+    cell.texts = texts;
+    cell.count = 2;
+    const u8g2gl_editor_cell* const rows[] = {&cell};
+    EXPECT_FALSE(u8g2gl_editor_fill(*cls, list, "rows", rows, 1, nullptr));
+    EXPECT_EQ(list->row_count(), 3u);
+    EXPECT_FALSE(u8g2gl_editor_fill(*cls, list, "carriages", rows, 1, nullptr));
 }

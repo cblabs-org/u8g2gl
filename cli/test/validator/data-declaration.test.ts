@@ -226,6 +226,13 @@ describe('the <data> rules', () => {
     });
   });
 
+  it('refuses repeat on a non-string field', () => {
+    expect(onlyDiagnostic(list('    <data name="rows" access="add_row">\n      <field name="n" type="int" repeat="3" />\n    </data>'))).toMatchObject({
+      code: DIAGNOSTIC_CODES.INVALID_DATA_DECLARATION,
+      offendingText: 'repeat',
+    });
+  });
+
   it('refuses max_len on a non-string field', () => {
     expect(onlyDiagnostic(list('    <data name="rows" access="add_row">\n      <field name="n" type="int" max_len="4" />\n    </data>'))).toMatchObject({
       code: DIAGNOSTIC_CODES.INVALID_DATA_DECLARATION,

@@ -1512,6 +1512,32 @@ static const u8g2gl_editor_element ui_editor_wd_service_list_elements[] = {
         },
         ui_editor_wd_service_list_column_args, 2},
 };
+static const u8g2gl_editor_field ui_editor_wd_service_list_rows_fields[] = {
+    {"cells", nullptr, {"max_cols", 6}, {"max_cell_chars", 24}, INT32_MIN, INT32_MAX, U8G2GL_EDITOR_STRING, 0, true},
+};
+static const auto ui_editor_wd_service_list_rows_call = [](auto* s, auto... a) -> decltype(s->add_row(a...)) { return s->add_row(a...); };
+static_assert(std::is_invocable_v<decltype(ui_editor_wd_service_list_rows_call), wd_service_list*, const char* const*, size_t>,
+              "wd_service_list <data name=\"rows\">: add_row() cannot be called with the fields the manifest declares (cells: string[] as const char* const*, size_t); make the <field>s match the method's parameters");
+static const u8g2gl_editor_data ui_editor_wd_service_list_data[] = {
+    // <data name="rows"> → begin(), add_row() per row, commit()
+    {"rows", "add_row",
+        [](u8g2gl_obj* obj, const u8g2gl_editor_cell* const* rows, size_t row_count, size_t* accepted) -> bool {
+            wd_service_list* self = static_cast<wd_service_list*>(obj);
+            self->begin();
+            size_t taken = 0;
+            bool ok = true;
+            for (size_t r = 0; r < row_count && ok; ++r) {
+                const u8g2gl_editor_cell* c = rows[r];
+                ok = u8g2gl_editor_row_call(self, [c](wd_service_list* s) { return ui_editor_wd_service_list_rows_call(s, c[0].texts, static_cast<size_t>(c[0].count)); });
+                taken += ok ? 1 : 0;
+            }
+            // The rows taken are published even after a refusal, as on the device.
+            self->commit();
+            *accepted = taken;
+            return ok;
+        },
+        ui_editor_wd_service_list_rows_fields, {"max_rows", 16}, 1},
+};
 
 // --- u8g2gl_box: drawing element, u8g2gl_draw_box() ([D-18]) ---
 static const u8g2gl_editor_param ui_editor_u8g2gl_box_params[] = {
@@ -1604,7 +1630,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_button_properties,
         ui_editor_u8g2gl_button_bindings,
         nullptr,
-        sizeof(u8g2gl_button), alignof(u8g2gl_button), 13, 6, 0},
+        nullptr,
+        sizeof(u8g2gl_button), alignof(u8g2gl_button), 13, 6, 0, 0},
     // u8g2gl_clock
     {"u8g2gl_clock",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_clock(); },
@@ -1612,7 +1639,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_clock_properties,
         ui_editor_u8g2gl_clock_bindings,
         nullptr,
-        sizeof(u8g2gl_clock), alignof(u8g2gl_clock), 15, 7, 0},
+        nullptr,
+        sizeof(u8g2gl_clock), alignof(u8g2gl_clock), 15, 7, 0, 0},
     // u8g2gl_glyph
     {"u8g2gl_glyph",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_glyph(); },
@@ -1620,7 +1648,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_glyph_properties,
         ui_editor_u8g2gl_glyph_bindings,
         nullptr,
-        sizeof(u8g2gl_glyph), alignof(u8g2gl_glyph), 12, 6, 0},
+        nullptr,
+        sizeof(u8g2gl_glyph), alignof(u8g2gl_glyph), 12, 6, 0, 0},
     // u8g2gl_label
     {"u8g2gl_label",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_label(); },
@@ -1628,7 +1657,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_label_properties,
         ui_editor_u8g2gl_label_bindings,
         nullptr,
-        sizeof(u8g2gl_label), alignof(u8g2gl_label), 16, 6, 0},
+        nullptr,
+        sizeof(u8g2gl_label), alignof(u8g2gl_label), 16, 6, 0, 0},
     // u8g2gl_obj
     {"u8g2gl_obj",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_obj(); },
@@ -1636,7 +1666,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_obj_properties,
         ui_editor_u8g2gl_obj_bindings,
         nullptr,
-        sizeof(u8g2gl_obj), alignof(u8g2gl_obj), 11, 6, 0},
+        nullptr,
+        sizeof(u8g2gl_obj), alignof(u8g2gl_obj), 11, 6, 0, 0},
     // u8g2gl_progress_bar
     {"u8g2gl_progress_bar",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_progress_bar(); },
@@ -1644,7 +1675,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_progress_bar_properties,
         ui_editor_u8g2gl_progress_bar_bindings,
         nullptr,
-        sizeof(u8g2gl_progress_bar), alignof(u8g2gl_progress_bar), 15, 7, 0},
+        nullptr,
+        sizeof(u8g2gl_progress_bar), alignof(u8g2gl_progress_bar), 15, 7, 0, 0},
     // u8g2gl_switch
     {"u8g2gl_switch",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_switch(); },
@@ -1652,7 +1684,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_switch_properties,
         ui_editor_u8g2gl_switch_bindings,
         nullptr,
-        sizeof(u8g2gl_switch), alignof(u8g2gl_switch), 12, 7, 0},
+        nullptr,
+        sizeof(u8g2gl_switch), alignof(u8g2gl_switch), 12, 7, 0, 0},
     // u8g2gl_xbm
     {"u8g2gl_xbm",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) u8g2gl_xbm(); },
@@ -1660,7 +1693,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_u8g2gl_xbm_properties,
         ui_editor_u8g2gl_xbm_bindings,
         nullptr,
-        sizeof(u8g2gl_xbm), alignof(u8g2gl_xbm), 12, 6, 0},
+        nullptr,
+        sizeof(u8g2gl_xbm), alignof(u8g2gl_xbm), 12, 6, 0, 0},
     // wd_service_list
     {"wd_service_list",
         [](void* storage) -> u8g2gl_obj* { return ::new (storage) wd_service_list(); },
@@ -1668,7 +1702,8 @@ static const u8g2gl_editor_class ui_editor_classes[] = {
         ui_editor_wd_service_list_properties,
         ui_editor_wd_service_list_bindings,
         ui_editor_wd_service_list_elements,
-        sizeof(wd_service_list), alignof(wd_service_list), 16, 6, 1},
+        ui_editor_wd_service_list_data,
+        sizeof(wd_service_list), alignof(wd_service_list), 16, 6, 1, 1},
 };
 
 static const u8g2gl_editor_drawing ui_editor_drawings[] = {

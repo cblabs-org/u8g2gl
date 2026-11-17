@@ -26,6 +26,7 @@
  *     - applyScene():       Build the scene's default screen
  *     - selectScreen():     Switch to another of its screens
  *     - applySampleData():  Set subject values
+ *     - applyCollectionData(): Fill collection widgets' rows (schema 0.7 `<data>`)
  *
  *     Frame:
  *     - renderFrame():      Tick and draw; a view of the 1-bit buffer
@@ -64,6 +65,20 @@ export interface EditorModule {
   selectScreen(name: string): boolean;
   /** @brief Sets subject values from a `{ name: value }` object's JSON. */
   applySampleData(json: string): boolean;
+  /**
+   * @brief Fills collection widgets on the active screen, through each
+   *        widget's own ingestion API (design_spec §9.2).
+   *
+   * `json` is `{ "<element name>": { "<data name>": [ rows ] } }`, each row an
+   * object keyed by field name; see `applyCollectionData()` in
+   * `wasm/bridge.cpp`. Every row is checked before any widget is called, so a
+   * refusal changes nothing. Objects are rebuilt by `applyScene()` and
+   * `selectScreen()`, so the data is applied again after each.
+   *
+   * @return False, with `lastError()` naming the element, row and field or
+   *         the capacity, on a refusal.
+   */
+  applyCollectionData(json: string): boolean;
   /**
    * @brief Ticks and draws the active screen.
    *
@@ -112,6 +127,7 @@ interface EmscriptenModule {
   _applyScene(pointer: number): number;
   _selectScreen(pointer: number): number;
   _applySampleData(pointer: number): number;
+  _applyCollectionData(pointer: number): number;
   _renderFrame(ms: number): number;
   _getBufferSize(): number;
   _getDisplayWidth(): number;
@@ -185,6 +201,7 @@ function wrap(module: EmscriptenModule): EditorModule {
     applyScene: (json) => withString((p) => module._applyScene(p), json) === 1,
     selectScreen: (name) => withString((p) => module._selectScreen(p), name) === 1,
     applySampleData: (json) => withString((p) => module._applySampleData(p), json) === 1,
+    applyCollectionData: (json) => withString((p) => module._applyCollectionData(p), json) === 1,
     renderFrame(ms) {
       const pointer = module._renderFrame(Math.max(0, Math.floor(ms)) >>> 0);
       if (pointer === 0) {

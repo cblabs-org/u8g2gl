@@ -150,6 +150,24 @@ int u8g2gl_editor_find_element_arg(const u8g2gl_editor_element& element, const c
     return -1;
 }
 
+const u8g2gl_editor_data* u8g2gl_editor_find_data(const u8g2gl_editor_class& cls, const char* name) {
+    for (uint8_t i = 0; i < cls.data_count; ++i) {
+        if (name != nullptr && std::strcmp(cls.data[i].name, name) == 0) {
+            return &cls.data[i];
+        }
+    }
+    return nullptr;
+}
+
+int u8g2gl_editor_find_field(const u8g2gl_editor_data& data, const char* name) {
+    for (uint8_t i = 0; i < data.field_count; ++i) {
+        if (name != nullptr && std::strcmp(data.fields[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 int u8g2gl_editor_find_param(const u8g2gl_editor_drawing& drawing, const char* name) {
     for (uint8_t i = 0; i < drawing.param_count; ++i) {
         if (name != nullptr && std::strcmp(drawing.params[i].name, name) == 0) {
@@ -249,6 +267,74 @@ bool u8g2gl_editor_add_element(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, 
         }
     }
     return element->add(obj, args);
+}
+
+// cell_fits
+// Whether one cell is what its field declares: the type, an int within its
+// bounds, an enum one of its values, a repeated field an array of texts. A
+// string's max_len is not checked: the widget truncates a longer one, as the
+// device does, so refusing it would make the canvas stricter than the device.
+static bool cell_fits(const u8g2gl_editor_field& field, const u8g2gl_editor_cell& cell) {
+    if (field.repeated) {
+        if (cell.count > 0 && cell.texts == nullptr) {
+            return false;
+        }
+        for (uint16_t i = 0; i < cell.count; ++i) {
+            if (cell.texts[i] == nullptr) {
+                return false;
+            }
+        }
+        return true;
+    }
+    const u8g2gl_editor_value& value = cell.value;
+    if (value.type != field.type) {
+        return false;
+    }
+    switch (field.type) {
+        case U8G2GL_EDITOR_INT:
+            return value.integer >= field.min && value.integer <= field.max;
+        case U8G2GL_EDITOR_STRING:
+            return value.text != nullptr;
+        case U8G2GL_EDITOR_ENUM:
+            for (uint8_t i = 0; i < field.value_count; ++i) {
+                if (u8g2gl_editor_is(value, field.values[i])) {
+                    return true;
+                }
+            }
+            return false;
+        default:
+            return true;
+    }
+}
+
+// u8g2gl_editor_fill
+// One <data> block's rows: every cell checked first, so a refusal calls
+// nothing, then the generated thunk's begin / access per row / commit.
+bool u8g2gl_editor_fill(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name,
+                        const u8g2gl_editor_cell* const* rows, size_t row_count, size_t* accepted) {
+    // --- Step 1: The entry, and every cell against its field ---
+    const u8g2gl_editor_data* data = u8g2gl_editor_find_data(cls, name);
+    if (data == nullptr || obj == nullptr || (row_count > 0 && rows == nullptr)) {
+        return false;
+    }
+    for (size_t r = 0; r < row_count; ++r) {
+        if (rows[r] == nullptr) {
+            return false;
+        }
+        for (uint8_t f = 0; f < data->field_count; ++f) {
+            if (!cell_fits(data->fields[f], rows[r][f])) {
+                return false;
+            }
+        }
+    }
+
+    // --- Step 2: The widget's own ingestion ---
+    size_t taken = 0;
+    const bool ok = data->fill(obj, rows, row_count, &taken);
+    if (accepted != nullptr) {
+        *accepted = taken;
+    }
+    return ok;
 }
 
 bool u8g2gl_editor_bind(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name, void* subject,

@@ -19,6 +19,9 @@
  *              `applyScene()` receives flat `ui_scene.json` text, sets up the
  *              virtual display and subjects, and constructs the active screen.
  *              `applySampleData()` applies key-value pairs to active subjects.
+ *              `applyCollectionData()` fills collection widgets by element
+ *              name through their `<data>` fill entries (§9.2): rows checked
+ *              against the declared fields and capacity before any call.
  *              `renderFrame()` ticks animating objects, renders into a virtual
  *              U8G2 display buffer, and returns a pointer to the raw buffer.
  *
@@ -62,6 +65,7 @@
  *     - applyScene():       Parse scene JSON and build the default screen
  *     - selectScreen():     Switch active screen and rebuild objects
  *     - applySampleData():  Set subject values from a JSON object
+ *     - applyCollectionData(): Fill collection widgets' rows from a JSON object
  *     - teardown():         Destroy objects, clear subjects, reset arena
  *     Frame:
  *     - renderFrame():      Tick objects and render to the virtual U8G2 buffer
@@ -807,6 +811,175 @@ bool design_hidden_draw_call(const scene_json& element, const std::vector<bool>&
     return false;
 }
 
+// count_for
+// A `capacity`, `repeat` or `max_len` for one instance: the prop it names as
+// the element writes it, else the manifest's literal or the prop's default;
+// -1 when there is none.
+//   count   — the registry's declaration
+//   element — the scene element; its `properties` carry what it writes
+int32_t count_for(const u8g2gl_editor_count& count, const scene_json& element) {
+    if (count.prop != nullptr) {
+        for (const scene_json& property : element.get("properties").items()) {
+            if (property.get("name").as_string() == count.prop && property.get("value").is_number()) {
+                return property.get("value").as_int();
+            }
+        }
+    }
+    return count.value;
+}
+
+/** One `<data>` block's rows, parsed and checked, ready for the fill call. */
+struct collection_fill {
+    size_t object = 0;
+    const u8g2gl_editor_data* data = nullptr;
+    std::string element;
+    std::vector<std::string> texts;                 // every string a cell points at; reserved, never moved
+    std::vector<std::vector<const char*>> arrays;   // a repeated field's texts, per cell
+    std::vector<std::vector<u8g2gl_editor_cell>> cells;
+    std::vector<const u8g2gl_editor_cell*> rows;
+};
+
+// count_strings
+// How many strings a block's rows carry, so `texts` can be reserved once and
+// the pointers into it stay valid.
+size_t count_strings(const scene_json& rows) {
+    size_t total = 0;
+    for (const scene_json& row : rows.items()) {
+        for (const auto& member : row.object) {
+            total += member.second.is_string() ? 1 : 0;
+            if (member.second.is_array()) total += member.second.items().size();
+        }
+    }
+    return total;
+}
+
+// parse_cell
+// One field of one row into its cell, refusing a value that is not the
+// field's: wrong JSON type, an int out of bounds, an enum not among its
+// values, or a repeated field longer than its repeat.
+//   fill    — the block being parsed; owns the strings
+//   field   — the declaration
+//   json    — the row's value for it, or null when the row leaves it out
+//   repeat  — the instance's repeat for a repeated field
+//   where   — "services rows[2].cells", for the message
+//   cell    — receives the value
+bool parse_cell(collection_fill& fill, const u8g2gl_editor_field& field, const scene_json& json, int32_t repeat,
+                const std::string& where, u8g2gl_editor_cell* cell) {
+    if (field.repeated) {
+        // Left out, a repeated field is an empty array: every cell blank.
+        if (json.is_null()) {
+            return true;
+        }
+        if (!json.is_array()) {
+            return fail(where + ": must be an array of strings");
+        }
+        if (repeat >= 0 && json.items().size() > static_cast<size_t>(repeat)) {
+            return fail(where + ": " + std::to_string(json.items().size()) + " values, more than its " +
+                        std::to_string(repeat));
+        }
+        std::vector<const char*> texts;
+        for (const scene_json& text : json.items()) {
+            if (!text.is_string()) {
+                return fail(where + ": must be an array of strings");
+            }
+            fill.texts.push_back(text.as_string());
+            texts.push_back(fill.texts.back().c_str());
+        }
+        fill.arrays.push_back(std::move(texts));
+        cell->texts = fill.arrays.back().data();
+        cell->count = static_cast<uint16_t>(fill.arrays.back().size());
+        return true;
+    }
+    if (json.is_null()) {
+        return fail(where + ": missing");
+    }
+    switch (field.type) {
+        case U8G2GL_EDITOR_INT:
+            if (!json.is_number()) return fail(where + ": must be an integer");
+            if (json.number < field.min || json.number > field.max) {
+                return fail(where + ": " + std::to_string(json.number) + " is outside " + std::to_string(field.min) +
+                            ".." + std::to_string(field.max));
+            }
+            cell->value = u8g2gl_editor_int(json.as_int());
+            return true;
+        case U8G2GL_EDITOR_BOOL:
+            if (!json.is_bool()) return fail(where + ": must be true or false");
+            cell->value = u8g2gl_editor_bool(json.as_bool());
+            return true;
+        case U8G2GL_EDITOR_STRING:
+        case U8G2GL_EDITOR_ENUM: {
+            if (!json.is_string()) return fail(where + ": must be a string");
+            fill.texts.push_back(json.as_string());
+            cell->value = u8g2gl_editor_text(field.type, fill.texts.back().c_str());
+            if (field.type == U8G2GL_EDITOR_ENUM) {
+                for (uint8_t i = 0; i < field.value_count; ++i) {
+                    if (u8g2gl_editor_is(cell->value, field.values[i])) return true;
+                }
+                std::string allowed;
+                for (uint8_t i = 0; i < field.value_count; ++i) allowed += (i == 0 ? "" : ", ") + std::string(field.values[i]);
+                return fail(where + ": '" + json.as_string() + "' is not one of " + allowed);
+            }
+            return true;
+        }
+        default:
+            return fail(where + ": the field's type cannot be filled");
+    }
+}
+
+// parse_block
+// One element's `<data>` block: the rows, against the instance's capacity and
+// each row against the fields. Nothing is called on the widget here.
+//   object  — the element's object index
+//   element — its scene element
+//   data    — the registry's fill entry
+//   rows    — the JSON array
+//   fill    — receives the parsed rows
+bool parse_block(size_t object, const scene_json& element, const u8g2gl_editor_data& data, const scene_json& rows,
+                 collection_fill* fill) {
+    const std::string& name = element.get("name").as_string();
+    const std::string where = name + " " + data.name;
+    if (!rows.is_array()) {
+        return fail(where + ": rows must be an array");
+    }
+    // --- Step 1: The capacity this instance declares, as add_row returns false past it ---
+    const int32_t capacity = count_for(data.capacity, element);
+    if (capacity >= 0 && rows.items().size() > static_cast<size_t>(capacity)) {
+        return fail(where + ": " + std::to_string(rows.items().size()) + " rows, over the capacity of " +
+                    std::to_string(capacity));
+    }
+    // --- Step 2: Each row against the fields ---
+    fill->object = object;
+    fill->data = &data;
+    fill->element = name;
+    fill->texts.reserve(count_strings(rows));
+    fill->arrays.reserve(rows.items().size() * data.field_count);
+    for (size_t r = 0; r < rows.items().size(); ++r) {
+        const scene_json& row = rows.items()[r];
+        const std::string at = where + "[" + std::to_string(r) + "]";
+        if (!row.is_object()) {
+            return fail(at + ": a row must be an object keyed by field name");
+        }
+        for (const auto& member : row.object) {
+            if (u8g2gl_editor_find_field(data, member.first.c_str()) < 0) {
+                return fail(at + "." + member.first + ": no such field");
+            }
+        }
+        std::vector<u8g2gl_editor_cell> cells(data.field_count);
+        for (uint8_t f = 0; f < data.field_count; ++f) {
+            const u8g2gl_editor_field& field = data.fields[f];
+            const int32_t repeat = field.repeated ? count_for(field.repeat, element) : 0;
+            if (!parse_cell(*fill, field, row.get(field.name), repeat, at + "." + field.name, &cells[f])) {
+                return false;
+            }
+        }
+        fill->cells.push_back(std::move(cells));
+    }
+    for (const auto& cells : fill->cells) {
+        fill->rows.push_back(cells.data());
+    }
+    return true;
+}
+
 // json_escape
 // A string as the body of a JSON string literal.
 std::string json_escape(const std::string& text) {
@@ -1015,6 +1188,107 @@ int applySampleData(const char* sample_data_json) {
                     slot->time_subject->set(static_cast<uint32_t>(val.as_int()));
                 }
                 break;
+        }
+    }
+    return 1;
+}
+
+/**
+ * @brief Fill collection widgets on the active screen from a JSON object
+ *        (schema 0.7 `<data>`, design_spec §9.2).
+ *
+ * The shape is always `{ "<element name>": { "<data name>": [ rows ] } }`,
+ * even for a widget with one `<data>`, so a widget that gains a second keeps
+ * its data valid. A row is an object keyed by field name: an `int` field a
+ * number, a `bool` a boolean, a `string` or `enum` a string, and a repeated
+ * field an array of strings, which may be shorter than its repeat or left out.
+ *
+ *     { "services": { "rows": [ { "cells": ["10:02", "Reading", "4", "On time"] } ] },
+ *       "formation": { "carriages": [ { "number": 1, "class_type": "first",
+ *                                       "wheelchair": true, "bike": false, "loading_pct": 40 } ] } }
+ *
+ * Every element, block and row is checked before any widget is called, so a
+ * refusal changes nothing: an element the active screen has no object for, a
+ * placeholder, a data name its class does not declare, more rows than the
+ * instance's capacity (naming the element and the capacity, as `add_row`
+ * returns false on the device), or a bad row (naming the element, the row
+ * index and the field). Each block then goes through its widget's own
+ * `begin()`, access method per row and `commit()`. A widget that refuses a row
+ * itself — its storage is smaller than its declared capacity — keeps the rows
+ * it took, as on the device, and the call fails saying so.
+ *
+ * Objects are rebuilt by applyScene() and selectScreen(), so their rows go
+ * with them: a host re-applies its collection data after each, as it does its
+ * sample values.
+ *
+ * @param collection_json Null-terminated JSON object string.
+ * @return 1 on success, 0 on failure (check getLastError()).
+ */
+EMSCRIPTEN_KEEPALIVE
+int applyCollectionData(const char* collection_json) {
+    s_last_error.clear();
+    if (collection_json == nullptr) {
+        s_last_error = "null collection data provided";
+        return 0;
+    }
+    if (s_active_screen == nullptr) {
+        s_last_error = "collection data needs an active screen";
+        return 0;
+    }
+    std::string parse_error;
+    const scene_json data = scene_json_parse(collection_json, &parse_error);
+    if (!parse_error.empty() || !data.is_object()) {
+        s_last_error = "collection data must be a JSON object of element names";
+        return 0;
+    }
+
+    // --- Step 1: Parse and check every block, calling nothing ---
+    std::vector<std::unique_ptr<collection_fill>> fills;
+    for (const auto& by_element : data.object) {
+        const scene_json* element = nullptr;
+        for (const scene_json& candidate : s_active_screen->get("elements").items()) {
+            if (candidate.get("name").as_string() == by_element.first && candidate.get("realisation").as_string() == "object") {
+                element = &candidate;
+                break;
+            }
+        }
+        if (element == nullptr) {
+            fail(by_element.first + ": the active screen has no object of that name");
+            return 0;
+        }
+        const size_t object = static_cast<size_t>(element->get("object").as_int());
+        const u8g2gl_editor_class* cls = object < s_classes.size() ? s_classes[object] : nullptr;
+        if (cls == nullptr) {
+            fail(by_element.first + ": its class is not in this editor build, so it cannot be filled");
+            return 0;
+        }
+        if (!by_element.second.is_object()) {
+            fail(by_element.first + ": must be an object of data names");
+            return 0;
+        }
+        for (const auto& by_data : by_element.second.object) {
+            const u8g2gl_editor_data* entry = u8g2gl_editor_find_data(*cls, by_data.first.c_str());
+            if (entry == nullptr) {
+                fail(by_element.first + ": <" + cls->tag + "> declares no <data name=\"" + by_data.first + "\">");
+                return 0;
+            }
+            auto fill = std::make_unique<collection_fill>();
+            if (!parse_block(object, *element, *entry, by_data.second, fill.get())) {
+                return 0;
+            }
+            fills.push_back(std::move(fill));
+        }
+    }
+
+    // --- Step 2: Fill each, through the widget's own ingestion API ---
+    for (const auto& fill : fills) {
+        size_t accepted = 0;
+        if (!u8g2gl_editor_fill(*s_classes[fill->object], s_objects[fill->object], fill->data->name, fill->rows.data(),
+                                fill->rows.size(), &accepted)) {
+            fail(fill->element + " " + fill->data->name + ": " + fill->data->access + "() refused row " +
+                 std::to_string(accepted) + ", so the widget holds " + std::to_string(accepted) +
+                 " rows: its storage is smaller than the declared capacity");
+            return 0;
         }
     }
     return 1;

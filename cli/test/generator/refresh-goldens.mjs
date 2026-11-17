@@ -8,7 +8,9 @@
  *          from the `emit-project` fixture, the compile-layer fixture's
  *          `generated/` directory, which the C++ test suite builds, the
  *          large-font guard fixture's, whose fonts unit it compiles, and the
- *          static-children fixture's, firmware and editor. A golden is
+ *          static-children, collection-data and fill-guard fixtures', firmware
+ *          and editor.
+ *          A golden is
  *          only worth having if refreshing it is deliberate, so this is a script
  *          to run and review rather than a flag on the test run — an `--update`
  *          mode that rewrites expectations on failure is how a golden stops
@@ -64,6 +66,25 @@ const FIXTURES = [
     project: resolve(here, '../../../test/static_children'),
     expected: resolve(here, '../../../test/static_children/generated'),
     editor: resolve(here, '../../../test/static_children/generated_editor'),
+  },
+  // A train formation and a service list filled by name (§9.2), built into
+  // the collection-data Wasm parity test.
+  {
+    project: resolve(here, '../../../test/collection_data'),
+    expected: resolve(here, '../../../test/collection_data/generated'),
+    editor: resolve(here, '../../../test/collection_data/generated_editor'),
+  },
+  // A <data> that matches its C++ signature and one that does not: the C++
+  // suite compiles both registries, and the second must fail its static_assert.
+  {
+    project: resolve(here, '../../../test/fill_guard/match'),
+    expected: resolve(here, '../../../test/fill_guard/match/generated'),
+    editor: resolve(here, '../../../test/fill_guard/match/generated_editor'),
+  },
+  {
+    project: resolve(here, '../../../test/fill_guard/mismatch'),
+    expected: resolve(here, '../../../test/fill_guard/mismatch/generated'),
+    editor: resolve(here, '../../../test/fill_guard/mismatch/generated_editor'),
   },
 ];
 

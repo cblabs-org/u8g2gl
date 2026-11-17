@@ -259,7 +259,7 @@ describe('emission', () => {
     expect(registry).toContain('static const u8g2gl_editor_element ui_editor_wd_service_list_elements[] = {');
     expect(registry).toContain('if (u8g2gl_editor_is(args[1], "center")) {\n                a1 = U8G2GL_ALIGN_CENTER;');
     expect(registry).toContain('static_cast<wd_service_list*>(obj)->add_column(a0, a1);');
-    expect(registry).toMatch(/ui_editor_wd_service_list_elements,\n\s+sizeof\(wd_service_list\)/);
+    expect(registry).toMatch(/ui_editor_wd_service_list_elements,\n\s+ui_editor_wd_service_list_data,\n\s+sizeof\(wd_service_list\)/);
   });
 });
 

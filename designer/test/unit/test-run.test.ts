@@ -102,6 +102,7 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     applyScene: () => true,
     selectScreen: () => true,
     applySampleData: () => true,
+    applyCollectionData: () => true,
     renderFrame: () => live,
     displaySize: () => ({ width: 8, height: 8 }),
     lastError: () => '',

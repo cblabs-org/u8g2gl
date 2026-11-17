@@ -98,7 +98,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sMODULARIZE=1"
     "-sEXPORT_NAME='createU8g2glEditor'"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','HEAPU8','lengthBytesUTF8']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders','_setDesignHidden','_getRuntimeHidden']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_applyCollectionData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders','_setDesignHidden','_getRuntimeHidden']"
     "-sALLOW_MEMORY_GROWTH=1"
 )
 string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
@@ -107,4 +107,60 @@ set_target_properties(u8g2gl_editor PROPERTIES
     OUTPUT_NAME "u8g2gl_editor"
     SUFFIX ".js"
     LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+)
+
+# --- The collection-data test Wasm (schema 0.7 <data>, design_spec §9.2) ---
+# The same bridge, built from test/collection_data/'s registry with the
+# departures fixture's own wd_train_formation and wd_service_list, plus a
+# hand-written reference (test/collection_reference.cpp) that builds and fills
+# the same widgets through their own methods. wasm/test/collection-data.test.mjs
+# compares the two frames, so the editor's fill path is proved against a
+# controller's calls. Test-only: its own output directory, never the framework
+# editor Wasm the designer ships.
+set(U8G2GL_COLLECTION_DIR ${PROJECT_SOURCE_DIR}/test/collection_data)
+set(U8G2GL_DEPARTURES_WIDGETS ${PROJECT_SOURCE_DIR}/cli/test/fixtures/departures-project/widgets)
+
+add_executable(u8g2gl_editor_collections
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${PROJECT_SOURCE_DIR}/test/editor_host/scene_json.cpp
+    ${U8G2GL_COLLECTION_DIR}/generated_editor/ui_editor_registry.cpp
+    ${U8G2GL_COLLECTION_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_COLLECTION_DIR}/generated/ui_images.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list/wd_service_list.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation/wd_train_formation.cpp
+    memory_display.cpp
+    bridge.cpp
+    test/collection_reference.cpp
+)
+target_include_directories(u8g2gl_editor_collections PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/test/real_u8g2
+    ${PROJECT_SOURCE_DIR}/test/editor_host
+    ${U8G2GL_COLLECTION_DIR}/generated
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation
+)
+target_include_directories(u8g2gl_editor_collections SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_editor_collections PRIVATE
+    ARDUINO=10819
+    U8G2GL_EDITOR
+    U8G2GL_GENERATED_CONFIG="editor_config.h"
+)
+target_compile_options(u8g2gl_editor_collections PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+target_link_libraries(u8g2gl_editor_collections PRIVATE
+    u8g2_wasm_csrc
+)
+string(REPLACE "'_getRuntimeHidden']" "'_getRuntimeHidden','_renderReference']"
+    U8G2GL_COLLECTION_LINK_FLAGS_STR "${EMSCRIPTEN_LINK_FLAGS_STR}")
+set_target_properties(u8g2gl_editor_collections PROPERTIES
+    OUTPUT_NAME "u8g2gl_editor"
+    SUFFIX ".js"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/collections"
+    LINK_FLAGS "${U8G2GL_COLLECTION_LINK_FLAGS_STR}"
 )

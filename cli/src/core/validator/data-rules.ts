@@ -20,7 +20,8 @@
  *              must belong to a manifest with a class of its own, name a C++
  *              identifier as its access method, and resolve every count; each
  *              field must have a type a row can carry and only the bounds that
- *              type takes. Names are unique per widget and per `<data>`.
+ *              type takes (`repeat` only on a string field). Names are unique
+ *              per widget and per `<data>`.
  *
  * Exports:
  * - DATA_SINCE:             The first schema version with `<data>`
@@ -172,6 +173,10 @@ function checkField(field: WidgetDataField, where: string, manifest: WidgetManif
   if (field.max !== undefined && field.type !== 'int') misplaced('max', 'int');
   if (field.values !== undefined && field.type !== 'enum') misplaced('values', 'enum');
   if (field.maxLen !== undefined && field.type !== 'string') misplaced('max_len', 'string');
+  // A repeated field reaches the access method as an array of texts and its
+  // count (`const char* const* cells, size_t n`); no other type has a shape
+  // the editor's fill thunk can pass.
+  if (field.repeat !== undefined && field.type !== 'string') misplaced('repeat', 'string');
 
   // --- Step 3: An int's bounds are integers, the least first ---
   if (field.type === 'int') {

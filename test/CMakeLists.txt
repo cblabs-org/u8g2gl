@@ -1162,6 +1162,42 @@ target_compile_options(test_static_children PRIVATE
 )
 u8g2gl_discover_tests(test_static_children)
 
+# --- Fill guard: a <data> that disagrees with its C++ fails the editor build ---
+# The generated registry static_asserts that a <data>'s declared fields can call
+# its access method (schema 0.7, design_spec §9.2), so a manifest out of step
+# with its widget fails the editor build naming the widget and the data,
+# instead of filling it wrongly. As with the version and large-font guards, the
+# refusal is tested by building a throwaway target from CTest and matching the
+# assert's own message, so an unrelated break fails the test rather than
+# passing it, and a control with the matching manifest must compile.
+#
+#   match    — at declared int, add_mark(int16_t): must compile
+#   mismatch — at declared string, the same method: must be refused
+#
+# Compiled against the host stubs and the runtime headers only, so the result
+# depends on no platform's U8G2 configuration; compile-only OBJECT libraries.
+foreach(_fill_case match mismatch)
+    add_library(fill_guard_${_fill_case} OBJECT EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_SOURCE_DIR}/fill_guard/${_fill_case}/generated_editor/ui_editor_registry.cpp
+    )
+    target_include_directories(fill_guard_${_fill_case} PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+        ${CMAKE_CURRENT_SOURCE_DIR}/fill_guard/include
+    )
+    target_compile_definitions(fill_guard_${_fill_case} PRIVATE U8G2GL_EDITOR)
+    target_compile_options(fill_guard_${_fill_case} PRIVATE -Wall -Wextra -Wpedantic)
+endforeach()
+add_test(NAME FillGuard.MatchingFieldsCompile
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target fill_guard_match
+)
+add_test(NAME FillGuard.MismatchedFieldsFailNamingTheWidgetAndData
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target fill_guard_mismatch
+)
+set_tests_properties(FillGuard.MismatchedFieldsFailNamingTheWidgetAndData PROPERTIES
+    PASS_REGULAR_EXPRESSION "wd_tally <data name=.marks.>: add_mark\\(\\) cannot be called with the fields the manifest declares"
+)
+
 # --- D-9 parity proof: native bridge renders the same pixels as Wasm ---
 # Compiles bridge.cpp natively (it guards Emscripten-only code behind
 # __EMSCRIPTEN__) and calls the same applyScene/renderFrame path the Wasm
@@ -1279,6 +1315,8 @@ set_tests_properties(
     VersionGuard.RuntimeOnePatchShortFailsToCompile
     VersionGuard.GeneratedConfigCompiles
     VersionGuard.PreMacroRuntimeFailsByName
+    FillGuard.MatchingFieldsCompile
+    FillGuard.MismatchedFieldsFailNamingTheWidgetAndData
     RealU8g2.RuntimeCompilesAgainstRealHeaders
     PROPERTIES RESOURCE_LOCK u8g2gl_build_tree
 )

@@ -424,8 +424,8 @@ export const DIAGNOSTIC_CODES = {
    * `max_len` is neither a non-negative integer nor the name of an int `<prop>`
    * the widget declares; a field's type is one no row can carry (`font`,
    * `image`, `subject`, `style`, `color`); or a field has a bound its type does
-   * not take, a non-integer `min`/`max`, `min` above `max`, or is an enum with
-   * no values. Located at the attribute at fault. An unknown field type is
+   * not take (`repeat` is a string field's only), a non-integer `min`/`max`,
+   * `min` above `max`, or is an enum with no values. Located at the attribute at fault. An unknown field type is
    * `U8G2GL_INVALID_ENUM_VALUE`, and a repeated name `U8G2GL_DUPLICATE_NAME`,
    * as for a `<prop>`.
    */
