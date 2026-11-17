@@ -77,6 +77,7 @@ import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
 import { MIRROR_ROTATIONS, ROTATION_VALUES } from '../schema/project-vocabulary.js';
 import { iconValueProblem } from './icon-rules.js';
 import { BEFORE_DATA, checkDataDeclarations } from './data-rules.js';
+import { checkElementDeclarations } from './static-child-rules.js';
 
 
 /**
@@ -1196,6 +1197,13 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
   for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
     const tooOld = preDataSchema !== undefined && !isFrameworkDeclaration(manifest, manifests);
     diagnostics.push(...checkDataDeclarations(manifest, tooOld ? preDataSchema : undefined));
+  }
+
+  // --- 10. `<element>` declarations: the static children a class takes (§6.5) ---
+  // Not gated: `<element>` has been in the schema since 0.4; only building it
+  // is new.
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    diagnostics.push(...checkElementDeclarations(manifest));
   }
 
   return diagnostics;

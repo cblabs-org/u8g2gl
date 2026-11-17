@@ -53,6 +53,27 @@ function diff(before: string, after: string): { added: string[]; removed: string
   return { added: b.filter((line) => !a.includes(line)), removed: a.filter((line) => !b.includes(line)) };
 }
 
+/**
+ * The lines of the element named `name`: its own line when self-closing,
+ * otherwise through its close tag, so a list's `<column>` children go with it.
+ */
+function blockOf(text: string, name: string): string[] {
+  const lines = text.split('\n');
+  const first = lines.findIndex((line) => line.includes(`name="${name}"`));
+  const opening = lines[first] ?? '';
+  if (opening.trimEnd().endsWith('/>')) return [opening];
+  const indent = /^\s*/.exec(opening)?.[0] ?? '';
+  const last = lines.findIndex((line, i) => i > first && line.startsWith(`${indent}</`));
+  return lines.slice(first, last + 1);
+}
+
+/** `text` without the given blocks of lines. */
+function without(text: string, ...blocks: readonly string[][]): string {
+  let out = text;
+  for (const block of blocks) out = out.replace(`${block.join('\n')}\n`, '');
+  return out;
+}
+
 /** Alt-drags from one device pixel to another. */
 async function altDrag(page: Page, from: readonly [number, number], to: readonly [number, number]): Promise<void> {
   const start = await devicePoint(page, from[0], from[1]);
@@ -68,12 +89,13 @@ async function altDrag(page: Page, from: readonly [number, number], to: readonly
 test('Delete removes the selected element’s line; with two selected, both; each is one undo stop', async ({ page }) => {
   await open(page);
   const before = await bufferText(page, SCREEN);
-  const row0 = before.split('\n').find((line) => line.includes('name="row0"')) ?? '';
-  const clock = before.split('\n').find((line) => line.includes('name="sys_clock"')) ?? '';
+  // row0's lines include its <column> children (§6.5), which go with it.
+  const row0 = blockOf(before, 'row0');
+  const clock = blockOf(before, 'sys_clock');
 
   await clickCanvas(page, 100, 8);
   await page.keyboard.press('Delete');
-  expect(diff(before, await bufferText(page, SCREEN))).toEqual({ added: [], removed: [row0] });
+  expect(await bufferText(page, SCREEN)).toBe(without(before, row0));
   expect((await selectedNames(page)).names).toEqual([]);
   await undo(page);
   expect(await bufferText(page, SCREEN)).toBe(before);
@@ -85,7 +107,7 @@ test('Delete removes the selected element’s line; with two selected, both; eac
   await clickCanvas(page, 200, 55, ['Shift']);
   expect((await selectedNames(page)).names).toEqual(['row0', 'sys_clock']);
   await page.keyboard.press('Backspace');
-  expect(diff(before, await bufferText(page, SCREEN))).toEqual({ added: [], removed: [row0, clock] });
+  expect(await bufferText(page, SCREEN)).toBe(without(before, row0, clock));
   await undo(page);
   expect(await bufferText(page, SCREEN)).toBe(before);
 });
@@ -96,10 +118,14 @@ test('an Alt-drag duplicates: a renamed copy after the original, moved, selected
   // row0: x="32" y="0", 224 × 16; Alt-dragged 6 right and 3 down.
   await altDrag(page, [100, 8], [106, 11]);
   const after = await bufferText(page, SCREEN);
-  const lines = after.split('\n');
-  const copy = '        <wd_service_list name="service_list_1" x="38" y="3" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1" />';
-  expect(diff(before, after)).toEqual({ added: [copy], removed: [] });
-  expect(lines.indexOf(copy)).toBe(lines.findIndex((line) => line.includes('name="row0"')) + 1);
+  // The copy is the whole element, its <column> children included (§6.5),
+  // renamed and moved, directly after the original.
+  const original = blockOf(before, 'row0');
+  const copy = [
+    '        <wd_service_list name="service_list_1" x="38" y="3" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1">',
+    ...original.slice(1),
+  ];
+  expect(after).toBe(before.replace(`${original.join('\n')}\n`, `${original.join('\n')}\n${copy.join('\n')}\n`));
   expect((await selectedNames(page)).names).toEqual(['service_list_1']);
   await undo(page);
   expect(await bufferText(page, SCREEN)).toBe(before);

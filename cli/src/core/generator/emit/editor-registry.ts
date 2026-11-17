@@ -25,7 +25,10 @@
  *                subject type** (`bind_text` for string and for int are two
  *                entries, never one); a position binding's thunk passes the
  *                container origin the host gives it, as firmware passes the
- *                literal (§7.2, `placement.ts`'s POSITION_BINDINGS);
+ *                literal (§7.2, `placement.ts`'s POSITION_BINDINGS); and one
+ *                add-by-name thunk per `<element>` (§6.5), calling its access
+ *                method with every argument, each enum spelled by `cppValue()`
+ *                as the firmware's init spells it;
  *              - a **drawing** element ([D-18]) gets a draw-by-name entry calling
  *                the same `u8g2gl_draw_*` function the firmware call does, its
  *                defaults spelled by `cppValue()`;
@@ -60,12 +63,12 @@
 
 import { BINDING_FLAGS, isDrawingElement, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { COLOR_VALUES } from '../../schema/globals.js';
-import type { BindDef, PropDef, PropType } from '../../schema/widget-manifest.js';
+import type { BindDef, ElementDef, PropDef, PropType } from '../../schema/widget-manifest.js';
 import { FLAG_COMPARISONS } from '../../schema/widget-node.js';
 import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
 import { POSITION_BINDINGS } from './placement.js';
-import { classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
+import { argPropOf, classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations } from './images.js';
 import { includeBlock, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
@@ -266,6 +269,71 @@ function bindingThunk(cls: string, binding: BindDef): string[] {
   ];
 }
 
+// elementThunk
+// One static child kind's add-by-name lambda: the access call the firmware's
+// `obj.<access>(<cppValue>, …)` line makes, each argument read from the host's
+// value — or, for an enum, matched against its values and spelled by
+// cppValue() exactly as the firmware spells that value. Every argument is
+// present: u8g2gl_editor_add_element() has checked each type already.
+//   cls     — the C++ class
+//   element — the `<element>` declaration
+function elementThunk(cls: string, element: ElementDef): string[] {
+  const body: string[] = [];
+  element.args.forEach((arg, index) => {
+    const value = `args[${index}]`;
+    const local = `a${index}`;
+    const prop = argPropOf(arg);
+    body.push(`// ${arg.name} (${arg.type})`);
+    if (arg.type === 'enum') {
+      const values = valuesOf(prop);
+      const first = values[0];
+      if (first === undefined) {
+        throw new Error(`<element name="${element.name}"> arg '${arg.name}' is an enum with no values; Pass 1 refuses it.`);
+      }
+      body.push(`decltype(${cppValue(prop, first)}) ${local} = ${cppValue(prop, first)};`);
+      values.forEach((text, i) => {
+        body.push(`${i === 0 ? '' : '} else '}if (u8g2gl_editor_is(${value}, ${cppStringLiteral(text)})) {`, `    ${local} = ${cppValue(prop, text)};`);
+      });
+      body.push('} else {', '    return false;', '}');
+      return;
+    }
+    const read = RUNTIME_READS[arg.type];
+    if (read === undefined) {
+      throw new Error(`<element name="${element.name}"> arg '${arg.name}' has type '${arg.type}'; Pass 1 refuses it.`);
+    }
+    body.push(`const ${read.type} ${local} = ${read.read(value)};`);
+  });
+  body.push(`static_cast<${cls}*>(obj)->${element.access}(${element.args.map((_, index) => `a${index}`).join(', ')});`, 'return true;');
+  return ['[](u8g2gl_obj* obj, const u8g2gl_editor_value* args) -> bool {', ...indent(body, 1), '}'];
+}
+
+// elementTables
+// A class's static child kinds (§6.5): an argument table per `<element>`, and
+// the element table its class entry points at. Empty for a class with none.
+//   tag      — the class's tag, for table names
+//   cls      — the C++ class
+//   elements — its own `<element>`s, never inherited
+function elementTables(tag: string, cls: string, elements: readonly ElementDef[]): string[] {
+  if (elements.length === 0) return [];
+  const lines: string[] = [];
+  const entries: string[] = [];
+  for (const element of elements) {
+    const argTable = `ui_editor_${tag}_${element.name}_args`;
+    if (element.args.length > 0) {
+      lines.push(
+        `static const u8g2gl_editor_param ${argTable}[] = {`,
+        ...element.args.map((arg) => `    {${cppStringLiteral(arg.name)}, ${editorTypeEnumerator(arg.type)}},`),
+        '};',
+      );
+    }
+    entries.push(`// <${element.name}> → ${element.access}()`, `{${cppStringLiteral(element.name)},`);
+    entries.push(...indent(elementThunk(cls, element).map((line, i, all) => (i === all.length - 1 ? `${line},` : line)), 1));
+    entries.push(`    ${element.args.length > 0 ? argTable : 'nullptr'}, ${element.args.length}},`);
+  }
+  lines.push(`static const u8g2gl_editor_element ui_editor_${tag}_elements[] = {`, ...indent(entries, 1), '};');
+  return lines;
+}
+
 /** One class entry's generated parts. */
 interface ClassEntry {
   readonly lines: string[];
@@ -325,7 +393,11 @@ function classEntry(manifest: EffectiveManifest): ClassEntry {
     lines.push(`static const u8g2gl_editor_binding ${bindingTable}[] = {`, ...indent(bindings, 1), '};');
   }
 
-  // --- Step 3: The class entry: construct, rectangle, tables, storage needs ---
+  // --- Step 3: One add-by-name thunk per static child kind (§6.5) ---
+  const elements = manifest.api.elements;
+  lines.push(...elementTables(tag, cls, elements));
+
+  // --- Step 4: The class entry: construct, rectangle, tables, storage needs ---
   const propertyCount = properties.filter((line) => line.startsWith('// ')).length;
   const bindingCount = manifest.api.bindings.length;
   const initialiser = [
@@ -337,7 +409,8 @@ function classEntry(manifest: EffectiveManifest): ClassEntry {
       : `    [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<${cls}*>(obj)->${rectangleSetter}(x, y, w, h); },`,
     `    ${propertyCount > 0 ? propertyTable : 'nullptr'},`,
     `    ${bindingCount > 0 ? bindingTable : 'nullptr'},`,
-    `    sizeof(${cls}), alignof(${cls}), ${propertyCount}, ${bindingCount}},`,
+    `    ${elements.length > 0 ? `ui_editor_${tag}_elements` : 'nullptr'},`,
+    `    sizeof(${cls}), alignof(${cls}), ${propertyCount}, ${bindingCount}, ${elements.length}},`,
   ];
   return { lines, initialiser, include };
 }

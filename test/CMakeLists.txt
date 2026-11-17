@@ -1106,6 +1106,62 @@ target_compile_options(test_editor PRIVATE
 )
 u8g2gl_discover_tests(test_editor)
 
+# --- Static children (design_spec §6.5) ---
+# test/static_children/ is a service list whose columns are written as <column>
+# children. Its committed generated units, both targets, are compiled with the
+# departures fixture's own wd_service_list C++ and the editor runtime, as
+# test_editor compiles test/generated_fixture/: the firmware init's
+# add_column() calls and the registry's add-by-name entry must each lay the
+# list out as hand-written calls do. cli/test/generator/static-children-fixture
+# .test.ts fails if regenerating the fixture changes a committed byte.
+set(U8G2GL_STATIC_CHILDREN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/static_children)
+set(U8G2GL_DEPARTURES_WIDGETS ${PROJECT_SOURCE_DIR}/cli/test/fixtures/departures-project/widgets)
+
+add_library(u8g2gl_static_children_fonts OBJECT
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_fonts.cpp
+)
+target_include_directories(u8g2gl_static_children_fonts PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_compile_options(u8g2gl_static_children_fonts PRIVATE
+    "SHELL:-include ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.h"
+    -Wall -Wextra -Wpedantic
+)
+
+add_executable(test_static_children
+    test_static_children.cpp
+    editor_host/editor_host.cpp
+    editor_host/scene_json.cpp
+    ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list/wd_service_list.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated_editor/ui_editor_registry.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_images.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_screen_board.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_subjects.cpp
+)
+target_include_directories(test_static_children PRIVATE
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated
+    ${U8G2GL_FIXTURE_DIR}/support
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host
+)
+target_compile_definitions(test_static_children PRIVATE
+    U8G2GL_STATIC_CHILDREN_SCENE_PATH="${U8G2GL_STATIC_CHILDREN_DIR}/generated_editor/ui_scene.json"
+)
+target_link_libraries(test_static_children PRIVATE
+    u8g2gl_static_children_fonts
+    u8g2gl_editor_runtime
+    GTest::gtest_main
+)
+target_compile_options(test_static_children PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_static_children)
+
 # --- D-9 parity proof: native bridge renders the same pixels as Wasm ---
 # Compiles bridge.cpp natively (it guards Emscripten-only code behind
 # __EMSCRIPTEN__) and calls the same applyScene/renderFrame path the Wasm

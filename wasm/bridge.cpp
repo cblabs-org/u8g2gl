@@ -236,7 +236,7 @@ private:
 
 // The scene description version this bridge reads: `version` in ui_scene.json,
 // written by the CLI's scene emitter (emit/scene.ts). Bump both together.
-constexpr int32_t kSceneVersion = 3;
+constexpr int32_t kSceneVersion = 4;
 
 // Virtual display, sized for each scene (memory_display.h, shared with the
 // test-run harness so both hosts hold their frames the same way)
@@ -443,9 +443,45 @@ bool build_object(const scene_json& element, const u8g2gl_editor_class* cls) {
     return true;
 }
 
+// add_static_children
+// An object's static children (`<column>`, §6.5), in document order, each
+// through its class's add-by-name entry: the access call the firmware's init
+// makes after the setters. Every argument must be present, as the method has
+// no defaults.
+//   cls     — the object's registry class
+//   obj     — the object
+//   element — its scene element; `static_children` is absent when it has none
+bool add_static_children(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const scene_json& element) {
+    const std::string& name = element.get("name").as_string();
+    for (const scene_json& child : element.get("static_children").items()) {
+        const std::string& tag = child.get("element").as_string();
+        const u8g2gl_editor_element* entry = u8g2gl_editor_find_element(cls, tag.c_str());
+        if (entry == nullptr) {
+            return fail(name + ": <" + tag + "> is not a static child its class takes");
+        }
+        std::vector<u8g2gl_editor_value> args(entry->arg_count);
+        for (const scene_json& arg : child.get("args").items()) {
+            const std::string& arg_name = arg.get("name").as_string();
+            const int at = u8g2gl_editor_find_element_arg(*entry, arg_name.c_str());
+            if (at < 0) {
+                return fail(name + " <" + tag + ">: no argument '" + arg_name + "'");
+            }
+            const size_t i = static_cast<size_t>(at);
+            if (!value_for(entry->args[i].type, arg.get("value"), name + " <" + tag + "> " + arg_name, &args[i])) {
+                return false;
+            }
+        }
+        if (!u8g2gl_editor_add_element(cls, obj, tag.c_str(), args.data(), entry->arg_count)) {
+            return fail(name + " <" + tag + ">: " + entry->name + " refused its arguments");
+        }
+    }
+    return true;
+}
+
 // configure_object
 // The "properties" init step: the rectangle, then each property through its
-// registry thunk. A placeholder takes only the rectangle.
+// registry thunk, then each static child. A placeholder takes only the
+// rectangle.
 //   index   — the object's index in s_objects
 //   element — its scene element
 bool configure_object(size_t index, const scene_json& element) {
@@ -483,7 +519,7 @@ bool configure_object(size_t index, const scene_json& element) {
             return fail(name + "." + prop + ": property set refused");
         }
     }
-    return true;
+    return add_static_children(cls, s_objects[index], element);
 }
 
 // apply_styles

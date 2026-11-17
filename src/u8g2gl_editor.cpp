@@ -132,6 +132,24 @@ const u8g2gl_editor_binding* u8g2gl_editor_find_binding(const u8g2gl_editor_clas
     return nullptr;
 }
 
+const u8g2gl_editor_element* u8g2gl_editor_find_element(const u8g2gl_editor_class& cls, const char* name) {
+    for (uint8_t i = 0; i < cls.element_count; ++i) {
+        if (name != nullptr && std::strcmp(cls.elements[i].name, name) == 0) {
+            return &cls.elements[i];
+        }
+    }
+    return nullptr;
+}
+
+int u8g2gl_editor_find_element_arg(const u8g2gl_editor_element& element, const char* name) {
+    for (uint8_t i = 0; i < element.arg_count; ++i) {
+        if (name != nullptr && std::strcmp(element.args[i].name, name) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 int u8g2gl_editor_find_param(const u8g2gl_editor_drawing& drawing, const char* name) {
     for (uint8_t i = 0; i < drawing.param_count; ++i) {
         if (name != nullptr && std::strcmp(drawing.params[i].name, name) == 0) {
@@ -214,6 +232,23 @@ bool u8g2gl_editor_set_property(const u8g2gl_editor_class& cls, u8g2gl_obj* obj,
                "u8g2gl: progress bar value must be within 0..100");
     }
     return property->set(obj, value);
+}
+
+// u8g2gl_editor_add_element
+// One static child: every argument must be present and of its declared type,
+// because an access method has no defaults to fall back on, unlike a draw.
+bool u8g2gl_editor_add_element(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name,
+                               const u8g2gl_editor_value* args, uint8_t count) {
+    const u8g2gl_editor_element* element = u8g2gl_editor_find_element(cls, name);
+    if (element == nullptr || obj == nullptr || count != element->arg_count || (count > 0 && args == nullptr)) {
+        return false;
+    }
+    for (uint8_t i = 0; i < count; ++i) {
+        if (args[i].type != element->args[i].type) {
+            return false;
+        }
+    }
+    return element->add(obj, args);
 }
 
 bool u8g2gl_editor_bind(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name, void* subject,

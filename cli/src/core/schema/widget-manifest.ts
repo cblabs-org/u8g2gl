@@ -269,6 +269,16 @@ export interface ElementArgDef {
   readonly type: PropType;
   /** Maximum character capacity for string arguments. */
   readonly maxLen?: number;
+  /** An `enum` argument's values, comma-separated, as a `<prop>`'s `values` is. */
+  readonly values?: string;
+  /**
+   * An `enum` argument's enumerator pattern, as a `<prop>`'s `emit` is (e.g.
+   * "U8G2GL_ALIGN_{VALUE^^}"), so a static child's argument is spelled exactly
+   * as the same value set through a setter would be.
+   */
+  readonly emit?: string;
+  /** Plain-words description for the designer. */
+  readonly help?: string;
   /** Source location where this argument was declared. */
   readonly loc?: SourceLocation;
 }

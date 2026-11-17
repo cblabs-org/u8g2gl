@@ -13,7 +13,8 @@
  * Description: Reads a project directory (u8g2gl.xml, globals.xml, screens/,
  *              widgets/) or a single XML file dispatched by its root tag, parses
  *              every document, and builds the registry from the bundled framework
- *              manifests plus the project's. A single file that *is* a bundled
+ *              manifests plus the project's. Manifests are parsed before screens,
+ *              so a screen's parse knows which children are static (§6.5). A single file that *is* a bundled
  *              framework manifest stands in for its bundled copy (WO5a, WO1 F5).
  *              The file map it returns holds every source text a diagnostic can
  *              point into — project files and the bundled framework manifests
@@ -50,6 +51,7 @@ import {
   parseGlobalsFile,
   parseScreenFile,
   parseWidgetManifestFile,
+  staticChildNamesOf,
   tokenizeXml,
   type RawXmlElement,
 } from '../core/parser/index.js';
@@ -196,6 +198,10 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
   let projectWithheld = false;
   let projectRoot: string | undefined;
 
+  // The framework manifests are parsed first: a screen's parse needs every
+  // manifest's `<element>` names (Step 1), and the registry needs them (Step 3).
+  const framework = parseFrameworkManifests(bundle);
+
   if (statSync(targetPath).isDirectory()) {
     // --- Step 1a: A directory — the standard project layout ---
     projectRoot = resolve(targetPath);
@@ -218,21 +224,27 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
       globals = globRes.value ?? globals;
     }
 
+    // Manifests are parsed before screens, because a screen's parse needs
+    // their `<element>` names to tell a static child (`<column>`) from an
+    // element (§6.5). Their diagnostics still follow the screens', as before.
+    const widgetDiagnostics: Diagnostic[] = [];
+    for (const widget of files.widgetManifestXmls) {
+      const widRes = parseWidgetManifestFile(widget.content, widget.filename);
+      widgetDiagnostics.push(...widRes.diagnostics);
+      if (widRes.value) {
+        projectManifests.push(widRes.value);
+      }
+    }
+    const staticChildren = staticChildNamesOf([...framework.manifests, ...projectManifests]);
+
     for (const screen of files.screenXmls) {
-      const scrRes = parseScreenFile(screen.content, screen.filename);
+      const scrRes = parseScreenFile(screen.content, screen.filename, { staticChildren });
       loadDiagnostics.push(...scrRes.diagnostics);
       if (scrRes.value) {
         screens.push(scrRes.value);
       }
     }
-
-    for (const widget of files.widgetManifestXmls) {
-      const widRes = parseWidgetManifestFile(widget.content, widget.filename);
-      loadDiagnostics.push(...widRes.diagnostics);
-      if (widRes.value) {
-        projectManifests.push(widRes.value);
-      }
-    }
+    loadDiagnostics.push(...widgetDiagnostics);
   } else {
     // --- Step 1b: A single file, dispatched by its root tag ---
     const label = options?.label ?? targetPath;
@@ -252,7 +264,8 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
       loadDiagnostics.push(...res.diagnostics);
       globals = res.value ?? globals;
     } else if (rootTag === 'screen') {
-      const res = parseScreenFile(xml, label);
+      // A screen alone has only the framework's manifests to name static children.
+      const res = parseScreenFile(xml, label, { staticChildren: staticChildNamesOf(framework.manifests) });
       loadDiagnostics.push(...res.diagnostics);
       if (res.value) {
         screens.push(res.value);
@@ -288,7 +301,6 @@ export function loadProject(targetPath: string, options?: LoadProjectOptions): L
   // npm-installed CLI has no include/ to read ([D-17]). Their text joins the
   // file map so a diagnostic located in one prints its source line (WO1 F9);
   // a project file of the same path, were there one, keeps its own text.
-  const framework = parseFrameworkManifests(bundle);
   loadDiagnostics.push(...framework.diagnostics);
   for (const text of bundle) {
     const path = `${FRAMEWORK_MANIFEST_PATH}/${text.filename}`;

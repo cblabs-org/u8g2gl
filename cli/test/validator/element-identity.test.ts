@@ -344,7 +344,7 @@ describe('[U-1] Element Identity', () => {
       const collected: string[] = [];
       const walk = (nodes: readonly WidgetNodeChild[]): void => {
         for (const node of nodes) {
-          if (!('tag' in node)) continue;
+          if ('kind' in node) continue;
           collected.push(node.attributes.name as string);
           walk(node.children);
         }

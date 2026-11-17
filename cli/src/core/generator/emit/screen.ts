@@ -94,7 +94,9 @@ import {
   flagComparison,
   INIT_STEPS,
   placeScreen,
+  argPropOf,
   rectangleOf,
+  staticChildCalls,
   styleOverridesOf,
   typed,
   writtenProperties,
@@ -188,11 +190,19 @@ function geometryLine(object: RealisedElement, placement: Placement): string | u
 
 // propertyLines
 // Every other written property, as setter calls in manifest declaration order
-// (§13.7 "set properties"); which props those are is screen-model.ts's answer.
+// (§13.7 "set properties"), then each static child as its access call; which
+// props and calls those are is screen-model.ts's answer.
 function propertyLines(object: RealisedElement, placement: Placement): string[] {
-  return writtenProperties(placement).map(
+  const setters = writtenProperties(placement).map(
     ({ prop, literal }) => `    ${cpp(object)}.${prop.setter ?? ''}(${cppValue(prop, literal)});`,
   );
+  // Static children (§6.5) after the setters, one access call each in
+  // document order, so a capacity a setter declares is already in force.
+  const calls = staticChildCalls(placement).map(
+    (call) =>
+      `    ${cpp(object)}.${call.access}(${call.args.map(({ arg, literal }) => cppValue(argPropOf(arg), literal)).join(', ')});  // <${call.tag}>`,
+  );
+  return [...setters, ...calls];
 }
 
 // styleLines

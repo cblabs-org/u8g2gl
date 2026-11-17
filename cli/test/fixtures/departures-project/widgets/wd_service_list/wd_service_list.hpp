@@ -54,6 +54,11 @@ public:
     void set_font(const uint8_t* font);
     void set_max_rows(int16_t rows);
     void set_max_cols(int16_t cols);
+    /**
+     * @brief Set the usable characters per cell, terminator not included
+     *        (clamped to DEFAULT_MAX_CELL_CHARS). A longer cell is truncated
+     *        to this many characters by add_row().
+     */
     void set_max_cell_chars(int16_t chars);
     void set_scroll_dwell_ms(int32_t dwell_ms);
     void set_scroll_duration_ms(int32_t duration_ms);
@@ -81,6 +86,10 @@ public:
 
     /**
      * @brief Add a row of cell strings to the collection.
+     *
+     * Each cell is copied, up to max_cell_chars characters; a longer one is
+     * truncated to that many.
+     *
      * @param cells Array of cell string pointers (or nullptr for missing cell).
      * @param n Number of cells provided.
      * @return true if accepted, false if capacity exceeded.
@@ -138,8 +147,10 @@ private:
     size_t current_row_index_{0};
     size_t row_count_{0};
 
-    // Static collection buffer: [row][col][char] — zero heap allocation
-    char cells_[DEFAULT_MAX_ROWS][DEFAULT_MAX_COLS][DEFAULT_MAX_CELL_CHARS]{};
+    // Static collection buffer: [row][col][char] — zero heap allocation. One
+    // byte per cell beyond DEFAULT_MAX_CELL_CHARS holds the terminator, because
+    // max_cell_chars counts usable characters.
+    char cells_[DEFAULT_MAX_ROWS][DEFAULT_MAX_COLS][DEFAULT_MAX_CELL_CHARS + 1]{};
 };
 
 #endif // WD_SERVICE_LIST_HPP

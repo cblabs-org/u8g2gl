@@ -114,11 +114,14 @@ bool wd_service_list::add_row(const char* const* cells, size_t n) {
         return false;
     }
 
-    // Copy each cell into bounded static storage
+    // Copy each cell into bounded static storage. max_cell_chars_ counts
+    // usable characters, as a string subject's max_len does (§8.2); each cell
+    // holds one more byte for the terminator, so a cell of exactly
+    // max_cell_chars_ characters survives whole.
     for (size_t c = 0; c < max_cols_; ++c) {
         if (c < n && cells[c] != nullptr) {
-            std::strncpy(cells_[current_row_index_][c], cells[c], max_cell_chars_ - 1);
-            cells_[current_row_index_][c][max_cell_chars_ - 1] = '\0';
+            std::strncpy(cells_[current_row_index_][c], cells[c], max_cell_chars_);
+            cells_[current_row_index_][c][max_cell_chars_] = '\0';
         } else {
             // Null or missing cell: store empty string
             cells_[current_row_index_][c][0] = '\0';

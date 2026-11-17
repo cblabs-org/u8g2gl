@@ -48,9 +48,9 @@ test('text that does not tokenise has no answer, so the caller keeps its selecti
 
 test('missing names are inserted in the buffer; a named document is returned unchanged', () => {
   const unnamed = '<screen name="home">\n  <view>\n    <u8g2gl_box x="0" y="0" width="4" height="4" />\n  </view>\n</screen>\n';
-  const named = withGeneratedNames('screens/screen_home.xml', unnamed);
+  const named = withGeneratedNames('screens/screen_home.xml', unnamed, new Map());
   expect(named).toMatch(/<u8g2gl_box name="[a-z0-9_]+" x="0"/);
   expect(named.replace(/ name="[a-z0-9_]+"(?= x=)/, '')).toBe(unnamed);
-  expect(withGeneratedNames('screens/screen_home.xml', SCREEN)).toBe(SCREEN);
-  expect(withGeneratedNames('globals.xml', unnamed)).toBe(unnamed);
+  expect(withGeneratedNames('screens/screen_home.xml', SCREEN, new Map())).toBe(SCREEN);
+  expect(withGeneratedNames('globals.xml', unnamed, new Map())).toBe(unnamed);
 });

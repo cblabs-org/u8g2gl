@@ -227,10 +227,16 @@ export function parseWidgetManifest(
               getNumberAttribute(argChild, 'max_len', filename, diagnostics) ??
               getNumberAttribute(argChild, 'maxLen', filename, diagnostics);
 
+            const values = getAttributeValue(argChild, 'values');
+            const emit = getAttributeValue(argChild, 'emit');
+            const argHelp = getAttributeValue(argChild, 'help');
             args.push({
               name: argNameAttr?.value ?? '',
               type: (argTypeAttr?.value ?? 'string') as PropType,
               maxLen,
+              ...(values !== undefined ? { values } : {}),
+              ...(emit !== undefined ? { emit } : {}),
+              ...(argHelp !== undefined ? { help: argHelp } : {}),
               loc: argChild.loc,
             });
           } else {

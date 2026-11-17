@@ -77,7 +77,7 @@
 import type { ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import type * as monaco from 'monaco-editor/editor/editor.api';
 import { loadedMonaco } from '../monaco/monaco';
-import { classifyProjectFile } from '../project/project-model';
+import { classifyProjectFile, projectStaticChildNames } from '../project/project-model';
 import { Observable } from '../state/observable';
 import type { TextChange } from '../selection/selection-model';
 import { elementAt, namedElements } from './element-at';
@@ -233,7 +233,7 @@ export class ProjectDocuments {
     }
     // The URI carries the project path, so markers set for a file find it.
     const model = api.editor.createModel(
-      withGeneratedNames(path, disk.text),
+      withGeneratedNames(path, disk.text, projectStaticChildNames(this.texts())),
       'xml',
       api.Uri.from({ scheme: 'u8g2gl', path: `/${path}` }),
     );
@@ -453,7 +453,7 @@ export class ProjectDocuments {
       const found = position === null ? undefined : elementAt(model.getValue(), model.getOffsetAt(position));
       return typeof found === 'object' ? found.name : undefined;
     });
-    const text = withGeneratedNames(path, theirs.text);
+    const text = withGeneratedNames(path, theirs.text, projectStaticChildNames(this.texts()));
     model.pushEditOperations([], [{ range: model.getFullModelRange(), text }], () => null);
     const spans = namedElements(text) ?? [];
     editors.forEach((editor, i) => {

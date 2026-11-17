@@ -6,8 +6,9 @@
  * File: test/generator/refresh-goldens.mjs
  * Purpose: Rewrites every committed generator expectation: the WO9 golden files
  *          from the `emit-project` fixture, the compile-layer fixture's
- *          `generated/` directory, which the C++ test suite builds, and the
- *          large-font guard fixture's, whose fonts unit it compiles. A golden is
+ *          `generated/` directory, which the C++ test suite builds, the
+ *          large-font guard fixture's, whose fonts unit it compiles, and the
+ *          static-children fixture's, firmware and editor. A golden is
  *          only worth having if refreshing it is deliberate, so this is a script
  *          to run and review rather than a flag on the test run — an `--update`
  *          mode that rewrites expectations on failure is how a golden stops
@@ -56,6 +57,13 @@ const FIXTURES = [
   {
     project: resolve(here, '../../../test/large_font_guard'),
     expected: resolve(here, '../../../test/large_font_guard/generated'),
+  },
+  // A service list with <column> static children (§6.5), compiled with the
+  // departures fixture's widget C++ by both targets.
+  {
+    project: resolve(here, '../../../test/static_children'),
+    expected: resolve(here, '../../../test/static_children/generated'),
+    editor: resolve(here, '../../../test/static_children/generated_editor'),
   },
 ];
 

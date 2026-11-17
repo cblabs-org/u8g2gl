@@ -27,6 +27,11 @@
  *              (EDITOR-DESIGN §3.6), on every selected element at once.
  *              Nothing is written until a field commits.
  *
+ *              With one element selected whose manifest declares `<element>`s,
+ *              `staticChildren` holds a table of its static children
+ *              (`static-children.ts`, design_spec §6.5), and `editStaticChildren()`
+ *              lands each table action the same way: one undo stop.
+ *
  * Exports:
  * - PanelSummary:     The header's lines: tag, names, notes, a resize refusal and element problems
  * - PanelOptions:     The choices the dropdowns and pickers offer
@@ -37,7 +42,9 @@
  *     - view:          The panel's structure, observable
  *     - options:       The dropdowns' choices, observable
  *     - start(), dispose()
+ *     - staticChildren: The selected element's static child tables, observable
  *     - commit():      Write a field's value, or remove it (reset), as one undo stop
+ *     - editStaticChildren(): Add, remove, reorder or set a static child, as one undo stop
  *     - detach():      Replace an expression with the literal the scene computed
  *     - editInXml():   Show the attribute behind a field in the XML editor
  */
@@ -54,6 +61,8 @@ import { attributeEdits, ROOT_TARGET } from './commit-edits';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
 import { panelLayout, sharedLayout, type FieldSpec, type PanelLayout } from './panel-layout';
+import { staticChildEdits, staticChildTables, type StaticChildAction, type StaticChildTable } from './static-children';
+import type { TextEdit } from '@u8g2gl/core/cst/index.js';
 import FONT_HEIGHTS from '@u8g2gl/data/u8g2-font-heights.json' with { type: 'json' };
 
 /** Each bundled U8G2 font's pixel height, by symbol, as the catalogue build read it. */
@@ -150,6 +159,12 @@ export class PanelController {
   readonly view = new Observable<PanelView>(WAITING);
   /** The choices the dropdowns offer. */
   readonly options = new Observable<PanelOptions>({ fonts: [], subjects: [], styles: [], images: [] }, sameOptions);
+  /**
+   * The one selected element's static children, a table per `<element>` its
+   * manifest declares; empty for a screen, several elements, or an element
+   * with none.
+   */
+  readonly staticChildren = new Observable<readonly StaticChildTable[]>([], sameTables);
 
   private readonly workspace: Workspace;
   private readonly subscriptions: Array<() => void> = [];
@@ -193,8 +208,34 @@ export class PanelController {
     if (view.kind === 'empty' || this.workspace.loop.lastRun.get()?.result.wellFormed === false) return false;
     const model = this.workspace.documents.open(view.file);
     if (model === undefined) return false;
-    const edits = attributeEdits(model.getValue(), view.file, view.names, key, value);
-    if (edits.length === 0) return false;
+    return this.apply(view.file, attributeEdits(model.getValue(), view.file, view.names, key, value));
+  }
+
+  /**
+   * @brief Adds, removes, reorders or sets one of the selected element's
+   *        static children (design_spec §6.5), as one undo stop.
+   *
+   * @param action The table action.
+   * @return True if the text changed.
+   */
+  editStaticChildren(action: StaticChildAction): boolean {
+    const view = this.view.get();
+    const name = view.kind === 'elements' && view.names.length === 1 ? view.names[0] : undefined;
+    if (view.kind !== 'elements' || name === undefined || this.workspace.loop.lastRun.get()?.result.wellFormed === false) return false;
+    const manifest = this.workspace.loop.lastRun.get()?.result.model.manifests.get(view.layout.tag);
+    const model = this.workspace.documents.open(view.file);
+    if (model === undefined || manifest === undefined) return false;
+    return this.apply(view.file, staticChildEdits(model.getValue(), view.file, name, manifest.api.elements, action));
+  }
+
+  // apply
+  // Lands edits computed from a document's current text on its model as one
+  // undo stop; false, and no stop, when there are none.
+  //   file  — the document
+  //   edits — in the coordinates of its current text
+  private apply(file: string, edits: readonly TextEdit[]): boolean {
+    const model = this.workspace.documents.open(file);
+    if (model === undefined || edits.length === 0) return false;
     // One stop on each side, so neither the edit before nor the one after
     // joins it: undo takes back exactly this commit.
     model.pushStackElement();
@@ -324,12 +365,20 @@ export class PanelController {
     });
     const context = { wellFormed: run.result.wellFormed, box: boxOf(facts.map((fact) => run.result.bounds.get(fact.name))) };
     this.updateFields(view.layout, view.fields, facts, context);
+
+    // --- Step 4: The static child tables, for one element (§6.5) ---
+    const element = facts.length === 1 && only !== undefined && cst !== undefined ? namedCstElements(cst).get(only.name) : undefined;
+    const [manifest] = manifests;
+    this.staticChildren.set(
+      element === undefined || manifest === undefined ? [] : staticChildTables(element, manifest.api.elements, manifest.name),
+    );
   }
 
   // showScreen
   // With nothing selected, the drawn screen's own properties.
   //   run — the last pipeline run
   private showScreen(run: CompletedRun): void {
+    this.staticChildren.set([]);
     const file = run.result.screenFile;
     const cst = file === undefined ? undefined : this.cstOf(file);
     if (file === undefined || cst?.root === undefined) {
@@ -397,6 +446,7 @@ export class PanelController {
   // publish
   // Shows a view with no fields, once per distinct key.
   private publish(key: string, view: PanelView): void {
+    this.staticChildren.set([]);
     if (key === this.viewKey) return;
     this.viewKey = key;
     this.view.set(view);
@@ -480,6 +530,16 @@ function sameSummary(a: PanelSummary, b: PanelSummary): boolean {
     a.resize === b.resize &&
     a.problems.map((p) => p.message).join('\n') === b.problems.map((p) => p.message).join('\n')
   );
+}
+
+// sameTables
+// Two sets of static child tables that show the same rows and values.
+function sameTables(a: readonly StaticChildTable[], b: readonly StaticChildTable[]): boolean {
+  const key = (tables: readonly StaticChildTable[]): string =>
+    JSON.stringify(
+      tables.map((table) => [table.tag, table.args.map((arg) => `${arg.key}/${arg.type}`), table.rows.map((row) => [...row.values.entries()])]),
+    );
+  return key(a) === key(b);
 }
 
 // sameOptions

@@ -10,8 +10,9 @@
  *          saves (ui_spec §16.1). The CLI's `--fix-names` performs the same
  *          insertion on disk; both apply the parser's own edits, so the names
  *          are identical.
- * Description: Parses the text under the `'generate'` missing-name policy and
- *              applies the insertions it returns. Only screens and widget
+ * Description: Parses the text under the `'generate'` missing-name policy,
+ *              knowing the manifests' static child names so a `<column>` is
+ *              never named, and applies the insertions it returns. Only screens and widget
  *              manifests have element names; other documents come back
  *              unchanged.
  *
@@ -19,22 +20,34 @@
  * - withGeneratedNames():  A document's text with its missing names inserted
  */
 
-import { applyTextEdits, parseScreenFile, parseWidgetManifestFile } from '@u8g2gl/core/parser/index.js';
+import {
+  applyTextEdits,
+  parseScreenFile,
+  parseWidgetManifestFile,
+  type StaticChildNames,
+} from '@u8g2gl/core/parser/index.js';
 import { classifyProjectFile } from '../project/project-model';
 
 /**
  * @brief The text with a generated `name="…"` inserted for every unnamed element.
  *
- * @param path Project-relative path, which decides the parser.
- * @param text The document as read.
+ * A static child (`<column>`, §6.5) is never named: it is configuration of
+ * its parent, not an element, and a name on it would be an attribute its
+ * manifest does not declare.
+ *
+ * @param path           Project-relative path, which decides the parser.
+ * @param text           The document as read.
+ * @param staticChildren The manifests' static child names
+ *                       (`projectStaticChildNames()`); a screen's parse needs
+ *                       them to know which children are not elements.
  * @return The same string when nothing was missing.
  */
-export function withGeneratedNames(path: string, text: string): string {
+export function withGeneratedNames(path: string, text: string, staticChildren: StaticChildNames): string {
   const kind = classifyProjectFile(path);
   const options = { missingNamePolicy: 'generate' } as const;
   const edits =
     kind === 'screen'
-      ? parseScreenFile(text, path, options).nameEdits
+      ? parseScreenFile(text, path, { ...options, staticChildren }).nameEdits
       : kind === 'widget'
         ? parseWidgetManifestFile(text, path, options).nameEdits
         : undefined;

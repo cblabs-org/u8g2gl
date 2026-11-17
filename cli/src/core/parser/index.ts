@@ -25,6 +25,7 @@
  * - rootElementName: The root element's tag, for dispatching a file to its parser
  * - RawXmlAttribute, RawXmlElement, RawXmlDocument: Low-level untyped XML types
  * - MissingNamePolicy, ParseOptions, SourceEdit, applyTextEdits: [U-1] name policy and write-back
+ * - StaticChildNames, staticChildNamesOf: The manifests' `<element>` child tags, for ParseOptions
  */
 
 import type { Diagnostic } from '../schema/diagnostic.js';
@@ -61,6 +62,7 @@ export {
   parseWidgetNode,
   createWidgetParseContext,
   hiddenAttributeValue,
+  staticChildNamesOf,
 } from './parse-widget-tree.js';
 export type { NameAllocator, WidgetParseContext } from './parse-widget-tree.js';
 export {
@@ -68,7 +70,7 @@ export {
   applyTextEdits,
   createNameInsertion,
 } from './name-policy.js';
-export type { MissingNamePolicy, ParseOptions, SourceEdit } from './name-policy.js';
+export type { MissingNamePolicy, ParseOptions, SourceEdit, StaticChildNames } from './name-policy.js';
 export {
   parseWidgetManifest,
   parseWidgetManifestFile,

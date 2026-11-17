@@ -19,6 +19,9 @@
  * - EventTrigger: Input interaction trigger ('press' | 'long_press' | 'value_changed')
  * - EventChild: Action handler attached to an element
  * - StyleChild: Inline style reference child element
+ * - StaticChild: A child the parent's manifest declares with `<element>` (`<column>`)
+ * - staticChildrenOf(): An element's static children, in document order
+ * - isElementNode(): Whether a child is an element, not a directive or static child
  * - namedStyles(): The styles an element names, in layering order
  */
 
@@ -90,7 +93,7 @@ export interface WidgetNode {
 /**
  * Union of valid child nodes within a widget element.
  */
-export type WidgetNodeChild = WidgetNode | BindingChild | EventChild | StyleChild;
+export type WidgetNodeChild = WidgetNode | BindingChild | EventChild | StyleChild | StaticChild;
 
 /**
  * Reactive subject binding child element (e.g. `<bind_flag_if_eq>`, §8.4).
@@ -170,6 +173,56 @@ export interface StyleChild {
   readonly name: string;
   /** Source location where this style child was declared. */
   readonly loc?: SourceLocation;
+}
+
+/**
+ * A child its parent's manifest declares with `<element>` (design_spec §6.5),
+ * e.g. `<column width="24" align="left" />` inside `<wd_service_list>`.
+ *
+ * It is configuration of its parent, not an element: it has no name, no
+ * geometry and no object, it never joins the element tree, and at
+ * construction the parent's declared access method is called once per static
+ * child in document order with its arguments (`add_column(24, …)`). The parser
+ * recognises one only when told the manifests' element names
+ * (`ParseOptions.staticChildren`); without them it is parsed as an element.
+ */
+export interface StaticChild {
+  /** Discriminated kind. */
+  readonly kind: 'static';
+  /** The tag, which is the manifest `<element>`'s name (e.g. "column"). */
+  readonly tag: string;
+  /** Its attributes as written: one per `<arg>`. */
+  readonly attributes: Readonly<Record<string, string>>;
+  /** Where each attribute was written: its value. */
+  readonly attributeLocs: Readonly<Record<string, SourceLocation>>;
+  /** Where each attribute's name was written. */
+  readonly attributeNameLocs: Readonly<Record<string, SourceLocation>>;
+  /** Source location of the opening tag. */
+  readonly loc?: SourceLocation;
+  /** Offsets of the whole child in its file's text, for the designer's edits. */
+  readonly range?: OffsetRange;
+}
+
+/**
+ * @brief Whether a child is an element — a nested `WidgetNode` — rather than a
+ *        directive, a style reference or a static child, each of which carries
+ *        a `kind`.
+ *
+ * The one test. Testing for a `tag` instead was right until static children,
+ * which have a tag too and must never be walked as elements.
+ */
+export function isElementNode(child: WidgetNodeChild): child is WidgetNode {
+  return !('kind' in child);
+}
+
+/**
+ * @brief An element's static children, in document order.
+ *
+ * Read by the validator, both emission targets and the designer's table, so it
+ * lives with the node it reads, as {@link namedStyles} does.
+ */
+export function staticChildrenOf(node: WidgetNode): StaticChild[] {
+  return node.children.filter((child): child is StaticChild => 'kind' in child && child.kind === 'static');
 }
 
 /**

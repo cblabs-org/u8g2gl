@@ -27,6 +27,11 @@
  *              problems, and the computed-value note with Detach and Edit in
  *              XML.
  *
+ *              An element whose manifest declares `<element>`s ends with a
+ *              table of its static children (`<column>`, design_spec §6.5):
+ *              a row per child with each argument's own typed control, and
+ *              add, remove and move up/down. Each change is one undo stop.
+ *
  * Exports:
  * - PropertyPanel:  The region
  */
@@ -44,6 +49,7 @@ import { FieldEditor } from './editors';
 import { fieldFacts } from './field-facts';
 import type { FieldState } from './field-state';
 import type { FieldSpec, PanelSection } from './panel-layout';
+import type { StaticChildTable } from './static-children';
 import './panel.css';
 
 /** @brief The property panel region. */
@@ -70,6 +76,7 @@ export function PropertyPanel(): React.JSX.Element {
           {view.layout.sections.map((section) => (
             <Section key={`${view.file}:${view.names.join(',')}:${section.id}`} section={section} fields={view.fields} controller={controller} />
           ))}
+          <StaticChildren controller={controller} />
         </>
       )}
     </aside>
@@ -238,5 +245,94 @@ function FieldRow({
         </Tooltip>
       )}
     </div>
+  );
+}
+
+/**
+ * @brief The selected element's static children (§6.5): a table per
+ *        `<element>` its manifest declares, or nothing.
+ */
+function StaticChildren({ controller }: { readonly controller: PanelController }): React.JSX.Element | null {
+  countRender('PanelStaticChildren');
+  const tables = useObservable(controller.staticChildren);
+  if (tables.length === 0) return null;
+  return (
+    <>
+      {tables.map((table) => (
+        <StaticChildTableView key={table.tag} table={table} controller={controller} />
+      ))}
+    </>
+  );
+}
+
+/** A static child's field state: written as it is, or absent; never mixed. */
+function cellState(value: string | undefined): FieldState {
+  return {
+    value,
+    mixed: false,
+    written: value !== undefined,
+    problems: [],
+    disabled: undefined,
+    detach: undefined,
+    shown: undefined,
+    reveal: undefined,
+  };
+}
+
+/** @brief One `<element>` kind: a row per child, a column per argument. */
+function StaticChildTableView({ table, controller }: { readonly table: StaticChildTable; readonly controller: PanelController }): React.JSX.Element {
+  const { tag } = table;
+  return (
+    <section className="panel-section static-children" data-section="static-children" data-static-tag={tag}>
+      <h3 title={table.help}>{`<${tag}> children`}</h3>
+      <table className="static-child-table">
+        <thead>
+          <tr>
+            {table.args.map((arg) => (
+              <th key={arg.key} scope="col" title={arg.help}>
+                {arg.key}
+              </th>
+            ))}
+            <th scope="col" aria-label="Order" />
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, index) => (
+            <tr key={index} data-row={index}>
+              {table.args.map((arg) => (
+                <td key={arg.key} data-arg={arg.key}>
+                  <FieldEditor
+                    spec={arg}
+                    field={cellState(row.values.get(arg.key))}
+                    commit={(value) => value !== undefined && controller.editStaticChildren({ kind: 'set', tag, row: index, arg: arg.key, value })}
+                    disabled={false}
+                    options={controller.options}
+                  />
+                </td>
+              ))}
+              <td className="row-actions">
+                <button type="button" aria-label={`Move ${tag} ${index + 1} up`} disabled={index === 0} onClick={() => controller.editStaticChildren({ kind: 'move', tag, row: index, by: -1 })}>
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${tag} ${index + 1} down`}
+                  disabled={index === table.rows.length - 1}
+                  onClick={() => controller.editStaticChildren({ kind: 'move', tag, row: index, by: 1 })}
+                >
+                  ↓
+                </button>
+                <button type="button" aria-label={`Remove ${tag} ${index + 1}`} onClick={() => controller.editStaticChildren({ kind: 'remove', tag, row: index })}>
+                  ×
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button type="button" className="action" onClick={() => controller.editStaticChildren({ kind: 'add', tag })}>
+        {`Add <${tag}>`}
+      </button>
+    </section>
   );
 }

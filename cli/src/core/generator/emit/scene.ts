@@ -28,8 +28,9 @@
  *              everything else the text the author wrote, which the host maps
  *              through the registry entry's declared type.
  *
- *              Format, version 3 (version 3 added a draw call's `clip`; version
- *              2 added `origin`; version 1 had neither):
+ *              Format, version 4 (version 4 added an object's
+ *              `static_children`; version 3 a draw call's `clip`; version 2
+ *              `origin`; version 1 had none of them):
  *              - `u8g2gl_generated`: the marker the **writer** recognises the file
  *                by. A host reads nothing from it, and it is not part of the
  *                format a host checks, so adding it did not bump the version —
@@ -44,12 +45,19 @@
  *              - `screens[]`: `{ name, objects, parents, elements }`, where
  *                `elements` is the draw order ([D-4]) and each element is either
  *                an **object** — `class`, `object`, `parent`, `rect`,
- *                `properties`, `styles`, `style_overrides`, `bindings`, `flags` —
+ *                `properties`, `static_children`, `styles`, `style_overrides`,
+ *                `bindings`, `flags` —
  *                or a **draw call** — `arguments` (bound ones name a subject;
  *                absent ones take the manifest default), `visibility`, and,
  *                only when the call is clipped, `clip`: the object index whose
  *                effective clip it is drawn inside, as firmware draws it inside
  *                a `u8g2gl_clip_scope` (§13.5). Absent means unclipped.
+ *              - `static_children`: `{ element, args: [{ name, value }] }` per
+ *                static child (§6.5), in document order, applied in the
+ *                `properties` step after the properties, through the class's
+ *                registry entry for that element, as firmware calls the access
+ *                method there. Every argument is present. Absent on an object
+ *                with none.
  *              - A binding or bound argument that sets a position (`bind_x`,
  *                `bind_y`) carries `origin`: its container's absolute corner on
  *                that axis, which the host adds to the subject's value as
@@ -85,6 +93,7 @@ import {
   INIT_STEPS,
   placeScreen,
   rectangleOf,
+  staticChildCalls,
   styleOverridesOf,
   writtenProperties,
   type FlagComparison,
@@ -101,7 +110,7 @@ export const SCENE_FILE = 'ui_scene.json';
  * The format version. A host checks it before reading anything else; bump it
  * for any change a host would read differently.
  */
-export const SCENE_FORMAT_VERSION = 3;
+export const SCENE_FORMAT_VERSION = 4;
 
 /** Everything describing the scenes needs. */
 export interface SceneInput {
@@ -187,9 +196,26 @@ function source(element: RealisedElement): Json {
   };
 }
 
+// staticChildrenJson
+// `{ static_children: [...] }` for an object with static children (§6.5), in
+// document order, or `{}` for one with none, so a scene with none is the
+// version 3 scene but for its version.
+//   placement — the object's manifest and device-space model
+function staticChildrenJson(placement: Placement): { [key: string]: Json } {
+  const calls = staticChildCalls(placement);
+  if (calls.length === 0) return {};
+  return {
+    static_children: calls.map((call) => ({
+      element: call.tag,
+      args: call.args.map(({ arg, literal }) => ({ name: arg.name, value: jsonValue(arg.type, literal) })),
+    })),
+  };
+}
+
 // objectJson
 // An object as the firmware's init builds it (§13.7): its class, place in the
-// flat model, rectangle, written properties, styles, overrides, then bindings.
+// flat model, rectangle, written properties and static children, styles,
+// overrides, then bindings.
 //   element   — the realised object
 //   placement — its manifest and device-space model
 function objectJson(element: RealisedElement, placement: Placement): { [key: string]: Json } {
@@ -234,6 +260,7 @@ function objectJson(element: RealisedElement, placement: Placement): { [key: str
       name: prop.name,
       value: jsonValue(prop.type, literal),
     })),
+    ...staticChildrenJson(placement),
     styles: namedStyles(placement.absolute.node),
     style_overrides: styleOverridesOf(placement).applied.map(({ prop, value }) => ({
       name: prop.name,

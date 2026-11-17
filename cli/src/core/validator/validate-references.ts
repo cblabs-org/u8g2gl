@@ -36,7 +36,7 @@ import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { isElementNode, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { walkExpanded } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
@@ -298,7 +298,7 @@ function walkNodes(
   visitor: (node: WidgetNode) => void,
 ): void {
   for (const child of children) {
-    if ('tag' in child && typeof child.tag === 'string') {
+    if (isElementNode(child)) {
       visitor(child);
       if (child.children && child.children.length > 0) {
         walkNodes(child.children, visitor);
@@ -316,32 +316,58 @@ function walkNodesWithParent(
   parent?: WidgetNode,
 ): void {
   for (const child of children) {
-    if ('tag' in child && typeof child.tag === 'string') {
+    if (isElementNode(child)) {
       visitor(child, parent);
       walkNodesWithParent(child.children, visitor, child);
     }
   }
 }
 
-// isDeclaredCollectionChild
-// Whether a tag with no manifest of its own is a collection element its parent's
-// manifest declares (§9) — `<column>` inside `<wd_list>`. Such a child is known:
-// Pass 8 reports it as not yet supported (a warning in `validate`, PR-04 decision
-// 1), so reporting it here as unknown would make `validate` error on it (PR-04
-// WO5b F2). Read from the parent's own `api.elements`, never a tag list ([D-17]);
-// collection elements are not inherited (PR-04 WO1 F8).
+// unknownTagDiagnostic
+// The diagnostic for a tag no manifest declares. When the enclosing element's
+// manifest declares static children (`<element>`, §6.5), the message names
+// them, because a misspelt `<colum>` inside a service list is far likelier
+// than an unknown widget. A declared static child never reaches here: the
+// parser makes it a static child, not an element.
 //   node      — the element whose tag has no manifest
 //   parent    — its enclosing element, if any
+//   where     — "screen 'x'" or "composite 'y'", for the message
 //   manifests — the registry
-function isDeclaredCollectionChild(
+//   knownTags — every registered tag, for suggestions
+function unknownTagDiagnostic(
   node: WidgetNode,
   parent: WidgetNode | undefined,
+  where: string,
   manifests: ValidateInput['manifests'],
-): boolean {
-  if (parent === undefined) {
-    return false;
+  knownTags: readonly string[],
+): Diagnostic {
+  const allowed = parent === undefined ? [] : (manifests.get(parent.tag)?.api.elements.map((element) => element.name) ?? []);
+  if (allowed.length > 0 && parent !== undefined) {
+    return createRefDiagnostic(
+      DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
+      `Unknown element '<${node.tag}>' in <${parent.tag}> in ${where}: <${parent.tag}> takes the static ` +
+        `children ${allowed.map((tag) => `<${tag}>`).join(', ')}, or an element some manifest declares.`,
+      node.loc,
+      node.tag,
+      findClosest(node.tag, [...allowed, ...knownTags]),
+    );
   }
-  return manifests.get(parent.tag)?.api.elements.some((element) => element.name === node.tag) ?? false;
+  if (node.tag.startsWith('u8g2gl_')) {
+    return createRefDiagnostic(
+      DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
+      `Unknown widget '<${node.tag}>' in ${where}.`,
+      node.loc,
+      node.tag,
+      findClosest(node.tag, knownTags),
+    );
+  }
+  return createRefDiagnostic(
+    DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
+    `Unknown element '<${node.tag}>' instantiated in ${where}.`,
+    node.loc,
+    node.tag,
+    findClosest(node.tag, knownTags),
+  );
 }
 
 /**
@@ -438,33 +464,12 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
       }
 
       // 2a. Check the element tag. Element knowledge is data,
-      // never code ([D-17]): a tag validates if and only if a manifest
-      // declares it, or its parent's manifest declares it as a collection
-      // element — there is no hardcoded primitives set to fall back on.
-      if (!manifests.has(node.tag) && !isDeclaredCollectionChild(node, parent, manifests)) {
-        if (node.tag.startsWith('u8g2gl_')) {
-          // Unknown built-in widget
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
-              `Unknown widget '<${node.tag}>' in screen '${screen.name}'.`,
-              node.loc,
-              node.tag,
-              findClosest(node.tag, knownTags),
-            ),
-          );
-        } else {
-          // Unknown user element
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
-              `Unknown element '<${node.tag}>' instantiated in screen '${screen.name}'.`,
-              node.loc,
-              node.tag,
-              findClosest(node.tag, knownTags),
-            ),
-          );
-        }
+      // never code ([D-17]): an element's tag validates if and only if a
+      // manifest declares it — there is no hardcoded primitives set to fall
+      // back on. A static child (`<column>`) is not an element and is not
+      // walked here; Pass 4 checks it against its parent's `<element>`.
+      if (!manifests.has(node.tag)) {
+        diagnostics.push(unknownTagDiagnostic(node, parent, `screen '${screen.name}'`, manifests, knownTags));
       }
 
       // 2b–2d. Font, image, style and focus-style references
@@ -567,28 +572,8 @@ export function validateReferences(input: ValidateInput): readonly Diagnostic[] 
       // Check the tag itself. Pass 2a runs only over screens, so without this
       // a misspelled element inside a composite's own template passed today —
       // the walk here checked fonts, images, and subjects but never the tag.
-      if (!manifests.has(node.tag) && !isDeclaredCollectionChild(node, parent, manifests)) {
-        if (node.tag.startsWith('u8g2gl_')) {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
-              `Unknown widget '<${node.tag}>' in composite '${component.name}'.`,
-              node.loc,
-              node.tag,
-              findClosest(node.tag, knownTags),
-            ),
-          );
-        } else {
-          diagnostics.push(
-            createRefDiagnostic(
-              DIAGNOSTIC_CODES.UNKNOWN_COMPONENT,
-              `Unknown element '<${node.tag}>' instantiated in composite '${component.name}'.`,
-              node.loc,
-              node.tag,
-              findClosest(node.tag, knownTags),
-            ),
-          );
-        }
+      if (!manifests.has(node.tag)) {
+        diagnostics.push(unknownTagDiagnostic(node, parent, `composite '${component.name}'`, manifests, knownTags));
       }
 
       // Check font references

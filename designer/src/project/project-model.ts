@@ -19,14 +19,21 @@
  *              opening the file writes into its buffer, so a file that is not
  *              open and one that is describe the same elements.
  *
+ *              Manifests parse first, because a screen's parse needs their
+ *              `<element>` names to tell a static child (`<column>`, §6.5)
+ *              from an element.
+ *
  *              The model is rebuilt on every pipeline run, so each document's
- *              parse is cached by its exact text: a keystroke re-parses only
- *              the document it changed, and the manifest registry is rebuilt
- *              only when a manifest's parse changed.
+ *              parse is cached by its exact text — a screen's by its text and
+ *              those names, so a manifest's `<element>` change re-parses the
+ *              screens: a keystroke re-parses only the document it changed,
+ *              and the manifest registry is rebuilt only when a manifest's
+ *              parse changed.
  *
  * Exports:
  * - ProjectFileKind:        How the project layout reads a file
  * - classifyProjectFile():  A path's kind, or undefined if no document reads it
+ * - projectStaticChildNames(): The manifests' static child names, for a parse outside the cache
  * - ProjectModelCache:      Text-keyed parses, and the model built from them
  *
  *     - build():            The model for a set of texts
@@ -41,7 +48,9 @@ import {
   parseProjectFile,
   parseScreenFile,
   parseWidgetManifestFile,
+  staticChildNamesOf,
   type ParseResult,
+  type StaticChildNames,
 } from '@u8g2gl/core/parser/index.js';
 import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
@@ -69,10 +78,39 @@ export function classifyProjectFile(path: string): ProjectFileKind | undefined {
   return undefined;
 }
 
-/** One cached parse: the text it was of, and the result. */
+/** One cached parse: what it was of (the text, and for a screen its static child names), and the result. */
 interface CachedParse<T> {
-  readonly text: string;
+  readonly key: string;
   readonly result: ParseResult<T>;
+}
+
+// staticChildrenKey
+// The static child names as one string, in a fixed order, so two builds with
+// the same names give the same cache key.
+function staticChildrenKey(names: StaticChildNames): string {
+  return [...names.entries()]
+    .map(([tag, children]) => `${tag}:${[...children].sort().join(',')}`)
+    .sort()
+    .join(';');
+}
+
+/**
+ * @brief The static child names (`<element>`, §6.5) every manifest among the
+ *        texts declares, with the framework's: what a screen's parse needs.
+ *
+ * For a caller outside the cache — the documents writing generated names on
+ * open — so a static child is never given a name there either.
+ *
+ * @param texts Every project document's current text by project-relative path.
+ */
+export function projectStaticChildNames(texts: ReadonlyMap<string, string>): StaticChildNames {
+  const manifests: WidgetManifest[] = [...FRAMEWORK.manifests];
+  for (const [path, text] of texts) {
+    if (classifyProjectFile(path) !== 'widget') continue;
+    const parsed = parseWidgetManifestFile(text, path).value;
+    if (parsed !== undefined) manifests.push(parsed);
+  }
+  return staticChildNamesOf(manifests);
 }
 
 /** The framework manifests never change during a session: parsed once. */
@@ -103,6 +141,11 @@ export class ProjectModelCache {
     // scene, and a different order would render a different default screen.
     const paths = [...texts.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
     const seen = new Set<string>();
+    // Manifests first: a screen's parse needs their `<element>` names to tell
+    // a static child (`<column>`) from an element (§6.5). Diagnostics are
+    // still reported in path order, so each parse's are kept by path.
+    const diagnosticsByPath = new Map<string, readonly Diagnostic[]>();
+    const screenPaths: string[] = [];
     for (const path of paths) {
       const kind = classifyProjectFile(path);
       const text = texts.get(path);
@@ -112,23 +155,37 @@ export class ProjectModelCache {
       seen.add(path);
       if (kind === 'project') {
         const result = this.parse(path, text, () => parseProjectFile(text, path));
-        loadDiagnostics.push(...result.diagnostics);
+        diagnosticsByPath.set(path, result.diagnostics);
         project = result.value ?? project;
         hasProjectManifest = true;
         projectWithheld = result.value === undefined;
       } else if (kind === 'globals') {
         const result = this.parse(path, text, () => parseGlobalsFile(text, path));
-        loadDiagnostics.push(...result.diagnostics);
+        diagnosticsByPath.set(path, result.diagnostics);
         globals = result.value ?? globals;
       } else if (kind === 'screen') {
-        const result = this.parse(path, text, () => parseScreenFile(text, path, { missingNamePolicy: 'generate' }));
-        loadDiagnostics.push(...result.diagnostics);
-        if (result.value !== undefined) screens.push(result.value);
+        screenPaths.push(path);
       } else {
         const result = this.parse(path, text, () => parseWidgetManifestFile(text, path, { missingNamePolicy: 'generate' }));
-        loadDiagnostics.push(...result.diagnostics);
+        diagnosticsByPath.set(path, result.diagnostics);
         if (result.value !== undefined) manifests.push(result.value);
       }
+    }
+    const staticChildren = staticChildNamesOf([...FRAMEWORK.manifests, ...manifests]);
+    // A screen's parse depends on its text and on those names, so both key
+    // its cache entry: renaming or adding a manifest's <element> re-parses
+    // every screen, and nothing else does.
+    const staticKey = staticChildrenKey(staticChildren);
+    for (const path of screenPaths) {
+      const text = texts.get(path) ?? '';
+      const result = this.parse(path, `${staticKey}\u0000${text}`, () =>
+        parseScreenFile(text, path, { missingNamePolicy: 'generate', staticChildren }),
+      );
+      diagnosticsByPath.set(path, result.diagnostics);
+      if (result.value !== undefined) screens.push(result.value);
+    }
+    for (const path of paths) {
+      loadDiagnostics.push(...(diagnosticsByPath.get(path) ?? []));
     }
     for (const path of [...this.parses.keys()]) {
       if (!seen.has(path)) this.parses.delete(path);
@@ -149,17 +206,18 @@ export class ProjectModelCache {
   }
 
   // parse
-  // The cached parse of this exact text, or a fresh one cached in its place.
-  //   path  — project-relative path, the cache key
-  //   text  — the document's current text
+  // The cached parse for this exact key, or a fresh one cached in its place.
+  //   path  — project-relative path, the cache entry
+  //   key   — everything the parse depends on: the document's text, and for a
+  //           screen the static child names too
   //   parse — the CLI parser for its kind
-  private parse<T>(path: string, text: string, parse: () => ParseResult<T>): ParseResult<T> {
+  private parse<T>(path: string, key: string, parse: () => ParseResult<T>): ParseResult<T> {
     const cached = this.parses.get(path) as CachedParse<T> | undefined;
-    if (cached !== undefined && cached.text === text) {
+    if (cached !== undefined && cached.key === key) {
       return cached.result;
     }
     const result = parse();
-    this.parses.set(path, { text, result });
+    this.parses.set(path, { key, result });
     return result;
   }
 }

@@ -61,7 +61,15 @@ import type { Globals } from '../schema/globals.js';
 import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { PropDef } from '../schema/widget-manifest.js';
-import type { BindingChild, EventChild, StyleChild, WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import {
+  isElementNode,
+  type BindingChild,
+  type EventChild,
+  type StaticChild,
+  type StyleChild,
+  type WidgetNode,
+  type WidgetNodeChild,
+} from '../schema/widget-node.js';
 import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { hiddenAttributeValue } from '../parser/parse-widget-tree.js';
@@ -240,7 +248,7 @@ function createExpansionDiagnostic(
 }
 
 function isElement(child: WidgetNodeChild): child is WidgetNode {
-  return 'tag' in child && typeof child.tag === 'string';
+  return isElementNode(child);
 }
 
 // elementLabel
@@ -412,13 +420,13 @@ function reportUnsubstitutedProp(
 // so Pass 2 can check the style it resolved to (PR-04 WO7b 6).
 //   substitutions — appended to; the caller carries them onto the element
 function substituteDirective(
-  child: BindingChild | EventChild | StyleChild,
+  child: BindingChild | EventChild | StyleChild | StaticChild,
   owner: WidgetNode,
   scope: TemplateScope,
   state: ExpansionState,
   substitutions: Substitution[],
 ): WidgetNodeChild {
-  const description = `<${child.kind === 'style' ? 'style' : child.type}> on ${elementLabel(owner)}`;
+  const description = `<${child.kind === 'style' ? 'style' : child.kind === 'static' ? child.tag : child.type}> on ${elementLabel(owner)}`;
   const loc = child.loc ?? owner.loc;
   const keep = (text: string, subjectPosition = false): string =>
     substituteText(text, { description, ...(loc ? { loc } : {}), subjectPosition }, scope, state) ?? text;
@@ -446,6 +454,16 @@ function substituteDirective(
       }
       return substituted;
     }
+    case 'static': {
+      // A static child is configuration of its owner (§6.5), so a `$prop` in
+      // one of its arguments takes the owner's template argument, as the
+      // owner's own attributes do.
+      const attributes: Record<string, string> = {};
+      for (const [name, value] of Object.entries(child.attributes)) {
+        attributes[name] = keep(value);
+      }
+      return { ...child, attributes };
+    }
   }
 }
 
@@ -453,7 +471,7 @@ function substituteDirective(
 interface SubstitutedValues {
   readonly attributes: WidgetNode['attributes'];
   readonly styleOverrides: Readonly<Record<string, string>>;
-  /** Binding, event and style children, in written order. */
+  /** Binding, event, style and static children, in written order. */
   readonly directives: readonly WidgetNodeChild[];
   /** Whole-value substitutions made, in attribute order. */
   readonly substitutions: readonly Substitution[];
@@ -517,7 +535,7 @@ function substituteNode(written: WidgetNode, scope: TemplateScope, state: Expans
 
   // --- Step 3: Directives ---
   const directives = written.children
-    .filter((child): child is BindingChild | EventChild | StyleChild => !isElement(child))
+    .filter((child): child is BindingChild | EventChild | StyleChild | StaticChild => !isElement(child))
     .map((child) => substituteDirective(child, written, scope, state, substitutions));
 
   return { attributes: attributes as WidgetNode['attributes'], styleOverrides, directives, substitutions };

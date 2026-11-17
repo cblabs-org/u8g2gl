@@ -32,7 +32,7 @@
  */
 
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
-import type { WidgetNodeChild } from '@u8g2gl/core/schema/widget-node.js';
+import { isElementNode, type WidgetNodeChild } from '@u8g2gl/core/schema/widget-node.js';
 
 /**
  * @brief The stem a generated name for `tag` starts with.
@@ -55,7 +55,7 @@ export function nameStem(tag: string): string {
 //   into     — where the names go
 function collectNodeNames(children: readonly WidgetNodeChild[], into: Set<string>): void {
   for (const child of children) {
-    if (!('tag' in child)) continue;
+    if (!isElementNode(child)) continue;
     const name = child.attributes.name;
     if (typeof name === 'string' && name !== '') into.add(name);
     collectNodeNames(child.children, into);
