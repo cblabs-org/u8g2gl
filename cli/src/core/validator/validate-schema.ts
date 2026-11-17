@@ -19,8 +19,9 @@
  *              in the vendored set (`icon-rules.ts`), and which a 0.4 or 0.5
  *              project is told it may not use until it says 0.6. 0.7 adds
  *              the `MIRROR` and `MIRROR_VERTICAL` rotations, which a 0.4–0.6
- *              project is told it may not use until it says 0.7. (0.7 also
- *              removes the pin attributes and `<bus>`; the parser refuses
+ *              project is told it may not use until it says 0.7, and
+ *              `<data>` in `<api>` (`data-rules.ts`), on the same terms. (0.7
+ *              also removes the pin attributes and `<bus>`; the parser refuses
  *              those at every version, so nothing here sees them.)
  *
  *              The 254-object ceiling is **not** checked here. This pass used to
@@ -75,6 +76,7 @@ import { booleanValueError, enumValueError } from './value-rules.js';
 import { CURRENT_SCHEMA_VERSION } from '../schema/schema-version.js';
 import { MIRROR_ROTATIONS, ROTATION_VALUES } from '../schema/project-vocabulary.js';
 import { iconValueProblem } from './icon-rules.js';
+import { BEFORE_DATA, checkDataDeclarations } from './data-rules.js';
 
 
 /**
@@ -1185,6 +1187,15 @@ export function validateSchema(input: ValidateInput): readonly Diagnostic[] {
     const tooOld = preIconSchema !== undefined && !isFrameworkDeclaration(manifest, manifests);
     const diagnostic = checkIcon(manifest, tooOld ? preIconSchema : undefined);
     if (diagnostic !== undefined) diagnostics.push(diagnostic);
+  }
+
+  // --- 9. `<data>` on `<api>` (schema 0.7) ---
+  // The same split again: every declaration is held to the rules
+  // (data-rules.ts), and only the project's own to the project's version.
+  const preDataSchema = project !== undefined && BEFORE_DATA.has(project.schema) ? project.schema : undefined;
+  for (const manifest of [...manifests.declaredWidgets, ...manifests.declaredComposites]) {
+    const tooOld = preDataSchema !== undefined && !isFrameworkDeclaration(manifest, manifests);
+    diagnostics.push(...checkDataDeclarations(manifest, tooOld ? preDataSchema : undefined));
   }
 
   return diagnostics;

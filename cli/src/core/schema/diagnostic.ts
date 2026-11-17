@@ -417,6 +417,19 @@ export const DIAGNOSTIC_CODES = {
    * message: the author is owed the reason and the replacement.
    */
   REMOVED_ATTRIBUTE: 'U8G2GL_REMOVED_ATTRIBUTE',
+  /**
+   * A widget manifest's `<data>` block (schema 0.7) breaks one of its rules:
+   * it sits on a manifest with no C++ class of its own (a drawing element or a
+   * composite); its `access` is not a C++ identifier; a `capacity`, `repeat` or
+   * `max_len` is neither a non-negative integer nor the name of an int `<prop>`
+   * the widget declares; a field's type is one no row can carry (`font`,
+   * `image`, `subject`, `style`, `color`); or a field has a bound its type does
+   * not take, a non-integer `min`/`max`, `min` above `max`, or is an enum with
+   * no values. Located at the attribute at fault. An unknown field type is
+   * `U8G2GL_INVALID_ENUM_VALUE`, and a repeated name `U8G2GL_DUPLICATE_NAME`,
+   * as for a `<prop>`.
+   */
+  INVALID_DATA_DECLARATION: 'U8G2GL_INVALID_DATA_DECLARATION',
 } as const;
 
 /**

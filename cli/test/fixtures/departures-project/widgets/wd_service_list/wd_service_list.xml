@@ -7,5 +7,8 @@
         <prop name="max_cell_chars" type="int" default="24" help="Per-cell string capacity including terminator." />
         <prop name="scroll_dwell_ms" type="int" default="5000" help="Time in ms to hold each page before scrolling." />
         <prop name="scroll_duration_ms" type="int" default="1000" help="Duration of page scroll animation in ms." />
+        <data name="rows" access="add_row" capacity="max_rows" help="One departure per row.">
+            <field name="cells" type="string" repeat="max_cols" max_len="max_cell_chars" help="The row's cells, one per column." />
+        </data>
     </api>
 </widget>

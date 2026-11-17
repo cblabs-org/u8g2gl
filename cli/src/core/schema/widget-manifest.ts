@@ -38,6 +38,11 @@
  * - BindAttributeLocations: Where a `<bind>`'s attributes were written
  * - ElementDef: Child collection element descriptor (for declared-capacity collections, §9)
  * - ElementArgDef: Parameter definition for a collection element
+ * - WidgetData: A `<data>` block — the rows a widget takes at run time (schema 0.7)
+ * - WidgetDataField: One `<field>` of a `<data>` row
+ * - DATA_FIELD_TYPES: The types a `<field>` may declare
+ * - DataCount: A `capacity`, `repeat` or `max_len`, understood
+ * - dataCountOf(): Resolve one against its widget's props
  */
 
 import type { AttributeLocation, SourceLocation } from './source-location.js';
@@ -89,6 +94,16 @@ export interface ApiBlock {
   readonly bindings: readonly BindDef[];
   /** Child collection elements (e.g. `<column>`, §9). */
   readonly elements: readonly ElementDef[];
+  /**
+   * The rows the widget takes at run time through its own ingestion API
+   * (`<data>`, schema 0.7, §9.2), in declaration order. Like `elements`, the
+   * element's own list only: a `<data>` describes one class's access method and
+   * is not inherited through `extends`.
+   *
+   * Optional on the type so a hand-built `ApiBlock` need not spell an empty
+   * list; the parser always sets it. Read it as `api.data ?? []`.
+   */
+  readonly data?: readonly WidgetData[];
   /**
    * The element's display name in the designer's Palette, e.g. "Label"
    * (schema 0.5). Trimmed as parsed; at most 32 characters.
@@ -256,4 +271,119 @@ export interface ElementArgDef {
   readonly maxLen?: number;
   /** Source location where this argument was declared. */
   readonly loc?: SourceLocation;
+}
+
+/**
+ * The types a `<field>` may declare: the `PropType`s a row's value is written
+ * as, the four a live feed carries. `font`, `image`, `subject` and `style`
+ * name something the project declares, which a row of data cannot carry, and
+ * `color` is a drawing mode rather than data, so the validator refuses them by
+ * name rather than as unknown.
+ */
+export const DATA_FIELD_TYPES: readonly PropType[] = ['int', 'bool', 'string', 'enum'];
+
+/**
+ * A `<data>` block (schema 0.7, design_spec §6.5, §9.2): the shape of the rows a
+ * collection widget takes at run time, declared beside the props that size it.
+ *
+ * It describes the widget's own hand-written ingestion API — `begin()`, the
+ * `access` method once per row, `commit()` — which §9.2 fixes, so `begin` and
+ * `commit` are not declared. Nothing here reaches firmware: the editor target
+ * fills a widget by name from it, and the designer shows its rows as a typed
+ * grid.
+ *
+ * `capacity` is kept as written, so the validator can say what is wrong with
+ * it; {@link dataCountOf} reads it.
+ */
+export interface WidgetData {
+  /** The data name, e.g. "carriages". Unique within the widget. */
+  readonly name: string;
+  /** The method called once per row, e.g. "add_carriage". A C++ identifier. */
+  readonly access: string;
+  /**
+   * How many rows fit: an int literal, or the name of an int `<prop>` of the
+   * same widget (`max_carriages`), so the capacity is the one the instance
+   * declares. Absent means the widget states none, and only the access method's
+   * own refusal limits the rows.
+   */
+  readonly capacity?: string;
+  /** Plain-words description for the designer. */
+  readonly help?: string;
+  /** The row's fields, in the access method's parameter order. */
+  readonly fields: readonly WidgetDataField[];
+  /** Where `<data>` was written. */
+  readonly loc?: SourceLocation;
+  /** Where each attribute was written, for those that were, by attribute name. */
+  readonly attributeLocs?: Readonly<Record<string, AttributeLocation>>;
+}
+
+/**
+ * One `<field>` of a `<data>` row: one argument of the access method.
+ *
+ * The bounds are kept as written, as `WidgetData.capacity` is; the validator
+ * holds them to their rules.
+ */
+export interface WidgetDataField {
+  /** The field name, e.g. "loading_pct". Unique within its `<data>`. */
+  readonly name: string;
+  /** The value's type, one of {@link DATA_FIELD_TYPES}, as written. */
+  readonly type: PropType;
+  /** An `int` field's least value, as written. */
+  readonly min?: string;
+  /** An `int` field's greatest value, as written. */
+  readonly max?: string;
+  /** An `enum` field's values, comma-separated, as a `<prop>`'s `values` is. */
+  readonly values?: string;
+  /**
+   * A `string` field's capacity in characters: an int literal or an int
+   * `<prop>`'s name, as `capacity` is.
+   */
+  readonly maxLen?: string;
+  /**
+   * How many times the field repeats in one row: an int literal or an int
+   * `<prop>`'s name. A repeated field is passed to the access method as an
+   * array and its count (`add_row(const char* const* cells, size_t n)`).
+   */
+  readonly repeat?: string;
+  /** Plain-words description for the designer. */
+  readonly help?: string;
+  /** Where `<field>` was written. */
+  readonly loc?: SourceLocation;
+  /** Where each attribute was written, for those that were, by attribute name. */
+  readonly attributeLocs?: Readonly<Record<string, AttributeLocation>>;
+}
+
+/**
+ * A `capacity`, `repeat` or `max_len`, understood: a literal, or a prop whose
+ * value it takes (with that prop's default, if it declares one).
+ */
+export type DataCount =
+  | { readonly kind: 'literal'; readonly value: number }
+  | { readonly kind: 'prop'; readonly prop: PropDef; readonly value?: number };
+
+/**
+ * @brief Resolves a `capacity`, `repeat` or `max_len` against its widget's props.
+ *
+ * A non-negative int literal is itself. Anything else must name an `int`
+ * `<prop>` the widget declares; its default, when an int literal, is the value
+ * an instance that does not set it gets.
+ *
+ * @param text  The attribute as written.
+ * @param props The widget's effective props.
+ * @return The count, or undefined when the text is neither — the validator's
+ *         `U8G2GL_INVALID_DATA_DECLARATION`.
+ */
+export function dataCountOf(text: string, props: readonly PropDef[]): DataCount | undefined {
+  const trimmed = text.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return { kind: 'literal', value: Number(trimmed) };
+  }
+  const prop = props.find((candidate) => candidate.name === trimmed);
+  if (prop === undefined || prop.type !== 'int') {
+    return undefined;
+  }
+  const fallback = prop.default?.trim();
+  return fallback !== undefined && /^\d+$/.test(fallback)
+    ? { kind: 'prop', prop, value: Number(fallback) }
+    : { kind: 'prop', prop };
 }
