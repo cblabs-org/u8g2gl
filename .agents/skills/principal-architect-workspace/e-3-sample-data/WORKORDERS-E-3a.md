@@ -37,6 +37,11 @@ status log (rule 00). Read `.agents/rules/03-versioning.md` before WO1.
   - **`designer/src/**` only for ruling 2's table** of static children in the property panel,
     and the minimum plumbing it needs;
   - tests and goldens; the docs in ruling 13; the versions.
+  - **Widened by W1 (owner-approved 2026-11-17, see PROJECT.md):** `cli/src/node/load-project.ts`,
+    `cli/src/node/fix-names.ts`, `cli/src/core/resolver/**`, `cli/src/core/realise/**`,
+    `designer/src/project/project-model.ts` and `designer/src/documents/generated-names.ts`.
+  - **W2:** the fixture's `wd_service_list.{hpp,cpp,xml}`, so that `max_cell_chars` means
+    usable characters.
 
   Anything else, stop and report.
 - **Install:** `extern/u8g2` is already checked out at the pinned commit (`d66b49a`). Don't touch it,
@@ -107,6 +112,25 @@ status log (rule 00). Read `.agents/rules/03-versioning.md` before WO1.
 - [ ] **Tests:** the parser, every validator rule above, the gate, and the fixture validating clean.
 
 # WO2 — static `<element>` children (`u8g2gl-e3a/wo2-static-elements`)
+
+- [ ] **W1, first:** static children are their own child kind, not elements.
+      - `parseScreen` takes an optional parse option naming, per class, the manifest's `<element>`
+        child names. A child so named is parsed as a static child: no `name` is needed, it never
+        joins the element tree, and it never takes an element name.
+      - Every loader parses manifests first and passes the option: `load-project.ts`,
+        `fix-names.ts`, and the designer's `project-model.ts`. `generated-names.ts` must never
+        name a static child.
+      - The designer re-parses screens when a manifest's `<element>` list changes. Its parse
+        cache is keyed by text today.
+      - The resolver and realiser carry static children on their element, never as elements.
+      - Pass 8's "collection children → PR-08" refusal (`validate-not-yet-supported.ts`) is lifted
+        for declared static children.
+- [ ] **W2:** in the fixture's `wd_service_list`, `max_cell_chars` means usable characters.
+      - The storage holds `max_cell_chars + 1` per cell, and `add_row` copies up to
+        `max_cell_chars`.
+      - Update the prop's help, which currently says "including terminator", and the C++ doc
+        comments.
+      - Test it: a cell of exactly `max_cell_chars` characters survives whole.
 
 The manifest schema already has `<element name access>` with typed `<arg>`s (design_spec §6.5's
 `<column width align>`). The parser reads it, and nothing else does (finding 5). Make it real (S4,
