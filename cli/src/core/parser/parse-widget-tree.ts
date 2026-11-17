@@ -48,6 +48,7 @@ import type {
 import type { WidgetManifest } from '../schema/widget-manifest.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
+import { findClosest } from '../catalogue/edit-distance.js';
 import { getAttributeValue, type RawXmlElement } from './raw-xml.js';
 import {
   DEFAULT_MISSING_NAME_POLICY,
@@ -201,6 +202,23 @@ const NO_STATIC_CHILDREN: StaticChildNames = new Map();
 // manifests' declarations. A top-level element has no parent, so never is one.
 function isStaticChild(parentTag: string | undefined, child: RawXmlElement, names: StaticChildNames): boolean {
   return parentTag !== undefined && (names.get(parentTag)?.has(child.name) ?? false);
+}
+
+// misspeltStaticChild
+// The static child an unnamed child of `parentTag` was most likely meant to be,
+// or undefined. An unnamed child that isn't a static child would otherwise be
+// reported as an element missing its name, and `--fix-names` would write one
+// into it: the wrong fix for a typo of `<column>`. A named child is left to the
+// validator, which reports an unknown child with its own suggestion.
+//   parentTag — the classed element's tag
+//   child     — the unnamed child that matched no static child
+//   names     — the manifests' static child tags
+function misspeltStaticChild(parentTag: string, child: RawXmlElement, names: StaticChildNames): string | undefined {
+  const declared = names.get(parentTag);
+  if (declared === undefined || declared.size === 0) return undefined;
+  const name = getAttributeValue(child, 'name');
+  if (typeof name === 'string' && name.trim() !== '') return undefined;
+  return findClosest(child.name, [...declared], 2)[0];
 }
 
 /**
@@ -413,6 +431,20 @@ export function parseWidgetNode(
       // Configuration of this element, declared by its manifest's <element>
       // (§6.5): no name, no place in the element tree.
       children.push(parseStaticChild(child, filename, diagnostics));
+    } else if (isNestedWidgetElement(child) && misspeltStaticChild(el.name, child, context.staticChildren) !== undefined) {
+      // A typo of a static child: say so, and parse it no further, so it is
+      // neither reported as unnamed nor given a synthesised name.
+      const meant = misspeltStaticChild(el.name, child, context.staticChildren) as string;
+      diagnostics.push({
+        code: DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
+        severity: 'error',
+        file: filename,
+        line: child.loc?.line ?? 1,
+        column: child.loc?.column ?? 1,
+        message: `Unknown element '<${child.name}>' in <${el.name}>: did you mean the static child <${meant}>?`,
+        offendingText: child.name,
+        suggestions: [meant],
+      });
     } else {
       // Nested widget, collection element (e.g. <column>), or component instance.
       // The same context descends, so names stay unique across the document and
