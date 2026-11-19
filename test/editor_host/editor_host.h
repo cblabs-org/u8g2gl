@@ -37,7 +37,7 @@
  * - editor_host: The host
  *     Setup:    load(), provide_font(), provide_image()
  *     Subjects: set_int(), set_bool(), set_string(), set_time()
- *     Screen:   build(), render(), teardown(), object_count()
+ *     Screen:   build(), render(), teardown(), object_count(), object()
  *     Result:   error()
  */
 #ifndef U8G2GL_TEST_EDITOR_HOST_H
@@ -98,6 +98,12 @@ public:
 
     /** @brief Objects in the built screen. */
     size_t object_count() const { return objects_.size(); }
+
+    /**
+     * @brief The built screen's object at `index`, or nullptr: for a test that
+     *        fills a collection widget through its own API before rendering.
+     */
+    u8g2gl_obj* object(size_t index) const { return index < objects_.size() ? objects_[index] : nullptr; }
 
     /** @brief The first refusal, or empty. */
     const std::string& error() const { return error_; }

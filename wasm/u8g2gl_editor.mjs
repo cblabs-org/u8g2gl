@@ -61,6 +61,16 @@ export async function createEditor(wasmDir) {
     },
 
     /**
+     * Fill collection widgets on the active screen (schema 0.7 `<data>`).
+     * @param {string} json `{ "<element>": { "<data>": [ rows ] } }`, each row
+     *                      an object keyed by field name.
+     * @returns {boolean} True on success; getLastError() says why not.
+     */
+    applyCollectionData(json) {
+      return callWithString('_applyCollectionData', json) === 1;
+    },
+
+    /**
      * Tick objects and render to virtual display buffer.
      * @param {number} ms Current timestamp in milliseconds.
      * @returns {Uint8Array|null} Copy of the pixel buffer, or null on error.

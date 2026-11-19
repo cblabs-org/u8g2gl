@@ -72,7 +72,7 @@ import type { Target } from '../schema/project.js';
 import { normaliseRotation, ROTATION_DEGREES, type Rotation } from '../schema/project-vocabulary.js';
 import type { Screen } from '../schema/screen.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { isElementNode, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
 import type { EffectiveManifest, ManifestRegistry } from '../manifest/manifest-registry.js';
 import {
   buildConstantTable,
@@ -909,7 +909,7 @@ function resolveChildren(
 ): ResolvedElement[] {
   const elements: ResolvedElement[] = [];
   for (const child of nodes) {
-    if ('tag' in child && typeof child.tag === 'string') {
+    if (isElementNode(child)) {
       elements.push(resolveNode(child, container, context, diagnostics, annotate));
     }
   }

@@ -16,6 +16,10 @@
  *              authoring category, so this parser makes no tier decision at all.
  *              Extracts common layout coordinates, style overrides (`style_*`), reactive
  *              binding slots (`bind_*`), condition directives, and input event handlers.
+ *              A child the parent's manifest declares with `<element>` — known
+ *              only from `ParseOptions.staticChildren` — is a static child
+ *              (`<column>`, §6.5): configuration of its parent, never an
+ *              element, never named.
  *              Under the `'generate'` policy an omitted name is synthesised as
  *              {tag}_{n} from a document-wide allocator — so synthesis can never
  *              manufacture a duplicate — and a write-back insertion is recorded.
@@ -28,6 +32,7 @@
  * - parseWidgetTree: Parse an array of child elements into WidgetNode AST nodes
  * - parseWidgetNode: Recursively parse a single element into a WidgetNode
  * - hiddenAttributeValue: The boolean rule for `hidden`, keeping a `$prop` placeholder as text
+ * - staticChildNamesOf: The static child tags each manifest declares, for ParseOptions
  */
 
 import type {
@@ -35,12 +40,15 @@ import type {
   CommonAttributes,
   EventChild,
   EventTrigger,
+  StaticChild,
   StyleChild,
   WidgetNode,
   WidgetNodeChild,
 } from '../schema/widget-node.js';
+import type { WidgetManifest } from '../schema/widget-manifest.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
+import { findClosest } from '../catalogue/edit-distance.js';
 import { getAttributeValue, type RawXmlElement } from './raw-xml.js';
 import {
   DEFAULT_MISSING_NAME_POLICY,
@@ -48,6 +56,7 @@ import {
   type MissingNamePolicy,
   type ParseOptions,
   type SourceEdit,
+  type StaticChildNames,
 } from './name-policy.js';
 
 /**
@@ -103,6 +112,57 @@ function parseEventChild(el: RawXmlElement): EventChild {
 }
 
 /**
+ * Parses a static child (`<column>` inside `<wd_service_list>`, §6.5): its
+ * attributes as written, located. A static child is configuration of its
+ * parent and holds nothing, so a child element of its own is an error.
+ */
+function parseStaticChild(el: RawXmlElement, filename: string, diagnostics: Diagnostic[]): StaticChild {
+  const attributes: Record<string, string> = {};
+  const attributeLocs: Record<string, SourceLocation> = {};
+  const attributeNameLocs: Record<string, SourceLocation> = {};
+  for (const attr of el.attributes) {
+    attributes[attr.name] = attr.value;
+    attributeLocs[attr.name] = attr.loc;
+    attributeNameLocs[attr.name] = attr.nameLoc;
+  }
+  for (const child of el.children) {
+    diagnostics.push({
+      code: DIAGNOSTIC_CODES.MALFORMED_XML,
+      severity: 'error',
+      file: filename,
+      line: child.loc.line,
+      column: child.loc.column,
+      message: `<${el.name}> is a static child of its parent and holds nothing; remove <${child.name}>.`,
+      offendingText: child.name,
+    });
+  }
+  return { kind: 'static', tag: el.name, attributes, attributeLocs, attributeNameLocs, loc: el.loc, range: el.range };
+}
+
+/**
+ * @brief The static child tags each manifest declares (`<element>`, §6.5), by
+ *        the manifest's tag, for {@link ParseOptions.staticChildren}.
+ *
+ * Declared manifests, not effective ones: an `<element>` describes one
+ * class's own access method and is not inherited (§6.5). A manifest declaring
+ * none is left out, so the map is empty for a project with none.
+ *
+ * @param manifests Every declared manifest, framework and project.
+ */
+export function staticChildNamesOf(manifests: Iterable<WidgetManifest>): StaticChildNames {
+  const names = new Map<string, Set<string>>();
+  for (const manifest of manifests) {
+    for (const element of manifest.api.elements) {
+      if (element.name === '') continue;
+      const set = names.get(manifest.name) ?? new Set<string>();
+      set.add(element.name);
+      names.set(manifest.name, set);
+    }
+  }
+  return names;
+}
+
+/**
  * The document-wide name pool used to synthesise [U-1] fallback names.
  *
  * `taken` holds every element name known to the document — explicit names found
@@ -130,6 +190,35 @@ export interface WidgetParseContext {
   readonly policy: MissingNamePolicy;
   /** Optional sink receiving one ` name="…"` insertion per synthesised name. */
   readonly edits?: SourceEdit[];
+  /** The manifests' static child tags, per parent tag; empty when not given. */
+  readonly staticChildren: StaticChildNames;
+}
+
+/** No static children: every child is an element. */
+const NO_STATIC_CHILDREN: StaticChildNames = new Map();
+
+// isStaticChild
+// Whether `child` is a static child of an element tagged `parentTag`, by the
+// manifests' declarations. A top-level element has no parent, so never is one.
+function isStaticChild(parentTag: string | undefined, child: RawXmlElement, names: StaticChildNames): boolean {
+  return parentTag !== undefined && (names.get(parentTag)?.has(child.name) ?? false);
+}
+
+// misspeltStaticChild
+// The static child an unnamed child of `parentTag` was most likely meant to be,
+// or undefined. An unnamed child that isn't a static child would otherwise be
+// reported as an element missing its name, and `--fix-names` would write one
+// into it: the wrong fix for a typo of `<column>`. A named child is left to the
+// validator, which reports an unknown child with its own suggestion.
+//   parentTag — the classed element's tag
+//   child     — the unnamed child that matched no static child
+//   names     — the manifests' static child tags
+function misspeltStaticChild(parentTag: string, child: RawXmlElement, names: StaticChildNames): string | undefined {
+  const declared = names.get(parentTag);
+  if (declared === undefined || declared.size === 0) return undefined;
+  const name = getAttributeValue(child, 'name');
+  if (typeof name === 'string' && name.trim() !== '') return undefined;
+  return findClosest(child.name, [...declared], 2)[0];
 }
 
 /**
@@ -162,25 +251,27 @@ function isNestedWidgetElement(el: RawXmlElement): boolean {
 function collectExplicitNames(
   elements: readonly RawXmlElement[],
   taken: Set<string>,
+  staticChildren: StaticChildNames,
+  parentTag?: string,
 ): void {
   for (const el of elements) {
-    if (!isNestedWidgetElement(el)) {
+    if (!isNestedWidgetElement(el) || isStaticChild(parentTag, el, staticChildren)) {
       continue;
     }
     const name = getAttributeValue(el, 'name');
     if (typeof name === 'string' && name.trim() !== '') {
       taken.add(name);
     }
-    collectExplicitNames(el.children, taken);
+    collectExplicitNames(el.children, taken, staticChildren, el.name);
   }
 }
 
 /**
  * Builds a name allocator seeded with every explicit name in the document.
  */
-function createNameAllocator(elements: readonly RawXmlElement[]): NameAllocator {
+function createNameAllocator(elements: readonly RawXmlElement[], staticChildren: StaticChildNames): NameAllocator {
   const taken = new Set<string>();
-  collectExplicitNames(elements, taken);
+  collectExplicitNames(elements, taken, staticChildren);
   return { taken, nextIndex: new Map<string, number>() };
 }
 
@@ -197,10 +288,12 @@ export function createWidgetParseContext(
   elements: readonly RawXmlElement[],
   options?: ParseOptions,
 ): WidgetParseContext {
+  const staticChildren = options?.staticChildren ?? NO_STATIC_CHILDREN;
   return {
-    allocator: createNameAllocator(elements),
+    allocator: createNameAllocator(elements, staticChildren),
     policy: options?.missingNamePolicy ?? DEFAULT_MISSING_NAME_POLICY,
     ...(options?.nameEdits ? { edits: options.nameEdits } : {}),
+    staticChildren,
   };
 }
 
@@ -334,6 +427,24 @@ export function parseWidgetNode(
       children.push(parseEventChild(child));
     } else if (child.name === 'style') {
       children.push(parseStyleChild(child));
+    } else if (isStaticChild(el.name, child, context.staticChildren)) {
+      // Configuration of this element, declared by its manifest's <element>
+      // (§6.5): no name, no place in the element tree.
+      children.push(parseStaticChild(child, filename, diagnostics));
+    } else if (isNestedWidgetElement(child) && misspeltStaticChild(el.name, child, context.staticChildren) !== undefined) {
+      // A typo of a static child: say so, and parse it no further, so it is
+      // neither reported as unnamed nor given a synthesised name.
+      const meant = misspeltStaticChild(el.name, child, context.staticChildren) as string;
+      diagnostics.push({
+        code: DIAGNOSTIC_CODES.UNKNOWN_WIDGET,
+        severity: 'error',
+        file: filename,
+        line: child.loc?.line ?? 1,
+        column: child.loc?.column ?? 1,
+        message: `Unknown element '<${child.name}>' in <${el.name}>: did you mean the static child <${meant}>?`,
+        offendingText: child.name,
+        suggestions: [meant],
+      });
     } else {
       // Nested widget, collection element (e.g. <column>), or component instance.
       // The same context descends, so names stay unique across the document and

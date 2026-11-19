@@ -7,15 +7,16 @@
  * Purpose: Pins the validator changes PR-04 WO7 makes on top of composite
  *          expansion: binding types checked inside composite interiors (WO3
  *          carry); flag values checked (WO5a carry); a composite's top level
- *          bounds-checked against each instance's size; declared collection
- *          children known to Pass 2 (WO5b carry); and the parser keeping
+ *          bounds-checked against each instance's size; a declared static
+ *          child (`<column>`) is not an element, and validates cleanly
+ *          (§6.5); and the parser keeping
  *          `extends` on a manifest with a `<view>` (WO5b carry).
  * Description: Parses real XML so locations are real; runs single passes against
  *              the bundled framework manifests.
  */
 
 import { describe, expect, it } from 'vitest';
-import { parseScreenFile, parseWidgetManifestFile } from '../../src/core/parser/index.js';
+import { parseScreenFile, parseWidgetManifestFile, staticChildNamesOf } from '../../src/core/parser/index.js';
 import {
   validate,
   validateGeometry,
@@ -31,9 +32,14 @@ import { frameworkRegistry } from '../helpers/manifest-registry.js';
 
 const NARROW = 'U8G2_SSD1306_128X64_NONAME_F_HW_I2C';
 
+/** The text of a screen whose view holds `body`. */
+function screenXml(body: string): string {
+  return `<screen name="home">\n    <view>\n${body}\n    </view>\n</screen>\n`;
+}
+
 /** A screen whose view holds `body`; the body's first line is line 3, column 9. */
 function screen(body: string): Screen {
-  return parseScreenFile(`<screen name="home">\n    <view>\n${body}\n    </view>\n</screen>\n`, 'screens/screen_home.xml').value!;
+  return parseScreenFile(screenXml(body), 'screens/screen_home.xml').value!;
 }
 
 function composite(lines: readonly string[], file: string): WidgetManifest {
@@ -231,16 +237,21 @@ describe('Pass 6: a composite top level is bounds-checked per instance', () => {
   });
 });
 
-describe('Pass 2: declared collection children are known (WO5b carry)', () => {
+describe('Pass 2: declared static children are not elements (§6.5)', () => {
   const list = composite(
     ['<widget name="wd_list" extends="u8g2gl_obj">', '    <api>', '        <element name="column" access="add"><arg name="width" type="int" /></element>', '    </api>', '</widget>'],
     'widgets/wd_list/wd_list.xml',
   );
+  // Parsed as every loader parses a screen: knowing the static child names.
+  const inputWithStatic = (body: string): ValidateInput => ({
+    ...inputWith(body, [list]),
+    screens: [parseScreenFile(screenXml(body), 'screens/screen_home.xml', { staticChildren: staticChildNamesOf([list]) }).value!],
+  });
   const unknownComponents = (body: string) =>
-    withCode(validateReferences(inputWith(body, [list])), DIAGNOSTIC_CODES.UNKNOWN_COMPONENT).map((d) => d.offendingText);
+    withCode(validateReferences(inputWithStatic(body)), DIAGNOSTIC_CODES.UNKNOWN_COMPONENT).map((d) => d.offendingText);
 
   it('does not report a child the parent declares as an <element>', () => {
-    expect(unknownComponents('        <wd_list name="l" x="0" y="0" width="128" height="40">\n            <column name="c" width="64" />\n        </wd_list>')).toEqual([]);
+    expect(unknownComponents('        <wd_list name="l" x="0" y="0" width="128" height="40">\n            <column width="64" />\n        </wd_list>')).toEqual([]);
   });
 
   it('still reports an undeclared child tag, and a collection element outside its parent', () => {
@@ -248,10 +259,9 @@ describe('Pass 2: declared collection children are known (WO5b carry)', () => {
     expect(unknownComponents('        <column name="c" width="64" />')).toEqual(['column']);
   });
 
-  it('so `validate` only warns on a collection, as PR-04 decision 1 requires', () => {
-    const result = validate(inputWith('        <wd_list name="l" x="0" y="0" width="128" height="40">\n            <column name="c" width="64" />\n        </wd_list>', [list]));
-    expect(result.errors).toBe(0);
-    expect(result.diagnostics.map((d) => [d.code, d.severity])).toEqual([[DIAGNOSTIC_CODES.NOT_YET_SUPPORTED, 'warning']]);
+  it('so `validate` accepts a declared static child cleanly: it builds since schema 0.7', () => {
+    const result = validate(inputWithStatic('        <wd_list name="l" x="0" y="0" width="128" height="40">\n            <column width="64" />\n        </wd_list>'));
+    expect(result.diagnostics).toEqual([]);
   });
 });
 

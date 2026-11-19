@@ -50,7 +50,8 @@
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import { namedStyles, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
+import { isElementNode, namedStyles, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
+import { checkStaticChildren } from './static-child-rules.js';
 import { isDrawingElement, OBJECT_ONLY_FLAGS, type EffectiveManifest } from '../manifest/manifest-registry.js';
 import { findClosest } from '../catalogue/edit-distance.js';
 import { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';
@@ -168,7 +169,7 @@ function walkNodes(
   visitor: (node: WidgetNode) => void,
 ): void {
   for (const child of children) {
-    if ('tag' in child && typeof child.tag === 'string') {
+    if (isElementNode(child)) {
       visitor(child);
       if (child.children && child.children.length > 0) {
         walkNodes(child.children, visitor);
@@ -723,6 +724,7 @@ export function validateWidgetProps(input: ValidateInput): readonly Diagnostic[]
     const manifest = manifests.get(node.tag);
     if (manifest) {
       diagnostics.push(...checkInstanceProps(node, manifest, atScreenLevel, styles));
+      diagnostics.push(...checkStaticChildren(node, manifest));
     }
   };
 

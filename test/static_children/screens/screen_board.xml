@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Four columns, one of each alignment and a repeat, in the order the
+     hand-written calls in test_static_children.cpp make them. -->
+<screen name="board">
+    <view>
+        <wd_service_list name="board" x="0" y="0" width="128" height="40" font="u8g2_font_6x10_mr" max_rows="4" max_cols="4">
+            <column width="30" align="left" />
+            <column width="50" align="left" />
+            <column width="16" align="center" />
+            <column width="32" align="right" />
+        </wd_service_list>
+    </view>
+</screen>

@@ -24,7 +24,9 @@
  * - MissingNamePolicy:            'error' (refuse) or 'generate' (synthesise)
  * - DEFAULT_MISSING_NAME_POLICY:  'error' — the safe journey when no caller chooses
  * - SourceEdit:                   One text insertion at a 1-based source location
- * - ParseOptions:                 Policy plus an optional sink for computed edits
+ * - ParseOptions:                 Policy, an optional sink for computed edits, and the
+ *                                 manifests' static child names
+ * - StaticChildNames:             Per element tag, the child tags its manifest declares
  * - createNameInsertion():        Build the ` name="…"` insertion for an element
  * - applyTextEdits():             Apply insertions to a source string, back-to-front
  */
@@ -85,7 +87,18 @@ export interface ParseOptions {
    * `diagnostics` parameter already used throughout the parser.
    */
   readonly nameEdits?: SourceEdit[];
+  /**
+   * Per element tag, the child tags its manifest declares with `<element>`
+   * (design_spec §6.5). A child so named is parsed as a static child: it needs
+   * no `name`, never joins the element tree and is never given a name. Built
+   * from the project's manifests with `staticChildNamesOf()`, so a loader must
+   * parse the manifests before the screens. Absent, every child is an element.
+   */
+  readonly staticChildren?: StaticChildNames;
 }
+
+/** Per element tag, the static child tags its manifest declares. */
+export type StaticChildNames = ReadonlyMap<string, ReadonlySet<string>>;
 
 /**
  * @brief Builds the insertion that writes a synthesised name into the source.

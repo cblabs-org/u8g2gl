@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="wd_service_list" extends="u8g2gl_obj">
+    <api label="Service list" category="Text" description="A table of departures, one service per row, scrolling page by page when the rows do not fit." icon="table">
+        <prop name="font" type="font" required="true" help="Font used to render table cells." />
+        <prop name="max_rows" type="int" default="16" help="Row capacity. Determines allocated RAM." />
+        <prop name="max_cols" type="int" default="6" help="Maximum columns per row. Determines allocated RAM." />
+        <prop name="max_cell_chars" type="int" default="24" help="Usable characters per cell; a longer cell is truncated." />
+        <prop name="scroll_dwell_ms" type="int" default="5000" help="Time in ms to hold each page before scrolling." />
+        <prop name="scroll_duration_ms" type="int" default="1000" help="Duration of page scroll animation in ms." />
+        <element name="column" access="add_column" help="One column of the table, left to right.">
+            <arg name="width" type="int" help="Column width in pixels." />
+            <arg name="align" type="enum" values="left,center,right" emit="U8G2GL_ALIGN_{VALUE^^}" help="Text alignment within the column." />
+        </element>
+        <data name="rows" access="add_row" capacity="max_rows" help="One departure per row.">
+            <field name="cells" type="string" repeat="max_cols" max_len="max_cell_chars" help="The row's cells, one per column." />
+        </data>
+    </api>
+</widget>

@@ -173,7 +173,8 @@ test('a selection change re-renders only what shows the selection: the status ba
       .filter(([, n]) => n > 0),
   );
   console.log(`renders across five selection changes: ${JSON.stringify(rendered)}`);
-  // The property panel and the Explorer's element rows show the selection, so
+  // The property panel (its static-children table included) and the
+  // Explorer's element rows show the selection, so
   // they re-render for it, and the align toolbar's buttons are enabled by it,
   // so it re-renders when which are enabled changes; nothing else in the
   // shell may — the Explorer around the rows included.
@@ -181,6 +182,8 @@ test('a selection change re-renders only what shows the selection: the status ba
     name === 'SelectionGeometry' ||
     name === 'PropertyPanel' ||
     name === 'PanelHeader' ||
+    // The panel's static-children table (§6.5) is the selected element's.
+    name === 'PanelStaticChildren' ||
     name === 'AlignToolbar' ||
     name === 'ElementTree' ||
     name.startsWith('PanelField:');

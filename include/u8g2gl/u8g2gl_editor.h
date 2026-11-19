@@ -10,8 +10,9 @@
  * Purpose: The editor target's side of the runtime ([UD-4], design_spec §13.1).
  *          The designer must render arbitrary XML without a C++ compiler in the
  *          browser, so its Wasm build constructs objects by name, sets their
- *          properties by name and draws class-less elements by name from a
- *          scene description (ui_spec §4.1 steps 6-7). This header declares the
+ *          properties by name, adds their static children by name, fills
+ *          their `<data>` rows by name and draws class-less elements by name
+ *          from a scene description (ui_spec §4.1 steps 6-7). This header declares the
  *          shapes of that registry and the lookups over it; the registry itself
  *          is generated from the same `<api>` manifests the firmware setters are
  *          (`ui_editor_registry.cpp`, PR-04 WO11), so both targets reach the
@@ -26,9 +27,10 @@
  *          every table is `const` data.
  *
  * Description: A value type the host fills from the scene description; the
- *              class, property, binding, drawing, directive and flag entry types
- *              the generated registry is made of; and the by-name operations —
- *              construct, set, bind, draw — that check what the host hands them
+ *              class, property, binding, static child, fill, drawing, directive
+ *              and flag entry types the generated registry is made of; and the
+ *              by-name operations — construct, set, bind, add a static child,
+ *              fill `<data>` rows, draw — that check what the host hands them
  *              before calling a generated thunk.
  *
  * Exported Classes:
@@ -36,6 +38,12 @@
  * - u8g2gl_editor_property:  Set-by-name thunk for one manifest `<prop>`
  * - u8g2gl_editor_binding:   Bind-by-name thunk for one `<bind>`, per subject type
  * - u8g2gl_editor_class:     Construct-by-name entry for one classed element
+ * - u8g2gl_editor_element:   Add-by-name entry for one static child kind (`<column>`, §6.5)
+ * - u8g2gl_editor_count:     A `capacity`, `repeat` or `max_len`: a literal, or an instance prop
+ * - u8g2gl_editor_field:     One `<field>` of a `<data>` row, with its declared rules
+ * - u8g2gl_editor_cell:      One field's value(s) in one row, as the host parsed it
+ * - u8g2gl_editor_data:      Fill-by-name entry for one `<data>` (§9.2)
+ * - u8g2gl_editor_element_fn, u8g2gl_editor_fill_fn: The add and fill thunk types
  * - u8g2gl_editor_param:     One argument of a draw-by-name entry
  * - u8g2gl_editor_drawing:   Draw-by-name entry for one drawing element
  * - u8g2gl_editor_directive: A `bind_flag_if_*` directive, per subject type (§8.4)
@@ -49,6 +57,8 @@
  *
  *     Lookup:
  *     - u8g2gl_editor_find_class() / _find_drawing() / _find_property()
+ *     - u8g2gl_editor_find_element() / _find_element_arg()
+ *     - u8g2gl_editor_find_data() / _find_field()
  *     - u8g2gl_editor_find_binding():  Dispatches on the subject's type
  *     - u8g2gl_editor_find_directive() / _find_flag()
  *
@@ -56,6 +66,8 @@
  *     - u8g2gl_editor_construct() / _destroy(): Placement into host storage
  *     - u8g2gl_editor_set_rect():      The rectangle setter
  *     - u8g2gl_editor_set_property():  Set-by-name, type-checked
+ *     - u8g2gl_editor_add_element():   A static child by name, type-checked
+ *     - u8g2gl_editor_fill():          A `<data>` block's rows by name, type-checked
  *     - u8g2gl_editor_bind():          Bind-by-name, dispatched on subject type
  *     - u8g2gl_editor_bind_flag():     A flag directive by name
  *     - u8g2gl_editor_flag_clear():    A draw call's guard term, by name
@@ -63,6 +75,7 @@
  *
  *     For generated code:
  *     - u8g2gl_editor_bind_call():     Pass a format only where the runtime takes one
+ *     - u8g2gl_editor_row_call():      Call a data access method, reading a bool return
  *     - ui_editor_registry():          Defined by the generated registry unit
  */
 #ifndef U8G2GL_EDITOR_H
@@ -176,6 +189,12 @@ using u8g2gl_editor_bind_fn = bool (*)(u8g2gl_obj* obj, void* subject, const cha
 /** @brief Placement-construct the class into `storage`. */
 using u8g2gl_editor_construct_fn = u8g2gl_obj* (*)(void* storage);
 /**
+ * @brief Call a static child's access method (`add_column(width, align)`).
+ * @param args One value per argument, in declaration order; every one present.
+ * @return false, calling nothing, if an enum text matches no value.
+ */
+using u8g2gl_editor_element_fn = bool (*)(u8g2gl_obj* obj, const u8g2gl_editor_value* args);
+/**
  * @brief Call a drawing element's free function.
  * @param args One value per param, in parameter order; NONE takes the default.
  * @return false, drawing nothing, if a required argument is absent or an enum
@@ -206,6 +225,96 @@ struct u8g2gl_editor_binding {
     u8g2gl_subject_type_t subject_type;  ///< The overload's subject type
 };
 
+/** @brief One argument of a draw-by-name entry, or of a static child. */
+struct u8g2gl_editor_param {
+    const char* name;           ///< The attribute, e.g. "width"
+    u8g2gl_editor_type_t type;
+};
+
+/**
+ * @brief Add-by-name for one static child kind: a manifest `<element>` (§6.5).
+ *
+ * The thunk calls the element's declared access method on the object, as the
+ * firmware's init does once per child, so a `<column>` the canvas shows is
+ * configured through the same method the device runs.
+ */
+struct u8g2gl_editor_element {
+    const char* name;                    ///< The child's tag, e.g. "column"
+    u8g2gl_editor_element_fn add;
+    const u8g2gl_editor_param* args;     ///< In declaration order
+    uint8_t arg_count;
+};
+
+/**
+ * @brief A `capacity`, `repeat` or `max_len` as the manifest declares it: an int
+ *        literal, or an int `<prop>` of the widget whose instance value it takes.
+ *
+ * Per instance, so a host resolves it against the element it fills: `prop`'s
+ * written value when the element sets it, else `value`.
+ */
+struct u8g2gl_editor_count {
+    const char* prop;  ///< The prop it names, e.g. "max_rows"; nullptr for a literal
+    int32_t value;     ///< The literal, or the prop's default; -1 when there is none
+};
+
+/** @brief One `<field>` of a `<data>` row (schema 0.7), with its declared rules. */
+struct u8g2gl_editor_field {
+    const char* name;                 ///< e.g. "loading_pct"
+    const char* const* values;        ///< ENUM: its values; nullptr otherwise
+    u8g2gl_editor_count repeat;       ///< How many times it repeats; `{nullptr, 0}` when it does not
+    u8g2gl_editor_count max_len;      ///< STRING: usable characters; `{nullptr, -1}` when undeclared
+    int32_t min;                      ///< INT: least value (INT32_MIN when undeclared)
+    int32_t max;                      ///< INT: greatest value (INT32_MAX when undeclared)
+    u8g2gl_editor_type_t type;        ///< INT, BOOL, STRING or ENUM
+    uint8_t value_count;              ///< ENUM: how many `values`
+    bool repeated;                    ///< Passed as an array and its count (a STRING field)
+};
+
+/**
+ * @brief One field's value in one row, as the host parsed it.
+ *
+ * A single field reads `value`. A repeated string field reads `texts` and
+ * `count`, passed to the access method as the array and count it takes
+ * (`add_row(const char* const* cells, size_t n)`). Nothing is owned: every
+ * pointer is the host's, valid for the duration of the fill call.
+ */
+struct u8g2gl_editor_cell {
+    const char* const* texts;     ///< A repeated field's texts; nullptr otherwise
+    u8g2gl_editor_value value;    ///< A single field's value
+    uint16_t count;               ///< How many `texts`
+};
+
+/**
+ * @brief Fill one `<data>` block: `begin()`, the access method once per row
+ *        with its fields in declared order, then `commit()` (§9.2).
+ *
+ * @param rows      `row_count` rows, each `field_count` cells in field order,
+ *                  already checked against the fields (u8g2gl_editor_fill()).
+ * @param accepted  Receives how many rows the widget took.
+ * @return false when the access method returns false for a row — the device's
+ *         own refusal, at its own capacity — after committing the rows it took,
+ *         as the device would have.
+ */
+using u8g2gl_editor_fill_fn = bool (*)(u8g2gl_obj* obj, const u8g2gl_editor_cell* const* rows, size_t row_count,
+                                       size_t* accepted);
+
+/**
+ * @brief Fill-by-name for one `<data>` block of a class (schema 0.7, §9.2).
+ *
+ * The editor's only way to put rows into a collection widget: generated from
+ * the manifest's `<data>`, it calls the widget's own hand-written ingestion
+ * API, so the canvas fills a widget exactly as a controller does on the
+ * device. Editor target only: firmware never sees this table ([UD-4]).
+ */
+struct u8g2gl_editor_data {
+    const char* name;                     ///< e.g. "rows"
+    const char* access;                   ///< The method, e.g. "add_row", for messages
+    u8g2gl_editor_fill_fn fill;
+    const u8g2gl_editor_field* fields;    ///< In declared order: the method's parameter order
+    u8g2gl_editor_count capacity;         ///< `{nullptr, -1}` when undeclared
+    uint8_t field_count;
+};
+
 /** @brief Construct-by-name for one classed element (tag == class, [D-12]). */
 struct u8g2gl_editor_class {
     const char* tag;
@@ -213,16 +322,14 @@ struct u8g2gl_editor_class {
     u8g2gl_editor_rect_fn set_rect;              ///< nullptr when the axes share no setter
     const u8g2gl_editor_property* properties;    ///< Every setter prop but the rectangle
     const u8g2gl_editor_binding* bindings;
+    const u8g2gl_editor_element* elements;       ///< Its static child kinds; nullptr when none
+    const u8g2gl_editor_data* data;              ///< Its fill entries; nullptr when it declares no `<data>`
     size_t size;                                 ///< sizeof the class: the storage the host provides
     size_t align;                                ///< alignof the class
     uint8_t property_count;
     uint8_t binding_count;
-};
-
-/** @brief One argument of a draw-by-name entry. */
-struct u8g2gl_editor_param {
-    const char* name;           ///< The attribute, e.g. "width"
-    u8g2gl_editor_type_t type;
+    uint8_t element_count;
+    uint8_t data_count;
 };
 
 /** @brief Draw-by-name for one drawing element — a `draw=`-only manifest ([D-18]). */
@@ -276,6 +383,14 @@ const u8g2gl_editor_property* u8g2gl_editor_find_property(const u8g2gl_editor_cl
  */
 const u8g2gl_editor_binding* u8g2gl_editor_find_binding(const u8g2gl_editor_class& cls, const char* name,
                                                         u8g2gl_subject_type_t subject_type);
+/** @brief A class's static child entry by tag (`column`), or nullptr. */
+const u8g2gl_editor_element* u8g2gl_editor_find_element(const u8g2gl_editor_class& cls, const char* name);
+/** @brief A static child entry's argument index by name, or -1. */
+int u8g2gl_editor_find_element_arg(const u8g2gl_editor_element& element, const char* name);
+/** @brief A class's fill entry by data name (`rows`), or nullptr. */
+const u8g2gl_editor_data* u8g2gl_editor_find_data(const u8g2gl_editor_class& cls, const char* name);
+/** @brief A fill entry's field index by name, or -1. */
+int u8g2gl_editor_find_field(const u8g2gl_editor_data& data, const char* name);
 /** @brief A draw entry's parameter index by name, or -1. */
 int u8g2gl_editor_find_param(const u8g2gl_editor_drawing& drawing, const char* name);
 /** @brief A directive entry by method name and subject type, or nullptr. */
@@ -325,6 +440,37 @@ bool u8g2gl_editor_set_rect(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, int
  */
 bool u8g2gl_editor_set_property(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name,
                                 const u8g2gl_editor_value& value);
+
+/**
+ * @brief Add one static child by name: its access method, with its arguments.
+ *
+ * @param args  One value per argument, in declaration order
+ *              (u8g2gl_editor_find_element_arg() maps names).
+ * @param count How many values `args` holds; must equal the entry's arg count.
+ * @return false, calling nothing, if the class declares no such element, the
+ *         count differs, an argument is absent or of the wrong type, or an
+ *         enum text matches none of its values.
+ */
+bool u8g2gl_editor_add_element(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name,
+                               const u8g2gl_editor_value* args, uint8_t count);
+
+/**
+ * @brief Fill one `<data>` block by name: its rows, through the widget's own
+ *        `begin()`, access method and `commit()` (§9.2).
+ *
+ * Every cell is checked against its field before any call — its type, an
+ * int's bounds, an enum's values, a repeated field's array — so a refused fill
+ * changes nothing. The capacity is the caller's to check, because it is the
+ * instance's (u8g2gl_editor_count); the access method's own `false` is the
+ * device's capacity, and stops the fill there with the rows taken committed.
+ *
+ * @param rows      `row_count` rows of `data.field_count` cells each.
+ * @param accepted  Receives how many rows the widget took; may be nullptr.
+ * @return false if the class declares no such data, a cell does not fit its
+ *         field (nothing is called), or the access method refused a row.
+ */
+bool u8g2gl_editor_fill(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const char* name,
+                        const u8g2gl_editor_cell* const* rows, size_t row_count, size_t* accepted);
 
 /**
  * @brief Bind-by-name, dispatched on the subject's type.
@@ -401,6 +547,23 @@ bool u8g2gl_editor_bind_call(Self* self, Subject* subject, const char* fmt, With
             return false;
         }
         return without_fmt(self, subject);
+    }
+}
+
+/**
+ * @brief Call a `<data>` access method and report whether the widget took the
+ *        row: its `bool` return where it has one, as `add_row` does, and true
+ *        for a method that returns nothing.
+ *
+ * @param call Callable `(self)` making the access call.
+ */
+template <typename Self, typename Call>
+bool u8g2gl_editor_row_call(Self* self, Call call) {
+    if constexpr (std::is_same_v<std::invoke_result_t<Call, Self*>, bool>) {
+        return call(self);
+    } else {
+        call(self);
+        return true;
     }
 }
 

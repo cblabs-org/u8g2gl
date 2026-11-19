@@ -31,6 +31,13 @@
  *              trimmed and located; whether the name exists is again the
  *              schema pass's question.
  *
+ *              Schema 0.7's `<data>` blocks — the rows a collection widget
+ *              takes at run time, each a `<field>` per argument of its access
+ *              method — are read the same way: every attribute kept as
+ *              written and located, so the schema pass can judge a count or a
+ *              bound against the widget's props. An attribute or child this
+ *              parser does not read is an error rather than dropped.
+ *
  * Exports:
  * - parseWidgetManifest: Transform a parsed RawXmlElement into a WidgetManifest model
  * - parseWidgetManifestFile: Parse a raw XML string into a ParseResult<WidgetManifest>
@@ -46,8 +53,11 @@ import {
   type PaletteMetadataLocations,
   type PropDef,
   type PropType,
+  type WidgetData,
+  type WidgetDataField,
   type WidgetManifest,
 } from '../schema/widget-manifest.js';
+import type { AttributeLocation } from '../schema/source-location.js';
 import type { View } from '../schema/screen.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import {
@@ -133,6 +143,7 @@ export function parseWidgetManifest(
   const props: PropDef[] = [];
   const bindings: BindDef[] = [];
   const elements: ElementDef[] = [];
+  const data: WidgetData[] = [];
 
   // A composite's own `<api>` props are template parameters (§6.4, §13.6):
   // expansion substitutes them into the `<view>`, and the container is a plain
@@ -216,10 +227,16 @@ export function parseWidgetManifest(
               getNumberAttribute(argChild, 'max_len', filename, diagnostics) ??
               getNumberAttribute(argChild, 'maxLen', filename, diagnostics);
 
+            const values = getAttributeValue(argChild, 'values');
+            const emit = getAttributeValue(argChild, 'emit');
+            const argHelp = getAttributeValue(argChild, 'help');
             args.push({
               name: argNameAttr?.value ?? '',
               type: (argTypeAttr?.value ?? 'string') as PropType,
               maxLen,
+              ...(values !== undefined ? { values } : {}),
+              ...(emit !== undefined ? { emit } : {}),
+              ...(argHelp !== undefined ? { help: argHelp } : {}),
               loc: argChild.loc,
             });
           } else {
@@ -242,6 +259,8 @@ export function parseWidgetManifest(
           help,
           loc: child.loc,
         });
+      } else if (child.name === 'data') {
+        data.push(parseData(child, filename, diagnostics));
       } else {
         diagnostics.push({
           code: DIAGNOSTIC_CODES.MALFORMED_XML,
@@ -260,6 +279,7 @@ export function parseWidgetManifest(
     props,
     bindings,
     elements,
+    data,
     ...(apiEl ? parsePaletteMetadata(apiEl) : {}),
     ...(apiEl ? parseIcon(apiEl) : {}),
     loc: apiEl?.loc,
@@ -313,6 +333,117 @@ export function parseWidgetManifest(
     view,
     loc: root.loc,
   };
+}
+
+/** The attributes a `<data>` reads besides `name`, kept as written. */
+const DATA_ATTRIBUTES = ['name', 'access', 'capacity', 'help'] as const;
+
+/** The attributes a `<field>` reads, kept as written. */
+const FIELD_ATTRIBUTES = ['name', 'type', 'min', 'max', 'values', 'max_len', 'repeat', 'help'] as const;
+
+// attributeLocations
+// Where each of `names` was written on `el`, for those that were.
+//   el    — the element
+//   names — the attributes to look for
+function attributeLocations(el: RawXmlElement, names: readonly string[]): Record<string, AttributeLocation> {
+  const locs: Record<string, AttributeLocation> = {};
+  for (const name of names) {
+    const loc = getAttributeLocation(el, name);
+    if (loc !== undefined) locs[name] = loc;
+  }
+  return locs;
+}
+
+// unknownAttributes
+// One MALFORMED_XML error per attribute of `el` that is not in `known`, at its
+// name. A misspelt `capacty` would otherwise be dropped silently and the data
+// declared with no capacity at all.
+//   el          — a `<data>` or `<field>`
+//   known       — the attributes its parser reads
+//   filename    — for the diagnostic
+//   diagnostics — collector
+function unknownAttributes(
+  el: RawXmlElement,
+  known: readonly string[],
+  filename: string,
+  diagnostics: Diagnostic[],
+): void {
+  for (const attr of el.attributes) {
+    if (known.includes(attr.name)) continue;
+    diagnostics.push({
+      code: DIAGNOSTIC_CODES.MALFORMED_XML,
+      severity: 'error',
+      file: filename,
+      line: attr.nameLoc.line,
+      column: attr.nameLoc.column,
+      message: `Unknown attribute '${attr.name}' on <${el.name}>; it takes ${known.join(', ')}.`,
+      offendingText: attr.name,
+    });
+  }
+}
+
+// parseData
+// One `<data>` (schema 0.7): its attributes as written, and its `<field>`s in
+// order. Only the shape is read here — `name` and a field's `type` are
+// required, as a `<prop>`'s are — and whether a value is allowed (a count that
+// names no int prop, `min` above `max`, a field type no row can carry) is the
+// schema pass's question, judged against the widget's props.
+//   el          — the `<data>` element
+//   filename    — for diagnostics
+//   diagnostics — collector
+function parseData(el: RawXmlElement, filename: string, diagnostics: Diagnostic[]): WidgetData {
+  const name = requireAttribute(el, 'name', filename, diagnostics)?.value ?? '';
+  unknownAttributes(el, DATA_ATTRIBUTES, filename, diagnostics);
+  const fields: WidgetDataField[] = [];
+  for (const child of el.children) {
+    if (child.name !== 'field') {
+      diagnostics.push({
+        code: DIAGNOSTIC_CODES.MALFORMED_XML,
+        severity: 'error',
+        file: filename,
+        line: child.loc.line,
+        column: child.loc.column,
+        message: `Unknown element '<${child.name}>' in <data>; a <data> holds <field>s only.`,
+        offendingText: child.name,
+      });
+      continue;
+    }
+    unknownAttributes(child, FIELD_ATTRIBUTES, filename, diagnostics);
+    const fieldName = requireAttribute(child, 'name', filename, diagnostics)?.value ?? '';
+    const fieldType = requireAttribute(child, 'type', filename, diagnostics)?.value ?? '';
+    const optional = (attr: string): string | undefined => getAttributeValue(child, attr);
+    fields.push({
+      name: fieldName,
+      type: fieldType as PropType,
+      ...withValue('min', optional('min')),
+      ...withValue('max', optional('max')),
+      ...withValue('values', optional('values')),
+      ...withValue('maxLen', optional('max_len')),
+      ...withValue('repeat', optional('repeat')),
+      ...withValue('help', optional('help')),
+      loc: child.loc,
+      attributeLocs: attributeLocations(child, FIELD_ATTRIBUTES),
+    });
+  }
+  return {
+    name,
+    // No default access: §9.2 names no default method, and guessing `add`
+    // would make a missing attribute a compile error in the editor build
+    // rather than a diagnostic here. The schema pass requires it.
+    access: getAttributeValue(el, 'access') ?? '',
+    ...withValue('capacity', getAttributeValue(el, 'capacity')),
+    ...withValue('help', getAttributeValue(el, 'help')),
+    fields,
+    loc: el.loc,
+    attributeLocs: attributeLocations(el, DATA_ATTRIBUTES),
+  };
+}
+
+// withValue
+// `{ [key]: value }` when the value was written, `{}` when it was not, so an
+// absent attribute leaves its optional field absent rather than undefined.
+function withValue<K extends string>(key: K, value: string | undefined): { [P in K]?: string } {
+  return value === undefined ? {} : ({ [key]: value } as { [P in K]?: string });
 }
 
 /** An `<api>`'s palette metadata as parsed: the values written, and where. */

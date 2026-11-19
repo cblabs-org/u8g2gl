@@ -20,8 +20,11 @@
  *              Reports, in document order:
  *              - `<focus_ring>`, `<event_cb>`, `<screen_load_event>`,
  *                `<screen_back_event>` → PR-09 (decision 1)
- *              - collection `<element>` children (§9), and a composite that also
- *                has a C++ class (`view` + `extends`) → PR-08 (decision 1)
+ *              - a composite that also has a C++ class (`view` + `extends`)
+ *                → PR-08 (decision 1)
+ *              A declared static child (`<column>`, an `<element>` of its
+ *              parent's manifest, §6.5) is no longer refused: schema 0.7's
+ *              generator builds it.
  *
  * Exports:
  * - RefusalPolicy:                'warning' (authoring) or 'error' (build)
@@ -32,7 +35,7 @@
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import type { View } from '../schema/screen.js';
-import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import type { WidgetNodeChild } from '../schema/widget-node.js';
 import type { ValidateInput } from './validate.js';
 
 /**
@@ -68,7 +71,7 @@ export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 // The PR that delivers each deferred construct. Named once so the messages
 // cannot disagree with each other, and so each PR finds its own entries here.
 const FOCUS_AND_EVENTS_PR = 'PR-09';
-const COLLECTIONS_AND_CLASSED_COMPOSITES_PR = 'PR-08';
+const CLASSED_COMPOSITES_PR = 'PR-08';
 
 // deferredDiagnostic
 // Builds one NOT_YET_SUPPORTED diagnostic at the caller's policy severity.
@@ -99,15 +102,13 @@ function refusalClause(pr: string): string {
 }
 
 // checkView
-// Reports the focus ring, events and collection children in one view — a
-// screen's or a composite's — walking the element tree in document order.
+// Reports the focus ring and events in one view — a screen's or a
+// composite's — walking the element tree in document order.
 //   view     — the view to check
-//   input    — validator input; only `manifests` is read, for collection elements
 //   severity — the policy in force
 //   out      — collector
 function checkView(
   view: View | undefined,
-  input: ValidateInput,
   severity: RefusalPolicy,
   out: Diagnostic[],
 ): void {
@@ -128,8 +129,8 @@ function checkView(
     );
   }
 
-  // --- Step 2: Events and collection children, anywhere in the tree ---
-  const walk = (children: readonly WidgetNodeChild[], parent: WidgetNode | undefined): void => {
+  // --- Step 2: Events, anywhere in the tree ---
+  const walk = (children: readonly WidgetNodeChild[]): void => {
     for (const child of children) {
       if ('kind' in child) {
         if (child.kind === 'event') {
@@ -146,25 +147,10 @@ function checkView(
         continue;
       }
 
-      // A collection child is recognised from its parent's manifest, never from
-      // a tag list ([D-17]). `api.elements` is the parent's own list: collection
-      // elements are not inherited (PR-04 WO1 F8, PA decision).
-      const parentManifest = parent ? input.manifests.get(parent.tag) : undefined;
-      if (parent && parentManifest?.api.elements.some((e) => e.name === child.tag)) {
-        out.push(
-          deferredDiagnostic(
-            severity,
-            `Collection element <${child.tag}> in <${parent.tag}> is not yet supported: ` +
-              `declared-capacity collections (§9) — ${refusalClause(COLLECTIONS_AND_CLASSED_COMPOSITES_PR)}.`,
-            child.loc,
-            child.tag,
-          ),
-        );
-      }
-      walk(child.children, child);
+      walk(child.children);
     }
   };
-  walk(view.children, undefined);
+  walk(view.children);
 }
 
 /**
@@ -182,7 +168,7 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
 
   // --- Step 1: Screens ---
   for (const screen of input.screens ?? []) {
-    checkView(screen.view, input, severity, diagnostics);
+    checkView(screen.view, severity, diagnostics);
   }
 
   // --- Step 2: Composites — their templates, and a class of their own ---
@@ -195,13 +181,13 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
         deferredDiagnostic(
           severity,
           `Composite <${composite.name}> also extends C++ class '${composite.extends}': a composite ` +
-            `with a C++ class of its own — ${refusalClause(COLLECTIONS_AND_CLASSED_COMPOSITES_PR)}.`,
+            `with a C++ class of its own — ${refusalClause(CLASSED_COMPOSITES_PR)}.`,
           composite.loc,
           composite.name,
         ),
       );
     }
-    checkView(composite.view, input, severity, diagnostics);
+    checkView(composite.view, severity, diagnostics);
   }
 
   return diagnostics;

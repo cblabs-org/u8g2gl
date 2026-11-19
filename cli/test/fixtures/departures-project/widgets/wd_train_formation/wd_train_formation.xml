@@ -3,5 +3,12 @@
     <api label="Train formation" category="Indicators" description="The carriages of a train in order, each drawn as a labelled frame." icon="train-front">
         <prop name="font" type="font" required="true" help="Font for carriage labels." />
         <prop name="max_carriages" type="int" default="12" help="Carriage capacity." />
+        <data name="carriages" access="add_carriage" capacity="max_carriages" help="The train's carriages, front first.">
+            <field name="number" type="int" min="1" max="99" help="Coach number, as shown on the carriage." />
+            <field name="class_type" type="enum" values="standard,first" help="Standard or first class." />
+            <field name="wheelchair" type="bool" help="Has a wheelchair space." />
+            <field name="bike" type="bool" help="Has bicycle storage." />
+            <field name="loading_pct" type="int" min="0" max="100" help="How full, in percent." />
+        </data>
     </api>
 </widget>

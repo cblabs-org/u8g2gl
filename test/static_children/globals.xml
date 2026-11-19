@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <fonts>
+        <builtin name="u8g2_font_6x10_mr" />
+    </fonts>
+</globals>

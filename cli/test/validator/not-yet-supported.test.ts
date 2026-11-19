@@ -17,6 +17,7 @@ import {
   parseProjectFile,
   parseScreenFile,
   parseWidgetManifestFile,
+  staticChildNamesOf,
 } from '../../src/core/parser/index.js';
 import {
   validate,
@@ -56,7 +57,7 @@ const SCREEN_XML = [
   '            <screen_back_event trigger="press" />',
   '        </u8g2gl_label>',
   '        <wd_list name="list" x="0" y="20" width="128" height="40">',
-  '            <column name="col_a" width="64" />',
+  '            <column width="64" />',
   '        </wd_list>',
   '        <focus_ring wrap="true">',
   '            <entry name="title" />',
@@ -89,14 +90,13 @@ const CARD_COMPOSITE_XML = `<widget name="wd_card">
 
 /** The document above as validator input, with the given extra project manifests. */
 function inputWith(extra: readonly WidgetManifest[] = []): ValidateInput {
+  const list = parseWidgetManifestFile(LIST_MANIFEST_XML, 'widgets/wd_list/wd_list.xml').value!;
   return {
     project: parseProjectFile(PROJECT_XML, 'u8g2gl.xml').value!,
     globals: parseGlobalsFile(GLOBALS_XML, 'globals.xml').value!,
-    screens: [parseScreenFile(SCREEN_XML, 'screens/screen_home.xml').value!],
-    manifests: frameworkRegistry([
-      parseWidgetManifestFile(LIST_MANIFEST_XML, 'widgets/wd_list/wd_list.xml').value!,
-      ...extra,
-    ]),
+    // Parsed as a loader parses it: knowing the manifests' static child names.
+    screens: [parseScreenFile(SCREEN_XML, 'screens/screen_home.xml', { staticChildren: staticChildNamesOf([list]) }).value!],
+    manifests: frameworkRegistry([list, ...extra]),
     catalogue: CATALOGUE,
   };
 }
@@ -112,14 +112,14 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const byText = new Map(found.map((d) => [d.offendingText, d]));
 
     // <bdf> and <convert> are not reported: both build.
+    // A declared static child (`<column>` in `<wd_list>`, §6.5) builds since
+    // schema 0.7, so it is not reported either.
     expect(found.map((d) => d.offendingText).sort()).toEqual(
-      ['column', 'event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
+      ['event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
     );
     for (const pr9 of ['focus_ring', 'event_cb', 'screen_load_event', 'screen_back_event']) {
       expect(byText.get(pr9)?.message).toContain('PR-09');
     }
-    expect(byText.get('column')?.message).toContain('PR-08');
-    expect(byText.get('column')?.message).toContain('<wd_list>');
   });
 
   it('locates each construct where it is declared', () => {
@@ -132,7 +132,6 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     expect(at('event_cb')).toBe('screens/screen_home.xml:4:13');
     expect(at('screen_load_event')).toBe('screens/screen_home.xml:5:13');
     expect(at('screen_back_event')).toBe('screens/screen_home.xml:6:13');
-    expect(at('column')).toBe('screens/screen_home.xml:9:13');
     expect(at('focus_ring')).toBe('screens/screen_home.xml:11:9');
   });
 
@@ -150,7 +149,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
     const warned = deferred(validate({ ...inputWith(), refusalPolicy: 'warning' }).diagnostics);
     const refused = deferred(validate({ ...inputWith(), refusalPolicy: 'error' }).diagnostics);
 
-    expect(byDefault).toHaveLength(5);
+    expect(byDefault).toHaveLength(4);
     expect(byDefault).toEqual(warned);
     expect(warned.every((d) => d.severity === 'warning')).toBe(true);
     expect(refused.every((d) => d.severity === 'error')).toBe(true);

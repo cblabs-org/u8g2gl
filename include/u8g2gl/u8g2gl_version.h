@@ -51,7 +51,7 @@
 // regex at configure time, and a preprocessor #if can test them.
 
 #define U8G2GL_VERSION_MAJOR 0  ///< Runtime major version
-#define U8G2GL_VERSION_MINOR 13 ///< Runtime minor version
+#define U8G2GL_VERSION_MINOR 14 ///< Runtime minor version
 #define U8G2GL_VERSION_PATCH 0  ///< Runtime patch version
 
 // Schemas 0.5 and 0.6 add only Palette metadata on <api> (0.5 the label,

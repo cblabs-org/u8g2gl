@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configured exactly as wasm/test/collection_reference.cpp configures its
+     hand-written widgets. -->
+<screen name="board">
+    <view>
+        <wd_train_formation name="formation" x="0" y="0" width="128" height="30" font="u8g2_font_6x10_mr" max_carriages="8" />
+        <wd_service_list name="services" x="0" y="32" width="128" height="32" font="u8g2_font_6x10_mr" max_rows="3" max_cols="4">
+            <column width="30" align="left" />
+            <column width="58" align="left" />
+            <column width="12" align="center" />
+            <column width="28" align="right" />
+        </wd_service_list>
+    </view>
+</screen>

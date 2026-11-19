@@ -13,8 +13,10 @@
  * Description: Re-parses screen and widget-manifest documents (the latter
  *              covers composites too, per [D-18] — PR-3R WO9 retired the
  *              separate `<component>` root) under the `'generate'` missing-name
- *              policy, applies the resulting insertions to their source files,
- *              and reports which names landed in which file. It never
+ *              policy, knowing every manifest's static child names (§6.5), so
+ *              a `<column>` is never named; applies the resulting insertions
+ *              to their source files, and reports which names landed in which
+ *              file. It never
  *              re-serialises XML — every change is a text insertion at a
  *              recorded source location, so comments, attribute order and
  *              indentation are preserved by construction.
@@ -31,8 +33,13 @@ import {
   parseScreenFile,
   parseWidgetManifestFile,
   rootElementName,
+  staticChildNamesOf,
   type SourceEdit,
+  type StaticChildNames,
 } from '../core/parser/index.js';
+import { parseFrameworkManifests } from '../core/manifest/index.js';
+import type { WidgetManifest } from '../core/schema/widget-manifest.js';
+import { FRAMEWORK_MANIFESTS } from '../data/manifests.js';
 import { readProjectFiles } from './read-project.js';
 
 /** One file rewritten by `--fix-names`, and the names inserted into it. */
@@ -53,12 +60,14 @@ export interface NameFixRecord {
  * extra here. Anything else — a project manifest, globals — has no
  * element-identity namespace, so it has nothing to fix.
  */
-function computeNameEdits(content: string, filename: string): readonly SourceEdit[] {
+function computeNameEdits(content: string, filename: string, staticChildren: StaticChildNames): readonly SourceEdit[] {
   const rootTag = rootElementName(content, filename) ?? '';
   const options = { missingNamePolicy: 'generate' } as const;
 
   if (rootTag === 'screen') {
-    return parseScreenFile(content, filename, options).nameEdits ?? [];
+    // A static child (`<column>`, §6.5) is never named, so the screen is
+    // parsed knowing which children are static.
+    return parseScreenFile(content, filename, { ...options, staticChildren }).nameEdits ?? [];
   }
   if (rootTag === 'widget') {
     return parseWidgetManifestFile(content, filename, options).nameEdits ?? [];
@@ -127,11 +136,23 @@ export function fixMissingNames(
     });
   }
 
-  // --- Step 2: Compute insertions, write them back, and record what landed ---
+  // --- Step 2: The static child names every manifest declares ---
+  // Framework and the project's own, as `validate` loads them, so a column
+  // `validate` accepts is one this never names.
+  const manifests: WidgetManifest[] = [...parseFrameworkManifests(FRAMEWORK_MANIFESTS).manifests];
+  for (const doc of documents) {
+    if (rootElementName(doc.content, doc.relativePath) === 'widget') {
+      const parsed = parseWidgetManifestFile(doc.content, doc.relativePath).value;
+      if (parsed !== undefined) manifests.push(parsed);
+    }
+  }
+  const staticChildren = staticChildNamesOf(manifests);
+
+  // --- Step 3: Compute insertions, write them back, and record what landed ---
   const records: NameFixRecord[] = [];
 
   for (const doc of documents) {
-    const edits = computeNameEdits(doc.content, doc.relativePath);
+    const edits = computeNameEdits(doc.content, doc.relativePath, staticChildren);
     if (edits.length === 0) {
       continue;
     }

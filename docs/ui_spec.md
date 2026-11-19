@@ -497,6 +497,21 @@ Geometry · Appearance · Content · Binding · Advanced. Order and grouping com
 
 Shared properties show a common value or a mixed indicator; editing applies to all. Geometry shows the bounding box, with align and distribute acting on the set.
 
+### 9.5 Static children
+
+An element whose manifest declares `<element>`s (design_spec §6.5) ends with a
+table of its **static children**, one per `<element>` kind, headed *`<column>`
+children*: a row per child in document order, a column per `<arg>`, each cell the
+control its type gets in §9.1 (a width is a number field with steppers, a
+three-value `align` a segmented control). Below each row's arguments, ↑ and ↓
+move it and × removes it; *Add `<column>`* adds a copy of the last row after it,
+or the first with each argument's plainest value (0, false, the first enum
+value, empty text). Every change, a committed value included, is one undo stop
+and the smallest text edit, computed from the current text with the element
+found by name, as every field is (§10). A table shows for one selected element
+only. A static child is never named, so opening a screen never writes a name
+into one ([U-1]).
+
 ---
 
 ## 10. The XML Editor
@@ -518,13 +533,23 @@ Monaco, configured for this schema.
 
 ## 11. Sample Data
 
-**Design-time values for bindings.** Without them the canvas renders empty labels and a layout cannot be judged.
+**Design-time values for bindings and collections.** Without them the canvas renders empty labels and blank tables, and a layout cannot be judged.
 
 This matters more in monochrome than in colour UI because **layout is length-dependent**: an 8-character station name and a 30-character one differ in whether text fits, scrolls or truncates. Designing against empty strings produces layouts that break on real data.
 
-- A **sample set** supplies a value per subject. Multiple named sets per project.
+**Three kinds of value, which the UI never blurs** (E-3, approved 2026-11-17):
+
+| | **Initial value** | **Sample value** | **Collection sample rows** |
+|---|---|---|---|
+| Lives in | `globals.xml` `value=` | A sample set | A sample set |
+| Compiled into the firmware | **Yes**: the boot frame | Never | Never |
+| Scope | Per subject | Per subject, per set | Per collection widget instance (screen + element name), per set |
+| Edited in | Subjects table, "Initial value" | Subjects table, one column per set; Sample data view | Sample data view, a typed grid per instance |
+
+- A set may leave a subject out. Then the initial value applies, and the UI shows that it was inherited. With neither, the element shows the visible placeholder below.
+- **Sample sets live in `samples/<set>.json`** in the project (S1, closing [U-6]): shared through source control, read by the designer and by test runs, ignored by `generate`, outside the schema. The active set is per-browser view state. The file format is E-3b's.
 - Conventional sets, offered on project creation: **typical**, **empty**, **longest plausible**, **worst case**.
-- Collection widgets (§9) take sample rows, so tables and lists render realistically. *Corrected 2026-10-26 (E-D):* this said "collection subjects", but [D-8] makes collections **not** subjects. How rows reach a widget at design time is PR-08's to decide; E-D requires that a declared-capacity collection be fillable by name through the editor registry ([implementation_plan.md](implementation_plan.md) §5, PR-08).
+- **Collection widgets take sample rows** ([D-8]: collections are not subjects). A widget declares the shape of its rows with `<data>` in its manifest (design_spec §6.5), and the editor fills it by name through the registry (design_spec §9.4, delivered by E-3a): every field of every row is typed, and every collection's capacity is the instance's own. The Sample data view's grids, paste, and the generated *empty*, *one* and *full, longest* sets are E-3b's.
 - Switchable from the canvas toolbar and cycleable by keyboard, so a layout can be swept against every set in seconds.
 - **Never compiled** ([UD-6]).
 
@@ -595,7 +620,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | **Palette metadata** | Display name, category, icon per element | **Done (0.5; icons done, 0.6)** — *2026-10-31: `label`, `category` and `description` on `<api>` ([design_spec.md §13.1](design_spec.md)); the Palette files by category and shows the label and description. 2026-11-10: `icon` on `<api>`, which every framework manifest declares; a tile shows its element's icon, else its category's* |
 | **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): every prop shows* |
 | **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** — *2026-10-26: done, fixture-bound; E-1d makes it project-driven* |
-| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`)* |
+| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`). 2026-11-17: [U-6] closed by S1, `samples/<set>.json` outside the schema (§11); a collection's row shape is schema 0.7's `<data>` (design_spec §6.5)* |
 | **Stable element identity** | The editor must address elements across edits | **Settled** ([U-1], PR-03). `name` is required. The CLI errors on a missing name; the editor generates one and persists it on save |
 | **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** — *2026-10-26: no CST exists yet; E-1a delivers it* |
 | **Editor view state** | Zoom, selection, panel sizes, active sample set | **Sidecar** `.u8g2gl-editor.json`, *not* project XML — per-user, and would otherwise make every pan a source-control change |
@@ -606,10 +631,11 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 | ID | Question | Blocks |
 |---|---|---|
-| **U-6** | Where does sample data live — a `samples/` document in the project, or a sidecar? Project-shared argues for the former; never-compiled argues for separation *E-D, 2026-10-26 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §7):* E-3's to decide. Leaning only: a project file outside the schema (`samples/*.json`), read by the designer and ignored by `generate`. Sample data for collections waits on PR-08 (EDITOR-DESIGN §9). | PR-02 |
 | **U-7** | Does the palette support user-authored categories, or is the taxonomy fixed? | Phase 3 |
 
-*(**U-1** closed in PR-03 — see §16.1. **U-3** closed 2026-11-14, E-2k1: a switcher on one canvas, see below.)*
+*(**U-1** closed in PR-03 — see §16.1. **U-3** closed 2026-11-14, E-2k1: a switcher on one canvas, see below. **U-6** closed 2026-11-17, E-3: see below.)*
+
+**`[U-6]` Where sample data lives — closed 2026-11-17 (E-3, the owner's decision S1).** In `samples/<set>.json` in the project: shared through source control, read by the designer and by test runs, ignored by `generate`, and outside the schema (§11). JSON, because it is data, never compiled, and what a live feed produces. The active set is per-browser view state. The format itself is E-3b's. Collection rows no longer wait on PR-08: E-3a delivered the editor's fill path (design_spec §9.4).
 
 **`[U-3]` Multi-target — closed 2026-11-14 (E-2k1, the owner's decision D1).** One canvas with a target switcher in the status bar (§6.4). The canvas, inserts, the impact preview and any budget figure follow the active target, which is per-browser view state and never written to the XML; a missing or renamed target falls back to the first. [Q-1], per-target overrides in the screen files, is unaffected: the switcher shows each target as its display resolves it.
 

@@ -8,6 +8,40 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-17	cli v0.23.xx	U8G2GL
+  * 0.23.0: Collection widgets declare their data, and their columns are
+    XML. Schema 0.7 (unreleased, so no bump) gains <data> in a widget's
+    <api>: the rows its own ingestion API takes, one <field> per argument
+    of the access method (int with min/max, bool, string with max_len,
+    enum with values; repeat for a string array), with a capacity that is
+    an int literal or an int prop. A 0.4-0.6 project that writes one is
+    told to declare 0.7. A field's max_len counts usable characters, as a
+    string subject's does. New diagnostic: U8G2GL_INVALID_DATA_DECLARATION.
+    The <element> children a manifest has always been able to declare are
+    now built: a <column> inside a <wd_service_list> is a static child,
+    parsed without a name (every loader parses manifests first), checked
+    against its <arg>s, called at construction through the declared access
+    method after the setters, and listed in the designer's property panel
+    as a table with add, remove and reorder, each one undo step. Pass 8 no
+    longer refuses them. The editor registry gains add-by-name entries for
+    static children and a fill entry per <data>, whose static_assert fails
+    the editor build when the fields cannot call the access method; the
+    editor bridge gains applyCollectionData(), which the designer does not
+    call yet. The scene format is version 4 (an object's static_children).
+    Generated firmware changes only for a screen with static children; the
+    runtime floor moves to 0.14.0, so every generated config's two floor
+    lines move.
+2026-11-17	runtime v0.14.xx	U8G2GL
+  * 0.14.0: The editor registry fills collection widgets by name. Editor
+    target only (U8G2GL_EDITOR), so firmware compiles and pays nothing:
+    u8g2gl_editor_class gains an element table, with
+    u8g2gl_editor_add_element(), for the static children a manifest's
+    <element> declares, and a fill table, with u8g2gl_editor_fill(), for
+    each <data>: the field rules, the capacity, and a generated thunk that
+    calls the widget's own begin(), access method per row and commit(),
+    checking every cell first. u8g2gl_editor_row_call() reads an access
+    method's bool return. Schema minor unchanged at 7.
+    Built and tested against U8G2 2.36.18.
 2026-11-15	cli v0.22.xx	U8G2GL
   * 0.22.0: U8G2's large fonts are named before the linker fails. U8G2
     compiles its 63 fonts over 32 KB only where U8G2_USE_LARGE_FONTS is

@@ -803,17 +803,79 @@ widgets/wd_service_list/
               help="Row capacity. Determines allocated RAM." />
         <prop name="max_cols"           type="int" default="6" />
         <prop name="max_cell_chars"     type="int" default="24"
-              help="Per-cell string capacity including terminator." />
+              help="Usable characters per cell; a longer cell is truncated." />
         <prop name="scroll_dwell_ms"    type="int" default="5000" />
         <prop name="scroll_duration_ms" type="int" default="1000" />
 
-        <element name="column" access="add" help="Column definition">
+        <element name="column" access="add_column" help="One column, left to right.">
             <arg name="width" type="int" />
-            <arg name="align" type="enum" values="left,center,right" />
+            <arg name="align" type="enum" values="left,center,right"
+                 emit="U8G2GL_ALIGN_{VALUE^^}" />
         </element>
+
+        <data name="rows" access="add_row" capacity="max_rows" help="One departure per row.">
+            <field name="cells" type="string" repeat="max_cols" max_len="max_cell_chars" />
+        </data>
     </api>
 </widget>
 ```
+
+#### Static children: `<element>`
+
+An `<element>` declares a child the widget takes in the screen XML as
+configuration of itself, a **static child**: the `<column>`s of §5.4's service
+list. A static child is not an element. It has no name and no geometry, never
+joins the element tree, and costs no object; at construction the generated init
+calls the declared `access` method once per child, in document order, after the
+widget's setters, with one argument per `<arg>` in declaration order
+(`ui_obj_departures.add_column(24, U8G2GL_ALIGN_LEFT)`). An enum argument is
+spelled through its `emit=` pattern exactly as a setter's value is.
+
+- *Arguments.* An `<arg>` is `int`, `bool`, `string` or `enum` (an enum lists
+  `values`, and may give `emit`): what a literal in the screen XML can be. Every
+  argument is required, because the method takes every one; an unknown
+  attribute, a missing argument and a value of the wrong type are errors at the
+  child, and an unknown child of a widget that declares static children is an
+  error naming the ones it takes. A static child is the widget's own: `<element>`
+  is not inherited through `extends`.
+- *Parsing.* Only a manifest can say that `<column>` is a static child, so every
+  loader parses the manifests before the screens and passes their `<element>`
+  names to the screen parser (the CLI's `loadProject()` and `--fix-names`, the
+  designer's project model, which re-parses screens when a manifest's
+  `<element>` list changes). Without them, a `<column>` would be an unnamed
+  element. A name is never generated for a static child.
+- *Both targets.* The editor builds the same calls through the registry's
+  add-by-name entry (§13.7), and the property panel lists the children as a table
+  (ui_spec §9.5).
+
+#### Run-time data: `<data>` (schema 0.7)
+
+A `<data>` declares the rows the widget takes **at run time** through its own
+hand-written ingestion API, §9.2's `begin()`, the `access` method once per row,
+`commit()` (`begin` and `commit` are not declared). One `<field>` per argument of
+the access method, in its parameter order:
+
+| `<field>` | Takes | Passed to the method as |
+|---|---|---|
+| `type="int"` | `min`, `max` | `int32_t` |
+| `type="bool"` | — | `bool` |
+| `type="string"` | `max_len`: usable characters, as a string subject's | `const char*` |
+| `type="enum"` | `values` | `const char*`: the text, which the widget interprets |
+| `repeat="N"` on a string field | — | `const char* const*` and `size_t`: the array and its count |
+
+`capacity`, `repeat` and `max_len` are each an int literal or the name of an int
+`<prop>` of the same widget, so the capacity an instance declares
+(`max_rows="10"`) is the one the RAM budget reports. A widget may declare more than
+one `<data>`. A `<data>` belongs only to a manifest with a C++ class of its own,
+never to a drawing element or a composite; its `access` must be a C++ identifier.
+Each rule is reported at the attribute at fault as
+`U8G2GL_INVALID_DATA_DECLARATION` (§15.3).
+
+Nothing in `<data>` reaches firmware. It is what lets the designer fill a widget
+by name with sample rows (§9.4, ui_spec §11), and what the editor build checks
+against the C++: the generated registry `static_assert`s that the declared
+fields can call the access method, so a manifest out of step with its widget
+fails the editor build, naming the widget and the data.
 
 **An element may have a `<view>`, C++, or both.** A widget that declares both
 gets its children built from the `<view>` and its behaviour from its class,
@@ -891,9 +953,11 @@ Two custom elements exist as reference implementations, written against this
 section and rendered through the Wasm harness during G-PROBE-2 (2026-10-18).
 They are the answer to "how do I actually write one", and they are the shortest
 route to the four things a widget author currently has to discover for
-themselves — font positioning under `setFontPosTop()`, configuring columns in
-C++ while `<element>` waits on PR-08, XOR for contrast, and rebuilding the Wasm
-target.
+themselves — font positioning under `setFontPosTop()`, declaring columns as
+`<column>` static children (§6.5, schema 0.7 onwards; before it, they had to be
+configured in C++), XOR for contrast, and rebuilding the Wasm target. The
+departures fixture's copies (`cli/test/fixtures/departures-project/widgets/`)
+also declare their `<data>`.
 
 | Example | What it demonstrates |
 |---|---|
@@ -1172,6 +1236,28 @@ ui_departures.commit();
 ### 9.3 Zero-Copy Escape Hatch — *Deferred*
 
 For very large datasets where 2 KB of copies is unacceptable, a pull model (the widget calls back for cell `(row, col)` at render time) avoids the copy entirely at the cost of a lifetime contract the user must honour. Not in v1. Recorded so the door stays open.
+
+### 9.4 The editor fill path (schema 0.7)
+
+**The designer fills a collection widget by name, through the widget's own API.**
+A widget's `<data>` (§6.5) declares the shape of its rows, and the editor target
+generates, per `<data>`, a fill entry in the class registry (§13.7): the field
+rules, the capacity, and a thunk that calls the widget's `begin()`, its access
+method once per row, and `commit()`, exactly as a controller does on the device.
+The editor bridge's `applyCollectionData()` takes
+`{ "<element name>": { "<data name>": [ rows ] } }`, each row an object keyed by
+field name, and checks every row before any widget is called: more rows than the
+instance's capacity are refused naming the element and the capacity (as `add_row`
+returns `false` on the device), and a bad row naming the element, the row index
+and the field. A widget whose storage is smaller than its declared capacity
+([Q-19]) refuses a row itself; the rows it took stay, as on the device, and the
+call says so. The live loop applies the rows after every scene, as it applies
+sample values; sample sets themselves are E-3b's (ui_spec §11).
+
+**PR-08 still owns the firmware ingestion API.** §9.2's *generated* typed API
+(`ui_departures_rows`) and generated storage are not part of this path. A widget
+keeps its hand-written `begin()`/`add_row()`/`commit()`, and firmware compiles
+none of the registry: the fill path is editor target only ([UD-4]).
 
 ---
 
@@ -1491,7 +1577,7 @@ Three models were considered:
 | Target | Emitted from the manifest | Cost |
 |---|---|---|
 | `firmware` | Direct setter calls (§13.7) | None beyond the calls themselves |
-| `editor` | A class registry (construct-by-name) and property thunks (set-by-name), compiled under `#ifdef U8G2GL_EDITOR` | Zero in firmware — compiled out |
+| `editor` | A class registry (construct-by-name), property thunks (set-by-name), static-child thunks (add-by-name) and, per `<data>`, a fill entry (fill-by-name, §9.4), compiled under `#ifdef U8G2GL_EDITOR` | Zero in firmware — compiled out |
 
 The editor target exists because the designer must render arbitrary XML without running a C++ compiler in the browser ([ui_spec.md §UD-4](ui_spec.md)). It is the first real consumer of [PD-3]'s virtual base, and it is why the object model was specified as *ready for* dynamic construction even though firmware never uses it. Built-in widgets ship the same `<api>` declaration as custom ones — `u8g2gl_label.xml` sits beside `u8g2gl_label.hpp`. This unifies Tier 2 and Tier 4: they differ in *who wrote them*, not in how the generator handles them. The generator's knowledge of widgets is data, not code, and adding a widget requires no generator release.
 
@@ -1829,7 +1915,9 @@ concrete elements.
 
 Per screen, one `.cpp`. Plus one `ui.hpp` umbrella; one unit each for subjects, fonts, images and styles (`ui_styles.cpp`); and `ui.cpp`, which holds `ui_init()` and the frame-dirty observers. There is one observer per subject rather than per screen (§13.5), so they can't live in a screen's unit.
 
-**The editor target emits different units from the same build** ([UD-4], §13.1). `generate --target-kind editor` writes the designer's class registry (`ui_editor_registry.cpp`) and a scene description (`ui_scene.json`) into `<output dir>_editor` by default, in place of the firmware units. `--target-kind firmware` is the default. The scene description carries a format version — 2 as of PR-04, which added the bound origin — so the designer can refuse a description it doesn't understand instead of misreading one. Both targets are generated from the same validated project, and a parity test renders each and compares the draw calls one for one. That equality is what entitles the designer's canvas to call itself pixel-exact ([D-9]). The `--json` contract ([D-16]) reports the emitted paths for whichever target ran.
+**The editor target emits different units from the same build** ([UD-4], §13.1). `generate --target-kind editor` writes the designer's class registry (`ui_editor_registry.cpp`) and a scene description (`ui_scene.json`) into `<output dir>_editor` by default, in place of the firmware units. `--target-kind firmware` is the default. The scene description carries a format version — 2 as of PR-04, which added the bound origin; 3 added a draw call's clip; 4 (schema 0.7) an object's `static_children` — so the designer can refuse a description it doesn't understand instead of misreading one.
+
+**The registry's entries per class** (`include/u8g2gl/u8g2gl_editor.h`): construct-by-name, the rectangle, one set-by-name thunk per setter prop, one bind-by-name thunk per `<bind>` per subject type, one add-by-name thunk per `<element>` (a static child's access call, §6.5), and one fill entry per `<data>` (`u8g2gl_editor_data`, §9.4), `nullptr` when the class declares none. A fill entry carries each field's rules (type, an int's bounds, an enum's values, a repeated string's count and `max_len`), the capacity as a literal or an instance prop, and the thunk; `u8g2gl_editor_fill()` checks every row's cells against the fields before calling it. Beside each fill entry the generated unit `static_assert`s, with `std::is_invocable_v` over a SFINAE-friendly generic lambda, that the declared fields can call the access method, so a manifest that disagrees with its C++ fails the editor build with a message naming the widget and the data. Both targets are generated from the same validated project, and a parity test renders each and compares the draw calls one for one. That equality is what entitles the designer's canvas to call itself pixel-exact ([D-9]). The `--json` contract ([D-16]) reports the emitted paths for whichever target ran.
 
 ```cpp
 void ui_screen_home_init();        // once at boot: construct, configure, bind
@@ -2124,6 +2212,17 @@ Two properties make this useful rather than decorative:
    | `U8G2GL_MALFORMED_XML` | An unknown child of `<u8g2gl>`, or of `<targets>`, `<target>`, `<display>` or `<output>` (CLI 0.20), at its tag; also a file that is not well-formed. The project is withheld, and nothing else is reported about it |
    | `U8G2GL_REMOVED_ATTRIBUTE` | A pin or `<bus>` ([D-22], §15.4). Never also `U8G2GL_UNKNOWN_ATTRIBUTE`. The project is still validated |
    | `U8G2GL_UNKNOWN_SCHEMA_VERSION` | A `schema` the CLI does not accept, `""` included. Not reported for a project the parser withheld (CLI 0.20) |
+
+   And those a widget manifest's `<data>` and `<element>`, and a screen's static children, report (§6.5, CLI 0.23):
+
+   | Code | When |
+   |---|---|
+   | `U8G2GL_INVALID_DATA_DECLARATION` | A `<data>` on a manifest with no class of its own; an `access` that is not a C++ identifier; a `capacity`, `repeat` or `max_len` that is neither an int literal nor an int prop of the widget; a field type no row can carry; a bound its type does not take (`repeat` only on a string); a non-integer `min`/`max`, or `min` above `max`; an enum with no values. The same code for an `<element>` with no class, a non-identifier `access`, or an `<arg>` whose type no literal can be or an enum with no values. Error, at the attribute |
+   | `U8G2GL_INVALID_ENUM_VALUE` | An unknown `<field>` or `<arg>` type, with the allowed types as suggestions; a static child's enum argument outside its values |
+   | `U8G2GL_DUPLICATE_NAME` | A `<data>`, `<field>`, `<element>` or `<arg>` name written twice in its scope |
+   | `U8G2GL_NEWER_SCHEMA_REQUIRED` | A `<data>` in a 0.4–0.6 project's own manifest (§15.4) |
+   | `U8G2GL_UNKNOWN_ATTRIBUTE`, `U8G2GL_MISSING_REQUIRED`, `U8G2GL_TYPE_MISMATCH` | A static child's attribute its `<element>` does not declare (with suggestions); an argument not written; an `int` argument that is not an integer literal |
+   | `U8G2GL_UNKNOWN_COMPONENT` | An unknown child of a widget that declares static children, naming the ones it takes |
 2. **Suggestions are structured** — the near-miss candidates behind "did you mean 'small_09'?" appear as a list, so a caller can apply a fix programmatically rather than regex the sentence.
 
 This is the mechanism by which "diagnostics are the product" (§1.2) actually pays off. A model that receives `{"code":"U8G2GL_UNKNOWN_FONT","suggestions":["small_09"],"line":14}` converges in one iteration. One that receives `Error: invalid XML` does not converge at all.
@@ -2138,9 +2237,10 @@ This is the mechanism by which "diagnostics are the product" (§1.2) actually pa
 
 **0.5 → 0.6 is additive** in the same way. 0.6 adds only `icon` on `<api>` (§13.1), and the CLI accepts `0.4`, `0.5` and `0.6`. An `icon` in one of a 0.4 or 0.5 project's own manifests is one `U8G2GL_NEWER_SCHEMA_REQUIRED`, naming `schema="0.6"` as the fix; the value is not judged until the project declares 0.6. The framework's own manifests carry icons and, as with the metadata, are not held to the project's version.
 
-**0.6 → 0.7 adds the mirrors and removes the pins.** The CLI accepts `0.4`, `0.5`, `0.6` and `0.7`.
+**0.6 → 0.7 adds the mirrors and `<data>`, and removes the pins.** The CLI accepts `0.4`, `0.5`, `0.6` and `0.7`.
 
 - *Added:* `MIRROR` and `MIRROR_VERTICAL` for `rotation` (§5.1). A mirror in a 0.4–0.6 project is one `U8G2GL_NEWER_SCHEMA_REQUIRED` on its target, naming `schema="0.7"` as the fix.
+- *Added:* `<data>` and `<field>` in a widget's `<api>` (§6.5), added to 0.7 before its release (E-3a), so 0.7 carries no further bump. A `<data>` in one of a 0.4–0.6 project's own manifests is one `U8G2GL_NEWER_SCHEMA_REQUIRED` per block, naming `schema="0.7"` as the fix, and nothing else about it is judged until the project declares 0.7. `<element>` was always in the schema; 0.7's generator is the first to build it, and Pass 8 no longer refuses it.
 - *Removed:* `cs`, `dc`, `reset` and `address` on `<display>`, `<target>` and `<bus>`, and the `<bus>` element ([D-22]). Each written one is `U8G2GL_REMOVED_ATTRIBUTE`, an error **at every schema version**, once per occurrence at its own line, saying that pins and bus are configured by the firmware's board and naming `u8g2gl display <setup> --snippet` with the target's setup. Never the generic unknown-attribute message.
 - *Why older versions stay accepted.* The removal is breaking surface, and the letter of `rules/03-versioning.md` would refuse every pre-0.7 project with a migration table. The owner weighed that and rejected it (2026-11-14): a pin never had any effect, so the only files the removal breaks are the ones that write one, and each of those gets the exact fix at the exact line. Refusing every 0.4–0.6 project to remove an attribute none of them needs would make every project edit its version string for nothing. The break is still diagnosable, never silent, which is what this section requires.
 

@@ -52,8 +52,8 @@ bool editor_host::load(const std::string& scene_path) {
     if (!parse_error.empty()) {
         return fail(parse_error);
     }
-    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 3) {
-        return fail("not a version 3 u8g2gl scene description");
+    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 4) {
+        return fail("not a version 4 u8g2gl scene description");
     }
     for (const scene_json& described : scene_.get("subjects").items()) {
         if (described.has("value")) {
@@ -240,7 +240,8 @@ bool editor_host::build_object(const scene_json& element) {
 }
 
 // configure_object
-// §13.7 step 2: the rectangle, then every written property, by name.
+// §13.7 step 2: the rectangle, then every written property, then every static
+// child, by name.
 bool editor_host::configure_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_class& cls = *classes_[index];
@@ -264,6 +265,26 @@ bool editor_host::configure_object(size_t index, const scene_json& element) {
         if (!value_for(entry->type, property.get("value"), name + "." + prop, &value) ||
             !u8g2gl_editor_set_property(cls, objects_[index], prop.c_str(), value)) {
             return fail(name + "." + prop + ": set-by-name refused");
+        }
+    }
+    // Then each static child (§6.5), in document order, by name, as the
+    // firmware's init calls the access method after the setters.
+    for (const scene_json& child : element.get("static_children").items()) {
+        const std::string& tag = child.get("element").as_string();
+        const u8g2gl_editor_element* entry = u8g2gl_editor_find_element(cls, tag.c_str());
+        if (entry == nullptr) {
+            return fail(name + ": no static child <" + tag + "> in the registry");
+        }
+        std::vector<u8g2gl_editor_value> args(entry->arg_count);
+        for (const scene_json& arg : child.get("args").items()) {
+            const int at = u8g2gl_editor_find_element_arg(*entry, arg.get("name").as_string().c_str());
+            if (at < 0 || !value_for(entry->args[at].type, arg.get("value"), name + " <" + tag + ">",
+                                     &args[static_cast<size_t>(at)])) {
+                return fail(name + " <" + tag + ">: argument refused");
+            }
+        }
+        if (!u8g2gl_editor_add_element(cls, objects_[index], tag.c_str(), args.data(), entry->arg_count)) {
+            return fail(name + " <" + tag + ">: add-by-name refused");
         }
     }
     return true;

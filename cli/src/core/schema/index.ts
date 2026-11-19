@@ -75,6 +75,9 @@
  *   - BindDef: Reactive subject binding slot descriptor
  *   - ElementDef: Child collection element descriptor
  *   - ElementArgDef: Collection element argument descriptor
+ *   - WidgetData, WidgetDataField: A `<data>` block and its fields (schema 0.7)
+ *   - DATA_FIELD_TYPES, DataCount, dataCountOf(): The field types, and a
+ *     `capacity`, `repeat` or `max_len` resolved against the widget's props
  *
  * - Project-file vocabulary (§5.1, §5.3), for forms and coverage tests:
  *   - PROJECT_VOCABULARY: Every element and attribute of u8g2gl.xml and globals.xml
@@ -177,7 +180,11 @@ export type {
   BindDef,
   ElementDef,
   ElementArgDef,
+  WidgetData,
+  WidgetDataField,
+  DataCount,
 } from './widget-manifest.js';
+export { DATA_FIELD_TYPES, dataCountOf } from './widget-manifest.js';
 
 export type {
   BusFamily,

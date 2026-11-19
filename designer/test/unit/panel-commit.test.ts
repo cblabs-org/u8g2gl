@@ -39,14 +39,14 @@ function commit(names: readonly string[], attribute: string, value: string | und
 test('a written attribute is rewritten in place: a one-line diff, its quote kept', () => {
   const after = commit(['row0'], 'x', '40');
   expect(changedLines(TEXT, after)).toEqual([
-    '        <wd_service_list name="row0" x="40" y="0" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1" />',
+    '        <wd_service_list name="row0" x="40" y="0" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1">',
   ]);
 });
 
 test('an unwritten attribute is added after the last one, in the element’s own layout', () => {
   const after = commit(['row0'], 'max_cols', '4');
   expect(changedLines(TEXT, after)).toEqual([
-    '        <wd_service_list name="row0" x="32" y="0" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1" max_cols="4" />',
+    '        <wd_service_list name="row0" x="32" y="0" width="224" height="16" font="u8g2_font_6x10_mr" max_rows="1" max_cols="4">',
   ]);
 });
 

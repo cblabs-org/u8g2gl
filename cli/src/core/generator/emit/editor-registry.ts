@@ -25,7 +25,16 @@
  *                subject type** (`bind_text` for string and for int are two
  *                entries, never one); a position binding's thunk passes the
  *                container origin the host gives it, as firmware passes the
- *                literal (§7.2, `placement.ts`'s POSITION_BINDINGS);
+ *                literal (§7.2, `placement.ts`'s POSITION_BINDINGS); and one
+ *                add-by-name thunk per `<element>` (§6.5), calling its access
+ *                method with every argument, each enum spelled by `cppValue()`
+ *                as the firmware's init spells it; and, per `<data>` (schema
+ *                0.7, §9.2), a fill thunk — `begin()`, the access method once
+ *                per row with the fields in declared order, `commit()` — with
+ *                the field rules the host checks rows against, and a
+ *                `static_assert` that the declared fields can call the access
+ *                method, so a manifest that disagrees with its C++ fails the
+ *                editor build naming the widget and the data;
  *              - a **drawing** element ([D-18]) gets a draw-by-name entry calling
  *                the same `u8g2gl_draw_*` function the firmware call does, its
  *                defaults spelled by `cppValue()`;
@@ -60,12 +69,20 @@
 
 import { BINDING_FLAGS, isDrawingElement, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { COLOR_VALUES } from '../../schema/globals.js';
-import type { BindDef, PropDef, PropType } from '../../schema/widget-manifest.js';
+import {
+  dataCountOf,
+  type BindDef,
+  type ElementDef,
+  type PropDef,
+  type PropType,
+  type WidgetData,
+  type WidgetDataField,
+} from '../../schema/widget-manifest.js';
 import { FLAG_COMPARISONS } from '../../schema/widget-node.js';
 import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
 import { POSITION_BINDINGS } from './placement.js';
-import { classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
+import { argPropOf, classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
 import { fontDeclarations } from './fonts.js';
 import { imageDeclarations } from './images.js';
 import { includeBlock, section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
@@ -266,6 +283,242 @@ function bindingThunk(cls: string, binding: BindDef): string[] {
   ];
 }
 
+// elementThunk
+// One static child kind's add-by-name lambda: the access call the firmware's
+// `obj.<access>(<cppValue>, …)` line makes, each argument read from the host's
+// value — or, for an enum, matched against its values and spelled by
+// cppValue() exactly as the firmware spells that value. Every argument is
+// present: u8g2gl_editor_add_element() has checked each type already.
+//   cls     — the C++ class
+//   element — the `<element>` declaration
+function elementThunk(cls: string, element: ElementDef): string[] {
+  const body: string[] = [];
+  element.args.forEach((arg, index) => {
+    const value = `args[${index}]`;
+    const local = `a${index}`;
+    const prop = argPropOf(arg);
+    body.push(`// ${arg.name} (${arg.type})`);
+    if (arg.type === 'enum') {
+      const values = valuesOf(prop);
+      const first = values[0];
+      if (first === undefined) {
+        throw new Error(`<element name="${element.name}"> arg '${arg.name}' is an enum with no values; Pass 1 refuses it.`);
+      }
+      body.push(`decltype(${cppValue(prop, first)}) ${local} = ${cppValue(prop, first)};`);
+      values.forEach((text, i) => {
+        body.push(`${i === 0 ? '' : '} else '}if (u8g2gl_editor_is(${value}, ${cppStringLiteral(text)})) {`, `    ${local} = ${cppValue(prop, text)};`);
+      });
+      body.push('} else {', '    return false;', '}');
+      return;
+    }
+    const read = RUNTIME_READS[arg.type];
+    if (read === undefined) {
+      throw new Error(`<element name="${element.name}"> arg '${arg.name}' has type '${arg.type}'; Pass 1 refuses it.`);
+    }
+    body.push(`const ${read.type} ${local} = ${read.read(value)};`);
+  });
+  body.push(`static_cast<${cls}*>(obj)->${element.access}(${element.args.map((_, index) => `a${index}`).join(', ')});`, 'return true;');
+  return ['[](u8g2gl_obj* obj, const u8g2gl_editor_value* args) -> bool {', ...indent(body, 1), '}'];
+}
+
+// elementTables
+// A class's static child kinds (§6.5): an argument table per `<element>`, and
+// the element table its class entry points at. Empty for a class with none.
+//   tag      — the class's tag, for table names
+//   cls      — the C++ class
+//   elements — its own `<element>`s, never inherited
+function elementTables(tag: string, cls: string, elements: readonly ElementDef[]): string[] {
+  if (elements.length === 0) return [];
+  const lines: string[] = [];
+  const entries: string[] = [];
+  for (const element of elements) {
+    const argTable = `ui_editor_${tag}_${element.name}_args`;
+    if (element.args.length > 0) {
+      lines.push(
+        `static const u8g2gl_editor_param ${argTable}[] = {`,
+        ...element.args.map((arg) => `    {${cppStringLiteral(arg.name)}, ${editorTypeEnumerator(arg.type)}},`),
+        '};',
+      );
+    }
+    entries.push(`// <${element.name}> → ${element.access}()`, `{${cppStringLiteral(element.name)},`);
+    entries.push(...indent(elementThunk(cls, element).map((line, i, all) => (i === all.length - 1 ? `${line},` : line)), 1));
+    entries.push(`    ${element.args.length > 0 ? argTable : 'nullptr'}, ${element.args.length}},`);
+  }
+  lines.push(`static const u8g2gl_editor_element ui_editor_${tag}_elements[] = {`, ...indent(entries, 1), '};');
+  return lines;
+}
+
+/** The C++ type the editor passes each field type as, for the signature check. */
+const FIELD_ARGUMENT_TYPES: Readonly<Partial<Record<PropType, string>>> = {
+  int: 'int32_t',
+  bool: 'bool',
+  string: 'const char*',
+  // A data enum is run-time data, so it reaches the method as its text, which
+  // the widget interprets (`add_carriage(…, const char* class_type, …)`).
+  enum: 'const char*',
+};
+
+/** How a single cell's value is read for each field type. */
+const FIELD_READS: Readonly<Partial<Record<PropType, string>>> = {
+  int: 'value.integer',
+  bool: 'value.boolean',
+  string: 'value.text',
+  enum: 'value.text',
+};
+
+// countInitialiser
+// A `capacity`, `repeat` or `max_len` as a `u8g2gl_editor_count` initialiser:
+// `{"max_rows", 16}` for a prop (its default, or -1 when it has none), or
+// `{nullptr, 12}` for a literal; `absent` when the manifest writes none.
+//   text   — the attribute as written, or undefined
+//   props  — the widget's own props
+//   absent — the initialiser for an unwritten count
+function countInitialiser(text: string | undefined, props: readonly PropDef[], absent: string): string {
+  if (text === undefined) return absent;
+  const count = dataCountOf(text, props);
+  if (count === undefined) {
+    throw new Error(`'${text}' is neither an int literal nor an int prop; Pass 1 refuses it.`);
+  }
+  return count.kind === 'literal' ? `{nullptr, ${count.value}}` : `{${cppStringLiteral(count.prop.name)}, ${count.value ?? -1}}`;
+}
+
+// fieldInitialiser
+// One field's `u8g2gl_editor_field` initialiser, and its enum values table.
+//   prefix — the identifier stem for the field's tables
+//   field  — the `<field>`
+//   props  — the widget's own props, for counts
+function fieldInitialiser(prefix: string, field: WidgetDataField, props: readonly PropDef[]): { tables: string[]; line: string } {
+  const values = field.type === 'enum' ? (field.values ?? '').split(',').map((v) => v.trim()).filter((v) => v !== '') : [];
+  const valuesTable = `${prefix}_${field.name}_values`;
+  const tables = values.length === 0 ? [] : [`static const char* const ${valuesTable}[] = {${values.map(cppStringLiteral).join(', ')}};`];
+  const bound = (text: string | undefined, fallback: string): string => (text === undefined ? fallback : String(Number(text.trim())));
+  const parts = [
+    cppStringLiteral(field.name),
+    values.length === 0 ? 'nullptr' : valuesTable,
+    countInitialiser(field.repeat, props, '{nullptr, 0}'),
+    countInitialiser(field.maxLen, props, '{nullptr, -1}'),
+    bound(field.min, 'INT32_MIN'),
+    bound(field.max, 'INT32_MAX'),
+    editorTypeEnumerator(field.type),
+    String(values.length),
+    field.repeat === undefined ? 'false' : 'true',
+  ];
+  return { tables, line: `{${parts.join(', ')}},` };
+}
+
+// fieldArguments
+// A row's arguments to the access method, in field order: a single field's
+// value, or a repeated field's texts and count.
+//   field — the `<field>`
+//   index — its position in the row
+function fieldArguments(field: WidgetDataField, index: number): string[] {
+  if (field.repeat !== undefined) {
+    return [`c[${index}].texts`, `static_cast<size_t>(c[${index}].count)`];
+  }
+  const read = FIELD_READS[field.type];
+  if (read === undefined) {
+    throw new Error(`<field name="${field.name}"> has type '${field.type}'; Pass 1 refuses it.`);
+  }
+  return [`c[${index}].${read}`];
+}
+
+// signatureTypes
+// The C++ types the editor passes for a data's fields, in order, for the
+// compile-time signature check and its message.
+function signatureTypes(data: WidgetData): { types: string[]; spelled: string } {
+  const types: string[] = [];
+  const spelled: string[] = [];
+  for (const field of data.fields) {
+    if (field.repeat !== undefined) {
+      types.push('const char* const*', 'size_t');
+      spelled.push(`${field.name}: string[] as const char* const*, size_t`);
+      continue;
+    }
+    const type = FIELD_ARGUMENT_TYPES[field.type];
+    if (type === undefined) {
+      throw new Error(`<field name="${field.name}"> has type '${field.type}'; Pass 1 refuses it.`);
+    }
+    types.push(type);
+    spelled.push(`${field.name}: ${field.type} as ${type}`);
+  }
+  return { types, spelled: spelled.join(', ') };
+}
+
+// dataTables
+// A class's fill entries (`<data>`, schema 0.7, §9.2): per block, its field
+// table, its access call with the compile-time check that the declared fields
+// can call it, and its thunk; then the table the class entry points at.
+//   tag      — the class's tag, for table names
+//   cls      — the C++ class
+//   blocks   — its own `<data>`s, never inherited
+//   props    — its own props, which counts may name
+function dataTables(tag: string, cls: string, blocks: readonly WidgetData[], props: readonly PropDef[]): string[] {
+  if (blocks.length === 0) return [];
+  const lines: string[] = [];
+  const entries: string[] = [];
+  for (const data of blocks) {
+    const prefix = `ui_editor_${tag}_${data.name}`;
+
+    // --- The fields, as the host checks rows against them ---
+    const fields = data.fields.map((field) => fieldInitialiser(prefix, field, props));
+    lines.push(...fields.flatMap((field) => field.tables));
+    if (fields.length > 0) {
+      lines.push(`static const u8g2gl_editor_field ${prefix}_fields[] = {`, ...fields.map((field) => `    ${field.line}`), '};');
+    }
+
+    // --- The access call, checked against the manifest at compile time ---
+    // A generic lambda, SFINAE-friendly as u8g2gl_editor_bind_call's are, so
+    // an overloaded method resolves as the call would.
+    const { types, spelled } = signatureTypes(data);
+    const message = `${tag} <data name="${data.name}">: ${data.access}() cannot be called with the fields the manifest declares (${spelled}); make the <field>s match the method's parameters`;
+    lines.push(
+      `static const auto ${prefix}_call = [](auto* s, auto... a) -> decltype(s->${data.access}(a...)) { return s->${data.access}(a...); };`,
+      `static_assert(std::is_invocable_v<decltype(${prefix}_call), ${[`${cls}*`, ...types].join(', ')}>,`,
+      `              ${cppStringLiteral(message)});`,
+    );
+
+    // --- The thunk: begin, the access call per row, commit ---
+    const args = data.fields.flatMap((field, index) => fieldArguments(field, index));
+    entries.push(
+      `// <data name="${data.name}"> → begin(), ${data.access}() per row, commit()`,
+      `{${cppStringLiteral(data.name)}, ${cppStringLiteral(data.access)},`,
+      ...indent(
+        [
+          '[](u8g2gl_obj* obj, const u8g2gl_editor_cell* const* rows, size_t row_count, size_t* accepted) -> bool {',
+          ...indent(
+            [
+              `${cls}* self = static_cast<${cls}*>(obj);`,
+              'self->begin();',
+              'size_t taken = 0;',
+              'bool ok = true;',
+              'for (size_t r = 0; r < row_count && ok; ++r) {',
+              ...indent(
+                [
+                  'const u8g2gl_editor_cell* c = rows[r];',
+                  `ok = u8g2gl_editor_row_call(self, [c](${cls}* s) { return ${prefix}_call(s${args.map((arg) => `, ${arg}`).join('')}); });`,
+                  'taken += ok ? 1 : 0;',
+                ],
+                1,
+              ),
+              '}',
+              '// The rows taken are published even after a refusal, as on the device.',
+              'self->commit();',
+              '*accepted = taken;',
+              'return ok;',
+            ],
+            1,
+          ),
+          '},',
+          `${fields.length > 0 ? `${prefix}_fields` : 'nullptr'}, ${countInitialiser(data.capacity, props, '{nullptr, -1}')}, ${data.fields.length}},`,
+        ],
+        1,
+      ),
+    );
+  }
+  lines.push(`static const u8g2gl_editor_data ui_editor_${tag}_data[] = {`, ...indent(entries, 1), '};');
+  return lines;
+}
+
 /** One class entry's generated parts. */
 interface ClassEntry {
   readonly lines: string[];
@@ -325,7 +578,15 @@ function classEntry(manifest: EffectiveManifest): ClassEntry {
     lines.push(`static const u8g2gl_editor_binding ${bindingTable}[] = {`, ...indent(bindings, 1), '};');
   }
 
-  // --- Step 3: The class entry: construct, rectangle, tables, storage needs ---
+  // --- Step 3: One add-by-name thunk per static child kind (§6.5) ---
+  const elements = manifest.api.elements;
+  lines.push(...elementTables(tag, cls, elements));
+
+  // --- Step 4: One fill thunk per <data> (schema 0.7, §9.2) ---
+  const data = manifest.api.data ?? [];
+  lines.push(...dataTables(tag, cls, data, manifest.declared.api.props));
+
+  // --- Step 5: The class entry: construct, rectangle, tables, storage needs ---
   const propertyCount = properties.filter((line) => line.startsWith('// ')).length;
   const bindingCount = manifest.api.bindings.length;
   const initialiser = [
@@ -337,7 +598,9 @@ function classEntry(manifest: EffectiveManifest): ClassEntry {
       : `    [](u8g2gl_obj* obj, int16_t x, int16_t y, int16_t w, int16_t h) { static_cast<${cls}*>(obj)->${rectangleSetter}(x, y, w, h); },`,
     `    ${propertyCount > 0 ? propertyTable : 'nullptr'},`,
     `    ${bindingCount > 0 ? bindingTable : 'nullptr'},`,
-    `    sizeof(${cls}), alignof(${cls}), ${propertyCount}, ${bindingCount}},`,
+    `    ${elements.length > 0 ? `ui_editor_${tag}_elements` : 'nullptr'},`,
+    `    ${data.length > 0 ? `ui_editor_${tag}_data` : 'nullptr'},`,
+    `    sizeof(${cls}), alignof(${cls}), ${propertyCount}, ${bindingCount}, ${elements.length}, ${data.length}},`,
   ];
   return { lines, initialiser, include };
 }
@@ -476,6 +739,9 @@ function assetLookup(assets: EditorAssets): string[] {
     ...assets.fonts.map((font) => `extern const uint8_t* const ${font.identifier};`),
     ...assets.images.map((image) => `extern const uint8_t ${image.identifier}[];`),
     `const void* ${EDITOR_ASSET_FUNCTION}(u8g2gl_editor_type_t type, const char* name) {`,
+    // A project with no fonts and no images reads neither argument's type,
+    // and an unused parameter is a warning under -Wextra (zero warnings, §4).
+    ...(assets.fonts.length === 0 && assets.images.length === 0 ? ['    (void)type;'] : []),
     '    if (name == nullptr) {',
     '        return nullptr;',
     '    }',

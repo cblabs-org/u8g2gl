@@ -45,13 +45,15 @@
  * - writtenProperties():  The setter props the author wrote, in manifest order
  * - styleOverridesOf():   An element's `style_*` overrides, resolved to props
  * - flagComparison():     A directive's method, comparison, ref and flag
+ * - StaticCall, staticChildCalls(): An object's static children (§6.5), as access calls
+ * - argPropOf():          An `<arg>` as the PropDef its value is spelled through
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
 import type { SourceLocation } from '../../schema/source-location.js';
-import type { PropDef } from '../../schema/widget-manifest.js';
+import type { ElementArgDef, PropDef } from '../../schema/widget-manifest.js';
 import { isStyleAttribute } from '../../schema/globals.js';
-import { FLAG_COMPARISONS, type WidgetNode } from '../../schema/widget-node.js';
+import { FLAG_COMPARISONS, staticChildrenOf, type WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
 import type { RealisedBinding, RealisedElement, RealisedScreen } from '../../realise/index.js';
@@ -495,4 +497,59 @@ function boolRef(ref: string): string {
     return 'true';
   }
   return ref;
+}
+
+/** One static child (§6.5), understood but not yet spelled: one access-method call. */
+export interface StaticCall {
+  /** The child's tag, e.g. "column". */
+  readonly tag: string;
+  /** The method the manifest's `<element access>` names, e.g. "add_column". */
+  readonly access: string;
+  /** One value per `<arg>`, in declaration order — the method's parameter order. */
+  readonly args: readonly { readonly arg: ElementArgDef; readonly literal: string }[];
+}
+
+/**
+ * @brief An `<arg>` as the PropDef its value is spelled through, so an enum
+ *        argument is spelled by the same `emit=` pattern a setter's would be.
+ */
+export function argPropOf(arg: ElementArgDef): PropDef {
+  return {
+    name: arg.name,
+    type: arg.type,
+    ...(arg.values !== undefined ? { values: arg.values } : {}),
+    ...(arg.emit !== undefined ? { emit: arg.emit } : {}),
+  };
+}
+
+/**
+ * @brief An object's static children as the access calls construction makes,
+ *        in document order (§6.5).
+ *
+ * The calls belong to the "properties" step, after the setters, so a capacity
+ * a setter declares (`max_cols`) is in force before the first `add_column()`.
+ * Pass 4 has checked every child against its `<element>`, so a child or
+ * argument the manifest does not declare is a programmer error, thrown.
+ *
+ * @param placement The object's placement; its node carries the static children.
+ * @return The calls, empty for an element with none.
+ */
+export function staticChildCalls(placement: Placement): StaticCall[] {
+  return staticChildrenOf(placement.absolute.node).map((child) => {
+    const element = placement.manifest.api.elements.find((candidate) => candidate.name === child.tag);
+    if (element === undefined) {
+      throw new Error(`<${placement.absolute.node.tag}> declares no <element name="${child.tag}">; Pass 4 refuses it.`);
+    }
+    return {
+      tag: child.tag,
+      access: element.access,
+      args: element.args.map((arg) => {
+        const literal = child.attributes[arg.name];
+        if (literal === undefined) {
+          throw new Error(`<${child.tag}> has no '${arg.name}'; Pass 4 refuses it.`);
+        }
+        return { arg, literal: literal.trim() };
+      }),
+    };
+  });
 }

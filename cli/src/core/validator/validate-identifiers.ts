@@ -27,7 +27,7 @@
 import { CPP_KEYWORDS } from '../schema/cpp-keywords.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { SourceLocation } from '../schema/source-location.js';
-import type { WidgetNode, WidgetNodeChild } from '../schema/widget-node.js';
+import { isElementNode, type WidgetNode, type WidgetNodeChild } from '../schema/widget-node.js';
 import { mangleIdentifiers, RESERVED_IDENTIFIER_PREFIXES } from '../resolver/index.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf } from './shared-model.js';
@@ -109,7 +109,7 @@ function walkNodes(
   visitor: (node: WidgetNode) => void,
 ): void {
   for (const child of children) {
-    if ('tag' in child && typeof child.tag === 'string') {
+    if (isElementNode(child)) {
       visitor(child);
       if (child.children && child.children.length > 0) {
         walkNodes(child.children, visitor);

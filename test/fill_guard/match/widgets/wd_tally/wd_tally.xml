@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget name="wd_tally" extends="u8g2gl_obj">
+    <api>
+        <data name="marks" access="add_mark" capacity="4">
+            <field name="at" type="int" />
+        </data>
+    </api>
+</widget>
