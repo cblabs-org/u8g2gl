@@ -17,7 +17,7 @@
  */
 
 /** The views the primary sidebar can show in this release. */
-export type SidebarView = 'explorer' | 'palette';
+export type SidebarView = 'explorer' | 'palette' | 'fonts';
 
 /** One entry of the activity bar. */
 export interface ActivityView {
@@ -35,7 +35,7 @@ export const ACTIVITY_VIEWS: readonly ActivityView[] = [
   { id: 'explorer', label: 'Explorer', icon: 'files', ready: true },
   { id: 'palette', label: 'Palette', icon: 'shapes', ready: true },
   { id: 'assets', label: 'Assets', icon: 'image', ready: false },
-  { id: 'fonts', label: 'Fonts', icon: 'type', ready: false },
+  { id: 'fonts', label: 'Fonts', icon: 'type', ready: true },
   { id: 'samples', label: 'Sample data', icon: 'database', ready: false },
   { id: 'flow', label: 'Flow', icon: 'workflow', ready: false },
   { id: 'search', label: 'Search', icon: 'search', ready: false },

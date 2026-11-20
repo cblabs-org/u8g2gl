@@ -36,6 +36,7 @@
  *
  *     - prepare():    Inject what the module lacks, now; or say it must wait
  *     - ready():      The same, once every built-in the project names has arrived
+ *     - fontBytes():  One font's bytes, as it would be injected
  */
 
 import type { Globals } from '@u8g2gl/core/schema/globals.js';
@@ -153,6 +154,23 @@ export class AssetInjector {
       if (state !== 'waiting') return state;
       await Promise.all([...this.builtins.values()].filter((held): held is Promise<void> => held instanceof Promise));
     }
+  }
+
+  /**
+   * @brief One font's bytes, as `prepare()` would inject them: a built-in's
+   *        from the server (fetched once, kept), a `<bdf>`'s from the compile.
+   *
+   * @param kind     `builtin` or `bdf`.
+   * @param name     The font's name.
+   * @param compiled The project's compiled assets, for a `<bdf>`.
+   * @return The bytes, or undefined for a font that cannot be had.
+   */
+  async fontBytes(kind: 'builtin' | 'bdf', name: string, compiled: CompiledAssets | undefined): Promise<Uint8Array | undefined> {
+    if (kind === 'bdf') return compiled?.fonts.get(name)?.bytes;
+    const held = this.builtin(name);
+    if (held instanceof Promise) await held;
+    const bytes = this.builtins.get(name);
+    return bytes instanceof Uint8Array ? bytes : undefined;
   }
 
   // builtin

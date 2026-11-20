@@ -36,6 +36,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BOOLEAN_VALUES } from '@u8g2gl/core/validator/value-rules.js';
 import type { Observable } from '../state/observable';
 import { useObservable } from '../ui/use-observable';
+import { useWorkspace } from '../ui/workspace-context';
 import { intDraftError, isIntegerLiteral, type FieldState } from './field-state';
 import type { FieldSpec } from './panel-layout';
 import type { ImageOption, PanelOptions } from './panel-controller';
@@ -229,10 +230,30 @@ function ChoiceEditor({ spec, field, commit, disabled, choices }: EditorProps & 
 /** The dropdown value standing for a mixed selection; no name can contain a newline. */
 const MIXED = '\n(mixed)';
 
-/** @brief A font: the project's fonts, each with its pixel height where known. */
+/**
+ * @brief A font: the project's fonts, each with its pixel height where known,
+ *        then "Browse fonts…", which opens the Fonts view to choose any font
+ *        and returns the choice to this field (ui_spec §6.4).
+ */
 function FontEditor(props: EditorProps & { readonly options: Observable<PanelOptions> }): React.JSX.Element {
   const { fonts } = useObservable(props.options);
-  return <ChoiceEditor {...props} choices={fonts.map((font) => ({ value: font.name, label: font.height === undefined ? font.name : `${font.name} · ${font.height} px` }))} />;
+  const workspace = useWorkspace();
+  const browse = (): void => {
+    const names = workspace.selection.current.get().names;
+    workspace.fontBrowse.set({
+      target: `${names.length === 1 ? names[0] : `${names.length} elements`}.${props.spec.key}`,
+      current: props.field.value,
+      choose: (name) => void props.commit(name),
+    });
+  };
+  return (
+    <div className="font-editor">
+      <ChoiceEditor {...props} choices={fonts.map((font) => ({ value: font.name, label: font.height === undefined ? font.name : `${font.name} · ${font.height} px` }))} />
+      <button type="button" className="action browse-fonts" disabled={props.disabled} onClick={browse}>
+        Browse fonts…
+      </button>
+    </div>
+  );
 }
 
 /** @brief A binding: the subjects of a type it accepts (§8.4). */

@@ -15,8 +15,11 @@
  *              file `font-samples.ts` fetches when a picker first opens). One
  *              of U8G2's large fonts carries a badge saying it needs
  *              `U8G2_USE_LARGE_FONTS`, here and in the current font's facts,
- *              and a "Hide large fonts" filter leaves them out. Choosing a font calls `onChoose` once, and the caller makes it
- *              one edit. `BuiltinFontField` is the `name` field's control:
+ *              and a "Hide large fonts" filter leaves them out. Choosing a
+ *              font calls `onChoose` once, and the caller makes it one edit.
+ *              The Fonts view lists every font through the same picker,
+ *              unlimited, with each sample drawn only once its row scrolls
+ *              into view, so 2,039 rows cost what the visible ones do. `BuiltinFontField` is the `name` field's control:
  *              the current font, its facts, a text box that stays typeable,
  *              and the picker behind "Change font…".
  *
@@ -26,7 +29,7 @@
  * - BuiltinFontField:  A `<builtin>`'s name field, with the picker behind a toggle
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import FONT_NAMES from '@u8g2gl/data/u8g2-fonts.json' with { type: 'json' };
 import FONT_HEIGHTS from '@u8g2gl/data/u8g2-font-heights.json' with { type: 'json' };
 import { fontFacts } from '@u8g2gl/core/catalogue/index.js';
@@ -138,8 +141,11 @@ function parseBound(text: string): number | undefined {
  * @param current   The font chosen now, marked in the list.
  * @param declared  The `<builtin>` fonts the project declares, marked.
  * @param onChoose  Called once with the font chosen.
- * @param onCancel  Closes the picker without choosing.
+ * @param onCancel  Closes the picker without choosing; omitted, there is no Cancel.
  * @param label     What the picker is for, as its heading says.
+ * @param browse    The Fonts view's list: every match rather than the first
+ *                  sixty, each sample drawn as its row scrolls into view, and
+ *                  the search not focused on mount.
  */
 export function FontPicker({
   current,
@@ -147,12 +153,14 @@ export function FontPicker({
   onChoose,
   onCancel,
   label,
+  browse = false,
 }: {
   readonly current: string | undefined;
   readonly declared: ReadonlySet<string>;
   readonly onChoose: (name: string) => void;
-  readonly onCancel: () => void;
+  readonly onCancel?: () => void;
   readonly label: string;
+  readonly browse?: boolean;
 }): React.JSX.Element {
   const { samples, failed } = useFontSamples(true);
   const rows = useMemo(() => fontRows(FONT_NAMES, HEIGHTS, declared), [declared]);
@@ -176,7 +184,7 @@ export function FontPicker({
       ...(hideLarge ? { hideLarge } : {}),
     };
   }, [minText, maxText, set, box, hideLarge]);
-  const found = useMemo(() => filterFonts(rows, query, filter), [rows, query, filter]);
+  const found = useMemo(() => filterFonts(rows, query, filter, browse ? Infinity : undefined), [rows, query, filter, browse]);
 
   return (
     <div className="font-picker" role="group" aria-label={label}>
@@ -186,13 +194,15 @@ export function FontPicker({
           U8G2's full font gallery
         </a>
         <span className="spacer" />
-        <button type="button" className="action" data-action="cancel-font" onClick={onCancel}>
-          Cancel
-        </button>
+        {onCancel !== undefined && (
+          <button type="button" className="action" data-action="cancel-font" onClick={onCancel}>
+            Cancel
+          </button>
+        )}
       </div>
       <label className="display-search">
         Search the font name{' '}
-        <input type="text" aria-label="Search fonts" placeholder="helv 10" value={query} spellCheck={false} autoFocus onChange={(event) => setQuery(event.target.value)} />
+        <input type="text" aria-label="Search fonts" placeholder="helv 10" value={query} spellCheck={false} autoFocus={!browse} onChange={(event) => setQuery(event.target.value)} />
       </label>
       <div className="font-filters">
         <label>
@@ -234,7 +244,7 @@ export function FontPicker({
       </p>
       <div className="font-options" role="listbox" aria-label="Fonts">
         {found.rows.map((row) => (
-          <FontOption key={row.name} row={row} samples={samples} selected={row.name === current} onChoose={onChoose} />
+          <FontOption key={row.name} row={row} samples={samples} selected={row.name === current} onChoose={onChoose} lazy={browse} />
         ))}
         {found.rows.length === 0 && <p className="form-empty">No font matches.</p>}
       </div>
@@ -242,29 +252,58 @@ export function FontPicker({
   );
 }
 
+// useSeen
+// Whether an element has come near the visible page yet; once seen it stays
+// seen, so a sample is drawn once. Not lazy, it is seen at once. The viewport
+// is the observer's root: the intersection is clipped by every scrolling
+// ancestor, so whichever of the list or the sidebar scrolls, a row out of
+// sight is not seen.
+//   element — the row
+//   lazy    — whether to wait for it to come into view
+function useSeen(element: RefObject<HTMLElement | null>, lazy: boolean): boolean {
+  const [seen, setSeen] = useState(!lazy);
+  useEffect(() => {
+    if (seen || element.current === null) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setSeen(true);
+      },
+      { rootMargin: '200px 0px' },
+    );
+    observer.observe(element.current);
+    return () => observer.disconnect();
+  }, [seen, element]);
+  return seen;
+}
+
 // FontOption
 // One font as a row: its name, whether the project declares it, whether it is
 // one of U8G2's large fonts, its facts and its sample. A click chooses it.
+// Lazy, the sample is drawn only once the row nears the view.
 function FontOption({
   row,
   samples,
   selected,
   onChoose,
+  lazy,
 }: {
   readonly row: FontRow;
   readonly samples: FontSamples | undefined;
   readonly selected: boolean;
   readonly onChoose: (name: string) => void;
+  readonly lazy: boolean;
 }): React.JSX.Element {
+  const self = useRef<HTMLButtonElement>(null);
+  const seen = useSeen(self, lazy);
   return (
-    <button type="button" role="option" className="font-option" aria-selected={selected} data-font={row.name} data-declared={row.declared} data-large={row.large} onClick={() => onChoose(row.name)}>
+    <button ref={self} type="button" role="option" className="font-option" aria-selected={selected} data-font={row.name} data-declared={row.declared} data-large={row.large} data-drawn={seen} onClick={() => onChoose(row.name)}>
       <span className="font-option-name">
         <code>{row.name}</code>
         {row.declared && <span className="font-declared">declared</span>}
         {row.large && <LargeFontBadge />}
       </span>
       <span className="display-facts">{factsLine(row)}</span>
-      <FontSampleCanvas name={row.name} samples={samples} />
+      {seen && <FontSampleCanvas name={row.name} samples={samples} />}
     </button>
   );
 }

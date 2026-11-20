@@ -52,7 +52,7 @@ test('the activity bar draws a Lucide icon for every view, none of them the fall
     { label: 'Explorer', icon: 'files', missing: false, text: '', disabled: false },
     { label: 'Palette', icon: 'shapes', missing: false, text: '', disabled: false },
     { label: 'Assets', icon: 'image', missing: false, text: '', disabled: true },
-    { label: 'Fonts', icon: 'type', missing: false, text: '', disabled: true },
+    { label: 'Fonts', icon: 'type', missing: false, text: '', disabled: false },
     { label: 'Sample data', icon: 'database', missing: false, text: '', disabled: true },
     { label: 'Flow', icon: 'workflow', missing: false, text: '', disabled: true },
     { label: 'Search', icon: 'search', missing: false, text: '', disabled: true },
@@ -61,7 +61,8 @@ test('the activity bar draws a Lucide icon for every view, none of them the fall
 
   // --- The pressed state follows the view, and the tooltips are unchanged ---
   await expect(bar.getByRole('button', { name: 'Explorer' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(bar.getByRole('button', { name: 'Fonts' })).toHaveAttribute('title', 'Fonts: not in this release');
+  await expect(bar.getByRole('button', { name: 'Fonts' })).toHaveAttribute('title', 'Fonts');
+  await expect(bar.getByRole('button', { name: 'Assets' })).toHaveAttribute('title', 'Assets: not in this release');
   await bar.getByRole('button', { name: 'Palette' }).click();
   await expect(bar.getByRole('button', { name: 'Palette' })).toHaveAttribute('aria-pressed', 'true');
   await expect(bar.getByRole('button', { name: 'Explorer' })).toHaveAttribute('aria-pressed', 'false');
