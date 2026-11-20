@@ -9,17 +9,25 @@
  *          generate the project's firmware and editor targets into a build
  *          cache (never into the project, whose `generated/` belongs to the
  *          user's firmware build), collect the widget sources, apply the
- *          platform-header rule, and compute the build hash.
+ *          platform-header rule and the widget asset rule, and compute the
+ *          build hash.
  * Description: The **build hash** is a SHA-256 over exactly what the build
  *              compiles from the project: every file in each widget's
- *              directory (sources, headers, manifest), the generated fonts and
- *              images units (which carry the font and image data), the
- *              generated configuration, and the editor registry. It therefore
- *              changes when a widget source, a manifest, a font, an image or a
- *              capacity changes, and does not when only a screen's layout or a
- *              subject's value does — those reach the canvas live, through the
- *              scene, with no rebuild. Generated files are written only when
- *              their content changes.
+ *              directory (sources, headers, manifest), the generated
+ *              configuration, and the editor registry. It therefore changes
+ *              when a widget source, a manifest or a capacity changes, and
+ *              does not when only a screen's layout, a subject's value, a font
+ *              or an image does — those reach the canvas live, through the
+ *              scene and the bridge's injected assets, with no rebuild.
+ *
+ *              The generated fonts and images units are written to the cache
+ *              with the rest of the firmware target, but they are neither
+ *              compiled nor hashed: the editor compiles in no project font or
+ *              image (design_spec §9), so hashing them would rebuild the Wasm
+ *              for a change it cannot show. Nothing an editor build compiles
+ *              can name their symbols, because a widget that names one is
+ *              refused here first (`U8G2GL_WIDGET_ASSET_SYMBOL`). Generated
+ *              files are written only when their content changes.
  *
  *              The hash also covers every framework file the build compiles or
  *              includes (`frameworkFiles()`: the runtime, the bridge, U8G2,
@@ -31,6 +39,7 @@
  * Exports:
  * - PreparedBuild:      The generated tree, widget sources and build hash
  * - prepareBuild():     Generate, collect, check and hash
+ * - readWidgetSources(): A project's widget sources and headers, by project path
  * - projectCacheDir():  The build cache directory for a project
  */
 
@@ -46,13 +55,14 @@ import { frameworkFiles, locateFrameworkRoot, readFrameworkSources } from './fra
 import { loadProject } from '../../load-project.js';
 import { writeGenerated } from '../../write-generated.js';
 import { checkPlatformHeaders } from './platform-headers.js';
+import { checkWidgetAssetSymbols } from '../../../core/validator/index.js';
 
 /** A widget source file's extensions: compiled units, and headers. */
 const UNIT_EXTENSIONS = ['.cpp', '.cc'];
 const HEADER_EXTENSIONS = ['.h', '.hpp'];
 
-/** The generated files a build compiles from, and so hashes. */
-const HASHED_GENERATED = ['generated/u8g2gl_generated_config.h', 'generated/ui_fonts.cpp', 'generated/ui_images.cpp'];
+/** The generated files a build compiles from, and so hashes: not the fonts or images units (see the file header). */
+const HASHED_GENERATED = ['generated/u8g2gl_generated_config.h'];
 const HASHED_EDITOR = ['generated_editor/ui_editor_registry.cpp'];
 
 /** What prepareBuild() produced. */
@@ -145,18 +155,13 @@ export async function prepareBuild(projectRoot: string, cacheRoot: string, frame
   });
   writeGenerated(editorDir, { ...result, files: editor.files });
 
-  // --- Step 2: The widgets' own files, and the platform-header rule ---
+  // --- Step 2: The widgets' own files, the platform-header rule and the asset rule ---
   const widgetDirs = listWidgetDirs(projectRoot);
   const widgetFiles = widgetDirs.flatMap((widgetDir) => listFiles(widgetDir));
-  const sources = new Map<string, string>();
-  for (const file of widgetFiles) {
-    if ([...UNIT_EXTENSIONS, ...HEADER_EXTENSIONS].some((ext) => file.endsWith(ext))) {
-      sources.set(projectRelative(projectRoot, file), readFileSync(file, 'utf8'));
-    }
-  }
-  const platformErrors = checkPlatformHeaders(sources);
-  if (platformErrors.length > 0) {
-    return { ok: false, diagnostics: platformErrors };
+  const sources = readWidgetSources(projectRoot);
+  const widgetErrors = [...checkPlatformHeaders(sources), ...checkWidgetAssetSymbols(sources)];
+  if (widgetErrors.length > 0) {
+    return { ok: false, diagnostics: widgetErrors };
   }
 
   // --- Step 3: The build hash, over every compiled input in a fixed order ---
@@ -189,6 +194,26 @@ export async function prepareBuild(projectRoot: string, cacheRoot: string, frame
     buildHash: hash.digest('hex'),
     diagnostics: result.diagnostics,
   };
+}
+
+/**
+ * @brief Every widget source and header in a project, by project-relative path.
+ *
+ * The files the editor build compiles from each `widgets/<name>/` directory,
+ * and so the ones the widget rules read. Nothing outside `widgets/` is read:
+ * application code is not a widget's.
+ *
+ * @param projectRoot The project directory.
+ * @return Path → text, sorted by path.
+ */
+export function readWidgetSources(projectRoot: string): Map<string, string> {
+  const sources = new Map<string, string>();
+  for (const file of listWidgetDirs(projectRoot).flatMap((widgetDir) => listFiles(widgetDir))) {
+    if ([...UNIT_EXTENSIONS, ...HEADER_EXTENSIONS].some((ext) => file.endsWith(ext))) {
+      sources.set(projectRelative(projectRoot, file), readFileSync(file, 'utf8'));
+    }
+  }
+  return sources;
 }
 
 // listWidgetDirs

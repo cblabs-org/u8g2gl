@@ -28,6 +28,7 @@ import { toolchainCacheRoot } from '../../../../src/node/toolchain/toolchain-pat
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
 import { fakeHost } from '../../toolchain/fake-host.js';
 import { FRAMEWORK_ROOT, DEPARTURES_PROJECT } from './departures-project.js';
+import { injectProjectAssets } from './inject-project-assets.js';
 
 const host = nodeToolchainHost();
 // Detection only reads the real cache directory; nothing here writes it.
@@ -45,6 +46,7 @@ interface EditorApi {
   getLastError(): string;
   getBuildHash(): string | null;
   getPlaceholders(): unknown[];
+  _module: unknown;
 }
 
 // loadEditor
@@ -88,6 +90,8 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
     expect(result.compiled).toEqual(expect.arrayContaining(['wd_service_list.cpp', 'wd_train_formation.cpp', 'wd_probe_box.cpp']));
 
     const editor = await loadEditor(result.wasmDir);
+    // The editor compiles in no project font or image: injected, as the designer does.
+    await injectProjectAssets(editor._module, project);
     const scene = readFileSync(result.sceneFile, 'utf8');
     // message_text max_len="256" is in the scene, and the bridge accepts it.
     expect(JSON.parse(scene).subjects).toContainEqual({ name: 'message_text', type: 'string', max_len: 256 });
@@ -95,6 +99,8 @@ describe.skipIf(toolchain === undefined)('the project editor Wasm build (needs E
     expect(editor.getPlaceholders()).toEqual([]);
     expect(editor.getBuildHash()).toBe(result.buildHash);
     const bare = litPixels(editor.renderFrame(0)!);
+    // Every font it names was injected: no fallback warning.
+    expect(editor.getLastError()).toBe('');
     expect(editor.applySampleData(JSON.stringify({ platform: '9', row0_dest: 'London Paddington', message_text: 'x'.repeat(256) }))).toBe(true);
     const sampled = litPixels(editor.renderFrame(0)!);
     console.log(`departures project rendered, ${bare} lit pixels bare, ${sampled} with sample subjects`);

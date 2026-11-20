@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEditor } from '../u8g2gl_editor.mjs';
+import { injectAssets, projectAssets } from './inject-assets.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
@@ -27,6 +28,9 @@ async function main() {
   // --- Step 1: Load Wasm module ---
   console.log('Loading Wasm module...');
   const editor = await createEditor();
+  // The editor Wasm compiles in no project font or image: the fixture's are
+  // injected first, as the designer injects a project's (design_spec §9).
+  injectAssets(editor._module, await projectAssets(fileURLToPath(new URL('../../test/generated_fixture', import.meta.url))));
   console.log('  Wasm module loaded.\n');
 
   // --- Step 2: Load scene JSON ---

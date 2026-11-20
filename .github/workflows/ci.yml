@@ -93,7 +93,12 @@ jobs:
           source "$HOME/emsdk/emsdk_env.sh"
           emcc --version | head -1
           emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor u8g2gl_editor_collections
+          cmake --build build-wasm -j$(nproc) --target u8g2gl_editor u8g2gl_editor_collections u8g2gl_editor_compiled_assets
+      - name: Install and build the CLI
+        # Before the Wasm tests: they inject each fixture's fonts and images
+        # as the designer does (wasm/test/inject-assets.mjs), gathered by the
+        # built CLI's own loaders, since the editor Wasm compiles in none.
+        run: cd cli && npm ci && npm run build
       - name: Wasm snapshot test (D-9 parity golden)
         run: node wasm/test/snapshot.test.mjs
       - name: Wasm placeholder test
@@ -104,8 +109,8 @@ jobs:
         run: node wasm/test/design-hidden.test.mjs
       - name: Wasm collection-data test (fill by name matches hand-written calls)
         run: node wasm/test/collection-data.test.mjs
-      - name: Install CLI
-        run: cd cli && npm ci
+      - name: Wasm asset-injection test (injected fonts and images match compiled in)
+        run: node wasm/test/asset-injection.test.mjs
       - name: CLI tests that need Emscripten, with Emscripten present
         # They skip with a message when no toolchain is found; here that would
         # hide a broken job, so the message fails the step.

@@ -20,12 +20,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEditor } from '../u8g2gl_editor.mjs';
+import { injectAssets, projectAssets } from './inject-assets.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenePath = join(__dirname, '..', '..', 'test', 'generated_fixture', 'generated_editor', 'ui_scene.json');
 
 async function main() {
   const editor = await createEditor(process.argv[2]);
+  // The editor Wasm compiles in no project font or image: the fixture's are
+  // injected first, as the designer injects a project's (design_spec §9).
+  injectAssets(editor._module, await projectAssets(fileURLToPath(new URL('../../test/generated_fixture', import.meta.url))));
   const select = (name) => editor._module.ccall('selectScreen', 'number', ['string'], [name]) === 1;
   const checks = [];
   const check = (what, ok, detail) => checks.push({ what, ok, detail });

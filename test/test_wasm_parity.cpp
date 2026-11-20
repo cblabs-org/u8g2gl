@@ -20,6 +20,13 @@
  *              This is the proof [D-9] requires: the preview is the runtime,
  *              not a second implementation that could drift.
  *
+ *              The bridge compiles in no project font or image: the designer
+ *              injects them (design_spec §9), and the Wasm snapshot test
+ *              injects the fixture's. So this test injects the same assets,
+ *              from the fixture's compiled units, before it applies the scene;
+ *              each font's length is its U8G2 table's own extent, since a
+ *              table's length is not part of its declaration.
+ *
  *              Scope: this proves the bridge compiled to Wasm equals the bridge
  *              compiled natively (one implementation, two targets). It does NOT
  *              prove the editor path equals the firmware path (generated direct
@@ -38,6 +45,9 @@
 // SHA-256 — a minimal single-header implementation for this one test.
 // The bridge functions are declared in the bridge header.
 extern "C" {
+    int injectFont(const char* name, const uint8_t* bytes, uint32_t length);
+    int injectImage(const char* name, int32_t width, int32_t height, const uint8_t* bytes, uint32_t length);
+    void clearInjected();
     int applyScene(const char* scene_json_str);
     uint8_t* renderFrame(uint32_t current_ms);
     int getDisplayWidth();
@@ -46,7 +56,62 @@ extern "C" {
     void teardown();
 }
 
+// The fixture's compiled fonts and images (its generated ui.hpp's declarations).
+extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
+extern const uint8_t* const ui_font_u8g2_font_5x7_mr;
+extern const uint8_t* const ui_font_u8g2_font_helvR08_tr;
+extern const uint8_t* const ui_font_font_4x6;
+extern const uint8_t* const ui_font_font_arrow_mini;
+extern const uint8_t ui_image_icon_wifi[];
+extern const uint8_t ui_image_logo_mark[];
+
 namespace {
+
+// font_length
+// A compiled U8G2 font table's length, from its own structure: the 23-byte
+// header, the 8-bit glyphs chained by jump bytes to a zero jump, the Unicode
+// jump table to its 0xffff entry, and the Unicode glyphs to encoding 0. The
+// table is a well-formed compiled one, so the walk needs no bound.
+//   font — the table
+uint32_t font_length(const uint8_t* font) {
+    const auto word = [font](uint32_t at) -> uint32_t { return (uint32_t(font[at]) << 8) | font[at + 1]; };
+    uint32_t at = 23;
+    while (font[at + 1] != 0) {
+        at += font[at + 1];
+    }
+    uint32_t table = 23 + word(21);
+    uint32_t glyph = table;
+    for (;;) {
+        glyph += word(table);
+        const uint32_t encoding = word(table + 2);
+        table += 4;
+        if (encoding == 0xffff) {
+            break;
+        }
+    }
+    while (word(glyph) != 0) {
+        glyph += font[glyph + 2];
+    }
+    return glyph + 2;
+}
+
+// inject_fixture_assets
+// The fixture's fonts and images, by the names its scene uses, as the Wasm
+// snapshot test injects them. Both images are 16x16 (globals.xml's sources).
+void inject_fixture_assets() {
+    const struct { const char* name; const uint8_t* font; } fonts[] = {
+        {"u8g2_font_6x10_mr", ui_font_u8g2_font_6x10_mr},
+        {"u8g2_font_5x7_mr", ui_font_u8g2_font_5x7_mr},
+        {"u8g2_font_helvR08_tr", ui_font_u8g2_font_helvR08_tr},
+        {"font_4x6", ui_font_font_4x6},
+        {"font_arrow_mini", ui_font_font_arrow_mini},
+    };
+    for (const auto& font : fonts) {
+        ASSERT_TRUE(injectFont(font.name, font.font, font_length(font.font))) << font.name;
+    }
+    ASSERT_TRUE(injectImage("icon_wifi", 16, 16, ui_image_icon_wifi, 32));
+    ASSERT_TRUE(injectImage("logo_mark", 16, 16, ui_image_logo_mark, 32));
+}
 
 // Minimal SHA-256 implementation (FIPS 180-4)
 // Only used in this test; not part of the runtime.
@@ -158,7 +223,8 @@ TEST(WasmParity, NativeMatchesWasm) {
     std::string scene_str = ss.str();
     ASSERT_FALSE(scene_str.empty());
 
-    // --- Step 2: Apply scene ---
+    // --- Step 2: Inject the fixture's fonts and images, then apply the scene ---
+    inject_fixture_assets();
     ASSERT_TRUE(applyScene(scene_str.c_str())) << "applyScene failed";
     EXPECT_EQ(getDisplayWidth(), 128);
     EXPECT_EQ(getDisplayHeight(), 64);
@@ -199,4 +265,5 @@ TEST(WasmParity, NativeMatchesWasm) {
 
     // --- Step 7: Teardown ---
     teardown();
+    clearInjected();
 }

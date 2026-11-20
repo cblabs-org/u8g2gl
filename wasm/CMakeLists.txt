@@ -164,3 +164,50 @@ set_target_properties(u8g2gl_editor_collections PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/collections"
     LINK_FLAGS "${U8G2GL_COLLECTION_LINK_FLAGS_STR}"
 )
+
+# --- The asset-injection reference Wasm (design_spec §9) ---
+# The framework editor Wasm compiles in no project font or image: the designer
+# injects them. This one is the same bridge over the same fixture, with the
+# fixture's fonts and images compiled in through a hand-written lookup
+# (wasm/test/compiled_assets_registry.cpp), as every editor Wasm had them before.
+# wasm/test/asset-injection.test.mjs renders the fixture's screens with both,
+# injecting into the framework Wasm, and requires identical frames. Test-only:
+# its own output directory, never the framework editor Wasm the designer ships.
+add_executable(u8g2gl_editor_compiled_assets
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${PROJECT_SOURCE_DIR}/test/editor_host/scene_json.cpp
+    test/compiled_assets_registry.cpp
+    ${U8G2GL_FIXTURE_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_FIXTURE_DIR}/generated/ui_images.cpp
+    memory_display.cpp
+    bridge.cpp
+)
+target_include_directories(u8g2gl_editor_compiled_assets PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/test/real_u8g2
+    ${PROJECT_SOURCE_DIR}/test/editor_host
+    ${U8G2GL_FIXTURE_DIR}/generated
+    ${U8G2GL_FIXTURE_DIR}/generated_editor
+)
+target_include_directories(u8g2gl_editor_compiled_assets SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_editor_compiled_assets PRIVATE
+    ARDUINO=10819
+    U8G2GL_EDITOR
+    U8G2GL_GENERATED_CONFIG="editor_config.h"
+)
+target_compile_options(u8g2gl_editor_compiled_assets PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+target_link_libraries(u8g2gl_editor_compiled_assets PRIVATE
+    u8g2_wasm_csrc
+)
+set_target_properties(u8g2gl_editor_compiled_assets PROPERTIES
+    OUTPUT_NAME "u8g2gl_editor"
+    SUFFIX ".js"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/compiled_assets"
+    LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+)

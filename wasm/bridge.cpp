@@ -48,6 +48,23 @@
  *
  *              Every entry point that can fail clears the last error first,
  *              so getLastError() always describes the call that just failed.
+ *              A call that succeeds can leave a warning there instead: a font
+ *              the scene names that is not loaded, which is drawn in
+ *              `u8g2_font_4x6_tr` rather than refusing the scene.
+ *
+ *              Fonts and images are resolved by name, the injected table
+ *              first: the designer passes each declared font's and image's
+ *              bytes in (`injectFont()`, `injectImage()`) before it applies a
+ *              scene, exactly the bytes the generated `ui_fonts.cpp` and
+ *              `ui_images.cpp` compile, so an editor Wasm needs none compiled
+ *              in and a font or image change never rebuilds it. Behind the
+ *              table is the registry's own `ui_editor_asset()`, which a
+ *              generated editor registry leaves empty. The table lives until
+ *              `clearInjected()`, never cleared by `applyScene()`, so one
+ *              injection serves every apply until the project's fonts or
+ *              images change. Bytes a replaced or cleared entry held are kept
+ *              until the next screen is built, because the active screen's
+ *              objects may still point into them.
  *
  *              The designer can hide elements from the frame without touching
  *              the scene (`setDesignHidden()`): a view setting of the editor
@@ -77,8 +94,12 @@
  *     Designer view:
  *     - setDesignHidden():  Elements the designer hides from the frame
  *     - getRuntimeHidden(): Elements the last frame left out by runtime rules
+ *     Injected assets:
+ *     - injectFont():       A font's U8G2 table, by the name scenes use
+ *     - injectImage():      An image's XBM bytes and size, by name
+ *     - clearInjected():    Forget every injected font and image
  *     Diagnostics:
- *     - getLastError():     The last error message
+ *     - getLastError():     The last error message, or a warning
  *     - getPlaceholders():  JSON list of the active screen's placeholder elements
  *
  *     A project editor Wasm also exports getBuildHash(). It is not defined
@@ -96,10 +117,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <new>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -115,9 +138,11 @@
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
 
-// The generated editor registry, and its font and image lookup: every font or
-// image a scene names is resolved through the project's own generated table,
-// so this bridge names none and links into any project's editor Wasm.
+// The generated editor registry, and its font and image lookup. A scene's font
+// or image is resolved through the injected table first and then this lookup,
+// which a generated editor registry leaves empty (the editor compiles in no
+// project asset); the bridge names no font but its fallback, so it links into
+// any project's editor Wasm.
 extern const u8g2gl_editor_registry& ui_editor_registry();
 extern const void* ui_editor_asset(u8g2gl_editor_type_t type, const char* name);
 
@@ -272,6 +297,9 @@ struct placeholder_record {
 // Scene state
 scene_json s_scene;
 std::string s_last_error;
+// Whether s_last_error is a warning a successful call left (warn()), which a
+// later error in the same call replaces.
+bool s_last_is_warning = false;
 std::vector<std::unique_ptr<subject_slot>> s_subjects;
 
 const scene_json* s_active_screen = nullptr;
@@ -290,15 +318,140 @@ std::unordered_set<std::string> s_design_hidden;
 std::vector<const scene_json*> s_runtime_hidden;
 std::string s_runtime_hidden_json;
 
+// --- Injected fonts and images ---
+/** One injected asset: its exact bytes, and an image's size in pixels. */
+struct injected_asset {
+    std::vector<uint8_t> bytes;
+    int32_t width = 0;
+    int32_t height = 0;
+};
+// By name, one table per kind, so a font name never resolves to an image.
+std::unordered_map<std::string, injected_asset> s_injected_fonts;
+std::unordered_map<std::string, injected_asset> s_injected_images;
+// Bytes of entries replaced or cleared since the active screen was built: its
+// objects may still hold pointers into them, so they are freed only when the
+// objects are (destroy_objects()). Moving a vector keeps its buffer.
+std::vector<std::vector<uint8_t>> s_retired_assets;
+// Fonts the active screen names that are not loaded, each drawn in the
+// fallback; renderFrame() warns of the first, so every frame says so.
+std::vector<std::string> s_missing_fonts;
+
 // fail
 // Records an error and returns false. Only the first is kept, because the
 // first refusal is the cause and later ones are its consequences; each entry
 // point clears the error first, so it is always this call's.
 bool fail(const std::string& message) {
-    if (s_last_error.empty()) {
+    if (s_last_error.empty() || s_last_is_warning) {
         s_last_error = message;
+        s_last_is_warning = false;
     }
     return false;
+}
+
+// warn
+// Records a warning for a call that goes on to succeed, unless something is
+// already recorded: an error always wins, and the first warning is kept.
+void warn(const std::string& message) {
+    if (s_last_error.empty()) {
+        s_last_error = message;
+        s_last_is_warning = true;
+    }
+}
+
+// clear_last_error
+// Empties the last error and its warning flag, as every entry point does first.
+void clear_last_error() {
+    s_last_error.clear();
+    s_last_is_warning = false;
+}
+
+// set_error
+// Records an entry point's own refusal, replacing whatever is recorded: the
+// entry point returns at once, so it is this call's cause.
+void set_error(const std::string& message) {
+    s_last_error = message;
+    s_last_is_warning = false;
+}
+
+// font_extent
+// The length a U8G2 font table's own structure gives it, or 0 when that
+// structure runs past `length` bytes, so an injected font U8G2 would read
+// beyond is refused rather than drawn from whatever follows it. Walks the
+// table as u8g2_font.c's glyph lookup does (u8g2_font_get_glyph_data): the
+// 23-byte header, the 8-bit glyphs chained by each one's jump byte up to a
+// zero jump, then the Unicode jump table ending at encoding 0xffff, and the
+// Unicode glyphs it leads to, ending at encoding 0. Every U8G2 2.36 built-in
+// and every bdfconv output ends exactly there, so a whole table's extent is
+// its length.
+//   font   — the table
+//   length — its byte count
+size_t font_extent(const uint8_t* font, size_t length) {
+    constexpr size_t kHeader = 23;  // U8G2_FONT_DATA_STRUCT_SIZE
+    const auto word = [font](size_t at) -> size_t { return (static_cast<size_t>(font[at]) << 8) | font[at + 1]; };
+    if (font == nullptr || length < kHeader) {
+        return 0;
+    }
+
+    // --- Step 1: The 8-bit glyphs, each jumping to the next ---
+    size_t at = kHeader;
+    for (;;) {
+        if (at + 2 > length) {
+            return 0;
+        }
+        if (font[at + 1] == 0) {
+            break;
+        }
+        at += font[at + 1];
+    }
+
+    // --- Step 2: The Unicode jump table, to its 0xffff entry ---
+    size_t table = kHeader + word(21);
+    size_t glyph = table;
+    for (;;) {
+        if (table + 4 > length) {
+            return 0;
+        }
+        glyph += word(table);
+        const size_t encoding = word(table + 2);
+        table += 4;
+        if (encoding == 0xffff) {
+            break;
+        }
+    }
+
+    // --- Step 3: The Unicode glyphs, to the zero encoding that ends them ---
+    for (;;) {
+        if (glyph + 2 > length) {
+            return 0;
+        }
+        if (word(glyph) == 0) {
+            return glyph + 2;
+        }
+        if (glyph + 3 > length || font[glyph + 2] == 0) {
+            return 0;
+        }
+        glyph += font[glyph + 2];
+    }
+}
+
+// asset_for
+// A scene font's or image's data: the injected table's entry, else the
+// registry's compiled one, else nullptr.
+//   type — U8G2GL_EDITOR_FONT or U8G2GL_EDITOR_IMAGE
+//   name — the scene's name for it
+const void* asset_for(u8g2gl_editor_type_t type, const std::string& name) {
+    const auto& table = type == U8G2GL_EDITOR_FONT ? s_injected_fonts : s_injected_images;
+    const auto found = table.find(name);
+    if (found != table.end()) {
+        return found->second.bytes.data();
+    }
+    return ui_editor_asset(type, name.c_str());
+}
+
+// retire
+// Moves an entry's bytes aside rather than freeing them (see s_retired_assets).
+void retire(injected_asset& asset) {
+    s_retired_assets.push_back(std::move(asset.bytes));
 }
 
 // arena_bytes
@@ -377,13 +530,27 @@ bool value_for(u8g2gl_editor_type_t type, const scene_json& json, const std::str
             if (!json.is_string()) break;
             *out = u8g2gl_editor_text(type, json.as_string().c_str());
             return true;
-        case U8G2GL_EDITOR_FONT:
+        case U8G2GL_EDITOR_FONT: {
+            if (!json.is_string()) break;
+            const std::string& name = json.as_string();
+            const void* data = asset_for(type, name);
+            if (data == nullptr) {
+                // Drawn, not refused: the text and its layout stay visible
+                // while the designer fetches the font, and the warning names it.
+                if (std::find(s_missing_fonts.begin(), s_missing_fonts.end(), name) == s_missing_fonts.end()) {
+                    s_missing_fonts.push_back(name);
+                }
+                warn(what + ": font '" + name + "' is not loaded, so it is drawn in u8g2_font_4x6_tr");
+                data = u8g2_font_4x6_tr;
+            }
+            *out = u8g2gl_editor_pointer(type, data);
+            return true;
+        }
         case U8G2GL_EDITOR_IMAGE: {
             if (!json.is_string()) break;
-            const void* data = ui_editor_asset(type, json.as_string().c_str());
+            const void* data = asset_for(type, json.as_string());
             if (data == nullptr) {
-                return fail(what + ": the project declares no " + (type == U8G2GL_EDITOR_FONT ? "font" : "image") +
-                            " '" + json.as_string() + "'");
+                return fail(what + ": no image '" + json.as_string() + "' is loaded");
             }
             *out = u8g2gl_editor_pointer(type, data);
             return true;
@@ -410,6 +577,10 @@ void destroy_objects() {
     s_arena.clear();
     s_arena_used = 0;
     s_active_screen = nullptr;
+    // No object points into a retired asset any more, and the next screen
+    // records its own missing fonts.
+    s_retired_assets.clear();
+    s_missing_fonts.clear();
 }
 
 // build_object
@@ -1013,7 +1184,7 @@ void teardown() {
     destroy_objects();
     s_subjects.clear();
     s_scene = scene_json{};
-    s_last_error.clear();
+    clear_last_error();
     s_display.release();
     // The designer's hiding belongs to the scene it was set on: a fresh scene,
     // as a test run applies, draws the exported view.
@@ -1028,7 +1199,7 @@ void teardown() {
 EMSCRIPTEN_KEEPALIVE
 int applyScene(const char* json_str) {
     if (json_str == nullptr) {
-        s_last_error = "null scene json provided";
+        set_error("null scene json provided");
         return 0;
     }
 
@@ -1039,11 +1210,11 @@ int applyScene(const char* json_str) {
     std::string parse_error;
     s_scene = scene_json_parse(json_str, &parse_error);
     if (!parse_error.empty()) {
-        s_last_error = "scene json parse error: " + parse_error;
+        set_error("scene json parse error: " + parse_error);
         return 0;
     }
     if (s_scene.get("format").as_string() != "u8g2gl-scene" || s_scene.get("version").as_int() != kSceneVersion) {
-        s_last_error = "not a version " + std::to_string(kSceneVersion) + " u8g2gl scene description";
+        set_error("not a version " + std::to_string(kSceneVersion) + " u8g2gl scene description");
         return 0;
     }
 
@@ -1057,7 +1228,7 @@ int applyScene(const char* json_str) {
     const int32_t width = disp.get("width").as_int();
     const int32_t height = disp.get("height").as_int();
     if (width <= 0 || height <= 0) {
-        s_last_error = "scene display has no width and height";
+        set_error("scene display has no width and height");
         return 0;
     }
     std::string display_error;
@@ -1088,7 +1259,7 @@ int applyScene(const char* json_str) {
             // would be (§8.2).
             const int32_t max_len = described.has("max_len") ? described.get("max_len").as_int() : U8G2GL_MAX_STRING_LEN;
             if (max_len < 0 || max_len >= std::numeric_limits<uint16_t>::max()) {
-                s_last_error = "subject '" + slot->name + "' has an invalid max_len";
+                set_error("subject '" + slot->name + "' has an invalid max_len");
                 return 0;
             }
             slot->string_subject = std::make_unique<host_string_subject>(static_cast<uint16_t>(max_len), observers);
@@ -1098,7 +1269,7 @@ int applyScene(const char* json_str) {
             slot->time_subject = std::make_unique<host_time_subject>(observers);
             slot->base = static_cast<u8g2gl_subject_time_base*>(slot->time_subject.get());
         } else {
-            s_last_error = "subject '" + slot->name + "' has unknown type '" + type + "'";
+            set_error("subject '" + slot->name + "' has unknown type '" + type + "'");
             return 0;
         }
         s_subjects.push_back(std::move(slot));
@@ -1107,7 +1278,7 @@ int applyScene(const char* json_str) {
     // --- Step 5: Choose default screen ---
     const auto& screens = s_scene.get("screens").items();
     if (screens.empty()) {
-        s_last_error = "scene contains no screens";
+        set_error("scene contains no screens");
         return 0;
     }
     std::string default_screen = screens[0].get("name").as_string();
@@ -1132,9 +1303,9 @@ int applyScene(const char* json_str) {
  */
 EMSCRIPTEN_KEEPALIVE
 int selectScreen(const char* screen_name) {
-    s_last_error.clear();
+    clear_last_error();
     if (screen_name == nullptr) {
-        s_last_error = "null screen name provided";
+        set_error("null screen name provided");
         return 0;
     }
     destroy_objects();
@@ -1151,15 +1322,15 @@ int selectScreen(const char* screen_name) {
  */
 EMSCRIPTEN_KEEPALIVE
 int applySampleData(const char* sample_data_json) {
-    s_last_error.clear();
+    clear_last_error();
     if (sample_data_json == nullptr) {
-        s_last_error = "null sample data provided";
+        set_error("null sample data provided");
         return 0;
     }
     std::string parse_error;
     scene_json data = scene_json_parse(sample_data_json, &parse_error);
     if (!parse_error.empty() || !data.is_object()) {
-        s_last_error = "sample data must be a valid JSON object";
+        set_error("sample data must be a valid JSON object");
         return 0;
     }
 
@@ -1228,19 +1399,19 @@ int applySampleData(const char* sample_data_json) {
  */
 EMSCRIPTEN_KEEPALIVE
 int applyCollectionData(const char* collection_json) {
-    s_last_error.clear();
+    clear_last_error();
     if (collection_json == nullptr) {
-        s_last_error = "null collection data provided";
+        set_error("null collection data provided");
         return 0;
     }
     if (s_active_screen == nullptr) {
-        s_last_error = "collection data needs an active screen";
+        set_error("collection data needs an active screen");
         return 0;
     }
     std::string parse_error;
     const scene_json data = scene_json_parse(collection_json, &parse_error);
     if (!parse_error.empty() || !data.is_object()) {
-        s_last_error = "collection data must be a JSON object of element names";
+        set_error("collection data must be a JSON object of element names");
         return 0;
     }
 
@@ -1303,10 +1474,15 @@ int applyCollectionData(const char* collection_json) {
  */
 EMSCRIPTEN_KEEPALIVE
 uint8_t* renderFrame(uint32_t current_ms) {
-    s_last_error.clear();
+    clear_last_error();
     if (s_active_screen == nullptr) {
-        s_last_error = "cannot render: no screen active";
+        set_error("cannot render: no screen active");
         return nullptr;
+    }
+    // The screen was built with a fallback font: every frame says so, until a
+    // screen is built with the font injected.
+    if (!s_missing_fonts.empty()) {
+        warn("font '" + s_missing_fonts.front() + "' is not loaded, so it is drawn in u8g2_font_4x6_tr");
     }
 
     // --- Step 1: Tick animation lifecycle on active objects ---
@@ -1428,21 +1604,21 @@ uint32_t getBufferSize() {
  */
 EMSCRIPTEN_KEEPALIVE
 int setDesignHidden(const char* names_json) {
-    s_last_error.clear();
+    clear_last_error();
     if (names_json == nullptr) {
-        s_last_error = "null hidden-names json provided";
+        set_error("null hidden-names json provided");
         return 0;
     }
     std::string parse_error;
     const scene_json names = scene_json_parse(names_json, &parse_error);
     if (!parse_error.empty() || !names.is_array()) {
-        s_last_error = "hidden names must be a JSON array of strings";
+        set_error("hidden names must be a JSON array of strings");
         return 0;
     }
     std::unordered_set<std::string> next;
     for (const scene_json& name : names.items()) {
         if (!name.is_string()) {
-            s_last_error = "hidden names must be a JSON array of strings";
+            set_error("hidden names must be a JSON array of strings");
             return 0;
         }
         next.insert(name.as_string());
@@ -1475,9 +1651,106 @@ const char* getRuntimeHidden() {
 }
 
 /**
- * @brief Get the last recorded error message; empty if the last call succeeded.
+ * @brief Injects a font: its U8G2 table, under the name scenes give it.
+ *
+ * The bytes are copied, so the caller may free them at once. A later
+ * applyScene() or selectScreen() draws with it; the screen already built keeps
+ * the bytes it was given. Injecting a name again replaces it.
+ *
+ * @param name   The font's name, as a scene names it (`u8g2_font_6x10_mr`,
+ *               or a `<bdf>`'s own name).
+ * @param bytes  The table, exactly as `ui_fonts.cpp` would compile it: a
+ *               built-in's array from `u8g2_fonts.c`, or bdfconv's output.
+ * @param length Its byte count.
+ * @return 1, or 0 with getLastError() saying why: no name, no bytes, or a
+ *         table whose own structure runs past `length` (one U8G2 would read
+ *         beyond).
+ */
+EMSCRIPTEN_KEEPALIVE
+int injectFont(const char* name, const uint8_t* bytes, uint32_t length) {
+    clear_last_error();
+
+    // --- Step 1: Refuse what U8G2 could not draw from safely ---
+    if (name == nullptr || name[0] == '\0') {
+        set_error("injectFont: a font needs a name");
+        return 0;
+    }
+    if (bytes == nullptr || font_extent(bytes, length) == 0) {
+        set_error(std::string("injectFont: '") + name + "' is not a whole U8G2 font table of " +
+                  std::to_string(length) + " bytes");
+        return 0;
+    }
+
+    // --- Step 2: Copy it in, keeping any bytes it replaces alive ---
+    injected_asset& entry = s_injected_fonts[name];
+    retire(entry);
+    entry.bytes.assign(bytes, bytes + length);
+    return 1;
+}
+
+/**
+ * @brief Injects an image: its XBM bytes and size, under the name scenes give it.
+ *
+ * Copied, and replaced on a second injection, as injectFont() is.
+ *
+ * @param name   The image's name, as a scene names it.
+ * @param width  Its width in pixels.
+ * @param height Its height in pixels.
+ * @param bytes  Its XBM bytes, as `ui_images.cpp` would compile them: rows of
+ *               ceil(width / 8) bytes, least significant bit leftmost.
+ * @param length Their byte count, which must be ceil(width / 8) × height.
+ * @return 1, or 0 with getLastError() saying why.
+ */
+EMSCRIPTEN_KEEPALIVE
+int injectImage(const char* name, int32_t width, int32_t height, const uint8_t* bytes, uint32_t length) {
+    clear_last_error();
+
+    // --- Step 1: Refuse bytes that are not this size's bitmap ---
+    if (name == nullptr || name[0] == '\0') {
+        set_error("injectImage: an image needs a name");
+        return 0;
+    }
+    const int64_t expected = width > 0 && height > 0 ? static_cast<int64_t>((width + 7) / 8) * height : -1;
+    if (bytes == nullptr || expected != static_cast<int64_t>(length)) {
+        set_error(std::string("injectImage: '") + name + "' is " + std::to_string(length) + " bytes, not the " +
+                  std::to_string(width) + "x" + std::to_string(height) + " bitmap's " + std::to_string(expected));
+        return 0;
+    }
+
+    // --- Step 2: Copy it in, keeping any bytes it replaces alive ---
+    injected_asset& entry = s_injected_images[name];
+    retire(entry);
+    entry.bytes.assign(bytes, bytes + length);
+    entry.width = width;
+    entry.height = height;
+    return 1;
+}
+
+/**
+ * @brief Forgets every injected font and image.
+ *
+ * Its own call, never a side effect of applyScene(), so one injection serves
+ * every apply until the project's assets change. The active screen keeps
+ * drawing with the bytes it was built with until the next screen is built.
+ */
+EMSCRIPTEN_KEEPALIVE
+void clearInjected() {
+    for (auto* table : {&s_injected_fonts, &s_injected_images}) {
+        for (auto& entry : *table) {
+            retire(entry.second);
+        }
+        table->clear();
+    }
+}
+
+/**
+ * @brief Get the last recorded error message, or a warning a successful call
+ *        left: a font the active screen names that is not loaded, drawn in
+ *        `u8g2_font_4x6_tr`. Empty when the last call succeeded cleanly.
  *
  * Valid until the next call into the bridge, which clears or replaces it.
+ * renderFrame() repeats the active screen's missing-font warning, so it is
+ * still there after the frame a caller draws.
  */
 EMSCRIPTEN_KEEPALIVE
 const char* getLastError() {

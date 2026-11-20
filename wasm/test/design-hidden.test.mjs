@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEditor } from '../u8g2gl_editor.mjs';
+import { injectAssets, projectAssets } from './inject-assets.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenePath = join(__dirname, '..', '..', 'test', 'generated_fixture', 'generated_editor', 'ui_scene.json');
@@ -69,6 +70,9 @@ function without(scene, screen, name) {
 
 async function main() {
   const editor = await createEditor(process.argv[2]);
+  // The editor Wasm compiles in no project font or image: the fixture's are
+  // injected first, as the designer injects a project's (design_spec §9).
+  injectAssets(editor._module, await projectAssets(fileURLToPath(new URL('../../test/generated_fixture', import.meta.url))));
   const call = (name, text) => editor._module.ccall(name, 'number', ['string'], [text]);
   const hide = (names) => call('setDesignHidden', typeof names === 'string' ? names : JSON.stringify(names)) === 1;
   const runtimeHidden = () => JSON.parse(editor._module.UTF8ToString(editor._module._getRuntimeHidden()));

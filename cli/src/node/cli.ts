@@ -46,7 +46,7 @@ import { buildGenerateReport, type GenerateReport } from '../core/generator/repo
 import { findTargetDisplay } from '../core/resolver/index.js';
 import { formatBudgetReport } from './format-budget.js';
 import type { Diagnostic } from '../core/schema/diagnostic.js';
-import type { CheckedTarget } from '../core/validator/index.js';
+import { checkWidgetAssetSymbols, compareDiagnostics, type CheckedTarget } from '../core/validator/index.js';
 import {
   identifyDisplay,
   sourceDisplay,
@@ -75,6 +75,7 @@ import { parseToolchainArgs, runToolchainCommand, terminalConfirm } from './tool
 import { fixMissingNames, type NameFixRecord } from './fix-names.js';
 import { getGeneratorVersion } from './generator-version.js';
 import { loadProject, type LoadedProject } from './load-project.js';
+import { readWidgetSources } from './design/build/prepare-build.js';
 import { planGeneratedWrite, writeGenerated, type FileChange } from './write-generated.js';
 
 /** List of recognized subcommands for U8G2GL CLI. */
@@ -653,7 +654,11 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
 
   // --- Step 2: Load and validate through the path `generate` shares ---
   const loaded = loadOrExit(targetArg, json, failureExtra);
-  const { diagnostics, errors, warnings, checkedTarget } = checkProject(loaded.model, 'warning');
+  const checked = checkProject(loaded.model, 'warning');
+  const { warnings, checkedTarget } = checked;
+  const widgetErrors = widgetAssetErrors(loaded);
+  const diagnostics = withWidgetErrors(checked.diagnostics, widgetErrors);
+  const errors = checked.errors + widgetErrors.length;
 
   // --- Step 3: Emit JSON or human-readable output ---
   if (json) {
@@ -705,6 +710,23 @@ function handleValidateCommand(args: readonly string[], json: boolean, useColor:
   }
   console.log(withTarget('Validation passed: 0 errors, 0 warnings.'));
   process.exit(0);
+}
+
+// widgetAssetErrors
+// The widget asset rule (U8G2GL_WIDGET_ASSET_SYMBOL) over the project's own
+// widget sources, as the designer's editor build runs it, so a widget cannot
+// pass here and fail only there. None for a lone file, which has no widgets.
+//   loaded — the loaded project
+function widgetAssetErrors(loaded: LoadedProject): Diagnostic[] {
+  return loaded.projectRoot === undefined ? [] : checkWidgetAssetSymbols(readWidgetSources(loaded.projectRoot));
+}
+
+// withWidgetErrors
+// A command's diagnostics with the widget rule's added, in §13.9's order.
+//   diagnostics  — the project's own
+//   widgetErrors — from widgetAssetErrors()
+function withWidgetErrors(diagnostics: readonly Diagnostic[], widgetErrors: readonly Diagnostic[]): readonly Diagnostic[] {
+  return widgetErrors.length === 0 ? diagnostics : [...diagnostics, ...widgetErrors].sort(compareDiagnostics);
 }
 
 // describeCheckedTarget
@@ -980,7 +1002,12 @@ async function handleGenerateCommand(args: readonly string[], json: boolean, use
     compiledAssets,
     bdfLicenceFiles: loaded.bdfLicenceFiles,
   });
-  const { diagnostics, errors, warnings } = result;
+  const { warnings } = result;
+  // A widget naming a generated font or image refuses generation, as it
+  // refuses the designer's editor build.
+  const widgetErrors = widgetAssetErrors(loaded);
+  const diagnostics = withWidgetErrors(result.diagnostics, widgetErrors);
+  const errors = result.errors + widgetErrors.length;
   // The editor target is emitted from this very build — its realisation,
   // resolution and capacities — and only when the firmware emission it shares a
   // model with succeeded, so it can never describe a document `generate` refuses.

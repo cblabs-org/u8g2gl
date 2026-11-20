@@ -10,7 +10,7 @@
  *          and stops that, so no test can leave a server running or touch the
  *          fixture itself.
  * Description: `startDesign` copies the project to the worktree's `tmp/e2e/`,
- *              optionally adjusts files, and spawns the CLI with `--no-open`
+ *              optionally adjusts files (writing some, removing others), and spawns the CLI with `--no-open`
  *              (never a window on the desktop) and port 0. The child gets its
  *              own HOME, so the toolchain cache, the editor build cache and the
  *              lock never touch the user's, and — unless the test asks for the
@@ -64,6 +64,8 @@ export interface DesignSession {
 export interface StartOptions {
   /** Files to write into the copy before the server starts, by project path. */
   readonly files?: Readonly<Record<string, string>>;
+  /** Files or directories to delete from the copy before the server starts, by project path. */
+  readonly remove?: readonly string[];
   /** Whether the server may find Emscripten (on the runner's PATH). */
   readonly toolchain?: boolean;
   /**
@@ -103,6 +105,9 @@ export async function startDesign(options: StartOptions = {}): Promise<DesignSes
   const home = join(root, 'home');
   cpSync(PROJECT_FIXTURE, project, { recursive: true });
   mkdirSync(home);
+  for (const path of options.remove ?? []) {
+    rmSync(join(project, path), { recursive: true, force: true });
+  }
   for (const [path, text] of Object.entries(options.files ?? {})) {
     mkdirSync(dirname(join(project, path)), { recursive: true });
     writeFileSync(join(project, path), text);

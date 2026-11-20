@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createEditor } from '../u8g2gl_editor.mjs';
+import { injectAssets, projectAssets } from './inject-assets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
@@ -61,6 +62,9 @@ function lit(buffer) {
 }
 
 const editor = await createEditor(join(root, 'build-wasm', 'wasm', 'collections'));
+// The editor Wasm compiles in no project font or image: the fixture's are
+// injected first, as the designer injects a project's (design_spec §9).
+injectAssets(editor._module, await projectAssets(fileURLToPath(new URL('../../test/collection_data', import.meta.url))));
 const module = editor._module;
 
 // The hand-written frame: built, filled and drawn by collection_reference.cpp.

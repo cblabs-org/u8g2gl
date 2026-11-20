@@ -38,6 +38,10 @@
  *              - `GET /api/build/<id>`     a build's record
  *              - `GET /api/editor-wasm/<id>/<file>` the editor Wasm a
  *                                          succeeded `editor-wasm` build made
+ *              - `GET /api/font/builtin?name=` a U8G2 built-in font's bytes,
+ *                                          from the packaged `u8g2_fonts.c`
+ *                                          (builtin-fonts.ts); 404 with a JSON
+ *                                          reason for a name U8G2 lacks
  *              - `POST <path>`             a JSON route a later piece of the
  *                                          designer registered with
  *                                          `registerJsonRoute()` (the test
@@ -62,6 +66,8 @@ import {
   VERSION_HEADER,
 } from '../../core/project-fs/served-project-file-system.js';
 import { EDITOR_WASM_JOB } from './build/editor-wasm-build.js';
+import { locateFrameworkRoot } from './build/framework-sources.js';
+import { BuiltinFontSource } from './builtin-fonts.js';
 import { BuildQueue, type BuildJobRecord } from './build-queue.js';
 import { DiskProject } from './disk-project.js';
 import type { FileOpener } from './file-opener.js';
@@ -82,6 +88,12 @@ const EDITOR_WASM_ROUTE = '/api/editor-wasm/';
 
 /** The files an editor Wasm build serves: the Emscripten loader and its module. */
 const EDITOR_WASM_FILES: readonly string[] = ['u8g2gl_editor.js', 'u8g2gl_editor.wasm'];
+
+/** The built-in font route: `?name=` the U8G2 font. */
+const BUILTIN_FONT_ROUTE = '/api/font/builtin';
+
+/** A U8G2 built-in font's name, as `<builtin name>` spells it: checked before any lookup. */
+const BUILTIN_FONT_NAME = /^u8g2_font_\w+$/;
 
 /** The routes that hand a project file to another program. */
 const OPEN_ROUTE = '/api/open';
@@ -109,6 +121,12 @@ export interface DesignServerOptions {
    * open a window on the desktop unless the test hands it a fake.
    */
   readonly opener?: FileOpener;
+  /**
+   * The framework tree whose `extern/u8g2/csrc/u8g2_fonts.c` the built-in font
+   * route reads; this CLI's own (`locateFrameworkRoot()`) when omitted.
+   * `null` serves no built-in font, as a CLI with no framework does.
+   */
+  readonly frameworkRoot?: string | null;
 }
 
 /**
@@ -165,6 +183,10 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
   const builds = new BuildQueue(project.root);
   const streams = new Set<ServerResponse>();
   const jsonRoutes = new Map<string, JsonRoute>();
+  // Parsed on the first font request, never at start-up (builtin-fonts.ts).
+  const builtinFonts = new BuiltinFontSource(
+    options.frameworkRoot === null ? undefined : (options.frameworkRoot ?? locateFrameworkRoot()),
+  );
 
   // --- Step 1: The watcher, broadcasting to every open event stream ---
   const broadcast = (event: ProjectFsEvent): void => {
@@ -239,6 +261,8 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       serveDesigner(response, route);
     } else if (route.startsWith(EDITOR_WASM_ROUTE) && method === 'GET') {
       serveEditorWasm(response, route);
+    } else if (route === BUILTIN_FONT_ROUTE && method === 'GET') {
+      serveBuiltinFont(response, url);
     } else if (route === '/api/files' && method === 'GET') {
       sendResult(response, project.list(), (r) => ({ files: r.files }));
     } else if (route === '/api/file' && method === 'GET') {
@@ -359,6 +383,29 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       return;
     }
     send(response, 200, found.contentType, found.bytes);
+  }
+
+  // serveBuiltinFont
+  // One U8G2 built-in font's bytes. The name is checked against the shape of a
+  // U8G2 font name before the index is touched, so a request can only ever
+  // name an entry of it.
+  //   url — the request URL, carrying `name`
+  function serveBuiltinFont(response: ServerResponse, url: URL): void {
+    const name = url.searchParams.get('name');
+    if (name === null || !BUILTIN_FONT_NAME.test(name)) {
+      sendJson(response, 400, { code: 'bad-request', message: 'name must be a U8G2 font name, u8g2_font_…' });
+      return;
+    }
+    if (!builtinFonts.available) {
+      sendJson(response, 503, { code: 'no-font-source', message: "this CLI has no U8G2 u8g2_fonts.c to read built-in fonts from" });
+      return;
+    }
+    const bytes = builtinFonts.lookup(name);
+    if (bytes === undefined) {
+      sendJson(response, 404, { code: 'unknown-font', message: `U8G2 has no built-in font '${name}'` });
+      return;
+    }
+    send(response, 200, 'application/octet-stream', bytes);
   }
 
   // serveJsonRoute
@@ -486,6 +533,7 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
         path === '/api/files' ||
         path === '/api/file' ||
         path === '/api/events' ||
+        path === BUILTIN_FONT_ROUTE ||
         path === OPEN_ROUTE ||
         path === REVEAL_ROUTE ||
         path.startsWith('/api/build/') ||

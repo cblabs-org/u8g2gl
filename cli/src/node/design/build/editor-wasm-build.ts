@@ -5,9 +5,10 @@
  *
  * File: src/node/design/build/editor-wasm-build.ts
  * Purpose: Builds the **project editor Wasm**: the canvas's renderer, built
- *          from this project's registry, its widgets' real C++, its fonts and
- *          images, and its generated capacities, so what the designer draws is
- *          what the project's firmware would. It runs on the design server's
+ *          from this project's registry, its widgets' real C++ and its
+ *          generated capacities, so what the designer draws is what the
+ *          project's firmware would. Its fonts and images are not compiled
+ *          in: the designer injects them (design_spec §9). It runs on the design server's
  *          build queue, outside the per-edit loop, and is shaped so a widget
  *          edit costs about a second: only what changed recompiles, the
  *          framework half is compiled once and shared, and the editing link is
@@ -24,9 +25,9 @@
  *              - **editor host** — the bridge and its scene parser, with the
  *                runtime's key, kept apart so the harness links the runtime
  *                without them;
- *              - **project** — the registry, the widgets, the fonts and images
- *                units, and the build-hash unit, each object keyed by its own
- *                source, the project's headers and the flags.
+ *              - **project** — the registry, the widgets and the build-hash
+ *                unit, each object keyed by its own source, the project's
+ *                headers and the flags.
  *              A key that already has its object is not recompiled. The link
  *              writes `u8g2gl_editor.js`/`.wasm` per optimisation level, and is
  *              skipped when that level's output already carries this build
@@ -180,8 +181,6 @@ export async function buildEditorWasm(options: EditorWasmBuildOptions): Promise<
     })),
     ...[
       join(prepared.editorDir, 'ui_editor_registry.cpp'),
-      join(prepared.generatedDir, 'ui_fonts.cpp'),
-      join(prepared.generatedDir, 'ui_images.cpp'),
       ...prepared.widgetUnits,
       hashUnit,
     ].map((source) => ({ source, driver: toolchain.emxx, flags: projectFlags, dir: join(prepared.dir, 'obj'), extra: projectHeaders })),

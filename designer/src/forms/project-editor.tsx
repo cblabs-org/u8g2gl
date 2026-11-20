@@ -410,6 +410,12 @@ function ImpactPreviewView({
       return undefined;
     }
     spare
+      // The spare holds its own injected table: the project's fonts and
+      // images, given before it draws (design_spec §9).
+      .then(async (module) => {
+        await workspace.loop.injector.ready(module, run.result.model.globals, run.assets);
+        return module;
+      })
       .then((module) => {
         if (cancelled) return;
         const texts = candidateTexts(workspace.documents.texts(), field.key, value);

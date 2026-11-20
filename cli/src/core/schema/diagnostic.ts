@@ -432,6 +432,20 @@ export const DIAGNOSTIC_CODES = {
    * a repeated name `U8G2GL_DUPLICATE_NAME`, as for a `<prop>`.
    */
   INVALID_DATA_DECLARATION: 'U8G2GL_INVALID_DATA_DECLARATION',
+  /**
+   * A widget's own C++ (a `.cpp`, `.cc`, `.h` or `.hpp` in its directory)
+   * names a generated font or image symbol: `ui_font_<name>`,
+   * `ui_fontdata_<name>` or `ui_image_<name>`. A widget gets a font or image
+   * by exactly one of two routes: a `type="font"` or `type="image"` prop,
+   * which U8G2GL declares, generates and (in the designer) injects; or a U8G2
+   * font or bitmap the widget owns and compiles itself. A generated symbol is
+   * neither — it exists only in one project's firmware build, so the widget
+   * would link on the device and fail in the designer, which compiles no
+   * project font or image. An error, located at the symbol; comments and
+   * string literals are not read, and application code is never scanned.
+   * Reported by `validate`, `generate` and the designer's editor build alike.
+   */
+  WIDGET_ASSET_SYMBOL: 'U8G2GL_WIDGET_ASSET_SYMBOL',
 } as const;
 
 /**

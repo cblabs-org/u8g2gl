@@ -114,6 +114,10 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
       return true;
     },
     runtimeHidden: () => [],
+    assetInjection: true,
+    injectFont: () => true,
+    injectImage: () => true,
+    clearInjected: () => undefined,
   };
   const editListeners = new Set<() => void>();
   const posted: unknown[] = [];
