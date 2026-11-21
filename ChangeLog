@@ -8,6 +8,30 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-21	cli v0.24.xx	U8G2GL
+  * 0.24.0: Fonts and images reach the editor by injection. The editor
+    Wasm compiles in no project font or image: the editor target's
+    ui_editor_asset() is emitted empty, and an editor build neither
+    compiles nor hashes ui_fonts.cpp or ui_images.cpp, so a font or image
+    change never rebuilds it. The bridge gains injectFont(),
+    injectImage() and clearInjected(); a font it has nowhere is drawn in
+    u8g2_font_4x6_tr with a warning in getLastError(). The design server
+    serves GET /api/font/builtin?name=, from the packaged u8g2_fonts.c
+    parsed once on the first request. The designer injects every declared
+    font and image before each scene, so a widget-free project draws any
+    font on the framework Wasm with no toolchain. Widgets get a font or
+    image by a type="font"/"image" prop or own a U8G2 one: naming a
+    generated ui_font_/ui_fontdata_/ui_image_ symbol is the new error
+    U8G2GL_WIDGET_ASSET_SYMBOL, from validate, generate and the editor
+    build. The Fonts view is enabled: the project's fonts and every
+    built-in, a glyph grid and a string ruler drawn by the renderer, Add
+    to project; the property panel's font field gains Browse fonts...
+    A <bdf>'s range field gains presets with their compiled sizes,
+    including one derived from the project's static text; static text
+    outside a <bdf> range is the new warning U8G2GL_GLYPH_OUTSIDE_RANGE.
+    The fonts and images sections show sizes and users, images at 1:1,
+    and refuse Remove while an item is used. Editor goldens move only in
+    the asset lookup; no firmware output changes.
 2026-11-17	cli v0.23.xx	U8G2GL
   * 0.23.0: Collection widgets declare their data, and their columns are
     XML. Schema 0.7 (unreleased, so no bump) gains <data> in a widget's

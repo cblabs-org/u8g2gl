@@ -107,7 +107,7 @@ import { isLineShaped } from '../editing/line-ends';
 import { ProjectAssets } from '../project/project-assets';
 import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
-import { AssetInjector } from '../wasm/asset-injector';
+import { AssetInjector, type InjectionState } from '../wasm/asset-injector';
 import type { EditorModule, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
 import type { HitTarget } from '../selection/hit-test';
@@ -487,7 +487,7 @@ export class EditLoop {
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
     const module = this.wasm.module.get();
     const timings = { ...result.timings, apply: 0, render: 0, blit: 0, frameStart, runStart, drawn: false };
-    const injection = module === undefined || result.scene === undefined ? 'ready' : this.injector.prepare(module, result.model.globals, this.assets.current);
+    const injection: InjectionState = module === undefined || result.scene === undefined ? 'ready' : this.injector.prepare(module, result.model.globals, this.assets.current);
     this.waitingForAssets = injection === 'waiting';
     if (result.scene === undefined || module === undefined || result.screen === undefined) {
       this.markStale(this.staleReason(result.diagnostics, module, result.screen));
@@ -774,7 +774,7 @@ export { TEXT_STAGES, WASM_STAGES };
 // loaded and drawn in the fallback.
 //   injection — what the injector found for the module
 //   warning   — the module's lastError() after renderFrame
-function assetNoteOf(injection: string, warning: string): { readonly assetNote?: string } {
+function assetNoteOf(injection: InjectionState, warning: string): { readonly assetNote?: string } {
   if (injection === 'own-table') {
     return { assetNote: 'this editor Wasm predates font injection, so it draws the fonts and images it was built with' };
   }

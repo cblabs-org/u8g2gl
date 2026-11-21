@@ -110,7 +110,10 @@ export function parseU8g2Fonts(source: Uint8Array): BuiltinFontIndex {
 // never run on into the next literal's first digit.
 //   source — the file's bytes
 //   start  — just after the declaration's `=` line
-//   out    — the shared buffer; at most `limit` bytes are written into it
+//   out    — the shared buffer
+//   at     — where in it this font's bytes start
+//   limit  — the declared length: no more than this is written, so a literal
+//            that is too long is measured, not let overrun the next font
 //   name   — the font, for an error
 function decodeLiterals(source: Uint8Array, start: number, out: Uint8Array, at: number, limit: number, name: string): number {
   let i = start;
