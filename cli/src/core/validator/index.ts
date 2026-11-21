@@ -18,7 +18,7 @@
  *   widget asset rule (a widget names no generated font or image symbol)
  * - Individual pass functions: validateSchema, validateReferences, validateDisplay,
  *   validateWidgetProps, validateTypes, validateGeometry, validateIdentifiers,
- *   validateNotYetSupported, validateRealisation
+ *   validateNotYetSupported, validateRealisation, validateGlyphRanges
  */
 
 export { compareDiagnostics, validate, type CheckedTarget, type ValidateInput, type ValidateResult } from './validate.js';
@@ -35,5 +35,6 @@ export {
   type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 export { validateRealisation } from './validate-realisation.js';
+export { validateGlyphRanges } from './validate-glyph-ranges.js';
 export { BOOLEAN_VALUES, booleanValueError, enumValueError } from './value-rules.js';
 export { checkWidgetAssetSymbols, generatedAssetSymbolOf, WIDGET_SOURCE_EXTENSIONS } from './widget-asset-symbols.js';

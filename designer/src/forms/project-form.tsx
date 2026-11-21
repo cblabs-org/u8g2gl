@@ -37,7 +37,7 @@ import type { Workspace } from '../workspace';
 import { useObservable } from '../ui/use-observable';
 import { useWorkspace } from '../ui/workspace-context';
 import { ProjectFormController } from './form-controller';
-import { isFormFile, type FormFile } from './form-model';
+import { isFormFile, type FormFile, type FormModel, type FormNode } from './form-model';
 import { FormView, type FormActions, type SectionRenderer } from './form-view';
 import { useGlobalsEditor } from './globals-editor';
 import { useProjectEditor } from './project-editor';
@@ -77,6 +77,8 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   useEffect(() => controller.start(), [controller]);
   const state = useObservable(controller.state);
   const root = useRef<HTMLDivElement>(null);
+  // The remove guard, read when Remove is pressed: the actions are made before the hooks.
+  const globalsRefusal = useRef<((node: FormNode) => string | undefined) | undefined>(undefined);
 
   // --- The Explorer's section rows: scroll to the one asked for ---
   const reveal = useObservable(workspace.formReveal);
@@ -104,7 +106,13 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
     () => ({
       set: (field, value) => void controller.apply({ kind: 'set', field, value }),
       add: (list, kind, values) => void controller.apply({ kind: 'add', list, itemKind: kind, values: { ...seedFor(workspace, kind), ...values } }),
-      remove: (item) => void controller.apply({ kind: 'remove', item }),
+      remove: (item) => {
+        // An item still in use is refused, naming its users (globals.xml's fonts and images).
+        const node = file === 'globals.xml' ? findItem(controller.state.get().model, item) : undefined;
+        const refusal = node === undefined ? undefined : globalsRefusal.current?.(node);
+        if (refusal !== undefined) controller.refuse(refusal);
+        else controller.apply({ kind: 'remove', item });
+      },
       move: (item, delta) => void controller.apply({ kind: 'move', item, delta }),
       focusRange: (range) => workspace.formHighlight.set(range === undefined ? undefined : { path: file, ...range }),
     }),
@@ -118,6 +126,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   // globals.xml's: the font picker and the file chooser, on a field and on adding.
   const globalsHooks = useGlobalsEditor(workspace, state.model);
   const globals = file === 'globals.xml' ? globalsHooks : undefined;
+  globalsRefusal.current = globals?.removeRefusal;
 
   return (
     <div className="project-form-scroll" ref={root}>
@@ -128,8 +137,27 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
         actions={actions}
         {...(sections !== undefined ? { renderSection: sections } : {})}
         {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, nodeExtra: hooks.nodeExtra, fieldNote: hooks.fieldNote } : {})}
-        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser } : {})}
+        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser, nodeExtra: globals.nodeExtra } : {})}
       />
     </div>
   );
+}
+
+// findItem
+// The form node with a key, anywhere in the form.
+//   model — the form, or undefined before the first read
+//   key   — the node's key
+function findItem(model: FormModel | undefined, key: string): FormNode | undefined {
+  let found: FormNode | undefined;
+  const visit = (node: FormNode): void => {
+    if (found !== undefined) return;
+    if (node.key === key) found = node;
+    node.parts.forEach(visit);
+    node.lists.forEach((list) => list.items.forEach(visit));
+  };
+  for (const section of model?.sections ?? []) {
+    if (section.node !== undefined) visit(section.node);
+    section.list?.items.forEach(visit);
+  }
+  return found;
 }

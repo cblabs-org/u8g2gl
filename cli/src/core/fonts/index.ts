@@ -14,9 +14,11 @@
  * Exports:
  * - compileBdf(), CompileBdfInput, CompiledFont, FontCompileFailure, CompileBdfResult
  * - parseBdfRange(), BdfRangeItem, BdfRangeResult, MAX_BDF_CODEPOINT
+ * - staticTexts(), stringBoundElements(), codepointsByFont(), elementFont(), formatLiterals(), StaticText
  */
 
 export { compileBdf } from './compile-bdf.js';
 export type { CompileBdfInput, CompiledFont, FontCompileFailure, CompileBdfResult } from './compile-bdf.js';
 export { parseBdfRange, MAX_BDF_CODEPOINT } from './bdf-range.js';
+export { codepointsByFont, elementFont, formatLiterals, staticTexts, stringBoundElements, type StaticText } from './static-text.js';
 export type { BdfRangeItem, BdfRangeResult } from './bdf-range.js';

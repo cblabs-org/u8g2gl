@@ -164,6 +164,15 @@ export class ProjectFormController {
     this.refresh();
     return changed;
   }
+
+  /**
+   * @brief Refuses a change before it is made, showing why in the form's
+   *        refusal banner until the next change, as a refused edit does.
+   */
+  refuse(reason: string): void {
+    this.refusal = reason;
+    this.refresh();
+  }
 }
 
 // currentKey

@@ -117,3 +117,15 @@
 
 /* --- The status bar's target switcher --- */
 .status-item.target select { background: transparent; border: 1px solid var(--border); border-radius: 3px; color: inherit; font: inherit; padding: 0 2px; }
+.bdf-range { display: flex; flex-direction: column; gap: 4px; }
+.range-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.range-preset { display: inline-flex; flex-direction: column; align-items: flex-start; padding: 2px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.range-preset[aria-pressed='true'] { border-color: var(--accent); }
+.range-cost { font-size: 10px; color: var(--text-dim); }
+.asset-facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-top: 4px; font-size: 12px; }
+.asset-size { color: var(--text-dim); }
+.asset-users summary { cursor: pointer; }
+.asset-users ul { margin: 2px 0 0; padding-left: 16px; }
+.asset-image { display: flex; align-items: center; gap: 8px; }
+.image-preview { image-rendering: pixelated; }
+.convert-choice { color: var(--text-dim); }

@@ -446,6 +446,16 @@ export const DIAGNOSTIC_CODES = {
    * Reported by `validate`, `generate` and the designer's editor build alike.
    */
   WIDGET_ASSET_SYMBOL: 'U8G2GL_WIDGET_ASSET_SYMBOL',
+  /**
+   * Static text — a string prop's literal value, or the literal part of a
+   * binding's format — uses a character its element's font does not hold,
+   * because that font is a `<bdf>` whose `range` leaves the character out
+   * (§14.1). U8G2 draws nothing for a missing glyph, silently, on the device.
+   * A warning, not an error, and it changes no generated output. Located at the
+   * attribute; the message names the characters. Built-in fonts are never
+   * checked: their glyph sets are U8G2's and are not guessed.
+   */
+  GLYPH_OUTSIDE_RANGE: 'U8G2GL_GLYPH_OUTSIDE_RANGE',
 } as const;
 
 /**

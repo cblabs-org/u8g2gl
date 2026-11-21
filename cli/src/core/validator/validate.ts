@@ -5,7 +5,7 @@
  *
  * File: src/core/validator/validate.ts
  * Purpose: Main validation orchestrator running multi-pass validation (§15.1, §15.2).
- * Description: Reports the manifest registry's own diagnostics, then coordinates 7
+ * Description: Reports the manifest registry's own diagnostics, then coordinates 10
  *              sequential validation passes across project configuration, globals,
  *              screen views and element manifests — every pass reading elements from
  *              the one registry ([D-17], [D-18]). Deterministically sorts all
@@ -53,6 +53,7 @@ import {
   type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 import { validateRealisation } from './validate-realisation.js';
+import { validateGlyphRanges } from './validate-glyph-ranges.js';
 
 /**
  * Full project and asset input structure supplied to the validator.
@@ -229,6 +230,9 @@ export function validate(input: ValidateInput): ValidateResult {
   // because it is the only pass that judges the realised model rather than the
   // authored one.
   allDiagnostics.push(...validateRealisation(passInput));
+
+  // Pass 10: Static text using a glyph its <bdf> font's range leaves out (§14.1)
+  allDiagnostics.push(...validateGlyphRanges(passInput));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
   allDiagnostics.sort(compareDiagnostics);
