@@ -256,3 +256,4 @@ The detailed `WORKORDERS.md` for each PR is written when that PR starts, from th
 | 2026-11-21 | E-2k2 merged in #63. The PA re-checked E-2k3 against main @ `8ec6da5`: [RESCOPE-E-2k3.md](RESCOPE-E-2k3.md). Where they differ, it supersedes rulings 18–22 for E-2k3. |
 | 2026-11-21 | **E-2k3's re-check approved by the owner, in their own words: "Approve E-2k3"**, with L1–L3 as recorded in RESCOPE-E-2k3.md, whose status log has the details. Branch `u8g2gl-e2k3/wo1-subjects` from `8ec6da5`. |
 | 2026-11-21 | Worker stopped at WO1 before any code, on a stop condition (reference shapes not in finding 4). **Owner approved the amendments, in their own words: "Approve M1–M3"**, recorded in RESCOPE-E-2k3.md under Amendments. |
+| 2026-11-21 | E-2k3 WO1–WO3 done. **Owner approved N1 and N2, in their own words: "agreed on both deciaions"**, recorded in RESCOPE-E-2k3.md. |
