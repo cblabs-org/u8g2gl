@@ -93,6 +93,20 @@ Answered by the owner on 2026-11-21:
 
 Still open: the **four-WO split** above, with rename separated out. It's approved together with the plan.
 
+## Amendments (approved 2026-11-21, after the worker stopped at WO1)
+
+The worker stopped before any code, as the work order requires, because the code has reference shapes finding 4 doesn't list. The PA confirmed each in source.
+
+- **M1. Finding 4 is completed.** The finder also covers:
+  - `style="<name>"` on any element, a common attribute (`validate-widget-props.ts` `COMMON_ATTRIBUTES`; checked as `U8G2GL_UNKNOWN_STYLE`), used inside widget templates too;
+  - `focus_style="<name>"` on any element (also `U8G2GL_UNKNOWN_STYLE`);
+  - the `style_font="<font>"` inline override (checked as `U8G2GL_UNKNOWN_FONT`);
+  - the `font` of a screen-local `<style>` in a screen's own `<styles>`.
+
+  Its file scope is **every file the project loads**: `u8g2gl.xml`, `globals.xml`, every screen, and every widget manifest wherever it lives (the fixture keeps them at `widgets/<name>/<name>.xml`), not `widgets/*.xml`.
+- **M2. Screen-local styles shadow global ones, as the code already resolves them.** A screen that declares a local style of the same name refers to its own (`static-text.ts`: screen first, then globals; `validate-references.ts`'s `referenceScope`). So on that screen, references to that name are not the global style's: they are neither its users nor renamed with it. Composite templates see global styles only (`validate-references.ts`), so their references always are. The rename dialog lists the screens skipped for shadowing, so nothing is skipped silently. Renaming a screen-local style is out of scope.
+- **M3. E-2k2's font removal guard is fixed.** `style_font` counts as a use of its font, so a font used that way can't be removed. This changes E-2k2's `fontUsers()` results on purpose; the work order's "the same results" is amended to "the same results, plus `style_font` users".
+
 ## Status log
 
 | Date | Entry |
@@ -100,3 +114,4 @@ Still open: the **four-WO split** above, with rename separated out. It's approve
 | 2026-11-21 | PA drafted this re-check against main @ `8ec6da5`, after #63 merged (merge commit, two parents). |
 | 2026-11-21 | Owner on the decisions, in their own words: L1, "a 1/2 way house: ask the user: 'you are renaming a variable... do you want to rename it in the files that reference it....'"; L2, "yes"; L3, "ok". Ruling 10 was rewritten to match L1. This is not yet approval to implement. |
 | 2026-11-21 | **Approved by the owner, in their own words: "Approve E-2k3"**, given in reply to the plan as updated with their L1–L3 answers. That approves rulings 1–15, L1 (ruling 10, ask on commit), L2, L3 (CLI 0.25.0) and the four-WO split. PA branched `u8g2gl-e2k3/wo1-subjects` from `origin/main` @ `8ec6da5` in `../U8G2GL-e4` (upstream unset). Work orders: [WORKORDERS-E-2k3.md](WORKORDERS-E-2k3.md). |
+| 2026-11-21 | Worker stopped at WO1 before any code (stop condition: unlisted reference shapes). **Owner approved the PA's amendments, in their own words: "Approve M1–M3"** (M1 the missing shapes and file scope, M2 shadowing as the code resolves it, M3 the `style_font` guard fix). Recorded above under Amendments. |

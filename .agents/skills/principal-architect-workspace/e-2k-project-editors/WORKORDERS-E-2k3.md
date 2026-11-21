@@ -16,7 +16,7 @@ You are a senior engineer and execution-focused worker. You are **not** the Prin
 Execute **WO1, then WO2, then WO3, then WO4**.
 
 **Parent project:** `e-2k-project-editors`.
-- **Binding:** [RESCOPE-E-2k3.md](RESCOPE-E-2k3.md), its rulings 1–15 and L1–L3. It supersedes
+- **Binding:** [RESCOPE-E-2k3.md](RESCOPE-E-2k3.md), its rulings 1–15, L1–L3 and amendments M1–M3. It supersedes
   [PROJECT.md](PROJECT.md)'s rulings 18–22 where they differ.
 - **Still in force from PROJECT.md:** the principle (ui_spec §2, "Everything is discoverable"),
   and rulings 1, 3, 4 and 23 for how the forms edit.
@@ -80,13 +80,19 @@ RESCOPE rulings 1–4, and RESCOPE finding 4.
   - `bind_*` attributes and `<bind_flag_if_*> subject=`;
   - manifest props typed `subject`, `style`, `font` or `image` (the manifests' data, [D-17], as
     `asset-usage.ts` already reads font and image props);
-  - `<style name>` children, and a style's `font`;
+  - `<style name>` children, and a style's `font`, global or screen-local;
+  - `style="<name>"` and `focus_style="<name>"` on any element (M1);
+  - `style_font="<font>"` overrides (M1);
   - `#name` constant tokens in any attribute value, found through the resolver's expression
     tokenizer, never by text search;
-  - screens, `widgets/*.xml` and `globals.xml`.
-  E-2k2's `asset-usage.ts` font and image users should come from it too, with the same results, so
-  there's one implementation.
-- [ ] **Unit tests** for each shape, including `#margin` inside `#margin_top + 1` (must not
+  - every file the project loads: `u8g2gl.xml`, `globals.xml`, every screen, and every widget
+    manifest wherever it lives (M1).
+  - **Shadowing (M2):** on a screen that declares a local style of the same name, that screen's
+    references are the local style's, not the global's. Composite templates see global styles
+    only. Report shadowed references separately, so rename can list the screens it skips.
+  E-2k2's `asset-usage.ts` font and image users should come from it too, with the same results plus
+  `style_font` users (M3), so there's one implementation and the font removal guard counts them.
+- [ ] **Unit tests** for each shape, M1's and M2's shadowing included, and `#margin` inside `#margin_top + 1` (must not
   match), a name that is a prefix of another, and a reference inside a widget template.
 - [ ] **The subjects table** (`renderSection`, as `globals-editor.tsx` does for fonts):
   name, type, initial value, `max_len` (strings only) with its byte cost, and "Used by".
@@ -111,7 +117,8 @@ RESCOPE rulings 5–10 and L1–L2.
 - [ ] **The rename dialog.** "Rename…" on every subject, const, style, font and image. It shows the
   new name's field, then each file with its number of changes and the symbols that change, with a
   note that application code calling the old symbols isn't changed and won't compile until it's
-  updated by hand (L2). It says each file is undone on its own.
+  updated by hand (L2). It says each file is undone on its own. Renaming a global style lists the
+  screens skipped because a local style of the same name shadows it (M2).
 - [ ] **Applied as one edit per document**, each its own undo step in its own document, as E-2k2's
   "Browse fonts…" does across two documents.
 - [ ] **The name field asks** (ruling 10, L1). When a name field commits a change and the old name
