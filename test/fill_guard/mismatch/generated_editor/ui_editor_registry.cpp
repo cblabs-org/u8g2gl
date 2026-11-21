@@ -10,7 +10,6 @@
 // file gets an empty translation unit and pays nothing.
 #ifdef U8G2GL_EDITOR
 
-#include <cstring>
 #include <new>
 
 #include "u8g2gl/u8g2gl_button.h"
@@ -1547,13 +1546,11 @@ static const u8g2gl_editor_param ui_editor_u8g2gl_vline_params[] = {
 };
 
 // --- Fonts and images, by name ---
-// The ui_font_* and ui_image_* symbols the firmware units define, so an
-// editor host resolves a scene's font or image name without spelling any.
+// None: the designer injects every font and image into the bridge before it
+// applies a scene, so this target compiles in none and the lookup finds nothing.
 const void* ui_editor_asset(u8g2gl_editor_type_t type, const char* name) {
     (void)type;
-    if (name == nullptr) {
-        return nullptr;
-    }
+    (void)name;
     return nullptr;
 }
 

@@ -6,9 +6,11 @@
  * File: test/node/design/build/prepare-build.test.ts
  * Purpose: The parts of the project editor Wasm build that need no compiler:
  *          the platform-header rule (one diagnostic, at the `#include`, before
- *          anything compiles) and the build hash (it changes when, and only
- *          when, a widget source, a manifest, a font, an image, the generated
- *          configuration or a framework source changes). Runs on every machine.
+ *          anything compiles), the widget asset rule (likewise, at the
+ *          symbol), and the build hash (it changes when, and only when, a
+ *          widget source, a manifest, the generated configuration or a
+ *          framework source changes: never for a font or an image, which the
+ *          designer injects). Runs on every machine.
  * Description: Each case copies the departures project (a fixture with custom
  *              widgets) into a temp
  *              directory, changes one thing, and prepares it again.
@@ -107,6 +109,28 @@ describe('the platform-header rule', () => {
   });
 });
 
+describe('the widget asset rule (U8G2GL_WIDGET_ASSET_SYMBOL)', () => {
+  it('refuses the build at the symbol before anything is compiled', async () => {
+    const project = departuresCopy();
+    edit(project, 'widgets/wd_probe_box/wd_probe_box.cpp', (text) => `${text}\nconst void* probe_font() { return ui_font_u8g2_font_6x10_mr; }\n`);
+    const lines = readFileSync(join(project, 'widgets/wd_probe_box/wd_probe_box.cpp'), 'utf8').split('\n').length - 1;
+    const { host, runs } = fakeHost();
+    const build = await buildEditorWasm({
+      projectRoot: project,
+      cacheRoot: makeTempDir('build-cache'),
+      frameworkRoot: FRAMEWORK_ROOT,
+      toolchain: { source: 'path', version: '5.0.3', emxx: '/fake/em++', emcc: '/fake/emcc', env: {} },
+      host,
+      optimisation: 'O1',
+    });
+    expect(build.status).toBe('failed');
+    expect(build.diagnostics).toEqual([
+      expect.objectContaining({ code: 'U8G2GL_WIDGET_ASSET_SYMBOL', file: 'widgets/wd_probe_box/wd_probe_box.cpp', line: lines, column: 35 }),
+    ]);
+    expect(runs).toEqual([]);
+  });
+});
+
 describe('the build hash', () => {
   it('generates into the cache, never into the project, and is stable', async () => {
     const project = departuresCopy();
@@ -143,12 +167,12 @@ describe('the build hash', () => {
     },
     {
       what: 'a font',
-      moves: true,
+      moves: false,
       apply: (p) => edit(p, 'globals.xml', (t) => t.replace('<fonts>', '<fonts>\n        <builtin name="u8g2_font_5x7_mr" />')),
     },
     {
       what: 'an image',
-      moves: true,
+      moves: false,
       apply: (p) => {
         mkdirSync(join(p, 'assets'), { recursive: true });
         cpSync(FIXTURE_XBM, join(p, 'assets', 'icon.xbm'));

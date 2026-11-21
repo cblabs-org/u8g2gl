@@ -41,6 +41,15 @@
  *              Each run's stage timings are handed to `onFrame` listeners, which
  *              is how a keystroke measurement attributes a keystroke's cost.
  *
+ *              Before each `applyScene` the module is given every font and
+ *              image the project declares (`asset-injector.ts`), since the
+ *              editor Wasm compiles in none (design_spec §9). That costs a key
+ *              comparison unless the assets changed. While a built-in font is
+ *              still being fetched the run draws nothing and keeps the last
+ *              frame as it is, rather than drawing the fallback font for a
+ *              frame; the fetch's arrival books the next run, and `settled()`
+ *              waits for it.
+ *
  *              The elements the author hid in the designer (`design-hidden.ts`)
  *              are left out of the frame by the editor Wasm itself, after each
  *              of this loop's own `applyScene`, which forgets them; a test
@@ -98,6 +107,7 @@ import { isLineShaped } from '../editing/line-ends';
 import { ProjectAssets } from '../project/project-assets';
 import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
+import { AssetInjector, type InjectionState } from '../wasm/asset-injector';
 import type { EditorModule, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
 import type { HitTarget } from '../selection/hit-test';
@@ -133,6 +143,13 @@ export interface FrameState {
   readonly hatched?: readonly string[];
   /** Lit pixels in the frame, for tests and the curious. */
   readonly lit: number;
+  /**
+   * What the status bar says about the frame's fonts and images, when there is
+   * something to say: the editor Wasm's warning for a font that is not loaded
+   * (drawn in its fallback), or that the loaded module draws the fonts it was
+   * built with because it takes no injection.
+   */
+  readonly assetNote?: string;
 }
 
 /** The drawn frame's hit targets, and the file whose names they carry. */
@@ -228,6 +245,10 @@ export class EditLoop {
   private readonly workspace: Workspace;
   private readonly wasm: EditorWasmController;
   private readonly assets: ProjectAssets;
+  /** Gives each module the project's fonts and images before a scene is applied. */
+  readonly injector: AssetInjector;
+  /** Whether the last run drew nothing because a built-in font was still on its way. */
+  private waitingForAssets = false;
   private readonly cache = new ProjectModelCache();
   private readonly scheduler: FrameScheduler;
   private readonly frames: FrameSource;
@@ -264,6 +285,7 @@ export class EditLoop {
     this.frames = frames;
     this.scheduler = new FrameScheduler((time) => this.run(time), frames);
     this.assets = new ProjectAssets(workspace.documents.fileSystem, () => this.scheduler.request());
+    this.injector = new AssetInjector(workspace.session, () => this.scheduler.request(), (line) => workspace.log(line));
   }
 
   /** @brief Subscribes to everything that changes the frame, and runs once. */
@@ -370,9 +392,12 @@ export class EditLoop {
    *        is booked, else after the booked run has finished.
    */
   settled(): Promise<void> {
-    if (!this.scheduler.pending) return Promise.resolve();
+    if (!this.scheduler.pending && !this.waitingForAssets) return Promise.resolve();
     return new Promise((resolve) => {
+      // A run that waited for a built-in font drew nothing: the one after it,
+      // which its arrival books, is the one that shows the text.
       const unsubscribe = this.onFrame(() => {
+        if (this.waitingForAssets) return;
         unsubscribe();
         resolve();
       });
@@ -462,8 +487,12 @@ export class EditLoop {
     // --- Step 2: Scene to pixels, or the last good frame with the reason ---
     const module = this.wasm.module.get();
     const timings = { ...result.timings, apply: 0, render: 0, blit: 0, frameStart, runStart, drawn: false };
+    const injection: InjectionState = module === undefined || result.scene === undefined ? 'ready' : this.injector.prepare(module, result.model.globals, this.assets.current);
+    this.waitingForAssets = injection === 'waiting';
     if (result.scene === undefined || module === undefined || result.screen === undefined) {
       this.markStale(this.staleReason(result.diagnostics, module, result.screen));
+    } else if (injection === 'waiting') {
+      // The last frame stays as it is; the font's arrival books the next run.
     } else {
       let lap = performance.now();
       const hidden = this.hiddenFor(result, module);
@@ -516,6 +545,7 @@ export class EditLoop {
           placeholders,
           hatched: hatched.map(({ name }) => name),
           lit: countLit(buffer),
+          ...assetNoteOf(injection, module.lastError()),
         });
         this.view?.setStale(false);
       }
@@ -737,3 +767,16 @@ function boundingBox(rects: readonly Rect[]): Rect | undefined {
 }
 
 export { TEXT_STAGES, WASM_STAGES };
+
+// assetNoteOf
+// The frame's note about its fonts and images, as the status bar shows it.
+// After a frame, the module's last error is its warning, if any: a font not
+// loaded and drawn in the fallback.
+//   injection — what the injector found for the module
+//   warning   — the module's lastError() after renderFrame
+function assetNoteOf(injection: InjectionState, warning: string): { readonly assetNote?: string } {
+  if (injection === 'own-table') {
+    return { assetNote: 'this editor Wasm predates font injection, so it draws the fonts and images it was built with' };
+  }
+  return warning === '' ? {} : { assetNote: warning };
+}

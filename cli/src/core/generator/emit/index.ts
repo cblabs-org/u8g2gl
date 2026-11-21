@@ -57,7 +57,7 @@ import { emitScreenUnit, screenUnitPath } from './screen.js';
 import { emitUiHeader, UI_HEADER } from './ui-hpp.js';
 import { emitUiInitUnit, UI_INIT_UNIT } from './ui-init.js';
 import type { DisplayContract, EmittedUnit, ProjectEmitInput } from './unit.js';
-import { EDITOR_REGISTRY_UNIT, editorAssetsOf, emitEditorRegistryUnit } from './editor-registry.js';
+import { EDITOR_REGISTRY_UNIT, emitEditorRegistryUnit } from './editor-registry.js';
 import { emitSceneFile, SCENE_FILE } from './scene.js';
 
 export { cppEnumerator, cppStringLiteral, cppValue } from './value.js';
@@ -291,8 +291,9 @@ export function emitEditorFiles(input: Omit<ProjectEmissionInput, 'contract'>): 
     target: input.target,
   };
 
-  // One project view for both units, so the registry's asset table and the
-  // scene's font and image lists are read from the same declarations.
+  // The scene's view of the project. The registry reads none of it: its asset
+  // lookup is empty in this target, because the designer injects every font
+  // and image the scene names (design_spec §9).
   const project = {
     project: input.project,
     globals: input.globals,
@@ -305,10 +306,10 @@ export function emitEditorFiles(input: Omit<ProjectEmissionInput, 'contract'>): 
     stamp: '',
   };
 
-  // --- Step 1: The registry, from every loaded manifest, with the asset table ---
+  // --- Step 1: The registry, from every loaded manifest, with the empty asset lookup ---
   const registry = emitEditorRegistryUnit({
     manifests: input.manifests,
-    assets: editorAssetsOf(project),
+    assetLookup: true,
     stamp: formatHeaderStamp(generated),
   });
 

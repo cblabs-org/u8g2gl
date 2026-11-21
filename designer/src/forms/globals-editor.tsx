@@ -21,6 +21,11 @@
  *              are read from the form itself, so the marks follow the text as
  *              it is typed, not the last run.
  *
+ *              The fonts and images sections also show each item's size and
+ *              users (`globals-assets.tsx`, after its fields), a `<bdf>`'s
+ *              `range` field carries its presets, and `removeRefusal` names
+ *              the users of an item that may not be removed yet.
+ *
  * Exports:
  * - GlobalsEditorHooks:  The hooks the globals.xml form takes
  * - useGlobalsEditor():  Those hooks, for a form
@@ -34,11 +39,17 @@ import { BuiltinFontField, FontPicker } from './font-picker';
 import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
 import type { AddChooser } from './form-view';
+import { AssetItemFacts, BdfRangeField } from './globals-assets';
+import { removeRefusal } from './asset-usage';
 
 /** The hooks the globals.xml form takes. */
 export interface GlobalsEditorHooks {
   readonly fieldControl: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
   readonly addChooser: AddChooser;
+  /** A font's or image's size and users, after its fields. */
+  readonly nodeExtra: (node: FormNode) => ReactNode;
+  /** Why an item may not be removed now, or undefined when it may. */
+  readonly removeRefusal: (node: FormNode) => string | undefined;
 }
 
 /** The vocabulary id of `<builtin>`. */
@@ -86,9 +97,11 @@ export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefi
   const declared = useMemo(() => declaredBuiltins(model), [model]);
   return useMemo<GlobalsEditorHooks>(
     () => ({
-      fieldControl: (field, _node, commit) => {
+      fieldControl: (field, node, commit) => {
         // --- A <builtin>'s name: the font picker behind "Change font…" ---
         if (field.elementId === BUILTIN && field.attribute.name === 'name') return <BuiltinFontField field={field} declared={declared} commit={commit} />;
+        // --- A <bdf>'s range: the presets, each with its compiled size ---
+        if (field.elementId === 'font-bdf' && field.attribute.name === 'range') return <BdfRangeField workspace={workspace} field={field} node={node} commit={commit} />;
         // --- A <bdf>, <xbm> or <convert> src: the file chooser behind "Choose file…" ---
         const kind = fileKindOfField(field.elementId, field.attribute.name);
         return kind === undefined ? undefined : <SourceFileField workspace={workspace} field={field} kind={kind} commit={commit} />;
@@ -113,6 +126,8 @@ export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefi
           );
         },
       },
+      nodeExtra: (node) => <AssetItemFacts workspace={workspace} node={node} />,
+      removeRefusal: (node) => removeRefusal(workspace.loop.lastRun.get()?.result.model, node),
     }),
     [workspace, declared],
   );

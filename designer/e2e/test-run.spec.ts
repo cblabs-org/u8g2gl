@@ -125,10 +125,15 @@ test('Run waits for the editor Wasm build, then runs; not well-formed and errors
   await expect(run(page).button).toBeEnabled();
 
   // --- Well-formed, but the canvas cannot draw it: the last good frame ---
-  await placeCaret(page, SCREEN, 'font="u8g2_font_6x10_mr" format', 6);
-  await page.keyboard.type('nope_');
+  // An image the project does not declare: the editor Wasm refuses a scene
+  // naming one. (An unknown font no longer does: it is drawn in the
+  // fallback, with a warning, design_spec §9.)
+  const before = await bufferText(page, SCREEN);
+  const setText = (text: string) =>
+    page.evaluate(({ path, text }) => (window as unknown as TestHandle).__u8g2gl.documents.modelOf(path)?.setValue(text), { path: SCREEN, text });
+  await setText(before.replace('<u8g2gl_clock', '<u8g2gl_xbm name="nope" x="0" y="0" width="8" height="8" src="nope" />\n        <u8g2gl_clock'));
   await expect(run(page).button).toHaveAttribute('data-reason', /last good frame/);
-  for (let i = 0; i < 5; i++) await page.keyboard.press('Backspace');
+  await setText(before);
   await expect(run(page).button).toBeEnabled();
 
   // --- Placeholders on the canvas. Only transiently real (a widget added

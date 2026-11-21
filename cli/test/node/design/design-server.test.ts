@@ -31,6 +31,8 @@ import { LOCK_FILE_NAME } from '../../../src/node/design/ignored-paths.js';
 import { INVALID_PATHS } from '../../project-fs/contract.js';
 import { createTestEventSource } from '../../project-fs/test-event-source.js';
 import { MINIMAL_PROJECT, makeTempDir, removeTempDirs, writeFiles } from './temp-project.js';
+import { FRAMEWORK_ROOT } from './build/departures-project.js';
+import LARGE_FONTS from '../../../src/data/u8g2-large-fonts.json' with { type: 'json' };
 
 let server: DesignServer | undefined;
 let root = '';
@@ -70,6 +72,7 @@ const ROUTES: ReadonlyArray<{ readonly method: string; readonly path: string; re
   { method: 'GET', path: '/api/file?path=u8g2gl.xml' },
   { method: 'PUT', path: '/api/file?path=screens/screen_x.xml', body: '<screen />\n' },
   { method: 'GET', path: '/api/events' },
+  { method: 'GET', path: '/api/font/builtin?name=u8g2_font_6x10_mr' },
   { method: 'POST', path: '/api/open', body: '{"path":"u8g2gl.xml"}' },
   { method: 'POST', path: '/api/reveal', body: '{"path":"u8g2gl.xml"}' },
   { method: 'POST', path: '/api/build/editor-wasm' },
@@ -509,6 +512,44 @@ describe('the designer route', () => {
     const s = await start();
     expect(await (await fetch(s.url)).text()).toContain('not built yet');
     expect((await fetch(`http://127.0.0.1:${s.port}/app/${s.token}/`)).status).toBe(404);
+  });
+});
+
+describe('the built-in font route', () => {
+  it("serves a U8G2 font's bytes from the packaged u8g2_fonts.c, exactly as its declaration gives them", async () => {
+    await start({}, { frameworkRoot: FRAMEWORK_ROOT });
+    const response = await api('/api/font/builtin?name=u8g2_font_6x10_mr');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/octet-stream');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    // u8g2_fonts.c declares it `u8g2_font_6x10_mr[1152]`; its first byte is the
+    // glyph count, '_' (95).
+    expect(bytes.length).toBe(1152);
+    expect(bytes[0]).toBe(95);
+  });
+
+  it('serves a large font, from inside #ifdef U8G2_USE_LARGE_FONTS', async () => {
+    await start({}, { frameworkRoot: FRAMEWORK_ROOT });
+    const response = await api(`/api/font/builtin?name=${LARGE_FONTS[0]}`);
+    expect(response.status).toBe(200);
+    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(32 * 1024);
+  });
+
+  it('answers a name U8G2 lacks with 404 and a JSON reason, and a malformed one with 400', async () => {
+    await start({}, { frameworkRoot: FRAMEWORK_ROOT });
+    const unknown = await api('/api/font/builtin?name=u8g2_font_no_such_font');
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ code: 'unknown-font', message: "U8G2 has no built-in font 'u8g2_font_no_such_font'" });
+    for (const path of ['/api/font/builtin', '/api/font/builtin?name=', '/api/font/builtin?name=../u8g2.h', '/api/font/builtin?name=ui_font_x']) {
+      expect((await api(path)).status, path).toBe(400);
+    }
+  });
+
+  it('answers 503 when this CLI has no fonts file to read', async () => {
+    await start({}, { frameworkRoot: null });
+    const response = await api('/api/font/builtin?name=u8g2_font_6x10_mr');
+    expect(response.status).toBe(503);
+    expect(((await response.json()) as { code: string }).code).toBe('no-font-source');
   });
 });
 

@@ -32,13 +32,19 @@
  *     - renderFrame():      Tick and draw; a view of the 1-bit buffer
  *     - displaySize():      The scene's display
  *
+ *     Injected assets:
+ *     - assetInjection:     Whether the module takes injected fonts and images
+ *     - injectFont():       A font's U8G2 table, by the name scenes use
+ *     - injectImage():      An image's XBM bytes and size, by name
+ *     - clearInjected():    Forget every injected font and image
+ *
  *     Designer view:
  *     - designHiding:       Whether the module can hide elements in the designer
  *     - setDesignHidden():  Elements the designer leaves out of the frame
  *     - runtimeHidden():    Elements the last frame left out by the runtime's rules
  *
  *     Reporting:
- *     - lastError():        Why the last call failed
+ *     - lastError():        Why the last call failed, or its warning
  *     - placeholders():     Elements the module has no class for
  *     - buildHash():        A project build's input hash; undefined for the framework's
  *
@@ -88,8 +94,30 @@ export interface EditorModule {
   renderFrame(ms: number): Uint8Array | undefined;
   /** @brief The applied scene's display, in pixels. */
   displaySize(): { readonly width: number; readonly height: number };
-  /** @brief Why the last call that failed did. */
+  /**
+   * @brief Why the last call that failed did; after one that succeeded, its
+   *        warning, if any: a font the screen names that is not loaded, drawn
+   *        in `u8g2_font_4x6_tr`. `renderFrame` repeats that warning.
+   */
   lastError(): string;
+  /**
+   * Whether this module takes injected fonts and images. A project editor
+   * Wasm built by an older CLI does not; it draws the fonts and images it was
+   * compiled with, and the designer says so.
+   */
+  readonly assetInjection: boolean;
+  /**
+   * @brief Injects a font's U8G2 table under the name scenes give it; a later
+   *        `applyScene` draws with it. Copied, so `bytes` may be reused.
+   *
+   * @return False with `lastError()` if refused (a table that is not whole),
+   *         or when the module cannot take injected assets.
+   */
+  injectFont(name: string, bytes: Uint8Array): boolean;
+  /** @brief Injects an image's XBM bytes and size, as `injectFont` does a font's. */
+  injectImage(name: string, width: number, height: number, bytes: Uint8Array): boolean;
+  /** @brief Forgets every injected font and image; never done by `applyScene`. */
+  clearInjected(): void;
   /** @brief The active screen's elements drawn as placeholders. */
   placeholders(): readonly Placeholder[];
   /** @brief The build hash a project editor Wasm carries; undefined for the framework's. */
@@ -135,6 +163,9 @@ interface EmscriptenModule {
   _getLastError(): number;
   _getPlaceholders(): number;
   _getBuildHash?: () => number;
+  _injectFont?: (name: number, bytes: number, length: number) => number;
+  _injectImage?: (name: number, width: number, height: number, bytes: number, length: number) => number;
+  _clearInjected?: () => void;
   _setDesignHidden?: (pointer: number) => number;
   _getRuntimeHidden?: () => number;
 }
@@ -197,6 +228,19 @@ function wrap(module: EmscriptenModule): EditorModule {
     }
   };
 
+  // withBytes
+  // Calls an export taking bytes, copied onto the Wasm heap for the call only:
+  // the bridge keeps its own copy.
+  const withBytes = (call: (pointer: number) => number, bytes: Uint8Array): number => {
+    const pointer = module._malloc(Math.max(1, bytes.length));
+    module.HEAPU8.set(bytes, pointer);
+    try {
+      return call(pointer);
+    } finally {
+      module._free(pointer);
+    }
+  };
+
   return {
     applyScene: (json) => withString((p) => module._applyScene(p), json) === 1,
     selectScreen: (name) => withString((p) => module._selectScreen(p), name) === 1,
@@ -218,6 +262,18 @@ function wrap(module: EmscriptenModule): EditorModule {
     // Optional, like the build hash: a project Wasm cached by an older CLI
     // lacks them, and must still draw.
     designHiding: module._setDesignHidden !== undefined,
+    assetInjection: module._injectFont !== undefined && module._injectImage !== undefined && module._clearInjected !== undefined,
+    injectFont(name, bytes) {
+      const inject = module._injectFont;
+      return inject !== undefined && withString((n) => withBytes((b) => inject(n, b, bytes.length), bytes), name) === 1;
+    },
+    injectImage(name, width, height, bytes) {
+      const inject = module._injectImage;
+      return inject !== undefined && withString((n) => withBytes((b) => inject(n, width, height, b, bytes.length), bytes), name) === 1;
+    },
+    clearInjected() {
+      module._clearInjected?.();
+    },
     setDesignHidden(names) {
       const set = module._setDesignHidden;
       return set !== undefined && withString((p) => set(p), JSON.stringify(names)) === 1;

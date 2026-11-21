@@ -46,6 +46,7 @@ import { PropertyPanel } from '../panel/property-panel';
 import { SessionBanner } from './session-banner';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { Palette } from '../palette/palette';
+import { FontsView } from '../fonts/fonts-view';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -66,6 +67,24 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   countRender('App');
   const dock = useRef<DockviewApi | undefined>(undefined);
   const [view, setView] = useState<SidebarView>('explorer');
+
+  // --- "Browse fonts…" from a font field opens the Fonts view, and the view
+  //     it came from comes back once the request is served or cancelled ---
+  useEffect(() => {
+    let previous: SidebarView | undefined;
+    return workspace.fontBrowse.subscribe(() => {
+      const request = workspace.fontBrowse.get();
+      setView((current) => {
+        if (request !== undefined) {
+          if (current !== 'fonts') previous = current;
+          return 'fonts';
+        }
+        const back = previous ?? current;
+        previous = undefined;
+        return back;
+      });
+    });
+  }, [workspace]);
 
   // --- Opening files: a tab per file, in one group right of the canvas ---
   // A project document gets an editor; anything else (a widget's C++) a
@@ -157,7 +176,7 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
         <SessionBanner />
         <div className="shell">
           <ActivityBar active={view} onSelect={setView} />
-          {view === 'explorer' ? <Explorer /> : <Palette />}
+          {view === 'explorer' ? <Explorer /> : view === 'palette' ? <Palette /> : <FontsView />}
           <main className="editor-area">
             <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
           </main>

@@ -21,6 +21,10 @@
  *              keystroke. The active target ([U-3]) is its own component as
  *              well: it re-renders only when the project's targets or the
  *              choice change, never on a keystroke that changes neither.
+ *              When the frame's fonts are not what the project declares — a
+ *              font not loaded, drawn in the editor Wasm's fallback, or a
+ *              module old enough to draw only the fonts it was built with —
+ *              an item beside Problems says so.
  *
  * Exports:
  * - StatusBar:          The component
@@ -83,6 +87,11 @@ export function StatusBar({ onShowOutput }: { readonly onShowOutput: () => void 
       <span className="status-item problems-count">
         ⛔ {errors} ⚠ {warnings}
       </span>
+      {frame.assetNote !== undefined && (
+        <span className="status-item asset-note" role="status" title={frame.assetNote}>
+          ⚠ fonts: {frame.assetNote}
+        </span>
+      )}
       <UnsavedSave />
       <NotSaved onShowOutput={onShowOutput} />
       <span className="status-spacer" />

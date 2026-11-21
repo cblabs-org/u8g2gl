@@ -39,6 +39,7 @@ import { detectToolchain, type SelectedToolchain } from '../../../../src/node/to
 import { nodeToolchainHost } from '../../../../src/node/toolchain/toolchain-host.js';
 import { toolchainCacheRoot } from '../../../../src/node/toolchain/toolchain-paths.js';
 import { DEPARTURES_PROJECT, FRAMEWORK_ROOT } from '../build/departures-project.js';
+import { injectProjectAssets } from '../build/inject-project-assets.js';
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
 
 const host = nodeToolchainHost();
@@ -149,6 +150,8 @@ describe.skipIf(toolchain === undefined)('the parity corpus: firmware frames equ
       for (const screen of harness.screens) {
         const firmware = await harness.run(screen, TEST_RUN_TIMES);
         const editor = await loadEditor(editorBuild.wasmDir);
+        // The editor compiles in no project font or image: injected, as the designer does.
+        await injectProjectAssets(editor._module, project);
         expect(editor.applyScene(scene), editor.getLastError()).toBe(true);
         expect(editor._module.ccall('selectScreen', 'number', ['string'], [screen]), editor.getLastError()).toBe(1);
         expect(editor.applySampleData(values), editor.getLastError()).toBe(true);

@@ -1,0 +1,30 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/fonts/fonts.css
+ * Purpose: The Fonts view's layout in the primary sidebar: its two lists, and
+ *          the selected font's glyph grid and ruler, drawn 1-bit and scaled
+ *          with crisp pixels as the canvas is.
+ */
+.fonts-view { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; }
+.fonts-section { padding: 0 12px; }
+.fonts-section h3 { margin: 6px 0 4px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.fonts-section h4 { margin: 8px 0 2px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.fonts-project { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.font-project-row { width: 100%; text-align: left; padding: 2px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.font-project-row[aria-pressed='true'] { border-color: var(--accent); }
+.font-project-row code { font: 11px ui-monospace, Menlo, monospace; }
+.font-kind { font-size: 10px; color: var(--text-dim); }
+.fonts-request { margin: 0 12px; padding: 4px 6px; border: 1px solid var(--accent); border-radius: 3px; font-size: 12px; }
+.fonts-request code, .font-detail h3 code { font: 11px ui-monospace, Menlo, monospace; }
+.font-actions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.fonts-view .action { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.fonts-view .action.primary { border-color: var(--accent); }
+.glyph-grid, .font-ruler { display: block; max-width: 100%; image-rendering: pixelated; background: #141414; zoom: 2; }
+.font-ruler-input input { width: 100%; box-sizing: border-box; }
+.font-ruler-reading { margin: 2px 0; font-size: 12px; }
+.fonts-view .font-options { max-height: none; }
+.font-editor { display: flex; flex-direction: column; gap: 4px; }
+.font-editor .browse-fonts { align-self: flex-start; padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }

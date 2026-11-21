@@ -35,6 +35,7 @@
  *     - formHighlight:  The range of the project-file form's focused section, for the XML
  *     - formCaret:      Where the XML caret is in a project file, for its form
  *     - formReveal:     The form section the Explorer last asked to show
+ *     - fontBrowse:     A font field's "Browse fonts…", while the Fonts view serves it
  *
  *     Lifecycle:
  *     - start():        Start the loop and the Wasm, once loaded
@@ -68,6 +69,7 @@ import { Observable } from './state/observable';
 import { TestRunController } from './test-run/test-run-controller';
 import { saveTarget } from './ui/save-status';
 import { EditorWasmController } from './wasm/editor-wasm-controller';
+import type { FontBrowseRequest } from './fonts/font-browse';
 
 /** A file to show, and optionally the position to put the caret at. */
 export interface OpenRequest {
@@ -142,6 +144,11 @@ export class Workspace {
    * the section, item or part it is in, without taking focus.
    */
   readonly formCaret = new Observable<{ readonly path: string; readonly offset: number } | undefined>(undefined);
+  /**
+   * A property panel font field's "Browse fonts…": the Fonts view opens to
+   * serve it, and clears it once the field has its font or the author cancels.
+   */
+  readonly fontBrowse = new Observable<FontBrowseRequest | undefined>(undefined);
   /**
    * The form section the Explorer last asked to show, with a count so the
    * same section asked for twice is shown twice.

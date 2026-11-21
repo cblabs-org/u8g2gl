@@ -73,14 +73,18 @@ const FRAMEWORK_DIR = './framework-wasm';
 /**
  * @brief Whether a change to this project file can change the editor Wasm build.
  *
- * Widget sources and manifests, the project and globals files (fonts, images
- * and the target's capacities), and any asset outside `screens/`. A screen
- * never does: drawing a screen is the live edit loop's job. A request that
- * turns out not to change the build hash costs the server one `generate`, no
- * compile.
+ * Widget sources and manifests (`widgets/`), and `u8g2gl.xml`, which chooses
+ * the target the build generates for. Nothing else: a screen is drawn by the
+ * live edit loop, and fonts and images (`globals.xml`'s declarations and the
+ * files they name, under `fonts/`, `images/` or anywhere) are injected into
+ * the editor Wasm rather than compiled into it (design_spec §9), so the build
+ * hash covers none of them. `globals.xml`'s style count does reach the
+ * generated configuration, as a screen's object count does, but no runtime
+ * source the editor compiles reads that ceiling, so neither is worth a
+ * request: the next widget change rebuilds with it.
  */
 export function affectsEditorBuild(path: string): boolean {
-  return !path.startsWith('screens/');
+  return path.startsWith('widgets/') || path === 'u8g2gl.xml';
 }
 
 /** A build record as `GET /api/build/<id>` serves it. */

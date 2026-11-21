@@ -921,6 +921,26 @@ no such members. An element that wants box-like drawing has two routes, and
 neither of them extends the box. Declare a drawing element of its own (`draw=`
 props, no `extends`), or extend `u8g2gl_obj` and draw from your own class.
 
+#### Fonts and images: exactly two routes
+
+*2026-11-20 (owner, E-2k2, K5).* A widget gets a font or an image in one of two ways:
+
+- **A prop.** A `type="font"` or `type="image"` prop. U8G2GL handles it end to end:
+  the project declares it, the generator emits it, and the designer injects it
+  into the editor Wasm (§9.5).
+- **Owned by the widget.** A U8G2 font (`u8g2_font_…`) or the widget's own bitmap,
+  named in its C++ and compiled with the widget, in the firmware and the editor
+  build alike.
+
+**Anything else is an error.** In practice that is widget source naming a generated
+project symbol — `ui_font_…`, `ui_fontdata_…` or `ui_image_…` — which exists only in
+one project's firmware build, and which the editor build (compiling no project font or
+image) cannot link. One check (`cli/src/core/validator/widget-asset-symbols.ts`) reports
+`U8G2GL_WIDGET_ASSET_SYMBOL` at the symbol, and `validate`, `generate` and the editor
+build all run it, so a widget cannot pass on the device and fail only in the designer.
+Comments and string literals are skipped. Application code may use the generated
+symbols freely, and is never scanned.
+
 #### What the designer's Run checks
 
 The designer's canvas draws a custom element through the **editor target**: the
@@ -1258,6 +1278,35 @@ sample values; sample sets themselves are E-3b's (ui_spec §11).
 (`ui_departures_rows`) and generated storage are not part of this path. A widget
 keeps its hand-written `begin()`/`add_row()`/`commit()`, and firmware compiles
 none of the registry: the fill path is editor target only ([UD-4]).
+
+### 9.5 The editor's fonts and images: injection
+
+*2026-11-20 (E-2k2).* **The editor Wasm compiles in no project font or image; the
+designer injects their bytes.** The editor target's `ui_editor_asset()` (§13.7) is
+emitted empty, and an editor build neither compiles nor hashes `ui_fonts.cpp` or
+`ui_images.cpp`. Before it applies a scene, the designer hands the bridge every
+font and image the project declares (`injectFont()`, `injectImage()`): a `<bdf>`
+and every image are what `compileProjectAssets()` produced in the page; a
+`<builtin>` comes from the design server's `GET /api/font/builtin?name=`, which
+reads the packaged `u8g2_fonts.c` once, on the first request, into a name → bytes
+index (large fonts included), and keeps it. Each is exactly the bytes the firmware
+links, so the canvas cannot differ from the device; `wasm/test/asset-injection.test.mjs`
+proves an injected built-in, BDF font and image render pixel-identically to the same
+asset compiled in, and the parity corpus compares injected editor frames with the
+firmware harness's.
+
+The injected table lives until `clearInjected()`, never cleared by `applyScene()`,
+so the designer re-injects only when the project's assets change. The bridge looks a
+name up there first, then in `ui_editor_asset()`. A font it has nowhere is drawn in
+`u8g2_font_4x6_tr`, not refused, and `getLastError()` carries a warning naming it,
+which the status bar shows; an image it has nowhere still refuses the scene. A font
+whose own U8G2 structure runs past the bytes given is refused at injection.
+
+**Consequences.** A font or image change never rebuilds the editor Wasm: only widget
+code and `u8g2gl.xml` request a build. A project with no widgets draws any font on
+the framework Wasm the designer ships, with no toolchain at all. A project editor
+Wasm cached by an older CLI, which lacks the exports, draws the fonts it was built
+with, and the status bar says so.
 
 ---
 
@@ -2107,6 +2156,8 @@ The CLI and the designer load the same artefact, so font compilation has one imp
 
 **`range` selects codepoints, and an absent `range` means no filter.** The grammar is a comma-separated list of single codepoints and `a-b` ranges, each hexadecimal (`0x20`) or decimal — `range="0x20-0x7F,0xE000-0xE01F"`. Anything else is a named error. A `<bdf>` without `range` compiles **every codepoint the BDF contains**: an optional filter attribute that silently filters when omitted is a trap, and `bdfconv`'s own `*` default of 32–255 would quietly drop every glyph a project needs above ASCII. The cost of omitting it is reported rather than hidden — §18's budget shows the compiled size, which is where a font pulling in a full CJK or symbol block becomes visible.
 
+**Range presets, and the glyph-range warning.** *2026-11-20 (E-2k2).* The designer's `<bdf>` form offers `range` presets, each with its compiled size from the in-page `bdfconv`: **All** (no `range`), **Printable ASCII** (`0x20-0x7E`), **Latin-1** (`0x20-0x7E,0xA0-0xFF`), **Digits and time** (`0x20,0x2B-0x3A`), and **Only what this project uses**, derived from the project's static text: every `string` prop's literal value and the literal part of every binding's format, by the font each element draws in (`cli/src/core/fonts/static-text.ts`). The derived preset is flagged unsafe for a font that an element bound to a string subject draws in, naming the elements, because live data can carry characters design time cannot see; sample values join the derivation once they exist. Choosing a preset writes `range` as one undo stop. The validator reads the same static text: where it uses a character a ranged `<bdf>` leaves out, it warns `U8G2GL_GLYPH_OUTSIDE_RANGE` (§15), naming the characters, because U8G2 draws nothing for a missing glyph. It is a warning, not an error, it changes no generated output, and built-in fonts are not checked, since their glyph sets are U8G2's and are not guessed.
+
 `bdfconv`'s mapping language also offers `>` remapping and `~` exclusion. Those are not range selection — they rewrite which glyph sits at which codepoint, which is font *authoring* and belongs to the Phase 4 BDF editor (§20) where the author can see the result, not to a build attribute whose effect is invisible until it renders. Schema surface is permanent once authors write XML against it (§1.5).
 
 `<builtin name="u8g2_font_6x10_mr" />` references U8G2's bundled fonts with no compilation step — it emits a reference to a symbol U8G2 already provides, so it needs no `bdfconv`, no packaging, and no licensing consideration beyond what the user accepted by linking U8G2 (§22.1). **This is the default path** and covers several hundred fonts; `<bdf>` exists for when a project genuinely needs its own typeface.
@@ -2114,7 +2165,7 @@ The CLI and the designer load the same artefact, so font compilation has one imp
 **What a built-in font's name says, and what it looks like.** *2026-11-15 (E-6).* The designer helps an author choose among U8G2's 2039 bundled fonts (ui_spec §6.4) with two pieces of data, both derived from the pinned U8G2 as the catalogue is ([D-14]):
 
 - **The facts in the name.** U8G2's font build tool names every font `u8g2_font_<name>_<box><set>` (`extern/u8g2/tools/font/build/build.c`, `gen_font()`; the wiki's `fntlistall` documents the same scheme). The box is `t` transparent, `h` common height, `m` monospace or `8` 8×8; the set is `f` full (32–255), `r` reduced (32–127), `u` uppercase (32–95), `n` numbers, `e` extended, or a font's own named postfix (`_cyrillic`, `_all`, or none). Core's `fontFacts()` (`cli/src/core/catalogue/font-facts.ts`) decodes them from one table. A postfix that is only a number (`_72_73`, `_1`) means a different map file or Unicode block per font, so the 19 fonts that use one are reported as unknown rather than guessed, and a test lists them, so a U8G2 upgrade that adds another is a visible diff. The heights come from each font's own header, as before (`u8g2-font-heights.json`).
-- **A sample drawn by U8G2 itself.** The editor Wasm links only the fonts a project declares, so it cannot draw one the author has not chosen yet. Instead, `npm run build:font-samples` in `cli/` builds `tools/font-samples/` — a host program, outside the root build and ctest, that links the vendored `u8g2_fonts.c` — and draws `AaBbGg 0123` (the digits, for an `n` font; the first glyphs, for a font that has neither) in each font at its own size, cropped to the drawn width and the font's own height, one bit per pixel. Its font table is generated from `u8g2-fonts.json`, so no list is typed by hand and a font U8G2 does not have is a compile error naming it. The output, `cli/src/data/u8g2-font-samples.json`, is committed: 2039 samples, 1.25 MB (295 kB gzipped), byte-identical across a clean rebuild. The designer imports it dynamically, so it is a chunk of its own, fetched when a picker first opens and never part of the initial page; it needs no server route. It ships inside the CLI package's designer, and the CLI itself never reads it.
+- **A sample drawn by U8G2 itself.** A picker row's sample is drawn ahead of time, so 2039 rows cost one file rather than 2039 injections into the editor Wasm (§9.5). Instead of drawing them live, `npm run build:font-samples` in `cli/` builds `tools/font-samples/` — a host program, outside the root build and ctest, that links the vendored `u8g2_fonts.c` — and draws `AaBbGg 0123` (the digits, for an `n` font; the first glyphs, for a font that has neither) in each font at its own size, cropped to the drawn width and the font's own height, one bit per pixel. Its font table is generated from `u8g2-fonts.json`, so no list is typed by hand and a font U8G2 does not have is a compile error naming it. The output, `cli/src/data/u8g2-font-samples.json`, is committed: 2039 samples, 1.25 MB (295 kB gzipped), byte-identical across a clean rebuild. The designer imports it dynamically, so it is a chunk of its own, fetched when a picker first opens and never part of the initial page; it needs no server route. It ships inside the CLI package's designer, and the CLI itself never reads it.
 
 **U8G2's large fonts are guarded at compile time.** *2026-11-15 (E-7).* U8G2 compiles its 63 fonts over 32 KB only where `U8G2_USE_LARGE_FONTS` is defined. `u8g2.h` defines it when `unix`, `__unix__`, `__arm__`, `__arc__`, `ESP8266`, `ESP_PLATFORM` or `__LUATOS__` is, and lets a project define it itself. `u8g2_fonts.c` wraps each large font's **definition** in `#ifdef U8G2_USE_LARGE_FONTS` … `#endif`, but `u8g2.h` declares every font unconditionally. So a `<builtin>` naming one compiles everywhere and, on a platform without the macro (AVR, for example), fails only at link time with a bare undefined reference.
 
@@ -2223,6 +2274,13 @@ Two properties make this useful rather than decorative:
    | `U8G2GL_NEWER_SCHEMA_REQUIRED` | A `<data>` in a 0.4–0.6 project's own manifest (§15.4) |
    | `U8G2GL_UNKNOWN_ATTRIBUTE`, `U8G2GL_MISSING_REQUIRED`, `U8G2GL_TYPE_MISMATCH` | A static child's attribute its `<element>` does not declare (with suggestions); an argument not written; an `int` argument that is not an integer literal |
    | `U8G2GL_UNKNOWN_COMPONENT` | An unknown child of a widget that declares static children, naming the ones it takes |
+
+   And those for fonts and images (§6.5, §14.1, CLI 0.24):
+
+   | Code | When |
+   |---|---|
+   | `U8G2GL_WIDGET_ASSET_SYMBOL` | A widget's own C++ (a `.cpp`, `.cc`, `.h` or `.hpp` in its directory) names a generated font or image symbol (`ui_font_…`, `ui_fontdata_…`, `ui_image_…`). Error, at the symbol, telling the author to take it through a `type="font"` or `type="image"` prop. Comments and string literals are not read; application code is never scanned. Reported by `validate`, `generate` and the designer's editor build alike |
+   | `U8G2GL_GLYPH_OUTSIDE_RANGE` | Static text (a string prop's literal, or a binding format's literal part) uses a character its `<bdf>` font's `range` leaves out, naming the characters. Warning, at the attribute; no generated output changes. Built-in fonts and unranged `<bdf>` fonts are not checked |
 2. **Suggestions are structured** — the near-miss candidates behind "did you mean 'small_09'?" appear as a list, so a caller can apply a fix programmatically rather than regex the sentence.
 
 This is the mechanism by which "diagnostics are the product" (§1.2) actually pays off. A model that receives `{"code":"U8G2GL_UNKNOWN_FONT","suggestions":["small_09"],"line":14}` converges in one iteration. One that receives `Error: invalid XML` does not converge at all.
