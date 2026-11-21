@@ -129,3 +129,23 @@
 .asset-image { display: flex; align-items: center; gap: 8px; }
 .image-preview { image-rendering: pixelated; }
 .convert-choice { color: var(--text-dim); }
+
+/* --- globals.xml's subjects table (E-2k3) --- */
+.subjects-table-wrap { overflow-x: auto; }
+.subjects-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.subjects-table th { padding: 2px 4px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.subjects-table td { padding: 3px 4px; vertical-align: top; border-top: 1px solid var(--border); }
+.subjects-table tr.form-item { padding: 0; border: none; background: transparent; }
+.subjects-table .form-field { margin-bottom: 0; }
+.subjects-table .form-field .field-label { font-size: 10px; }
+.subjects-table input[type='text'] { width: 100%; min-width: 4em; }
+.subject-heading-note { display: block; font-weight: 400; font-size: 10px; }
+.subject-type { font: 11px ui-monospace, Menlo, monospace; color: var(--text-dim); }
+.subject-cost { display: block; font-size: 10px; color: var(--text-dim); }
+.subject-none { color: var(--text-dim); }
+.subject-users { margin: 0; padding: 0; list-style: none; }
+.subject-users .link, .globals-users .link { padding: 0; background: none; border: none; color: var(--info); font: 11px ui-monospace, Menlo, monospace; cursor: pointer; text-align: left; }
+.subject-actions { white-space: nowrap; }
+.subject-actions button { padding: 0 5px; margin-left: 2px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+.subject-actions button:disabled { opacity: 0.35; cursor: default; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

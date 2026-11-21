@@ -24,7 +24,9 @@
  *              The fonts and images sections also show each item's size and
  *              users (`globals-assets.tsx`, after its fields), a `<bdf>`'s
  *              `range` field carries its presets, and `removeRefusal` names
- *              the users of an item that may not be removed yet.
+ *              the users of an item that may not be removed yet. The
+ *              subjects section is a table (`globals-subjects.tsx`), with
+ *              each subject's cost and the bindings that use it.
  *
  * Exports:
  * - GlobalsEditorHooks:  The hooks the globals.xml form takes
@@ -38,9 +40,11 @@ import { derivedName, fileKindOf, fileKindOfField, pngSize, type FileKind } from
 import { BuiltinFontField, FontPicker } from './font-picker';
 import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
-import type { AddChooser } from './form-view';
+import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
+import { SubjectsTable } from './globals-subjects';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
 import { removeRefusal } from './asset-usage';
+import { workspaceReferences } from '../project/project-references';
 
 /** The hooks the globals.xml form takes. */
 export interface GlobalsEditorHooks {
@@ -50,7 +54,12 @@ export interface GlobalsEditorHooks {
   readonly nodeExtra: (node: FormNode) => ReactNode;
   /** Why an item may not be removed now, or undefined when it may. */
   readonly removeRefusal: (node: FormNode) => string | undefined;
+  /** The sections drawn their own way: the subjects table. */
+  readonly renderSection: SectionRenderer;
 }
+
+/** The subjects section's key. */
+const SUBJECTS = 'globals.xml>subjects';
 
 /** The vocabulary id of `<builtin>`. */
 const BUILTIN = 'font-builtin';
@@ -92,8 +101,10 @@ async function addedValues(workspace: Workspace, list: FormList, kind: FileKind,
  *
  * @param workspace  The session: the project's files, for the file chooser.
  * @param model      The form as last read, for the fonts it declares.
+ * @param state      What the form draws, for the tables' fields.
+ * @param actions    The form's edits, which the tables make.
  */
-export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefined): GlobalsEditorHooks {
+export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefined, state: FormViewState, actions: FormActions): GlobalsEditorHooks {
   const declared = useMemo(() => declaredBuiltins(model), [model]);
   return useMemo<GlobalsEditorHooks>(
     () => ({
@@ -127,8 +138,10 @@ export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefi
         },
       },
       nodeExtra: (node) => <AssetItemFacts workspace={workspace} node={node} />,
-      removeRefusal: (node) => removeRefusal(workspace.loop.lastRun.get()?.result.model, node),
+      removeRefusal: (node) => removeRefusal(workspaceReferences(workspace), node),
+      renderSection: (section, _generic, readOnly) =>
+        section.key === SUBJECTS && section.list !== undefined ? <SubjectsTable workspace={workspace} list={section.list} state={state} actions={actions} readOnly={readOnly} /> : undefined,
     }),
-    [workspace, declared],
+    [workspace, declared, state, actions],
   );
 }

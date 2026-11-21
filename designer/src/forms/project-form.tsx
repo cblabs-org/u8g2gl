@@ -107,7 +107,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
       set: (field, value) => void controller.apply({ kind: 'set', field, value }),
       add: (list, kind, values) => void controller.apply({ kind: 'add', list, itemKind: kind, values: { ...seedFor(workspace, kind), ...values } }),
       remove: (item) => {
-        // An item still in use is refused, naming its users (globals.xml's fonts and images).
+        // An item still in use is refused, naming its users (globals.xml's subjects, fonts and images).
         const node = file === 'globals.xml' ? findItem(controller.state.get().model, item) : undefined;
         const refusal = node === undefined ? undefined : globalsRefusal.current?.(node);
         if (refusal !== undefined) controller.refuse(refusal);
@@ -122,11 +122,12 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   // u8g2gl.xml's own editors: the display picker, the constructor snippet, the output example.
   const project = useProjectEditor(workspace, projectSchema(state.model));
   const hooks = file === 'u8g2gl.xml' ? project : undefined;
-  const sections = renderSection ?? hooks?.renderSection;
+  const sectionsFor = renderSection ?? hooks?.renderSection;
   // globals.xml's: the font picker and the file chooser, on a field and on adding.
-  const globalsHooks = useGlobalsEditor(workspace, state.model);
+  const globalsHooks = useGlobalsEditor(workspace, state.model, state, actions);
   const globals = file === 'globals.xml' ? globalsHooks : undefined;
   globalsRefusal.current = globals?.removeRefusal;
+  const sections = sectionsFor ?? globals?.renderSection;
 
   return (
     <div className="project-form-scroll" ref={root}>
