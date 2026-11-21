@@ -26,8 +26,10 @@
  *              `range` field carries its presets, and `removeRefusal` names
  *              the users of an item that may not be removed yet. The
  *              subjects section is a table (`globals-subjects.tsx`), with
- *              each subject's cost and the bindings that use it. Every item
- *              that declares a name has "Rename…" (`rename-dialog.tsx`).
+ *              each subject's cost and the bindings that use it. Each style's
+ *              card ends with its preview, users and radius bound, and each
+ *              constant with its references (`globals-styles.tsx`). Every
+ *              item that declares a name has "Rename…" (`rename-dialog.tsx`).
  *
  * Exports:
  * - GlobalsEditorHooks:  The hooks the globals.xml form takes
@@ -43,6 +45,7 @@ import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
 import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
 import { SubjectsTable } from './globals-subjects';
+import { ConstFacts, StyleFacts } from './globals-styles';
 import { renameTargetOf } from './rename-dialog';
 import type { RenameTarget } from './rename-plan';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
@@ -53,7 +56,7 @@ import { workspaceReferences } from '../project/project-references';
 export interface GlobalsEditorHooks {
   readonly fieldControl: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
   readonly addChooser: AddChooser;
-  /** A font's or image's size and users, after its fields. */
+  /** A font's or image's size and users, a style's preview, users and radius bound, a constant's references: after its fields. */
   readonly nodeExtra: (node: FormNode) => ReactNode;
   /** Why an item may not be removed now, or undefined when it may. */
   readonly removeRefusal: (node: FormNode) => string | undefined;
@@ -161,7 +164,14 @@ export function useGlobalsEditor(
           );
         },
       },
-      nodeExtra: (node) => <AssetItemFacts workspace={workspace} node={node} />,
+      nodeExtra: (node) =>
+        node.element.id === 'style' ? (
+          <StyleFacts workspace={workspace} node={node} />
+        ) : node.element.id === 'const-int' || node.element.id === 'const-string' ? (
+          <ConstFacts workspace={workspace} node={node} />
+        ) : (
+          <AssetItemFacts workspace={workspace} node={node} />
+        ),
       removeRefusal: (node) => removeRefusal(workspaceReferences(workspace), node),
       renderSection: (section, _generic, readOnly) =>
         section.key === SUBJECTS && section.list !== undefined ? (

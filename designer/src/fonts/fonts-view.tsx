@@ -30,6 +30,11 @@
  *
  * Exports:
  * - FontsView:          The view
+ * - Drawing:            A drawn view project's frame, or why there is none
+ * - NO_ASSETS:          Compiled assets with nothing in them
+ * - drawProject():      Draw a view project through the real renderer
+ * - paint():            Put a frame, or part of it, on a canvas
+ *                       (the style cards' previews draw through these too)
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -70,10 +75,10 @@ function contentWidth(element: HTMLElement | null | undefined): number | undefin
 }
 
 /** What a drawn view project produced: a frame and its size, or why there is none. */
-type Drawing = { readonly frame: Uint8Array; readonly width: number; readonly height: number } | { readonly problem: string };
+export type Drawing = { readonly frame: Uint8Array; readonly width: number; readonly height: number } | { readonly problem: string };
 
 /** Compiled assets with nothing in them, for a view project of a built-in alone. */
-const NO_ASSETS: CompiledAssets = { fonts: new Map(), images: new Map(), diagnostics: [], failedFonts: new Set(), failedImages: new Set() };
+export const NO_ASSETS: CompiledAssets = { fonts: new Map(), images: new Map(), diagnostics: [], failedFonts: new Set(), failedImages: new Set() };
 
 /** The ruler's text until the author types their own. */
 const DEFAULT_RULER = 'Platform 9 12:34';
@@ -119,13 +124,15 @@ function addBuiltin(workspace: Workspace, name: string): boolean {
   return added;
 }
 
-// drawProject
-// Draws a view project in the spare editor module, with its fonts injected as
-// the canvas's are, and returns its frame.
-//   workspace — the session
-//   texts     — the project's files
-//   assets    — the compiled fonts, for a <bdf>
-async function drawProject(workspace: Workspace, texts: ReadonlyMap<string, string>, assets: CompiledAssets): Promise<Drawing> {
+/**
+ * @brief Draws a view project in the spare editor module, with its fonts
+ *        injected as the canvas's are, and returns its frame.
+ *
+ * @param workspace The session.
+ * @param texts     The project's files (`viewProjectTexts()` and its kin).
+ * @param assets    The compiled fonts, for a `<bdf>`.
+ */
+export async function drawProject(workspace: Workspace, texts: ReadonlyMap<string, string>, assets: CompiledAssets): Promise<Drawing> {
   const spare = workspace.wasm.spareInstance();
   if (spare === undefined) return { problem: 'The editor Wasm has not loaded yet.' };
   const module = await spare;
@@ -146,7 +153,7 @@ async function drawProject(workspace: Workspace, texts: ReadonlyMap<string, stri
  * @param drawing The frame.
  * @param crop    The part to show.
  */
-function paint(canvas: HTMLCanvasElement | null, drawing: Drawing | undefined, crop: InkBox | undefined): void {
+export function paint(canvas: HTMLCanvasElement | null, drawing: Drawing | undefined, crop: InkBox | undefined): void {
   const context = canvas?.getContext('2d');
   if (canvas === null || context === null || context === undefined || drawing === undefined || 'problem' in drawing || crop === undefined) return;
   const pixels = new Uint32Array(drawing.width * drawing.height);

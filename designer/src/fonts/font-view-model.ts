@@ -28,6 +28,7 @@
  * - fontMetrics():       Read it
  * - glyphGridTexts():    The project files that draw a font's glyph grid
  * - rulerTexts():        The project files that draw one string in a font
+ * - viewProjectTexts():  The project files that draw any one-screen view
  * - inkBox():            The lit pixels' bounding box in a U8G2 buffer
  * - escapeXml():         Text as an XML attribute value
  */
@@ -138,6 +139,20 @@ function projectFiles(view: string): Map<string, string> {
     ],
     [VIEW_SCREEN, `<?xml version="1.0" encoding="UTF-8"?>\n<screen name="fonts_view">\n    <view>\n${view}    </view>\n</screen>\n`],
   ]);
+}
+
+/**
+ * @brief The project files of a one-screen view on the view's display, over a
+ *        `globals.xml`: what the glyph grid and ruler are made of, and what
+ *        another view (a style's preview) draws through the same route.
+ *
+ * @param globals The `globals.xml` to draw with.
+ * @param view    The screen's `<view>` body, each line indented eight spaces.
+ */
+export function viewProjectTexts(globals: string, view: string): Map<string, string> {
+  const texts = projectFiles(view);
+  texts.set('globals.xml', globals);
+  return texts;
 }
 
 /** The gap between grid cells, in pixels. */

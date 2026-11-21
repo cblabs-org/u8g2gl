@@ -203,6 +203,9 @@ const ITEM_KINDS: Readonly<Record<string, ReferenceKind>> = {
   'subject-string': 'subject',
   'subject-bool': 'subject',
   'subject-time': 'subject',
+  'const-int': 'const',
+  'const-string': 'const',
+  style: 'style',
   'font-builtin': 'font',
   'font-bdf': 'font',
   'image-xbm': 'image',
@@ -222,7 +225,10 @@ export function kindOfItem(node: FormNode): ReferenceKind | undefined {
  *        the reason names its users.
  *
  * Fonts and images count the users `fontUsers()` and `imageUsers()` list;
- * subjects, every binding and subject-typed prop or default.
+ * subjects, styles and constants, every use the reference finder reports
+ * (bindings, typed props and defaults, style references, `#name` tokens). A
+ * global style's uses on a screen that shadows it are that screen's own
+ * style's, so they do not hold it. Every globals kind is then guarded.
  *
  * @param refs The project's references now; undefined before the first run.
  * @param node The item.
