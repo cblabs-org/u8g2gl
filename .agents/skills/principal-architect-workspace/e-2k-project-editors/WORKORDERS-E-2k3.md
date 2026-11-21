@@ -16,7 +16,7 @@ You are a senior engineer and execution-focused worker. You are **not** the Prin
 Execute **WO1, then WO2, then WO3, then WO4**.
 
 **Parent project:** `e-2k-project-editors`.
-- **Binding:** [RESCOPE-E-2k3.md](RESCOPE-E-2k3.md), its rulings 1–15, L1–L3 and amendments M1–M3, N1 and N2. It supersedes
+- **Binding:** [RESCOPE-E-2k3.md](RESCOPE-E-2k3.md), its rulings 1–15, L1–L3 and amendments M1–M3, N1 (as corrected by N1′) and N2. It supersedes
   [PROJECT.md](PROJECT.md)'s rulings 18–22 where they differ.
 - **Still in force from PROJECT.md:** the principle (ui_spec §2, "Everything is discoverable"),
   and rulings 1, 3, 4 and 23 for how the forms edit.
@@ -153,9 +153,10 @@ RESCOPE rulings 11–13.
 
 # WO4 — Docs and review (`u8g2gl-e2k3/wo4-docs-review`)
 
-- [ ] **N1 first, on this branch:** the style card's preview draws a label and a button side by side in the
-  style, each captioned with the properties it draws (RESCOPE N1). e2e: a `border` edit shows on the
-  button.
+- [ ] **N1 first, on this branch, as corrected by N1′:** the style card's preview draws a label and a
+  button side by side in the style, each captioned with what it really draws (RESCOPE N1′). The
+  `border` field notes that no element draws it yet. e2e: an `invert` and a `radius` edit each show
+  on the button.
 - [ ] **N2, on this branch:** every removal guard (subjects, consts, styles, fonts, images) counts every
   reference the finder finds, widget templates and prop defaults included (RESCOPE N2). Unit and e2e:
   a font named only inside a widget template can't be removed.

@@ -110,6 +110,12 @@ The worker stopped before any code, as the work order requires, because the code
 - **N1. The style preview is a label and a button, side by side** (amends ruling 11). Both are drawn by the real renderer in the style, each captioned with the properties it draws: the label its font, draw colour, font mode and alignment (`src/u8g2gl_label.cpp`); the button also border, padding, invert and radius (`src/u8g2gl_button.cpp`). Ruling 11's "as the device will" holds for each. A label alone can't show border, padding, radius or invert.
 - **N2. Every removal guard counts every reference the finder finds,** for every kind: widget templates and prop defaults included. This widens M3, under which the font and image guards kept E-2k2's scope (screen elements and styles) plus `style_font`, so a font named only inside a widget template could be removed and the project would then fail to validate.
 
+- **N1′. N1's captions corrected to the code** (supersedes N1's property lists). No runtime element draws a style's `border`: the button frames itself from its own `border_width` prop (default 1) and never reads `style_.border` (`src/u8g2gl_button.cpp`). The preview stays a label and a button side by side, captioned with what each really draws:
+  - the label: font, draw colour, font mode, alignment;
+  - the button: those, plus `invert` (a filled box, when not disabled), `radius` (box and frame), and `padding` only beside a left or right alignment.
+
+  The style card's `border` field notes that no element draws it yet. The e2e checks that an `invert` and a `radius` edit show on the button, in place of a `border` edit. The runtime gap itself is outside this PR (`src/`), and is raised with the owner for its own plan after E-2k3.
+
 ## Status log
 
 | Date | Entry |
@@ -119,3 +125,4 @@ The worker stopped before any code, as the work order requires, because the code
 | 2026-11-21 | **Approved by the owner, in their own words: "Approve E-2k3"**, given in reply to the plan as updated with their L1–L3 answers. That approves rulings 1–15, L1 (ruling 10, ask on commit), L2, L3 (CLI 0.25.0) and the four-WO split. PA branched `u8g2gl-e2k3/wo1-subjects` from `origin/main` @ `8ec6da5` in `../U8G2GL-e4` (upstream unset). Work orders: [WORKORDERS-E-2k3.md](WORKORDERS-E-2k3.md). |
 | 2026-11-21 | Worker stopped at WO1 before any code (stop condition: unlisted reference shapes). **Owner approved the PA's amendments, in their own words: "Approve M1–M3"** (M1 the missing shapes and file scope, M2 shadowing as the code resolves it, M3 the `style_font` guard fix). Recorded above under Amendments. |
 | 2026-11-21 | Worker completed WO1 (`4a034a6`), WO2 (`4c3c64b`) and WO3 (`19ae70f`), then stopped before WO4: ruling 11's label preview can't draw border, padding, radius or invert (PA confirmed in `src/u8g2gl_label.cpp`). PA proposed N1 (label and button preview) and N2 (every guard counts every finder reference). **Owner, in their own words: "agreed on both deciaions"**, in reply to "Do you approve N1 and N2 as recommended?". Recorded above. |
+| 2026-11-21 | Worker did N2 (`c900b4f`), then stopped before N1: no element draws a style's `border` (PA confirmed in `src/u8g2gl_button.cpp`). PA proposed N1′. **Owner, in their own words: "Approve N1′"**. Recorded above. |

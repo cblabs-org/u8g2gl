@@ -257,3 +257,4 @@ The detailed `WORKORDERS.md` for each PR is written when that PR starts, from th
 | 2026-11-21 | **E-2k3's re-check approved by the owner, in their own words: "Approve E-2k3"**, with L1–L3 as recorded in RESCOPE-E-2k3.md, whose status log has the details. Branch `u8g2gl-e2k3/wo1-subjects` from `8ec6da5`. |
 | 2026-11-21 | Worker stopped at WO1 before any code, on a stop condition (reference shapes not in finding 4). **Owner approved the amendments, in their own words: "Approve M1–M3"**, recorded in RESCOPE-E-2k3.md under Amendments. |
 | 2026-11-21 | E-2k3 WO1–WO3 done. **Owner approved N1 and N2, in their own words: "agreed on both deciaions"**, recorded in RESCOPE-E-2k3.md. |
+| 2026-11-21 | **Owner approved N1′, in their own words: "Approve N1′"**: the style preview's captions are corrected to what the runtime draws, recorded in RESCOPE-E-2k3.md. A style's `border` is drawn by no element; that runtime gap waits for its own plan. |
