@@ -177,3 +177,95 @@ RESCOPE rulings 11–13.
 - A reference shape exists that finding 4 doesn't list, or one can't be located to an exact range.
 - A rename can't be applied as one edit per document with per-document undo.
 - Any approved ruling turns out to be wrong in the code.
+
+# Completion report (worker, 2026-11-21)
+
+WO1–WO4 are done, with three stops on the way, each settled by the owner and committed by the PA
+before work went on: M1–M3 (`1e855da`, reference shapes finding 4 lacked), N1 and N2 (`b6d2e6d`,
+a label can't draw border, padding, radius or invert), and N1′ (`1a1c399`, no element draws a
+style's `border`). Authorization was checked each time in the committed status logs. Nothing was
+pushed or tagged. No schema, runtime, generator-output or golden change.
+
+## Commits
+
+| WO | Branch | Commit | What |
+|---|---|---|---|
+| WO1 | `u8g2gl-e2k3/wo1-subjects` | `4a034a6` | The reference finder (`cli/src/core/references/find-references.ts`) and its tests; `constantTokens()` exported from `expression.ts`; `asset-usage.ts` on the finder, plus `style_font` users (M3); the subjects table; the subject removal guard |
+| WO2 | `u8g2gl-e2k3/wo2-rename` | `4c3c64b` | Rename planning (`designer/src/forms/rename-plan.ts`), the rename dialog, Rename… on every kind, the name field's question, refusals before any write; `checkNameRule()` exported |
+| WO3 | `u8g2gl-e2k3/wo3-styles-consts` | `19ae70f` | Style cards (preview, users, shadowing screens, radius bound), constants' references, the style and constant removal guards |
+| WO4 | `u8g2gl-e2k3/wo4-docs-review` | `c900b4f` | N2: every guard counts every reference the finder finds |
+| | | `9a37518` | N1′: the preview is a label and a button, each captioned with what it draws; the `border` field's note |
+| | | `bdabf0b` | ui_spec §6.4 and §14, ChangeLog, CLI 0.24.0 → 0.25.0, readability fixes |
+| | | (this) | This report |
+
+## Suites, run one at a time
+
+| Suite | Baseline (`60d6c4f`) | Final (`bdabf0b`) |
+|---|---|---|
+| Wasm tests (`node wasm/test/<name>.test.mjs`, 6, `asset-injection` included) | 6/6 | 6/6 |
+| Host C++ (ctest) | 530/530 (1 skipped) | 530/530 (1 skipped) |
+| CLI vitest | 3185 passed, 23 skipped | 3200 passed, 23 skipped |
+| CLI lint (eslint and `tsconfig.test.json`) | — | clean |
+| Designer unit (Playwright) | 302 | 316 |
+| e2e (`build:e2e`) | 135 passed, 12 skipped | 148 passed, 12 skipped |
+| Production e2e (`npm run build`) | 3 | 3 |
+| `refresh-goldens.mjs` | — | empty diff |
+| `check-package` | — | PASS, `u8g2gl-0.25.0.tgz` (packed as `0.25.0-dev.1` in its own clone; no tag here) |
+| Home-path guard, and its self-test | — | clean; 11/11 |
+| `scripts/release-version.test.mjs` | — | 37/37 |
+
+No known flake failed on either run.
+
+## The generated symbols a rename changes
+
+Spelt by the generator's own `mangle.ts` functions, never restated:
+
+| Kind | Symbols |
+|---|---|
+| subject | `ui_set_<name>()`, `ui_subject_<name>` |
+| font | `ui_font_<name>`; a `<bdf>` also `ui_fontdata_<name>` |
+| image | `ui_image_<name>` |
+| style | `ui_style_<name>` |
+| constant | none: it is resolved at build time |
+
+## Deviations and decisions
+
+Accepted by the PA: 1, 2 and 4–8. N2 replaced 3.
+
+1. A typed prop's `default` in a widget's `<api>` (`type="subject" default="station"`) is a
+   reference (`prop-default`), read as part of "manifest props typed …".
+2. `checkNameRule()` is exported from `validate-identifiers.ts`, so rename refuses exactly the
+   names the validator reports. Outside the finder module; an export, no behaviour change.
+3. *(Replaced by N2.)* The font and image guards had kept E-2k2's scope plus `style_font`. They
+   now count every reference, widget templates and prop defaults included.
+4. The font picker's *Change font…* commits through the name field, so on a used font it asks
+   the rename question. `font-picker.spec.ts` takes *Only here*.
+5. Renaming a `<builtin>` swaps it to another U8G2 font: the new name must be one U8G2 bundles.
+6. The radius bound counts users that apply the style by `<style>` child, `style=` or
+   `focus_style=`, with literal `width` and `height`; a user with its own `radius` or
+   `style_radius` is left out, since its own value wins (§10).
+7. In `globals.xml`, `#name` tokens are read in every attribute except names and `<consts>`
+   values.
+8. `fonts-view.tsx` exports `drawProject`, `paint`, `Drawing` and `NO_ASSETS`, and
+   `font-view-model.ts` gains `viewProjectTexts()`, so the style preview draws by the Fonts
+   view's route.
+
+Also, by design and within the rulings:
+
+- The finder tells files apart by their root element (`globals`, `screen`, `widget`, anything
+  else read for `#name` only), so a widget manifest is found wherever it lives (M1). A range is
+  exact past an entity reference earlier in a value.
+- Rename refuses a new style name that a screen's own style already has, naming the screen: it
+  would shadow the renamed style there.
+- A rename opens every file it touches before planning, then plans once, because opening a
+  document can write the names [U-1] supplies.
+- "Only here" writes the name as typed in the dialog's field.
+
+## Open items
+
+- **No element draws a style's `border`** (N1′): the button frames itself from its own
+  `border_width`. The runtime gap waits for its own plan; the card's `border` field says so.
+- A button's `padding` shows only beside a left or right alignment, as the runtime draws it.
+- Sample values (E-3b) are not yet columns of the subjects table.
+- e2e renames a subject; the other four kinds' renames are covered by unit tests.
+- `u8g2gl.xml` holds no references today; it is read for `#name` only, in case.
