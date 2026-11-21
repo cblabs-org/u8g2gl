@@ -26,7 +26,9 @@
  *              first (`AddChooser`, ui_spec §6.4): its "+" shows the file's
  *              own chooser below the list, choosing adds the item with the
  *              chosen values as one edit, and cancelling adds nothing. A kind
- *              with no chooser is added at once, as before.
+ *              with no chooser is added at once, as before. A file's editor
+ *              can add buttons to each item's header (`itemActions`, the
+ *              globals form's Rename…).
  *
  * Exports:
  * - FormActions:     What the form asks of its host

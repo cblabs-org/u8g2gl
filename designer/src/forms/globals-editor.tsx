@@ -28,7 +28,8 @@
  *              subjects section is a table (`globals-subjects.tsx`), with
  *              each subject's cost and the bindings that use it. Each style's
  *              card ends with its preview, users and radius bound, and each
- *              constant with its references (`globals-styles.tsx`). Every
+ *              constant with its references (`globals-styles.tsx`); a style's
+ *              `border` field notes that no element draws it yet. Every
  *              item that declares a name has "Rename…" (`rename-dialog.tsx`).
  *
  * Exports:

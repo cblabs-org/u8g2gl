@@ -33,12 +33,12 @@
  */
 
 import { useMemo, useState } from 'react';
+import type { ReferenceKind } from '@u8g2gl/core/references/find-references.js';
 import { CanvasEditor } from '../editing/canvas-editor';
 import { referencesOf, workspaceReferences } from '../project/project-references';
 import type { Workspace } from '../workspace';
 import type { FormNode } from './form-model';
 import { planRename, type RenamePlan, type RenameTarget } from './rename-plan';
-import type { ReferenceKind } from '@u8g2gl/core/references/find-references.js';
 
 /** What the dialog is asked to do. */
 export interface RenameRequest {
@@ -106,6 +106,8 @@ export function applyRename(workspace: Workspace, target: RenameTarget, newName:
   // --- Step 3: One undo stop in each document ---
   const editor = new CanvasEditor((path) => workspace.documents.open(path));
   for (const part of plan.files) {
+    // The edits are offsets into the text planned against: should the model
+    // hold anything else when they land, this file is left alone, not corrupted.
     const expected = workspace.documents.textOf(part.file);
     editor.apply(part.file, (text) => (text === expected ? part.edits : []));
   }

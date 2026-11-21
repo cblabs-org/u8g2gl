@@ -7,9 +7,8 @@
  * Purpose: globals.xml's fonts section end to end (ui_spec §12): a `<bdf>`'s
  *          range presets show what each costs, and choosing one writes `range`
  *          as one undo stop; each font shows its size and users; removing a
- *          font still in use (a widget template's element included) is refused,
- *          naming its users, and removing an
- *          unused one works.
+ *          font still in use, even only by a widget template's element, is
+ *          refused, naming its users; and removing an unused one works.
  * Description: Against the real `u8g2gl design` on a copy of the departures
  *              project, given the compile fixture's 4x6.bdf as an unused
  *              `<bdf name="tiny">`. Undo is the Monaco model's own, through
