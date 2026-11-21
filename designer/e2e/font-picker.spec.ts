@@ -139,6 +139,9 @@ test('"Change font…" swaps a <builtin>’s name, filtered by height and set, a
   await picker.getByRole('combobox', { name: 'Glyph box' }).selectOption('monospace');
   await picker.getByRole('textbox', { name: 'Search fonts' }).fill('6x10');
   await picker.locator('.font-option[data-font="u8g2_font_6x10_mn"]').click();
+  // The font is used, so its name field asks first (ui_spec §6.4); Only here is the one globals.xml edit.
+  const question = page.getByRole('dialog', { name: "You're renaming u8g2_font_6x10_mr. Rename it in the files that reference it too?" });
+  await question.getByRole('button', { name: 'Only here' }).click();
   await expect.poll(() => bufferText(page, 'globals.xml')).toBe(before.replace('u8g2_font_6x10_mr', 'u8g2_font_6x10_mn'));
   await undo(page, 'globals.xml');
   await expect.poll(() => bufferText(page, 'globals.xml')).toBe(before);
@@ -147,6 +150,7 @@ test('"Change font…" swaps a <builtin>’s name, filtered by height and set, a
   const name = field.getByRole('textbox', { name: 'name' });
   await name.fill('u8g2_font_helvB08_tr');
   await name.press('Enter');
+  await question.getByRole('button', { name: 'Only here' }).click();
   await expect.poll(() => bufferText(page, 'globals.xml')).toBe(before.replace('u8g2_font_6x10_mr', 'u8g2_font_helvB08_tr'));
 });
 

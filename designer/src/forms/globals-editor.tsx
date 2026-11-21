@@ -26,7 +26,8 @@
  *              `range` field carries its presets, and `removeRefusal` names
  *              the users of an item that may not be removed yet. The
  *              subjects section is a table (`globals-subjects.tsx`), with
- *              each subject's cost and the bindings that use it.
+ *              each subject's cost and the bindings that use it. Every item
+ *              that declares a name has "Rename…" (`rename-dialog.tsx`).
  *
  * Exports:
  * - GlobalsEditorHooks:  The hooks the globals.xml form takes
@@ -42,6 +43,8 @@ import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
 import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
 import { SubjectsTable } from './globals-subjects';
+import { renameTargetOf } from './rename-dialog';
+import type { RenameTarget } from './rename-plan';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
 import { removeRefusal } from './asset-usage';
 import { workspaceReferences } from '../project/project-references';
@@ -56,6 +59,20 @@ export interface GlobalsEditorHooks {
   readonly removeRefusal: (node: FormNode) => string | undefined;
   /** The sections drawn their own way: the subjects table. */
   readonly renderSection: SectionRenderer;
+  /** "Rename…" on each item that declares a name. */
+  readonly itemActions: (item: FormNode) => ReactNode;
+}
+
+// RenameButton
+// An item's "Rename…", for one that declares a renamable name.
+function RenameButton({ item, onRename }: { readonly item: FormNode; readonly onRename: (target: RenameTarget) => void }): React.JSX.Element | null {
+  const target = renameTargetOf(item);
+  if (target === undefined) return null;
+  return (
+    <button type="button" className="rename-button" aria-label={`Rename ${item.element.label} ${target.name}`} title="Rename it here and everywhere it is used" onClick={() => onRename(target)}>
+      Rename…
+    </button>
+  );
 }
 
 /** The subjects section's key. */
@@ -103,8 +120,15 @@ async function addedValues(workspace: Workspace, list: FormList, kind: FileKind,
  * @param model      The form as last read, for the fonts it declares.
  * @param state      What the form draws, for the tables' fields.
  * @param actions    The form's edits, which the tables make.
+ * @param onRename   Opens the rename dialog for an item's name.
  */
-export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefined, state: FormViewState, actions: FormActions): GlobalsEditorHooks {
+export function useGlobalsEditor(
+  workspace: Workspace,
+  model: FormModel | undefined,
+  state: FormViewState,
+  actions: FormActions,
+  onRename: (target: RenameTarget) => void,
+): GlobalsEditorHooks {
   const declared = useMemo(() => declaredBuiltins(model), [model]);
   return useMemo<GlobalsEditorHooks>(
     () => ({
@@ -140,8 +164,18 @@ export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefi
       nodeExtra: (node) => <AssetItemFacts workspace={workspace} node={node} />,
       removeRefusal: (node) => removeRefusal(workspaceReferences(workspace), node),
       renderSection: (section, _generic, readOnly) =>
-        section.key === SUBJECTS && section.list !== undefined ? <SubjectsTable workspace={workspace} list={section.list} state={state} actions={actions} readOnly={readOnly} /> : undefined,
+        section.key === SUBJECTS && section.list !== undefined ? (
+          <SubjectsTable
+            workspace={workspace}
+            list={section.list}
+            state={state}
+            actions={actions}
+            readOnly={readOnly}
+            rowExtra={(item) => (readOnly ? null : <RenameButton item={item} onRename={onRename} />)}
+          />
+        ) : undefined,
+      itemActions: (item) => <RenameButton item={item} onRename={onRename} />,
     }),
-    [workspace, declared, state, actions],
+    [workspace, declared, state, actions, onRename],
   );
 }

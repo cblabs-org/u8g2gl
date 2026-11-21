@@ -110,6 +110,8 @@ interface Context {
   readonly fieldControl?: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
   /** Choosers that run before an item of a kind is added; undefined for none. */
   readonly addChooser?: AddChooser;
+  /** Extra buttons in an item's header (Rename…); undefined for none. */
+  readonly itemActions?: (item: FormNode) => ReactNode;
 }
 
 // NodeProblems
@@ -222,6 +224,7 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
               </span>
               <span className="form-item-name">{name ?? ''}</span>
               <span className="spacer" />
+              {!readOnly && context.itemActions?.(item)}
               <button
                 type="button"
                 aria-label={`Move ${label} up`}
@@ -292,6 +295,7 @@ function ListBody({ list, context }: { readonly list: FormList; readonly context
  * @param nodeExtra     Content after a node's body (a target's constructor snippet).
  * @param fieldControl  A control in place of a field's generic one (the display picker).
  * @param addChooser    Choosers that run before an item of a kind is added (the font picker).
+ * @param itemActions   Extra buttons in each item's header (Rename…).
  */
 export function FormView({
   file,
@@ -302,6 +306,7 @@ export function FormView({
   nodeExtra,
   fieldControl,
   addChooser,
+  itemActions,
 }: {
   readonly file: string;
   readonly state: FormViewState;
@@ -311,6 +316,7 @@ export function FormView({
   readonly nodeExtra?: Context['nodeExtra'];
   readonly fieldControl?: Context['fieldControl'];
   readonly addChooser?: AddChooser;
+  readonly itemActions?: Context['itemActions'];
 }): React.JSX.Element {
   const readOnly = state.unreadable !== undefined;
   const context: Context = {
@@ -321,6 +327,7 @@ export function FormView({
     ...(nodeExtra !== undefined ? { nodeExtra } : {}),
     ...(fieldControl !== undefined ? { fieldControl } : {}),
     ...(addChooser !== undefined ? { addChooser } : {}),
+    ...(itemActions !== undefined ? { itemActions } : {}),
   };
   return (
     <div className="project-form" data-form-file={file} data-readonly={readOnly} aria-label={`${file} form`}>

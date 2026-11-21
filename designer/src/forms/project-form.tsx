@@ -20,6 +20,10 @@
  *              and on "+ Built-in font", and the file chooser on a `<bdf>`,
  *              `<xbm>` or `<convert>` `src` and on adding one.
  *
+ *              Each named item has "Rename…", and a name field whose old name
+ *              is referenced asks before it commits (`rename-dialog.tsx`); the
+ *              dialog shows above the form while it is open.
+ *
  *              It scrolls, never focuses: to the section the Explorer asks
  *              for (`Workspace.formReveal`), and to the node the XML caret is
  *              in (`Workspace.formCaret`). A focused section, item or part
@@ -31,7 +35,7 @@
  * - ProjectForm:      One file's form
  */
 
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { countRender } from '../perf/render-count';
 import type { Workspace } from '../workspace';
 import { useObservable } from '../ui/use-observable';
@@ -42,6 +46,8 @@ import { FormView, type FormActions, type SectionRenderer } from './form-view';
 import { useGlobalsEditor } from './globals-editor';
 import { useProjectEditor } from './project-editor';
 import { projectSchema } from './snippet-panel-model';
+import { hasReferences, RenameDialog, renameTargetOf, type RenameRequest } from './rename-dialog';
+import type { RenameTarget } from './rename-plan';
 import './form.css';
 
 // seedFor
@@ -79,6 +85,8 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const root = useRef<HTMLDivElement>(null);
   // The remove guard, read when Remove is pressed: the actions are made before the hooks.
   const globalsRefusal = useRef<((node: FormNode) => string | undefined) | undefined>(undefined);
+  // The rename dialog, while one is open: from "Rename…", or a name field asking.
+  const [renaming, setRenaming] = useState<RenameRequest | undefined>(undefined);
 
   // --- The Explorer's section rows: scroll to the one asked for ---
   const reveal = useObservable(workspace.formReveal);
@@ -104,7 +112,17 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
 
   const actions = useMemo<FormActions>(
     () => ({
-      set: (field, value) => void controller.apply({ kind: 'set', field, value }),
+      set: (field, value) => {
+        // A globals.xml name that something references asks first (ui_spec §6.4):
+        // rename everywhere, only here, or not at all.
+        const node = file === 'globals.xml' && value !== undefined && field.endsWith('/name') ? findItem(controller.state.get().model, field.split('|')[0] ?? '') : undefined;
+        const target = node === undefined ? undefined : renameTargetOf(node);
+        if (target !== undefined && value !== undefined && value !== target.name && hasReferences(workspace, target)) {
+          setRenaming({ target, ask: { newName: value, onlyHere: (name) => void controller.apply({ kind: 'set', field, value: name }) } });
+          return;
+        }
+        controller.apply({ kind: 'set', field, value });
+      },
       add: (list, kind, values) => void controller.apply({ kind: 'add', list, itemKind: kind, values: { ...seedFor(workspace, kind), ...values } }),
       remove: (item) => {
         // An item still in use is refused, naming its users (globals.xml's subjects, fonts and images).
@@ -124,7 +142,8 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   const hooks = file === 'u8g2gl.xml' ? project : undefined;
   const sectionsFor = renderSection ?? hooks?.renderSection;
   // globals.xml's: the font picker and the file chooser, on a field and on adding.
-  const globalsHooks = useGlobalsEditor(workspace, state.model, state, actions);
+  const openRename = useCallback((target: RenameTarget) => setRenaming({ target }), []);
+  const globalsHooks = useGlobalsEditor(workspace, state.model, state, actions, openRename);
   const globals = file === 'globals.xml' ? globalsHooks : undefined;
   globalsRefusal.current = globals?.removeRefusal;
   const sections = sectionsFor ?? globals?.renderSection;
@@ -132,13 +151,16 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
   return (
     <div className="project-form-scroll" ref={root}>
       {children}
+      {renaming !== undefined && file === 'globals.xml' && (
+        <RenameDialog key={`${renaming.target.kind}:${renaming.target.name}:${renaming.ask?.newName ?? ''}`} workspace={workspace} request={renaming} onClose={() => setRenaming(undefined)} />
+      )}
       <FormView
         file={file}
         state={state}
         actions={actions}
         {...(sections !== undefined ? { renderSection: sections } : {})}
         {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, nodeExtra: hooks.nodeExtra, fieldNote: hooks.fieldNote } : {})}
-        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser, nodeExtra: globals.nodeExtra } : {})}
+        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser, nodeExtra: globals.nodeExtra, itemActions: globals.itemActions } : {})}
       />
     </div>
   );
