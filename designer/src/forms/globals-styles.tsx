@@ -6,21 +6,24 @@
  * File: designer/src/forms/globals-styles.tsx
  * Purpose: What a style's card and a constant show after their fields
  *          (ui_spec §6.4, §10): a style's preview, drawn by the real renderer
- *          so padding, border, radius, invert and alignment look as the device
- *          draws them; who uses it, by screen and element; and the largest
+ *          on a label and a button so each property looks as the device draws
+ *          it, and says which element draws which; who uses it, by screen and element; and the largest
  *          radius its users allow. A constant's every reference, by file and
  *          attribute. Each user is a link to it.
  * Description: The card is the generic form's item, with its §10 fields
  *              driven by `STYLE_PROPERTIES`; these are its `nodeExtra`. The
- *              preview is `style-facts.ts`'s one-screen project over the
+ *              preview is a label and a button, each captioned with what the
+ *              runtime draws of a style on it: `style-facts.ts`'s one-screen
+ *              project over the
  *              current `globals.xml` text, drawn in the editor Wasm's spare
  *              instance as the Fonts view draws its ruler, and drawn again
  *              whenever that text changes. The facts are pure functions of the
  *              reference finder's index.
  *
  * Exports:
- * - StyleFacts:  A style's preview, users and radius bound
- * - ConstFacts:  A constant's references
+ * - StyleFacts:         A style's preview, users and radius bound
+ * - ConstFacts:         A constant's references
+ * - BORDER_UNDRAWN:     What a style's `border` field notes
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -30,7 +33,13 @@ import { useObservable } from '../ui/use-observable';
 import type { Workspace } from '../workspace';
 import { nameUsers, type NameUser } from './asset-usage';
 import type { FormNode } from './form-model';
-import { constUses, radiusBound, SAMPLE_BOX, styleSampleTexts } from './style-facts';
+import { constUses, radiusBound, STYLE_SAMPLES, styleSampleTexts, type StyleSample } from './style-facts';
+
+/**
+ * What a style's `border` field notes: no runtime element reads a style's
+ * border. A button frames itself from its own `border_width`.
+ */
+export const BORDER_UNDRAWN = "No element draws a style's border yet: a label has no frame, and a button frames itself from its own border_width.";
 
 // valueOf
 // A node's attribute value, by name.
@@ -55,6 +64,23 @@ function UserLinks({ workspace, users }: { readonly workspace: Workspace; readon
   );
 }
 
+// SamplePreview
+// One sample of the preview, cut from the drawn frame with a margin, with its
+// caption: what the runtime draws of a style on it.
+//   style   — the style's name
+//   sample  — the label or the button
+//   drawing — the drawn frame, and how many times it has been drawn
+function SamplePreview({ style, sample, drawing }: { readonly style: string; readonly sample: StyleSample; readonly drawing: { readonly drawing: Drawing; readonly seq: number } | undefined }): React.JSX.Element {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => paint(canvas.current, drawing?.drawing, { x: sample.x - 2, y: sample.y - 2, width: sample.width + 4, height: sample.height + 4 }), [drawing, sample]);
+  return (
+    <figure className="style-sample" data-part={sample.part}>
+      <canvas ref={canvas} className="style-preview-canvas" data-style-preview={style} data-part={sample.part} data-drawn={drawing?.seq ?? 0} aria-label={`${style} preview, ${sample.part}`} />
+      <figcaption className="field-reason">{sample.caption}</figcaption>
+    </figure>
+  );
+}
+
 /**
  * @brief A style's preview, its users and its radius bound.
  *
@@ -68,7 +94,6 @@ export function StyleFacts({ workspace, node }: { readonly workspace: Workspace;
   const globals = workspace.documents.textOf('globals.xml') ?? '';
   const fallback = run?.result.model.globals.fonts[0]?.name;
   const assets = run?.assets;
-  const canvas = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState<{ readonly drawing: Drawing; readonly seq: number } | undefined>(undefined);
 
   // --- The preview: drawn again whenever globals.xml's text changes ---
@@ -82,7 +107,6 @@ export function StyleFacts({ workspace, node }: { readonly workspace: Workspace;
       live = false;
     };
   }, [workspace, globals, name, fallback, styleFont, assets]);
-  useEffect(() => paint(canvas.current, drawing?.drawing, { x: 0, y: 0, width: SAMPLE_BOX.x * 2 + SAMPLE_BOX.width, height: SAMPLE_BOX.y * 2 + SAMPLE_BOX.height }), [drawing]);
 
   const refs = run === undefined ? undefined : workspaceReferences(workspace);
   const users = refs === undefined || name === '' ? [] : nameUsers(refs, 'style', name);
@@ -91,8 +115,10 @@ export function StyleFacts({ workspace, node }: { readonly workspace: Workspace;
   const problem = drawing !== undefined && 'problem' in drawing.drawing ? drawing.drawing.problem : undefined;
   return (
     <div className="style-facts" data-style={name}>
-      <div className="style-preview">
-        <canvas ref={canvas} className="style-preview-canvas" data-style-preview={name} data-drawn={drawing?.seq ?? 0} aria-label={`${name} preview`} />
+      <div className="style-preview" data-drawn={drawing?.seq ?? 0}>
+        {STYLE_SAMPLES.map((sample) => (
+          <SamplePreview key={sample.part} style={name} sample={sample} drawing={drawing} />
+        ))}
         {problem !== undefined && <p className="field-problem warning">The preview cannot be drawn: {problem}</p>}
       </div>
       <div className="style-users">

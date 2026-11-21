@@ -45,7 +45,7 @@ import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
 import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
 import { SubjectsTable } from './globals-subjects';
-import { ConstFacts, StyleFacts } from './globals-styles';
+import { BORDER_UNDRAWN, ConstFacts, StyleFacts } from './globals-styles';
 import { renameTargetOf } from './rename-dialog';
 import type { RenameTarget } from './rename-plan';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
@@ -64,6 +64,8 @@ export interface GlobalsEditorHooks {
   readonly renderSection: SectionRenderer;
   /** "Rename…" on each item that declares a name. */
   readonly itemActions: (item: FormNode) => ReactNode;
+  /** A note beneath a field: a style's `border`, which no element draws yet. */
+  readonly fieldNote: (field: FormField, node: FormNode) => ReactNode;
 }
 
 // RenameButton
@@ -185,6 +187,12 @@ export function useGlobalsEditor(
           />
         ) : undefined,
       itemActions: (item) => <RenameButton item={item} onRename={onRename} />,
+      fieldNote: (field) =>
+        field.elementId === 'style' && field.attribute.name === 'border' ? (
+          <p className="field-reason" data-note="border-undrawn">
+            {BORDER_UNDRAWN}
+          </p>
+        ) : null,
     }),
     [workspace, declared, state, actions, onRename],
   );

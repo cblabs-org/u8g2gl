@@ -5,9 +5,11 @@
  *
  * File: designer/e2e/styles-consts.spec.ts
  * Purpose: globals.xml's style cards and constants end to end (ui_spec §6.4,
- *          §10): a style's card shows its preview, drawn by the real renderer
- *          and drawn again when the style changes, its users and its radius
- *          bound; a constant lists a reference written inside an expression;
+ *          §10): a style's card shows its preview, a label and a button drawn
+ *          by the real renderer and drawn again when the style changes, each
+ *          captioned with what it draws; an invert and a radius edit show on
+ *          the button; the card notes that no element draws a style's border;
+ *          and it shows its users and its radius bound; a constant lists a reference written inside an expression;
  *          and removing a style or a constant still used is refused, naming
  *          the users.
  * Description: Against the real `u8g2gl design` on a copy of the departures
@@ -50,28 +52,46 @@ async function open(page: Page): Promise<void> {
 }
 
 // previewOf
-// A style preview's pixels, as a data URL.
-async function previewOf(page: Page, style: string): Promise<string> {
-  return page.locator(`canvas[data-style-preview="${style}"]`).evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
+// One sample of a style's preview, its pixels as a data URL.
+async function previewOf(page: Page, style: string, part: 'label' | 'button'): Promise<string> {
+  return page.locator(`canvas[data-style-preview="${style}"][data-part="${part}"]`).evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
 }
 
-test('a style card shows its preview, users and radius bound, and an edit to the style redraws the preview', async ({ page }) => {
+test('a style card shows its preview, users and radius bound, and notes that no element draws its border', async ({ page }) => {
   await open(page);
   const card = form(page).locator('.form-item[data-element="style"]');
-  const preview = card.locator('canvas[data-style-preview="boxed"]');
-  await expect(preview).not.toHaveAttribute('data-drawn', '0');
+  await expect(card.locator('canvas[data-style-preview="boxed"][data-part="label"]')).not.toHaveAttribute('data-drawn', '0');
+  await expect(card.locator('.style-sample figcaption')).toHaveText([/^Label: font, draw colour, font mode, alignment$/, /^Button: .*invert.*radius.*padding/]);
   await expect(card.locator('.style-facts .field-problem')).toHaveCount(0);
   await expect(card.locator('.globals-users button')).toHaveText(['departures.plat_label']);
   await expect(card.locator('.style-radius')).toHaveAttribute('data-radius-bound', '6');
   await expect(card.locator('.style-radius')).toContainText('departures.plat_label is 18×13');
+  await expect(card.locator('.form-field[data-field="style/border"] [data-note="border-undrawn"]')).toContainText("No element draws a style's border yet");
+});
 
-  const drawn = Number(await preview.getAttribute('data-drawn'));
-  const before = await previewOf(page, 'boxed');
-  // A label draws a style's font, colour, font mode and alignment; alignment moves its text.
-  await card.locator('.form-field[data-field="style/align"]').getByRole('button', { name: 'right' }).click();
-  await expect.poll(() => bufferText(page, 'globals.xml')).toContain('<style name="boxed" border="true" padding="1" align="right" />');
-  await expect.poll(async () => Number(await preview.getAttribute('data-drawn'))).toBeGreaterThan(drawn);
-  await expect.poll(() => previewOf(page, 'boxed')).not.toBe(before);
+test('an invert edit and a radius edit each show on the button sample', async ({ page }) => {
+  await open(page);
+  const card = form(page).locator('.form-item[data-element="style"]');
+  const button = card.locator('canvas[data-style-preview="boxed"][data-part="button"]');
+  await expect(button).not.toHaveAttribute('data-drawn', '0');
+
+  // --- invert: the button fills its box ---
+  let drawn = Number(await button.getAttribute('data-drawn'));
+  let before = await previewOf(page, 'boxed', 'button');
+  await card.locator('.form-field[data-field="style/invert"]').getByRole('switch', { name: 'invert' }).click();
+  await expect.poll(() => bufferText(page, 'globals.xml')).toContain('<style name="boxed" border="true" padding="1" invert="true" />');
+  await expect.poll(async () => Number(await button.getAttribute('data-drawn'))).toBeGreaterThan(drawn);
+  await expect.poll(() => previewOf(page, 'boxed', 'button')).not.toBe(before);
+
+  // --- radius: the box's corners round ---
+  drawn = Number(await button.getAttribute('data-drawn'));
+  before = await previewOf(page, 'boxed', 'button');
+  const radius = card.locator('.form-field[data-field="style/radius"]').getByRole('textbox', { name: 'radius' });
+  await radius.fill('4');
+  await radius.press('Enter');
+  await expect.poll(() => bufferText(page, 'globals.xml')).toContain('invert="true" radius="4" />');
+  await expect.poll(async () => Number(await button.getAttribute('data-drawn'))).toBeGreaterThan(drawn);
+  await expect.poll(() => previewOf(page, 'boxed', 'button')).not.toBe(before);
 });
 
 test('a constant lists each reference by file and attribute, one inside an expression included', async ({ page }) => {

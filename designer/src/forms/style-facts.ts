@@ -21,15 +21,18 @@
  *              style's (§10). The bound is `min(width, height) / 2` of the
  *              smallest such element, rounded down, and names it.
  *
- *              The preview is a sample label in the style, on a one-screen
- *              project over the project's own `globals.xml`, drawn as the
- *              Fonts view draws its ruler. It takes the style's font, or, for
- *              a style without one, the first font the project declares.
+ *              The preview is a label and a button in the style, side by side,
+ *              on a one-screen project over the project's own `globals.xml`,
+ *              drawn as the Fonts view draws its ruler, each captioned with
+ *              what the runtime draws of a style on it. They take the style's
+ *              font, or, for a style without one, the first font the project
+ *              declares.
  *
  * Exports:
  * - RadiusBound:         The bound and the element that sets it
  * - radiusBound():       A style's radius bound, if any user has a literal size
- * - SAMPLE_BOX:          The sample label's box on the preview's display
+ * - StyleSample:         One sample of a style's preview, and what it draws
+ * - STYLE_SAMPLES:       The label and the button, side by side
  * - styleSampleTexts():  The project files that draw a style's preview
  * - ConstUse:            One place a constant is referenced, as its list shows it
  * - constUses():         Every place a constant is referenced
@@ -98,15 +101,45 @@ export function radiusBound(refs: ReferenceIndex, texts: ReadonlyMap<string, str
   return best;
 }
 
-/** The sample label's box on the preview's display: inset, so a border shows whole. */
-export const SAMPLE_BOX = { x: 2, y: 2, width: 96, height: 22 } as const;
+/** One sample in a style's preview: the element, its box on the preview's display, and what it draws of a style. */
+export interface StyleSample {
+  readonly part: 'label' | 'button';
+  readonly tag: 'u8g2gl_label' | 'u8g2gl_button';
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  /** The style properties the runtime draws on it, as its caption says them. */
+  readonly caption: string;
+}
 
-/** What the sample label says. */
+/**
+ * The preview's two samples, side by side, inset so a frame shows whole. What
+ * each draws is what its `render()` reads of the style: a label its font, draw
+ * colour, font mode and alignment (`u8g2gl_label.cpp`); a button those, and
+ * `invert`, `radius`, and `padding` beside a left or right alignment
+ * (`u8g2gl_button.cpp`). No element draws a style's `border`: a button frames
+ * itself from its own `border_width`.
+ */
+export const STYLE_SAMPLES: readonly StyleSample[] = [
+  { part: 'label', tag: 'u8g2gl_label', x: 2, y: 2, width: 96, height: 22, caption: 'Label: font, draw colour, font mode, alignment' },
+  {
+    part: 'button',
+    tag: 'u8g2gl_button',
+    x: 104,
+    y: 2,
+    width: 96,
+    height: 22,
+    caption: 'Button: those, invert (a filled box, when not disabled), radius (box and frame), and padding beside a left or right alignment',
+  },
+];
+
+/** What the samples say. */
 const SAMPLE_TEXT = 'Sample 123';
 
 /**
- * @brief The project files that draw a style's preview: one label in the
- *        style, over the project's own `globals.xml`.
+ * @brief The project files that draw a style's preview: a label and a button
+ *        in the style, side by side, over the project's own `globals.xml`.
  *
  * @param globals   The project's `globals.xml`, as it is now.
  * @param style     The style's name.
@@ -114,16 +147,16 @@ const SAMPLE_TEXT = 'Sample 123';
  * @param styleFont The style's own font, if it names one.
  */
 export function styleSampleTexts(globals: string, style: string, fallback: string | undefined, styleFont: string | undefined): Map<string, string> {
-  // The label names no font of its own when the style does: an element's own
-  // attribute would win over the style's (§10), and the preview is the style's.
+  // The samples name no font of their own when the style does: an element's
+  // own attribute would win over the style's (§10), and the preview is the style's.
   const font = styleFont === undefined && fallback !== undefined ? ` font="${escapeXml(fallback)}"` : '';
-  const { x, y, width, height } = SAMPLE_BOX;
-  return viewProjectTexts(
-    globals,
-    `        <u8g2gl_label name="sample" x="${x}" y="${y}" width="${width}" height="${height}"${font} text="${SAMPLE_TEXT}">\n` +
+  const view = STYLE_SAMPLES.map(
+    ({ part, tag, x, y, width, height }) =>
+      `        <${tag} name="sample_${part}" x="${x}" y="${y}" width="${width}" height="${height}"${font} text="${SAMPLE_TEXT}">\n` +
       `            <style name="${escapeXml(style)}" />\n` +
-      '        </u8g2gl_label>\n',
-  );
+      `        </${tag}>\n`,
+  ).join('');
+  return viewProjectTexts(globals, view);
 }
 
 /** One place a constant is referenced, as its "Used by" lists it. */

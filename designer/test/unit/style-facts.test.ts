@@ -18,7 +18,7 @@ import { expect, test } from '@playwright/test';
 import { indexReferences } from '@u8g2gl/core/references/find-references.js';
 import { removeRefusal } from '../../src/forms/asset-usage';
 import { buildFormModel, type FormNode } from '../../src/forms/form-model';
-import { constUses, radiusBound, styleSampleTexts } from '../../src/forms/style-facts';
+import { constUses, radiusBound, STYLE_SAMPLES, styleSampleTexts } from '../../src/forms/style-facts';
 import { runTextPipeline } from '../../src/pipeline/live-pipeline';
 import { ProjectModelCache } from '../../src/project/project-model';
 
@@ -73,14 +73,20 @@ test('with no literal-sized user there is no bound', () => {
   expect(radiusBound(refs(), texts(), 'nobody')).toBeUndefined();
 });
 
-test('the preview is a label in the style over the project\'s own globals, which validates and draws', () => {
+test('the preview is a label and a button in the style over the project\'s own globals, which validates and draws', () => {
   const preview = styleSampleTexts(GLOBALS, 'boxed', 'u8g2_font_6x10_mr', undefined);
   expect(preview.get('globals.xml')).toBe(GLOBALS);
   const assets = { fonts: new Map(), images: new Map(), diagnostics: [], failedFonts: new Set<string>(), failedImages: new Set<string>() };
   const run = runTextPipeline({ texts: preview, cache: new ProjectModelCache(), assets, activeFile: 'screens/screen_fonts_view.xml', targetName: 'view' });
   expect(run.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
   expect(run.scene).toBeDefined();
-  // A style with a font of its own: the label names none, so the style's applies.
+  // A label and a button, side by side, each applying the style.
+  const screen = preview.get('screens/screen_fonts_view.xml') ?? '';
+  expect(screen.match(/<u8g2gl_(label|button) name="sample_(label|button)"/g)).toEqual(['<u8g2gl_label name="sample_label"', '<u8g2gl_button name="sample_button"']);
+  expect(screen.match(/<style name="boxed" \/>/g)).toHaveLength(2);
+  expect(STYLE_SAMPLES.find((sample) => sample.part === 'button')?.caption).toMatch(/invert.*radius.*padding/);
+  expect(STYLE_SAMPLES.find((sample) => sample.part === 'label')?.caption).not.toMatch(/border|invert|radius|padding/);
+  // A style with a font of its own: the samples name none, so the style's applies.
   expect(styleSampleTexts(GLOBALS, 'x', 'u8g2_font_6x10_mr', 'u8g2_font_6x10_mr').get('screens/screen_fonts_view.xml')).not.toContain(' font=');
 });
 

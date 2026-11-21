@@ -164,7 +164,10 @@
 .rename-actions .action:disabled { opacity: 0.4; cursor: default; }
 
 /* --- A style's card and a constant's references (ui_spec §6.4, §10) --- */
-.style-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: start; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border); }
+.style-facts { display: grid; grid-template-columns: 1fr; gap: 4px 12px; align-items: start; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border); }
+.style-preview { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.style-sample { margin: 0; max-width: 200px; }
+.style-sample figcaption { font-size: 10px; }
 .style-preview-canvas { display: block; width: 200px; height: 52px; image-rendering: pixelated; border: 1px solid var(--border); background: #141414; }
 .style-users, .const-facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .globals-users { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 0; padding: 0; list-style: none; }

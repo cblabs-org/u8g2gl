@@ -160,7 +160,7 @@ export function ProjectForm({ file, renderSection, children }: { readonly file: 
         actions={actions}
         {...(sections !== undefined ? { renderSection: sections } : {})}
         {...(hooks !== undefined ? { fieldControl: hooks.fieldControl, nodeExtra: hooks.nodeExtra, fieldNote: hooks.fieldNote } : {})}
-        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser, nodeExtra: globals.nodeExtra, itemActions: globals.itemActions } : {})}
+        {...(globals !== undefined ? { fieldControl: globals.fieldControl, addChooser: globals.addChooser, nodeExtra: globals.nodeExtra, itemActions: globals.itemActions, fieldNote: globals.fieldNote } : {})}
       />
     </div>
   );
