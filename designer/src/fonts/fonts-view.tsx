@@ -56,6 +56,19 @@ interface Selected {
   readonly kind: 'builtin' | 'bdf';
 }
 
+/** The glyph grid's CSS zoom (`.glyph-grid` in fonts.css); the two must agree. */
+const GRID_ZOOM = 2;
+
+// contentWidth
+// An element's width inside its padding, in CSS pixels, or undefined before it
+// is laid out.
+//   element — the element, if mounted
+function contentWidth(element: HTMLElement | null | undefined): number | undefined {
+  if (element === null || element === undefined || element.clientWidth === 0) return undefined;
+  const style = getComputedStyle(element);
+  return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+}
+
 /** What a drawn view project produced: a frame and its size, or why there is none. */
 type Drawing = { readonly frame: Uint8Array; readonly width: number; readonly height: number } | { readonly problem: string };
 
@@ -255,7 +268,10 @@ function FontDetail({
         return;
       }
       const codes = fontEncodings(bytes).filter((code) => code > 0);
-      const { texts, cells } = glyphGridTexts(globals, font.name, codes, fontMetrics(bytes));
+      // The grid wraps at the view's width, in device pixels at the CSS zoom.
+      const available = contentWidth(grid.current?.parentElement);
+      const maxWidth = available === undefined ? undefined : Math.floor(available / GRID_ZOOM);
+      const { texts, cells } = glyphGridTexts(globals, font.name, codes, fontMetrics(bytes), maxWidth);
       const drawing = await drawProject(workspace, texts, assets ?? NO_ASSETS);
       if (live) setGridDrawing({ drawing, cells: cells.length, total: codes.length });
     })();

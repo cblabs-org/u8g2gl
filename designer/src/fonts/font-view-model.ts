@@ -152,6 +152,9 @@ const GRID_GAP = 2;
  * @param font      The font's name.
  * @param codes     The glyphs, from fontEncodings(); at most GRID_LIMIT are drawn.
  * @param metrics   The font's glyph box, from fontMetrics().
+ * @param maxWidth  The widest the grid may be, in device pixels: the view's
+ *                  width at its zoom. Rows wrap there, so the grid is shown at
+ *                  its zoom instead of shrunk to fit the sidebar.
  * @return The files, and the cells drawn with the code each holds, for the
  *         view's labels and hover.
  */
@@ -160,10 +163,11 @@ export function glyphGridTexts(
   font: string,
   codes: readonly number[],
   metrics: FontMetrics,
+  maxWidth: number = VIEW_WIDTH,
 ): { readonly texts: Map<string, string>; readonly cells: readonly (InkBox & { readonly code: number })[] } {
   const width = Math.max(1, Math.min(metrics.width + GRID_GAP, VIEW_WIDTH));
   const height = Math.max(1, Math.min(metrics.height + GRID_GAP, VIEW_HEIGHT));
-  const columns = Math.max(1, Math.floor(VIEW_WIDTH / width));
+  const columns = Math.max(1, Math.floor(Math.min(VIEW_WIDTH, maxWidth) / width));
   const rows = Math.max(1, Math.floor(VIEW_HEIGHT / height));
   const cells = codes.slice(0, Math.min(GRID_LIMIT, columns * rows)).map((code, index) => ({
     code,

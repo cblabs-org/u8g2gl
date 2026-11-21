@@ -75,6 +75,14 @@ test('the glyph grid is one glyph per cell, in rows across the view\'s display, 
   expect(many.cells).toHaveLength(GRID_LIMIT);
 });
 
+test('the glyph grid wraps at the width it is given, so a narrow view is not shrunk', () => {
+  // A sidebar 190 px wide at zoom 2 gives 95 device pixels: eleven 8 px cells a row.
+  const { cells } = glyphGridTexts('', 'f', Array.from({ length: 30 }, (_, i) => 32 + i), { width: 6, height: 10, ascent: 8 }, 95);
+  expect(Math.max(...cells.map((c) => c.x + c.width))).toBeLessThanOrEqual(95);
+  expect(cells[11]).toMatchObject({ x: 0, y: 12 });
+  expect(cells).toHaveLength(30);
+});
+
 test('the ruler draws its text escaped, at the display\'s top left', () => {
   expect(escapeXml('a<b & "c">')).toBe('a&lt;b &amp; &quot;c&quot;&gt;');
   expect(rulerTexts('<globals/>', 'u8g2_font_6x10_mr', 'A&B').get(VIEW_SCREEN)).toContain('x="0" y="0" width="640" height="320" font="u8g2_font_6x10_mr" text="A&amp;B"');
