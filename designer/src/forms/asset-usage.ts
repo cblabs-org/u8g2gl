@@ -13,10 +13,13 @@
  *              is the CLI's reference finder's answer
  *              (`core/references/find-references.ts`), so these lists, the
  *              guards and rename cannot disagree about what a reference is.
- *              A font's users are the screens' elements that name it through
- *              a font-typed prop or a `style_font` override, and the styles
- *              whose `font` it is; an image's, the elements naming it through
- *              an image-typed prop. "Only what this project uses" reads the
+ *              A font's users are every element that names it, on a screen
+ *              or in a widget's template, through a font-typed prop or a
+ *              `style_font` override, each widget whose prop defaults to it,
+ *              and the styles whose `font` it is; an image's, the same through
+ *              image-typed props. Every guard counts every reference the
+ *              finder reports, so nothing Remove lets go leaves the project
+ *              failing to validate. "Only what this project uses" reads the
  *              static text by font exactly as the CLI's glyph-range warning
  *              does (`static-text.ts`), so the preset never yields a range the
  *              warning flags; sample values can join it later through
@@ -47,7 +50,7 @@ import type { FormNode } from './form-model';
 
 /** The elements and styles that use one font or image. */
 export interface AssetUsers {
-  /** `screen.element`, in screen then document order. */
+  /** `screen.element`, `widget.element`, or `widget name` for a prop's default, in file then document order. */
   readonly elements: readonly string[];
   /** Style names: a global one, or `screen.style` for a screen's own. */
   readonly styles: readonly string[];
@@ -65,9 +68,10 @@ function addOnce(into: Map<string, string[]>, name: string, user: string): void 
 }
 
 // usersOfType
-// For every font or image name, the screens' elements naming it, and (for
-// fonts) the styles: a screen's own first, then the global ones, as each
-// screen layers its own styles over the globals.
+// For every font or image name, the elements and widgets naming it (screens
+// and templates, in file order), and (for fonts) the styles: a screen's own
+// first, then the global ones, as each screen layers its own styles over the
+// globals.
 //   refs — the project's references
 //   kind — 'font' or 'image'
 function usersOfType(refs: ReferenceIndex, kind: 'font' | 'image'): Map<string, AssetUsers> {
@@ -77,7 +81,7 @@ function usersOfType(refs: ReferenceIndex, kind: 'font' | 'image'): Map<string, 
   for (const name of refs.names(kind)) {
     for (const use of refs.of(kind, name).uses) {
       if (use.shape === 'style-declaration-font') addOnce(use.localStyle === true ? localStyles : globalStyles, name, use.localStyle === true ? `${use.screen ?? ''}.${use.style ?? ''}` : (use.style ?? ''));
-      else if (use.screen !== undefined && use.element !== undefined && (use.shape === 'prop' || use.shape === 'style-font')) addOnce(elements, name, `${use.screen}.${use.element}`);
+      else addOnce(elements, name, userLabel(use));
     }
   }
   const names = new Set([...elements.keys(), ...localStyles.keys(), ...globalStyles.keys()]);
@@ -224,11 +228,12 @@ export function kindOfItem(node: FormNode): ReferenceKind | undefined {
  * @brief Why a globals.xml item may not be removed now: it is still used, and
  *        the reason names its users.
  *
- * Fonts and images count the users `fontUsers()` and `imageUsers()` list;
- * subjects, styles and constants, every use the reference finder reports
- * (bindings, typed props and defaults, style references, `#name` tokens). A
- * global style's uses on a screen that shadows it are that screen's own
- * style's, so they do not hold it. Every globals kind is then guarded.
+ * Every kind counts every use the reference finder reports: bindings, typed
+ * props on screens and in widget templates, props' defaults, style references
+ * and fonts, `style_font` overrides and `#name` tokens. Fonts and images name
+ * them as `fontUsers()` and `imageUsers()` list them. A global style's uses on
+ * a screen that shadows it are that screen's own style's, so they do not hold
+ * it.
  *
  * @param refs The project's references now; undefined before the first run.
  * @param node The item.

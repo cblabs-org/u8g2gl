@@ -137,3 +137,21 @@ test('Remove is refused for a subject still bound, naming the bindings by screen
   expect(removeRefusal(refs(), msg)).toBe("Subject 'msg' is still used by main.temp. Change it first, then remove it.");
   expect(removeRefusal(refs(GLOBALS, SCREEN.replace(' bind_text="msg"', '')), msg)).toBeUndefined();
 });
+
+test('a font named only inside a widget template, or as a prop\'s default, cannot be removed', () => {
+  const widget = `<?xml version="1.0" encoding="UTF-8"?>
+<widget name="badge">
+    <api>
+        <prop name="face" type="font" default="u8g2_font_6x10_mr" />
+    </api>
+    <view>
+        <u8g2gl_label name="mark" x="0" y="0" width="10" height="8" font="u8g2_font_5x7_mr" text="!" />
+    </view>
+</widget>
+`;
+  const documents = new Map([...texts(), ['widgets/badge/badge.xml', widget]]);
+  const index = indexReferences({ documents, manifests: new ProjectModelCache().build(documents).manifests });
+  expect(fontUsers(index).get('u8g2_font_5x7_mr')).toEqual({ elements: ['badge.mark'], styles: [] });
+  expect(removeRefusal(index, item('u8g2_font_5x7_mr'))).toBe("Font 'u8g2_font_5x7_mr' is still used by badge.mark. Change it first, then remove it.");
+  expect(fontUsers(index).get('u8g2_font_6x10_mr')?.elements).toEqual(['main.other', 'widget badge']);
+});
