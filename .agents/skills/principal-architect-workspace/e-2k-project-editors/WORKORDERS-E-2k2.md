@@ -220,3 +220,132 @@ RESCOPE rulings 8–10.
 - An injected asset can't be made pixel-identical to the compiled one.
 - K1 can't remove the fonts from the editor build without breaking a widget that uses a prop.
 - Any approved ruling turns out to be wrong in the code.
+
+# Completion report (worker, 2026-11-21)
+
+Authorization checked from the committed records: both RESCOPE-E-2k2.md's and PROJECT.md's
+status logs record the owner's own words, "Approve E-2k2". Worktree `../U8G2GL-e4`, nothing pushed,
+tagged or published.
+
+## Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-e2k2/wo1-injection` | `5e458f8` feat(e2k2): fonts and images reach the editor Wasm by injection |
+| WO2 | `u8g2gl-e2k2/wo2-fonts-view` | `5a7b6d5` feat(e2k2): the Fonts view and "Browse fonts…" |
+| WO3 | `u8g2gl-e2k2/wo3-ranges-usage` | `43e5b84` feat(e2k2): range presets, glyph-range warning, sizes and usage |
+| WO4 | `u8g2gl-e2k2/wo4-docs-review` | `19b7215` docs, ChangeLog, CLI 0.24.0, review; then this report |
+
+## Suites, run one at a time
+
+| Suite | Baseline (`ea2a0ff`) | Final (WO4 tip) |
+|---|---|---|
+| Framework Wasm build | ok | ok, 0 warnings (plus the new `u8g2gl_editor_compiled_assets`) |
+| Wasm tests | 5/5 | 6/6 (`asset-injection` added) |
+| Host C++ | 530/530 (1 skipped) | 530/530 (1 skipped), 0 warnings |
+| CLI vitest | 3177, 1 known flake (`generate-editor.test.ts` 5 s limit; passes alone) | 3208/3208 |
+| CLI lint | clean | clean |
+| `refresh-goldens.mjs` | — | empty diff |
+| Designer typecheck / unit | clean / 291 | clean / 301 |
+| e2e (`build:e2e`) | 138/138 | 146/147: known flake `design-hidden.spec.ts:144` (canvas hash); passed alone, and 3 more whole-file runs |
+| Production build, hook grep, `test:e2e:production` | 3/3 | clean, 3/3 |
+| `check-package` | — | PASS at 0.24.0 (821 files, tarball 15.8 MB) |
+| Home-path guard | clean | clean (self-test passes) |
+
+Per WO: WO1 e2e 141/141 and production 3/3; WO2 e2e 144/144, production 3/3; WO3 CLI 3208,
+e2e 147/147, production 3/3.
+
+Flakes seen: `drag-performance.spec.ts:189` failed once in a WO1 rerun (5 missed frames, 3
+allowed), then passed twice alone. Two `test-run.spec.ts` failures in the first WO1 run were
+my fault: I ran the unit suite concurrently, which deleted Playwright's trace artefacts; both
+passed when rerun alone.
+
+## WO1 measurements
+
+- **A font change's time to canvas** (departures project; the IDE writes globals.xml with a
+  new `<builtin name="u8g2_font_ncenB08_tr">` and the screen using it; from the write to the
+  first non-stale frame showing it; headless Chromium):
+  - before, with Emscripten: **2114, 1596, 2096 ms**. The canvas went stale at ~65 ms (the
+    Wasm refused the undeclared-in-Wasm font) until the rebuilt project Wasm was swapped in;
+  - before, without a toolchain: **never**. Stale, the framework Wasm having no such font;
+  - after, with Emscripten: **97, 94, 90 ms**; without: **88 ms**. No build is requested.
+    The figure includes the file watcher and the buffer reload.
+- **Built-in font route:** first request 92–111 ms (the parse is 92–101 ms of it), later
+  requests 1–2 ms. The index holds 2,039 fonts in **13.3 MiB** of array buffer plus 0.5 MiB of
+  heap. Every font decodes to exactly its declared length, and its U8G2 structure ends there.
+
+## Moved golden lines
+
+Only the five editor registries (`test/generated_fixture`, `test/static_children`,
+`test/collection_data`, `test/fill_guard/{match,mismatch}`), only in the asset lookup:
+
+- `#include <cstring>` removed. It existed only for the lookup's `strcmp`.
+- The lookup's two comment lines replaced.
+- Its `extern const uint8_t* const ui_font_*;` / `extern const uint8_t ui_image_*[];` lines
+  removed (7 in the fixture), and its `strcmp` branches removed (7).
+- Its body is now `(void)type; (void)name; return nullptr;`.
+
+No firmware golden moved.
+
+## Deviations and decisions
+
+1. **Framework Wasm and its fixture fonts.** Its target is unchanged (wasm/CMakeLists.txt gained
+   only a new test target), so its fixture registry's lookup is now empty. Its Wasm tests
+   inject the fixture's assets as the designer does (`wasm/test/inject-assets.mjs`, through
+   the built CLI's own loaders). `test/test_wasm_parity.cpp` injects the compiled fixture
+   symbols, with each font's length taken from its U8G2 structure. The D-9 golden hash did
+   not move. The compiled-in reference is the new target `u8g2gl_editor_compiled_assets`,
+   with `wasm/test/compiled_assets_registry.cpp`: the generated registry, its empty lookup
+   renamed by the preprocessor, and the old table hand-written.
+2. **CI:** the wasm-tests job now installs and builds the CLI *before* the Wasm tests, which
+   need it, and builds and runs the new target and test.
+3. **Exports:** the framework export list is unchanged. `EMSCRIPTEN_KEEPALIVE` exports
+   `_injectFont`, `_injectImage` and `_clearInjected` on the module; verified in both the
+   framework and the project builds. `wasm/u8g2gl_editor.mjs` is untouched; the tests use
+   `_module`.
+4. **Bridge behaviour beyond the WO:** an injected font is refused when its U8G2 structure runs
+   past its bytes. A missing image still refuses the scene; only fonts fall back. Replaced or
+   cleared bytes are kept until the next screen build, because live objects may point at them.
+   `renderFrame()` repeats a missing-font warning, so it survives `applySampleData()` clearing
+   the last error.
+5. **`affectsEditorBuild()`** keeps `widgets/` and `u8g2gl.xml`. `globals.xml` was dropped,
+   though its style count reaches the generated config's `U8G2GL_MAX_STYLES`: no runtime
+   source the editor compiles reads that ceiling, so it is the same case as a screen's object
+   count, which was already not a trigger.
+6. **Designer:** while a built-in's fetch is in flight, the edit loop draws nothing and keeps
+   the last frame, rather than flashing the fallback, and `settled()` waits for the run after
+   it. Injection is keyed per module, so an unchanged project costs a reference comparison.
+7. **e2e `test-run.spec.ts:104`:** its "last good frame" case typed an unknown font, which now
+   draws in the fallback (ruling 1). It now inserts an undeclared image instead. Same assertion.
+8. **Docs:** design_spec §9 is "Collection Data", so injection is a new §9.5; the widget-manifest
+   section is §6.5. One stale §14.1 sentence, which said the editor Wasm links only the
+   project's fonts, was corrected.
+9. **Fonts view:**
+   - "Loads fonts lazily" is implemented as each row's sample drawn only as it nears the view
+     (e2e-checked), with font bytes fetched for the selected font only.
+   - The ruler reads the lit box of the drawn text, not U8G2's advance width.
+   - The glyph grid draws at most 192 glyphs (object indices are a byte) and says how many
+     the font has.
+   - The view's projects draw in the editor Wasm's spare instance, shared with the impact
+     preview.
+10. **Range presets:**
+    - "Digits and time" is `0x20,0x2B-0x3A`.
+    - The derivation and the warning share `cli/src/core/fonts/static-text.ts`.
+    - "Static text" means string props' literals plus binding formats' literal parts.
+11. **Readability review:** done by the worker against `u8g2gl-standards`, without a subagent.
+    Two findings were fixed: an untyped injection state, and an undocumented decoder
+    parameter. No workspace pointers are in source comments or test titles.
+
+## Open items
+
+- Per-glyph metrics (width, ascent, descent for a chosen glyph, ui_spec §12) are not in the Fonts
+  view.
+- "Only what this project uses" has no sample values yet (E-3b), and the derivation takes
+  them through `codepointsByFont()`'s `extra` input.
+- No e2e covers the 1:1 image preview or the `<convert>` choice (the departures project has no
+  image); unit tests cover usage and refusal.
+- A scene naming an undeclared font now draws in the fallback while the validator reports the
+  error. Run is therefore available on such a frame, as it already was for any error the
+  canvas can draw.
+- The bridge records an injected image's width and height but does not read them yet.
+- `drag-performance.spec.ts:189` is marginal on this machine under load.
