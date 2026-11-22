@@ -58,6 +58,19 @@ interface CorpusProject {
   readonly dir: string;
   /** Absent: both build, and every frame must match. Present: both must refuse with this code. */
   readonly refusedWith?: string;
+  /**
+   * Pixels, as [x, y], that the first firmware frame of the project's first
+   * screen must show lit and unlit. Two targets agreeing proves nothing about
+   * what either drew, so a fixture added for one feature says where it is seen.
+   */
+  readonly expectPixels?: { readonly lit: readonly (readonly [number, number])[]; readonly unlit: readonly (readonly [number, number])[] };
+}
+
+// pixel
+// Whether (x, y) is lit in a full-buffer frame in U8G2's vertical_top_lsb
+// layout, as the 128-pixel-wide SSD1306 targets of the corpus draw it.
+function pixel(frame: Uint8Array, width: number, x: number, y: number): boolean {
+  return ((frame[Math.floor(y / 8) * width + x]! >> (y % 8)) & 1) === 1;
 }
 
 const CORPUS: readonly CorpusProject[] = [
@@ -70,6 +83,25 @@ const CORPUS: readonly CorpusProject[] = [
   // The departures widgets as first written, at schema 0.4, before their
   // manifests carried palette metadata: the validator still accepts 0.4.
   { name: 'widget probe (schema 0.4)', dir: join(__dirname, 'fixtures', 'widget-probe-0.4') },
+  // A style's `border` outline (§10) on a container with a child over it, a
+  // rounded label, a named style, xor, and buttons at border_width 0 and 1.
+  // Each lit pixel is on one element's outline, away from its text; each unlit
+  // one is a corner a radius rounds off.
+  {
+    name: 'style border',
+    dir: join(__dirname, 'fixtures', 'style-border'),
+    expectPixels: {
+      lit: [
+        [59, 15], [30, 29], // panel: right and bottom edges
+        [123, 7], // rounded: right edge
+        [123, 22], // styled (named style): right edge
+        [59, 40], // xored: right edge, under xor
+        [91, 39], // bare (border_width 0): the framework's outline
+        [123, 39], // framed_button (border_width 1): its own frame, once
+      ],
+      unlit: [[64, 0], [64, 16]], // rounded and styled: their top-left corners
+    },
+  },
 ];
 
 /** The editor API of wasm/u8g2gl_editor.mjs, as the corpus drives it. */
@@ -168,6 +200,14 @@ describe.skipIf(toolchain === undefined)('the parity corpus: firmware frames equ
             mismatches.push(`${screen} @ ${time} ms: ${differ} px differ`);
           }
         });
+      }
+      // --- Step 4: What the fixture exists to show is really drawn ---
+      if (fixture.expectPixels !== undefined) {
+        const first = (await harness.run(harness.screens[0]!, TEST_RUN_TIMES)).frames[0];
+        expect(first).toBeDefined();
+        const at = ([x, y]: readonly [number, number]) => `(${x}, ${y})`;
+        expect(fixture.expectPixels.lit.filter((p) => !pixel(first!, 128, p[0], p[1])).map(at), 'should be lit').toEqual([]);
+        expect(fixture.expectPixels.unlit.filter((p) => pixel(first!, 128, p[0], p[1])).map(at), 'should be unlit').toEqual([]);
       }
       console.log(`${fixture.name}: ${harness.screens.length} screen(s), ${compared} frames compared, ${mismatches.length} differ`);
       expect(mismatches, 'a parity mismatch is a framework bug: diagnose and report it, do not adjust this test').toEqual([]);

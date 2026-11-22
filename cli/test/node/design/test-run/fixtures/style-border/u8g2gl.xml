@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A parity-corpus fixture for a style's `border` (design_spec §10): the
+     framework draws a one-pixel outline on every element whose resolved style
+     sets it, so the firmware harness and the editor Wasm must draw the same
+     outline, pixel for pixel. One screen holds a bordered container with a
+     child over its outline, a bordered label with a corner radius, the same
+     outline from a named style and under xor, and buttons at border_width 0
+     and 1, where the button's own frame stands in for the outline. -->
+<u8g2gl schema="0.7" name="style_border" version="1.0.0">
+    <targets>
+        <target name="primary" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
+    </targets>
+    <output dir="generated" />
+</u8g2gl>
