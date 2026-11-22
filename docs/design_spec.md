@@ -1320,7 +1320,7 @@ Monochrome collapses the styling domain to a small set:
 | `draw_color` | `0`, `1`, `xor` | Pixel value |
 | `invert` | `true` / `false` | XOR region (selection highlighting) |
 | `padding` | int px | Internal spacing |
-| `border` | `true` / `false` | 1px outline |
+| `border` | `true` / `false` | 1px outline on the element's box, drawn by the framework — see below |
 | `radius` | int px | Rounded corners. Bounded: `2 · radius ≤ min(width, height)` — see below |
 | `align` | `left` / `center` / `right` | Text alignment |
 | `font_mode` | `solid` / `transparent` | Text background |
@@ -1328,11 +1328,21 @@ Monochrome collapses the styling domain to a small set:
 
 **A rounded box's corner radius satisfies `2 · radius ≤ min(width, height)`.** The validator refuses a radius beyond it **however it is configured** — as an attribute, as `style_radius`, or through a named style — whenever the element's width and height are literal, and the diagnostic names which of the three the value came from. Precedence is the one `init` applies: attribute, then `style_radius`, then the last named style in scope. The runtime clamps to the same bound whatever survives to run time — a bound size, or a style resolved late — so both paths agree.
 
-The check runs for any element whose manifest declares `radius`, not only those that draw a rounded shape. **A label inherits `radius` and draws nothing round, and is refused an oversized one too.** That is deliberate: the alternative is a rule conditioned on what an element *happens* to draw, which the manifest does not say and the validator cannot know. Measured (`test/test_radius_honoured.cpp`, 18 sizes × every radius): the button and the switch pass the requested radius to U8G2 unchanged exactly when `2 · radius ≤ min(width, height)`, and substitute `min/2` beyond it — the same boundary, so one rule covers every element that reads the property. At equality the corner discs meet and the shape is a capsule. That is intended, and it is what `u8g2gl_switch` draws by default.
+The check runs for any element whose manifest declares `radius`, not only those that draw a rounded shape. **A label inherits `radius`, draws nothing round of its own (only its `border` outline, below, is rounded by it), and is refused an oversized one too.** That is deliberate: the alternative is a rule conditioned on what an element *happens* to draw, which the manifest does not say and the validator cannot know. Measured (`test/test_radius_honoured.cpp`, 18 sizes × every radius): the button and the switch pass the requested radius to U8G2 unchanged exactly when `2 · radius ≤ min(width, height)`, and substitute `min/2` beyond it — the same boundary, so one rule covers every element that reads the property. At equality the corner discs meet and the shape is a capsule. That is intended, and it is what `u8g2gl_switch` draws by default.
 
 Past the bound, the band U8G2 draws between the corner discs — `w - r - r`, `u8g2_box.c:121-123` — wraps in `u8g2_uint_t`, the `>= 3` guard that follows still passes, and the box paints across the display.
 
 **This bound was measured, not derived.** An earlier Chief Architect ruling set `radius ≤ min(width, height) − 1` by reasoning from the corner-centre arithmetic, and missed that the band wraps first: measurement refused it, because 30 of 68 radii it accepted drew outside the box — a 10×10 box at `r=6` set 1310 pixels outside itself. It is recorded here so the looser bound is not reintroduced by the same reasoning. `RealU8g2RoundedBoxBound.*` links U8G2's own C sources and sweeps 14 sizes across both primitives, so a dependency bump that moves the boundary fails the build rather than the display.
+
+**`border` is a one-pixel outline that the framework draws for every element**, so no widget needs code of its own to honour it:
+
+- **What is drawn.** A one-pixel frame on the element's own box `(x, y, width, height)`, in the style's `draw_color`, with corners from its `radius`, clamped by the bound above (`u8g2gl_coord_corner_radius()`). It is drawn with `u8g2gl_draw_frame()` (`u8g2gl_draw.h`), which always calls U8G2's `drawRFrame`, the same primitive the button's own frame uses.
+- **When.** In `u8g2gl_render_object()`, right after the element's `render()`, and in `u8g2gl_repaint_object()` at the same point, so the blocked-loop repaint ([D-5]) draws the same outline as the frame.
+- **The clip.** It is drawn inside the element's effective clip and state guard (§11.3), like everything else the element draws: an outline partly outside a container or off the display draws only its visible part, and no draw colour leaks to the caller.
+- **Children draw over it.** It belongs to the element's own slot in document order, and children render after their container, so a child overlapping a container's outline draws over it, exactly as it draws over anything else the container drew.
+- **The button.** A button whose `border_width` is above 0 already frames its box: its outermost layer lies on exactly the outline's pixels. Drawn twice, the two are identical in draw colours 0 and 1, but under `xor` the second pass erases the first and the frame disappears. So such a button draws no framework outline (`u8g2gl_obj::draws_own_outline()`, which only the button overrides); at `border_width="0"` with `border="true"` it gets the framework's outline like any other element.
+
+`border` is set like every style property: as an attribute, as `style_border`, or through a named style, with the precedence above. Only width 1 exists, and `padding` does not grow to clear the outline. `test/test_style_border.cpp` pins all of this against real U8G2 pixels.
 
 ```xml
 <styles>

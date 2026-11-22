@@ -23,7 +23,6 @@
  * Exports:
  * - StyleFacts:         A style's preview, users and radius bound
  * - ConstFacts:         A constant's references
- * - BORDER_UNDRAWN:     What a style's `border` field notes
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -34,12 +33,6 @@ import type { Workspace } from '../workspace';
 import { nameUsers, type NameUser } from './asset-usage';
 import type { FormNode } from './form-model';
 import { constUses, radiusBound, STYLE_SAMPLES, styleSampleTexts, type StyleSample } from './style-facts';
-
-/**
- * What a style's `border` field notes: no runtime element reads a style's
- * border. A button frames itself from its own `border_width`.
- */
-export const BORDER_UNDRAWN = "No element draws a style's border yet: a label has no frame, and a button frames itself from its own border_width.";
 
 // valueOf
 // A node's attribute value, by name.
