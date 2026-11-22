@@ -165,3 +165,32 @@ Approved by the owner on 2026-11-22 ("Approve P1"), as recorded in PROJECT.md's 
 - [ ] **Tests** in `test/test_style_border.cpp`: each widget with `border` true and false, under draw colours 0, 1 and xor, at style radius 0 and above 0. Its pixels are identical with and without `border`, and its frame survives xor.
 - [ ] Update design_spec §10 and the ChangeLog entry to say that the button (while `border_width > 0`), the progress bar and the switch frame their own box and skip the outline.
 - [ ] Every host suite passes, then the CLI, designer unit and e2e suites, one at a time. Append a short P1 report here.
+
+## P1 report (Tier-3 worker, 2026-11-22)
+
+Authorization checked from the committed files: PROJECT.md's Amendments section and status log record the owner's "Approve P1" (`fec891a`). Nothing was pushed or downloaded. `apply_style()` (finding 4) was not touched.
+
+**Commit:** `96f0bdf` fix(runtime): the progress bar and the switch draw their own outline (P1)
+
+**What changed**
+- `u8g2gl_progress_bar` and `u8g2gl_switch` each override `draws_own_outline()` to return `true`, with a why-comment and Doxygen. The base Doxygen, the core helper's comment, design_spec §10 and the runtime 0.15.0 ChangeLog line all now name the three elements that skip the outline.
+- **Tests,** in `test/test_style_border.cpp`:
+  - The element sweep now expects no change for the three elements that frame themselves.
+  - New `ProgressBarAndSwitchFrameTheirOwnBoxAtEveryColourAndRadius` covers both widgets with `border` true and false, under colours 0, 1 and xor, at radius 0 and 3. The pixels are identical, and the top edge survives xor.
+  - Mutation check: with the switch's override returning false, both tests fail.
+- **Designer caption text:** unchanged. The captions describe only the label and button samples, and name no other widget.
+
+**Suites (one at a time)**
+
+| Suite | Result |
+|---|---|
+| Host C++ (ctest) | 540/540 passed, 1 skipped (the usual `SizeOfReport.ThirtyTwoBitTarget`) |
+| Wasm (editor Wasm rebuilt) | all 6 pass |
+| CLI (vitest, Emscripten on PATH, parity corpus included) | 153 files, 3233/3233 |
+| Designer unit | 316/316 |
+| e2e (`build:e2e` rebuilt, Emscripten on PATH) | 156 passed, 5 failed, in 52 minutes against 7 before; the load average was about 7 throughout |
+
+**The five e2e failures**
+- `overlays.spec.ts:139`, `selection.spec.ts:121`, `test-run.spec.ts:104` and `panel-budget.spec.ts:177` were timeouts or timing gates. Each passed on its first rerun alone.
+- `design-hidden.spec.ts:144` is the listed flake. It failed once more alone, then passed twice alone.
+- None of the five involves a progress bar or a switch with `border`.
