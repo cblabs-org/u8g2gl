@@ -33,7 +33,10 @@
  *
  * Description: One free function per primitive manifest — box, circle,
  *              ellipse, hline, line, pixel, triangle, vline — plus the shared
- *              segment enum used by circle and ellipse's `segments` property.
+ *              segment enum used by circle and ellipse's `segments` property,
+ *              and one function no manifest names: u8g2gl_draw_frame(), the
+ *              one-pixel frame the button's border and the framework's style
+ *              `border` outline share (§10).
  *              Degenerate geometry (zero width/height/radius) is a no-op, not
  *              a crash: these run inside the render loop, where a bad value
  *              is a reboot rather than an exception.
@@ -58,7 +61,7 @@
  *              |                                         | then u8g2gl_coord_clamp;|
  *              |                                         | never wrapped           |
  *              | rounded box corner radius               | u8g2gl_coord_corner_    |
- *              | (u8g2gl_draw_box)                       | radius(): clamped to    |
+ *              | (u8g2gl_draw_box, u8g2gl_draw_frame)    | radius(): clamped to    |
  *              |                                         | 2r <= min(w, h); one    |
  *              |                                         | that clamps to 0 draws  |
  *              |                                         | square; a literal over- |
@@ -81,6 +84,8 @@
  *
  * Exported Functions:
  * - u8g2gl_draw_box():      Filled or outline rectangle, optionally rounded
+ * - u8g2gl_draw_frame():    One-pixel frame, always through drawRFrame: the
+ *                           button's border and a style's `border` outline
  * - u8g2gl_draw_circle():   Circle outline or filled disc
  * - u8g2gl_draw_ellipse():  Ellipse outline or filled
  * - u8g2gl_draw_hline():    Horizontal line
@@ -139,6 +144,31 @@ enum u8g2gl_draw_segment_t : uint8_t {
  */
 void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
                       int16_t height, bool filled = true, int16_t radius = 0);
+
+/**
+ * @brief Draw a one-pixel frame on a box, always through U8G2's `drawRFrame`.
+ *
+ * Not an element of its own: it is the frame the framework draws for a style's
+ * `border` (§10) and the one each layer of a button's border draws, so the two
+ * cannot drift apart. It differs from `u8g2gl_draw_box(..., false, r)` in one
+ * way only, and deliberately: it calls `drawRFrame` even at radius 0, where
+ * u8g2gl_draw_box() picks `drawFrame`. The button has always drawn its border
+ * that way, and its pixels are pinned by its tests.
+ *
+ * The coordinate rules are u8g2gl_draw_box()'s: the origin wraps through
+ * u8g2gl_coord_pos(), so a frame partly off the left or top edge draws its
+ * visible part, and the clip window in force trims the rest.
+ *
+ * @param display U8G2 display context to draw into, in its current draw colour.
+ * @param x       Left edge, in device pixels. May be negative.
+ * @param y       Top edge, in device pixels. May be negative.
+ * @param width   Width in pixels. `<= 0` draws nothing.
+ * @param height  Height in pixels. `<= 0` draws nothing.
+ * @param radius  Corner radius in pixels, clamped to `2r <= min(width, height)`
+ *                by u8g2gl_coord_corner_radius(); `<= 0` means square corners.
+ */
+void u8g2gl_draw_frame(U8G2& display, int16_t x, int16_t y, int16_t width,
+                        int16_t height, int16_t radius = 0);
 
 /**
  * @brief Draw a circle outline or filled disc.

@@ -58,6 +58,8 @@
  *     Lifecycle (virtual):
  *     - tick():              Advance animation; returns next deadline
  *     - render():            Draw to the U8G2 buffer
+ *     - draws_own_outline(): Whether render() frames the box itself, so the
+ *                            framework skips the style `border` outline
  */
 #ifndef U8G2GL_OBJ_H
 #define U8G2GL_OBJ_H
@@ -452,6 +454,22 @@ public:
      * @param display The U8G2 instance owned by the application.
      */
     virtual void render(U8G2& display);
+
+    /**
+     * @brief Whether render() already draws the one-pixel frame on this
+     *        element's own box.
+     *
+     * The framework draws a style's `border` as that frame, after render(), for
+     * every element (§10). An element whose render() frames its own box would
+     * then draw those pixels twice, which is invisible in draw colours 0 and 1
+     * but not under xor, where the second pass erases the first and the frame
+     * disappears. Such an element answers true, and the framework leaves its
+     * outline out. Only u8g2gl_button does, while its border_width is above 0.
+     *
+     * @return false by default: the framework draws the outline when `border`
+     *         is set.
+     */
+    virtual bool draws_own_outline() const;
 
     // --- Escape hatch ---
 

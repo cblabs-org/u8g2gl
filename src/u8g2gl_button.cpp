@@ -20,7 +20,8 @@
  *          bound button drew no label.
  *
  * Description: Implementation of set_text, get_text, set_border_width,
- *              get_border_width, tick, and render methods for u8g2gl_button.
+ *              get_border_width, draws_own_outline, tick, and render methods
+ *              for u8g2gl_button.
  */
 #include "u8g2gl/u8g2gl_button.h"
 #include "u8g2gl/u8g2gl_coord.h"
@@ -35,30 +36,6 @@
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
-
-// draw_border_rframe
-// Draws one border layer. The button has always called drawRFrame, even at
-// radius 0, so this cannot route through u8g2gl_draw_box(), which picks
-// drawFrame at radius 0. It applies the same rules (u8g2gl_coord.h): the origin
-// wraps explicitly, so a border partly off the left or top edge draws its
-// visible part; the size must be positive; the corner radius is clamped to
-// 2r <= min(w, h) of this layer (u8g2gl_coord_corner_radius()), 0 meaning
-// square corners. Clamping per layer is what keeps each inner layer of a thick
-// border, which is smaller than the button, inside its own box.
-//   display  — U8G2 display driver instance
-//   x, y     — layer origin; may be negative
-//   w, h     — layer size
-//   r        — requested corner radius; clamped to this layer
-static void draw_border_rframe(U8G2& display, int16_t x, int16_t y,
-                               int16_t w, int16_t h, int16_t r) {
-    u8g2_uint_t uw = 0;
-    u8g2_uint_t uh = 0;
-    if (!u8g2gl_coord_size(w, uw) || !u8g2gl_coord_size(h, uh)) {
-        return;
-    }
-    display.drawRFrame(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw, uh,
-                       u8g2gl_coord_corner_radius(r, w, h));
-}
 
 // u8g2gl_button::set_text
 // Stores pointer to the button label text and flags the object as dirty.
@@ -91,6 +68,14 @@ void u8g2gl_button::set_border_width(uint8_t w) {
 // Returns border width in pixels.
 uint8_t u8g2gl_button::get_border_width() const {
     return border_width_;
+}
+
+// u8g2gl_button::draws_own_outline
+// True whenever the border draws at all: its outermost layer is the box's own
+// one-pixel frame, the same pixels the framework's style outline would draw a
+// second time, and under xor the two would cancel.
+bool u8g2gl_button::draws_own_outline() const {
+    return border_width_ > 0;
 }
 
 // u8g2gl_button::tick
@@ -134,10 +119,14 @@ void u8g2gl_button::render(U8G2& display) {
     // --- Step 5: Draw border frame(s) ---
     // For border_width == 1, draw a single rounded frame matching style radius.
     // For border_width > 1, draw concentric nested frames inset by 1px per layer.
+    // Each layer goes through u8g2gl_draw_frame(), which always calls
+    // drawRFrame, as this border always has, and clamps the radius per layer.
+    // Layer 0 lies on exactly the pixels of a style's `border` outline, which
+    // is why draws_own_outline() tells the framework to leave that outline out.
     if (border_width_ > 0) {
         display.setDrawColor(static_cast<uint8_t>(style_.draw_color));
         if (border_width_ == 1) {
-            draw_border_rframe(display, x_, y_, w_, h_, style_.radius);
+            u8g2gl_draw_frame(display, x_, y_, w_, h_, style_.radius);
         } else {
             for (uint8_t i = 0; i < border_width_; ++i) {
                 int16_t bx = static_cast<int16_t>(x_ + i);
@@ -148,7 +137,7 @@ void u8g2gl_button::render(U8G2& display) {
                     break;
                 }
                 int16_t br = (style_.radius > i) ? static_cast<int16_t>(style_.radius - i) : 0;
-                draw_border_rframe(display, bx, by, bw, bh, br);
+                u8g2gl_draw_frame(display, bx, by, bw, bh, br);
             }
         }
     }

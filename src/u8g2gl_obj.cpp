@@ -192,6 +192,14 @@ void u8g2gl_obj::render(U8G2& /*display*/) {
     // Default: no-op
 }
 
+// u8g2gl_obj::draws_own_outline
+// Default: the element frames nothing of its own, so the framework draws a
+// style's `border` outline for it. Only an element whose render() already
+// draws that frame (the button) answers true.
+bool u8g2gl_obj::draws_own_outline() const {
+    return false;
+}
+
 void u8g2gl_obj::render_animation_update(U8G2& /*display*/, uint32_t /*now_ms*/) {
     // Default: no-op
 }

@@ -28,6 +28,8 @@
  *     Appearance:
  *     - set_border_width(): Configure border stroke width in pixels
  *     - get_border_width(): Retrieve active border stroke width
+ *     - draws_own_outline(): True while border_width > 0, so the framework's
+ *                            style `border` outline is not drawn twice
  *
  *     Lifecycle (overrides):
  *     - tick():   Advance animation state; always returns U8G2GL_IDLE
@@ -101,6 +103,20 @@ public:
      * @return Border width in pixels.
      */
     uint8_t get_border_width() const;
+
+    /**
+     * @brief Report that a non-zero border already draws the box's outline.
+     *
+     * The border's outermost layer is a one-pixel frame on the button's own
+     * box, which is exactly where the framework would draw a style's `border`
+     * outline (§10). Drawing both would draw those pixels twice, and under
+     * `draw_color` xor the second pass erases the first, so the frame would
+     * vanish. At `border_width` 0 the button draws no frame, and a style's
+     * `border` then gets the framework's outline like any other element.
+     *
+     * @return true while border_width is above 0.
+     */
+    bool draws_own_outline() const override;
 
     // --- Lifecycle ---
 

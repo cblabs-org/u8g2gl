@@ -35,7 +35,8 @@
  *     - u8g2gl_set_resume_cb(): Set a callback that wakes a sleeping loop
  *
  *     Support for generated code (§11.3, §13.5):
- *     - u8g2gl_render_object():        Render one object with visibility, clip and state guarded
+ *     - u8g2gl_render_object():        Render one object with visibility, clip and state guarded,
+ *                                      then its style `border` outline
  *     - u8g2gl_repaint_object():       Clear and re-render one object while the main loop is blocked
  *     - u8g2gl_frame_dirty_observer(): Subject observer that marks the active screen dirty
  *
@@ -284,9 +285,19 @@ private:
  * height over every glyph, direction 0); sets the clip window to the
  * effective clip (own bounds intersected with every ancestor's) with a
  * u8g2gl_clip_scope; calls the object's render() unless that clip is empty or
- * off the display; and lets the scope reset the clip window to the full
- * display before the saver restores the caller's state. U8G2GL's state is in force inside the render; the caller's at every
- * other moment.
+ * off the display, then draws its style `border` outline (below); and lets
+ * the scope reset the clip window to the full display before the saver
+ * restores the caller's state. U8G2GL's state is in force inside the render;
+ * the caller's at every other moment.
+ *
+ * **The style outline (§10).** When the object's resolved style sets `border`
+ * and the object does not frame its own box (u8g2gl_obj::draws_own_outline()),
+ * a one-pixel frame is drawn on its box with u8g2gl_draw_frame(), in the
+ * style's `draw_color` and with its `radius`. It is drawn here, by the
+ * framework, so that every element honours `border` with no code of its own.
+ * It is drawn after render() and inside the same clip and state guard, so it
+ * is clipped like everything else the object draws, and leaks no draw colour.
+ * Children are rendered later in document order, so they draw over it.
  *
  * Clip lifetime is this function's responsibility, not the state saver's: its
  * u8g2gl_clip_scope sets the clip and resets it, the same guard a generated
@@ -330,8 +341,10 @@ void u8g2gl_render_object(
  * order: constructs a u8g2gl_state_saver (the caller's state saved, the
  * framework's baseline established); clips to the object's **own** bounds
  * through u8g2gl_apply_clip(); clears those bounds with draw colour 0, because
- * the buffer was not cleared on this path; calls render(); and resets the clip
- * window to the full display before the saver restores the caller's state.
+ * the buffer was not cleared on this path; calls render(), then draws the
+ * style `border` outline exactly as u8g2gl_render_object() does, inside the
+ * same clip; and resets the clip window to the full display before the saver
+ * restores the caller's state.
  *
  * Own bounds rather than the effective clip because a widget holds no
  * reference to its screen's arrays, so its ancestors' bounds are out of reach.

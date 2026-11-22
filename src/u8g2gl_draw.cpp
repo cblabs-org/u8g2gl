@@ -17,8 +17,10 @@
  *          size passed through unguarded would wrap to a very large unsigned
  *          value rather than draw nothing.
  *
- * Description: One function body per primitive. Positions reach U8G2 through
- *              u8g2gl_coord_pos() (an explicit wrap U8G2 clips) and sizes
+ * Description: One function body per primitive, plus u8g2gl_draw_frame(), the
+ *              frame the button and a style's border share. Positions reach
+ *              U8G2 through u8g2gl_coord_pos() (an explicit wrap U8G2 clips)
+ *              and sizes
  *              through u8g2gl_coord_size() (refused when <= 0); see
  *              u8g2gl_coord.h for why each rule is what it is. Lines are the
  *              exception: u8g2gl_clip_line_to_display() clips them to the
@@ -74,6 +76,25 @@ void u8g2gl_draw_box(U8G2& display, int16_t x, int16_t y, int16_t width,
     } else {
         display.drawFrame(ux, uy, uw, uh);
     }
+}
+
+// u8g2gl_draw_frame
+// Draws one frame with drawRFrame at every radius, 0 included, after refusing a
+// size that is non-positive or unrepresentable. Clamping here, per call, is
+// what keeps each inner layer of a thick button border, which is smaller than
+// the button, inside its own box.
+//   display — U8G2 display driver instance, in the caller's draw colour
+//   x, y    — frame origin; may be negative, wrapped for U8G2 to clip
+//   radius  — requested corner radius; clamped to this frame
+void u8g2gl_draw_frame(U8G2& display, int16_t x, int16_t y, int16_t width,
+                        int16_t height, int16_t radius) {
+    u8g2_uint_t uw = 0;
+    u8g2_uint_t uh = 0;
+    if (!u8g2gl_coord_size(width, uw) || !u8g2gl_coord_size(height, uh)) {
+        return;
+    }
+    display.drawRFrame(u8g2gl_coord_pos(x), u8g2gl_coord_pos(y), uw, uh,
+                       u8g2gl_coord_corner_radius(radius, width, height));
 }
 
 // u8g2gl_draw_circle
