@@ -22,7 +22,8 @@
  *              through u8g2gl_render_object() and u8g2gl_repaint_object().
  *              Covers:
  *              - every element type: `border` false draws no outline; true adds
- *                exactly the frame on its box and nothing else;
+ *                exactly the frame on its box and nothing else, or nothing at
+ *                all for an element that frames its own box;
  *              - the three ways `border` is set (attribute, `style_border`,
  *                named style) draw the same, and the element's own `false`
  *                beats a named style's `true`;
@@ -32,6 +33,9 @@
  *              - a container's child drawing over the container's outline;
  *              - the button at border_width 0, 1 and 2 under draw colours 0, 1
  *                and xor: its own frame stands in for the outline, once;
+ *              - the progress bar and the switch under the same colours, at
+ *                radius 0 and above: their tracks frame the box, so `border`
+ *                changes nothing and the frame survives xor;
  *              - the repaint path drawing the frame path's outline;
  *              - the caller's draw colour surviving both paths.
  */
@@ -292,6 +296,16 @@ TEST(StyleBorder, EveryElementTypeAddsExactlyItsBoxFrameAndNothingElse) {
         u8g2gl_obj& on = make_element(on_set, kind);
         on.set_border(true);
         const frame_t bordered = render_one(real, on);
+
+        // An element that frames its own box (the framing button, the progress
+        // bar, the switch) skips the outline, so `border` changes nothing.
+        const bool frames_itself = kind == KIND_BUTTON_WIDTH_1 || kind == KIND_PROGRESS_BAR ||
+                                   kind == KIND_SWITCH;
+        EXPECT_EQ(on.draws_own_outline(), frames_itself);
+        if (frames_itself) {
+            EXPECT_EQ(bordered, plain);
+            continue;
+        }
         const frame_t outline = reference_frame(real, on.get_x(), on.get_y(), on.get_w(),
                                                 on.get_h(), 0);
         EXPECT_EQ(bordered, frame_union(plain, outline));
@@ -490,6 +504,47 @@ TEST(StyleBorder, ButtonFrameAppearsExactlyOnceAtEveryBorderWidthAndColour) {
             // Either way the middle of the top edge shows the frame: lit, or
             // cleared under colour 0. Under xor a second pass would clear it.
             EXPECT_EQ(pixel(bordered, kX + kW / 2, kY), !lit);
+        }
+    }
+}
+
+// --- The progress bar and the switch: their own track stands in for it ---
+
+TEST(StyleBorder, ProgressBarAndSwitchFrameTheirOwnBoxAtEveryColourAndRadius) {
+    real_display real;
+    const u8g2gl_color_t colours[] = {U8G2GL_COLOR_0, U8G2GL_COLOR_1, U8G2GL_COLOR_XOR};
+    const int16_t radii[] = {0, 3};
+    const element_kind kinds[] = {KIND_PROGRESS_BAR, KIND_SWITCH};
+    for (const element_kind kind : kinds) {
+        for (const u8g2gl_color_t colour : colours) {
+            // Colour 0 can only show on a lit buffer; 1 and xor on an empty one.
+            const bool lit = colour == U8G2GL_COLOR_0;
+            for (const int16_t radius : radii) {
+                SCOPED_TRACE(testing::Message() << kind_name(kind) << " colour "
+                                                << static_cast<int>(colour) << " radius " << radius);
+                element_set without_set;
+                u8g2gl_obj& without = make_element(without_set, kind);
+                without.set_draw_color(colour);
+                without.set_radius(radius);
+                without.set_border(false);
+                const frame_t plain = render_one(real, without, lit);
+
+                element_set with_set;
+                u8g2gl_obj& with = make_element(with_set, kind);
+                with.set_draw_color(colour);
+                with.set_radius(radius);
+                with.set_border(true);
+                const frame_t bordered = render_one(real, with, lit);
+
+                // Its track already frames its box, so `border` changes no pixel.
+                EXPECT_TRUE(with.draws_own_outline());
+                EXPECT_EQ(bordered, plain);
+
+                // And the frame survives: the middle of the top edge shows it,
+                // lit, or cleared under colour 0. Under xor a second pass would
+                // clear it.
+                EXPECT_EQ(pixel(bordered, kX + kW / 2, kY), !lit);
+            }
         }
     }
 }

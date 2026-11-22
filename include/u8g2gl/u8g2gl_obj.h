@@ -464,7 +464,9 @@ public:
      * then draw those pixels twice, which is invisible in draw colours 0 and 1
      * but not under xor, where the second pass erases the first and the frame
      * disappears. Such an element answers true, and the framework leaves its
-     * outline out. Only u8g2gl_button does, while its border_width is above 0.
+     * outline out. Three do: u8g2gl_button, while its border_width is above 0,
+     * and u8g2gl_progress_bar and u8g2gl_switch, whose tracks always frame
+     * their box.
      *
      * @return false by default: the framework draws the outline when `border`
      *         is set.

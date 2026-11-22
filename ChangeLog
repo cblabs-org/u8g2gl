@@ -19,10 +19,11 @@ history is in git. See docs/RELEASING.md.
     element's render() and inside its clip and state guard: a frame on
     the element's box, in its draw_color, with corners from its radius
     (clamped to the radius bound). Children draw over a container's
-    outline. A button whose border_width is above 0 draws no extra
-    outline, because its own frame lies on the same pixels and the two
-    would cancel under xor; u8g2gl_obj::draws_own_outline() says so, and
-    only the button overrides it. New public u8g2gl_draw_frame() in
+    outline. Elements that frame their own box draw no extra outline,
+    because the two frames would share edges that cancel under xor: the
+    button while its border_width is above 0, and the progress bar and
+    the switch always. u8g2gl_obj::draws_own_outline() says so, and only
+    those three override it. New public u8g2gl_draw_frame() in
     u8g2gl_draw.h, the button's frame primitive, which the button now
     uses; its pixels are unchanged. Schema minor unchanged at 7.
     Built and tested against U8G2 2.36.18.

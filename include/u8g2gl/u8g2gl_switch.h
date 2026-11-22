@@ -31,6 +31,8 @@
  *     Lifecycle (overrides):
  *     - tick():   Advance animation state; always returns U8G2GL_IDLE
  *     - render(): Draw switch track and handle to U8G2 display buffer
+ *     - draws_own_outline(): Always true: the track frames the box, so the
+ *                            framework's style `border` outline is skipped
  */
 #ifndef U8G2GL_SWITCH_H
 #define U8G2GL_SWITCH_H
@@ -118,6 +120,18 @@ public:
      * @param display U8G2 display context to draw into.
      */
     void render(U8G2& display) override;
+
+    /**
+     * @brief Report that render() already frames this element's box.
+     *
+     * The track is a rounded frame on the switch's own box, on every render, so a style's `border` outline (§10) would draw
+     * those pixels a second time. Under `draw_color` xor the second pass erases
+     * the first. In colours 0 and 1 it would add a square box around the pill, because the outline takes the style's radius while the track defaults to half the height. So the framework
+     * leaves the outline out, and `border` adds nothing here.
+     *
+     * @return true, always.
+     */
+    bool draws_own_outline() const override;
 
 private:
     /**

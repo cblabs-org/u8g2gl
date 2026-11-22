@@ -195,7 +195,7 @@ void u8g2gl_obj::render(U8G2& /*display*/) {
 // u8g2gl_obj::draws_own_outline
 // Default: the element frames nothing of its own, so the framework draws a
 // style's `border` outline for it. Only an element whose render() already
-// draws that frame (the button) answers true.
+// draws that frame answers true: the button, the progress bar and the switch.
 bool u8g2gl_obj::draws_own_outline() const {
     return false;
 }

@@ -1340,7 +1340,12 @@ Past the bound, the band U8G2 draws between the corner discs — `w - r - r`, `u
 - **When.** In `u8g2gl_render_object()`, right after the element's `render()`, and in `u8g2gl_repaint_object()` at the same point, so the blocked-loop repaint ([D-5]) draws the same outline as the frame.
 - **The clip.** It is drawn inside the element's effective clip and state guard (§11.3), like everything else the element draws: an outline partly outside a container or off the display draws only its visible part, and no draw colour leaks to the caller.
 - **Children draw over it.** It belongs to the element's own slot in document order, and children render after their container, so a child overlapping a container's outline draws over it, exactly as it draws over anything else the container drew.
-- **The button.** A button whose `border_width` is above 0 already frames its box: its outermost layer lies on exactly the outline's pixels. Drawn twice, the two are identical in draw colours 0 and 1, but under `xor` the second pass erases the first and the frame disappears. So such a button draws no framework outline (`u8g2gl_obj::draws_own_outline()`, which only the button overrides); at `border_width="0"` with `border="true"` it gets the framework's outline like any other element.
+- **Elements that frame their own box skip it.** Three do, and each answers true to `u8g2gl_obj::draws_own_outline()`, so the framework draws no outline for it and `border` adds nothing:
+  - **the button, while its `border_width` is above 0.** Its outermost layer lies on exactly the outline's pixels. At `border_width="0"` with `border="true"` it gets the framework's outline like any other element;
+  - **the progress bar, always.** Its track is a square frame on its box;
+  - **the switch, always.** Its track is a rounded frame on its box, with radius `height / 2` when the style sets none.
+
+  The reason is the same for all three. A second frame on the same edges is invisible in draw colours 0 and 1, but under `xor` the second pass erases the first and the shared edges disappear. Where the radii differ it is worse in every colour: a switch would gain a square box around its pill, and a progress bar rounded corner pixels inside its square frame.
 
 `border` is set like every style property: as an attribute, as `style_border`, or through a named style, with the precedence above. Only width 1 exists, and `padding` does not grow to clear the outline. `test/test_style_border.cpp` pins all of this against real U8G2 pixels.
 

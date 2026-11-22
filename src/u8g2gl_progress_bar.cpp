@@ -18,7 +18,7 @@
  * Description: Implementation of u8g2gl_progress_bar methods: set_value,
  *              set_animate_duration_ms, set_fill_style, set_show_percent_text,
  *              get_value, get_target_value, get_animate_duration_ms,
- *              get_fill_style, get_show_percent_text, tick, render, and
+ *              get_fill_style, get_show_percent_text, draws_own_outline, tick, render, and
  *              render_animation_update.
  */
 #include "u8g2gl/u8g2gl_progress_bar.h"
@@ -202,6 +202,13 @@ uint32_t u8g2gl_progress_bar::tick(uint32_t now_ms) {
     }
 
     return U8G2GL_IDLE;
+}
+
+// u8g2gl_progress_bar::draws_own_outline
+// Always true: render() frames the box on every call (Step 3), so a style's
+// `border` outline would be the same frame twice, cancelled under xor.
+bool u8g2gl_progress_bar::draws_own_outline() const {
+    return true;
 }
 
 // u8g2gl_progress_bar::render

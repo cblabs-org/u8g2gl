@@ -165,8 +165,9 @@ void u8g2gl_frame_dirty_observer(void* /*user_data*/) {
 // draw_style_outline
 // Draws a style's `border` (§10): a one-pixel frame on the object's own box,
 // in its draw colour and corner radius, unless the object already frames its
-// box itself (draws_own_outline(): the button), where a second pass would
-// erase the first under xor. The one implementation both render paths call, so
+// box itself (draws_own_outline(): the button, the progress bar and the
+// switch), where a second pass would erase the first under xor. The one
+// implementation both render paths call, so
 // the frame and the repaint cannot draw two different outlines. Runs inside
 // the caller's clip and state guard, so it needs neither of its own.
 //   display — the application's U8G2 instance, clip already set
