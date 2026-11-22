@@ -7,8 +7,8 @@
  * Purpose: globals.xml's fonts section end to end (ui_spec §12): a `<bdf>`'s
  *          range presets show what each costs, and choosing one writes `range`
  *          as one undo stop; each font shows its size and users; removing a
- *          font still in use is refused, naming its users, and removing an
- *          unused one works.
+ *          font still in use, even only by a widget template's element, is
+ *          refused, naming its users; and removing an unused one works.
  * Description: Against the real `u8g2gl design` on a copy of the departures
  *              project, given the compile fixture's 4x6.bdf as an unused
  *              `<bdf name="tiny">`. Undo is the Monaco model's own, through
@@ -88,4 +88,23 @@ test('removing an unused font works', async ({ page }) => {
   await form(page).getByRole('button', { name: 'Remove BDF font tiny' }).click();
   await expect.poll(() => bufferText(page, 'globals.xml')).not.toContain('<bdf name="tiny"');
   await expect(form(page).locator('.form-banner.refusal')).toHaveCount(0);
+});
+
+test('a font named only inside a widget template cannot be removed, and names the template’s element', async ({ page }) => {
+  const badge = `<?xml version="1.0" encoding="UTF-8"?>
+<widget name="badge">
+    <view>
+        <u8g2gl_label name="mark" x="0" y="0" width="10" height="8" font="u8g2_font_5x7_mr" text="!" />
+    </view>
+</widget>
+`;
+  const globals = GLOBALS.replace('<builtin name="u8g2_font_helvR08_tr" />', '<builtin name="u8g2_font_helvR08_tr" />\n        <builtin name="u8g2_font_5x7_mr" />');
+  session = await startDesign({ files: { 'globals.xml': globals, 'fonts/4x6.bdf': BDF, 'widgets/badge/badge.xml': badge } });
+  await openShell(page, session.url);
+  await openFile(page, 'globals.xml');
+  const before = await bufferText(page, 'globals.xml');
+  await expect(form(page).locator('.asset-facts[data-asset="u8g2_font_5x7_mr"] summary')).toHaveText('used by 1 element');
+  await form(page).getByRole('button', { name: 'Remove Built-in font u8g2_font_5x7_mr' }).click();
+  await expect(form(page).locator('.form-banner.refusal')).toContainText("Font 'u8g2_font_5x7_mr' is still used by badge.mark");
+  expect(await bufferText(page, 'globals.xml')).toBe(before);
 });

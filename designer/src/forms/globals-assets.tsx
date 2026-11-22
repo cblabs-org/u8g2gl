@@ -35,6 +35,7 @@ import { FieldTextControl } from './form-controls';
 import type { FormField, FormNode } from './form-model';
 import { fontUsers, imageUsers, projectPreset, RANGE_PRESETS, usersLine, type AssetUsers, type RangePreset } from './asset-usage';
 import { useObservable } from '../ui/use-observable';
+import { workspaceReferences } from '../project/project-references';
 import type { Workspace } from '../workspace';
 
 /** Lit and unlit pixels, RGBA, as the canvas draws them. */
@@ -211,7 +212,9 @@ export function AssetItemFacts({ workspace, node }: { readonly workspace: Worksp
       live = false;
     };
   }, [workspace, kind, name]);
-  const users = useMemo(() => (run === undefined ? undefined : (isFont ? fontUsers : imageUsers)(run.result.model).get(name)), [run, isFont, name]);
+  // The references follow the buffers, which re-render the form; the index is cached by text.
+  const refs = run === undefined ? undefined : workspaceReferences(workspace);
+  const users = refs === undefined ? undefined : (isFont ? fontUsers : imageUsers)(refs).get(name);
   if (!isFont && !isImage) return null;
 
   const image = isImage ? run?.assets?.images.get(name) : undefined;

@@ -22,6 +22,7 @@ import { compileBdf } from '@u8g2gl/core/fonts/index.js';
 import { fontUsers, imageUsers, projectPreset, RANGE_PRESETS, rangeOf, removeRefusal, usersLine } from '../../src/forms/asset-usage';
 import { buildFormModel, type FormNode } from '../../src/forms/form-model';
 import { ProjectModelCache } from '../../src/project/project-model';
+import { indexReferences } from '@u8g2gl/core/references/find-references.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const PROJECT = '<?xml version="1.0" encoding="UTF-8"?>\n<u8g2gl schema="0.7" name="t" version="1.0.0">\n    <targets>\n        <target name="t" setup="U8G2_SSD1322_NHD_256X64_F_4W_HW_SPI" />\n    </targets>\n</u8g2gl>\n';
@@ -50,8 +51,11 @@ const SCREEN = `<?xml version="1.0" encoding="UTF-8"?>
 </screen>
 `;
 
-const model = (globals = GLOBALS) =>
-  new ProjectModelCache().build(new Map([['u8g2gl.xml', PROJECT], ['globals.xml', globals], ['screens/screen_main.xml', SCREEN]]));
+const texts = (globals = GLOBALS, screen = SCREEN) => new Map([['u8g2gl.xml', PROJECT], ['globals.xml', globals], ['screens/screen_main.xml', screen]]);
+const model = (globals = GLOBALS) => new ProjectModelCache().build(texts(globals));
+// refs
+// The references in the project, as the forms read them.
+const refs = (globals = GLOBALS, screen = SCREEN) => indexReferences({ documents: texts(globals, screen), manifests: model(globals).manifests });
 
 // item
 // The globals form's item for a font or image of a name.
@@ -73,11 +77,11 @@ function item(name: string): FormNode {
 }
 
 test('who uses a font: elements through any font prop, and styles; nobody for an unused one', () => {
-  const users = fontUsers(model());
+  const users = fontUsers(refs());
   expect(users.get('tiny')).toEqual({ elements: ['main.title', 'main.temp'], styles: ['small'] });
   expect(users.get('u8g2_font_6x10_mr')).toEqual({ elements: ['main.other'], styles: [] });
   expect(users.get('u8g2_font_5x7_mr')).toBeUndefined();
-  expect(imageUsers(model()).size).toBe(0);
+  expect(imageUsers(refs()).size).toBe(0);
   expect(usersLine(users.get('tiny'))).toBe('2 elements, 1 style');
   expect(usersLine(undefined)).toBe('not used');
 });
@@ -109,7 +113,45 @@ test('each preset\'s cost is bdfconv\'s compiled size, smaller for a narrower ra
 });
 
 test('Remove is refused for a used font, naming its users, and allowed for an unused one', () => {
-  expect(removeRefusal(model(), item('tiny'))).toBe("Font 'tiny' is still used by main.title, main.temp, style small. Change them first, then remove it.");
-  expect(removeRefusal(model(), item('u8g2_font_5x7_mr'))).toBeUndefined();
+  expect(removeRefusal(refs(), item('tiny'))).toBe("Font 'tiny' is still used by main.title, main.temp, style small. Change them first, then remove it.");
+  expect(removeRefusal(refs(), item('u8g2_font_5x7_mr'))).toBeUndefined();
   expect(removeRefusal(undefined, item('tiny'))).toBeUndefined();
+});
+
+test('a style_font override uses its font, so the font cannot be removed while it does', () => {
+  const screen = SCREEN.replace('text="x" />', 'text="x" style_font="u8g2_font_5x7_mr" />');
+  expect(fontUsers(refs(GLOBALS, screen)).get('u8g2_font_5x7_mr')).toEqual({ elements: ['main.other'], styles: [] });
+  expect(removeRefusal(refs(GLOBALS, screen), item('u8g2_font_5x7_mr'))).toBe("Font 'u8g2_font_5x7_mr' is still used by main.other. Change it first, then remove it.");
+});
+
+test('a screen\'s own style counts as a user of its font, named by its screen, before the global styles', () => {
+  const screen = SCREEN.replace('<view>', '<styles>\n        <style name="mine" font="tiny" />\n    </styles>\n    <view>');
+  expect(fontUsers(refs(GLOBALS, screen)).get('tiny')?.styles).toEqual(['main.mine', 'small']);
+});
+
+test('Remove is refused for a subject still bound, naming the bindings by screen and element', () => {
+  const reading = buildFormModel('globals.xml', GLOBALS);
+  if (reading.kind !== 'form') throw new Error('unreadable');
+  const msg = reading.model.sections.find((section) => section.key === 'globals.xml>subjects')?.list?.items[0];
+  if (msg === undefined) throw new Error('no subject');
+  expect(removeRefusal(refs(), msg)).toBe("Subject 'msg' is still used by main.temp. Change it first, then remove it.");
+  expect(removeRefusal(refs(GLOBALS, SCREEN.replace(' bind_text="msg"', '')), msg)).toBeUndefined();
+});
+
+test('a font named only inside a widget template, or as a prop\'s default, cannot be removed', () => {
+  const widget = `<?xml version="1.0" encoding="UTF-8"?>
+<widget name="badge">
+    <api>
+        <prop name="face" type="font" default="u8g2_font_6x10_mr" />
+    </api>
+    <view>
+        <u8g2gl_label name="mark" x="0" y="0" width="10" height="8" font="u8g2_font_5x7_mr" text="!" />
+    </view>
+</widget>
+`;
+  const documents = new Map([...texts(), ['widgets/badge/badge.xml', widget]]);
+  const index = indexReferences({ documents, manifests: new ProjectModelCache().build(documents).manifests });
+  expect(fontUsers(index).get('u8g2_font_5x7_mr')).toEqual({ elements: ['badge.mark'], styles: [] });
+  expect(removeRefusal(index, item('u8g2_font_5x7_mr'))).toBe("Font 'u8g2_font_5x7_mr' is still used by badge.mark. Change it first, then remove it.");
+  expect(fontUsers(index).get('u8g2_font_6x10_mr')?.elements).toEqual(['main.other', 'widget badge']);
 });

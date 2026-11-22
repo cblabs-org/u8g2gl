@@ -16,7 +16,7 @@
  * Exports:
  * - INT32_MIN, INT32_MAX, INT16_MIN, INT16_MAX, integerLiteralValue, BUILTIN_CONSTANTS,
  *   ContainerSize, EvaluationScope, ExpressionSite, Evaluation, buildConstantTable,
- *   evaluateExpression (expression.ts)
+ *   evaluateExpression, constantTokens, ConstantToken (expression.ts)
  * - Provenance, ResolvedCoordinate, ResolvedGeometry, Container, DeferredCoordinate,
  *   AxisOutcome, ResolvedExtra, ResolvedProperty, ResolvedElement, ResolvedScreen,
  *   ResolverContext, ResolveInput,
@@ -50,6 +50,8 @@ export {
   BUILTIN_CONSTANTS,
   buildConstantTable,
   evaluateExpression,
+  constantTokens,
+  type ConstantToken,
   type ContainerSize,
   type EvaluationScope,
   type ExpressionSite,

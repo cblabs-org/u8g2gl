@@ -8,6 +8,30 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-21	cli v0.25.xx	U8G2GL
+  * 0.25.0: Subjects, styles and constants get their own editors, and any
+    name renames across files. A pure reference finder in the core
+    (core/references/) lists every declaration and use of a subject,
+    constant, style, font or image, with the exact text: bind_* and
+    <bind_flag_if_*> subject=, typed props and their defaults, <style
+    name>, style=, focus_style=, style_font=, a style's font, and each
+    #name the expression tokeniser reads (constantTokens(), now exported),
+    in every file the project loads; a screen's own style shadows a global
+    one there. In the designer, globals.xml's subjects are a table: name,
+    type, the value the firmware boots with, max_len with its byte cost,
+    and who binds it, each a link that selects the element. A style's card
+    previews it on a label and a button drawn by the renderer, each
+    captioned with what it draws (no element draws a style's border yet,
+    and the border field says so), lists its users and gives the radius
+    bound; a constant lists its #name references. Remove is refused for
+    every kind while anything the finder reports uses it. Rename... on
+    every subject, constant, style, font and image lists each file and the
+    generated symbols that change (ui_set_<name>(), ui_subject_, ui_font_,
+    ui_fontdata_, ui_image_, ui_style_), refuses an invalid, taken or
+    unsafe rename before any write, and applies one undo step per
+    document; a name field whose name is referenced asks first: Rename
+    everywhere, Only here or Cancel. checkNameRule() is exported from the
+    validator. No generated output changes.
 2026-11-21	cli v0.24.xx	U8G2GL
   * 0.24.0: Fonts and images reach the editor by injection. The editor
     Wasm compiles in no project font or image: the editor target's

@@ -22,6 +22,9 @@
  *
  * Exports:
  * - validateIdentifiers(input): Runs Pass 7 identifier validation
+ * - checkNameRule():            §13.4's rule for one author-chosen name, so a
+ *                               tool proposing a name (the designer's rename)
+ *                               refuses exactly what this pass reports
  */
 
 import { CPP_KEYWORDS } from '../schema/cpp-keywords.js';
@@ -49,7 +52,17 @@ function createIdDiagnostic(
   };
 }
 
-function checkNameRule(
+/**
+ * @brief §13.4's rule for one author-chosen name: `[a-z][a-z0-9_]*`, no `__`,
+ *        no reserved prefix, no C++ keyword.
+ *
+ * @param name    The name; an empty one is not this rule's to report.
+ * @param loc     Where it is written, for the diagnostic.
+ * @param context What it names, in the message ('subject', 'style').
+ * @return `U8G2GL_INVALID_NAME` saying which part of the rule it breaks, or
+ *         undefined when it keeps it.
+ */
+export function checkNameRule(
   name: string,
   loc: SourceLocation | undefined,
   context: string,

@@ -33,6 +33,8 @@
  * - Evaluation:             value | deferred | invalid
  * - buildConstantTable():   `<consts>` by name, first declaration winning
  * - evaluateExpression():   Evaluate one attribute's text
+ * - ConstantToken:          Where one `#name` is written in an attribute's text
+ * - constantTokens():       Every `#name` the tokeniser reads in a text
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
@@ -224,6 +226,36 @@ function tokenise(text: string): Parsed<Token[]> {
     return { ok: false, reason: `unexpected '${ch}' at character ${pos}` };
   }
   return { ok: true, value: tokens };
+}
+
+/** Where one `#name` token is written in an attribute's text. */
+export interface ConstantToken {
+  /** The constant's name, without the `#`. */
+  readonly name: string;
+  /** Offset of the name's first character in the text (just past the `#`). */
+  readonly start: number;
+  /** Offset one past the name's last character. */
+  readonly end: number;
+}
+
+/**
+ * @brief Every `#name` the expression tokeniser reads in a text, in order.
+ *
+ * The one reading of where a constant is referenced, so a tool that finds or
+ * renames constants sees exactly what the evaluator would: `#margin` in
+ * `#margin_top + 1` is not a token, because the tokeniser reads the whole
+ * name `margin_top`. Text the tokeniser cannot read at all (prose, a format
+ * string) has no tokens. Well-formedness beyond tokens is not checked: a
+ * malformed expression still names the constants it names.
+ *
+ * @param text An attribute's value, decoded.
+ * @return The tokens, or undefined when the text does not tokenise.
+ */
+export function constantTokens(text: string): readonly ConstantToken[] | undefined {
+  const tokens = tokenise(text);
+  if (!tokens.ok) return undefined;
+  // A token's `pos` is the sigil's 1-based offset, which is the name's 0-based one.
+  return tokens.value.flatMap((token) => (token.kind === 'constant' ? [{ name: token.name, start: token.pos, end: token.pos + token.name.length }] : []));
 }
 
 /**

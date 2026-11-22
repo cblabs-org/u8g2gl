@@ -24,7 +24,13 @@
  *              The fonts and images sections also show each item's size and
  *              users (`globals-assets.tsx`, after its fields), a `<bdf>`'s
  *              `range` field carries its presets, and `removeRefusal` names
- *              the users of an item that may not be removed yet.
+ *              the users of an item that may not be removed yet. The
+ *              subjects section is a table (`globals-subjects.tsx`), with
+ *              each subject's cost and the bindings that use it. Each style's
+ *              card ends with its preview, users and radius bound, and each
+ *              constant with its references (`globals-styles.tsx`); a style's
+ *              `border` field notes that no element draws it yet. Every
+ *              item that declares a name has "Rename…" (`rename-dialog.tsx`).
  *
  * Exports:
  * - GlobalsEditorHooks:  The hooks the globals.xml form takes
@@ -38,19 +44,45 @@ import { derivedName, fileKindOf, fileKindOfField, pngSize, type FileKind } from
 import { BuiltinFontField, FontPicker } from './font-picker';
 import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
-import type { AddChooser } from './form-view';
+import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
+import { SubjectsTable } from './globals-subjects';
+import { BORDER_UNDRAWN, ConstFacts, StyleFacts } from './globals-styles';
+import { renameTargetOf } from './rename-dialog';
+import type { RenameTarget } from './rename-plan';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
 import { removeRefusal } from './asset-usage';
+import { workspaceReferences } from '../project/project-references';
 
 /** The hooks the globals.xml form takes. */
 export interface GlobalsEditorHooks {
   readonly fieldControl: (field: FormField, node: FormNode, commit: (value: string | undefined) => void) => ReactNode;
   readonly addChooser: AddChooser;
-  /** A font's or image's size and users, after its fields. */
+  /** A font's or image's size and users, a style's preview, users and radius bound, a constant's references: after its fields. */
   readonly nodeExtra: (node: FormNode) => ReactNode;
   /** Why an item may not be removed now, or undefined when it may. */
   readonly removeRefusal: (node: FormNode) => string | undefined;
+  /** The sections drawn their own way: the subjects table. */
+  readonly renderSection: SectionRenderer;
+  /** "Rename…" on each item that declares a name. */
+  readonly itemActions: (item: FormNode) => ReactNode;
+  /** A note beneath a field: a style's `border`, which no element draws yet. */
+  readonly fieldNote: (field: FormField, node: FormNode) => ReactNode;
 }
+
+// RenameButton
+// An item's "Rename…", for one that declares a renamable name.
+function RenameButton({ item, onRename }: { readonly item: FormNode; readonly onRename: (target: RenameTarget) => void }): React.JSX.Element | null {
+  const target = renameTargetOf(item);
+  if (target === undefined) return null;
+  return (
+    <button type="button" className="rename-button" aria-label={`Rename ${item.element.label} ${target.name}`} title="Rename it here and everywhere it is used" onClick={() => onRename(target)}>
+      Rename…
+    </button>
+  );
+}
+
+/** The subjects section's key. */
+const SUBJECTS = 'globals.xml>subjects';
 
 /** The vocabulary id of `<builtin>`. */
 const BUILTIN = 'font-builtin';
@@ -92,8 +124,17 @@ async function addedValues(workspace: Workspace, list: FormList, kind: FileKind,
  *
  * @param workspace  The session: the project's files, for the file chooser.
  * @param model      The form as last read, for the fonts it declares.
+ * @param state      What the form draws, for the tables' fields.
+ * @param actions    The form's edits, which the tables make.
+ * @param onRename   Opens the rename dialog for an item's name.
  */
-export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefined): GlobalsEditorHooks {
+export function useGlobalsEditor(
+  workspace: Workspace,
+  model: FormModel | undefined,
+  state: FormViewState,
+  actions: FormActions,
+  onRename: (target: RenameTarget) => void,
+): GlobalsEditorHooks {
   const declared = useMemo(() => declaredBuiltins(model), [model]);
   return useMemo<GlobalsEditorHooks>(
     () => ({
@@ -126,9 +167,34 @@ export function useGlobalsEditor(workspace: Workspace, model: FormModel | undefi
           );
         },
       },
-      nodeExtra: (node) => <AssetItemFacts workspace={workspace} node={node} />,
-      removeRefusal: (node) => removeRefusal(workspace.loop.lastRun.get()?.result.model, node),
+      nodeExtra: (node) =>
+        node.element.id === 'style' ? (
+          <StyleFacts workspace={workspace} node={node} />
+        ) : node.element.id === 'const-int' || node.element.id === 'const-string' ? (
+          <ConstFacts workspace={workspace} node={node} />
+        ) : (
+          <AssetItemFacts workspace={workspace} node={node} />
+        ),
+      removeRefusal: (node) => removeRefusal(workspaceReferences(workspace), node),
+      renderSection: (section, _generic, readOnly) =>
+        section.key === SUBJECTS && section.list !== undefined ? (
+          <SubjectsTable
+            workspace={workspace}
+            list={section.list}
+            state={state}
+            actions={actions}
+            readOnly={readOnly}
+            rowExtra={(item) => (readOnly ? null : <RenameButton item={item} onRename={onRename} />)}
+          />
+        ) : undefined,
+      itemActions: (item) => <RenameButton item={item} onRename={onRename} />,
+      fieldNote: (field) =>
+        field.elementId === 'style' && field.attribute.name === 'border' ? (
+          <p className="field-reason" data-note="border-undrawn">
+            {BORDER_UNDRAWN}
+          </p>
+        ) : null,
     }),
-    [workspace, declared],
+    [workspace, declared, state, actions, onRename],
   );
 }

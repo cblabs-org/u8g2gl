@@ -4,18 +4,24 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/forms/asset-usage.ts
- * Purpose: What globals.xml's fonts and images sections say about each item
- *          beyond its attributes (ui_spec §12): who uses it, so the author can
- *          see what a change touches and Remove can refuse while it is still
+ * Purpose: What globals.xml's sections say about each item beyond its
+ *          attributes (ui_spec §6.4, §12): who uses it, so the author can see
+ *          what a change touches and Remove can refuse while it is still
  *          used; and, for a `<bdf>`, the range presets — each a `range` value
  *          with a name, including one derived from the project's own text.
- * Description: Pure functions over the project model, unit-tested without a
- *              browser. An element uses a font or an image through any prop
- *              its manifest types `font` or `image` ([D-17]: which props are
- *              fonts is the manifests' data); a style uses a font through its
- *              `font`. "Only what this project uses" reads the static text by
- *              font exactly as the CLI's glyph-range warning does
- *              (`static-text.ts`), so the preset never yields a range the
+ * Description: Pure functions, unit-tested without a browser. Who uses what
+ *              is the CLI's reference finder's answer
+ *              (`core/references/find-references.ts`), so these lists, the
+ *              guards and rename cannot disagree about what a reference is.
+ *              A font's users are every element that names it, on a screen
+ *              or in a widget's template, through a font-typed prop or a
+ *              `style_font` override, each widget whose prop defaults to it,
+ *              and the styles whose `font` it is; an image's, the same through
+ *              image-typed props. Every guard counts every reference the
+ *              finder reports, so nothing Remove lets go leaves the project
+ *              failing to validate. "Only what this project uses" reads the
+ *              static text by font exactly as the CLI's glyph-range warning
+ *              does (`static-text.ts`), so the preset never yields a range the
  *              warning flags; sample values can join it later through
  *              `codepointsByFont()`'s extra text. It is unsafe for a font an
  *              element bound to a string subject draws in, since live data can
@@ -26,23 +32,25 @@
  * - AssetUsers:       The elements and styles that use one font or image
  * - fontUsers():      Each font's users
  * - imageUsers():     Each image's users
+ * - NameUser:         One user of a name, as a list shows it
+ * - nameUsers():      Every user of one name, of any kind
  * - usersLine():      Users as one line of text
  * - RangePreset:      One `range` preset
  * - RANGE_PRESETS:    The fixed presets, in the form's order
  * - rangeOf():        Codepoints written as a `range` value
  * - projectPreset():  "Only what this project uses" for one font, and why it may be unsafe
+ * - kindOfItem():     The kind of name a globals.xml item declares
  * - removeRefusal():  Why an item may not be removed now, naming its users
  */
 
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import { codepointsByFont, staticTexts, stringBoundElements } from '@u8g2gl/core/fonts/static-text.js';
-import type { Screen } from '@u8g2gl/core/schema/screen.js';
-import type { WidgetNode, WidgetNodeChild } from '@u8g2gl/core/schema/widget-node.js';
+import type { Reference, ReferenceIndex, ReferenceKind } from '@u8g2gl/core/references/find-references.js';
 import type { FormNode } from './form-model';
 
 /** The elements and styles that use one font or image. */
 export interface AssetUsers {
-  /** `screen.element`, in screen then document order. */
+  /** `screen.element`, `widget.element`, or `widget name` for a prop's default, in file then document order. */
   readonly elements: readonly string[];
   /** Style names: a global one, or `screen.style` for a screen's own. */
   readonly styles: readonly string[];
@@ -51,56 +59,79 @@ export interface AssetUsers {
 /** Nobody. */
 const NO_USERS: AssetUsers = { elements: [], styles: [] };
 
-// each
-// Every element of a screen, depth first, in document order.
-function each(screen: Screen, visit: (node: WidgetNode) => void): void {
-  const walk = (children: readonly WidgetNodeChild[]): void => {
-    for (const child of children) {
-      if ('kind' in child) continue;
-      visit(child);
-      walk(child.children);
-    }
-  };
-  walk(screen.view.children);
+// addOnce
+// Appends a user to a name's list unless it is already there.
+function addOnce(into: Map<string, string[]>, name: string, user: string): void {
+  const list = into.get(name) ?? [];
+  if (!list.includes(user)) list.push(user);
+  into.set(name, list);
 }
 
 // usersOfType
-// For every font or image name, the elements naming it through a prop of the
-// given manifest type, and (for fonts) the styles.
-//   model — the project
-//   type  — 'font' or 'image'
-function usersOfType(model: ProjectModel, type: 'font' | 'image'): Map<string, AssetUsers> {
+// For every font or image name, the elements and widgets naming it (screens
+// and templates, in file order), and (for fonts) the styles: a screen's own
+// first, then the global ones, as each screen layers its own styles over the
+// globals.
+//   refs — the project's references
+//   kind — 'font' or 'image'
+function usersOfType(refs: ReferenceIndex, kind: 'font' | 'image'): Map<string, AssetUsers> {
   const elements = new Map<string, string[]>();
-  const styles = new Map<string, string[]>();
-  const add = (into: Map<string, string[]>, name: string, user: string): void => {
-    const list = into.get(name) ?? [];
-    if (!list.includes(user)) list.push(user);
-    into.set(name, list);
-  };
-  for (const screen of model.screens) {
-    each(screen, (node) => {
-      const manifest = model.manifests.get(node.tag);
-      const name = typeof node.attributes.name === 'string' ? node.attributes.name : node.tag;
-      for (const prop of manifest?.api.props ?? []) {
-        const value = node.attributes[prop.name];
-        if (prop.type === type && typeof value === 'string' && value !== '') add(elements, value, `${screen.name}.${name}`);
-      }
-    });
-    if (type === 'font') for (const style of screen.styles ?? []) if (style.font !== undefined) add(styles, style.font, `${screen.name}.${style.name}`);
+  const localStyles = new Map<string, string[]>();
+  const globalStyles = new Map<string, string[]>();
+  for (const name of refs.names(kind)) {
+    for (const use of refs.of(kind, name).uses) {
+      if (use.shape === 'style-declaration-font') addOnce(use.localStyle === true ? localStyles : globalStyles, name, use.localStyle === true ? `${use.screen ?? ''}.${use.style ?? ''}` : (use.style ?? ''));
+      else addOnce(elements, name, userLabel(use));
+    }
   }
-  if (type === 'font') for (const style of model.globals.styles ?? []) if (style.font !== undefined) add(styles, style.font, style.name);
-  const names = new Set([...elements.keys(), ...styles.keys()]);
-  return new Map([...names].map((name) => [name, { elements: elements.get(name) ?? [], styles: styles.get(name) ?? [] }]));
+  const names = new Set([...elements.keys(), ...localStyles.keys(), ...globalStyles.keys()]);
+  return new Map([...names].map((name) => [name, { elements: elements.get(name) ?? [], styles: [...(localStyles.get(name) ?? []), ...(globalStyles.get(name) ?? [])] }]));
 }
 
 /** @brief Each font's users, by font name; a font nobody uses has no entry. */
-export function fontUsers(model: ProjectModel): Map<string, AssetUsers> {
-  return usersOfType(model, 'font');
+export function fontUsers(refs: ReferenceIndex): Map<string, AssetUsers> {
+  return usersOfType(refs, 'font');
 }
 
 /** @brief Each image's users, by image name; an image nobody uses has no entry. */
-export function imageUsers(model: ProjectModel): Map<string, AssetUsers> {
-  return usersOfType(model, 'image');
+export function imageUsers(refs: ReferenceIndex): Map<string, AssetUsers> {
+  return usersOfType(refs, 'image');
+}
+
+/** One user of a name, as a "Used by" list shows it. */
+export interface NameUser {
+  /** `screen.element`, `widget.element`, `style name`, or the file. */
+  readonly label: string;
+  /** The first reference behind it, for going to it. */
+  readonly reference: Reference;
+  /** How many references it makes. */
+  readonly count: number;
+}
+
+// userLabel
+// How a list names the user a reference belongs to.
+function userLabel(reference: Reference): string {
+  if (reference.style !== undefined) return reference.localStyle === true ? `style ${reference.screen ?? ''}.${reference.style}` : `style ${reference.style}`;
+  if (reference.screen !== undefined && reference.element !== undefined) return `${reference.screen}.${reference.element}`;
+  if (reference.widget !== undefined) return reference.element !== undefined ? `${reference.widget}.${reference.element}` : `widget ${reference.widget}`;
+  return reference.file;
+}
+
+/**
+ * @brief Every user of one name, each once, in file then document order.
+ *
+ * @param refs The project's references.
+ * @param kind What the name is.
+ * @param name The name.
+ */
+export function nameUsers(refs: ReferenceIndex, kind: ReferenceKind, name: string): NameUser[] {
+  const users = new Map<string, NameUser>();
+  for (const reference of refs.of(kind, name).uses) {
+    const label = userLabel(reference);
+    const known = users.get(label);
+    users.set(label, known === undefined ? { label, reference, count: 1 } : { ...known, count: known.count + 1 });
+  }
+  return [...users.values()];
 }
 
 /** @brief Users as one line: `2 elements, 1 style`, or `not used`. */
@@ -170,21 +201,55 @@ export function projectPreset(model: ProjectModel, font: string): { readonly pre
   return { preset, unsafeFor };
 }
 
+/** The kind of name each globals.xml item declares, by its vocabulary id. */
+const ITEM_KINDS: Readonly<Record<string, ReferenceKind>> = {
+  'subject-int': 'subject',
+  'subject-string': 'subject',
+  'subject-bool': 'subject',
+  'subject-time': 'subject',
+  'const-int': 'const',
+  'const-string': 'const',
+  style: 'style',
+  'font-builtin': 'font',
+  'font-bdf': 'font',
+  'image-xbm': 'image',
+  'image-convert': 'image',
+};
+
+/** How a refusal names each kind. */
+const KIND_NOUNS: Readonly<Record<ReferenceKind, string>> = { subject: 'Subject', const: 'Constant', style: 'Style', font: 'Font', image: 'Image' };
+
+/** @brief The kind of name a globals.xml item declares, or undefined for one that declares none this guards. */
+export function kindOfItem(node: FormNode): ReferenceKind | undefined {
+  return ITEM_KINDS[node.element.id];
+}
+
 /**
- * @brief Why a fonts or images item may not be removed now: it is still used,
- *        and the reason names its users.
+ * @brief Why a globals.xml item may not be removed now: it is still used, and
+ *        the reason names its users.
  *
- * @param model The project, as last run.
- * @param node  The item.
+ * Every kind counts every use the reference finder reports: bindings, typed
+ * props on screens and in widget templates, props' defaults, style references
+ * and fonts, `style_font` overrides and `#name` tokens. Fonts and images name
+ * them as `fontUsers()` and `imageUsers()` list them. A global style's uses on
+ * a screen that shadows it are that screen's own style's, so they do not hold
+ * it.
+ *
+ * @param refs The project's references now; undefined before the first run.
+ * @param node The item.
  * @return The refusal, or undefined when it may be removed.
  */
-export function removeRefusal(model: ProjectModel | undefined, node: FormNode): string | undefined {
-  const kind = node.element.id;
-  const isFont = kind === 'font-builtin' || kind === 'font-bdf';
-  if (model === undefined || (!isFont && kind !== 'image-xbm' && kind !== 'image-convert')) return undefined;
+export function removeRefusal(refs: ReferenceIndex | undefined, node: FormNode): string | undefined {
+  const kind = kindOfItem(node);
+  if (refs === undefined || kind === undefined) return undefined;
   const name = node.fields.find((field) => field.attribute.name === 'name')?.value ?? '';
-  const users = (isFont ? fontUsers : imageUsers)(model).get(name);
-  if (users === undefined) return undefined;
-  const names = [...users.elements, ...users.styles.map((style) => `style ${style}`)];
-  return `${isFont ? 'Font' : 'Image'} '${name}' is still used by ${names.join(', ')}. Change ${names.length === 1 ? 'it' : 'them'} first, then remove it.`;
+  let names: string[];
+  if (kind === 'font' || kind === 'image') {
+    const users = (kind === 'font' ? fontUsers : imageUsers)(refs).get(name);
+    names = users === undefined ? [] : [...users.elements, ...users.styles.map((style) => `style ${style}`)];
+  } else {
+    names = nameUsers(refs, kind, name).map((user) => user.label);
+  }
+  if (names.length === 0) return undefined;
+  return `${KIND_NOUNS[kind]} '${name}' is still used by ${names.join(', ')}. Change ${names.length === 1 ? 'it' : 'them'} first, then remove it.`;
 }

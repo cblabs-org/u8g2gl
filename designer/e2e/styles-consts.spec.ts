@@ -1,0 +1,113 @@
+/**
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/e2e/styles-consts.spec.ts
+ * Purpose: globals.xml's style cards and constants end to end (ui_spec §6.4,
+ *          §10): a style's card shows its preview, a label and a button drawn
+ *          by the real renderer and drawn again when the style changes, each
+ *          captioned with what it draws; an invert and a radius edit show on
+ *          the button; the card notes that no element draws a style's border;
+ *          and it shows its users and its radius bound; a constant lists a reference written inside an expression;
+ *          and removing a style or a constant still used is refused, naming
+ *          the users.
+ * Description: Against the real `u8g2gl design` on a copy of the departures
+ *              project, given a style `boxed` and a constant `gap`, both used
+ *              by `plat_label` (`x="#gap + 3"`, an 18×13 label).
+ */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
+import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
+import { bufferText, openFile, openShell } from './support/shell';
+
+const GLOBALS = readFileSync(join(PROJECT_FIXTURE, 'globals.xml'), 'utf8').replace(
+  '</globals>',
+  '    <styles>\n        <style name="boxed" border="true" padding="1" />\n    </styles>\n\n    <consts>\n        <int name="gap" value="2" />\n    </consts>\n</globals>',
+);
+const SCREEN = 'screens/screen_departures.xml';
+const SCREEN_TEXT = readFileSync(join(PROJECT_FIXTURE, ...SCREEN.split('/')), 'utf8').replace(
+  '<u8g2gl_label name="plat_label" x="5"',
+  '<u8g2gl_label name="plat_label" style="boxed" x="#gap + 3"',
+);
+
+let session: DesignSession | undefined;
+test.afterEach(async () => {
+  await session?.stop();
+  session = undefined;
+});
+
+// form
+// The globals.xml form.
+const form = (page: Page) => page.locator('.project-form[data-form-file="globals.xml"]');
+
+// open
+// The session, with globals.xml's form shown.
+async function open(page: Page): Promise<void> {
+  session = await startDesign({ files: { 'globals.xml': GLOBALS, [SCREEN]: SCREEN_TEXT } });
+  await openShell(page, session.url);
+  await openFile(page, 'globals.xml');
+}
+
+// previewOf
+// One sample of a style's preview, its pixels as a data URL.
+async function previewOf(page: Page, style: string, part: 'label' | 'button'): Promise<string> {
+  return page.locator(`canvas[data-style-preview="${style}"][data-part="${part}"]`).evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
+}
+
+test('a style card shows its preview, users and radius bound, and notes that no element draws its border', async ({ page }) => {
+  await open(page);
+  const card = form(page).locator('.form-item[data-element="style"]');
+  await expect(card.locator('canvas[data-style-preview="boxed"][data-part="label"]')).not.toHaveAttribute('data-drawn', '0');
+  await expect(card.locator('.style-sample figcaption')).toHaveText([/^Label: font, draw colour, font mode, alignment$/, /^Button: .*invert.*radius.*padding/]);
+  await expect(card.locator('.style-facts .field-problem')).toHaveCount(0);
+  await expect(card.locator('.globals-users button')).toHaveText(['departures.plat_label']);
+  await expect(card.locator('.style-radius')).toHaveAttribute('data-radius-bound', '6');
+  await expect(card.locator('.style-radius')).toContainText('departures.plat_label is 18×13');
+  await expect(card.locator('.form-field[data-field="style/border"] [data-note="border-undrawn"]')).toContainText("No element draws a style's border yet");
+});
+
+test('an invert edit and a radius edit each show on the button sample', async ({ page }) => {
+  await open(page);
+  const card = form(page).locator('.form-item[data-element="style"]');
+  const button = card.locator('canvas[data-style-preview="boxed"][data-part="button"]');
+  await expect(button).not.toHaveAttribute('data-drawn', '0');
+
+  // --- invert: the button fills its box ---
+  let drawn = Number(await button.getAttribute('data-drawn'));
+  let before = await previewOf(page, 'boxed', 'button');
+  await card.locator('.form-field[data-field="style/invert"]').getByRole('switch', { name: 'invert' }).click();
+  await expect.poll(() => bufferText(page, 'globals.xml')).toContain('<style name="boxed" border="true" padding="1" invert="true" />');
+  await expect.poll(async () => Number(await button.getAttribute('data-drawn'))).toBeGreaterThan(drawn);
+  await expect.poll(() => previewOf(page, 'boxed', 'button')).not.toBe(before);
+
+  // --- radius: the box's corners round ---
+  drawn = Number(await button.getAttribute('data-drawn'));
+  before = await previewOf(page, 'boxed', 'button');
+  const radius = card.locator('.form-field[data-field="style/radius"]').getByRole('textbox', { name: 'radius' });
+  await radius.fill('4');
+  await radius.press('Enter');
+  await expect.poll(() => bufferText(page, 'globals.xml')).toContain('invert="true" radius="4" />');
+  await expect.poll(async () => Number(await button.getAttribute('data-drawn'))).toBeGreaterThan(drawn);
+  await expect.poll(() => previewOf(page, 'boxed', 'button')).not.toBe(before);
+});
+
+test('a constant lists each reference by file and attribute, one inside an expression included', async ({ page }) => {
+  await open(page);
+  const facts = form(page).locator('.const-facts[data-const="gap"]');
+  await expect(facts.locator('.globals-users button')).toHaveText([`${SCREEN}: plat_label.x`]);
+});
+
+test('removing a style or a constant still used is refused, naming the users, and writes nothing', async ({ page }) => {
+  await open(page);
+  const before = await bufferText(page, 'globals.xml');
+  const refusal = form(page).locator('.form-banner.refusal');
+
+  await form(page).getByRole('button', { name: 'Remove Style boxed' }).click();
+  await expect(refusal).toContainText("Style 'boxed' is still used by departures.plat_label");
+  await form(page).getByRole('button', { name: 'Remove Int constant gap' }).click();
+  await expect(refusal).toContainText("Constant 'gap' is still used by departures.plat_label");
+  expect(await bufferText(page, 'globals.xml')).toBe(before);
+});

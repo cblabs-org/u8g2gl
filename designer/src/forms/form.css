@@ -129,3 +129,47 @@
 .asset-image { display: flex; align-items: center; gap: 8px; }
 .image-preview { image-rendering: pixelated; }
 .convert-choice { color: var(--text-dim); }
+
+/* --- globals.xml's subjects table (ui_spec §6.4) --- */
+.subjects-table-wrap { overflow-x: auto; }
+.subjects-table { width: 100%; border-collapse: collapse; table-layout: auto; }
+.subjects-table th { padding: 2px 4px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.subjects-table td { padding: 3px 4px; vertical-align: top; border-top: 1px solid var(--border); }
+.subjects-table tr.form-item { padding: 0; border: none; background: transparent; }
+.subjects-table .form-field { margin-bottom: 0; }
+.subjects-table .form-field .field-label { font-size: 10px; }
+.subjects-table input[type='text'] { width: 100%; min-width: 4em; }
+.subject-heading-note { display: block; font-weight: 400; font-size: 10px; }
+.subject-type { font: 11px ui-monospace, Menlo, monospace; color: var(--text-dim); }
+.subject-cost { display: block; font-size: 10px; color: var(--text-dim); }
+.subject-none { color: var(--text-dim); }
+.subject-users { margin: 0; padding: 0; list-style: none; }
+.subject-users .link, .globals-users .link { padding: 0; background: none; border: none; color: var(--info); font: 11px ui-monospace, Menlo, monospace; cursor: pointer; text-align: left; }
+.subject-actions { white-space: nowrap; }
+.subject-actions button { padding: 0 5px; margin-left: 2px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+.subject-actions button:disabled { opacity: 0.35; cursor: default; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* --- Rename across files (ui_spec §6.4, §14) --- */
+.rename-button { padding: 0 6px; background: var(--bg-raised); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; font-size: 11px; }
+.rename-dialog { position: sticky; top: 0; z-index: 2; max-width: 720px; margin: 0 0 10px; padding: 8px 10px; background: var(--bg-sunken); border: 1px solid var(--accent); border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.rename-dialog h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; }
+.rename-name { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: var(--text-dim); }
+.rename-name input { flex: 1; padding: 2px 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font: 12px ui-monospace, Menlo, monospace; }
+.rename-files, .rename-symbols ul { margin: 0 0 4px; padding-left: 16px; }
+.rename-files code, .rename-symbols code { font: 11px ui-monospace, Menlo, monospace; }
+.rename-actions { display: flex; gap: 6px; margin-top: 6px; }
+.rename-actions .action { padding: 1px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.rename-actions .action.primary { color: var(--text); border-color: var(--accent); }
+.rename-actions .action:disabled { opacity: 0.4; cursor: default; }
+
+/* --- A style's card and a constant's references (ui_spec §6.4, §10) --- */
+.style-facts { display: grid; grid-template-columns: 1fr; gap: 4px 12px; align-items: start; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border); }
+.style-preview { display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.style-sample { margin: 0; max-width: 200px; }
+.style-sample figcaption { font-size: 10px; }
+.style-preview-canvas { display: block; width: 200px; height: 52px; image-rendering: pixelated; border: 1px solid var(--border); background: #141414; }
+.style-users, .const-facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.globals-users { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 0; padding: 0; list-style: none; }
+.style-radius { grid-column: 1 / -1; margin: 0; }
+.const-facts { margin-top: 4px; }
