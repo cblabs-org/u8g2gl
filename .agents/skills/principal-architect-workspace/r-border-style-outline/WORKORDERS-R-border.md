@@ -98,3 +98,59 @@ Execute **WO1, then WO2, then WO3**.
   - **ChangeLog:** runtime 0.15.0 and CLI 0.25.1, saying plainly that **any element with `border="true"` now draws a one-pixel outline it did not draw before**.
 - [ ] Every suite passes, one at a time. `check-package` passes at 0.25.1.
 - [ ] **Completion report**, appended here: the commits, each suite's result, every moved test with why, and anything you were unsure of.
+
+# Completion report (Tier-3 worker, 2026-11-22)
+
+Authorization checked from the committed files: this file names `r-border-style-outline`, and its PROJECT.md records the owner's "Approach A" and "Approve R-border" in "Owner approval" and the status log. Nothing was pushed, tagged, published, downloaded beyond `npm ci`, or flashed.
+
+## Commits
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-rborder/wo1-runtime` | `c84f97e` feat(runtime): the framework draws a style's border outline; runtime 0.15.0 |
+| WO2 | `u8g2gl-rborder/wo2-wasm` | `2e1f4c2` test(parity): a bordered scene in the parity corpus |
+| WO3 | `u8g2gl-rborder/wo3-cli-docs` | `4574405` chore(cli): CLI 0.25.1 for the runtime 0.15.0 floor |
+| WO3 | `u8g2gl-rborder/wo3-cli-docs` | `5df8f74` feat(designer): captions name the border a style draws; docs for the outline |
+
+## Suites (one at a time, at the WO3 tip unless noted)
+
+| Suite | Result |
+|---|---|
+| Host C++ (ctest) | 539/539 passed, 1 skipped (`SizeOfReport.ThirtyTwoBitTarget`, skipped at baseline too). Baseline before WO1: 530/530. The 9 new tests are `StyleBorder.*`. |
+| Wasm (Emscripten 5.0.3, rebuilt) | all 6 `wasm/test/*.test.mjs` pass; snapshot hash unchanged (`1c0c7bb2…`) |
+| Parity corpus (Emscripten on PATH) | 6/6: departures, emit-project, generated_fixture (3 screens), widget probe and the new `style border` all 0 px differ; valid-project refused in both, as before |
+| CLI (vitest, Emscripten on PATH) | 153 files, 3233/3233 passed |
+| Lint and typecheck | `npm run lint` (eslint + tsc test config) clean; designer `typecheck` clean |
+| Designer unit | 316/316 passed |
+| e2e (`build:e2e` rebuilt before each run) | run 1 (no Emscripten on PATH): 149 passed, 12 skipped. Run 2 (Emscripten on PATH): 160 passed, 1 failed, the known flake `design-hidden.spec.ts:144` (a canvas-hash poll timed out). Rerun alone it passed. Run 1 had passed it too. Its scene sets no `border`. |
+| Production (`npm run build`, then `test:e2e:production`) | 3/3 passed |
+| Goldens | refreshed with `refresh-goldens.mjs`. Every golden diff since `main` (`1915179`) is the runtime floor alone: 7 files, each with `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 15, 0)` and its `#error` text. |
+| check-package | PASS at 0.25.1 (`0.25.1-dev.1` in the throwaway clone; 825 files) |
+| Home-path guard | self-test 11/11; no home-folder paths in tracked files |
+
+## Moved tests
+
+- **No existing host test moved.** `test_button.cpp` and `test_radius_honoured.cpp` pass untouched.
+- **`VersionGuard.PreMacroRuntimeFailsByName`** needs the committed `test/generated_fixture/generated/` floor to equal the runtime version. So WO1 regenerated the six `test/*/generated*` configs (floor lines only). WO3 then moved the `cli/` emit-project golden.
+- **Designer unit `style-facts.test.ts`.** It asserted that the label caption doesn't mention `border` or `radius`. It now asserts both captions name `border`, and that the label's caption still has no `invert` or `padding`.
+- **e2e `styles-consts.spec.ts` (first test).** Updated for the new captions and the removed note.
+- **e2e `palette.spec.ts`, `design-hidden.spec.ts` and `element-tree.spec.ts`.** They already write `border="true"` panels, and none moved: none of them asserts the panel's pixels.
+
+## Boundary calls, and things to check
+
+1. **Version files outside WO1's boundary.**
+   - WO1 bumped `library.json` (CMake refuses to configure otherwise) and `cli/src/data/runtime-version.json` (the CLI drift test enforces it).
+   - It also regenerated the `test/*/generated*` configs.
+   - I read the WO1 version item ("wherever else the runtime version must agree… any check that enforces agreement must pass") as authorising this. 0.14.0 did the same in one commit (`a06c3b3`).
+   - The `cli/` golden waited for WO3.
+2. **WO2's scene went into the parity corpus, not the two host parity tests.**
+   - The corpus is `cli/test/node/design/test-run/parity-corpus.test.ts` with a new fixture beside `widget-probe-0.4`. It is the test whose frames are computed at run time. `test_editor_parity.cpp` and `test_wasm_parity.cpp` work from the committed `test/generated_fixture` and a committed hash, and were not changed.
+   - A corpus entry can now name pixels that must be lit or unlit. This stops the agreement being vacuous: with the outline disabled, 6 of 7 lit pixels failed.
+   - The new fixture isn't in `project-unknown-vocabulary.test.ts`'s hand-written fixture list, which is outside the boundary.
+3. **Design gap (not changed, needs your decision).** Two other widgets frame their own box, and B2a covers only the button:
+   - **`u8g2gl_progress_bar`** always draws a radius-0 frame on its box. With `border="true"` and `draw_color="xor"`, its frame and the framework outline cancel.
+   - **`u8g2gl_switch`** draws its track as a rounded frame on its box. Under xor, its straight edges cancel against the outline.
+   - In draw colours 0 and 1 the result is the same pixels. The WO says no other widget overrides `draws_own_outline()`, so I left both alone.
+4. **Existing runtime behaviour (unrelated, noted).** `u8g2gl_obj::apply_style()` lets a style applied later overwrite a property the element set itself. That contradicts §10's "the runtime must keep the rule". I removed a test assertion that assumed otherwise, and didn't change the runtime.
+5. **Wasm baseline.** The Wasm baseline was recorded after the WO1 source changes, not on `main`. The host baseline was taken before any change.
+6. **Not done here.** Your built-CLI fixture diff, browser check and any device check.
