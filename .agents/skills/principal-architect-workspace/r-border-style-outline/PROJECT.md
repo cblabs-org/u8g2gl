@@ -120,6 +120,21 @@ A panel is the case that hurts most. An author gives a container `border="true"`
 - **Browser:** a scratch project with a bordered panel, a bordered label, a rounded bordered label, and buttons at `border_width` 0, 1 and 2. Check each preview against the runtime's frame.
 - **Device:** none planned. Flashing would need your approval each time, and the host pixel tests cover the drawing.
 
+## Amendments
+
+### P1 (approved by the owner, 2026-11-22: "Approve P1"): the progress bar and the switch also draw their own outline
+
+**Found by the worker and confirmed by the PA in source.** Two more widgets frame their own box on every render, and B2a covers only the button:
+
+- `u8g2gl_progress_bar::render()` always draws a square frame on its box (`u8g2gl_draw_box(…, false)`, Step 3).
+- `u8g2gl_switch::render()` always draws its track as `drawRFrame` on its box, with radius `h / 2` when the style sets none (Step 4).
+
+**With `border="true"`, as built:**
+- **Under xor,** the edges that the two frames share cancel. The progress bar's frame vanishes, and so do the switch track's straight edges.
+- **Under colours 0 and 1,** the progress bar looks unchanged at radius 0. A switch with no style radius gains a square box around its pill, because the outline uses the style's radius (0) while the track uses `h / 2`. A progress bar with a style radius gains rounded corner pixels inside its square frame.
+
+**Proposed:** `u8g2gl_progress_bar` and `u8g2gl_switch` override `draws_own_outline()` to return `true` always, for B2a's reason. `border` then adds nothing to either. This is one override each, a test per widget under every draw colour, and a sentence in design_spec §10.
+
 ## Owner approval
 
 The PA sent this plan on 2026-11-22. The owner answered B1:
@@ -139,3 +154,5 @@ Both answers were given on 2026-11-22. They approve the plan as drafted, with B1
 | 2026-11-22 | PA drafted this plan after #64 merged (`main` at `1915179`). |
 | 2026-11-22 | Owner on B1: "Approach A". |
 | 2026-11-22 | Owner: "Approve R-border". Approved with B2a and B3 as proposed. Worktree `../U8G2GL-e4`, branch `u8g2gl-rborder/wo1-runtime` cut from `origin/main` at `1915179`. |
+| 2026-11-22 | Worker completed WO1–WO3 (`c84f97e`, `2e1f4c2`, `4574405`, `5df8f74`, `2de795d`). PA confirmed in source that the progress bar and the switch also frame their own box. Amendment P1 proposed; PA verification paused for the owner. |
+| 2026-11-22 | Owner: "Approve P1". The worker implements it on `u8g2gl-rborder/wo3-cli-docs`. |

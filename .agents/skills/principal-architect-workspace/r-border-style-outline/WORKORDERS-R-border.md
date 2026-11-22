@@ -154,3 +154,14 @@ Authorization checked from the committed files: this file names `r-border-style-
 4. **Existing runtime behaviour (unrelated, noted).** `u8g2gl_obj::apply_style()` lets a style applied later overwrite a property the element set itself. That contradicts §10's "the runtime must keep the rule". I removed a test assertion that assumed otherwise, and didn't change the runtime.
 5. **Wasm baseline.** The Wasm baseline was recorded after the WO1 source changes, not on `main`. The host baseline was taken before any change.
 6. **Not done here.** Your built-CLI fixture diff, browser check and any device check.
+
+# Amendment P1 — the progress bar and the switch draw their own outline (on `u8g2gl-rborder/wo3-cli-docs`)
+
+Approved by the owner on 2026-11-22 ("Approve P1"), as recorded in PROJECT.md's Amendments section and status log.
+
+**Boundary:** `include/`, `src/`, `test/test_style_border.cpp`, `docs/design_spec.md` §10, the designer caption text if it names which widgets skip the outline, and `ChangeLog`.
+
+- [ ] `u8g2gl_progress_bar` and `u8g2gl_switch` override `draws_own_outline()` to return `true` always, with a why-comment: each frames its own box on every render. Update the base Doxygen, which says only the button does.
+- [ ] **Tests** in `test/test_style_border.cpp`: each widget with `border` true and false, under draw colours 0, 1 and xor, at style radius 0 and above 0. Its pixels are identical with and without `border`, and its frame survives xor.
+- [ ] Update design_spec §10 and the ChangeLog entry to say that the button (while `border_width > 0`), the progress bar and the switch frame their own box and skip the outline.
+- [ ] Every host suite passes, then the CLI, designer unit and e2e suites, one at a time. Append a short P1 report here.
