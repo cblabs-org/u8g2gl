@@ -13,8 +13,8 @@
  *          ([D-15]), and renders an outer rounded track frame with an inner
  *          rounded thumb handle positioned to indicate state on a monochrome display.
  *
- * Description: Implementation of set_value, get_value, tick, and render methods
- *              for the u8g2gl_switch widget.
+ * Description: Implementation of set_value, get_value, draws_own_outline,
+ *              tick, and render methods for the u8g2gl_switch widget.
  */
 #include "u8g2gl/u8g2gl_switch.h"
 #include "u8g2gl/u8g2gl_coord.h"
@@ -75,6 +75,14 @@ void u8g2gl_switch::on_value_changed(void* binding) {
 uint32_t u8g2gl_switch::tick(uint32_t now_ms) {
     (void)now_ms;
     return U8G2GL_IDLE;
+}
+
+// u8g2gl_switch::draws_own_outline
+// Always true: render() frames the box with the track on every call, so a
+// style's `border` outline would share its straight edges, which cancel under
+// xor, and draw a square box around the pill at the style's radius 0.
+bool u8g2gl_switch::draws_own_outline() const {
+    return true;
 }
 
 // u8g2gl_switch::render

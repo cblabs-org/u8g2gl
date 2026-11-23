@@ -8,7 +8,34 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-22	runtime v0.15.xx	U8G2GL
+  * 0.15.0: A style's border draws. Any element with border="true" now
+    draws a one-pixel outline it did not draw before, on the device and
+    in the designer's preview: set as an attribute, as style_border or
+    through a named style, it was stored and never drawn, although the
+    schema, design_spec 10 and the designer's help all said it was an
+    outline. The framework draws it for every element, in
+    u8g2gl_render_object() and u8g2gl_repaint_object(), right after the
+    element's render() and inside its clip and state guard: a frame on
+    the element's box, in its draw_color, with corners from its radius
+    (clamped to the radius bound). Children draw over a container's
+    outline. Elements that frame their own box draw no extra outline,
+    because the two frames would share edges that cancel under xor: the
+    button while its border_width is above 0, and the progress bar and
+    the switch always. u8g2gl_obj::draws_own_outline() says so, and only
+    those three override it. New public u8g2gl_draw_frame() in
+    u8g2gl_draw.h, the button's frame primitive, which the button now
+    uses; its pixels are unchanged. Schema minor unchanged at 7.
+    Built and tested against U8G2 2.36.18.
 2026-11-21	cli v0.25.xx	U8G2GL
+  * 0.25.1: Generated code requires runtime 0.15.0, so every generated
+    config's two runtime floor lines move; no other generated output
+    changes. Any element with border="true" now draws its one-pixel
+    outline in the designer's canvas and previews, as on the device. A
+    style card's captions name the border each sample draws, a button's
+    saying its own border_width frame stands in for the outline when
+    border_width is above 0, and the border field's note that no element
+    drew it is gone.
   * 0.25.0: Subjects, styles and constants get their own editors, and any
     name renames across files. A pure reference finder in the core
     (core/references/) lists every declaration and use of a subject,

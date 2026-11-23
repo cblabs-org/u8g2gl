@@ -797,6 +797,33 @@ target_compile_options(test_ambient_state PRIVATE
 )
 u8g2gl_discover_tests(test_ambient_state)
 
+# --- Real U8G2: a style's `border` draws a one-pixel outline (§10) ---
+# The framework draws the outline for every element, after its render(), inside
+# its clip and state guard. Whether a frame pixel really lands, is clipped, or
+# is cancelled under xor is U8G2's to decide, so this runs against real U8G2,
+# built exactly as test_ambient_state is, with U8G2's fonts for the widgets
+# that draw text.
+add_executable(test_style_border
+    test_style_border.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_style_border PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_style_border SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_style_border PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_style_border PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_style_border)
+
 # --- Real U8G2: the clock's seconds share its HH:MM baseline ---
 # The panel is an SSD1322 256x64, so the test draws through that driver, which
 # no other target links; it is compiled here with ARDUINO defined like

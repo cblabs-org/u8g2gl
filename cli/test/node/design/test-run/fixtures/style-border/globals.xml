@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <styles>
+        <style name="framed" border="true" radius="2" />
+    </styles>
+
+    <fonts>
+        <builtin name="u8g2_font_6x10_mr" />
+    </fonts>
+</globals>

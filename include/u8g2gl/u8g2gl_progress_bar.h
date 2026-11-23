@@ -43,6 +43,8 @@
  *     - tick():                    Advance animation; return ~60 FPS or U8G2GL_IDLE
  *     - render():                  Draw track frame, fill pattern, and optional label
  *     - render_animation_update(): Targeted partial refresh during blocked loop
+ *     - draws_own_outline():       Always true: the track frames the box, so the
+ *                                  framework's style `border` outline is skipped
  *
  * Exported Types:
  * - u8g2gl_fill_style_t: Fill pattern enum (SOLID or STIPPLE), explicit uint8_t base
@@ -198,6 +200,18 @@ public:
      * @param display U8G2 display context to draw into.
      */
     void render(U8G2& display) override;
+
+    /**
+     * @brief Report that render() already frames this element's box.
+     *
+     * The track is a square frame on the bar's own box, on every render, so a style's `border` outline (§10) would draw
+     * those pixels a second time. Under `draw_color` xor the second pass erases
+     * the first. In colours 0 and 1 it would add rounded corner pixels inside that square frame whenever the style sets a radius. So the framework
+     * leaves the outline out, and `border` adds nothing here.
+     *
+     * @return true, always.
+     */
+    bool draws_own_outline() const override;
 
     /**
      * @brief Targeted partial refresh during blocked execution loops.

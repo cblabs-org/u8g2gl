@@ -24,7 +24,8 @@
  *              The preview is a label and a button in the style, side by side,
  *              on a one-screen project over the project's own `globals.xml`,
  *              drawn as the Fonts view draws its ruler, each captioned with
- *              what the runtime draws of a style on it. They take the style's
+ *              what the runtime draws of a style on it, a style's `border`
+ *              outline included (§10). They take the style's
  *              font, or, for a style without one, the first font the project
  *              declares.
  *
@@ -115,14 +116,25 @@ export interface StyleSample {
 
 /**
  * The preview's two samples, side by side, inset so a frame shows whole. What
- * each draws is what its `render()` reads of the style: a label its font, draw
- * colour, font mode and alignment (`u8g2gl_label.cpp`); a button those, and
- * `invert`, `radius`, and `padding` beside a left or right alignment
- * (`u8g2gl_button.cpp`). No element draws a style's `border`: a button frames
- * itself from its own `border_width`.
+ * each draws is what its `render()` reads of the style, plus the one thing the
+ * framework draws for every element: a label its font, draw colour, font mode
+ * and alignment (`u8g2gl_label.cpp`); a button those, and `invert`, `radius`,
+ * and `padding` beside a left or right alignment (`u8g2gl_button.cpp`). On
+ * both, `border` is a one-pixel outline on the element's box, rounded by
+ * `radius`, which the framework draws after the element (`u8g2gl_core.cpp`,
+ * §10), except on a button whose `border_width` is above 0: its own frame
+ * already lies on those pixels, so it stands in for the outline.
  */
 export const STYLE_SAMPLES: readonly StyleSample[] = [
-  { part: 'label', tag: 'u8g2gl_label', x: 2, y: 2, width: 96, height: 22, caption: 'Label: font, draw colour, font mode, alignment' },
+  {
+    part: 'label',
+    tag: 'u8g2gl_label',
+    x: 2,
+    y: 2,
+    width: 96,
+    height: 22,
+    caption: 'Label: font, draw colour, font mode, alignment, and border (a one-pixel outline, rounded by radius)',
+  },
   {
     part: 'button',
     tag: 'u8g2gl_button',
@@ -130,7 +142,8 @@ export const STYLE_SAMPLES: readonly StyleSample[] = [
     y: 2,
     width: 96,
     height: 22,
-    caption: 'Button: those, invert (a filled box, when not disabled), radius (box and frame), and padding beside a left or right alignment',
+    caption:
+      'Button: those, invert (a filled box, when not disabled), radius (box and frame), padding beside a left or right alignment, and border, which its own border_width frame stands in for when border_width is above 0',
   },
 ];
 

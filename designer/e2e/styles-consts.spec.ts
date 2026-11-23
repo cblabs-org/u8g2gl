@@ -7,9 +7,11 @@
  * Purpose: globals.xml's style cards and constants end to end (ui_spec §6.4,
  *          §10): a style's card shows its preview, a label and a button drawn
  *          by the real renderer and drawn again when the style changes, each
- *          captioned with what it draws; an invert and a radius edit show on
- *          the button; the card notes that no element draws a style's border;
- *          and it shows its users and its radius bound; a constant lists a reference written inside an expression;
+ *          captioned with what it draws, a style's border outline included,
+ *          with no note left saying the border is not drawn; an invert and a
+ *          radius edit show on the button; and it shows its users and its
+ *          radius bound; a constant lists a reference written inside an
+ *          expression;
  *          and removing a style or a constant still used is refused, naming
  *          the users.
  * Description: Against the real `u8g2gl design` on a copy of the departures
@@ -57,16 +59,21 @@ async function previewOf(page: Page, style: string, part: 'label' | 'button'): P
   return page.locator(`canvas[data-style-preview="${style}"][data-part="${part}"]`).evaluate((canvas) => (canvas as HTMLCanvasElement).toDataURL());
 }
 
-test('a style card shows its preview, users and radius bound, and notes that no element draws its border', async ({ page }) => {
+test('a style card shows its preview, users and radius bound, and captions the border it draws', async ({ page }) => {
   await open(page);
   const card = form(page).locator('.form-item[data-element="style"]');
   await expect(card.locator('canvas[data-style-preview="boxed"][data-part="label"]')).not.toHaveAttribute('data-drawn', '0');
-  await expect(card.locator('.style-sample figcaption')).toHaveText([/^Label: font, draw colour, font mode, alignment$/, /^Button: .*invert.*radius.*padding/]);
+  await expect(card.locator('.style-sample figcaption')).toHaveText([
+    /^Label: font, draw colour, font mode, alignment, and border \(a one-pixel outline, rounded by radius\)$/,
+    /^Button: .*invert.*radius.*padding.*border, which its own border_width frame stands in for when border_width is above 0$/,
+  ]);
   await expect(card.locator('.style-facts .field-problem')).toHaveCount(0);
   await expect(card.locator('.globals-users button')).toHaveText(['departures.plat_label']);
   await expect(card.locator('.style-radius')).toHaveAttribute('data-radius-bound', '6');
   await expect(card.locator('.style-radius')).toContainText('departures.plat_label is 18×13');
-  await expect(card.locator('.form-field[data-field="style/border"] [data-note="border-undrawn"]')).toContainText("No element draws a style's border yet");
+  // The framework draws the border now, so the field carries no note saying otherwise.
+  await expect(card.locator('.form-field[data-field="style/border"]')).toBeVisible();
+  await expect(card.locator('.form-field[data-field="style/border"] .field-reason')).toHaveCount(0);
 });
 
 test('an invert edit and a radius edit each show on the button sample', async ({ page }) => {

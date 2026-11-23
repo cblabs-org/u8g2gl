@@ -28,8 +28,8 @@
  *              subjects section is a table (`globals-subjects.tsx`), with
  *              each subject's cost and the bindings that use it. Each style's
  *              card ends with its preview, users and radius bound, and each
- *              constant with its references (`globals-styles.tsx`); a style's
- *              `border` field notes that no element draws it yet. Every
+ *              constant with its references (`globals-styles.tsx`), whose
+ *              preview captions say what a style's `border` draws. Every
  *              item that declares a name has "Rename…" (`rename-dialog.tsx`).
  *
  * Exports:
@@ -46,7 +46,7 @@ import { declaredBuiltins } from './font-picker-model';
 import type { FormField, FormList, FormModel, FormNode } from './form-model';
 import type { AddChooser, FormActions, FormViewState, SectionRenderer } from './form-view';
 import { SubjectsTable } from './globals-subjects';
-import { BORDER_UNDRAWN, ConstFacts, StyleFacts } from './globals-styles';
+import { ConstFacts, StyleFacts } from './globals-styles';
 import { renameTargetOf } from './rename-dialog';
 import type { RenameTarget } from './rename-plan';
 import { AssetItemFacts, BdfRangeField } from './globals-assets';
@@ -65,8 +65,6 @@ export interface GlobalsEditorHooks {
   readonly renderSection: SectionRenderer;
   /** "Rename…" on each item that declares a name. */
   readonly itemActions: (item: FormNode) => ReactNode;
-  /** A note beneath a field: a style's `border`, which no element draws yet. */
-  readonly fieldNote: (field: FormField, node: FormNode) => ReactNode;
 }
 
 // RenameButton
@@ -188,12 +186,6 @@ export function useGlobalsEditor(
           />
         ) : undefined,
       itemActions: (item) => <RenameButton item={item} onRename={onRename} />,
-      fieldNote: (field) =>
-        field.elementId === 'style' && field.attribute.name === 'border' ? (
-          <p className="field-reason" data-note="border-undrawn">
-            {BORDER_UNDRAWN}
-          </p>
-        ) : null,
     }),
     [workspace, declared, state, actions, onRename],
   );

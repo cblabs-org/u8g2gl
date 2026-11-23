@@ -22,7 +22,7 @@
  *              generated code makes into the frame — the per-object render
  *              wrapper (§11.3) and the frame-dirty subject observer (§13.5) —
  *              the blocked-loop repaint that shares the wrapper's state guard
- *              ([D-5]),
+ *              ([D-5]), the style `border` outline both of them draw (§10),
  *              u8g2gl_apply_clip(), the single owner of the clip-corner
  *              convention, and u8g2gl_clip_scope, the one set-and-reset of an
  *              object's effective clip, shared by the render wrapper and a
@@ -162,10 +162,31 @@ void u8g2gl_frame_dirty_observer(void* /*user_data*/) {
     u8g2gl_mark_dirty();
 }
 
+// draw_style_outline
+// Draws a style's `border` (§10): a one-pixel frame on the object's own box,
+// in its draw colour and corner radius, unless the object already frames its
+// box itself (draws_own_outline(): the button, the progress bar and the
+// switch), where a second pass would erase the first under xor. The one
+// implementation both render paths call, so
+// the frame and the repaint cannot draw two different outlines. Runs inside
+// the caller's clip and state guard, so it needs neither of its own.
+//   display — the application's U8G2 instance, clip already set
+//   obj     — the object just rendered
+static void draw_style_outline(U8G2& display, const u8g2gl_obj& obj) {
+    const u8g2gl_style& style = obj.get_resolved_style();
+    if (!style.border || obj.draws_own_outline()) {
+        return;
+    }
+    display.setDrawColor(static_cast<uint8_t>(style.draw_color));
+    u8g2gl_draw_frame(display, obj.get_x(), obj.get_y(), obj.get_w(), obj.get_h(),
+                      style.radius);
+}
+
 // u8g2gl_render_object
 // Renders one object with the framework's containment around it: effective
 // visibility, effective clip, and the state guard — the caller's U8G2 state
-// saved, the framework's text baseline established, the caller's restored.
+// saved, the framework's text baseline established, the caller's restored —
+// then its style `border` outline inside the same containment.
 //   display — the application's U8G2 instance
 //   objs    — flat object array in document order
 //   parents — parallel parent-index array, or nullptr for each object's own
@@ -198,11 +219,16 @@ void u8g2gl_render_object(
         return;
     }
     objs[index]->render(display);
+
+    // --- Step 4: The style outline, over what render() drew ---
+    // Still inside the clip and the guard. Children come later in document
+    // order, so they draw over a container's outline.
+    draw_style_outline(display, *objs[index]);
 }
 
 // u8g2gl_repaint_object
 // Clears and re-renders one object outside the frame, under the same state
-// guard as u8g2gl_render_object(), clipped to its own bounds.
+// guard as u8g2gl_render_object(), clipped to its own bounds, outline included.
 //   display — the application's U8G2 instance
 //   obj     — the object to repaint
 bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj) {
@@ -227,7 +253,12 @@ bool u8g2gl_repaint_object(U8G2& display, u8g2gl_obj& obj) {
     u8g2gl_draw_box(display, bounds.x, bounds.y, bounds.w, bounds.h);
     obj.render(display);
 
-    // --- Step 4: Leave the full display clipped, as between objects ---
+    // --- Step 4: The style outline, as the frame path draws it ---
+    // Before the clip is reset, so it stays inside the object's bounds; the
+    // clear above erased the old outline along with everything else.
+    draw_style_outline(display, obj);
+
+    // --- Step 5: Leave the full display clipped, as between objects ---
     display.setMaxClipWindow();
     return true;
 }

@@ -9,7 +9,8 @@
  *          a size written another way or a radius of its own does not, and
  *          with none there is no bound); the preview's project, which must
  *          validate and apply the style; each place a constant is used; and
- *          the removal guard for styles and constants.
+ *          the removal guard for styles and constants. The captions say what
+ *          the runtime draws of a style on each sample, its `border` included.
  * Description: A project written inline, read by the CLI's reference finder
  *              over the designer's own model cache, as the forms read it.
  */
@@ -84,8 +85,15 @@ test('the preview is a label and a button in the style over the project\'s own g
   const screen = preview.get('screens/screen_fonts_view.xml') ?? '';
   expect(screen.match(/<u8g2gl_(label|button) name="sample_(label|button)"/g)).toEqual(['<u8g2gl_label name="sample_label"', '<u8g2gl_button name="sample_button"']);
   expect(screen.match(/<style name="boxed" \/>/g)).toHaveLength(2);
-  expect(STYLE_SAMPLES.find((sample) => sample.part === 'button')?.caption).toMatch(/invert.*radius.*padding/);
-  expect(STYLE_SAMPLES.find((sample) => sample.part === 'label')?.caption).not.toMatch(/border|invert|radius|padding/);
+  const button = STYLE_SAMPLES.find((sample) => sample.part === 'button')?.caption;
+  const label = STYLE_SAMPLES.find((sample) => sample.part === 'label')?.caption;
+  expect(button).toMatch(/invert.*radius.*padding.*border/);
+  // The framework draws a style's border on every element (§10), so both
+  // captions name it; the button's own frame stands in while border_width > 0.
+  expect(label).toMatch(/border \(a one-pixel outline, rounded by radius\)/);
+  expect(button).toMatch(/border, which its own border_width frame stands in for when border_width is above 0/);
+  // The label draws no invert box and no padding.
+  expect(label).not.toMatch(/invert|padding/);
   // A style with a font of its own: the samples name none, so the style's applies.
   expect(styleSampleTexts(GLOBALS, 'x', 'u8g2_font_6x10_mr', 'u8g2_font_6x10_mr').get('screens/screen_fonts_view.xml')).not.toContain(' font=');
 });

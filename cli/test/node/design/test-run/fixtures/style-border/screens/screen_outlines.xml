@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="outlines">
+    <view>
+        <!-- A bordered container. Its child starts on the outline's top-left
+             corner, and children draw after their container, so the child's
+             solid text box covers that part of the outline. -->
+        <u8g2gl_obj name="panel" x="0" y="0" width="60" height="30" border="true">
+            <u8g2gl_label name="panel_caption" x="0" y="0" width="40" height="10"
+                          font="u8g2_font_6x10_mr" text="Panel" />
+        </u8g2gl_obj>
+
+        <!-- A bordered label with a radius, set as attributes. -->
+        <u8g2gl_label name="rounded" x="64" y="0" width="60" height="14"
+                      font="u8g2_font_6x10_mr" text="Round" border="true" radius="4" />
+
+        <!-- The same outline from a named style, and one under xor. -->
+        <u8g2gl_label name="styled" x="64" y="16" width="60" height="12"
+                      font="u8g2_font_6x10_mr" text="Style" style="framed" />
+        <u8g2gl_label name="xored" x="0" y="34" width="60" height="12"
+                      font="u8g2_font_6x10_mr" text="Xor" border="true" draw_color="xor" />
+
+        <!-- At border_width 0 the framework draws the outline; at 1 the
+             button's own frame is the outline, drawn once. -->
+        <u8g2gl_button name="bare" x="64" y="32" width="28" height="14"
+                       font="u8g2_font_6x10_mr" text="B0" border_width="0" border="true" />
+        <u8g2gl_button name="framed_button" x="96" y="32" width="28" height="14"
+                       font="u8g2_font_6x10_mr" text="B1" border_width="1" border="true" />
+    </view>
+</screen>
