@@ -195,4 +195,129 @@ RESCOPE-E-3b.md first. The owner's approval is recorded in both status logs (rul
 
 # Completion report
 
-*(worker: append here)*
+*Worker, 2026-11-24.* Provenance verified first, from the files (rule 00): this work order names
+`e-3-sample-data`, and both PROJECT.md's and RESCOPE-E-3b.md's status logs record the owner's own
+"Approve E-3b" (2026-11-24) with Q1a–Q4a.
+
+## Commits per WO
+
+| WO | Branch | Commits |
+|---|---|---|
+| WO1 | `u8g2gl-e3b/wo1-sample-sets` | `47297fe` set files, checks, server DELETE route, canvas |
+| WO2 | `u8g2gl-e3b/wo2-sample-view` | `321dab0` Sample data view, typed grids, paste, subjects-table columns |
+| WO3 | `u8g2gl-e3b/wo3-generated-sweep` | `263ad6f` `measureText`, generated and conventional sets, switcher, per-set test runs |
+| WO4 | `u8g2gl-e3b/wo4-docs-review` | `99f4aad` docs, ChangeLog, CLI 0.26.0; `57df54f` readability-review fixes; `1989f05` two e2e test fixes (below); this report |
+
+Nothing pushed, tagged or published.
+
+## Suite results (one at a time)
+
+| Suite | Baseline (`ca39244`) | Final |
+|---|---|---|
+| Framework Wasm build | ok | ok |
+| Wasm tests | 6/6 | 7/7 (new `measure-text.test.mjs`, 14 checks) |
+| Host C++ ctest | 540/540 | 540/540 |
+| CLI vitest | 3233 | 3247 |
+| CLI lint + tsc | clean | clean |
+| Designer typecheck | clean | clean |
+| Designer unit | 316 | 346 |
+| e2e (`build:e2e`) | 159 passed, 2 failed; both passed alone (below) | first run 166 passed, 3 failed (below); after the fixes, the full suite 169/169 |
+| Production (`build` + `test:e2e:production`) | 3 | 3 (also re-run after the final e2e fixes) |
+| `refresh-goldens.mjs` | — | empty diff (`git status` clean) |
+| `check-home-paths.mjs` | clean | clean |
+| `check-package.mjs` | — | PASS at 0.26.0 (829 files, 15.9 MB) |
+
+**Failures, each re-run alone:**
+- Baseline: `performance.spec.ts:168` (a known flake) and `drag-performance.spec.ts:189`, both CPU-throttled latency tests. Both passed alone (p95s within budget). I read them as load on the machine.
+- Final first run: `samples.spec.ts:154` and `:204` failed, a real defect in my own WO2 helper. WO3's *Create the conventional sets* button made `name: 'Create'` match two buttons. The locator is now `exact: true`.
+- Final first run: `palette.spec.ts:238` failed alone too, so it was not load. The new toolbar switcher wraps the canvas toolbar one more line, and the fitted zoom fell to 1×. At 1× the `dropTag` helper's `Math.round` of a pixel centre (on x.5) landed on the next device pixel. I changed the helper to aim at the whole screen pixel nearest the centre inside the device pixel's span, the way the canvas's `floor((p − edge) / scale)` maps a point. No assertion changed. Every drop spec passed twice, then the full suite passed.
+
+## The set-file format
+
+`samples/<set>.json`, as RESCOPE-E-3b.md gives it. One real example, the departures fixture's `typical`, as the designer generates it (abridged to one row each):
+
+```json
+{
+  "u8g2gl_samples": 1,
+  "values": { "platform": "9", "system_time": 71700, "row0_time": "19:55", "row0_dest": "London Paddington",
+              "row0_status": "On time", "box_fill": 8, "message_text": "" },
+  "rows": {
+    "screens/screen_departures.xml": {
+      "row0":      [ { "cells": ["cells"] } ],
+      "formation": [ { "number": 1, "class_type": "standard", "wheelchair": false, "bike": false, "loading_pct": 0 } ],
+      "services":  [ { "cells": ["cells"] } ]
+    }
+  }
+}
+```
+
+- **Problem codes.** `U8G2GL_SAMPLE_JSON` and `U8G2GL_SAMPLE_VERSION` are errors, and the set applies nothing. `SHAPE`, `UNKNOWN_SUBJECT`, `UNKNOWN_SCREEN`, `UNKNOWN_ELEMENT`, `NO_DATA`, `UNKNOWN_FIELD`, `VALUE` and `CAPACITY` are warnings, with only the value or row at fault left out.
+- **Locations.** Each problem has the set file, the line and column (from a small located JSON reader), and the JSON path.
+- **Where the code lives.** The types, reader and checks are `designer/src/samples/sample-set.ts`. The server needs none of them: it already treated `samples/` as project files.
+
+## The staged C++ for one set, and how the index guard works
+
+`u8g2gl_harness_samples.cpp`, written by `cli/src/node/design/test-run/sample-set-unit.ts` (from its unit test, departures):
+
+```cpp
+void ui_sample_set_0() {
+    ui_set_platform("4");
+    ui_set_box_fill(int32_t{3});
+    ui_set_system_time(uint32_t{3600u});
+    {  // departures.formation: carriages, 2 rows
+        wd_train_formation* obj = static_cast<wd_train_formation*>(ui_screen_departures.objs[4]);
+        obj->begin();
+        obj->add_carriage(int32_t{1}, static_cast<const char*>("first"), true, false, int32_t{40});
+        obj->add_carriage(int32_t{2}, static_cast<const char*>("standard"), false, true, int32_t{80});
+        obj->commit();
+    }
+    {  // departures.services: rows, 2 rows
+        wd_service_list* obj = static_cast<wd_service_list*>(ui_screen_departures.objs[5]);
+        obj->begin();
+        static const char* const row_0_cells[] = {"10:15", "Reading", "3", "On time"};
+        obj->add_row(row_0_cells, size_t{4});
+        obj->add_row(nullptr, size_t{0});
+        obj->commit();
+    }
+}
+```
+
+The same unit defines three exports, `selectSampleSet()`, `getSampleSetCount()` and `getSampleSetName()`, and `u8g2gl_harness_apply_sample_set()`. That is a `switch` over the selected set, which does nothing when none is selected.
+
+**The index guard.** `i` is the element's `object` index in the `ui_scene.json` generated in the same run. Before writing the unit, the stage reads each screen's generated `ui_screen_<s>_objs[]` table from the firmware `.cpp`. It requires entry `i` to be `&ui_obj_<element>`. A drift refuses the run with `U8G2GL_TEST_RUN_SAMPLES`, for example: `ui_screen_departures_objs[4] is &ui_obj_services, not &ui_obj_formation`.
+- **Unit tests** (no toolchain): every departures collection resolves to its own table entry, and a table with two entries swapped is refused.
+- **`sample-set-parity.test.ts`** (Emscripten): the departures fixture across its four conventional sets plus the initial values, 5 cases × 8 frames, 0 pixels differ. It also checks what each set draws, so two blank frames cannot pass by agreeing:
+  - with the initial values and with `empty`, the service list and `row0` are unlit;
+  - `typical` lights more than 20 service-list pixels;
+  - `worst-case` lights more than `typical`, in the formation and the service list;
+  - `longest-plausible` draws the same frame as `typical`.
+
+## E-2g's first-use project
+
+It does not exist. E-2g ("Designer first-use fixes") delivered designer fixes only: icons, explicit save and shape resizing. So that part was skipped, as the work order says. The four conventional sets of the departures fixture are committed instead, as CLI test-run fixtures (`cli/test/node/design/test-run/fixtures/departures-samples/`). They were generated by the designer's own generator with the real `measureText`. I did not put them in the departures fixture itself, because every e2e session copies that fixture, and a project that already has sets changes what the Sample data view offers.
+
+## Found outside scope
+
+- **CI** (`.github/workflows/ci.yml`, outside the Boundary) does not run the new `wasm/test/measure-text.test.mjs`. It needs one line beside `collection-data.test.mjs`. The new CLI tests run under `npm test` already.
+- **`docs/ui_flows.md` §2.9**, the keyboard reference, does not list ⌥] / ⌥[. Only ui_spec §11 and design_spec §9 were in the WO4 docs Boundary. ui_flows §4.3 also still describes a `samples.xml`, which S1 superseded.
+- **Two lines of `docs/ui_spec.md` outside §11** are slightly stale. §15's row (line ~722) and U-6's closing note (~737) still say "the format is E-3b's" and do not mention that `validate` ignores `samples/`. §6 may still describe Sample data as reserved.
+- **Possible copyable code.** `cli/test/fixtures/departures-project/widgets/` is the fixture's copy. The foundation repository's own copy of the departures widgets is untouched (R10).
+
+## Deviations, and why
+
+1. **The server gained `DELETE /api/file`**, sample sets only and only at the expected version. The served file system (`cli/src/core/project-fs`, outside the Boundary) has no removal, and WO2's delete and rename need one. It lives in `design-server.ts` and `disk-project.ts`. The designer calls it through `ProjectDocuments.remove()`.
+2. **The `u8g2gl_harness_apply_sample_set()` declaration is in `harness.cpp`, as `extern "C"`, not in `harness.h`.** `harness.h` is not in the Boundary, and the declaration is the one call's own. The header comment now says where it is defined.
+3. **The firmware half takes each set from the request, as the canvas applied it** (checked values, rows by screen name), rather than re-reading `samples/`. So both halves get the same data, the checker is not duplicated in Node, and dirty set buffers are not staged. `checkStagedDocuments` accepts XML only, so the workspace now leaves sample sets out of `dirtyDocuments`; posting them would have failed every run.
+4. **A run now covers every screen**, each with the initial values and with each set. The result keeps `screen` and `frames`, the requested screen with the initial values, so a client that predates sets still works. With no sets and one screen, it is exactly today's run.
+5. **Rows map to an element's only `<data>`.** The format keys rows by element. An element with several `<data>` blocks is a `NO_DATA` problem rather than a guess.
+6. **Generated sets.**
+   - *One row:* strings are the field's name, so the row can be seen.
+   - *Full, longest:* an unbounded collection gets 1 row, a subject with no `max_len` uses 32 (`U8G2GL_MAX_STRING_LEN`), and a string whose font cannot be measured uses `W`, which Output names.
+   - *Widest glyph:* chosen from `!` to `~`, space left out because it draws nothing. A tie for the largest advance goes to `W`, since every glyph of a monospaced font ties.
+   - *typical:* the initial values written out, plus one row per collection, so it draws something.
+   - *Names:* the conventional sets are `longest-plausible` and `worst-case`, file names a shell needs no quoting for.
+7. **The cycle shortcut is ⌥] / Alt+] and ⌥[ / Alt+[**, global in the capture phase like ⌘↵, matched by key code. The stops are *none* and then every set in name order. It is listed in the switcher's tooltip and in ui_spec §11.4.
+8. **No autosave**, consistent with the XML. Set edits are dirty until saved, with ⌘S in the set's tab, ⌘⌥S, or the view's Save. Create, duplicate, rename and delete write to disk at once, because they are file operations the author asks for by name.
+9. **The canvas link follows the selection while the view is open.** It opens and scrolls to the grid, and does not switch the sidebar to Sample data on every canvas click.
+10. **Readability review:** no P1. Both P2s and every P3 are fixed (`57df54f`). Of the P4s, I changed "the owner's test case" and the PR-08 citation in the new unit. The `ruling N` / `Q1a` citations stay: ui_spec and design_spec cite the same rulings, so a reader can follow them.
+
