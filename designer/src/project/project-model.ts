@@ -13,7 +13,8 @@
  *          cannot disagree about what a document means.
  * Description: Files are classified by the project layout (design_spec §19):
  *              `u8g2gl.xml`, `globals.xml`, `screens/screen_*.xml`, and widget
- *              manifests under `widgets/`. Screens and manifests parse under
+ *              manifests under `widgets/`; and the sample sets under
+ *              `samples/`, which are documents but not part of the model. Screens and manifests parse under
  *              the `'generate'` missing-name policy ([U-1]): the editor
  *              supplies a name the author has not written yet, the same name
  *              opening the file writes into its buffer, so a file that is not
@@ -43,6 +44,7 @@ import { CATALOGUE } from '@u8g2gl/data/catalogue.js';
 import { FRAMEWORK_MANIFESTS } from '@u8g2gl/data/manifests.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
 import { buildManifestRegistry, parseFrameworkManifests, type ManifestRegistry } from '@u8g2gl/core/manifest/index.js';
+import { isSampleSetPath } from '../samples/sample-set';
 import {
   parseGlobalsFile,
   parseProjectFile,
@@ -58,8 +60,12 @@ import type { U8g2glProject } from '@u8g2gl/core/schema/project.js';
 import type { Screen } from '@u8g2gl/core/schema/screen.js';
 import type { WidgetManifest } from '@u8g2gl/core/schema/widget-manifest.js';
 
-/** How the project layout reads a file. */
-export type ProjectFileKind = 'project' | 'globals' | 'screen' | 'widget';
+/**
+ * How the project layout reads a file. A `sample` is a sample set
+ * (`samples/<set>.json`): a document the designer edits and saves like the
+ * XML, but never parsed into the model, because a set is never compiled.
+ */
+export type ProjectFileKind = 'project' | 'globals' | 'screen' | 'widget' | 'sample';
 
 /** `screens/screen_*.xml`, exactly as the CLI's `read-project.ts` matches it. */
 const SCREEN_PATH = /^screens\/screen_[^/]*\.xml$/;
@@ -75,6 +81,7 @@ export function classifyProjectFile(path: string): ProjectFileKind | undefined {
   if (path === 'globals.xml') return 'globals';
   if (SCREEN_PATH.test(path)) return 'screen';
   if (WIDGET_PATH.test(path)) return 'widget';
+  if (isSampleSetPath(path)) return 'sample';
   return undefined;
 }
 
@@ -149,7 +156,8 @@ export class ProjectModelCache {
     for (const path of paths) {
       const kind = classifyProjectFile(path);
       const text = texts.get(path);
-      if (kind === undefined || text === undefined) {
+      // A sample set is checked against the model, never part of it.
+      if (kind === undefined || kind === 'sample' || text === undefined) {
         continue;
       }
       seen.add(path);

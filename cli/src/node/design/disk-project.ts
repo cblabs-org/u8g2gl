@@ -13,7 +13,10 @@
  *          on, so the editor cannot write anywhere the CLI would not read.
  * Description: Read, write-with-expected-version, and list, each returning the
  *              `ProjectFsResult` shapes the browser half passes straight
- *              through. Versions are `contentVersion` of the bytes, so the
+ *              through. Removal is narrower than writing: only a sample set
+ *              (`samples/<set>.json`) can be removed, because the designer
+ *              deletes nothing else, and a route that could delete any project
+ *              file would be a much larger thing to get wrong. Versions are `contentVersion` of the bytes, so the
  *              server and browser agree without shared state.
  *
  *              The file operations are synchronous on purpose: Node runs one
@@ -30,6 +33,10 @@
  *     - write():              Conditional write, creating directories
  *     - list():               Every project source file
  *
+ *     Sample sets:
+ *     - SAMPLE_SET_PATH:      The only paths remove() takes
+ *     - removeSampleSet():    Conditional removal of one set
+ *
  *     Handing a file to another program:
  *     - locate():             An existing project source file's absolute path
  *
@@ -38,7 +45,7 @@
  *     - listFiles():          The same walk `list()` does, as a plain array
  */
 
-import { lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { compareCodeUnits } from '../../core/order.js';
 import { contentVersion } from '../../core/project-fs/content-version.js';
@@ -53,6 +60,14 @@ import type {
 } from '../../core/project-fs/project-file-system.js';
 import { isInsideProject } from '../project-path.js';
 import { isIgnoredPath } from './ignored-paths.js';
+
+/**
+ * A sample set's path, `samples/<set>.json`, one level deep: the designer's
+ * file format for sample data (ui_spec §11), and the only kind of file the
+ * design server removes. The designer's `samples/sample-set.ts` holds the same
+ * rule; the two sides share no module, and the rule is one line.
+ */
+export const SAMPLE_SET_PATH = /^samples\/[^/]+\.json$/;
 
 /**
  * One project directory, as the design server reads and writes it.
@@ -185,6 +200,52 @@ export class DiskProject {
       return error('unavailable', `'${path}' could not be written: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
     return { ok: true, path, version: contentVersion(bytes), created: current === undefined };
+  }
+
+  /**
+   * @brief Removes a sample set if it is still at the expected version.
+   *
+   * The same checks a write makes — the lexical rule, the real-path rule —
+   * and the version check, so a set changed on disk since the designer read
+   * it is never deleted from under its author.
+   *
+   * @param path            As the client sent it; checked here.
+   * @param expectedVersion The version the client last read.
+   * @return Success, or `invalid-path` (not a sample set, or not a valid
+   *         path), `outside-project`, `not-found`, `conflict`, or
+   *         `unavailable` for an I/O failure.
+   */
+  removeSampleSet(path: string, expectedVersion: string): ProjectFsResult<{ readonly path: string }> {
+    // --- Step 1: A sample set's path, and inside the project ---
+    const check = checkProjectPath(path);
+    if (!check.ok) {
+      return error('invalid-path', refusedPathMessage(path, check.reason));
+    }
+    if (!SAMPLE_SET_PATH.test(path)) {
+      return error('invalid-path', `'${path}' is not a sample set; only samples/<set>.json can be removed.`);
+    }
+    const absolute = this.absolutePath(path);
+    if (!isInsideProject(this.root, absolute)) {
+      return error('outside-project', `'${path}' resolves outside the project directory.`);
+    }
+
+    // --- Step 2: Still the version the client read ---
+    const current = readFileOrUndefined(absolute);
+    if (current === undefined) {
+      return error('not-found', `'${path}' does not exist.`);
+    }
+    const currentVersion = contentVersion(current);
+    if (currentVersion !== expectedVersion) {
+      return { ok: false, code: 'conflict', message: `'${path}' changed since it was read; it was not removed.`, currentVersion };
+    }
+
+    // --- Step 3: Remove it ---
+    try {
+      unlinkSync(absolute);
+    } catch (cause) {
+      return error('unavailable', `'${path}' could not be removed: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+    return { ok: true, path };
   }
 
   /** @brief Every project source file, sorted (§13.9). */

@@ -71,6 +71,7 @@ const ROUTES: ReadonlyArray<{ readonly method: string; readonly path: string; re
   { method: 'GET', path: '/api/files' },
   { method: 'GET', path: '/api/file?path=u8g2gl.xml' },
   { method: 'PUT', path: '/api/file?path=screens/screen_x.xml', body: '<screen />\n' },
+  { method: 'DELETE', path: '/api/file?path=samples/typical.json' },
   { method: 'GET', path: '/api/events' },
   { method: 'GET', path: '/api/font/builtin?name=u8g2_font_6x10_mr' },
   { method: 'POST', path: '/api/open', body: '{"path":"u8g2gl.xml"}' },

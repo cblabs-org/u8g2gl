@@ -20,6 +20,7 @@
  * - placeCaret():       Put the caret at a text offset in an open file
  * - bufferText():       An open file's buffer
  * - frameInfo():        The current frame state
+ * - litIn():            How many of a device rectangle's pixels are lit
  * - canvasPixels():     A hash of the frame canvas's pixels
  * - nextFrames():       Resolve after the page has drawn N animation frames
  * - devicePoint():      Where a device pixel's centre is on the page
@@ -104,6 +105,23 @@ export async function canvasPixels(page: Page): Promise<string> {
     for (let i = 0; i < data.length; i += 4) hash = Math.imul(hash ^ (data[i] ?? 0), 16777619);
     return `${canvas.width}x${canvas.height}:${(hash >>> 0).toString(16)}`;
   });
+}
+
+/**
+ * @brief How many of a device rectangle's pixels are lit on the frame canvas,
+ *        which is drawn one canvas pixel per device pixel: a lit pixel is the
+ *        amber `LIT`, whose red channel is full, an unlit one near black.
+ */
+export async function litIn(page: Page, rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): Promise<number> {
+  return page.evaluate((rect) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.canvas-frame canvas.frame');
+    const context = canvas?.getContext('2d');
+    if (canvas == null || context == null) return 0;
+    const data = context.getImageData(rect.x, rect.y, rect.width, rect.height).data;
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) if ((data[i] ?? 0) > 128) lit += 1;
+    return lit;
+  }, rect);
 }
 
 /** @brief Resolves after the page has drawn `count` more animation frames. */

@@ -61,6 +61,11 @@
  *              a shape's guards, with the current sample data) are published
  *              for the Explorer's "hidden by data" marker.
  *
+ *              The canvas draws the active sample set (`samples/`): its values
+ *              over the declared ones, and its rows for the drawn screen, both
+ *              applied after each `applyScene`, which clears them. Every set's
+ *              problems join the run's in Problems.
+ *
  * Exports:
  * - FrameState:       What the canvas panel and status bar show about the frame
  * - selectionOverlay(): The selection's overlay rectangles, with or without box handles
@@ -117,6 +122,7 @@ import { innermostAt, namedElements } from '../documents/element-at';
 import { effectiveHidden } from '../canvas/design-hidden';
 import { markersByFile, sameProblems, toProblemRows, withoutBuildRepeats } from './diagnostics';
 import { BROWSER_FRAMES, FrameScheduler, type FrameSource } from './frame-scheduler';
+import { sampleSetPath } from '../samples/sample-set';
 import {
   runTextPipeline,
   TEXT_STAGES,
@@ -269,6 +275,8 @@ export class EditLoop {
   private applied: EditorModule | undefined;
   private tickHandle: number | undefined;
   private drawn = 0;
+  /** The bridge's last refusal of the active set's rows, so it is logged once. */
+  private sampleRefusal: string | undefined;
   private diagnosticFiles = new Set<string>();
   private latestDiagnostics: readonly Diagnostic[] = [];
   private readonly diagnosticSources: Array<Observable<readonly Diagnostic[]>> = [];
@@ -303,6 +311,8 @@ export class EditLoop {
       this.workspace.activeFile.subscribe(request),
       // Switching the target re-resolves every screen at its display ([U-3]).
       this.workspace.activeTarget.name.subscribe(request),
+      // Switching the sample set redraws with its values and rows.
+      this.workspace.activeSampleSet.name.subscribe(request),
       this.wasm.module.subscribe(request),
       this.wasm.buildDiagnostics.subscribe(request),
       this.frozen.subscribe(request),
@@ -469,6 +479,7 @@ export class EditLoop {
       assets: this.assets.current,
       activeFile: this.workspace.activeFile.get(),
       targetName: this.workspace.activeTarget.name.get(),
+      sampleSet: activeSetPath(this.workspace.activeSampleSet.name.get()),
     });
     this.assets.ensure(result.model.globals, texts.get('globals.xml') ?? '');
     // A build's or a test run's diagnostics that repeat a live one are dropped:
@@ -476,6 +487,7 @@ export class EditLoop {
     this.publishDiagnostics(
       withoutBuildRepeats([
         ...result.diagnostics,
+        ...result.sampleProblems,
         ...this.wasm.buildDiagnostics.get(),
         ...this.diagnosticSources.flatMap((source) => source.get()),
       ]),
@@ -497,7 +509,18 @@ export class EditLoop {
       let lap = performance.now();
       const hidden = this.hiddenFor(result, module);
       const applied =
-        module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.subjectValues);
+        module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.sampleValues);
+      // The active set's rows, which the rebuild just cleared. They were
+      // checked as the bridge checks them, so a refusal here means the loaded
+      // Wasm is older than its widgets' <data> (or lacks their class): the
+      // frame is drawn without rows rather than lost.
+      // Said in Output once per new refusal, not once per frame.
+      if (applied) {
+        const refusal =
+          result.collectionData === undefined || module.applyCollectionData(result.collectionData) ? undefined : module.lastError();
+        if (refusal !== undefined && refusal !== this.sampleRefusal) this.workspace.log(`the sample set's rows were not applied: ${refusal}`);
+        this.sampleRefusal = refusal;
+      }
       // After the apply, which forgets the set. Only this loop sets it: a test
       // run applies afresh and so renders the exported view.
       if (applied && hidden.size > 0) module.setDesignHidden(bridgeNames(hidden, result.drawnBy));
@@ -779,4 +802,11 @@ function assetNoteOf(injection: InjectionState, warning: string): { readonly ass
     return { assetNote: 'this editor Wasm predates font injection, so it draws the fonts and images it was built with' };
   }
   return warning === '' ? {} : { assetNote: warning };
+}
+
+// activeSetPath
+// The project path of the chosen sample set, if one is chosen.
+//   name — the set's name, as the browser remembers it
+function activeSetPath(name: string | undefined): string | undefined {
+  return name === undefined ? undefined : sampleSetPath(name);
 }

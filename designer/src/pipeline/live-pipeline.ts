@@ -43,6 +43,12 @@
  *
  *              It also returns the subjects' declared values, which the
  *              caller applies after every scene, since a rebuild clears them.
+ *              And it checks every sample set among the texts against the
+ *              model it just built (`samples/sample-set.ts`), returning their
+ *              problems and, for the active set, the subject values with the
+ *              set's over them and the drawn screen's rows: what the canvas
+ *              shows with that set. With no set active they are the declared
+ *              values and no rows, so the canvas is as it was.
  *
  * Exports:
  * - Rect:                  A device-space rectangle
@@ -67,6 +73,8 @@ import type { ProjectModelCache } from '../project/project-model';
 import { pickTarget } from '../project/active-target';
 import type { Target } from '@u8g2gl/core/schema/project.js';
 import type { HitTarget } from '../selection/hit-test';
+import { checkSampleSet, collectionDataJson, isSampleSetPath, NO_SAMPLES, sampleValuesJson, type AppliedSampleSet } from '../samples/sample-set';
+import { sampleShapeOf, type SampleShape } from '../samples/sample-shape';
 
 /** A device-space rectangle. */
 export interface Rect {
@@ -95,6 +103,12 @@ export interface TextPipelineInput {
    * not declared.
    */
   readonly targetName?: string | undefined;
+  /**
+   * The project path of the sample set the canvas shows
+   * (`samples/active-sample-set.ts`); none, or a path not among the texts,
+   * draws the declared values only.
+   */
+  readonly sampleSet?: string | undefined;
 }
 
 /** One run's outcome. */
@@ -149,10 +163,30 @@ export interface TextPipelineResult {
   readonly placements: ReadonlyMap<string, Placement>;
   /**
    * Each subject's declared initial value, as the `{ name: value }` JSON
-   * `applySampleData` takes: the frame the firmware draws at boot, until sample
-   * data (a later step) supplies others.
+   * `applySampleData` takes: the frame the firmware draws at boot. A test run
+   * applies these; the canvas applies `sampleValues`.
    */
   readonly subjectValues: string;
+  /** What a sample set can hold for this model: its subjects and collection instances. */
+  readonly sampleShape: SampleShape;
+  /**
+   * Every sample set's problems, by set file and JSON path. Kept apart from
+   * `diagnostics`: a set is never compiled, so its problems neither block a
+   * build nor hatch the canvas.
+   */
+  readonly sampleProblems: readonly Diagnostic[];
+  /** What of the active set checks clean; nothing when none is active. */
+  readonly sampleApplied: AppliedSampleSet;
+  /**
+   * The `applySampleData` JSON the canvas draws with: `subjectValues`, with
+   * the active set's values over them.
+   */
+  readonly sampleValues: string;
+  /**
+   * The active set's rows for the drawn screen, as `applyCollectionData`
+   * takes them; undefined when it has none for that screen.
+   */
+  readonly collectionData: string | undefined;
   /** Milliseconds per stage, in {@link TEXT_STAGES} order. */
   readonly timings: Readonly<Record<TextStage, number>>;
 }
@@ -259,6 +293,21 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   }
   lap('scene');
 
+  // --- Step 6: Every sample set against this model, and the active one's data ---
+  // After the timed stages: a set is checked against the model, and so
+  // depends on all of them, but it never changes the scene.
+  const sampleShape = sampleShapeOf(model);
+  const sampleProblems: Diagnostic[] = [];
+  let sampleApplied = NO_SAMPLES;
+  for (const [path, text] of input.texts) {
+    if (!isSampleSetPath(path)) continue;
+    const check = checkSampleSet(path, text, sampleShape);
+    sampleProblems.push(...check.problems);
+    if (path === input.sampleSet) sampleApplied = check.applied;
+  }
+  const subjectValues = declaredValues(model.globals);
+  const screenFile = model.screens[screenIndex]?.loc?.file;
+
   return {
     model,
     target,
@@ -267,14 +316,19 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     scene,
     wellFormed,
     screen,
-    screenFile: model.screens[screenIndex]?.loc?.file,
+    screenFile,
     display: display === undefined ? undefined : { width: display.width, height: display.height },
     bounds,
     placed,
     targets,
     placements,
     drawnBy,
-    subjectValues: declaredValues(model.globals),
+    subjectValues,
+    sampleShape,
+    sampleProblems,
+    sampleApplied,
+    sampleValues: sampleValuesJson(subjectValues, sampleApplied),
+    collectionData: collectionDataJson(sampleApplied, screenFile),
     timings,
   };
 }
