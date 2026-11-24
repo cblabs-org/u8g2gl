@@ -125,6 +125,7 @@ Refusing is not obstruction. The user retains the constant and the ability to ab
 | `Tab` | Next element in document order — see `[FQ-2]` |
 | `Ctrl/⌘ Z` | Undo one coalesced run (`[FD-1]`) |
 | `⌘↵` / `Ctrl+Enter` | **Run**: the test run, which builds the generated firmware code and compares its frames with the canvas, from anywhere in the designer, the XML editor included. It overrides Monaco's *Insert Line Below*, which it would otherwise be |
+| `⌥]` / `Alt+]`, `⌥[` / `Alt+[` | Cycle the canvas's sample set forwards or back, through *none* and every set in name order, from anywhere in the designer (`ui_spec.md` §11.4) |
 
 ### 2.10 What this flow proves
 
@@ -239,6 +240,8 @@ Canvas toolbar selector; keyboard cycle; from F3 when a binding has no sample va
 At least one sample set. `ui_spec.md` §11 offers the four conventional sets — **typical**, **empty**, **longest plausible**, **worst case** — at project creation.
 
 ### 4.3 `[FD-9]` Sample data is a project document, `samples.xml` — closing `[U-6]`
+
+> *2026-11-24.* **Superseded in its file format, not its finding.** The owner's decision S1 (E-3, 2026-11-17) put sample data in the project as `samples/<set>.json`, outside the schema, and E-3b built it (`ui_spec.md` §11). The argument below for a shared project document, rather than a sidecar, is what S1 kept; read `samples.xml` as `samples/`.
 
 **Sample data lives in the project, beside `globals.xml`. It is not a sidecar.**
 
