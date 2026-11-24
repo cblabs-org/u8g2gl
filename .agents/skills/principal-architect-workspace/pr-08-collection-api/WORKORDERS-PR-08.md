@@ -228,3 +228,127 @@ PR, settling the detail of decisions Q1a, Q2a, Q3a, Q4a and Q7 in
 # Completion report
 
 *(The worker appends it here.)*
+
+## Report (worker, 2026-11-24)
+
+**Authorization.** Before any change I checked the provenance. This file names its parent project. PROJECT.md's status log records the owner's own words, "Approve as recommended", and REFRESH-PR-08-09.md's log records the same approval.
+
+### Commits per WO
+
+Each WO is on its own branch, cut from the tip of the one before. Nothing was pushed or tagged.
+
+| WO | Branch | Commit |
+|---|---|---|
+| WO1 | `u8g2gl-08/wo1-element-handles` | `657fd14` named element handles in ui.hpp |
+| WO2 | `u8g2gl-08/wo2-row-storage` | `eda055d` generated collection storage through u8g2gl_rows |
+| WO3 | `u8g2gl-08/wo3-collection-facade` | `889d213` the generated collection facade |
+| WO4 | `u8g2gl-08/wo4-docs-review` | `0f1b429` docs, versions and review; this report follows it |
+
+### Suite results
+
+Every suite ran one at a time. The baseline is main at `128b506`; the final run is the WO4 tree.
+
+| Suite | Baseline | Final |
+|---|---|---|
+| Framework editor Wasm build | ok | ok, 0 warnings |
+| Wasm tests (all seven in CI) | 7/7 pass | 7/7 pass |
+| Host C++ build and ctest | 540/540 (1 skip) | 560/560 (1 skip), 0 warnings |
+| CLI vitest, with Emscripten | 3247 in 156 files | 3280 in 159 files, all pass |
+| CLI lint and tsc | ok | ok |
+| Designer typecheck | ok | ok |
+| Designer unit | 346 | 351 |
+| e2e, after `build:e2e` | 169 | 170 |
+| Production build, hook grep | ok | ok, no hook |
+| `test:e2e:production` | 3 | 3 |
+| `refresh-goldens.mjs` after the commits | — | empty diff |
+| `check-home-paths.mjs` | — | pass |
+| `check-package.mjs` | — | PASS, u8g2gl-0.27.0.tgz |
+
+Collection-data in the Wasm tests: 0 pixels lit before the fill, and 1418 after, equal to the reference frame. The CLI parity corpus reported "departures: 5 cases × 8 frames, 0 differ".
+
+**Flakes.** Each failure below passed when re-run alone.
+- WO2's e2e run: `drag-performance.spec.ts:189` (7 missed frames, p95 19.9 ms) and `performance.spec.ts:168` failed. Both are on the known-flakes list.
+- WO3's CLI run: four integration tests timed out at 5 s under a parallel run (`cli.test.ts` fix-names, `generate-convert.test.ts`, and two in `generate.test.ts`). The final run had one such timeout, in `generate-convert.test.ts`.
+
+**check-package.** It packs a clone of HEAD, so it ran after the WO4 commit, with Emscripten on PATH. Its first attempt refused because `emcc` was not on PATH.
+
+### The departures fixture
+
+`ui.hpp` handles:
+```cpp
+extern u8g2gl_label& ui_departures_plat_label;
+extern u8g2gl_label& ui_departures_plat_num;
+extern wd_service_list& ui_departures_row0;
+extern u8g2gl_label& ui_departures_message_bar;
+extern wd_train_formation& ui_departures_formation;
+extern wd_service_list& ui_departures_services;
+extern u8g2gl_clock& ui_departures_sys_clock;
+```
+`ui.hpp` facades: `ui_departures_row0_rows`, `ui_departures_formation_carriages` and `ui_departures_services_rows`, each `extern const` with a `…_t` struct. For example:
+```cpp
+struct ui_departures_services_rows_t {
+    void begin() const;
+    bool add_row(const char* const* cells, size_t cells_count) const;
+    bool add_row(std::initializer_list<const char*> cells) const;
+    void commit() const;
+    size_t capacity() const { return 10; }
+};
+// and ui_departures_formation_carriages_t::add_row(int32_t number, const char* class_type, bool wheelchair, bool bike, int32_t loading_pct) const;
+```
+One instance's storage line, from `ui_screen_departures.cpp`, and its entry in §18 (`--json`):
+```
+// services <data name="rows">: 10 rows × 152 bytes (cells: 6 × string, 25 bytes each, max_len 24 + 1, at 0; padded to 4) = 1520 bytes
+alignas(4) static uint8_t ui_rows_services_rows[1520];
+```
+§18 reports the same block as `collection storage`, names `departures.services.rows`, count 10, measured at 1520 bytes, with the same derivation. `row0` (`max_rows="1"`) is 152 bytes and `formation` is 144. Q-19's example now holds: 1× and 10× the row's size.
+
+### Migrated widget copies
+
+Only one copy of each widget declares `<data>` in its C++: the departures fixture's, `cli/test/fixtures/departures-project/widgets/wd_service_list/` and `…/wd_train_formation/`. Both were migrated. Three other places use those copies or their manifests, and their XML is unchanged:
+- `test/collection_data` and `test/static_children` hold only the manifests;
+- `wasm/test/collection_reference.cpp` builds the widgets by hand, and now hands them storage.
+
+Two copies are untouched, as ruling 7 says: the 0.4 widget-probe fixture has no `<data>`, and G-PROBE-2's evidence copy is under `.agents/`.
+
+### Each golden's change
+
+**WO1, handles**
+- Each `ui.hpp` gains the class forward declarations and the handles. That is the emit-project, generated_fixture, large_font_guard, static_children, collection_data and both fill_guard fixtures.
+- Each of their screen units gains the handle definitions.
+- Editor goldens are unchanged.
+
+**WO2, storage**
+- Each screen unit with `<data>` gains `u8g2gl_rows.h`, its field table, layout, buffer and `attach_rows` call: collection_data, static_children, and both fill_guard fixtures.
+- Every `ui_scene.json` goes to version 5. Those with `<data>` also gain `storage`.
+- The fill_guard mismatch registry's field `max_len` changes from -1 to 8, because the fixture's string field gained `max_len="8"` so it can be sized.
+
+**WO3, facades**
+- The same four `ui.hpp`s gain `<cstddef>`, `<initializer_list>` and the facade declarations.
+- Their screen units gain the facade definitions.
+
+**WO4, versions**
+- Every `u8g2gl_generated_config.h` changes its runtime floor from 0.15.0 to 0.16.0, in both the `#error` text and `U8G2GL_REQUIRE_RUNTIME_AT_LEAST`.
+
+### Found outside scope
+
+- **The human §18 text report** (`cli/src/node/format-budget.ts`, outside the Boundary) prints each `collection storage` line's count and bytes, but not its name or derivation. Those are in `--json` and in the generated comment. A follow-up should print them.
+- **A stale comment** in `cli/src/core/parser/parse-widget-manifest.ts:293`, also outside the Boundary, still says Pass 8 refuses classed composites "until PR-08". It is a comment only, and was left as it is.
+- **The foundation's own widget copies** still keep their row arrays. That was out of scope; they need the same migration when foundation picks up runtime 0.16.
+
+### Deviations, and choices the rulings did not settle
+
+1. **Refusals for unsized storage.** A `<data>` with no `capacity`, and a count naming a prop that the instance leaves unset with no default, are refused with the same `U8G2GL_UNSIZED_DATA` code. So is the string with no `max_len` that ruling 2 names. A buffer cannot be sized without its capacity, so I read this as ruling 2's own reason. No current fixture is affected.
+2. **Where the unsized refusal is reported.** It is reported in Pass 9 at the refusal policy: a warning in `validate`, an error in `generate`, and so an error in the designer. Reported in `generate` alone, the designer would never show it.
+3. **The collision code** `U8G2GL_GENERATED_NAME_COLLISION` is an error in both journeys, as `U8G2GL_NAME_COLLISION` is. It checks:
+   - handles, facades and their types, against everything every unit sees;
+   - storage names, against the globals and their own screen.
+   There is no `ui_get_…` to check: the generator emits none.
+4. **Storage lives in the capacities.** `computeCapacities()` now takes `resolved` and `manifests` and carries `collections`. That way emission, the scene, §18 and the designer read one sizing, and `cli.ts`, which is outside the Boundary, needed no change.
+   - The designer's live pipeline had to pass them too, or its scene would carry no storage and the canvas would draw empty collections.
+   - Pass 9 calls the same pure layout function itself, to report.
+5. **The editor host reads its layout from the scene.** The editor target takes the layout from the scene (version 5) rather than recomputing it in C++. So both targets size from the one CLI module, and the layout algorithm exists once. Two small checked helpers were added to the editor runtime: `u8g2gl_editor_field_type()` and `u8g2gl_editor_rows_fit()`.
+6. **Facades for template children.** Facades and storage exist for every object with `<data>`, including one expanded from a composite's template, named by its joined name. Ruling 1 excludes template children only from handles. No fixture has such a collection.
+7. **The facade is stateless.** It forwards add_row and returns the widget's own refusal. For an access method returning `void`, `u8g2gl_row_added()` reports true, as the editor's fill thunk does. Both migrated widgets return `false` past capacity, and `add_row` returns `false` there. The facade's methods are `const` and the object is a `const` empty struct, so it costs no RAM.
+8. **The migrated widgets' sizing setters are no-ops.** `set_max_rows`, `set_max_cols`, `set_max_cell_chars` and `set_max_carriages` now do nothing, with doc comments saying so, because the props size the generated storage instead. `wd_train_formation::get_carriage()` now copies into an out-parameter, because there is no record array to point into. Nothing outside the widget called it.
+9. **`CMakeLists.txt` lists the new source.** I added `src/u8g2gl_rows.cpp` to `U8G2GL_RUNTIME_SOURCES`, which is plumbing the new type needs.
+10. **The pre-release stamp test.** `prerelease-version.test.ts`'s STABLE was `0.16.0`, which now equals the runtime floor, so its replace-and-compare also hit the floor. It now uses `0.99.0` and `0.99.0-beta.1`, with a comment.
