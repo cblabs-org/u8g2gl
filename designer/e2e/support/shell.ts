@@ -177,15 +177,28 @@ export async function dropTag(page: Page, tag: string, x: number, y: number): Pr
   // Palette is taller than the sidebar, and a drag cannot start off screen.
   const entry = page.locator(`.palette-tag[data-tag="${tag}"]`);
   await entry.scrollIntoViewIfNeeded();
-  const point = await devicePoint(page, x, y);
+  const canvas = page.locator('.canvas-frame canvas.frame');
+  const box = await canvas.boundingBox();
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
   const source = await entry.boundingBox();
   if (source === null) throw new Error(`<${tag}> is not in the Palette`);
+  if (box === null || size.width === 0) throw new Error('the frame canvas is not laid out');
   // The mouse, not dragTo: dragTo's target is an offset it rounds again, which
   // at 1× can land on the neighbouring device pixel. A drag event's position
-  // is whole screen pixels, so aim at the whole pixel inside the centre.
+  // is whole screen pixels, and the canvas maps a point to the device pixel
+  // floor((p − edge) / scale), so aim at a whole screen pixel inside the
+  // device pixel's span [edge, edge + scale): the one nearest its centre.
+  // Rounding the centre is not enough: at 1× it lies on x.5 and can round
+  // onto the next pixel, depending on where the layout put the canvas.
+  const inside = (start: number, scale: number, device: number): number => {
+    const from = start + device * scale;
+    const centre = from + scale / 2;
+    const below = Math.floor(centre);
+    return below >= from && below < from + scale ? below : Math.ceil(from);
+  };
   await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
   await page.mouse.down();
-  await page.mouse.move(Math.round(point.x), Math.round(point.y), { steps: 5 });
+  await page.mouse.move(inside(box.x, box.width / size.width, x), inside(box.y, box.height / size.height, y), { steps: 5 });
   await page.mouse.up();
 }
 

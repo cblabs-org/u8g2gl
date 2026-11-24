@@ -147,7 +147,7 @@ async function openView(page: Page): Promise<void> {
 async function createSet(page: Page, name: string): Promise<void> {
   await view(page).getByRole('button', { name: 'New…' }).click();
   await view(page).getByRole('form', { name: 'New set' }).getByRole('textbox').fill(name);
-  await view(page).getByRole('button', { name: 'Create' }).click();
+  await view(page).getByRole('button', { name: 'Create', exact: true }).click();
   await expect(view(page).getByRole('radio', { name: name })).toHaveAttribute('aria-checked', 'true');
 }
 
@@ -246,7 +246,7 @@ test('sets are created, duplicated, renamed and deleted in the view; delete asks
   await view(page).getByRole('radio', { name: 'typical' }).click();
   await view(page).getByRole('button', { name: 'Duplicate…' }).click();
   await view(page).getByRole('form', { name: 'Duplicate set' }).getByRole('textbox').fill('worst case');
-  await view(page).getByRole('button', { name: 'Create' }).click();
+  await view(page).getByRole('button', { name: 'Create', exact: true }).click();
   await expect.poll(() => session?.read('samples/worst case.json')).toBe(TYPICAL);
   await view(page).getByRole('button', { name: 'Rename…' }).click();
   await view(page).getByRole('form', { name: 'Rename set' }).getByRole('textbox').fill('busy');
@@ -258,7 +258,7 @@ test('sets are created, duplicated, renamed and deleted in the view; delete asks
   // A bad name is refused, saying why.
   await view(page).getByRole('button', { name: 'New…' }).click();
   await view(page).getByRole('form', { name: 'New set' }).getByRole('textbox').fill('../escape');
-  await view(page).getByRole('button', { name: 'Create' }).click();
+  await view(page).getByRole('button', { name: 'Create', exact: true }).click();
   await expect(view(page).getByRole('alert')).toContainText('cannot name a set');
 
   // Delete asks first; Cancel keeps the file, Delete removes it.
