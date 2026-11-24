@@ -534,7 +534,7 @@ bool u8g2gl_editor_draw(const u8g2gl_editor_drawing& drawing, U8G2& display, con
 /**
  * @brief A scene field's type, as the u8g2gl_field_type_t its layout uses.
  * @param name "int", "bool", "string" or "enum".
- * @param out  Receives the type; untouched when the name is none of them.
+ * @param out  Receives the type; must be non-null; untouched when the name is none of them.
  * @return false for any other name.
  */
 bool u8g2gl_editor_field_type(const char* name, u8g2gl_field_type_t* out);

@@ -95,8 +95,8 @@ export const MAX_OBJECTS_PER_SCREEN = 254;
  *                           they are positioned and clipped against.
  * - `typed_child_pointer` — its enclosing composite has a C++ class of its own,
  *                           whose generated code holds a typed member pointer to
- *                           it ([D-6] as [D-18] amends it). Refused until PR-08;
- *                           modelled here.
+ *                           it ([D-6] as [D-18] amends it). Refused until a
+ *                           later PR; modelled here.
  */
 export type RealisationReason =
   | 'class_backed'

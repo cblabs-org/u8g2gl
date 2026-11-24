@@ -46,6 +46,7 @@
  * Exports:
  * - ROW_ALIGNMENT:          The padding every row is rounded up to
  * - RowFieldType:           A field's type, one of the four a row carries
+ * - FieldShape:             A field's type and counts, before it is placed
  * - RowField, RowLayout:    One field placed in a row; the row's whole layout
  * - fieldBytes():           One repeat of a field, in bytes
  * - rowLayout():            Lay a row out from its fields
@@ -92,7 +93,7 @@ export interface RowLayout {
 }
 
 /** A field before it is placed: its type and its counts for one instance. */
-interface FieldShape {
+export interface FieldShape {
   readonly name: string;
   readonly type: RowFieldType;
   readonly repeat: number;
@@ -375,7 +376,7 @@ export function collectionStorage(input: CollectionStorageInput): CollectionStor
  * @brief How a block's bytes follow from its layout, as §18 prints it and the
  *        generated storage comment states it.
  *
- * `10 rows × 152 bytes (cells: 6 × string, 25 bytes each, at 0; padded to 4)`.
+ * `10 rows × 152 bytes (cells: 6 × string, 25 bytes each, max_len 24 + 1, at 0; padded to 4)`.
  *
  * @param storage A sized block.
  */

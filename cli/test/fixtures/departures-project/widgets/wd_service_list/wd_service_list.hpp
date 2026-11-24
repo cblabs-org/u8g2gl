@@ -21,6 +21,20 @@
  *
  * Exported Classes:
  * - wd_service_list: Table widget extending u8g2gl_obj.
+ *     Configuration:
+ *     - set_font():             Font for table cells
+ *     - set_max_rows/cols/cell_chars(): Size the generated storage; no effect at run time
+ *     - add_column(), clear_columns(): The <column> static children (§6.5)
+ *
+ *     Ingestion (§9.2):
+ *     - begin():                Reset the staging index for a batch
+ *     - add_row():              Stage one row of cells
+ *     - commit():               Publish the staged rows and request repaint
+ *     - capacity(), row_count(): The attached storage's rows; the committed count
+ *
+ *     Lifecycle (override):
+ *     - attach_rows():          Keep the view over the generated storage (§9.2)
+ *     - render():               Draw the committed rows in their columns
  */
 #ifndef WD_SERVICE_LIST_HPP
 #define WD_SERVICE_LIST_HPP

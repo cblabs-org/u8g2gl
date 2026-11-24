@@ -871,11 +871,54 @@ never to a drawing element or a composite; its `access` must be a C++ identifier
 Each rule is reported at the attribute at fault as
 `U8G2GL_INVALID_DATA_DECLARATION` (§15.3).
 
-Nothing in `<data>` reaches firmware. It is what lets the designer fill a widget
-by name with sample rows (§9.4, ui_spec §11), and what the editor build checks
-against the C++: the generated registry `static_assert`s that the declared
-fields can call the access method, so a manifest out of step with its widget
-fails the editor build, naming the widget and the data.
+**The row encoding.** A `<data>`'s row has a fixed byte layout, derived from its
+`<field>`s alone, in declaration order, each repeated `repeat` times (once when
+absent), its repeats contiguous:
+
+| `<field>` | Bytes per repeat | Aligned to |
+|---|---|---|
+| `type="string"` | `max_len + 1`, NUL-terminated, `max_len` resolved per instance | 1 |
+| `type="int"` | 4: an `int32_t` | 4 |
+| `type="bool"` | 1 | 1 |
+| `type="enum"` | 1: the value's index in `values` | 1 |
+
+The row is padded to 4 bytes. The service list above, with its defaults, is six
+cells of 25 bytes: 150, padded to a 152-byte row. The train formation's
+carriage is `number` at 0, `class_type` at 4, `wheelchair` and `bike` at 5 and 6,
+`loading_pct` aligned to 8: a 12-byte row. Because the layout follows from the
+manifest, the generator knows it exactly without assuming anything about a
+class's `sizeof` (§13.7). A `string` field with no `max_len`, a `<data>` with no
+`capacity`, or a count naming a prop the instance leaves unset with no default
+cannot be stored, and is `U8G2GL_UNSIZED_DATA`: a warning in `validate`, an
+error in `generate`, naming the widget, the `<data>` and the field.
+
+**The storage is the framework's** ([Q-19], closed by PR-08). A collection widget
+declares no row arrays of its own. The generator allocates one buffer per
+instance per `<data>`, capacity × row bytes from that instance's props, and
+hands it to the widget at init, after its setters and static children, through
+`u8g2gl_obj::attach_rows(index, rows)` — `index` the `<data>`'s declaration
+index, `rows` a `u8g2gl_rows`, a non-owning view over the buffer and its
+generated `constexpr` layout, with a typed accessor per field and repeat index
+and the capacity in rows. The default `attach_rows()` does nothing. A widget
+keeps the view, writes rows in place from its access method and publishes the
+count at `commit()`; with no view attached its capacity is 0 and its access
+method returns `false`. The editor target allocates the same size when it
+builds the instance, from the layout the scene carries, and frees it with the
+scene, so both targets size from one layout. Both departures widgets are
+written this way.
+
+**The handle and the facade.** Every named object a screen writes gets a handle
+in `ui.hpp`, `extern wd_service_list& ui_departures_services;` (§9.2, §13.7), and
+each `<data>` on each instance a generated collection facade,
+`ui_departures_services_rows`, whose typed `add_row()` takes the fields above in
+declaration order. An application fills a collection through the facade, never
+by reaching for the object.
+
+The fields are also what lets the designer fill a widget by name with sample
+rows (§9.4, ui_spec §11), and what the editor build checks against the C++: the
+generated registry `static_assert`s that the declared fields can call the
+access method, so a manifest out of step with its widget fails the editor
+build, naming the widget and the data.
 
 **An element may have a `<view>`, C++, or both.** A widget that declares both
 gets its children built from the `<view>` and its behaviour from its class,
@@ -981,8 +1024,8 @@ also declare their `<data>`.
 
 | Example | What it demonstrates |
 |---|---|
-| [`wd_service_list`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_service_list/) | §9's declared-capacity collection — the manifest, the `begin()`/`add_row()`/`commit()` API, static storage, no heap. **Read [Q-19] first:** its storage is fixed at the manifest's defaults because §9.2's *generated* capacity does not exist, so it is the reference for what an author must hand-write today rather than for what §9.2 describes |
-| [`wd_train_formation`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/evidence/probe-project/widgets/wd_train_formation/) | Pixel arithmetic that belongs in C++ — twelve carriages, per-carriage indicators, proportional fill gauges. The case this section's "reach for C++" rule exists for |
+| [`wd_service_list`](../cli/test/fixtures/departures-project/widgets/wd_service_list/) | §9's declared-capacity collection — the manifest, the `begin()`/`add_row()`/`commit()` API, its rows in the generated storage it is handed through `attach_rows()` (§9.2), no heap. (G-PROBE-2's evidence copy predates generated storage and keeps its own arrays, which [Q-19] retired) |
+| [`wd_train_formation`](../cli/test/fixtures/departures-project/widgets/wd_train_formation/) | Pixel arithmetic that belongs in C++ — twelve carriages, per-carriage indicators, proportional fill gauges. The case this section's "reach for C++" rule exists for. Its carriages, too, live in generated storage |
 
 The full screen they compose is
 [`WIDGET-PATH.md`](../.agents/skills/principal-architect-workspace/g-probe2-widgets/WIDGET-PATH.md):
@@ -1215,43 +1258,79 @@ The widget retained a pointer into a stack frame that died on return, and the ce
 
 ### 9.2 The v0.2 Model — Declared Capacity, Framework Storage
 
-The widget declares its capacity in XML. The generator allocates the storage statically, emits a typed API, and reports the RAM cost.
+The widget declares its capacity in XML. The generator allocates the storage
+statically, emits a typed API, and reports the RAM cost. Built by PR-08; the names
+below are the generator's own, for the departures fixture.
 
 ```xml
-<wd_service_list name="departures"
-    max_rows="16" max_cols="6" max_cell_chars="24" ... />
+<wd_service_list name="services" ... max_rows="10" />
 ```
 
 ```cpp
 // generated/ui.hpp — emitted from the XML above
-class ui_departures_rows {
-public:
-    void begin();                                  // clear, start a batch
-    bool add_row(std::initializer_list<const char*> cells);
-    bool add_row(const char* const* cells, size_t n);
-    void commit();                                 // publish; marks dirty
-    size_t capacity() const { return 16; }
+class wd_service_list;
+...
+extern wd_service_list& ui_departures_services;     // the element's handle
+
+// services <data name="rows">: begin(), add_row() per row (the widget's add_row()), commit() (§9.2)
+struct ui_departures_services_rows_t {
+    void begin() const;
+    bool add_row(const char* const* cells, size_t cells_count) const;
+    bool add_row(std::initializer_list<const char*> cells) const;
+    void commit() const;
+    size_t capacity() const { return 10; }
 };
-extern ui_departures_rows ui_departures;
+extern const ui_departures_services_rows_t ui_departures_services_rows;
+```
+
+```cpp
+// generated/ui_screen_departures.cpp — the storage, sized for this instance
+// services <data name="rows">: 10 rows × 152 bytes (cells: 6 × string, 25 bytes each, ...) = 1520 bytes
+static constexpr u8g2gl_rows_field ui_rows_services_rows_fields[] = {
+    {0, 25, 6, U8G2GL_FIELD_STRING},  // cells
+};
+static constexpr u8g2gl_rows_layout ui_rows_services_rows_layout = {ui_rows_services_rows_fields, 152, 1};
+alignas(4) static uint8_t ui_rows_services_rows[1520];
+...
+    // in init, after the setters and the static children:
+    ui_obj_services.attach_rows(0, u8g2gl_rows(ui_rows_services_rows, 10, &ui_rows_services_rows_layout));
 ```
 
 ```cpp
 // user controller
-ui_departures.begin();
+ui_departures_services_rows.begin();
 for (const auto& svc : services) {
-    ui_departures.add_row({ svc.platform, svc.time, svc.dest, svc.coaches, svc.status });
+    ui_departures_services_rows.add_row({ svc.time, svc.dest, svc.platform, svc.status });
 }
-ui_departures.commit();
+ui_departures_services_rows.commit();
 ```
+
+- **The handle.** Every named object written in a screen is reachable as
+  `ui_<screen>_<element>`, a typed reference `ui.hpp` declares and the screen's unit
+  binds to its `static` object; the object itself stays `static`. A drawing element
+  has no object and no handle, and an element expanded out of a composite's template
+  is not written in the screen and gets none. The class is forward-declared, so
+  `ui.hpp` still includes no widget header.
+- **The facade.** Each `<data>` on each instance gets `ui_<screen>_<element>_<data>`,
+  a `const` object of type `…_t` whose `begin()`, `add_row(…)` and `commit()` forward
+  to the widget's own `begin()`, declared access method and `commit()`, and whose
+  `capacity()` is the instance's declared capacity. `add_row`'s parameters are the
+  `<field>`s in declaration order, typed exactly as the editor's fill thunk passes
+  them (§6.5); a repeated field is a pointer and a count, with an
+  `std::initializer_list<const char*>` overload beside it. The facade adds no state
+  and no RAM.
+- **The storage** is §6.5's row encoding, allocated per instance per `<data>` as
+  capacity × row bytes and handed to the widget through `attach_rows()`.
 
 **Properties of this design:**
 
-- **No lifetime hazard.** `add_row` copies each cell into the framework's buffer. The caller's strings may be transient.
-- **Bounded and visible.** `16 × 6 × 24 = 2304 bytes`, declared in XML, reported by the build (§18). No hidden allocation, no heap.
+- **No lifetime hazard.** `add_row` copies each field into the framework's buffer. The caller's strings may be transient.
+- **Bounded and visible.** `10 × 152 = 1520 bytes` for `max_rows="10"`, and `152` for `max_rows="1"`, declared in XML, reported by the build (§18). No hidden allocation, no heap.
 - **Declared, not capped.** The defaults suit the baseline; they are not limits. A project on a part with room to spare may declare `max_rows="500"` and the framework neither knows nor cares — it allocates what was asked for and reports the cost ([D-1]).
-- **Overflow is explicit.** `add_row` returns `false` past capacity rather than corrupting memory; the CLI can also warn when a screen's declared capacity exceeds a configured RAM budget.
+- **Overflow is explicit.** `add_row` returns `false` past capacity rather than corrupting memory: the widget refuses a row its storage has no room for, and the facade returns that refusal. The CLI can also warn when a screen's declared capacity exceeds a configured RAM budget.
 - **No inverted dependency.** `globals.xml` knows nothing about widget internals. v0.1's `<data name="departures" type="wd_service_list_data" />` made the global subject registry depend on a widget's private header.
-- **Atomic.** `begin`/`commit` bracketing means the widget never renders a half-populated table.
+- **Atomic.** `begin`/`commit` bracketing means the widget never renders a half-populated table: one buffer, written in place, the count published at `commit()`.
+- **Checked names.** A handle or facade is composed from two author-written names, so two can meet where no written name does (screen `a_b`'s element `c` and screen `a`'s element `b_c`); that, or a composed name meeting one of §13.4's, is `U8G2GL_GENERATED_NAME_COLLISION`, an error naming both sources.
 
 ### 9.3 Zero-Copy Escape Hatch — *Deferred*
 
@@ -1269,15 +1348,17 @@ The editor bridge's `applyCollectionData()` takes
 field name, and checks every row before any widget is called: more rows than the
 instance's capacity are refused naming the element and the capacity (as `add_row`
 returns `false` on the device), and a bad row naming the element, the row index
-and the field. A widget whose storage is smaller than its declared capacity
-([Q-19]) refuses a row itself; the rows it took stay, as on the device, and the
+and the field. A widget that refuses a row itself (its access method returns
+`false`) stops the fill there; the rows it took stay, as on the device, and the
 call says so. The live loop applies the rows after every scene, as it applies
 sample values; sample sets and the per-set test run are §9.6's.
 
-**PR-08 still owns the firmware ingestion API.** §9.2's *generated* typed API
-(`ui_departures_rows`) and generated storage are not part of this path. A widget
-keeps its hand-written `begin()`/`add_row()`/`commit()`, and firmware compiles
-none of the registry: the fill path is editor target only ([UD-4]).
+**The firmware ingestion API is §9.2's facade** (PR-08). The fill path is editor
+target only ([UD-4]): firmware compiles none of the registry, and fills a
+collection through its generated `ui_<screen>_<element>_<data>` facade instead.
+Both reach the same widget methods with the same argument types, and the widget's
+rows live in storage the editor host allocates from the scene exactly as firmware
+allocates it (§6.5).
 
 ### 9.5 The editor's fonts and images: injection
 
@@ -1328,38 +1409,29 @@ void ui_sample_set_0() {
     ui_set_platform("4");
     ui_set_box_fill(int32_t{3});
     {  // departures.formation: carriages, 1 row
-        wd_train_formation* obj = static_cast<wd_train_formation*>(ui_screen_departures.objs[4]);
-        obj->begin();
-        obj->add_carriage(int32_t{1}, static_cast<const char*>("first"), false, false, int32_t{40});
-        obj->commit();
+        ui_departures_formation_carriages.begin();
+        ui_departures_formation_carriages.add_row(int32_t{1}, static_cast<const char*>("first"), false, false, int32_t{40});
+        ui_departures_formation_carriages.commit();
     }
     {  // departures.services: rows, 1 row
-        wd_service_list* obj = static_cast<wd_service_list*>(ui_screen_departures.objs[5]);
-        obj->begin();
+        ui_departures_services_rows.begin();
         static const char* const row_0_cells[] = {"10:15", "Reading", "3", "On time"};
-        obj->add_row(row_0_cells, size_t{4});
-        obj->commit();
+        ui_departures_services_rows.add_row(row_0_cells, size_t{4});
+        ui_departures_services_rows.commit();
     }
 }
 ```
 
 - **Scalars** go through `ui_set_<subject>(value)`.
-- **A collection** is reached through `ui_screen_<s>.objs[i]` — the generated objects
-  are `static` in each screen's unit, and nothing else names them — cast to its
-  class, and filled with `begin()`, the `<data>`'s declared access method per row,
-  and `commit()`: the widget's own hand-written ingestion API. Arguments are typed
-  as the registry's fill thunk passes them (`int32_t`, `bool`, `const char*`, and a
-  repeated field as `const char* const*` and `size_t`), so overload resolution is
-  the same in both halves.
-- **`i`** is the element's `object` index in the scene generated with the firmware
-  code: the realiser's document-order index, which the generator emits `objs` in.
-- **The guard.** Before writing the unit, the stage reads each screen's generated
-  `ui_screen_<s>_objs[]` table and holds every staged index to it: entry `i` must be
-  `&ui_obj_<element>`. A drift refuses the run (`U8G2GL_TEST_RUN_SAMPLES`), naming
-  the index, what the table holds there and what was expected, so an index drift
-  fails loudly instead of filling the wrong widget. A unit test proves the
-  departures fixture's every collection resolves to its own entry and that a table
-  with two entries swapped is refused.
+- **A collection** goes through its generated facade (§9.2),
+  `ui_<screen>_<element>_<data>`: `begin()`, `add_row()` per row and `commit()`,
+  which forward to the widget's own `begin()`, declared access method and
+  `commit()`. Arguments are typed as the facade declares them, which is how the
+  registry's fill thunk passes them (`int32_t`, `bool`, `const char*`, and a
+  repeated field as `const char* const*` and `size_t`), so both halves call the
+  widget's method the same way. The facade is named, not indexed, so the unit
+  needs no object index and no guard against one drifting: the `objs[i]` route
+  and its guard retired with PR-08.
 - **Wiring.** The unit also defines `u8g2gl_harness_apply_sample_set()` and the
   harness exports that choose a set (`selectSampleSet()`, `getSampleSetCount()`,
   `getSampleSetName()`). `wasm/harness.cpp` makes one call to it, after `ui_init()`
@@ -1369,7 +1441,7 @@ void ui_sample_set_0() {
 **The editor half** applies the same set as the canvas does, through
 `applySampleData()` and `applyCollectionData()`, so the two halves are given the
 same data and fill it by different routes: the editor through its registry's fill
-thunk, the firmware through the widget's own methods. The designer sends each set
+thunk, the firmware through the generated facade. The designer sends each set
 as it applies it — its checked values, and its rows by screen name, element and
 data name — so a set's problems (ui_spec §11.1) are left out of both halves alike.
 
@@ -1382,10 +1454,10 @@ fixture across its four conventional sets, and that each set's frame draws what 
 holds (empty services are blank, the worst case's are fuller than typical's), so
 two blank frames cannot pass by agreeing.
 
-**PR-08 still owns the firmware ingestion API.** The staged unit is test-run
-plumbing, never part of the firmware target or of `generate`'s output: an
-application still fills a widget through its own `begin()`/access/`commit()`, and
-§9.2's generated typed API (`ui_departures_rows`) remains PR-08's.
+**The staged unit takes the facade route an application takes.** It is test-run
+plumbing, never part of the firmware target or of `generate`'s output, and it
+fills each collection exactly as an application does: through §9.2's generated
+facade, which `generate` does emit.
 
 **`measureText(font, text)`**, a bridge export (editor target only), gives a
 string's width in pixels from U8G2's own `getUTF8Width()` in a loaded font, so the
@@ -2062,7 +2134,7 @@ concrete elements.
 
 Per screen, one `.cpp`. Plus one `ui.hpp` umbrella; one unit each for subjects, fonts, images and styles (`ui_styles.cpp`); and `ui.cpp`, which holds `ui_init()` and the frame-dirty observers. There is one observer per subject rather than per screen (§13.5), so they can't live in a screen's unit.
 
-**The editor target emits different units from the same build** ([UD-4], §13.1). `generate --target-kind editor` writes the designer's class registry (`ui_editor_registry.cpp`) and a scene description (`ui_scene.json`) into `<output dir>_editor` by default, in place of the firmware units. `--target-kind firmware` is the default. The scene description carries a format version — 2 as of PR-04, which added the bound origin; 3 added a draw call's clip; 4 (schema 0.7) an object's `static_children` — so the designer can refuse a description it doesn't understand instead of misreading one.
+**The editor target emits different units from the same build** ([UD-4], §13.1). `generate --target-kind editor` writes the designer's class registry (`ui_editor_registry.cpp`) and a scene description (`ui_scene.json`) into `<output dir>_editor` by default, in place of the firmware units. `--target-kind firmware` is the default. The scene description carries a format version — 2 as of PR-04, which added the bound origin; 3 added a draw call's clip; 4 (schema 0.7) an object's `static_children`; 5 (PR-08) an object's `storage`, each `<data>`'s capacity and row layout as the generator laid it out — so the designer can refuse a description it doesn't understand instead of misreading one. The editor host allocates each `storage` block with the scene's objects, hands the widget its view after the static children, and frees it with the scene.
 
 **The registry's entries per class** (`include/u8g2gl/u8g2gl_editor.h`): construct-by-name, the rectangle, one set-by-name thunk per setter prop, one bind-by-name thunk per `<bind>` per subject type, one add-by-name thunk per `<element>` (a static child's access call, §6.5), and one fill entry per `<data>` (`u8g2gl_editor_data`, §9.4), `nullptr` when the class declares none. A fill entry carries each field's rules (type, an int's bounds, an enum's values, a repeated string's count and `max_len`), the capacity as a literal or an instance prop, and the thunk; `u8g2gl_editor_fill()` checks every row's cells against the fields before calling it. Beside each fill entry the generated unit `static_assert`s, with `std::is_invocable_v` over a SFINAE-friendly generic lambda, that the declared fields can call the access method, so a manifest that disagrees with its C++ fails the editor build with a message naming the widget and the data. Both targets are generated from the same validated project, and a parity test renders each and compares the draw calls one for one. That equality is what entitles the designer's canvas to call itself pixel-exact ([D-9]). The `--json` contract ([D-16]) reports the emitted paths for whichever target ran.
 
@@ -2073,6 +2145,8 @@ void ui_screen_home_deactivate();  // leaving
 uint32_t ui_screen_home_tick(uint32_t ms);   // returns next deadline ([D-15])
 void ui_screen_home_render(U8G2& d);         // draw, document order
 ```
+
+**Handles, storage and facades** (§9.2, PR-08). `ui.hpp` declares, beside each screen's functions, a typed reference `extern <class>& ui_<screen>_<element>;` to every named object written in the screen (its class forward-declared, so `ui.hpp` includes no widget header), and for each `<data>` on each instance a facade type `ui_<screen>_<element>_<data>_t` and its `const` object. The screen's unit binds each handle to its `static` object, declares each collection's storage — a `constexpr u8g2gl_rows_field` table, a `constexpr u8g2gl_rows_layout` and an `alignas(4) static uint8_t ui_rows_<element>_<data>[capacity × row bytes]` (§6.5's encoding), a block of no bytes having no buffer — and defines each facade's methods, which forward to the widget's `begin()`, access method and `commit()`. In the "set properties" step, after an object's setters and static children, it calls `attach_rows(<data index>, u8g2gl_rows(buffer, capacity, &layout))` once per sized block. Every composed name — handle, facade object and type, storage buffer, layout and field table — is checked against §13.4's table and each other (`U8G2GL_GENERATED_NAME_COLLISION`).
 
 `init` is ordered: construct → apply styles → set properties → register bindings → wire events → build the focus ring. Styles come before properties so that **an element's own attributes win over a named style** (§10). Bindings are registered last so no observer fires against a partly configured object.
 
@@ -2585,15 +2659,28 @@ u8g2gl 0.2.0 — target 'default' (SSD1322 256x64)
     framebuffer (256x64)              2.0 KB   <- derived from u8g2_m_32_8_f
     widget instances (9)              0.4 KB
     subjects (6, incl. 2 strings)     0.1 KB
-    wd_service_list capacity          2.3 KB   ← 16 rows x 6 cols x 24 chars
+    collection storage (10)           1520 B   ← departures.services.rows:
+                                                  10 rows × 152 bytes (cells:
+                                                  6 × string, 25 bytes each, ...)
                                     --------
-                                      4.8 KB
+                                      4.0 KB
 
   warning: screens/screen_home.xml:12 — wd_service_list capacity is 2.3 KB,
            48% of this target's declared RAM budget (--ram-budget=4800)
 ```
 
 Figures come from the linker map for a reference build, the statically declared capacities, and — for the framebuffer — the exact tile dimensions in U8G2's buffer allocator ([D-14]). **They are indicative until measured**, and establishing real numbers is a Phase 1 deliverable.
+
+**Collection storage is reported exactly, per instance** ([Q-19], PR-08). Each
+`<data>` of each instance is one `collection storage` line naming
+`screen.element.data`, its count the instance's capacity in rows, and its figure
+the bytes of the buffer the generator declares for it — capacity × row bytes from
+§6.5's encoding — with the derivation: `10 rows × 152 bytes (cells: 6 × string,
+25 bytes each, max_len 24 + 1, at 0; padded to 4)`. The figure is read from the
+same capacities the screen unit sizes the buffer from, so the report and the
+buffer cannot disagree; a host test (`test/test_storage_sizeof.cpp`) holds one
+fixture's figure to `sizeof` of its generated buffer. It is the buffer's size, not
+the widget's: a widget instance's own `sizeof` stays unmeasured (§13.7).
 
 **`fonts (builtin)` carries no figure, and that is deliberate.** A `<builtin>` declaration emits a reference to a symbol U8G2 already provides (§22.1); whether it adds a single byte depends on whether the firmware links that font anyway, and the linker decides. Attributing a number to it would be exactly the kind of claim §1.3 forbids, so the line is reported as present-but-unmeasured rather than guessed at or silently omitted. `fonts (compiled bdf)` and `image data (bitmap arrays)` are measured, because U8G2GL emits those arrays itself and knows their size.
 
@@ -2765,7 +2852,7 @@ Re-scoped from v0.1. The largest change: the Wasm renderer moves from Phase 3 to
 | **Q-13** | **`$prop` interpolation inside text.** A whole-value `$name` substitutes; `text="Hi $who"` does not, and is a hard error as of PR-04 (WO7b) rather than passing `$who` through to generated output. Interpolation is additive, so §1.5 applies: defer until a real composite needs a composed string, then decide at the next schema bump | Next schema bump |
 | **Q-14** | **Send only dirty tiles.** [D-4]'s redraw stays full-frame. The question is whether to *send* only the tiles covered by the union of dirty object bounds, including each moved or hidden object's previous bounds, using U8G2's `updateDisplayArea()`. Measure bus time per frame, whole buffer against dirty tiles only, on I²C and on SPI, for one real departures-board screen. Adopt it only if the saving matters. **SPI half answered:** SPI (SSD1322, 10 MHz) measured 2026-10-13: full frame 11.8 ms, one label's tiles 4.4 ms; the saving is material above roughly 10 frames/s. **I²C open.** U8G2 can also cap how many tiles go out per call, which fits `ui_handler()`'s cooperative scheduling ([D-15]). Prior art: UiUiUi ([concept.md §4.2](concept.md)) | Q-4 / Phase 1 exit |
 | **Q-15** | **A "cards" element** — one container showing exactly one of its children, chosen by an integer subject, equivalent to UiUiUi's `UICards`. Today this takes `bind_flag_if` on every child, which is clumsy. It would switch between modes or pages within one region of a screen — the mechanism a carousel would drive. It is *not* a modal: modals need overlays and z-order beyond document order, which ui_spec §7.3 excludes, and a cards element needs neither. It would be a *mechanism*. Carousel *policy* stays in `modules/U8G2GLDisplay`, as ui_spec §7.3 already rules. It adds schema surface, so §1.5 applies: defer until E-3's navigation design or a departures-board carousel actually needs it | E-3 |
-| **Q-19** | **Generated storage and reporting for collection widgets.** §9.2 says the generator "allocates the storage statically, emits a typed API, and reports the RAM cost" for a declared-capacity widget, and shows `generated/ui.hpp` emitting `ui_departures.add_row()`. **None of the three exists** — measured by G-PROBE-2 (2026-10-18), which built §9.2's own `wd_service_list` example for real. `generated/ui.hpp` emits no collection accessor at all; the widget hand-writes `begin()`/`add_row()`/`commit()` on its own class; and its storage is fixed at the manifest's **defaults**, so two instances declaring `max_rows="1"` and `max_rows="10"` each carry **2,304 bytes** where the declarations imply 144 and 1,440. [D-21]'s generated capacities do not reach project widgets, so §18 cannot report the cost, and the manifest's own `help="Determines allocated RAM"` is therefore false — which §1.3 treats as worse than silence, and [UD-5] will put straight into the designer's property panel. **Not a blocker:** an author can hand-write the storage and did. But it is a specified capability that does not exist, and the gap is invisible until someone measures RAM *E-D ruling, 2026-10-26 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §7):* Q-19 stays Phase 2, under the gate's condition 2. E-2 inherits a rule meanwhile: **the panel shows a memory cost only where §18 can compute one**, so project widgets' capacity props get a muted *RAM cost not reported* line and never a figure. | Phase 2 |
+| **Q-19** | **Generated storage and reporting for collection widgets.** ~~§9.2's generated storage, typed API and RAM report did not exist; a collection widget carried its manifest defaults' storage (2,304 bytes for a service list whatever its `max_rows`) and §18 could not report it.~~ **Closed 2026-11-24 by PR-08.** A `<data>`'s row has a fixed layout derived from its fields (§6.5); the generator allocates capacity × row bytes per instance from that instance's props and hands it to the widget through `u8g2gl_obj::attach_rows()` and `u8g2gl_rows`; §18 reports each instance's storage exactly, with its derivation; firmware fills it through the generated facade `ui_<screen>_<element>_<data>` (§9.2). Two service lists declaring `max_rows="1"` and `max_rows="10"` now cost 152 and 1,520 bytes. The manifest's `help="Determines allocated RAM"` is true, and the designer's panel states the figure for a widget with `<data>`; a project widget without `<data>` keeps the muted *RAM cost not reported* line. | **Closed** (PR-08) |
 | **Q-18** | **Arduino IDE packaging.** The runtime ships as a PlatformIO library; the Arduino one is deferred (§16). Arduino 1.5 compiles only `src/`, and the public headers are in `include/u8g2gl/`. Options: relocate the headers (breaks the CMake and PlatformIO layout), carry a forwarding include path (a second path to keep in step), or **build a flattened release artefact** — the recommendation, because it leaves the working layout alone. Not urgent: there are no Arduino users yet. But [D-11] commits `generated/` *for* that audience, so deferring it indefinitely would quietly drop the reason `generated/` is in the repository at all. **Trigger:** after the PR-07 gate, or the first Arduino IDE user | After PR-07 |
 | **Q-17** | **Manifest diagnostics locate at the element, not the attribute.** **CLOSED by E-1b (PR #24, merged 2026-10-28):** every attribute now carries a name range and a value range from the CST, and the manifest diagnostics below report at the attribute — eight cases moved from the `<widget>` tag, with `U8G2GL_DRAWING_ELEMENT_EXTENDS` at the attribute's name, since the fix is to delete it. The `<bind>` refusals stay at the `<bind>` tag, which is the element at fault. The original question follows. An `extends` that names an unknown element, a drawing element or a cycle, and a `<bind>` refused by §13.1, all report at the `<widget>` tag rather than the attribute at fault. §15.1 requires **file, line and column** and the offending text, and §1.2 makes diagnostics the product rather than polish, so this is the spec unmet rather than a nicety. It needs the manifest parser to record attribute locations, which it does not today. Found by PR-4R3's PA (2026-10-06); it does not block PR-05, and the editor will feel it hardest — a property panel that can only say "something in this manifest" is not much of a panel. **Trigger:** the next PR that touches the manifest parser, or E-1, whichever comes first *E-D ruling, 2026-10-26 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §7):* **E-1b closes it.** E-1b gives every attribute a name range and a value range from the CST and passes them to the manifest parser's diagnostics; its acceptance requires every diagnostic listed here to report the attribute's column. | **Closed** |
 | **Q-16** | **Children that follow their container.** Schema 0.4 forbids children inside a container whose position is bound (§7.2), because children's positions are fixed at build time. That rules out sliding panels and carousels — the very cases where you'd bind a container's position. Lifting it needs no layout pass: the runtime already walks each object's ancestors every frame for clipping and visibility ([A-3]), and adding up the ancestors' origins in that same walk would move children with their parent. That's translation, not layout, so [D-7] and [D-20] still hold. It touches every render path, so it waits until a real screen needs it — probably alongside Q-15 in E-3 | E-3 |

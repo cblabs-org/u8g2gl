@@ -245,9 +245,9 @@ describe('realisation — the rule is evaluated whole, not short-circuited', () 
     expect(byIdentifier(result, 'btn').reasons).toContain('event');
   });
 
-  it("records a composite's typed child pointer, a condition PR-08 has not enabled yet", () => {
+  it("records a composite's typed child pointer, a condition a later PR enables", () => {
     // A composite that also declares a C++ class of its own holds typed member
-    // pointers to its children ([D-6] as [D-18] amends it). Refused until PR-08,
+    // pointers to its children ([D-6] as [D-18] amends it). Refused until a later PR,
     // and modelled here so the reason is true the day it is allowed.
     const classed = composite(
       'fancy_bar',

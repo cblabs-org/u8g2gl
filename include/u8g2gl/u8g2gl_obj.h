@@ -490,12 +490,12 @@ public:
      * block, after the setters and the static children, before any binding;
      * the editor host does the same with storage it allocates per scene. A
      * widget keeps the view and reads and writes its rows through it; with
-     * none attached it has no rows, and its access method returns false.
+     * none attached it has no rows, and its access method returns false. The
+     * default does nothing: an element with no `<data>` has nothing to keep.
      *
      * @param data_index The `<data>`'s index in its manifest's declaration order.
      * @param rows       The view; the storage it names outlives the object.
      *                   Keep a copy, not the reference.
-     * The default does nothing: an element with no `<data>` has nothing to keep.
      */
     virtual void attach_rows(uint8_t data_index, const u8g2gl_rows& rows);
 

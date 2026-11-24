@@ -399,6 +399,10 @@ bool u8g2gl_editor_draw(const u8g2gl_editor_drawing& drawing, U8G2& display, con
 
 // --- Collection storage (§9.2) ---
 
+// u8g2gl_editor_field_type
+// A scene field's type name looked up in the four a row carries.
+//   name — the scene's `type`, or nullptr
+//   out  — receives the type; written only on a match
 bool u8g2gl_editor_field_type(const char* name, u8g2gl_field_type_t* out) {
     if (name == nullptr) {
         return false;

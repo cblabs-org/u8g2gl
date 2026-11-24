@@ -17,8 +17,9 @@
  *          `ui.hpp` declares a facade (`facadeDeclaration()`) and the screen
  *          unit that owns the object defines it (`facadeDefinition()`); both
  *          spell its signatures from the one model here, so a declaration and
- *          its definition cannot disagree. The parameter types are E-3a's fill
- *          thunk's (`field-types.ts`): one convention, not two.
+ *          its definition cannot disagree. The parameter types are the editor
+ *          registry's fill thunk's (`editor-registry.ts`, §9.4), from
+ *          `field-types.ts`: one convention, not two.
  *
  * Description: `add_row()` takes the fields in declaration order: an `int` as
  *              `int32_t`, a `bool` as `bool`, a `string` or `enum` as

@@ -74,14 +74,13 @@ export interface TestRunSampleSet {
 interface SceneObject {
   readonly name: string;
   readonly tag: string;
-  readonly object: number;
 }
 
 /** What the unit is written against: the project the harness was generated from. */
 export interface SampleStage {
   /** The subjects, by name, with their types. */
   readonly subjects: ReadonlyMap<string, SubjectType>;
-  /** The manifests: a class's `<data>` and its header. */
+  /** The manifests: a class's `<data>`. */
   readonly manifests: ManifestRegistry;
   /** Each screen's objects in the scene, by screen name. */
   readonly objects: ReadonlyMap<string, readonly SceneObject[]>;
@@ -136,8 +135,8 @@ export function readSampleStage(projectRoot: string, sceneJson: string): SampleS
     objects.set(
       screen.name,
       (screen.elements ?? []).flatMap((e): SceneObject[] =>
-        e.realisation === 'object' && typeof e.name === 'string' && typeof e.tag === 'string' && typeof e.object === 'number'
-          ? [{ name: e.name, tag: e.tag, object: e.object }]
+        e.realisation === 'object' && typeof e.name === 'string' && typeof e.tag === 'string'
+          ? [{ name: e.name, tag: e.tag }]
           : [],
       ),
     );

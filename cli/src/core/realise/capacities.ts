@@ -39,8 +39,8 @@
  *              `<data>` of every object, sized per instance as capacity × row
  *              bytes by `collection-storage.ts`, the one module that lays a row
  *              out. Carried here so the firmware emitter, the scene and §18
- *              all read the figures from the same capacities, never sizing a
- *              block twice. A block that cannot be sized is left out; Pass 9
+ *              all read the figures from the same capacities, never laying a
+ *              block out twice. A block that cannot be sized is left out; Pass 9
  *              reports it, and `generate` refuses the build.
  *
  *              Deterministic: subjects in declaration order, styles in

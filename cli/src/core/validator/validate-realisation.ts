@@ -10,8 +10,9 @@
  *          §13.3's 254-object ceiling; and the refusals it raises must reach the
  *          authoring journey as warnings rather than surfacing for the first
  *          time when `generate` refuses the build (PR-04 decision 1).
- * Description: Four checks, all reading one realisation of the run's shared
- *              model — never a second analysis of its own.
+ * Description: Four checks, all reading the run's shared model — its one
+ *              realisation, expansion and resolution — never a second
+ *              analysis of its own.
  *
  *              **The object ceiling.** `parent_index_` is a `uint8_t` and
  *              `U8G2GL_NO_PARENT` consumes one of its values ([A-3], [D-21]), so

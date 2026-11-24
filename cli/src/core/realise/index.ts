@@ -27,10 +27,11 @@
  *   RealisedElement, DrawStep, RealisedScreen, RealisationResult (model.ts)
  * - realiseScreens, walkRealised, RealiseInput (realise.ts)
  * - computeCapacities, Capacities, CapacitiesInput, SubjectObservers (capacities.ts)
- * - ROW_ALIGNMENT, RowFieldType, RowField, RowLayout, fieldBytes, rowLayout,
+ * - ROW_ALIGNMENT, RowFieldType, FieldShape, RowField, RowLayout, fieldBytes, rowLayout,
  *   CollectionStorage, CollectionStorageInput, CollectionStorageResult,
  *   collectionStorage, storageDerivation (collection-storage.ts)
- * - elementHandleIdentifier, collectionFacadeIdentifiers, storageIdentifiers, handledElements, generatedNames, checkGeneratedNames,
+ * - elementHandleIdentifier, collectionFacadeIdentifiers, storageIdentifiers,
+ *   handledElements, generatedNames, checkGeneratedNames,
  *   GeneratedName, GeneratedNamesInput (handles.ts)
  */
 
@@ -71,6 +72,7 @@ export {
   collectionStorage,
   storageDerivation,
   type RowFieldType,
+  type FieldShape,
   type RowField,
   type RowLayout,
   type CollectionStorage,

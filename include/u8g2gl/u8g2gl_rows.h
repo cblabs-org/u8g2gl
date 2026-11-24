@@ -34,11 +34,11 @@
  *              and the view owns nothing.
  *
  * Exported Classes:
- * - u8g2gl_row_added():  (template) Whether an access call took its row, for the
- *                        generated collection facade
- * - u8g2gl_field_type_t: A field's type
- * - u8g2gl_rows_field:   One field's place in a row
- * - u8g2gl_rows_layout:  A row's fields and its size
+ *     Layout:
+ *     - u8g2gl_field_type_t: A field's type
+ *     - u8g2gl_rows_field:   One field's place in a row
+ *     - u8g2gl_rows_layout:  A row's fields and its size
+ *
  * - u8g2gl_rows:         A non-owning view over a buffer of rows
  *
  *     Shape:
@@ -51,6 +51,10 @@
  *     Write (false, writing nothing, outside the layout):
  *     - set_int() / set_bool() / set_enum()
  *     - set_string():        Copied in place, truncated at max_len
+ *
+ * Functions:
+ * - u8g2gl_row_added():  (template) Whether an access call took its row, for the
+ *                        generated collection facade
  */
 #ifndef U8G2GL_ROWS_H
 #define U8G2GL_ROWS_H

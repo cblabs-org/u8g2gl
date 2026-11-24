@@ -270,7 +270,8 @@ bool editor_host::attach_storage(size_t index, const scene_json& element) {
         storage->layout = {storage->fields.empty() ? nullptr : storage->fields.data(),
                            static_cast<uint32_t>(block.get("row_bytes").as_int()),
                            static_cast<uint8_t>(storage->fields.size())};
-        if (capacity < 0 || static_cast<int64_t>(capacity) * storage->layout.row_bytes != bytes ||
+        if (capacity < 0 || storage->fields.size() > 255u ||
+            static_cast<int64_t>(capacity) * storage->layout.row_bytes != bytes ||
             !u8g2gl_editor_rows_fit(storage->layout)) {
             return fail(name + ": storage does not fit its layout");
         }

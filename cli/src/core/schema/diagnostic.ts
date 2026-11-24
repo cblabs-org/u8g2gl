@@ -198,8 +198,8 @@ export const DIAGNOSTIC_CODES = {
   BOUND_POSITION_HAS_CHILDREN: 'U8G2GL_BOUND_POSITION_HAS_CHILDREN',
   /**
    * The document uses a construct the schema accepts but the generator does not
-   * build yet — focus rings, events and screen navigation (PR-09), collections
-   * and composites with their own C++ class (PR-08). The message names the PR
+   * build yet — focus rings, events and screen navigation (PR-09), and
+   * composites with their own C++ class (a later PR). The message names the PR
    * that delivers it.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
