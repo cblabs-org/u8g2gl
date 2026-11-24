@@ -10,7 +10,7 @@
  *          §13.3's 254-object ceiling; and the refusals it raises must reach the
  *          authoring journey as warnings rather than surfacing for the first
  *          time when `generate` refuses the build (PR-04 decision 1).
- * Description: Three checks, all reading one realisation of the run's shared
+ * Description: Four checks, all reading one realisation of the run's shared
  *              model — never a second analysis of its own.
  *
  *              **The object ceiling.** `parent_index_` is a `uint8_t` and
@@ -36,19 +36,28 @@
  *              states the fact, this pass states what the fact costs the caller.
  *
  *              **The composed names.** The generator composes identifiers
- *              for an application beyond §13.4's table — a handle per named
- *              object, `ui_<screen>_<element>` (§9.2) — and which elements get
- *              one is realisation's answer. A composed name that collides with
- *              another, or with the table, is an error in both journeys, as
+ *              beyond §13.4's table — a handle per named object,
+ *              `ui_<screen>_<element>`, and each collection's storage
+ *              (§9.2) — and which elements get them is realisation's
+ *              answer. A composed name that collides with another, or with
+ *              the table, is an error in both journeys, as
  *              the ceiling is: it is a property of the generated code, not a
  *              construct a later PR delivers (`realise/handles.ts`).
+ *
+ *              **Collection storage.** Every `<data>` of every object is
+ *              sized for its instance (`realise/collection-storage.ts`, §9.2);
+ *              a block that cannot be — a string with no `max_len`, no
+ *              capacity, a count left unset — has nothing to allocate.
+ *              Reported at the run's policy, as realisation's refusals are:
+ *              a warning while authoring, an error in the build that would
+ *              have to emit storage it cannot size.
  *
  * Exports:
  * - validateRealisation(input): Runs Pass 9
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import { checkGeneratedNames, MAX_OBJECTS_PER_SCREEN } from '../realise/index.js';
+import { checkGeneratedNames, collectionStorage, MAX_OBJECTS_PER_SCREEN } from '../realise/index.js';
 import type { ValidateInput } from './validate.js';
 import { pipelineOf, realisationOf } from './shared-model.js';
 import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';
@@ -64,7 +73,8 @@ import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';
  * @return One `U8G2GL_TOO_MANY_OBJECTS` per overflowing screen, in document
  *         order, followed by realisation's own diagnostics at the run's policy,
  *         then one `U8G2GL_GENERATED_NAME_COLLISION` per composed name that
- *         is already taken.
+ *         is already taken, then one `U8G2GL_UNSIZED_DATA` per collection
+ *         that cannot be sized, at the run's policy.
  */
 export function validateRealisation(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -107,13 +117,27 @@ export function validateRealisation(input: ValidateInput): readonly Diagnostic[]
   // --- Step 3: The names the generator composes, against everything in scope ---
   // Always an error: two declarations of one C++ name do not compile, whatever
   // the journey (§13.4), exactly as Pass 7's own collisions are.
+  const pipeline = pipelineOf(input);
   diagnostics.push(
     ...checkGeneratedNames({
       globals: input.globals,
-      expansion: pipelineOf(input).expansion.screens,
+      expansion: pipeline.expansion.screens,
       realised: realisation.screens,
+      manifests: input.manifests,
     }),
   );
+
+  // --- Step 4: Every collection's storage can be sized (§9.2) ---
+  // The same sizing the capacities carry to emission, so what is refused here
+  // is exactly what emission would have had no size for.
+  const storage = collectionStorage({
+    realised: realisation.screens,
+    resolved: pipeline.resolution.screens,
+    manifests: input.manifests,
+  });
+  for (const diagnostic of storage.diagnostics) {
+    diagnostics.push({ ...diagnostic, severity });
+  }
 
   return diagnostics;
 }

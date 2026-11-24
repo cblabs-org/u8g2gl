@@ -200,6 +200,12 @@ bool u8g2gl_obj::draws_own_outline() const {
     return false;
 }
 
+// u8g2gl_obj::attach_rows
+// Default: an element with no <data> keeps no storage, so a view handed to it
+// is ignored. A collection widget overrides this and keeps its view (§9.2).
+void u8g2gl_obj::attach_rows(uint8_t /*data_index*/, const u8g2gl_rows& /*rows*/) {
+}
+
 void u8g2gl_obj::render_animation_update(U8G2& /*display*/, uint32_t /*now_ms*/) {
     // Default: no-op
 }

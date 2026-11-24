@@ -32,7 +32,9 @@
  *                is default-constructible and nothing about its fields.
  *
  *              What *is* derivable is derived exactly: a string subject's storage
- *              from its declared `max_len + 1` (§8.2), an image's bytes (`<xbm>`
+ *              from its declared `max_len + 1` (§8.2), each instance's
+ *              collection storage from the row layout the capacities carry
+ *              (capacity × row bytes, §9.2), an image's bytes (`<xbm>`
  *              or `<convert>`) from the image the build emitted, the framebuffer from the
  *              catalogue's tile dimensions for the target's setup ([D-14], §18),
  *              and every count and capacity [D-21] emitted.
@@ -64,6 +66,7 @@ import type { XbmImage } from '../../images/index.js';
 import { compareCodeUnits } from '../../order.js';
 import {
   MAX_OBJECTS_PER_SCREEN,
+  storageDerivation,
   walkRealised,
   type Capacities,
   type RealisedElement,
@@ -353,6 +356,21 @@ function framebufferLine(input: ReportInput): BudgetLine {
   };
 }
 
+// collectionStorageLines
+// One line per instance per <data>: the buffer generated code allocates for it
+// ([Q-19], §9.2), exactly, with how its bytes follow from its layout. Read from
+// the capacities — the very sizes the screen units declare their buffers with
+// — and never laid out here, so the report and the buffer cannot disagree.
+//   capacities — [D-21]'s figures, as emitted
+function collectionStorageLines(capacities: Capacities): readonly BudgetLine[] {
+  return capacities.collections.map((storage) => ({
+    item: 'collection storage',
+    count: storage.capacity,
+    names: [`${storage.screen}.${storage.element.identifier}.${storage.data.name}`],
+    figure: measured(storage.bytes, `${storageDerivation(storage)}, generated per instance (§9.2)`),
+  }));
+}
+
 // ramLines
 // §18's static-RAM table: derived where the document or the catalogue settles the
 // figure, and unmeasured — with the reason — everywhere the size belongs to the
@@ -370,6 +388,7 @@ function ramLines(input: ReportInput): readonly BudgetLine[] {
       count: objects,
       figure: unmeasured(SIZEOF_REASON),
     },
+    ...collectionStorageLines(capacities),
     {
       item: 'string subject storage',
       count: strings.declared.length,

@@ -469,6 +469,20 @@ export const DIAGNOSTIC_CODES = {
    * the code for two identifiers of §13.4's own table.
    */
   GENERATED_NAME_COLLISION: 'U8G2GL_GENERATED_NAME_COLLISION',
+  /**
+   * A collection's storage cannot be sized, so it cannot be generated (§9.2,
+   * §18): a `<data>`'s rows are a fixed byte layout, allocated per instance as
+   * capacity × row bytes, and every count must resolve to a non-negative
+   * integer for that instance. Raised for a `string` field with no `max_len`
+   * (located at the field in its manifest), for a `<data>` with no
+   * `capacity` (at the `<data>`), and for a `capacity`, `repeat` or `max_len`
+   * naming a prop this instance leaves unset with no default, or sets to
+   * something that is not a non-negative integer (at the instance). The
+   * message names the widget, the `<data>` and, where one is at fault, the
+   * field. At the refusal policy, as Pass 9 reports realisation's other
+   * refusals: an error in `generate`, a warning in `validate`.
+   */
+  UNSIZED_DATA: 'U8G2GL_UNSIZED_DATA',
 } as const;
 
 /**

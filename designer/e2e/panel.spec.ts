@@ -354,7 +354,7 @@ test('a value the validator rejects is flagged at its field, with the validator�
   await expect(field(page, 'height').locator('.field-problem')).toHaveCount(0);
 });
 
-test('a prop at its default is greyed with no reset; a project widget says its RAM cost is not reported ([Q-19]); a framework one does not', async ({ page }) => {
+test('a prop at its default is greyed with no reset; a collection widget states its storage, a framework one no RAM line', async ({ page }) => {
   await open(page);
   await clickCanvas(page, 100, 5); // row0, a wd_service_list: max_rows written, max_cols not
   await expect(panel(page).locator('.panel-subtitle')).toHaveText('row0');
@@ -364,14 +364,26 @@ test('a prop at its default is greyed with no reset; a project widget says its R
   await expect(maxCols.getByRole('textbox', { name: 'max_cols' })).toHaveClass(/default/);
   await expect(maxCols.getByRole('button', { name: 'Reset max_cols' })).toHaveCount(0);
   await expect(field(page, 'max_rows').getByRole('button', { name: 'Reset max_rows' })).toBeVisible();
-  // The author's help as written; the panel's own line never puts a figure on it.
+  // The author's help as written, now true: max_rows sizes the storage, and
+  // the panel's line states the figure §18 reports for it (§9.2).
   await field(page, 'max_rows').getByRole('button', { name: 'About max_rows' }).hover();
   await expect(page.getByRole('tooltip').locator('.field-tooltip-help')).toHaveText('Row capacity. Determines allocated RAM.');
-  await expect(panel(page).locator('.panel-note', { hasText: 'RAM cost not reported for project widgets ([Q-19])' })).toBeVisible();
-  await expect(panel(page).getByText(/\d+(\.\d+)? ?(KB|B)\b/)).toHaveCount(0);
+  await expect(panel(page).locator('.panel-note', { hasText: 'RAM 152 bytes for rows: 1 row × 152 bytes' })).toBeVisible();
+  await expect(panel(page).locator('.panel-note', { hasText: '[Q-19]' })).toHaveCount(0);
 
   await clickCanvas(page, 220, 57); // sys_clock, a framework widget
-  await expect(panel(page).locator('.panel-note', { hasText: '[Q-19]' })).toHaveCount(0);
+  await expect(panel(page).locator('.panel-note', { hasText: 'RAM' })).toHaveCount(0);
+});
+
+test("a collection widget's RAM line follows its capacity as it is edited (§9.2)", async ({ page }) => {
+  await open(page);
+  await clickCanvas(page, 100, 5); // row0, max_rows="1"
+  await expect(panel(page).locator('.panel-note', { hasText: 'RAM 152 bytes for rows' })).toBeVisible();
+  const maxRows = field(page, 'max_rows').getByRole('textbox', { name: 'max_rows' });
+  await maxRows.fill('10');
+  await maxRows.press('Enter');
+  await expect(panel(page).locator('.panel-note', { hasText: 'RAM 1520 bytes for rows: 10 rows × 152 bytes' })).toBeVisible();
+  expect(await changedLines(page)).toEqual([expect.stringContaining('max_rows="10"')]);
 });
 
 test('several selected: shared fields show a common value or mixed, geometry their box read-only, and a commit to all is one undo stop', async ({ page }) => {

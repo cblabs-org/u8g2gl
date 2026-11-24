@@ -28,9 +28,9 @@
  *              everything else the text the author wrote, which the host maps
  *              through the registry entry's declared type.
  *
- *              Format, version 4 (version 4 added an object's
- *              `static_children`; version 3 a draw call's `clip`; version 2
- *              `origin`; version 1 had none of them):
+ *              Format, version 5 (version 5 added an object's `storage`;
+ *              version 4 an object's `static_children`; version 3 a draw
+ *              call's `clip`; version 2 `origin`; version 1 had none of them):
  *              - `u8g2gl_generated`: the marker the **writer** recognises the file
  *                by. A host reads nothing from it, and it is not part of the
  *                format a host checks, so adding it did not bump the version —
@@ -58,6 +58,16 @@
  *                registry entry for that element, as firmware calls the access
  *                method there. Every argument is present. Absent on an object
  *                with none.
+ *              - `storage`: one entry per `<data>` of an object, in declaration
+ *                order, so an entry's position is the index `attach_rows()`
+ *                takes (§9.2): `{ data, capacity, row_bytes, bytes, fields:
+ *                [{ name, type, offset, size, repeat }] }`, the layout
+ *                `realise/collection-storage.ts` computed for this instance,
+ *                exactly as the firmware unit's `constexpr` descriptor spells
+ *                it. The host allocates `bytes` with the scene's objects, hands
+ *                the widget a view over it after the `properties` step's static
+ *                children, and frees it with the scene; with `bytes` 0 it
+ *                attaches nothing. Absent on an object with no `<data>`.
  *              - A binding or bound argument that sets a position (`bind_x`,
  *                `bind_y`) carries `origin`: its container's absolute corner on
  *                that axis, which the host adds to the subject's value as
@@ -82,7 +92,13 @@ import type { PropDef } from '../../schema/widget-manifest.js';
 import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
-import { U8G2GL_NO_PARENT, type RealisedBinding, type RealisedElement, type RealisedScreen } from '../../realise/index.js';
+import {
+  U8G2GL_NO_PARENT,
+  type CollectionStorage,
+  type RealisedBinding,
+  type RealisedElement,
+  type RealisedScreen,
+} from '../../realise/index.js';
 import { drawArgumentSources, drawClipObject } from './draw-args.js';
 import { boundPositionOrigin } from './placement.js';
 import { fontDeclarations } from './fonts.js';
@@ -110,7 +126,7 @@ export const SCENE_FILE = 'ui_scene.json';
  * The format version. A host checks it before reading anything else; bump it
  * for any change a host would read differently.
  */
-export const SCENE_FORMAT_VERSION = 4;
+export const SCENE_FORMAT_VERSION = 5;
 
 /** Everything describing the scenes needs. */
 export interface SceneInput {
@@ -212,13 +228,44 @@ function staticChildrenJson(placement: Placement): { [key: string]: Json } {
   };
 }
 
+// storageJson
+// `{ storage: [...] }` for an object with `<data>`, one entry per block in
+// declaration order, or `{}` for one with none, so a scene of objects without
+// collections reads as version 4's did.
+//   blocks — this object's sized blocks, from the capacities
+function storageJson(blocks: readonly CollectionStorage[]): { [key: string]: Json } {
+  if (blocks.length === 0) return {};
+  return {
+    storage: [...blocks]
+      .sort((a, b) => a.index - b.index)
+      .map((block) => ({
+        data: block.data.name,
+        capacity: block.capacity,
+        row_bytes: block.layout.rowBytes,
+        bytes: block.bytes,
+        fields: block.layout.fields.map((field) => ({
+          name: field.name,
+          type: field.type,
+          offset: field.offset,
+          size: field.size,
+          repeat: field.repeat,
+        })),
+      })),
+  };
+}
+
 // objectJson
 // An object as the firmware's init builds it (§13.7): its class, place in the
-// flat model, rectangle, written properties and static children, styles,
-// overrides, then bindings.
+// flat model, rectangle, written properties and static children, its
+// collections' storage, styles, overrides, then bindings.
 //   element   — the realised object
 //   placement — its manifest and device-space model
-function objectJson(element: RealisedElement, placement: Placement): { [key: string]: Json } {
+//   blocks    — its collections, sized
+function objectJson(
+  element: RealisedElement,
+  placement: Placement,
+  blocks: readonly CollectionStorage[],
+): { [key: string]: Json } {
   const rectangle = rectangleOf(element, placement);
   const bindings: Json[] = [];
   const flags: Json[] = [];
@@ -261,6 +308,7 @@ function objectJson(element: RealisedElement, placement: Placement): { [key: str
       value: jsonValue(prop.type, literal),
     })),
     ...staticChildrenJson(placement),
+    ...storageJson(blocks),
     styles: namedStyles(placement.absolute.node),
     style_overrides: styleOverridesOf(placement).applied.map(({ prop, value }) => ({
       name: prop.name,
@@ -329,7 +377,12 @@ function drawCallJson(element: RealisedElement, placement: Placement): { [key: s
 
 // screenJson
 // One screen: its object count, parent table and elements in draw order.
-function screenJson(realised: RealisedScreen, resolved: ResolvedScreen, manifests: ManifestRegistry): Json {
+function screenJson(
+  realised: RealisedScreen,
+  resolved: ResolvedScreen,
+  manifests: ManifestRegistry,
+  collections: readonly CollectionStorage[],
+): Json {
   const { placements, diagnostics } = placeScreen(realised, resolved, manifests);
   if (diagnostics.length > 0) {
     throw new Error(`Screen '${realised.screen.name}' cannot be placed; firmware emission refuses it.`);
@@ -346,7 +399,13 @@ function screenJson(realised: RealisedScreen, resolved: ResolvedScreen, manifest
     objects: realised.objects.length,
     parents: realised.parents.map((parent) => (parent === U8G2GL_NO_PARENT ? null : parent)),
     elements: realised.drawOrder.map((step) =>
-      step.kind === 'object' ? objectJson(step.element, placed(step.element)) : drawCallJson(step.element, placed(step.element)),
+      step.kind === 'object'
+        ? objectJson(
+            step.element,
+            placed(step.element),
+            collections.filter((block) => block.element === step.element),
+          )
+        : drawCallJson(step.element, placed(step.element)),
     ),
   };
 }
@@ -386,7 +445,7 @@ export function describeScenes(input: SceneInput): { readonly [key: string]: Jso
     if (resolved?.screen !== realised.screen) {
       throw new Error(`Screen '${realised.screen.name}' has no matching resolved model at position ${index}.`);
     }
-    return screenJson(realised, resolved, input.manifests);
+    return screenJson(realised, resolved, input.manifests, project.capacities.collections);
   });
 
   return {

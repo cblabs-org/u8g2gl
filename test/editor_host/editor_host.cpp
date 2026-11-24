@@ -20,14 +20,19 @@
  *              time, as firmware's `ui_subject_x.get()` does (§13.5), clamped
  *              with the origin by the runtime's own u8g2gl_coord_bound(), and
  *              drawing a call the scene marks `clip` inside the runtime's own
- *              u8g2gl_clip_scope.
+ *              u8g2gl_clip_scope. Each collection's storage (§9.2) is allocated
+ *              in the arena with the layout the scene carries and handed to its
+ *              widget after the static children, as firmware's init does.
  */
 #include "editor_host.h"
 
 #include "U8g2lib.h"
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_types.h"
+
+#include <cstring>
 
 editor_host::editor_host(const u8g2gl_editor_registry& registry) : registry_(registry) {}
 
@@ -52,8 +57,8 @@ bool editor_host::load(const std::string& scene_path) {
     if (!parse_error.empty()) {
         return fail(parse_error);
     }
-    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 4) {
-        return fail("not a version 4 u8g2gl scene description");
+    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 5) {
+        return fail("not a version 5 u8g2gl scene description");
     }
     for (const scene_json& described : scene_.get("subjects").items()) {
         if (described.has("value")) {
@@ -239,9 +244,55 @@ bool editor_host::build_object(const scene_json& element) {
     return true;
 }
 
+// attach_storage
+// Each of an object's collections (§9.2): the layout the scene describes, its
+// bytes from the arena, and a view handed to the widget keyed by the block's
+// position, its <data> declaration index. A block of no bytes is attached
+// nothing, as firmware attaches nothing.
+bool editor_host::attach_storage(size_t index, const scene_json& element) {
+    const std::string& name = element.get("name").as_string();
+    const auto& blocks = element.get("storage").items();
+    for (size_t b = 0; b < blocks.size(); ++b) {
+        const scene_json& block = blocks[b];
+        auto storage = std::make_unique<collection_storage>();
+        for (const scene_json& field : block.get("fields").items()) {
+            u8g2gl_rows_field entry{};
+            if (!u8g2gl_editor_field_type(field.get("type").as_string().c_str(), &entry.type)) {
+                return fail(name + ": a storage field has no row type");
+            }
+            entry.offset = static_cast<uint32_t>(field.get("offset").as_int());
+            entry.size = static_cast<uint32_t>(field.get("size").as_int());
+            entry.repeat = static_cast<uint32_t>(field.get("repeat").as_int());
+            storage->fields.push_back(entry);
+        }
+        const int32_t capacity = block.get("capacity").as_int();
+        const int32_t bytes = block.get("bytes").as_int();
+        storage->layout = {storage->fields.empty() ? nullptr : storage->fields.data(),
+                           static_cast<uint32_t>(block.get("row_bytes").as_int()),
+                           static_cast<uint8_t>(storage->fields.size())};
+        if (capacity < 0 || static_cast<int64_t>(capacity) * storage->layout.row_bytes != bytes ||
+            !u8g2gl_editor_rows_fit(storage->layout)) {
+            return fail(name + ": storage does not fit its layout");
+        }
+        if (bytes == 0) {
+            continue;
+        }
+        void* buffer = allocate(static_cast<size_t>(bytes), alignof(int32_t));
+        if (buffer == nullptr) {
+            return fail(name + ": the arena has no room for its storage");
+        }
+        std::memset(buffer, 0, static_cast<size_t>(bytes));
+        objects_[index]->attach_rows(static_cast<uint8_t>(b),
+                                     u8g2gl_rows(static_cast<uint8_t*>(buffer), static_cast<size_t>(capacity),
+                                                 &storage->layout));
+        storage_.push_back(std::move(storage));
+    }
+    return true;
+}
+
 // configure_object
 // §13.7 step 2: the rectangle, then every written property, then every static
-// child, by name.
+// child, by name, then each collection's storage.
 bool editor_host::configure_object(size_t index, const scene_json& element) {
     const std::string& name = element.get("name").as_string();
     const u8g2gl_editor_class& cls = *classes_[index];
@@ -287,7 +338,7 @@ bool editor_host::configure_object(size_t index, const scene_json& element) {
             return fail(name + " <" + tag + ">: add-by-name refused");
         }
     }
-    return true;
+    return attach_storage(index, element);
 }
 
 // apply_styles
@@ -562,6 +613,7 @@ void editor_host::teardown() {
     objects_.clear();
     classes_.clear();
     parents_.clear();
+    storage_.clear();
     arena_used_ = 0;
     screen_ = nullptr;
 }

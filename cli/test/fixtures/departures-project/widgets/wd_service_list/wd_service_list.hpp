@@ -10,9 +10,14 @@
  * Purpose: Custom collection widget implementing the §9.2 declared-capacity,
  *          atomic-commit table display model for departures data.
  *
- * Description: Declarations for the wd_service_list widget class. Provides
- *              static non-heap storage, column configuration, begin/add_row/commit
- *              data ingestion API, and U8G2 multi-column rendering.
+ * Description: Declarations for the wd_service_list widget class: column
+ *              configuration, the begin/add_row/commit data ingestion API, and
+ *              U8G2 multi-column rendering. Its rows live in storage the
+ *              generator allocates for each instance from its `<data>` (§9.2):
+ *              max_rows rows of max_cols cells, each max_cell_chars + 1 bytes.
+ *              The widget is handed a view over it through attach_rows() and
+ *              owns no row array of its own, so an instance costs what its XML
+ *              declares.
  *
  * Exported Classes:
  * - wd_service_list: Table widget extending u8g2gl_obj.
@@ -24,6 +29,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_style.h"
 
 class U8G2;
@@ -42,9 +48,8 @@ struct u8g2gl_column_def {
  */
 class wd_service_list : public u8g2gl_obj {
 public:
-    static constexpr size_t DEFAULT_MAX_ROWS = 16;
+    /** Columns the static `<column>` children can define: the column table's own size. */
     static constexpr size_t DEFAULT_MAX_COLS = 6;
-    static constexpr size_t DEFAULT_MAX_CELL_CHARS = 24;
 
     wd_service_list() = default;
     ~wd_service_list() override = default;
@@ -52,12 +57,19 @@ public:
     // --- Configuration setters (emitted from <prop> in manifest) ---
 
     void set_font(const uint8_t* font);
+
+    // max_rows, max_cols and max_cell_chars size this instance's generated row
+    // storage (§9.2): the generator allocates from them, and the widget reads
+    // the result from the view attach_rows() hands it. These setters exist
+    // because every prop has one, and change nothing at run time.
+    /** @brief Row capacity: sizes the generated storage; no effect at run time. */
     void set_max_rows(int16_t rows);
+    /** @brief Cells per row: sizes the generated storage; no effect at run time. */
     void set_max_cols(int16_t cols);
     /**
-     * @brief Set the usable characters per cell, terminator not included
-     *        (clamped to DEFAULT_MAX_CELL_CHARS). A longer cell is truncated
-     *        to this many characters by add_row().
+     * @brief Usable characters per cell, terminator not included: sizes the
+     *        generated storage, which truncates a longer cell to this many;
+     *        no effect at run time.
      */
     void set_max_cell_chars(int16_t chars);
     void set_scroll_dwell_ms(int32_t dwell_ms);
@@ -87,12 +99,13 @@ public:
     /**
      * @brief Add a row of cell strings to the collection.
      *
-     * Each cell is copied, up to max_cell_chars characters; a longer one is
-     * truncated to that many.
+     * Each cell is copied into the row storage, up to max_cell_chars
+     * characters; a longer one is truncated to that many. Cells past max_cols
+     * are dropped, and missing ones stored empty.
      *
      * @param cells Array of cell string pointers (or nullptr for missing cell).
      * @param n Number of cells provided.
-     * @return true if accepted, false if capacity exceeded.
+     * @return true if accepted; false if the storage is full, or none is attached.
      */
     bool add_row(const char* const* cells, size_t n);
 
@@ -109,7 +122,7 @@ public:
     void commit();
 
     /**
-     * @brief Return row capacity.
+     * @brief Return row capacity: the attached storage's rows, 0 with none.
      */
     size_t capacity() const;
 
@@ -118,7 +131,14 @@ public:
      */
     size_t row_count() const;
 
-    // --- Lifecycle override ---
+    // --- Lifecycle overrides ---
+
+    /**
+     * @brief Keep the view over this instance's `rows` storage (§9.2).
+     * @param data_index 0, the manifest's one `<data>`; any other is ignored.
+     * @param rows       The generated storage; one string field, repeated per cell.
+     */
+    void attach_rows(uint8_t data_index, const u8g2gl_rows& rows) override;
 
     /**
      * @brief Render committed table rows to display buffer.
@@ -127,11 +147,6 @@ public:
     void render(U8G2& display) override;
 
 private:
-    // Capacity limits (clamped to static array bounds)
-    size_t max_rows_{DEFAULT_MAX_ROWS};
-    size_t max_cols_{DEFAULT_MAX_COLS};
-    size_t max_cell_chars_{DEFAULT_MAX_CELL_CHARS};
-
     // Scroll timing
     int32_t scroll_dwell_ms_{5000};
     int32_t scroll_duration_ms_{1000};
@@ -147,10 +162,9 @@ private:
     size_t current_row_index_{0};
     size_t row_count_{0};
 
-    // Static collection buffer: [row][col][char] — zero heap allocation. One
-    // byte per cell beyond DEFAULT_MAX_CELL_CHARS holds the terminator, because
-    // max_cell_chars counts usable characters.
-    char cells_[DEFAULT_MAX_ROWS][DEFAULT_MAX_COLS][DEFAULT_MAX_CELL_CHARS + 1]{};
+    // The rows, in the generator's storage: field 0 is `cells`, one string per
+    // column. A batch writes in place and commit() publishes the count (§9.2).
+    u8g2gl_rows rows_{};
 };
 
 #endif // WD_SERVICE_LIST_HPP

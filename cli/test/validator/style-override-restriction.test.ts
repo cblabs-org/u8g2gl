@@ -271,7 +271,7 @@ describe('emission says which reason refused an override (PR-4R WO5 R5)', () => 
     const resolved = result.generated.resolved![0]!;
     const element = resolved.elements.find((candidate) => candidate.node.tag === 'u8g2gl_label')!;
     (element.node as { styleOverrides: Record<string, string> }).styleOverrides = styleOverrides;
-    return emitScreenUnit({ realised: result.generated.realised![0]!, resolved, manifests, stamp: '' }).diagnostics;
+    return emitScreenUnit({ realised: result.generated.realised![0]!, resolved, manifests, collections: [], stamp: '' }).diagnostics;
   }
 
   it('a setter prop outside the nine is refused as not a style override, not for want of a setter', () => {

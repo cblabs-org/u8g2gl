@@ -29,6 +29,9 @@
  *              an element the registry cannot build fails the test instead of
  *              silently vanishing from both sides.
  *
+ *              Each collection's storage (§9.2) comes from the same arena, with
+ *              the row layout the scene carries.
+ *
  *              Test-only: standard containers hold the host's own bookkeeping.
  *              Objects themselves live in the host's own aligned arena and are
  *              placed by u8g2gl_editor_construct(), as a Wasm host's would be.
@@ -57,6 +60,7 @@
 #include "scene_json.h"
 #include "u8g2gl/u8g2gl_editor.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_subject.h"
 
 class U8G2;
@@ -128,6 +132,7 @@ private:
     bool subject_type_of(const scene_json& json, u8g2gl_subject_type_t* out) const;
     bool build_object(const scene_json& element);
     bool configure_object(size_t index, const scene_json& element);
+    bool attach_storage(size_t index, const scene_json& element);
     bool apply_styles(size_t index, const scene_json& element);
     bool bind_object(size_t index, const scene_json& element);
     bool draw_call(U8G2& display, const scene_json& element);
@@ -149,6 +154,12 @@ private:
     std::vector<u8g2gl_obj*> objects_;
     std::vector<const u8g2gl_editor_class*> classes_;
     std::vector<uint8_t> parents_;
+    /** One collection's layout (§9.2), held where a view handed to its widget can point. */
+    struct collection_storage {
+        std::vector<u8g2gl_rows_field> fields;
+        u8g2gl_rows_layout layout{nullptr, 0, 0};
+    };
+    std::vector<std::unique_ptr<collection_storage>> storage_;
     size_t arena_used_ = 0;
     std::string error_;
 };

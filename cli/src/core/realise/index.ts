@@ -16,8 +16,10 @@
  *          it depends on neither. The direction is realise <- validator <-
  *          generator; `test/architecture/layering.test.ts` holds it.
  * Description: Re-exports model.ts (the shapes), realise.ts (the analysis),
- *              capacities.ts (the counting) and handles.ts (the identifiers
- *              the generator composes for an application). Isomorphic.
+ *              capacities.ts (the counting), collection-storage.ts (the row
+ *              layout every collection's storage is sized by) and handles.ts
+ *              (the identifiers the generator composes for an application).
+ *              Isomorphic.
  *
  * Exports:
  * - U8G2GL_NO_PARENT, MAX_OBJECTS_PER_SCREEN, REALISATION_REASONS,
@@ -25,7 +27,10 @@
  *   RealisedElement, DrawStep, RealisedScreen, RealisationResult (model.ts)
  * - realiseScreens, walkRealised, RealiseInput (realise.ts)
  * - computeCapacities, Capacities, CapacitiesInput, SubjectObservers (capacities.ts)
- * - elementHandleIdentifier, handledElements, generatedNames, checkGeneratedNames,
+ * - ROW_ALIGNMENT, RowFieldType, RowField, RowLayout, fieldBytes, rowLayout,
+ *   CollectionStorage, CollectionStorageInput, CollectionStorageResult,
+ *   collectionStorage, storageDerivation (collection-storage.ts)
+ * - elementHandleIdentifier, storageIdentifiers, handledElements, generatedNames, checkGeneratedNames,
  *   GeneratedName, GeneratedNamesInput (handles.ts)
  */
 
@@ -51,9 +56,23 @@ export {
 } from './capacities.js';
 export {
   elementHandleIdentifier,
+  storageIdentifiers,
   handledElements,
   generatedNames,
   checkGeneratedNames,
   type GeneratedName,
   type GeneratedNamesInput,
 } from './handles.js';
+export {
+  ROW_ALIGNMENT,
+  fieldBytes,
+  rowLayout,
+  collectionStorage,
+  storageDerivation,
+  type RowFieldType,
+  type RowField,
+  type RowLayout,
+  type CollectionStorage,
+  type CollectionStorageInput,
+  type CollectionStorageResult,
+} from './collection-storage.js';

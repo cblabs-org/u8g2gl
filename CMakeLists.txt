@@ -55,6 +55,7 @@ option(U8G2GL_BUILD_TESTS "Build U8G2GL tests" ON)
 set(U8G2GL_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_obj.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_rows.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_label.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_xbm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_glyph.cpp

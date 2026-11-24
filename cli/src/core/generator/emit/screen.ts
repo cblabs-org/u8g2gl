@@ -40,10 +40,14 @@
  * Description: The unit holds, in order: the widget headers it uses; the static
  *              objects in array order (a composite's container is a plain
  *              `u8g2gl_obj`, §13.12); the handle `ui.hpp` declares for each
- *              named object, bound to its static (§9.2); the object and parent
- *              tables; `init`
+ *              named object, bound to its static (§9.2); each collection's
+ *              storage, a `constexpr` row layout and a `static` buffer sized
+ *              for that instance (§9.2, `realise/collection-storage.ts`); the
+ *              object and parent tables; `init`
  *              (construct → apply styles → set properties → register bindings,
- *              §13.7 — styles first so an element's own attributes win, §10); `activate`/`deactivate`; `tick`, the minimum deadline
+ *              §13.7 — styles first so an element's own attributes win, §10;
+ *              each collection's buffer is handed to its widget in the
+ *              properties step, after the setters and static children); `activate`/`deactivate`; `tick`, the minimum deadline
  *              across every object ([D-15]); `render`; and the `u8g2gl_screen`
  *              descriptor `ui_handler()` drives.
  *
@@ -82,7 +86,11 @@ import {
 } from '../../resolver/index.js';
 import { objectIdentifier } from '../../resolver/mangle.js';
 import {
+  ROW_ALIGNMENT,
+  storageDerivation,
+  storageIdentifiers,
   U8G2GL_NO_PARENT,
+  type CollectionStorage,
   type RealisedElement,
   type RealisedScreen,
   type VisibilityTerm,
@@ -119,8 +127,65 @@ export interface ScreenEmitInput {
   readonly resolved: ResolvedScreen;
   /** Effective manifests, for each element's props, setters and class. */
   readonly manifests: ManifestRegistry;
+  /**
+   * This screen's collections, sized ([D-21]'s capacities, §9.2): each
+   * object's `<data>` storage, in object order. Emitted, never resized here.
+   */
+  readonly collections: readonly CollectionStorage[];
   /** This file's header stamp, already rendered. */
   readonly stamp: string;
+}
+
+/** The runtime header declaring `u8g2gl_rows`, which a unit with collection storage needs. */
+const ROWS_HEADER = '#include "u8g2gl/u8g2gl_rows.h"';
+
+// storageLines
+// One collection's storage as its unit declares it: the derivation §18
+// reports, the field table, the layout and the buffer. A block of no bytes has
+// no buffer, because C++ has no zero-length array; its widget is handed none,
+// which is a capacity of 0 either way.
+//   storage — the sized block
+function storageLines(storage: CollectionStorage): string[] {
+  const names = storageIdentifiers(storage.element.identifier, storage.data.name);
+  const { fields, rowBytes } = storage.layout;
+  const lines = [
+    `// ${storage.element.identifier} <data name="${storage.data.name}">: ${storageDerivation(storage)} = ${storage.bytes} bytes`,
+  ];
+  if (fields.length > 0) {
+    lines.push(
+      `static constexpr u8g2gl_rows_field ${names.fields}[] = {`,
+      ...fields.map(
+        (field) =>
+          `    {${field.offset}, ${field.size}, ${field.repeat}, U8G2GL_FIELD_${field.type.toUpperCase()}},  // ${field.name}`,
+      ),
+      '};',
+    );
+  }
+  lines.push(
+    `static constexpr u8g2gl_rows_layout ${names.layout} = {${fields.length > 0 ? names.fields : 'nullptr'}, ${rowBytes}, ${fields.length}};`,
+  );
+  lines.push(
+    storage.bytes > 0
+      ? `alignas(${ROW_ALIGNMENT}) static uint8_t ${names.buffer}[${storage.bytes}];`
+      : `// No buffer: ${storage.capacity === 0 ? 'a capacity of 0' : 'a row of 0 bytes'} stores nothing, and nothing is attached.`,
+  );
+  return lines;
+}
+
+// attachLine
+// The init statement handing one collection's buffer to its widget, keyed by
+// the <data>'s declaration index (u8g2gl_obj::attach_rows()), or undefined for
+// a block with no buffer.
+//   storage — the sized block
+function attachLine(storage: CollectionStorage): string | undefined {
+  if (storage.bytes === 0) {
+    return undefined;
+  }
+  const names = storageIdentifiers(storage.element.identifier, storage.data.name);
+  return (
+    `    ${cpp(storage.element)}.attach_rows(${storage.index}, u8g2gl_rows(${names.buffer}, ${storage.capacity}, ` +
+    `&${names.layout}));  // <data name="${storage.data.name}">`
+  );
 }
 
 /** The runtime header declaring `u8g2gl_draw_*` (§6.2). */
@@ -523,6 +588,10 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   if (realised.drawOrder.some((step) => step.kind === 'draw_calls')) {
     includes.push(DRAW_HEADER, COORD_HEADER);
   }
+  const collections = input.collections;
+  if (collections.length > 0) {
+    includes.push(ROWS_HEADER);
+  }
 
   // --- Step 3: Each part of the unit, in §13.12's order ---
   const declarations = objects.map((object) => {
@@ -538,7 +607,10 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   const bindings: string[] = [];
   for (const object of objects) {
     const placement = placed(object);
-    const own = [geometryLine(object, placement), ...propertyLines(object, placement)].filter(
+    // The storage after the setters and the static children, so the widget
+    // is configured before it is handed its rows (§9.2).
+    const attached = collections.filter((storage) => storage.element === object).map(attachLine);
+    const own = [geometryLine(object, placement), ...propertyLines(object, placement), ...attached].filter(
       (line): line is string => line !== undefined,
     );
     if (own.length > 0) {
@@ -582,6 +654,19 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
       '',
       section('Handles: the named objects ui.hpp declares (§9.2)'),
       ...handles.map((handle) => `${handle.className}& ${handle.identifier} = ${handle.object};`),
+    );
+  }
+
+  // Each collection's rows, in storage sized for this instance ([Q-19]): the
+  // widget owns none, and is handed this at init.
+  if (collections.length > 0) {
+    lines.push(
+      '',
+      section('Collection storage: one buffer per instance per <data> (§9.2, §18)'),
+      '// Each sized from its own instance\'s props, capacity x row bytes; the row',
+      "// layout follows from the manifest's <field>s, so this is the buffer's size,",
+      "// never an assumption about the widget's.",
+      ...collections.flatMap(storageLines),
     );
   }
 

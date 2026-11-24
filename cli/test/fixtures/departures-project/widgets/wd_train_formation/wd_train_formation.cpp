@@ -8,12 +8,14 @@
  *
  * File: widgets/wd_train_formation/wd_train_formation.cpp
  * Purpose: Implements wd_train_formation horizontal carriage strip rendering
- *          and collection ingestion API. Provides bounded static memory storage
- *          with atomic commit bracketing (§9.2).
+ *          and collection ingestion API, with atomic commit bracketing over the
+ *          row storage the generator allocates for each instance (§9.2).
  *
  * Description: Implementation of set_font, set_max_carriages, begin, add_carriage,
- *              commit, capacity, carriage_count, get_carriage, and pixel-arithmetic
- *              U8G2 draw dispatch.
+ *              commit, capacity, carriage_count, get_carriage, attach_rows, and
+ *              pixel-arithmetic U8G2 draw dispatch. Every carriage is read and
+ *              written through the attached u8g2gl_rows view, by the field
+ *              indices the manifest's `<data>` declares them in.
  */
 #include "wd_train_formation.hpp"
 
@@ -25,6 +27,22 @@
 #elif __has_include("U8g2lib.h")
 #include "U8g2lib.h"
 #endif
+
+namespace {
+
+// The carriages <data>'s fields, in the manifest's declaration order: the
+// indices the generated layout gives them.
+constexpr uint8_t kNumber = 0;
+constexpr uint8_t kClassType = 1;
+constexpr uint8_t kWheelchair = 2;
+constexpr uint8_t kBike = 3;
+constexpr uint8_t kLoadingPct = 4;
+
+// class_type's values="standard,first": an enum field stores its value's index.
+constexpr uint8_t kStandardClass = 0;
+constexpr uint8_t kFirstClass = 1;
+
+}  // namespace
 
 // --- Configuration Setters ---
 
@@ -41,20 +59,9 @@ void wd_train_formation::set_font(const uint8_t* font) {
 }
 
 // wd_train_formation::set_max_carriages
-// Clamps requested carriage capacity to static bounds [1, DEFAULT_MAX_CARRIAGES].
-//   max_carriages — requested capacity from manifest or host
-void wd_train_formation::set_max_carriages(int16_t max_carriages) {
-    if (max_carriages <= 0) {
-        return;
-    }
-    size_t clamped = static_cast<size_t>(max_carriages);
-    if (clamped > DEFAULT_MAX_CARRIAGES) {
-        clamped = DEFAULT_MAX_CARRIAGES;
-    }
-    if (max_carriages_ != clamped) {
-        max_carriages_ = clamped;
-        mark_dirty();
-    }
+// The generator sizes this instance's storage from max_carriages (§9.2); the
+// widget's capacity is the attached view's, so there is nothing to store.
+void wd_train_formation::set_max_carriages(int16_t /*max_carriages*/) {
 }
 
 // --- Data Ingestion API (§9.2) ---
@@ -90,16 +97,16 @@ bool wd_train_formation::add_carriage(uint8_t number, const char* class_type, bo
 //   loading_pct    — passenger load percentage (0..100)
 bool wd_train_formation::add_carriage(uint8_t number, bool is_first_class, bool wheelchair, bool bike,
                                       uint8_t loading_pct) {
-    if (current_carriage_index_ >= max_carriages_) {
+    if (current_carriage_index_ >= rows_.capacity()) {
         return false;
     }
 
-    u8g2gl_carriage_t& c = carriages_[current_carriage_index_];
-    c.number = number;
-    c.is_first_class = is_first_class;
-    c.has_wheelchair = wheelchair;
-    c.has_bike = bike;
-    c.loading_pct = (loading_pct > 100) ? 100 : loading_pct;
+    const size_t row = current_carriage_index_;
+    rows_.set_int(row, kNumber, number);
+    rows_.set_enum(row, kClassType, is_first_class ? kFirstClass : kStandardClass);
+    rows_.set_bool(row, kWheelchair, wheelchair);
+    rows_.set_bool(row, kBike, bike);
+    rows_.set_int(row, kLoadingPct, (loading_pct > 100) ? 100 : loading_pct);
 
     current_carriage_index_++;
     return true;
@@ -113,18 +120,44 @@ void wd_train_formation::commit() {
 }
 
 size_t wd_train_formation::capacity() const {
-    return max_carriages_;
+    return rows_.capacity();
 }
 
 size_t wd_train_formation::carriage_count() const {
     return carriage_count_;
 }
 
-const u8g2gl_carriage_t* wd_train_formation::get_carriage(size_t index) const {
-    if (index >= carriage_count_) {
-        return nullptr;
+// wd_train_formation::get_carriage
+// One committed carriage, read back field by field from the row storage.
+//   index — the carriage, below carriage_count()
+//   out   — receives it
+bool wd_train_formation::get_carriage(size_t index, u8g2gl_carriage_t* out) const {
+    if (index >= carriage_count_ || out == nullptr) {
+        return false;
     }
-    return &carriages_[index];
+    out->number = static_cast<uint8_t>(rows_.get_int(index, kNumber));
+    out->is_first_class = rows_.get_enum(index, kClassType) == kFirstClass;
+    out->has_wheelchair = rows_.get_bool(index, kWheelchair);
+    out->has_bike = rows_.get_bool(index, kBike);
+    out->loading_pct = static_cast<uint8_t>(rows_.get_int(index, kLoadingPct));
+    return true;
+}
+
+// --- Collection Storage (§9.2) ---
+
+// wd_train_formation::attach_rows
+// Keeps the view over this instance's carriages. A new view starts empty:
+// carriages written to an earlier one are not this storage's.
+//   data_index — the <data>'s declaration index; this widget has one, `carriages`
+//   rows       — the generated storage
+void wd_train_formation::attach_rows(uint8_t data_index, const u8g2gl_rows& rows) {
+    if (data_index != 0) {
+        return;
+    }
+    rows_ = rows;
+    current_carriage_index_ = 0;
+    carriage_count_ = 0;
+    mark_dirty();
 }
 
 // --- Rendering Lifecycle ---
@@ -190,14 +223,16 @@ void wd_train_formation::render(U8G2& display) {
 
     // --- Step 5: Render each carriage ---
     for (size_t i = 0; i < n; ++i) {
+        u8g2gl_carriage_t carriage{};
+        get_carriage(i, &carriage);
         const int16_t box_x = static_cast<int16_t>(x + left_margin + static_cast<int16_t>(i) * (cell_w + gap));
         const int16_t inner_x = static_cast<int16_t>(box_x + 1);
         const int16_t inner_y = static_cast<int16_t>(box_y + 1);
 
         // 5a. Carriage number label above the box (setFontPosTop ensures y is top of glyph box)
-        if (carriages_[i].number > 0) {
+        if (carriage.number > 0) {
             char num_buf[8];
-            std::snprintf(num_buf, sizeof(num_buf), "%u", carriages_[i].number);
+            std::snprintf(num_buf, sizeof(num_buf), "%u", carriage.number);
             const int16_t num_w = static_cast<int16_t>(display.getUTF8Width(num_buf));
             const int16_t num_x = static_cast<int16_t>(box_x + (cell_w - num_w) / 2);
             display.drawUTF8(
@@ -216,9 +251,9 @@ void wd_train_formation::render(U8G2& display) {
         );
 
         // 5c. Loading gauge (filled bar from bottom proportional to loading percentage)
-        if (carriages_[i].loading_pct > 0 && inner_h > 0 && inner_w > 0) {
+        if (carriage.loading_pct > 0 && inner_h > 0 && inner_w > 0) {
             int16_t gauge_h = static_cast<int16_t>(
-                (static_cast<int32_t>(carriages_[i].loading_pct) * inner_h + 50) / 100
+                (static_cast<int32_t>(carriage.loading_pct) * inner_h + 50) / 100
             );
             if (gauge_h == 0) {
                 gauge_h = 1;
@@ -243,7 +278,7 @@ void wd_train_formation::render(U8G2& display) {
             display.setDrawColor(2);
 
             // First-class indicator: filled rectangle at top-left corner
-            if (carriages_[i].is_first_class) {
+            if (carriage.is_first_class) {
                 display.drawBox(
                     static_cast<u8g2_uint_t>(inner_x + 1),
                     static_cast<u8g2_uint_t>(inner_y + 1),
@@ -253,7 +288,7 @@ void wd_train_formation::render(U8G2& display) {
             }
 
             // Wheelchair indicator: "W" glyph
-            if (carriages_[i].has_wheelchair) {
+            if (carriage.has_wheelchair) {
                 int16_t w_pos = static_cast<int16_t>(inner_x + 6);
                 if (w_pos + 6 > inner_x + inner_w) {
                     w_pos = static_cast<int16_t>(inner_x + inner_w - 6);
@@ -266,7 +301,7 @@ void wd_train_formation::render(U8G2& display) {
             }
 
             // Bike indicator: "B" glyph
-            if (carriages_[i].has_bike) {
+            if (carriage.has_bike) {
                 int16_t b_pos = static_cast<int16_t>(inner_x + 12);
                 if (b_pos + 6 > inner_x + inner_w) {
                     b_pos = static_cast<int16_t>(inner_x + inner_w - 6);

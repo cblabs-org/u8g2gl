@@ -7,15 +7,16 @@
  * SPDX-License-Identifier: MIT
  *
  * File: widgets/wd_service_list/wd_service_list.cpp
- * Purpose: Implements wd_service_list tabular rendering and collection API.
- *          Provides bounded static memory storage with atomic commit bracketing.
+ * Purpose: Implements wd_service_list tabular rendering and collection API,
+ *          with atomic commit bracketing over the row storage the generator
+ *          allocates for each instance (§9.2).
  *
  * Description: Implementation of add_column, begin, add_row, commit, capacity,
- *              and multi-column U8G2 draw dispatch.
+ *              attach_rows and multi-column U8G2 draw dispatch. Every cell is
+ *              read and written through the attached u8g2gl_rows view, so the
+ *              widget never indexes storage it did not size.
  */
 #include "wd_service_list.hpp"
-
-#include <cstring>
 
 #if __has_include(<U8g2lib.h>)
 #include <U8g2lib.h>
@@ -34,46 +35,16 @@ void wd_service_list::set_font(const uint8_t* font) {
     mark_dirty();
 }
 
-void wd_service_list::set_max_rows(int16_t rows) {
-    if (rows <= 0) {
-        return;
-    }
-    size_t clamped = static_cast<size_t>(rows);
-    if (clamped > DEFAULT_MAX_ROWS) {
-        clamped = DEFAULT_MAX_ROWS;
-    }
-    if (max_rows_ != clamped) {
-        max_rows_ = clamped;
-        mark_dirty();
-    }
+// The three sizing props are read by the generator, which allocates this
+// instance's rows from them (§9.2); the view attach_rows() hands over is the
+// only capacity the widget has, so there is nothing for these to store.
+void wd_service_list::set_max_rows(int16_t /*rows*/) {
 }
 
-void wd_service_list::set_max_cols(int16_t cols) {
-    if (cols <= 0) {
-        return;
-    }
-    size_t clamped = static_cast<size_t>(cols);
-    if (clamped > DEFAULT_MAX_COLS) {
-        clamped = DEFAULT_MAX_COLS;
-    }
-    if (max_cols_ != clamped) {
-        max_cols_ = clamped;
-        mark_dirty();
-    }
+void wd_service_list::set_max_cols(int16_t /*cols*/) {
 }
 
-void wd_service_list::set_max_cell_chars(int16_t chars) {
-    if (chars <= 0) {
-        return;
-    }
-    size_t clamped = static_cast<size_t>(chars);
-    if (clamped > DEFAULT_MAX_CELL_CHARS) {
-        clamped = DEFAULT_MAX_CELL_CHARS;
-    }
-    if (max_cell_chars_ != clamped) {
-        max_cell_chars_ = clamped;
-        mark_dirty();
-    }
+void wd_service_list::set_max_cell_chars(int16_t /*chars*/) {
 }
 
 void wd_service_list::set_scroll_dwell_ms(int32_t dwell_ms) {
@@ -108,26 +79,20 @@ void wd_service_list::begin() {
     current_row_index_ = 0;
 }
 
+// wd_service_list::add_row
+// Stages one row in place: each cell through the view, which truncates it at
+// max_cell_chars. Cells past the storage's columns are dropped; missing or null
+// ones are stored empty, so a short row never shows a previous batch's text.
+//   cells — the row's texts, nullptr for an empty cell
+//   n     — how many `cells` holds
 bool wd_service_list::add_row(const char* const* cells, size_t n) {
-    // Check row capacity
-    if (current_row_index_ >= max_rows_) {
+    if (current_row_index_ >= rows_.capacity()) {
         return false;
     }
-
-    // Copy each cell into bounded static storage. max_cell_chars_ counts
-    // usable characters, as a string subject's max_len does (§8.2); each cell
-    // holds one more byte for the terminator, so a cell of exactly
-    // max_cell_chars_ characters survives whole.
-    for (size_t c = 0; c < max_cols_; ++c) {
-        if (c < n && cells[c] != nullptr) {
-            std::strncpy(cells_[current_row_index_][c], cells[c], max_cell_chars_);
-            cells_[current_row_index_][c][max_cell_chars_] = '\0';
-        } else {
-            // Null or missing cell: store empty string
-            cells_[current_row_index_][c][0] = '\0';
-        }
+    const uint32_t columns = rows_.repeat(0);
+    for (uint32_t c = 0; c < columns; ++c) {
+        rows_.set_string(current_row_index_, 0, c < n ? cells[c] : nullptr, c);
     }
-
     current_row_index_++;
     return true;
 }
@@ -143,11 +108,28 @@ void wd_service_list::commit() {
 }
 
 size_t wd_service_list::capacity() const {
-    return max_rows_;
+    return rows_.capacity();
 }
 
 size_t wd_service_list::row_count() const {
     return row_count_;
+}
+
+// --- Collection Storage (§9.2) ---
+
+// wd_service_list::attach_rows
+// Keeps the view over this instance's rows. A new view starts empty: rows
+// written to an earlier one are not this storage's.
+//   data_index — the <data>'s declaration index; this widget has one, `rows`
+//   rows       — the generated storage
+void wd_service_list::attach_rows(uint8_t data_index, const u8g2gl_rows& rows) {
+    if (data_index != 0) {
+        return;
+    }
+    rows_ = rows;
+    current_row_index_ = 0;
+    row_count_ = 0;
+    mark_dirty();
 }
 
 // --- Rendering Lifecycle ---
@@ -202,8 +184,8 @@ void wd_service_list::render(U8G2& display) {
                 continue; // Skip zero-width columns
             }
 
-            const char* text = cells_[r][c];
-            if (text != nullptr && text[0] != '\0') {
+            const char* text = rows_.get_string(r, 0, static_cast<uint32_t>(c));
+            if (text[0] != '\0') {
                 int16_t text_w = static_cast<int16_t>(display.getUTF8Width(text));
                 int16_t cell_x = col_x;
                 if (columns_[c].align == U8G2GL_ALIGN_CENTER) {

@@ -60,6 +60,9 @@
  *     - render():            Draw to the U8G2 buffer
  *     - draws_own_outline(): Whether render() frames the box itself, so the
  *                            framework skips the style `border` outline
+ *
+ *     Collection storage (virtual, §9.2):
+ *     - attach_rows():       Receive a `<data>`'s generated storage at init
  */
 #ifndef U8G2GL_OBJ_H
 #define U8G2GL_OBJ_H
@@ -72,6 +75,8 @@
 
 // Forward declaration of U8G2
 class U8G2;
+// A collection's rows (u8g2gl_rows.h); only a widget with <data> includes it.
+class u8g2gl_rows;
 
 /**
  * @brief Bytes of stack a text-drawing widget reserves to format an int-bound
@@ -472,6 +477,27 @@ public:
      *         is set.
      */
     virtual bool draws_own_outline() const;
+
+    // --- Collection storage (§9.2) ---
+
+    /**
+     * @brief Receive one `<data>` block's storage: the buffer the generator
+     *        sized for this instance, as a view.
+     *
+     * A collection widget does not allocate its own rows ([Q-19]). The
+     * generator allocates one buffer per instance per `<data>`, capacity × row
+     * bytes from the instance's props, and generated init calls this once per
+     * block, after the setters and the static children, before any binding;
+     * the editor host does the same with storage it allocates per scene. A
+     * widget keeps the view and reads and writes its rows through it; with
+     * none attached it has no rows, and its access method returns false.
+     *
+     * @param data_index The `<data>`'s index in its manifest's declaration order.
+     * @param rows       The view; the storage it names outlives the object.
+     *                   Keep a copy, not the reference.
+     * The default does nothing: an element with no `<data>` has nothing to keep.
+     */
+    virtual void attach_rows(uint8_t data_index, const u8g2gl_rows& rows);
 
     // --- Escape hatch ---
 

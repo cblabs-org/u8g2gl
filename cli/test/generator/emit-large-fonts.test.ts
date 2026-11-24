@@ -57,7 +57,7 @@ function emitFonts(fonts: readonly FontDecl[]): string {
     project: { schema: '0.7', name: 'p', version: '1.0.0', targets: [] },
     globals: { consts: [], subjects: [], styles: [], fonts: [...fonts], images: [] },
     screens: [],
-    capacities: { maxObjectsPerScreen: 0, maxBindingsPerObject: 0, totalBindings: 0, styles: 0, styleNames: [], subjects: [] },
+    capacities: { maxObjectsPerScreen: 0, maxBindingsPerObject: 0, totalBindings: 0, styles: 0, styleNames: [], subjects: [], collections: [] },
     manifests: frameworkRegistry(),
     images: new Map(),
     compiledFonts: new Map([['my_bdf', TINY_BDF]]),

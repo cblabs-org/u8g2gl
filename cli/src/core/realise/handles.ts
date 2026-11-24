@@ -30,8 +30,14 @@
  *              A handle is declared in `ui.hpp`, so it is visible in every
  *              translation unit, and is checked against every screen's names.
  *
+ *              A collection's storage (§9.2) is composed the same way:
+ *              `ui_rows_<element>_<data>`, with its layout and field table
+ *              beside it. Those are `static` in their screen's unit, so they
+ *              are checked against the globals and that screen's names only.
+ *
  * Exports:
  * - elementHandleIdentifier(): `ui_<screen>_<element>`
+ * - storageIdentifiers():      A collection's buffer, layout and field table
  * - handledElements():         The objects of a screen that get a handle
  * - GeneratedName:             One composed identifier, with its source
  * - generatedNames():          Every composed identifier of a project
@@ -49,6 +55,7 @@ import {
   type ExpandedScreen,
   type IdentifierSource,
 } from '../resolver/index.js';
+import type { ManifestRegistry } from '../manifest/manifest-registry.js';
 import type { RealisedElement, RealisedScreen } from './model.js';
 
 /**
@@ -64,6 +71,22 @@ import type { RealisedElement, RealisedScreen } from './model.js';
  */
 export function elementHandleIdentifier(screen: string, element: string): string {
   return `ui_${screen}_${element}`;
+}
+
+/**
+ * @brief The `static` identifiers one collection's storage is emitted as, in
+ *        its screen's unit (§9.2): its buffer `ui_rows_<element>_<data>`, its
+ *        layout and its field table.
+ *
+ * @param element The object's name (§13.4's joined name).
+ * @param data    The `<data>`'s name.
+ */
+export function storageIdentifiers(
+  element: string,
+  data: string,
+): { readonly buffer: string; readonly layout: string; readonly fields: string } {
+  const buffer = `ui_rows_${element}_${data}`;
+  return { buffer, layout: `${buffer}_layout`, fields: `${buffer}_fields` };
 }
 
 /**
@@ -106,12 +129,18 @@ function elementLoc(element: RealisedElement): SourceLocation | undefined {
 
 /**
  * @brief Every identifier the generator composes for a project, in document
- *        order: per screen, each handled object's handle.
+ *        order: per screen, each handled object's handle, then each
+ *        collection's storage.
  *
- * @param realised The realised screens, in load order.
+ * Storage names are composed for every `<data>` of every object, whether or
+ * not the block can be sized: the names do not depend on its size, and a
+ * collision is worth reporting beside an unsized block, not after it.
+ *
+ * @param realised  The realised screens, in load order.
+ * @param manifests The effective manifests, for each object's `<data>`.
  * @return The names, with their scope and source.
  */
-export function generatedNames(realised: readonly RealisedScreen[]): readonly GeneratedName[] {
+export function generatedNames(realised: readonly RealisedScreen[], manifests: ManifestRegistry): readonly GeneratedName[] {
   const names: GeneratedName[] = [];
   for (const screen of realised) {
     const screenName = screen.screen.name;
@@ -125,6 +154,26 @@ export function generatedNames(realised: readonly RealisedScreen[]): readonly Ge
         ...(loc !== undefined ? { loc } : {}),
       });
     }
+    for (const element of screen.objects) {
+      if (element.identifier === '') continue;
+      const loc = elementLoc(element);
+      for (const data of manifests.get(element.element.node.tag)?.api.data ?? []) {
+        const spelled = storageIdentifiers(element.identifier, data.name);
+        const source = `the storage of <${element.element.node.tag}> '${element.identifier}' <data name="${data.name}">`;
+        for (const [identifier, what] of [
+          [spelled.buffer, 'buffer'],
+          [spelled.layout, 'layout'],
+          [spelled.fields, 'field table'],
+        ] as const) {
+          names.push({
+            identifier,
+            scope: { kind: 'screen', screen: screenName },
+            description: `${source} (its ${what})`,
+            ...(loc !== undefined ? { loc } : {}),
+          });
+        }
+      }
+    }
   }
   return names;
 }
@@ -136,6 +185,8 @@ export interface GeneratedNamesInput {
   readonly expansion: readonly ExpandedScreen[];
   /** Their realisation, in the same order. */
   readonly realised: readonly RealisedScreen[];
+  /** The effective manifests, for each object's `<data>`. */
+  readonly manifests: ManifestRegistry;
 }
 
 /** One name already in scope, and what to say about it. */
@@ -190,7 +241,8 @@ function collision(name: GeneratedName, first: Holder): Diagnostic {
  * Collisions inside §13.4's table are not reported here: they are Pass 7's
  * `U8G2GL_NAME_COLLISION`.
  *
- * @param input Globals, the expanded screens and their realisation.
+ * @param input Globals, the expanded screens, their realisation and the
+ *              manifests.
  * @return One `U8G2GL_GENERATED_NAME_COLLISION` error per collision, at the
  *         later source, in document order. Never throws for user input.
  */
@@ -222,7 +274,7 @@ export function checkGeneratedNames(input: GeneratedNamesInput): readonly Diagno
   // --- Step 2: Each composed name, against what is in its scope so far ---
   // Globals first, in document order, then each screen's own: a global is
   // visible to every unit, so it is in scope wherever a local is checked.
-  const composed = generatedNames(input.realised);
+  const composed = generatedNames(input.realised, input.manifests);
   const diagnostics: Diagnostic[] = [];
   const composedGlobal = new Map<string, Holder>();
   for (const name of composed) {

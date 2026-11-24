@@ -1451,7 +1451,7 @@ static const u8g2gl_editor_binding ui_editor_wd_tally_bindings[] = {
         U8G2GL_SUBJECT_INT},
 };
 static const u8g2gl_editor_field ui_editor_wd_tally_marks_fields[] = {
-    {"at", nullptr, {nullptr, 0}, {nullptr, -1}, INT32_MIN, INT32_MAX, U8G2GL_EDITOR_STRING, 0, false},
+    {"at", nullptr, {nullptr, 0}, {nullptr, 8}, INT32_MIN, INT32_MAX, U8G2GL_EDITOR_STRING, 0, false},
 };
 static const auto ui_editor_wd_tally_marks_call = [](auto* s, auto... a) -> decltype(s->add_mark(a...)) { return s->add_mark(a...); };
 static_assert(std::is_invocable_v<decltype(ui_editor_wd_tally_marks_call), wd_tally*, const char*>,

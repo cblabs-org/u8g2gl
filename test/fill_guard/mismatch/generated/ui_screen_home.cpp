@@ -6,6 +6,7 @@
 
 #include "ui.hpp"
 
+#include "u8g2gl/u8g2gl_rows.h"
 #include "wd_tally.hpp"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
@@ -13,6 +14,17 @@ static wd_tally ui_obj_tally;  // 0
 
 // --- Handles: the named objects ui.hpp declares (§9.2) ---
 wd_tally& ui_home_tally = ui_obj_tally;
+
+// --- Collection storage: one buffer per instance per <data> (§9.2, §18) ---
+// Each sized from its own instance's props, capacity x row bytes; the row
+// layout follows from the manifest's <field>s, so this is the buffer's size,
+// never an assumption about the widget's.
+// tally <data name="marks">: 4 rows × 12 bytes (at: string, 9 bytes, max_len 8 + 1, at 0; padded to 4) = 48 bytes
+static constexpr u8g2gl_rows_field ui_rows_tally_marks_fields[] = {
+    {0, 9, 1, U8G2GL_FIELD_STRING},  // at
+};
+static constexpr u8g2gl_rows_layout ui_rows_tally_marks_layout = {ui_rows_tally_marks_fields, 12, 1};
+alignas(4) static uint8_t ui_rows_tally_marks[48];
 
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
@@ -35,6 +47,7 @@ void ui_screen_home_init() {
 
     // --- Step 3: Set properties ---
     ui_obj_tally.set_coords(0, 0, 32, 8);
+    ui_obj_tally.attach_rows(0, u8g2gl_rows(ui_rows_tally_marks, 4, &ui_rows_tally_marks_layout));  // <data name="marks">
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
