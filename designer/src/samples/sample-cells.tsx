@@ -102,9 +102,11 @@ export function SubjectValueCell({
   readonly value: unknown;
   readonly onCommit: (value: unknown) => void;
 }): React.JSX.Element {
+  // --- Step 1: Inherited or the set's own, and whether it checks ---
   const inherited = value === undefined;
   const problem = inherited ? undefined : subjectValueProblem(subject, value);
   const label = `${subject.name} in ${set}`;
+  // --- Step 2: The control, by the subject's type ---
   const control =
     subject.type === 'bool' ? (
       <input type="checkbox" aria-label={label} checked={inherited ? subject.initial === 'true' : value === true} onChange={(event) => onCommit(event.target.checked)} />
@@ -121,6 +123,7 @@ export function SubjectValueCell({
         }}
       />
     );
+  // --- Step 3: The control, its inherited mark or reset, and any problem ---
   return (
     <span className="sample-value" data-inherited={inherited} data-set={set} data-subject={subject.name} data-problem={problem !== undefined}>
       {control}
@@ -162,6 +165,7 @@ export function FieldCell({
   readonly onCommit: (value: unknown) => void;
 }): React.JSX.Element {
   const label = `${field.name} of row ${row + 1}`;
+  // --- Step 1: A repeated field is its cells, each a string cell ---
   if (field.repeated) {
     return (
       <span className="sample-repeat">
@@ -171,6 +175,7 @@ export function FieldCell({
       </span>
     );
   }
+  // --- Step 2: A single field's control, by its type ---
   switch (field.type) {
     case 'bool':
       return <input type="checkbox" aria-label={label} checked={value === true} onChange={(event) => onCommit(event.target.checked)} />;

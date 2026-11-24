@@ -20,7 +20,8 @@
  *
  *              A collection is reached through `ui_screen_<s>.objs[i]`: the
  *              generated objects are `static` in each screen's unit, and the
- *              firmware ingestion API that would name them is PR-08's. `i` is
+ *              firmware ingestion API that would name them is not generated
+ *              yet (design_spec §9.2, §9.6). `i` is
  *              the element's object index in the scene generated with the
  *              firmware code (its `object`, the realiser's document-order
  *              index, which the generator emits `objs` in), cast to its class.

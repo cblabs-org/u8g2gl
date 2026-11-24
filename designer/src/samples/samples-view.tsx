@@ -89,12 +89,14 @@ function SetBar({
   readonly active: string | undefined;
   readonly shape: SampleShape;
 }): React.JSX.Element {
+  // --- Step 1: The bar's own state: the open name field, a pending delete, a refusal ---
   const [mode, setMode] = useState<NameMode | undefined>(undefined);
   const [name, setName] = useState('');
   const [message, setMessage] = useState<string | undefined>(undefined);
   const [confirming, setConfirming] = useState(false);
   const samples = workspace.samples;
 
+  // --- Step 2: The file operations: new, duplicate and rename by name ---
   const open = (next: NameMode): void => {
     setMode(next);
     setConfirming(false);
@@ -120,6 +122,7 @@ function SetBar({
     setMessage(undefined);
   };
 
+  // --- Step 3: The generated and conventional sets ---
   // The renderer's own widths, for the widest glyph: the canvas's module has
   // every declared font injected before each frame.
   const measure: TextMeasure = (font, text) => workspace.wasm.module.get()?.measureText(font, text);
@@ -151,6 +154,7 @@ function SetBar({
     workspace.activeSampleSet.choose(CONVENTIONAL_SETS[0]);
   };
 
+  // --- Step 4: The list, the actions, then the name field or delete confirmation when open ---
   return (
     <section className="samples-section samples-sets" aria-label="Sample sets">
       <h3>Sets</h3>
@@ -410,6 +414,7 @@ function CollectionGrid({ workspace, collection, set }: { readonly workspace: Wo
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState('');
   const [report, setReport] = useState<PasteResult | undefined>(undefined);
+  // --- Step 1: The one <data> block, in a set that parses ---
   const block = collection.blocks[0];
   const document = workspace.samples.documentOf(set);
   if (block === undefined || collection.blocks.length > 1) {
@@ -418,6 +423,7 @@ function CollectionGrid({ workspace, collection, set }: { readonly workspace: Wo
   if (document === undefined) {
     return <p className="field-problem warning">{workspace.samples.pathOf(set)} is not valid JSON: fix it in its editor tab first.</p>;
   }
+  // --- Step 2: The rows, and how an edit writes them back as one undo step ---
   const rows = rowsIn(document, collection.file, collection.element);
   const full = block.capacity !== undefined && rows.length >= block.capacity;
   // write
@@ -425,6 +431,7 @@ function CollectionGrid({ workspace, collection, set }: { readonly workspace: Wo
   const write = (next: readonly unknown[]): void => void workspace.samples.edit(set, (d) => withRows(d, collection.file, collection.element, next));
   const rowOf = (row: unknown): Record<string, unknown> => (typeof row === 'object' && row !== null && !Array.isArray(row) ? (row as Record<string, unknown>) : {});
 
+  // --- Step 3: The grid, its row actions, and paste with its report ---
   return (
     <div className="sample-grid-wrap">
       <table className="sample-grid" aria-label={`${collection.element} rows in ${set}`}>

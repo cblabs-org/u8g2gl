@@ -6,8 +6,8 @@
  * File: designer/src/documents/project-documents.ts
  * Purpose: The project's documents as the designer holds them: the text on
  *          disk, with its version, for every XML document the project reads
- *          and every sample set (`samples/*.json`),
- *          and a Monaco model for each one the user has opened. Text is the
+ *          and every sample set (`samples/*.json`), and a Monaco model for
+ *          each one the user has opened. Text is the
  *          single source of truth ([UD-3]); this is where it is kept, and the
  *          only place the pipeline reads it from, so the canvas can never show
  *          a document other than the one in the editor.

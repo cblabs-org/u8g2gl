@@ -14,8 +14,9 @@
  * Description: Files are classified by the project layout (design_spec §19):
  *              `u8g2gl.xml`, `globals.xml`, `screens/screen_*.xml`, and widget
  *              manifests under `widgets/`; and the sample sets under
- *              `samples/`, which are documents but not part of the model. Screens and manifests parse under
- *              the `'generate'` missing-name policy ([U-1]): the editor
+ *              `samples/`, which are documents but not part of the model.
+ *              Screens and manifests parse under the `'generate'`
+ *              missing-name policy ([U-1]): the editor
  *              supplies a name the author has not written yet, the same name
  *              opening the file writes into its buffer, so a file that is not
  *              open and one that is describe the same elements.

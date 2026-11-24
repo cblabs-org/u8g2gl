@@ -26,8 +26,8 @@
  *              subscribe to the selection themselves, and Run with the last
  *              test run's verdict (`test-run-controls.tsx`), whose mismatch
  *              legend sits over the stage, and the sample-set switcher
- *              (`samples/sample-set-switcher.tsx`). The banner says why the frame is
- *              the last good one, or what the renderer cannot draw. While
+ *              (`samples/sample-set-switcher.tsx`). The banner says why the
+ *              frame is the last good one, or what the renderer cannot draw. While
  *              anything on the drawn screen is hidden in the designer, the
  *              toolbar says so (`design-hidden-badge.tsx`). While a project
  *              file is the active file, its form covers the panel

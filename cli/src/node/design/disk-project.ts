@@ -16,8 +16,9 @@
  *              through. Removal is narrower than writing: only a sample set
  *              (`samples/<set>.json`) can be removed, because the designer
  *              deletes nothing else, and a route that could delete any project
- *              file would be a much larger thing to get wrong. Versions are `contentVersion` of the bytes, so the
- *              server and browser agree without shared state.
+ *              file would be a much larger thing to get wrong. Versions are
+ *              `contentVersion` of the bytes, so the server and browser agree
+ *              without shared state.
  *
  *              The file operations are synchronous on purpose: Node runs one
  *              request handler at a time, so a synchronous check-then-write
@@ -34,7 +35,7 @@
  *     - list():               Every project source file
  *
  *     Sample sets:
- *     - SAMPLE_SET_PATH:      The only paths remove() takes
+ *     - SAMPLE_SET_PATH:      The only paths removeSampleSet() takes
  *     - removeSampleSet():    Conditional removal of one set
  *
  *     Handing a file to another program:

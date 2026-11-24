@@ -205,9 +205,13 @@ interface RunContext {
 }
 
 /**
- * @brief One test run: stage the text, build the harness, run the frame loop.
+ * @brief One test run: stage the text, build the harness, then run every
+ *        screen with the initial values and with each posted sample set, each
+ *        on a freshly booted harness.
  *
- * @return The result, or the diagnostics that stopped the build.
+ * @return The result, whose `runs` holds every case and whose `frames`
+ *         repeat the requested screen's run with the initial values; or the
+ *         diagnostics that stopped the build.
  */
 export async function runTestRun(
   context: RunContext,
@@ -240,7 +244,9 @@ export async function runTestRun(
     };
   }
 
-  // --- Step 3: The frame loop, on a freshly booted harness ---
+  // --- Step 3: Every screen with the initial values, then with each set, each on a freshly booted harness ---
+  // `frames` stays the requested screen's initial-values run, as it was
+  // before sets, so a client that reads only it still gets its answer.
   const runStarted = Date.now();
   const harness = await loadHarness(build.harnessDir);
   const encode = (frames: readonly Uint8Array[]): TestRunFrame[] =>

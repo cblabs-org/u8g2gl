@@ -15,9 +15,9 @@
  *              1 = a lit pixel), `scene.json`, `staged/<path>` for each
  *              document that differed from disk, and `report.json` with the
  *              screen, the sample set, the time, both hashes, the differing
- *              pixel count and the versions. The harness frame is taken from the run's own
- *              record, never from the request, so a report always holds what
- *              the server actually produced. `testRunReportRoute()` is the
+ *              pixel count and the versions. The harness frame is taken
+ *              from the run's own record, never from the request, so a
+ *              report always holds what the server actually produced. `testRunReportRoute()` is the
  *              server route (`POST /api/test-run/report`) around it.
  *
  * Exports:

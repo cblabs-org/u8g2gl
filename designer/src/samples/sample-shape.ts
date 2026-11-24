@@ -120,6 +120,7 @@ export interface SampleShape {
  * @param model The project model the live pipeline built.
  */
 export function sampleShapeOf(model: ProjectModel): SampleShape {
+  // --- Step 1: Every screen's elements, in document order ---
   const drawnIn = new Map<string, string[]>();
   const collections: SampleCollection[] = [];
   const screenFiles = new Set<string>();
@@ -160,6 +161,7 @@ export function sampleShapeOf(model: ProjectModel): SampleShape {
     };
     visit(screen.view.children);
   }
+  // --- Step 2: The subjects, each with the fonts that draw it ---
   const subjects = (model.globals.subjects ?? []).map(
     (s): SampleSubject => ({ name: s.name, type: s.type, initial: s.default, maxLen: s.maxLen, fonts: drawnIn.get(s.name) ?? [] }),
   );

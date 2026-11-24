@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/e2e/samples.spec.ts
- * Purpose: Sample sets end to end (ui_spec §11), on the owner's test case: a
+ * Purpose: Sample sets end to end (ui_spec §11), on the departures fixture: a
  *          set file on disk fills the departures board's train formation and
  *          service list on the canvas, an external edit to the set reaches the
  *          canvas as an XML edit would; the Sample data view's typed grids,

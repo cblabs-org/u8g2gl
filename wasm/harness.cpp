@@ -17,10 +17,15 @@
  *
  * Description: An application registers a clock, calls `ui_init()`, activates
  *              a screen and calls `ui_handler()` each loop. runScreen() does
- *              exactly that, applying the selected sample set (if any) after
- *              `ui_init()` as an application applies its data, with a clock it sets to each requested time
+ *              exactly that, with a clock it sets to each requested time
  *              before each call, and keeps the display buffer after each
- *              call as that time's frame. A frame `ui_handler()` declined to
+ *              call as that time's frame. After `ui_init()` it applies the
+ *              selected sample set, if any, as an application applies its
+ *              data: the hook (`u8g2gl_harness_apply_sample_set()`) and the
+ *              set-selection exports (`getSampleSetCount()`,
+ *              `getSampleSetName()`, `selectSampleSet()`) are defined by the
+ *              design server's generated unit (sample-set-unit.ts), linked
+ *              beside the screen table. A frame `ui_handler()` declined to
  *              redraw (nothing dirty) therefore shows the frame before it, as
  *              the panel would.
  *

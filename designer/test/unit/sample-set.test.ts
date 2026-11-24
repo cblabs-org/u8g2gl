@@ -15,7 +15,7 @@
  *              against: its `formation` (a `<data>` of five typed fields,
  *              capacity `max_carriages="12"`) and `services` (a repeated string
  *              field, `max_rows="10"`, `max_cols` 6 and `max_cell_chars` 24
- *              by default) are the owner's test case.
+ *              by default) are the collections the sets were designed against.
  */
 
 import { expect, test } from '@playwright/test';

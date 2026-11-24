@@ -24,8 +24,8 @@
  *                a project that has built its editor Wasm compiles neither;
  *              - the harness: its own framework cache, with the runtime's key;
  *              - the firmware units, the widgets, the screen table and the
- *                sample sets: the
- *                project's `obj-firmware/`, compiled without `U8G2GL_EDITOR`,
+ *                sample sets: the project's `obj-firmware/`, compiled without
+ *                `U8G2GL_EDITOR`,
  *                as the device's build compiles them. The widgets therefore
  *                compile twice per project, once per target, and only when
  *                they change.

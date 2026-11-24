@@ -125,22 +125,6 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
   // Below: Run overrides it, and the Run button's tooltip says so.
   // The S key is matched by its code as well as its character, because with
   // Option held a Mac keyboard reports the character ß, not s.
-  // --- ⌥] / Alt+] and ⌥[ / Alt+[ anywhere cycle the canvas's sample set ---
-  // Matched by code, because with Option held a Mac keyboard reports another
-  // character than the bracket, as for ⌘⌥S below.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
-      const by = event.code === 'BracketRight' ? 1 : event.code === 'BracketLeft' ? -1 : 0;
-      if (by === 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      workspace.samples.cycle(by);
-    };
-    window.addEventListener('keydown', onKey, { capture: true });
-    return () => window.removeEventListener('keydown', onKey, { capture: true });
-  }, [workspace]);
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey) return;
@@ -154,6 +138,22 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
         event.stopPropagation();
         workspace.testRun.run();
       }
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [workspace]);
+
+  // --- ⌥] / Alt+] and ⌥[ / Alt+[ anywhere cycle the canvas's sample set ---
+  // Matched by code, because with Option held a Mac keyboard reports another
+  // character than the bracket, as for ⌘⌥S above.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const by = event.code === 'BracketRight' ? 1 : event.code === 'BracketLeft' ? -1 : 0;
+      if (by === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      workspace.samples.cycle(by);
     };
     window.addEventListener('keydown', onKey, { capture: true });
     return () => window.removeEventListener('keydown', onKey, { capture: true });
