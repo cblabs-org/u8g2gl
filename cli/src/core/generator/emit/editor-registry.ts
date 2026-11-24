@@ -85,6 +85,7 @@ import {
 import { FLAG_COMPARISONS } from '../../schema/widget-node.js';
 import { EDITOR_REGISTRY_FUNCTION } from '../../resolver/index.js';
 import { drawFunctionOf } from './draw-args.js';
+import { FIELD_ARGUMENT_TYPES, REPEATED_ARGUMENT_TYPES } from './field-types.js';
 import { POSITION_BINDINGS } from './placement.js';
 import { argPropOf, classOf, FLAG_ENUMERATOR_PATTERN, RECTANGLE, rectangleSetterOf } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
@@ -327,16 +328,6 @@ function elementTables(tag: string, cls: string, elements: readonly ElementDef[]
   return lines;
 }
 
-/** The C++ type the editor passes each field type as, for the signature check. */
-const FIELD_ARGUMENT_TYPES: Readonly<Partial<Record<PropType, string>>> = {
-  int: 'int32_t',
-  bool: 'bool',
-  string: 'const char*',
-  // A data enum is run-time data, so it reaches the method as its text, which
-  // the widget interprets (`add_carriage(…, const char* class_type, …)`).
-  enum: 'const char*',
-};
-
 /** How a single cell's value is read for each field type. */
 const FIELD_READS: Readonly<Partial<Record<PropType, string>>> = {
   int: 'value.integer',
@@ -409,7 +400,7 @@ function signatureTypes(data: WidgetData): { types: string[]; spelled: string } 
   const spelled: string[] = [];
   for (const field of data.fields) {
     if (field.repeat !== undefined) {
-      types.push('const char* const*', 'size_t');
+      types.push(...REPEATED_ARGUMENT_TYPES);
       spelled.push(`${field.name}: string[] as const char* const*, size_t`);
       continue;
     }

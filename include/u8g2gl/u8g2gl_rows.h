@@ -34,6 +34,8 @@
  *              and the view owns nothing.
  *
  * Exported Classes:
+ * - u8g2gl_row_added():  (template) Whether an access call took its row, for the
+ *                        generated collection facade
  * - u8g2gl_field_type_t: A field's type
  * - u8g2gl_rows_field:   One field's place in a row
  * - u8g2gl_rows_layout:  A row's fields and its size
@@ -55,6 +57,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 /** @brief A row field's type (§9.2's encoding). */
 enum u8g2gl_field_type_t : uint8_t {
@@ -157,5 +160,26 @@ private:
     const u8g2gl_rows_layout* layout_ = nullptr;
     size_t capacity_ = 0;
 };
+
+/**
+ * @brief Whether a `<data>` access call took its row: its `bool` result, or
+ *        true for an access method that returns nothing.
+ *
+ * The generated collection facade (§9.2) forwards add_row() to the widget's
+ * declared access method, whose return type is the widget's own choice; this
+ * reads it one way for both, as the editor's fill thunk does. Past capacity a
+ * widget refuses with false, and the facade returns that refusal.
+ *
+ * @param call Callable `()` making the access call.
+ */
+template <typename Call>
+bool u8g2gl_row_added(Call call) {
+    if constexpr (std::is_void_v<std::invoke_result_t<Call>>) {
+        call();
+        return true;
+    } else {
+        return static_cast<bool>(call());
+    }
+}
 
 #endif  // U8G2GL_ROWS_H

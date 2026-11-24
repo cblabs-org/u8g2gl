@@ -1353,6 +1353,50 @@ target_compile_options(test_wasm_parity PRIVATE
 u8g2gl_discover_tests(test_wasm_parity)
 
 
+# --- The generated collection facade (design_spec §9.2), drawn by real U8G2 ---
+# test/collection_data/'s committed firmware units, compiled with the departures
+# widgets, the runtime and real U8G2 onto the memory display the Wasm hosts
+# draw on, so a fill through the facades is checked in lit pixels. The
+# runtime is compiled here with the fixture's generated capacities.
+set(U8G2GL_COLLECTION_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/collection_data)
+add_executable(test_collection_facade
+    test_collection_facade.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/memory_display.cpp
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list/wd_service_list.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation/wd_train_formation.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_images.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_screen_board.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_subjects.cpp
+)
+target_include_directories(test_collection_facade PRIVATE
+    ${PROJECT_SOURCE_DIR}/wasm
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation
+)
+target_include_directories(test_collection_facade SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(test_collection_facade PRIVATE
+    ARDUINO=10819
+    U8G2GL_GENERATED_CONFIG="u8g2gl_generated_config.h"
+)
+target_link_libraries(test_collection_facade PRIVATE
+    u8g2gl_parity_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_collection_facade PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_collection_facade)
+
 # --- Firmware pays nothing for the editor ([UD-4]) ---
 # The registry and src/u8g2gl_editor.cpp compile to nothing without
 # U8G2GL_EDITOR. Proven on the linked artefacts rather than assumed: nm must find

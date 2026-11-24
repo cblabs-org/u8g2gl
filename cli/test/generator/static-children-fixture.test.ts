@@ -223,7 +223,9 @@ describe('emission', () => {
   it('calls the access method after the setters, once per child, in document order', async () => {
     const { firmware } = await regenerate(DEPARTURES);
     const unit = firmware.files.find((file) => file.path === 'ui_screen_departures.cpp')!.content;
-    const services = unit.split('\n').filter((line) => line.includes('ui_obj_services.'));
+    // From init on: the collection facade above it forwards to the same object.
+    const init = unit.slice(unit.indexOf('void ui_screen_departures_init() {'));
+    const services = init.split('\n').filter((line) => line.includes('ui_obj_services.'));
     expect(services).toEqual([
       '    ui_obj_services.set_coords(0, 51, 190, 13);',
       '    ui_obj_services.set_font(ui_font_u8g2_font_6x10_mr);',

@@ -16,8 +16,9 @@
  *              (§13.9), the `U8G2GL_PROGMEM` shim the images unit needs, the
  *              display contract, every subject and its `ui_set_*` setter, the
  *              styles, fonts and images, the classes the handles refer to,
- *              each screen's five §13.7 functions with its descriptor and its
- *              named objects' handles, and the project's own entry points.
+ *              each screen's five §13.7 functions with its descriptor, its
+ *              named objects' handles and its collections' facades, and the
+ *              project's own entry points.
  *
  *              **The display contract** (design_spec §16) is here because this
  *              is the one file an application includes, and not in
@@ -55,6 +56,11 @@
  *              this header still pulls in no widget (below). Code that calls
  *              through a handle includes the widget's header itself.
  *
+ *              **Each collection gets a facade** beside its screen (§9.2,
+ *              `facades.ts`): a `const` object whose `begin()`, typed
+ *              `add_row()` and `commit()` forward to the widget's own, so an
+ *              application fills `services` without including its class.
+ *
  * Exports:
  * - UI_HEADER:        The header's file name
  * - UI_INIT_FUNCTION: The application's entry point
@@ -80,6 +86,7 @@ import { STYLES_INIT_FUNCTION, styleIdentifiers } from './styles.js';
 import { SUBJECTS_INIT_FUNCTION, subjectDeclarations } from './subjects.js';
 import { includeBlock, section, type DisplayContract, type EmittedUnit, type ProjectEmitInput } from './unit.js';
 import { elementHandles, type ElementHandle } from './screen-model.js';
+import { FACADE_HEADERS, facadeDeclaration, facadeOf } from './facades.js';
 import { compareCodeUnits } from '../../order.js';
 
 /** §13.7's umbrella header. */
@@ -228,7 +235,8 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
     `#include "${GENERATED_CONFIG_HEADER}"`,
     '',
     section('Runtime (§13.7)'),
-    '#include <cstdint>',
+    // The facades' signatures need size_t and initializer_list (§9.2).
+    includeBlock(['#include <cstdint>', ...(input.capacities.collections.length > 0 ? FACADE_HEADERS : [])]),
     '',
     includeBlock(RUNTIME_HEADERS),
     '',
@@ -320,6 +328,10 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
     if (own.length > 0) {
       lines.push(`// Its named objects (§9.2), each bound to its static in ui_screen_${screen.name}.cpp:`);
       lines.push(...own.map((handle) => `extern ${handle.className}& ${handle.identifier};`));
+    }
+    // Its collections' facades (§9.2), defined in its unit beside the widgets.
+    for (const storage of input.capacities.collections.filter((block) => block.screen === screen.name)) {
+      lines.push(...facadeDeclaration(facadeOf(storage)));
     }
   }
 

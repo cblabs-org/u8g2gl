@@ -35,8 +35,15 @@
  *              beside it. Those are `static` in their screen's unit, so they
  *              are checked against the globals and that screen's names only.
  *
+ *              Each collection also gets a facade in `ui.hpp` (§9.2): an
+ *              object `ui_<screen>_<element>_<data>` of type
+ *              `ui_<screen>_<element>_<data>_t`, the typed `begin()`,
+ *              `add_row()` and `commit()` an application fills it through.
+ *              Both are global, and checked as a handle is.
+ *
  * Exports:
  * - elementHandleIdentifier(): `ui_<screen>_<element>`
+ * - collectionFacadeIdentifiers(): A collection's facade object and its type
  * - storageIdentifiers():      A collection's buffer, layout and field table
  * - handledElements():         The objects of a screen that get a handle
  * - GeneratedName:             One composed identifier, with its source
@@ -71,6 +78,23 @@ import type { RealisedElement, RealisedScreen } from './model.js';
  */
 export function elementHandleIdentifier(screen: string, element: string): string {
   return `ui_${screen}_${element}`;
+}
+
+/**
+ * @brief The facade `ui.hpp` declares for one collection (§9.2): the object
+ *        `ui_<screen>_<element>_<data>` and its type, the same name with `_t`.
+ *
+ * @param screen  The screen's name as written.
+ * @param element The object's name (§13.4's joined name).
+ * @param data    The `<data>`'s name.
+ */
+export function collectionFacadeIdentifiers(
+  screen: string,
+  element: string,
+  data: string,
+): { readonly object: string; readonly type: string } {
+  const object = `ui_${screen}_${element}_${data}`;
+  return { object, type: `${object}_t` };
 }
 
 /**
@@ -130,7 +154,7 @@ function elementLoc(element: RealisedElement): SourceLocation | undefined {
 /**
  * @brief Every identifier the generator composes for a project, in document
  *        order: per screen, each handled object's handle, then each
- *        collection's storage.
+ *        collection's facade and storage.
  *
  * Storage names are composed for every `<data>` of every object, whether or
  * not the block can be sized: the names do not depend on its size, and a
@@ -158,6 +182,14 @@ export function generatedNames(realised: readonly RealisedScreen[], manifests: M
       if (element.identifier === '') continue;
       const loc = elementLoc(element);
       for (const data of manifests.get(element.element.node.tag)?.api.data ?? []) {
+        const facade = collectionFacadeIdentifiers(screenName, element.identifier, data.name);
+        const facadeSource = `the collection facade of <${element.element.node.tag}> '${element.identifier}' <data name="${data.name}"> on screen '${screenName}'`;
+        for (const [identifier, what] of [
+          [facade.object, facadeSource],
+          [facade.type, `${facadeSource} (its type)`],
+        ] as const) {
+          names.push({ identifier, scope: { kind: 'global' }, description: what, ...(loc !== undefined ? { loc } : {}) });
+        }
         const spelled = storageIdentifiers(element.identifier, data.name);
         const source = `the storage of <${element.element.node.tag}> '${element.identifier}' <data name="${data.name}">`;
         for (const [identifier, what] of [

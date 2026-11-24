@@ -26,6 +26,18 @@ static constexpr u8g2gl_rows_field ui_rows_board_rows_fields[] = {
 static constexpr u8g2gl_rows_layout ui_rows_board_rows_layout = {ui_rows_board_rows_fields, 100, 1};
 alignas(4) static uint8_t ui_rows_board_rows[400];
 
+// --- Collection facades: the typed fill API ui.hpp declares (§9.2) ---
+// Each forwards to the widget's own begin(), access method and commit().
+const ui_board_board_rows_t ui_board_board_rows{};
+void ui_board_board_rows_t::begin() const { ui_obj_board.begin(); }
+bool ui_board_board_rows_t::add_row(const char* const* cells, size_t cells_count) const {
+    return u8g2gl_row_added([&] { return ui_obj_board.add_row(cells, cells_count); });
+}
+bool ui_board_board_rows_t::add_row(std::initializer_list<const char*> cells) const {
+    return add_row(cells.begin(), cells.size());
+}
+void ui_board_board_rows_t::commit() const { ui_obj_board.commit(); }
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

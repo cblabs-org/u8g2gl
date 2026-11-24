@@ -26,6 +26,15 @@ static constexpr u8g2gl_rows_field ui_rows_tally_marks_fields[] = {
 static constexpr u8g2gl_rows_layout ui_rows_tally_marks_layout = {ui_rows_tally_marks_fields, 4, 1};
 alignas(4) static uint8_t ui_rows_tally_marks[16];
 
+// --- Collection facades: the typed fill API ui.hpp declares (§9.2) ---
+// Each forwards to the widget's own begin(), access method and commit().
+const ui_home_tally_marks_t ui_home_tally_marks{};
+void ui_home_tally_marks_t::begin() const { ui_obj_tally.begin(); }
+bool ui_home_tally_marks_t::add_row(int32_t at) const {
+    return u8g2gl_row_added([&] { return ui_obj_tally.add_mark(at); });
+}
+void ui_home_tally_marks_t::commit() const { ui_obj_tally.commit(); }
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

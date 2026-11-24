@@ -42,7 +42,8 @@
  *              `u8g2gl_obj`, §13.12); the handle `ui.hpp` declares for each
  *              named object, bound to its static (§9.2); each collection's
  *              storage, a `constexpr` row layout and a `static` buffer sized
- *              for that instance (§9.2, `realise/collection-storage.ts`); the
+ *              for that instance (§9.2, `realise/collection-storage.ts`); each
+ *              collection's facade, which `ui.hpp` declares (`facades.ts`); the
  *              object and parent tables; `init`
  *              (construct → apply styles → set properties → register bindings,
  *              §13.7 — styles first so an element's own attributes win, §10;
@@ -116,6 +117,7 @@ import {
   type Placement,
 } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
+import { facadeDefinition, facadeOf } from './facades.js';
 import { cppEnumerator, cppValue } from './value.js';
 import { screenDescriptorIdentifier, UI_HEADER } from './ui-hpp.js';
 
@@ -667,6 +669,10 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
       "// layout follows from the manifest's <field>s, so this is the buffer's size,",
       "// never an assumption about the widget's.",
       ...collections.flatMap(storageLines),
+      '',
+      section('Collection facades: the typed fill API ui.hpp declares (§9.2)'),
+      "// Each forwards to the widget's own begin(), access method and commit().",
+      ...collections.flatMap((storage) => facadeDefinition(facadeOf(storage))),
     );
   }
 

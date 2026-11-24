@@ -30,7 +30,7 @@
  * - ROW_ALIGNMENT, RowFieldType, RowField, RowLayout, fieldBytes, rowLayout,
  *   CollectionStorage, CollectionStorageInput, CollectionStorageResult,
  *   collectionStorage, storageDerivation (collection-storage.ts)
- * - elementHandleIdentifier, storageIdentifiers, handledElements, generatedNames, checkGeneratedNames,
+ * - elementHandleIdentifier, collectionFacadeIdentifiers, storageIdentifiers, handledElements, generatedNames, checkGeneratedNames,
  *   GeneratedName, GeneratedNamesInput (handles.ts)
  */
 
@@ -56,6 +56,7 @@ export {
 } from './capacities.js';
 export {
   elementHandleIdentifier,
+  collectionFacadeIdentifiers,
   storageIdentifiers,
   handledElements,
   generatedNames,
