@@ -47,6 +47,8 @@ export interface SampleSubject {
   readonly initial: string | undefined;
   /** A string subject's capacity in characters, when declared. */
   readonly maxLen: number | undefined;
+  /** The fonts of the elements that draw it (`bind_text`), in document order, each once. */
+  readonly fonts: readonly string[];
 }
 
 /** One field of a row, as the instance sizes it. */
@@ -96,6 +98,8 @@ export interface SampleCollection {
   readonly label: string;
   /** Every `<data>` it declares; a set can address only the first, and only when it is alone. */
   readonly blocks: readonly SampleBlock[];
+  /** The font its rows are drawn in: its first `font` prop, as written or defaulted. */
+  readonly font: string | undefined;
 }
 
 /** Everything a sample set may hold for one project. */
@@ -116,9 +120,7 @@ export interface SampleShape {
  * @param model The project model the live pipeline built.
  */
 export function sampleShapeOf(model: ProjectModel): SampleShape {
-  const subjects = (model.globals.subjects ?? []).map(
-    (s): SampleSubject => ({ name: s.name, type: s.type, initial: s.default, maxLen: s.maxLen }),
-  );
+  const drawnIn = new Map<string, string[]>();
   const collections: SampleCollection[] = [];
   const screenFiles = new Set<string>();
   const elements = new Map<string, Map<string, string>>();
@@ -133,6 +135,14 @@ export function sampleShapeOf(model: ProjectModel): SampleShape {
         if (!isElement(child)) continue;
         if (child.attributes.name !== '') named.set(child.attributes.name, child.tag);
         const manifest = model.manifests.get(child.tag);
+        // The font a bound text is drawn in, for the widest text a subject can hold.
+        const bound = child.attributes.bind_text;
+        const font = fontOf(child, manifest?.api.props ?? []);
+        if (typeof bound === 'string' && font !== undefined) {
+          const fonts = drawnIn.get(bound) ?? [];
+          if (!fonts.includes(font)) fonts.push(font);
+          drawnIn.set(bound, fonts);
+        }
         const data = manifest?.api.data ?? [];
         if (data.length > 0 && child.attributes.name !== '') {
           collections.push({
@@ -142,6 +152,7 @@ export function sampleShapeOf(model: ProjectModel): SampleShape {
             tag: child.tag,
             label: manifest?.api.label ?? child.tag,
             blocks: data.map((block) => blockFor(block, child, manifest?.api.props ?? [], model.globals)),
+            font,
           });
         }
         visit(child.children);
@@ -149,6 +160,9 @@ export function sampleShapeOf(model: ProjectModel): SampleShape {
     };
     visit(screen.view.children);
   }
+  const subjects = (model.globals.subjects ?? []).map(
+    (s): SampleSubject => ({ name: s.name, type: s.type, initial: s.default, maxLen: s.maxLen, fonts: drawnIn.get(s.name) ?? [] }),
+  );
   return { subjects, collections, screenFiles, elements };
 }
 
@@ -169,6 +183,19 @@ export function enumValues(values: string | undefined): string[] {
 // event, a style or a static child, all of which carry a `kind`.
 function isElement(child: WidgetNodeChild): child is WidgetNode {
   return !('kind' in child);
+}
+
+// fontOf
+// An element's font: the value of its manifest's first `font` prop, as
+// written, else that prop's default. A font set only through a style is not
+// followed: the generated sets then fall back to a wide glyph.
+//   element — the element
+//   props   — its manifest's props
+function fontOf(element: WidgetNode, props: Parameters<typeof dataCountOf>[1]): string | undefined {
+  const prop = props.find((candidate) => candidate.type === 'font');
+  if (prop === undefined) return undefined;
+  const written = element.attributes[prop.name];
+  return typeof written === 'string' && written !== '' ? written : prop.default;
 }
 
 // blockFor

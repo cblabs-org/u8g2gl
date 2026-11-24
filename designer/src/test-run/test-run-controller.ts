@@ -13,14 +13,20 @@
  *          offers to save a bug report.
  * Description: On Run, once the edit loop has drawn the latest text:
  *              1. the live frames are rendered from that run's scene, on the
- *                 loaded editor Wasm, from a fresh apply, at TEST_RUN_TIMES;
- *                 then the loop is asked for a normal run, so the canvas is
- *                 restored on the next frame;
+ *                 loaded editor Wasm, from a fresh apply, at TEST_RUN_TIMES,
+ *                 for every case: each screen with the initial values, then
+ *                 with each sample set, applied as the canvas applies it
+ *                 (`applySampleData()` and `applyCollectionData()`); then the
+ *                 loop is asked for a normal run, so the canvas is restored
+ *                 on the next frame;
  *              2. every buffer that differs from disk is posted to the
  *                 server's `test-run` job with its version and the screen, so
- *                 the server tests the same text, unsaved;
- *              3. the job's frames are compared with the live ones, first
- *                 differing frame first.
+ *                 the server tests the same text, unsaved, with each set as
+ *                 the canvas applied it, which the firmware half applies
+ *                 through the subject setters and the widgets' own methods;
+ *              3. each case's frames are compared with the job's, first
+ *                 differing frame first, and the verdict is reported per set
+ *                 and per screen: parity only when every case agrees.
  *              The verdict's staleness is counted in edits: each content
  *              change after the run's snapshot is one, and the diff overlay
  *              clears at the first.
@@ -70,9 +76,12 @@ import type { DesignSession } from '../session';
 import { Observable } from '../state/observable';
 import type { EditorModule } from '../wasm/editor-module';
 import type { WasmStatus } from '../wasm/editor-wasm-controller';
+import { checkSampleSet, collectionDataJson, sampleSetPath, sampleValuesJson, type AppliedSampleSet } from '../samples/sample-set';
 import {
+  caseLabel,
   compareFrames,
   runAvailability,
+  type CaseVerdict,
   TEST_RUN_TIMES,
   type Pixel,
   type RunAvailability,
@@ -126,6 +135,10 @@ export interface TestRunTarget {
   restoreCanvas(): void;
   /** Every buffer that differs from disk, with the version of its text. */
   dirtyDocuments(): Array<{ path: string; content: string; version: string }>;
+  /** Every sample set's name and current text, the run checks each. */
+  sampleSets(): ReadonlyArray<{ readonly name: string; readonly text: string }>;
+  /** The set the canvas shows, if any: a mismatch with it can be overlaid on the canvas. */
+  activeSampleSet(): string | undefined;
   /** Subscribes to every content change; returns the unsubscribe. */
   onEdit(listener: () => void): () => void;
   /** Output panel line. */
@@ -135,6 +148,9 @@ export interface TestRunTarget {
 /** The last mismatch: what the overlay draws and the bug report sends. */
 export interface MismatchDetail {
   readonly runId: string;
+  /** The case: its screen, and its sample set (null for the initial values). */
+  readonly screen: string;
+  readonly set: string | null;
   readonly time: number;
   readonly pixels: readonly Pixel[];
   readonly liveSha256: string;
@@ -148,6 +164,15 @@ export interface MismatchDetail {
 interface RunResult {
   readonly display: { readonly width: number; readonly height: number };
   readonly frames: ReadonlyArray<{ readonly time: number; readonly sha256: string; readonly bytes: string }>;
+  /** Every case the server ran; a server that predates sets sends none. */
+  readonly runs?: ReadonlyArray<{ readonly screen: string; readonly set: string | null; readonly frames: RunResult['frames'] }>;
+}
+
+/** One case's live frames, and what it was. */
+interface LiveCase {
+  readonly screen: string;
+  readonly set: string | null;
+  readonly frames: Uint8Array[];
 }
 
 /** A build record, as `GET /api/build/<id>` serves it. */
@@ -285,6 +310,8 @@ export class TestRunController {
       headers: this.headers(),
       body: JSON.stringify({
         run: detail.runId,
+        screen: detail.screen,
+        set: detail.set,
         time: detail.time,
         live: toBase64(detail.live),
         scene: detail.scene,
@@ -316,26 +343,44 @@ export class TestRunController {
     const documents = this.target.dirtyDocuments();
     this.editsAtSnapshot = this.edits;
 
-    // --- Step 2: The live frames, from a fresh apply, then the canvas restored ---
-    const live: Uint8Array[] = [];
-    const applied =
-      module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.subjectValues);
-    for (const time of TEST_RUN_TIMES) {
-      const frame = applied ? module.renderFrame(time) : undefined;
-      if (frame === undefined) break;
-      live.push(frame.slice());
+    // --- Step 2: Each case's sets, checked as the canvas checks them ---
+    const sets = this.target.sampleSets().map(({ name, text }) => ({ name, applied: checkSampleSet(sampleSetPath(name), text, result.sampleShape).applied }));
+    const screens = result.model.screens.map((screen) => ({ name: screen.name, file: screen.loc?.file }));
+
+    // --- Step 3: The live frames, from a fresh apply per case, then the canvas restored ---
+    const live: LiveCase[] = [];
+    let refusal: string | undefined;
+    for (const screen of screens) {
+      for (const set of [undefined, ...sets]) {
+        const values = set === undefined ? result.subjectValues : sampleValuesJson(result.subjectValues, set.applied);
+        const rows = set === undefined ? undefined : collectionDataJson(set.applied, screen.file);
+        const applied =
+          module.applyScene(result.scene) &&
+          module.selectScreen(screen.name) &&
+          module.applySampleData(values) &&
+          (rows === undefined || module.applyCollectionData(rows));
+        const frames: Uint8Array[] = [];
+        for (const time of TEST_RUN_TIMES) {
+          const frame = applied ? module.renderFrame(time) : undefined;
+          if (frame === undefined) break;
+          frames.push(frame.slice());
+        }
+        if (frames.length !== TEST_RUN_TIMES.length) refusal ??= module.lastError();
+        live.push({ screen: screen.name, set: set?.name ?? null, frames });
+      }
     }
     const { width, height } = module.displaySize();
     this.target.restoreCanvas();
-    if (live.length !== TEST_RUN_TIMES.length) {
-      throw new Error(`the editor Wasm refused the scene: ${module.lastError()}`);
+    if (refusal !== undefined) {
+      throw new Error(`the editor Wasm refused the scene: ${refusal}`);
     }
 
-    // --- Step 3: The firmware target's frames, from the server ---
+    // --- Step 4: The firmware target's frames, from the server ---
     const started = performance.now();
+    const firmwareSets = sets.map(({ name, applied }) => ({ name, values: applied.values, rows: rowsByScreen(applied, screens) }));
     let record = await this.api<Record_>(`/api/build/${TEST_RUN_JOB}`, {
       method: 'POST',
-      body: JSON.stringify({ screen: result.screen, documents, times: TEST_RUN_TIMES }),
+      body: JSON.stringify({ screen: result.screen, documents, times: TEST_RUN_TIMES, sets: firmwareSets }),
     });
     while (record.status === 'queued' || record.status === 'running') {
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
@@ -347,41 +392,74 @@ export class TestRunController {
       return;
     }
 
-    // --- Step 4: The verdict ---
-    const harness = record.result.frames.map((frame) => fromBase64(frame.bytes));
-    // `typeof` first, so the unit tests, which have no build flags, run this file.
-    if (typeof __U8G2GL_TEST_HOOKS__ !== 'undefined' && __U8G2GL_TEST_HOOKS__) {
-      const frame = harness[0];
-      if (frame !== undefined && (window as unknown as Record<string, unknown>)[SELF_TEST_FLIP] === true) {
-        frame[0] = (frame[0] ?? 0) ^ 0x01;
+    // --- Step 5: The verdict, per set and per screen ---
+    const runs = record.result.runs ?? [{ screen: result.screen, set: null, frames: record.result.frames }];
+    const cases: CaseVerdict[] = [];
+    let first: { readonly live: LiveCase; readonly harness: Uint8Array[]; readonly index: number; readonly time: number; readonly pixels: readonly Pixel[] } | undefined;
+    for (const own of live) {
+      const theirs = runs.find((run) => run.screen === own.screen && run.set === own.set);
+      if (theirs === undefined) {
+        this.fail(`the server did not run ${caseLabel(own, false)}`, []);
+        return;
+      }
+      const harness = theirs.frames.map((frame) => fromBase64(frame.bytes));
+      // `typeof` first, so the unit tests, which have no build flags, run this file.
+      if (typeof __U8G2GL_TEST_HOOKS__ !== 'undefined' && __U8G2GL_TEST_HOOKS__) {
+        const frame = harness[0];
+        if (frame !== undefined && own === live[0] && (window as unknown as Record<string, unknown>)[SELF_TEST_FLIP] === true) {
+          frame[0] = (frame[0] ?? 0) ^ 0x01;
+        }
+      }
+      const comparison = compareFrames(TEST_RUN_TIMES, own.frames, harness, width, height);
+      if (comparison.kind === 'parity') {
+        cases.push({ screen: own.screen, set: own.set, kind: 'parity', pixels: 0, time: 0 });
+      } else {
+        cases.push({ screen: own.screen, set: own.set, kind: 'mismatch', pixels: comparison.pixels.length, time: comparison.time });
+        first ??= { live: own, harness, index: comparison.index, time: comparison.time, pixels: comparison.pixels };
       }
     }
-    const comparison = compareFrames(TEST_RUN_TIMES, live, harness, width, height);
     const finishedAt = performance.now();
     this.diagnostics.set([]);
     const editsSince = this.edits - this.editsAtSnapshot;
-    this.target.log(`test run: ${comparison.kind} on ${result.screen} in ${((finishedAt - started) / 1000).toFixed(1)} s`);
-    if (comparison.kind === 'parity') {
+    const oneScreen = screens.length <= 1;
+    const seconds = ((finishedAt - started) / 1000).toFixed(1);
+    for (const verdict of cases) {
+      this.target.log(`test run: ${verdict.kind} on ${caseLabel(verdict, false)}${verdict.kind === 'mismatch' ? `, ${verdict.pixels} px at ${verdict.time} ms` : ''}`);
+    }
+    this.target.log(`test run: ${first === undefined ? 'parity' : 'mismatch'} across ${cases.length} case${cases.length === 1 ? '' : 's'} in ${seconds} s`);
+    if (first === undefined) {
       this.lastMismatch = undefined;
       this.mismatch.set(undefined);
-      this.view.set({ kind: 'parity', finishedAt, editsSince });
+      this.view.set({ kind: 'parity', finishedAt, editsSince, cases });
       return;
     }
     const detail: MismatchDetail = {
       runId: record.id,
-      time: comparison.time,
-      pixels: comparison.pixels,
-      liveSha256: await sha256(live[comparison.index] as Uint8Array),
-      harnessSha256: await sha256(harness[comparison.index] as Uint8Array),
-      live: live[comparison.index] as Uint8Array,
+      screen: first.live.screen,
+      set: first.live.set,
+      time: first.time,
+      pixels: first.pixels,
+      liveSha256: await sha256(first.live.frames[first.index] as Uint8Array),
+      harnessSha256: await sha256(first.harness[first.index] as Uint8Array),
+      live: first.live.frames[first.index] as Uint8Array,
       scene: result.scene,
       documents,
     };
     this.lastMismatch = detail;
-    // The overlay is about the text the run checked: if the user typed while
-    // the server worked, the canvas already shows other text, so no overlay.
-    this.mismatch.set(editsSince === 0 ? detail : undefined);
-    this.view.set({ kind: 'mismatch', finishedAt, editsSince, pixels: comparison.pixels.length, time: comparison.time });
+    // The overlay is about the text the run checked, as the canvas draws it:
+    // if the user typed while the server worked, or the case is another
+    // screen or set than the canvas shows, there is nothing to overlay it on.
+    const shown = first.live.screen === result.screen && first.live.set === (this.target.activeSampleSet() ?? null);
+    this.mismatch.set(editsSince === 0 && shown ? detail : undefined);
+    this.view.set({
+      kind: 'mismatch',
+      finishedAt,
+      editsSince,
+      pixels: first.pixels.length,
+      time: first.time,
+      cases,
+      ...(cases.length > 1 ? { at: caseLabel(first.live, oneScreen) } : {}),
+    });
   }
 
   // fail
@@ -514,4 +592,21 @@ function fromBase64(text: string): Uint8Array {
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// rowsByScreen
+// A set's rows keyed by screen name, as the firmware half takes them: the
+// harness reaches a widget through its screen's descriptor, not its file.
+//   applied — the set as the canvas applies it
+//   screens — each screen's name and file
+function rowsByScreen(
+  applied: AppliedSampleSet,
+  screens: ReadonlyArray<{ readonly name: string; readonly file: string | undefined }>,
+): Record<string, unknown> {
+  const rows: Record<string, unknown> = {};
+  for (const screen of screens) {
+    const byElement = screen.file === undefined ? undefined : applied.rows.get(screen.file);
+    if (byElement !== undefined) rows[screen.name] = byElement;
+  }
+  return rows;
 }

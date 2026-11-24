@@ -41,14 +41,18 @@ afterAll(removeTempDirs);
 
 describe('the test-run params', () => {
   it('takes the screen and the dirty documents, and the fixed times by default', () => {
-    expect(parseTestRunParams({ screen: 'home', documents: [] })).toEqual({ screen: 'home', documents: [], times: TEST_RUN_TIMES });
+    expect(parseTestRunParams({ screen: 'home', documents: [] })).toEqual({ screen: 'home', documents: [], times: TEST_RUN_TIMES, sets: [] });
     expect(TEST_RUN_TIMES).toEqual([0, 16, 100, 250, 500, 1000, 2000, 5000]);
     const document = { path: 'screens/screen_home.xml', content: '<screen/>', version: '7' };
     expect(parseTestRunParams({ screen: 'home', documents: [document], times: [0, 0, 5] })).toEqual({
       screen: 'home',
       documents: [document],
       times: [0, 0, 5],
+      sets: [],
     });
+    // Sample sets, as the canvas applies them, ride along.
+    const set = { name: 'typical', values: { platform: '4' }, rows: { home: { list: { rows: [{ cells: ['a'] }] } } } };
+    expect(parseTestRunParams({ screen: 'home', documents: [], sets: [set] })).toMatchObject({ sets: [set] });
   });
 
   it('refuses what is not a run of the text the canvas showed', () => {
@@ -62,6 +66,8 @@ describe('the test-run params', () => {
       { screen: 'home', documents: [], times: [16, 0] },
       { screen: 'home', documents: [], times: [0.5] },
       { screen: 'home', documents: [], times: [-1] },
+      { screen: 'home', documents: [], sets: {} },
+      { screen: 'home', documents: [], sets: [{ name: 'x' }] },
     ]) {
       expect(typeof parseTestRunParams(params), JSON.stringify(params)).toBe('string');
     }
@@ -155,6 +161,21 @@ describe('the bug report', () => {
     expect(report.sha256.harness).toBe(result.frames[1]!.sha256);
     expect(report.versions.documents).toEqual([{ path: 'screens/screen_home.xml', version: '4' }]);
     expect(readFileSync(join(written.dir, 'staged', 'screens', 'screen_home.xml'), 'utf8')).toBe('<screen name="home"/>');
+  });
+
+  it('takes the harness frame of the case asked for: its screen and sample set', () => {
+    const cache = makeTempDir('report-set');
+    const initial = new Uint8Array(16);
+    const withSet = new Uint8Array(16);
+    withSet[0] = 0xff;
+    const plain = syntheticResult(initial);
+    const result: TestRunResult = { ...plain, runs: [...plain.runs, { screen: 'home', set: 'worst-case', frames: syntheticResult(withSet).frames }] };
+    const base = { cacheRoot: cache, runId: '3', result, time: 0, live: new Uint8Array(16), scene: '{}', documents: [], now: new Date('2026-11-01T00:00:00Z') };
+    const written = writeBugReport({ ...base, set: 'worst-case' });
+    if (typeof written === 'string') throw new Error(written);
+    const report = JSON.parse(readFileSync(join(written.dir, 'report.json'), 'utf8'));
+    expect(report).toMatchObject({ screen: 'home', set: 'worst-case', differingPixels: 8 });
+    expect(writeBugReport({ ...base, set: 'missing' })).toBe("the run did not check home with the sample set 'missing'");
   });
 
   it('refuses a time the run has no frame for, and a live frame of another size', () => {
@@ -251,6 +272,13 @@ function syntheticResult(frame: Uint8Array): TestRunResult {
       sha256: createHash('sha256').update(frame).digest('hex'),
       bytes: Buffer.from(frame).toString('base64'),
     })),
+    runs: [
+      {
+        screen: 'home',
+        set: null,
+        frames: TEST_RUN_TIMES.map((time) => ({ time, sha256: createHash('sha256').update(frame).digest('hex'), bytes: Buffer.from(frame).toString('base64') })),
+      },
+    ],
     build: 'current',
     harnessHash: 'h'.repeat(64),
     versions: { documents: [{ path: 'screens/screen_home.xml', version: '4' }], generator: '0.15.0', runtime: '0.10.0', emscripten: '5.0.3' },

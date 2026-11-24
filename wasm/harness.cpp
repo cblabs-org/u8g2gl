@@ -17,7 +17,8 @@
  *
  * Description: An application registers a clock, calls `ui_init()`, activates
  *              a screen and calls `ui_handler()` each loop. runScreen() does
- *              exactly that, with a clock it sets to each requested time
+ *              exactly that, applying the selected sample set (if any) after
+ *              `ui_init()` as an application applies its data, with a clock it sets to each requested time
  *              before each call, and keeps the display buffer after each
  *              call as that time's frame. A frame `ui_handler()` declined to
  *              redraw (nothing dirty) therefore shows the frame before it, as
@@ -81,6 +82,11 @@ uint32_t harness_tick() {
 }
 
 }  // namespace
+
+// The sample set the test run checks, applied as an application applies data:
+// defined by the design server's sample-set unit beside the screen table, and
+// a no-op when the run selects no set.
+extern "C" void u8g2gl_harness_apply_sample_set();
 
 extern "C" {
 
@@ -163,6 +169,7 @@ int runScreen(int index, const uint32_t* times_ms, int count) {
     s_now_ms = 0;
     u8g2gl_set_tick_cb(harness_tick);
     ui_init();
+    u8g2gl_harness_apply_sample_set();
     u8g2gl_set_active_screen(u8g2gl_harness_screens[index].screen);
 
     // --- Step 4: The frame loop, keeping the buffer after each call ---

@@ -34,15 +34,15 @@ import type { SampleCell, SampleRow } from './sample-set';
 import type { SampleBlock, SampleField } from './sample-shape';
 
 /**
- * @brief A field's value in a new row: an int's 0 held to its bounds (so its
- *        `min` when that is above 0); an enum's first value; false; an empty
+ * @brief A field's value in a new row: an int's `min`, or 0 held to its
+ *        bounds when it declares none; an enum's first value; false; an empty
  *        string; and an empty array for a repeated field (every cell blank).
  */
 export function defaultCell(field: SampleField): SampleCell {
   if (field.repeated) return [];
   switch (field.type) {
     case 'int':
-      return heldInteger(field, 0) ?? 0;
+      return field.min ?? heldInteger(field, 0) ?? 0;
     case 'bool':
       return false;
     case 'enum':
@@ -59,9 +59,7 @@ export function newRow(block: SampleBlock): SampleRow {
 
 /**
  * @brief A typed number held to a field's bounds: rounded to an integer,
- *        then clamped to `min` and `max`. Held from 0, it is an int field's
- *        default: `min` when that is above 0 (a coach is numbered from 1),
- *        `max` when that is below 0, else 0.
+ *        then clamped to `min` and `max`.
  *
  * @param field The int field.
  * @param value The number typed; NaN or infinite gives undefined, which keeps

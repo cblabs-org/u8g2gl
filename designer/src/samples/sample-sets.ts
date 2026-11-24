@@ -39,6 +39,7 @@
  *     - rename():       A new name, the active set following
  *     - remove():       Delete one
  *     - save():         Save one
+ *     - cycle():        Make the next or previous set active, none included
  *
  *     Document changes:
  * - withValue():        A subject's value written, or removed to inherit
@@ -177,6 +178,22 @@ export class SampleSets {
     const removed = await this.documents.remove(sampleSetPath(name));
     if (removed && this.active.name.get() === name) this.active.choose(undefined);
     return removed;
+  }
+
+  /**
+   * @brief Makes the next (1) or previous (-1) set active, in name order, with
+   *        none (the initial values) as the stop before the first: the canvas
+   *        switcher's keyboard cycle, so one layout is swept against every set.
+   *
+   * @return The set now active, or undefined for none.
+   */
+  cycle(by: 1 | -1): string | undefined {
+    const stops: (string | undefined)[] = [undefined, ...this.names.get()];
+    const current = this.active.name.get();
+    const at = Math.max(0, stops.indexOf(stops.includes(current) ? current : undefined));
+    const next = stops[(at + by + stops.length) % stops.length];
+    this.active.choose(next);
+    return next;
   }
 
   /** @brief Saves a set's buffer. */

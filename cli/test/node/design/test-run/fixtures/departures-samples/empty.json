@@ -1,0 +1,19 @@
+{
+  "u8g2gl_samples": 1,
+  "values": {
+    "platform": "",
+    "system_time": 0,
+    "row0_time": "",
+    "row0_dest": "",
+    "row0_status": "",
+    "box_fill": 0,
+    "message_text": ""
+  },
+  "rows": {
+    "screens/screen_departures.xml": {
+      "row0": [],
+      "formation": [],
+      "services": []
+    }
+  }
+}

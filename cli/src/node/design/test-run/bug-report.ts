@@ -14,8 +14,8 @@
  *              cache: `live-<t>ms.pbm` and `harness-<t>ms.pbm` (binary PBM,
  *              1 = a lit pixel), `scene.json`, `staged/<path>` for each
  *              document that differed from disk, and `report.json` with the
- *              screen, the time, both hashes, the differing pixel count and
- *              the versions. The harness frame is taken from the run's own
+ *              screen, the sample set, the time, both hashes, the differing
+ *              pixel count and the versions. The harness frame is taken from the run's own
  *              record, never from the request, so a report always holds what
  *              the server actually produced. `testRunReportRoute()` is the
  *              server route (`POST /api/test-run/report`) around it.
@@ -81,6 +81,9 @@ interface BugReport {
   readonly cacheRoot: string;
   readonly runId: string;
   readonly result: TestRunResult;
+  /** The case that mismatched: its screen and sample set (null for the initial values); the requested screen's when absent. */
+  readonly screen?: string;
+  readonly set?: string | null;
   readonly time: number;
   readonly live: Uint8Array;
   readonly scene: string;
@@ -96,8 +99,15 @@ interface BugReport {
  *         be written (no frame at that time, frames of different sizes).
  */
 export function writeBugReport(report: BugReport): { readonly dir: string; readonly files: readonly string[] } | string {
-  // --- Step 1: The harness frame, from the run's own record ---
-  const frame = report.result.frames.find((candidate) => candidate.time === report.time);
+  // --- Step 1: The harness frame, from the run's own record: the case asked for ---
+  const screen = report.screen ?? report.result.screen;
+  const set = report.set ?? null;
+  const found = (report.result.runs ?? []).find((run) => run.screen === screen && run.set === set);
+  if (found === undefined && (report.screen !== undefined || set !== null)) {
+    return `the run did not check ${screen}${set === null ? '' : ` with the sample set '${set}'`}`;
+  }
+  const frames = found?.frames ?? report.result.frames;
+  const frame = frames.find((candidate) => candidate.time === report.time);
   if (frame === undefined) {
     return `the run has no frame at ${report.time} ms`;
   }
@@ -119,7 +129,8 @@ export function writeBugReport(report: BugReport): { readonly dir: string; reado
       'report.json',
       `${JSON.stringify(
         {
-          screen: report.result.screen,
+          screen,
+          set,
           time: report.time,
           display: report.result.display,
           sha256: { live: sha256(report.live), harness: frame.sha256 },
@@ -145,9 +156,11 @@ export function writeBugReport(report: BugReport): { readonly dir: string; reado
 /**
  * @brief The bug-report route's handler.
  *
- * Body: `{ run, time, live, scene, documents }` — the test-run record's id,
- * the frame's time, the live frame (base64), the scene the canvas drew, and
- * the documents the run was posted. Answers `{ path, files }`, or 400/404
+ * Body: `{ run, time, live, scene, documents, screen?, set? }` — the test-run
+ * record's id, the frame's time, the live frame (base64), the scene the canvas
+ * drew, the documents the run was posted, and the case that mismatched: its
+ * screen and sample set (the requested screen with the initial values when
+ * absent). Answers `{ path, files }`, or 400/404
  * with `{ code, message }`.
  *
  * @param cacheRoot Resolves the build cache when a report is written.
@@ -161,7 +174,7 @@ export function testRunReportRoute(
 ): JsonRoute {
   return async (body) => {
     // --- Step 1: The request's shape ---
-    const { run, time, live, scene, documents } = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
+    const { run, time, live, scene, documents, screen, set } = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>;
     const parsedDocuments = Array.isArray(documents) ? (documents as unknown[]) : undefined;
     if (
       typeof run !== 'string' ||
@@ -169,7 +182,9 @@ export function testRunReportRoute(
       typeof live !== 'string' ||
       typeof scene !== 'string' ||
       parsedDocuments === undefined ||
-      !parsedDocuments.every(isDocument)
+      !parsedDocuments.every(isDocument) ||
+      (screen !== undefined && typeof screen !== 'string') ||
+      (set !== undefined && set !== null && typeof set !== 'string')
     ) {
       return { status: 400, body: { code: 'bad-request', message: 'a report needs { run, time, live, scene, documents }' } };
     }
@@ -189,6 +204,8 @@ export function testRunReportRoute(
       cacheRoot: cacheRoot(),
       runId: run,
       result: found.result as TestRunResult,
+      ...(typeof screen === 'string' ? { screen } : {}),
+      ...(typeof set === 'string' ? { set } : {}),
       time,
       live: new Uint8Array(Buffer.from(live, 'base64')),
       scene,

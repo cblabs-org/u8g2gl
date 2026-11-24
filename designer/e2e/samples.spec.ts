@@ -9,7 +9,9 @@
  *          service list on the canvas, an external edit to the set reaches the
  *          canvas as an XML edit would; the Sample data view's typed grids,
  *          paste, set management and canvas link; the subjects table's set
- *          columns; and none of it touches the project's XML on disk.
+ *          columns; the conventional sets, swept from the keyboard; a test run
+ *          reporting parity per set; and none of it touches the project's XML
+ *          on disk.
  * Description: The tests that draw a project widget need its editor Wasm, so
  *              they need Emscripten 5.0.3 on PATH and skip without it. The
  *              active set is a view setting of the browser, so a test chooses
@@ -23,11 +25,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import type { TestHandle } from '../src/test-hooks';
-import { emscriptenOnPath, PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
+import { emscriptenOnPath, PROJECT_FIXTURE, REPO, startDesign, type DesignSession } from './support/design-session';
 import { bufferText, clickCanvas, litIn, nextFrames, openFile, openShell, selectedNames } from './support/shell';
 
 const SCREEN = 'screens/screen_departures.xml';
 const SET = 'samples/typical.json';
+/** The departures fixture's conventional sets, as the CLI's per-set parity test has them. */
+const SAMPLE_FIXTURES = join(REPO, 'cli', 'test', 'node', 'design', 'test-run', 'fixtures', 'departures-samples');
 /** The departures fixture's project name, which keys the browser's view settings. */
 const PROJECT = 'probe';
 /** Where the formation and the service list draw on the departures screen. */
@@ -297,5 +301,77 @@ test('the subjects table has a sample column per set beside the compiled-in init
   // ↺ inherits again.
   await platform.getByRole('button', { name: 'Inherit the initial value of platform in empty' }).click();
   await expect(platform.locator('td[data-set="empty"] .sample-value')).toHaveAttribute('data-inherited', 'true');
+  expectXmlUntouched();
+});
+
+/** The canvas toolbar's set switcher. */
+const switcher = (page: Page) => page.getByRole('combobox', { name: 'Sample set' });
+
+test('the conventional sets are offered while samples/ is empty, and Alt+] / Alt+[ sweep the canvas through them', async ({ page }) => {
+  test.skip(!emscriptenOnPath(), 'skipped, no Emscripten 5.0.3 on PATH');
+  test.setTimeout(600_000);
+  session = await startDesign({ toolchain: true });
+  await openWithWasm(page);
+  await openView(page);
+  await view(page).getByRole('button', { name: 'Create the conventional sets' }).click();
+  await expect(switcher(page)).toHaveValue('typical');
+  for (const name of ['typical', 'empty', 'longest-plausible', 'worst-case']) {
+    await expect.poll(() => session?.read(`samples/${name}.json`) ?? '').toContain('"u8g2gl_samples": 1');
+  }
+  // worst-case is full: twelve carriages, strings at max_len in the 6x10's widest glyph.
+  const worst = JSON.parse(session.read('samples/worst-case.json'));
+  expect(worst.rows[SCREEN].formation).toHaveLength(12);
+  expect(worst.rows[SCREEN].services[0].cells[0]).toBe('W'.repeat(24));
+  expect(worst.values.platform).toHaveLength(8);
+  await expect(view(page).getByRole('button', { name: 'Create the conventional sets' })).toHaveCount(0);
+
+  // --- The keyboard sweep, in name order with none before the first ---
+  const seen = new Map<string, number>();
+  await page.locator('.canvas-frame canvas.frame').click({ position: { x: 1, y: 1 } });
+  for (const expected of ['worst-case', '', 'empty', 'longest-plausible', 'typical']) {
+    await page.keyboard.press('Alt+BracketRight');
+    await expect(switcher(page)).toHaveValue(expected);
+    await nextFrames(page, 3);
+    seen.set(expected, await litIn(page, SERVICES));
+  }
+  await page.keyboard.press('Alt+BracketLeft');
+  await expect(switcher(page)).toHaveValue('longest-plausible');
+  expect(seen.get('')).toBe(0);
+  expect(seen.get('empty')).toBe(0);
+  expect(seen.get('typical')).toBeGreaterThan(0);
+  expect(seen.get('worst-case')).toBeGreaterThan(seen.get('typical') ?? 0);
+  // The switcher names the shortcut.
+  await expect(page.locator('.sample-switcher')).toHaveAttribute('title', /Alt\+\]/);
+  expectXmlUntouched();
+});
+
+test('a test run checks every set: parity is reported for each case, and the bug report names its set', async ({ page }) => {
+  test.skip(!emscriptenOnPath(), 'skipped, no Emscripten 5.0.3 on PATH');
+  test.setTimeout(600_000);
+  const sets = Object.fromEntries(
+    ['typical', 'empty', 'longest-plausible', 'worst-case'].map((name) => [`samples/${name}.json`, readFileSync(join(SAMPLE_FIXTURES, `${name}.json`), 'utf8')]),
+  );
+  session = await startDesign({ toolchain: true, files: sets });
+  await openWithWasm(page);
+  await expect(page.locator('.run-button')).toHaveAttribute('data-availability', 'ready');
+  await page.locator('.run-button').click();
+  await expect(page.locator('.verdict')).toHaveAttribute('data-verdict', 'parity', { timeout: 300_000 });
+  await expect(page.locator('.verdict')).toContainText('5 cases');
+  const cases = page.locator('.verdict-cases .verdict-case');
+  await expect(cases).toHaveCount(5);
+  await expect(cases).toHaveText(['✓ initial values', '✓ empty', '✓ longest-plausible', '✓ typical', '✓ worst-case']);
+  expect(await cases.evaluateAll((items) => items.map((item) => item.getAttribute('data-verdict')))).toEqual(Array(5).fill('parity'));
+
+  // --- The self-test's flipped pixel: a mismatch names its case ---
+  await page.evaluate(() => Object.assign(window, { 'u8g2gl:flip-harness-pixel': true }));
+  await page.locator('.run-button').click();
+  await expect(page.locator('.verdict')).toHaveAttribute('data-verdict', 'mismatch', { timeout: 300_000 });
+  await expect(page.locator('.verdict')).toContainText('with initial values');
+  await expect(page.locator('.verdict-case[data-verdict="mismatch"]')).toHaveText(['≠ initial values']);
+  await page.getByRole('button', { name: 'Save bug report' }).click();
+  const reportPath = await page.locator('.report-path').getAttribute('title');
+  expect(reportPath).toBeTruthy();
+  const report = JSON.parse(readFileSync(join(reportPath ?? '', 'report.json'), 'utf8'));
+  expect(report).toMatchObject({ screen: 'departures', set: null });
   expectXmlUntouched();
 });

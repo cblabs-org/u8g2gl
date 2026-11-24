@@ -273,6 +273,9 @@ button { font: inherit; color: inherit; }
 .verdict-parity { color: #7fd17f; }
 .verdict-mismatch, .verdict-failed { color: var(--error); }
 .verdict-note { color: var(--text-dim); white-space: nowrap; }
+.verdict-cases { display: inline-flex; flex-wrap: wrap; gap: 4px; font-size: 11px; }
+.verdict-case { white-space: nowrap; color: var(--text-dim); }
+.verdict-case.verdict-mismatch { color: var(--error); }
 .report-path { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-family: ui-monospace, Menlo, monospace; }
 .diff-info { position: absolute; bottom: 8px; left: 8px; right: 8px; max-width: 34em; z-index: 1; padding: 4px 8px; border-radius: 3px; background: #0d2a30; border: 1px solid #00e5ff; color: #d8fbff; font-size: 11px; }
 /* A hash breaks anywhere rather than being clipped: a report quotes it whole. */

@@ -60,6 +60,7 @@ import { DesignHiddenModel } from './canvas/design-hidden';
 import { ActiveTarget } from './project/active-target';
 import { ActiveSampleSet } from './samples/active-sample-set';
 import { SampleSets } from './samples/sample-sets';
+import { isSampleSetPath } from './samples/sample-set';
 import { nextTrees, type ElementNode } from './documents/element-tree';
 import { isFormFile } from './forms/form-model';
 import { nextSectionRows, type SectionRow } from './forms/form-sections';
@@ -225,11 +226,25 @@ export class Workspace {
       canvas: this.loop.frameState,
       settled: () => this.loop.settled(),
       restoreCanvas: () => this.loop.requestRun(),
+      // A sample set is not staged as a document: the run sends each set as
+      // the canvas applies it (`sampleSets`), and the firmware never reads one.
       dirtyDocuments: () =>
-        [...this.documents.dirty.get()].sort().flatMap((path) => {
-          const model = this.documents.modelOf(path);
-          return model === undefined ? [] : [{ path, content: model.getValue(), version: String(model.getVersionId()) }];
+        [...this.documents.dirty.get()]
+          .filter((path) => !isSampleSetPath(path))
+          .sort()
+          .flatMap((path) => {
+            const model = this.documents.modelOf(path);
+            return model === undefined ? [] : [{ path, content: model.getValue(), version: String(model.getVersionId()) }];
+          }),
+      sampleSets: () =>
+        this.samples.names.get().flatMap((name) => {
+          const text = this.documents.textOf(this.samples.pathOf(name));
+          return text === undefined ? [] : [{ name, text }];
         }),
+      activeSampleSet: () => {
+        const name = this.activeSampleSet.name.get();
+        return name !== undefined && this.samples.names.get().includes(name) ? name : undefined;
+      },
       onEdit: (listener) => this.documents.onDidChangeContent(() => listener()),
       log: (line) => this.log(line),
     });

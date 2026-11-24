@@ -14,6 +14,9 @@
  *              - **Sets:** pick the active set (or none, the initial values);
  *                create, duplicate, rename and delete sets. Delete asks first,
  *                here in the view. Save and undo act on the active set's file.
+ *                Generate an *empty*, *one row* or *full, longest* set
+ *                (`generated-sets.ts`), and, while samples/ is empty, create
+ *                the four conventional sets in one action.
  *              - **Values:** one row per subject, one column per set, beside
  *                the initial value. A value a set leaves out is inherited.
  *              - **Collections:** every collection instance on every screen,
@@ -35,6 +38,7 @@ import { useWorkspace } from '../ui/workspace-context';
 import type { Workspace } from '../workspace';
 import { capacityLabel, newRow } from './grid-rules';
 import { pasteRows, type PasteResult } from './paste-rows';
+import { CONVENTIONAL_SETS, conventionalSets, FALLBACK_GLYPH, generateSampleSet, type GeneratedKind, type TextMeasure } from './generated-sets';
 import { FieldCell, SubjectValueCell } from './sample-cells';
 import { rowsIn, withRows, withValue } from './sample-sets';
 import type { SampleCollection, SampleShape } from './sample-shape';
@@ -62,7 +66,7 @@ export function SamplesView(): React.JSX.Element {
   return (
     <aside className="sidebar samples-view" aria-label="Sample data">
       <header className="sidebar-title">Sample data</header>
-      <SetBar workspace={workspace} names={names} active={activeName} />
+      <SetBar workspace={workspace} names={names} active={activeName} shape={shape} />
       <ValuesTable workspace={workspace} shape={shape} names={names} />
       <Collections workspace={workspace} shape={shape} active={activeName} />
     </aside>
@@ -74,7 +78,17 @@ type NameMode = 'new' | 'duplicate' | 'rename';
 
 // SetBar
 // The sets: the active one chosen, and the file operations on them.
-function SetBar({ workspace, names, active }: { readonly workspace: Workspace; readonly names: readonly string[]; readonly active: string | undefined }): React.JSX.Element {
+function SetBar({
+  workspace,
+  names,
+  active,
+  shape,
+}: {
+  readonly workspace: Workspace;
+  readonly names: readonly string[];
+  readonly active: string | undefined;
+  readonly shape: SampleShape;
+}): React.JSX.Element {
   const [mode, setMode] = useState<NameMode | undefined>(undefined);
   const [name, setName] = useState('');
   const [message, setMessage] = useState<string | undefined>(undefined);
@@ -106,6 +120,37 @@ function SetBar({ workspace, names, active }: { readonly workspace: Workspace; r
     setMessage(undefined);
   };
 
+  // The renderer's own widths, for the widest glyph: the canvas's module has
+  // every declared font injected before each frame.
+  const measure: TextMeasure = (font, text) => workspace.wasm.module.get()?.measureText(font, text);
+  const reportUnmeasured = (fonts: readonly string[]): void => {
+    if (fonts.length > 0) workspace.log(`sample sets: ${fonts.join(', ')} could not be measured, so its strings use '${FALLBACK_GLYPH}'`);
+  };
+  // generate
+  // A generated set under the first free name from `base`, made active.
+  const generate = async (kind: GeneratedKind, base: string): Promise<void> => {
+    const { document, unmeasured } = generateSampleSet(kind, shape, measure);
+    reportUnmeasured(unmeasured);
+    const name = freeName(base, names);
+    const refused = await samples.create(name, document);
+    setMessage(refused);
+    if (refused === undefined) workspace.activeSampleSet.choose(name);
+  };
+  // conventional
+  // The four conventional sets, typical made active.
+  const conventional = async (): Promise<void> => {
+    const { sets, unmeasured } = conventionalSets(shape, measure);
+    reportUnmeasured(unmeasured);
+    for (const [name, document] of sets) {
+      const refused = await samples.create(name, document);
+      if (refused !== undefined) {
+        setMessage(refused);
+        return;
+      }
+    }
+    workspace.activeSampleSet.choose(CONVENTIONAL_SETS[0]);
+  };
+
   return (
     <section className="samples-section samples-sets" aria-label="Sample sets">
       <h3>Sets</h3>
@@ -128,7 +173,15 @@ function SetBar({ workspace, names, active }: { readonly workspace: Workspace; r
           </li>
         ))}
       </ul>
-      {names.length === 0 && <p className="samples-hint">No sets yet: the canvas shows the initial values. A set is a file in samples/, shared with the project.</p>}
+      {names.length === 0 && (
+        <div className="samples-conventional">
+          <p className="samples-hint">No sets yet: the canvas shows the initial values. A set is a file in samples/, shared with the project.</p>
+          <button type="button" className="action primary" onClick={() => void conventional()} title={`Creates ${CONVENTIONAL_SETS.join(', ')}`}>
+            Create the conventional sets
+          </button>
+          <p className="samples-hint">typical (the initial values, one row each), empty, longest-plausible (a copy of typical to lengthen) and worst-case (every collection full, every string at its max_len in its widest glyph).</p>
+        </div>
+      )}
       <div className="samples-actions">
         <button type="button" className="action" onClick={() => open('new')}>
           New…
@@ -158,6 +211,18 @@ function SetBar({ workspace, names, active }: { readonly workspace: Workspace; r
         </button>
         <button type="button" className="action" aria-label="Redo the last undone change to the set" disabled={active === undefined} onClick={() => active !== undefined && samples.redo(active)}>
           Redo
+        </button>
+      </div>
+      <div className="samples-actions" role="group" aria-label="Generate a set">
+        <span className="sample-set-note">Generate:</span>
+        <button type="button" className="action" title="No rows, empty strings" onClick={() => void generate('empty', 'empty')}>
+          Empty
+        </button>
+        <button type="button" className="action" title="A single row per collection" onClick={() => void generate('one', 'one')}>
+          One row
+        </button>
+        <button type="button" className="action" title="Every collection at capacity, every string at its max_len in its font's widest glyph" onClick={() => void generate('full', 'full-longest')}>
+          Full, longest
         </button>
       </div>
       {mode !== undefined && (
@@ -490,4 +555,11 @@ function moved(rows: readonly unknown[], index: number, by: number): unknown[] {
   const [row] = next.splice(index, 1);
   next.splice(index + by, 0, row);
   return next;
+}
+
+// freeName
+// `base`, or `base-2`, `base-3`, … : the first name no set has.
+function freeName(base: string, names: readonly string[]): string {
+  if (!names.includes(base)) return base;
+  for (let n = 2; ; n++) if (!names.includes(`${base}-${n}`)) return `${base}-${n}`;
 }

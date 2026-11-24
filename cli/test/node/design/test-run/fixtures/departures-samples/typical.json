@@ -1,0 +1,39 @@
+{
+  "u8g2gl_samples": 1,
+  "values": {
+    "platform": "9",
+    "system_time": 71700,
+    "row0_time": "19:55",
+    "row0_dest": "London Paddington",
+    "row0_status": "On time",
+    "box_fill": 8,
+    "message_text": ""
+  },
+  "rows": {
+    "screens/screen_departures.xml": {
+      "row0": [
+        {
+          "cells": [
+            "cells"
+          ]
+        }
+      ],
+      "formation": [
+        {
+          "number": 1,
+          "class_type": "standard",
+          "wheelchair": false,
+          "bike": false,
+          "loading_pct": 0
+        }
+      ],
+      "services": [
+        {
+          "cells": [
+            "cells"
+          ]
+        }
+      ]
+    }
+  }
+}
