@@ -456,6 +456,19 @@ export const DIAGNOSTIC_CODES = {
    * checked: their glyph sets are U8G2's and are not guessed.
    */
   GLYPH_OUTSIDE_RANGE: 'U8G2GL_GLYPH_OUTSIDE_RANGE',
+  /**
+   * Two identifiers the generator itself composes would be one C++ name: an
+   * element handle `ui_<screen>_<element>` (§9.2), a collection facade or its
+   * type, or a collection's storage, against each other or against an
+   * identifier §13.4's table already holds — a screen function or
+   * descriptor, a subject or its `ui_set_` setter, a font, image, style or
+   * object. Composed names can meet where no author-written name does: screen
+   * `a_b`'s element `c` and screen `a`'s element `b_c` are both `ui_a_b_c`.
+   * An error in both journeys, located at the later source and naming both,
+   * and never resolved by renaming (§13.4). `U8G2GL_NAME_COLLISION` remains
+   * the code for two identifiers of §13.4's own table.
+   */
+  GENERATED_NAME_COLLISION: 'U8G2GL_GENERATED_NAME_COLLISION',
 } as const;
 
 /**

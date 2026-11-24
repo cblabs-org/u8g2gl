@@ -25,6 +25,16 @@ static u8g2gl_label ui_obj_bdf_arrow;  // 8
 // "track_knob" is not here: no object required (§13.5)
 // "dot" is not here: no object required (§13.5)
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+u8g2gl_obj& ui_bounds_track = ui_obj_track;
+u8g2gl_xbm& ui_bounds_logo = ui_obj_logo;
+u8g2gl_label& ui_bounds_temp = ui_obj_temp;
+u8g2gl_label& ui_bounds_own_font = ui_obj_own_font;
+u8g2gl_label& ui_bounds_override = ui_obj_override;
+u8g2gl_label& ui_bounds_caps = ui_obj_caps;
+u8g2gl_label& ui_bounds_bdf_4x6 = ui_obj_bdf_4x6;
+u8g2gl_label& ui_bounds_bdf_arrow = ui_obj_bdf_arrow;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

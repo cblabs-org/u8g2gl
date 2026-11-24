@@ -10,7 +10,7 @@
  *          §13.3's 254-object ceiling; and the refusals it raises must reach the
  *          authoring journey as warnings rather than surfacing for the first
  *          time when `generate` refuses the build (PR-04 decision 1).
- * Description: Two checks, both reading one realisation of the run's shared
+ * Description: Three checks, all reading one realisation of the run's shared
  *              model — never a second analysis of its own.
  *
  *              **The object ceiling.** `parent_index_` is a `uint8_t` and
@@ -35,14 +35,22 @@
  *              only in severity. Realisation's own analysis is untouched: it
  *              states the fact, this pass states what the fact costs the caller.
  *
+ *              **The composed names.** The generator composes identifiers
+ *              for an application beyond §13.4's table — a handle per named
+ *              object, `ui_<screen>_<element>` (§9.2) — and which elements get
+ *              one is realisation's answer. A composed name that collides with
+ *              another, or with the table, is an error in both journeys, as
+ *              the ceiling is: it is a property of the generated code, not a
+ *              construct a later PR delivers (`realise/handles.ts`).
+ *
  * Exports:
  * - validateRealisation(input): Runs Pass 9
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
-import { MAX_OBJECTS_PER_SCREEN } from '../realise/index.js';
+import { checkGeneratedNames, MAX_OBJECTS_PER_SCREEN } from '../realise/index.js';
 import type { ValidateInput } from './validate.js';
-import { realisationOf } from './shared-model.js';
+import { pipelineOf, realisationOf } from './shared-model.js';
 import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';
 
 /**
@@ -54,7 +62,9 @@ import { DEFAULT_REFUSAL_POLICY } from './validate-not-yet-supported.js';
  *              error, because it is a property of the object model rather than
  *              something a later PR delivers.
  * @return One `U8G2GL_TOO_MANY_OBJECTS` per overflowing screen, in document
- *         order, followed by realisation's own diagnostics at the run's policy.
+ *         order, followed by realisation's own diagnostics at the run's policy,
+ *         then one `U8G2GL_GENERATED_NAME_COLLISION` per composed name that
+ *         is already taken.
  */
 export function validateRealisation(input: ValidateInput): readonly Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
@@ -93,6 +103,17 @@ export function validateRealisation(input: ValidateInput): readonly Diagnostic[]
   for (const diagnostic of realisation.diagnostics) {
     diagnostics.push({ ...diagnostic, severity });
   }
+
+  // --- Step 3: The names the generator composes, against everything in scope ---
+  // Always an error: two declarations of one C++ name do not compile, whatever
+  // the journey (§13.4), exactly as Pass 7's own collisions are.
+  diagnostics.push(
+    ...checkGeneratedNames({
+      globals: input.globals,
+      expansion: pipelineOf(input).expansion.screens,
+      realised: realisation.screens,
+    }),
+  );
 
   return diagnostics;
 }

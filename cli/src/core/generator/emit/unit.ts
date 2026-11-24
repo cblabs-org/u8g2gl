@@ -36,7 +36,7 @@ import type { ManifestRegistry } from '../../manifest/index.js';
 import type { U8g2glProject } from '../../schema/project.js';
 import type { Screen } from '../../schema/screen.js';
 import type { SourceLocation } from '../../schema/source-location.js';
-import type { Capacities } from '../../realise/index.js';
+import type { Capacities, RealisedScreen } from '../../realise/index.js';
 import type { CompiledFont } from '../../fonts/index.js';
 import type { XbmImage } from '../../images/index.js';
 import type { OrientedDisplay } from '../../resolver/index.js';
@@ -110,6 +110,13 @@ export interface ProjectEmitInput {
    * (typescript.md §1). Optional for the same reason as {@link compiledFonts}.
    */
   readonly bdfLicenceFiles?: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Realisation's answer per screen, in the same order as {@link screens}.
+   * `ui.hpp` reads it for the handle it declares to each named object (§9.2).
+   * Optional because only the firmware file set declares handles; a unit
+   * emitted without it declares none.
+   */
+  readonly realised?: readonly RealisedScreen[];
   /** This file's header stamp, already rendered (`header.ts`). */
   readonly stamp: string;
   /**

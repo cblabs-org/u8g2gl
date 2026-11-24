@@ -15,8 +15,9 @@
  *              including them first), the runtime headers with sorted includes
  *              (§13.9), the `U8G2GL_PROGMEM` shim the images unit needs, the
  *              display contract, every subject and its `ui_set_*` setter, the
- *              styles, fonts and images, each screen's five §13.7 functions,
- *              and the project's own entry points.
+ *              styles, fonts and images, the classes the handles refer to,
+ *              each screen's five §13.7 functions with its descriptor and its
+ *              named objects' handles, and the project's own entry points.
  *
  *              **The display contract** (design_spec §16) is here because this
  *              is the one file an application includes, and not in
@@ -45,6 +46,15 @@
  *              `u8g2gl_set_active_screen()` — without the declaration a screen
  *              could be initialised but never shown.
  *
+ *              **Each named object gets a handle** beside its screen's
+ *              functions (§9.2): `extern wd_service_list& ui_departures_services;`,
+ *              a reference the screen's unit binds to its `static` object, so
+ *              an application can reach the object without the object itself
+ *              leaving its unit. Its class is forward-declared, never included:
+ *              a reference to an incomplete type is a complete declaration, and
+ *              this header still pulls in no widget (below). Code that calls
+ *              through a handle includes the widget's header itself.
+ *
  * Exports:
  * - UI_HEADER:        The header's file name
  * - UI_INIT_FUNCTION: The application's entry point
@@ -69,6 +79,8 @@ import { imageDeclarations, PROGMEM_MACRO } from './images.js';
 import { STYLES_INIT_FUNCTION, styleIdentifiers } from './styles.js';
 import { SUBJECTS_INIT_FUNCTION, subjectDeclarations } from './subjects.js';
 import { includeBlock, section, type DisplayContract, type EmittedUnit, type ProjectEmitInput } from './unit.js';
+import { elementHandles, type ElementHandle } from './screen-model.js';
+import { compareCodeUnits } from '../../order.js';
 
 /** §13.7's umbrella header. */
 export const UI_HEADER = 'ui.hpp';
@@ -174,6 +186,18 @@ const SCREEN_SIGNATURES: Readonly<Record<string, { readonly returns: string; rea
   render: { returns: 'void', params: 'U8G2& display' },
 };
 
+// handlesByScreen
+// Each screen's handles, from the realisation emission was handed; none when
+// it was handed none (the editor target's project units).
+//   input — the unit's input
+function handlesByScreen(input: ProjectEmitInput): Map<ProjectEmitInput['screens'][number], readonly ElementHandle[]> {
+  const byScreen = new Map<ProjectEmitInput['screens'][number], readonly ElementHandle[]>();
+  for (const realised of input.realised ?? []) {
+    byScreen.set(realised.screen, elementHandles(realised, input.manifests));
+  }
+  return byScreen;
+}
+
 /**
  * @brief Emits `ui.hpp` (§13.7).
  *
@@ -262,6 +286,19 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
     lines.push(`extern const uint8_t ${identifier}[];`);
   }
 
+  // --- The classes the handles below refer to, declared but not included (§9.2) ---
+  const handles = handlesByScreen(input);
+  const classes = [...new Set([...handles.values()].flat().map((handle) => handle.className))].sort(compareCodeUnits);
+  if (classes.length > 0) {
+    lines.push(
+      '',
+      section('Element classes, for the handles below (§9.2)'),
+      "// Declared, not included: a handle is a reference, which needs no complete",
+      "// type. To call through one, include the class's own header.",
+      ...classes.map((name) => `class ${name};`),
+    );
+  }
+
   // --- Screens (§13.7) ---
   lines.push('', section('Screens (§13.7)'));
   if (input.screens.length === 0) {
@@ -279,6 +316,11 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
       );
     }
     lines.push(`extern u8g2gl_screen ${screenDescriptorIdentifier(screen.name)};`);
+    const own = handles.get(screen) ?? [];
+    if (own.length > 0) {
+      lines.push(`// Its named objects (§9.2), each bound to its static in ui_screen_${screen.name}.cpp:`);
+      lines.push(...own.map((handle) => `extern ${handle.className}& ${handle.identifier};`));
+    }
   }
 
   // --- The project's own entry points ---

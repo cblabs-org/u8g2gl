@@ -39,7 +39,9 @@
  *
  * Description: The unit holds, in order: the widget headers it uses; the static
  *              objects in array order (a composite's container is a plain
- *              `u8g2gl_obj`, §13.12); the object and parent tables; `init`
+ *              `u8g2gl_obj`, §13.12); the handle `ui.hpp` declares for each
+ *              named object, bound to its static (§9.2); the object and parent
+ *              tables; `init`
  *              (construct → apply styles → set properties → register bindings,
  *              §13.7 — styles first so an element's own attributes win, §10); `activate`/`deactivate`; `tick`, the minimum deadline
  *              across every object ([D-15]); `render`; and the `u8g2gl_screen`
@@ -95,6 +97,7 @@ import {
   INIT_STEPS,
   placeScreen,
   argPropOf,
+  elementHandles,
   rectangleOf,
   staticChildCalls,
   styleOverridesOf,
@@ -570,6 +573,17 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     lines.push('// This screen has no objects; everything on it is a draw call (§13.5).');
   }
   lines.push(...declarations, ...drawnOnly);
+
+  // The handles ui.hpp declares (§9.2): external references to the statics
+  // above, so the objects keep internal linkage and only these are exported.
+  const handles = elementHandles(realised, manifests);
+  if (handles.length > 0) {
+    lines.push(
+      '',
+      section('Handles: the named objects ui.hpp declares (§9.2)'),
+      ...handles.map((handle) => `${handle.className}& ${handle.identifier} = ${handle.object};`),
+    );
+  }
 
   if (hasObjects) {
     lines.push(

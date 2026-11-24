@@ -47,6 +47,7 @@
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_draw.h"
+#include "u8g2gl/u8g2gl_label.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_subject.h"
 
@@ -301,6 +302,36 @@ TEST(GeneratedFixture, HiddenObjectIsNeverDrawn) {
     EXPECT_EQ(display.draw_utf8_count, 1);
     EXPECT_EQ(std::string(display.last_draw_utf8_buf), "Note");
     ui_set_show_panel(false);
+}
+
+// --- §9.2: a named object is reachable through the handle ui.hpp declares ---
+
+TEST(GeneratedFixture, AHandleIsTheScreensOwnObject) {
+    // The handle is a reference to the static the screen's unit declares, so
+    // it is the very object the screen's table walks, not a copy.
+    ensure_ui_initialised();
+    bool found = false;
+    for (uint8_t i = 0; i < ui_screen_gauges.obj_count; ++i) {
+        found = found || ui_screen_gauges.objs[i] == &ui_gauges_ghost;
+    }
+    EXPECT_TRUE(found);
+    EXPECT_EQ(ui_gauges_ghost.get_x(), 64);
+    EXPECT_EQ(&ui_home_bar, ui_screen_home.objs[0]);
+}
+
+TEST(GeneratedFixture, FirmwareReachesAnElementThroughItsHandle) {
+    // ghost is hidden by its XML; unhiding it through the handle draws it on
+    // the next frame, as an application reaching the object would expect.
+    U8G2 hidden;
+    show(ui_screen_gauges, hidden);
+    EXPECT_EQ(hidden.draw_utf8_count, 0);
+
+    ui_gauges_ghost.set_hidden(false);
+    U8G2 shown;
+    ui_handler(shown);
+    EXPECT_EQ(shown.draw_utf8_count, 1);
+    EXPECT_EQ(std::string(shown.last_draw_utf8_buf), "Ghost");
+    ui_gauges_ghost.set_hidden(true);
 }
 
 TEST(GeneratedFixture, DrawCallWithABoundHiddenFlagObeysItsGuard) {

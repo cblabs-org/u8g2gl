@@ -21,6 +21,10 @@ static u8g2gl_clock ui_obj_bar_clock;  // 3  child of ui_obj_bar
 static u8g2gl_label ui_obj_msg;  // 4
 // "rule" is not here: no object required (§13.5)
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+u8g2gl_obj& ui_home_bar = ui_obj_bar;
+u8g2gl_label& ui_home_msg = ui_obj_msg;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

@@ -13,6 +13,10 @@
 static wd_train_formation ui_obj_formation;  // 0
 static wd_service_list ui_obj_services;  // 1
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+wd_train_formation& ui_board_formation = ui_obj_formation;
+wd_service_list& ui_board_services = ui_obj_services;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

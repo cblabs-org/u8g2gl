@@ -72,6 +72,11 @@ bool ui_display_matches(U8G2& display);
 // --- Images (§14.2) ---
 // globals.xml declares no <xbm> images.
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class wd_tally;
+
 // --- Screens (§13.7) ---
 
 // screen 'home'
@@ -81,6 +86,8 @@ void ui_screen_home_deactivate();
 uint32_t ui_screen_home_tick(uint32_t now_ms);
 void ui_screen_home_render(U8G2& display);
 extern u8g2gl_screen ui_screen_home;
+// Its named objects (§9.2), each bound to its static in ui_screen_home.cpp:
+extern wd_tally& ui_home_tally;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

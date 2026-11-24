@@ -72,6 +72,12 @@ extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
 // --- Images (§14.2) ---
 // globals.xml declares no <xbm> images.
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class wd_service_list;
+class wd_train_formation;
+
 // --- Screens (§13.7) ---
 
 // screen 'board'
@@ -81,6 +87,9 @@ void ui_screen_board_deactivate();
 uint32_t ui_screen_board_tick(uint32_t now_ms);
 void ui_screen_board_render(U8G2& display);
 extern u8g2gl_screen ui_screen_board;
+// Its named objects (§9.2), each bound to its static in ui_screen_board.cpp:
+extern wd_train_formation& ui_board_formation;
+extern wd_service_list& ui_board_services;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

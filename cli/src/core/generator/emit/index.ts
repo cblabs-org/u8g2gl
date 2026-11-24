@@ -218,6 +218,7 @@ export function emitProjectFiles(input: ProjectEmissionInput): ProjectEmission {
       images: input.images,
       compiledFonts: input.compiledFonts,
       bdfLicenceFiles: input.bdfLicenceFiles,
+      realised: input.realised,
       stamp: stampFor(plan.source === 'project' ? projectSource : globalsSource),
       contract: input.contract,
     });

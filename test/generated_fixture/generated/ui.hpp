@@ -109,6 +109,13 @@ extern const uint8_t* const ui_font_font_arrow_mini;
 extern const uint8_t ui_image_icon_wifi[];
 extern const uint8_t ui_image_logo_mark[];
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class u8g2gl_label;
+class u8g2gl_obj;
+class u8g2gl_xbm;
+
 // --- Screens (§13.7) ---
 
 // screen 'bounds'
@@ -118,6 +125,15 @@ void ui_screen_bounds_deactivate();
 uint32_t ui_screen_bounds_tick(uint32_t now_ms);
 void ui_screen_bounds_render(U8G2& display);
 extern u8g2gl_screen ui_screen_bounds;
+// Its named objects (§9.2), each bound to its static in ui_screen_bounds.cpp:
+extern u8g2gl_obj& ui_bounds_track;
+extern u8g2gl_xbm& ui_bounds_logo;
+extern u8g2gl_label& ui_bounds_temp;
+extern u8g2gl_label& ui_bounds_own_font;
+extern u8g2gl_label& ui_bounds_override;
+extern u8g2gl_label& ui_bounds_caps;
+extern u8g2gl_label& ui_bounds_bdf_4x6;
+extern u8g2gl_label& ui_bounds_bdf_arrow;
 
 // screen 'gauges'
 void ui_screen_gauges_init();
@@ -126,6 +142,9 @@ void ui_screen_gauges_deactivate();
 uint32_t ui_screen_gauges_tick(uint32_t now_ms);
 void ui_screen_gauges_render(U8G2& display);
 extern u8g2gl_screen ui_screen_gauges;
+// Its named objects (§9.2), each bound to its static in ui_screen_gauges.cpp:
+extern u8g2gl_obj& ui_gauges_panel;
+extern u8g2gl_label& ui_gauges_ghost;
 
 // screen 'home'
 void ui_screen_home_init();
@@ -134,6 +153,9 @@ void ui_screen_home_deactivate();
 uint32_t ui_screen_home_tick(uint32_t now_ms);
 void ui_screen_home_render(U8G2& display);
 extern u8g2gl_screen ui_screen_home;
+// Its named objects (§9.2), each bound to its static in ui_screen_home.cpp:
+extern u8g2gl_obj& ui_home_bar;
+extern u8g2gl_label& ui_home_msg;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

@@ -11,6 +11,9 @@
 // --- Objects, in document order: index is draw order (§13.3) ---
 static wd_tally ui_obj_tally;  // 0
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+wd_tally& ui_home_tally = ui_obj_tally;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

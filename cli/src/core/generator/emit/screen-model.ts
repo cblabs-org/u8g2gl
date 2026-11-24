@@ -47,6 +47,7 @@
  * - flagComparison():     A directive's method, comparison, ref and flag
  * - StaticCall, staticChildCalls(): An object's static children (§6.5), as access calls
  * - argPropOf():          An `<arg>` as the PropDef its value is spelled through
+ * - ElementHandle, elementHandles(): The handle `ui.hpp` declares per named object (§9.2)
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
@@ -56,7 +57,14 @@ import { isStyleAttribute } from '../../schema/globals.js';
 import { FLAG_COMPARISONS, staticChildrenOf, type WidgetNode } from '../../schema/widget-node.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
-import type { RealisedBinding, RealisedElement, RealisedScreen } from '../../realise/index.js';
+import {
+  elementHandleIdentifier,
+  handledElements,
+  type RealisedBinding,
+  type RealisedElement,
+  type RealisedScreen,
+} from '../../realise/index.js';
+import { objectIdentifier } from '../../resolver/mangle.js';
 import { resolvedLiteralFor } from './draw-args.js';
 import { absoluteElement, childOrigin, DISPLAY_ORIGIN, type Origin } from './placement.js';
 
@@ -550,6 +558,45 @@ export function staticChildCalls(placement: Placement): StaticCall[] {
         }
         return { arg, literal: literal.trim() };
       }),
+    };
+  });
+}
+
+/** One named object's handle (§9.2): what `ui.hpp` declares and the screen unit defines. */
+export interface ElementHandle {
+  /** The handle, `ui_<screen>_<element>`. */
+  readonly identifier: string;
+  /** The object's C++ class, as {@link classOf} names it. */
+  readonly className: string;
+  /** The `static` object it refers to, `ui_obj_<element>`. */
+  readonly object: string;
+  /** The realised element, for its tag and name in a comment. */
+  readonly element: RealisedElement;
+}
+
+/**
+ * @brief The handles of one screen's named objects, in object order (§9.2).
+ *
+ * Which objects get one is `realise/handles.ts`'s answer, so the names Pass 9
+ * checks for collisions are exactly the names emitted. The object stays
+ * `static`; only the reference to it has external linkage.
+ *
+ * @param screen    A realised screen.
+ * @param manifests The effective manifests, for each object's class.
+ * @return One handle per named object written in the screen.
+ * @throws Error if an object has no manifest — a broken pipeline.
+ */
+export function elementHandles(screen: RealisedScreen, manifests: ManifestRegistry): readonly ElementHandle[] {
+  return handledElements(screen).map((element) => {
+    const manifest = manifests.get(element.element.node.tag);
+    if (manifest === undefined) {
+      throw new Error(`'${element.identifier}' <${element.element.node.tag}> has no manifest, so its handle has no class.`);
+    }
+    return {
+      identifier: elementHandleIdentifier(screen.screen.name, element.identifier),
+      className: classOf(manifest).name,
+      object: objectIdentifier(element.identifier),
+      element,
     };
   });
 }

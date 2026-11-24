@@ -11,6 +11,9 @@
 // --- Objects, in document order: index is draw order (§13.3) ---
 static wd_service_list ui_obj_board;  // 0
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+wd_service_list& ui_board_board = ui_obj_board;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk
