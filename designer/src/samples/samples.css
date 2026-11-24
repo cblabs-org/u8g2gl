@@ -1,0 +1,60 @@
+/*
+ * U8G2GL — declarative UI for U8G2 monochrome displays
+ * Copyright (c) 2026 Matt McNeill (CB Labs)
+ * SPDX-License-Identifier: MIT
+ *
+ * File: designer/src/samples/samples.css
+ * Purpose: The Sample data view's layout in the primary sidebar, which widens
+ *          while it shows (a grid of a service list's cells does not fit the
+ *          Explorer's width), and the sample value cells the subjects table
+ *          shares: an inherited value dimmed and marked, a string's count, and
+ *          one over its max_len flagged.
+ */
+.shell[data-sidebar='samples'] { grid-template-columns: 44px minmax(300px, 520px) 1fr 280px; }
+.samples-view { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; }
+.samples-section { padding: 0 12px; }
+.samples-section h3 { margin: 6px 0 4px; font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.samples-hint { margin: 2px 0; font-size: 12px; color: var(--text-dim); }
+.samples-set-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.sample-set { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.sample-set[aria-checked='true'] { border-color: var(--accent); }
+.sample-set-note { font-size: 10px; color: var(--text-dim); font-weight: normal; }
+.sample-set-dirty { margin-left: 4px; color: var(--warning); }
+.samples-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.samples-view .action { padding: 1px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }
+.samples-view .action.primary { color: var(--text); border-color: var(--accent); }
+.samples-view .action.danger { color: var(--error); border-color: var(--error); }
+.samples-view .action:disabled { opacity: 0.4; cursor: default; }
+.samples-name, .samples-confirm { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; margin: 4px 0; padding: 4px 6px; border: 1px solid var(--border); border-radius: 3px; font-size: 12px; }
+.samples-confirm { border-color: var(--error); }
+.samples-confirm p { margin: 0 0 4px; flex-basis: 100%; }
+.samples-table-wrap, .sample-grid-wrap { overflow-x: auto; }
+.samples-values, .sample-grid { border-collapse: collapse; font-size: 12px; }
+.samples-values th, .sample-grid th { padding: 2px 4px; text-align: left; font-size: 11px; font-weight: 600; color: var(--text-dim); white-space: nowrap; }
+.samples-values td, .sample-grid td { padding: 2px 4px; vertical-align: top; border-top: 1px solid var(--border); }
+.samples-values code, .sample-collection code { font: 11px ui-monospace, Menlo, monospace; }
+.sample-collection { margin: 2px 0; border: 1px solid var(--border); border-radius: 3px; }
+.sample-collection[data-open='true'] { border-color: var(--accent); }
+.sample-collection-head { display: flex; align-items: baseline; gap: 4px; width: 100%; padding: 2px 6px; background: none; border: none; color: var(--text); text-align: left; cursor: pointer; }
+.sample-capacity { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+.sample-grid-wrap { padding: 2px 6px 4px; }
+.sample-grid input[type='text'] { width: 7em; }
+.sample-number { width: 4.5em; }
+.sample-repeat { display: flex; gap: 2px; }
+.sample-string { display: inline-flex; flex-direction: column; }
+.sample-count { font-size: 9px; color: var(--text-dim); }
+.sample-string[data-over='true'] .sample-count { color: var(--warning); }
+.sample-string[data-over='true'] input { border-color: var(--warning); }
+.sample-row-actions { white-space: nowrap; }
+.sample-row-actions button { padding: 0 3px; background: none; border: none; color: var(--text-dim); cursor: pointer; }
+.sample-row-actions button:disabled { opacity: 0.3; cursor: default; }
+.sample-paste { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.sample-paste textarea { width: 100%; box-sizing: border-box; font: 11px ui-monospace, Menlo, monospace; }
+.sample-paste-report { font-size: 12px; }
+.sample-paste-report ul { margin: 2px 0; padding-left: 16px; }
+.sample-paste-notes { color: var(--text-dim); }
+.sample-value { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 3px; }
+.sample-value input[type='text'], .sample-value input[type='number'] { width: 8em; }
+.sample-value[data-inherited='true'] input { opacity: 0.7; font-style: italic; }
+.sample-inherited { font-size: 9px; color: var(--text-dim); }
+.sample-reset { padding: 0 3px; background: none; border: none; color: var(--text-dim); cursor: pointer; }

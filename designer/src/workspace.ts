@@ -31,6 +31,7 @@
  *     - designHidden:   The elements the author hid in the designer (never exported)
  *     - activeTarget:   The target the designer shows (per browser, never exported)
  *     - activeSampleSet: The sample set the canvas shows (per browser, never exported)
+ *     - samples:        The project's sample sets, and every change to them
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
  *     - formHighlight:  The range of the project-file form's focused section, for the XML
@@ -58,6 +59,7 @@ import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/proj
 import { DesignHiddenModel } from './canvas/design-hidden';
 import { ActiveTarget } from './project/active-target';
 import { ActiveSampleSet } from './samples/active-sample-set';
+import { SampleSets } from './samples/sample-sets';
 import { nextTrees, type ElementNode } from './documents/element-tree';
 import { isFormFile } from './forms/form-model';
 import { nextSectionRows, type SectionRow } from './forms/form-sections';
@@ -169,6 +171,8 @@ export class Workspace {
   /** The screen texts the element trees were last built from. */
   private treeTexts: ReadonlyMap<string, string> = new Map();
 
+  /** The project's sample sets: the Sample data view's and the subjects table's edits go through it. */
+  readonly samples: SampleSets;
   /** The editor Wasm the canvas draws with. */
   readonly wasm: EditorWasmController;
   /** The live loop from text to pixels. */
@@ -198,6 +202,7 @@ export class Workspace {
       }
     });
     this.selection = new SelectionModel((path) => this.documents.textOf(path));
+    this.samples = new SampleSets(this.documents, this.activeSampleSet, (line) => this.log(line), (path) => this.save(path));
     // Canvas or tree to XML: a selection made on the canvas or in the
     // Explorer's tree shows its file, so the editor can reveal it, and the
     // canvas draws that file's screen. An open request without a position

@@ -47,6 +47,7 @@ import { SessionBanner } from './session-banner';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { Palette } from '../palette/palette';
 import { FontsView } from '../fonts/fonts-view';
+import { SamplesView } from '../samples/samples-view';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -174,9 +175,9 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     <WorkspaceContext.Provider value={workspace}>
       <div className="window">
         <SessionBanner />
-        <div className="shell">
+        <div className="shell" data-sidebar={view}>
           <ActivityBar active={view} onSelect={setView} />
-          {view === 'explorer' ? <Explorer /> : view === 'palette' ? <Palette /> : <FontsView />}
+          {view === 'explorer' ? <Explorer /> : view === 'palette' ? <Palette /> : view === 'fonts' ? <FontsView /> : <SamplesView />}
           <main className="editor-area">
             <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
           </main>

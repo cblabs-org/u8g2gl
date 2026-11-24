@@ -53,7 +53,7 @@ test('the activity bar draws a Lucide icon for every view, none of them the fall
     { label: 'Palette', icon: 'shapes', missing: false, text: '', disabled: false },
     { label: 'Assets', icon: 'image', missing: false, text: '', disabled: true },
     { label: 'Fonts', icon: 'type', missing: false, text: '', disabled: false },
-    { label: 'Sample data', icon: 'database', missing: false, text: '', disabled: true },
+    { label: 'Sample data', icon: 'database', missing: false, text: '', disabled: false },
     { label: 'Flow', icon: 'workflow', missing: false, text: '', disabled: true },
     { label: 'Search', icon: 'search', missing: false, text: '', disabled: true },
   ]);

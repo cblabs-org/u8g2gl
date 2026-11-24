@@ -50,7 +50,7 @@ export function ActivityBar({ active, onSelect }: { readonly active: SidebarView
           disabled={!view.ready}
           data-view={view.id}
           onClick={() => {
-            if (view.id === 'explorer' || view.id === 'palette' || view.id === 'fonts') onSelect(view.id);
+            if (view.id === 'explorer' || view.id === 'palette' || view.id === 'fonts' || view.id === 'samples') onSelect(view.id);
           }}
         >
           <Icon name={view.icon} size={ICON_SIZE} />
