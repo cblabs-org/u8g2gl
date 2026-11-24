@@ -23,7 +23,7 @@ test('every activity-bar view names an icon that resolves, and none is the fallb
   }
 });
 
-test('the views keep their labels and readiness: Explorer, Palette and Fonts are ready, the rest are not', () => {
+test('the views keep their labels and readiness: Explorer, Palette, Fonts and Sample data are ready, the rest are not', () => {
   expect(ACTIVITY_VIEWS.map((view) => view.label)).toEqual(['Explorer', 'Palette', 'Assets', 'Fonts', 'Sample data', 'Flow', 'Search']);
-  expect(ACTIVITY_VIEWS.filter((view) => view.ready).map((view) => view.id)).toEqual(['explorer', 'palette', 'fonts']);
+  expect(ACTIVITY_VIEWS.filter((view) => view.ready).map((view) => view.id)).toEqual(['explorer', 'palette', 'fonts', 'samples']);
 });

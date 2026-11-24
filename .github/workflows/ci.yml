@@ -109,6 +109,8 @@ jobs:
         run: node wasm/test/design-hidden.test.mjs
       - name: Wasm collection-data test (fill by name matches hand-written calls)
         run: node wasm/test/collection-data.test.mjs
+      - name: Wasm measureText test (string widths from the real renderer)
+        run: node wasm/test/measure-text.test.mjs
       - name: Wasm asset-injection test (injected fonts and images match compiled in)
         run: node wasm/test/asset-injection.test.mjs
       - name: CLI tests that need Emscripten, with Emscripten present

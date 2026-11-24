@@ -28,6 +28,10 @@
  *              - `GET /api/files`          `{ files }`
  *              - `GET /api/file?path=`     bytes, version in `U8G2GL-Version`
  *              - `PUT /api/file?path=`     conditional write; 409 on conflict
+ *              - `DELETE /api/file?path=`  conditional removal of a sample set
+ *                                          (`samples/<set>.json`) only, at the
+ *                                          version in the expected-version
+ *                                          header; 409 on conflict
  *              - `GET /api/events`         server-sent events of file changes
  *              - `POST /api/open`          `{ path, line? }`: open a project
  *                                          file in the author's editor; only
@@ -293,6 +297,16 @@ export async function startDesignServer(options: DesignServerOptions): Promise<D
       }
       const result = project.write(path, body, { expectedVersion: expected });
       sendResult(response, result, (r) => ({ path: r.path, version: r.version, created: r.created }));
+    } else if (route === '/api/file' && method === 'DELETE') {
+      // Sample sets only (DiskProject.removeSampleSet), and only at the
+      // version the client read: the header is required, never assumed.
+      const header = request.headers[EXPECTED_VERSION_HEADER.toLowerCase()];
+      const path = pathParam(url);
+      if (path === undefined || typeof header !== 'string' || header === EXPECTED_ABSENT) {
+        sendMalformed(response);
+        return;
+      }
+      sendResult(response, project.removeSampleSet(path, header), (r) => ({ path: r.path }));
     } else if (route === '/api/events' && method === 'GET') {
       openStream(response);
     } else if ((route === OPEN_ROUTE || route === REVEAL_ROUTE) && method === 'POST') {

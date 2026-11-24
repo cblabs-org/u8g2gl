@@ -21,6 +21,8 @@
  * - FrameComparison:      Parity, or the first differing frame
  * - differingPixels():    Where two frames differ
  * - compareFrames():      Compare a run's frames, in order
+ * - CaseVerdict:          One screen's verdict with one sample set
+ * - caseLabel():          "departures · worst-case", as the toolbar names a case
  * - TestRunView:          What the toolbar shows about the last run
  * - verdictText():        The toolbar's text for it
  * - formatAgo():          "2 s ago", "3 min ago"
@@ -100,13 +102,48 @@ export function compareFrames(
   return { kind: 'parity' };
 }
 
-/** What the toolbar shows about the last run. */
+/**
+ * One case of a run: one screen, booted with the initial values (`set` null)
+ * or with one sample set, and whether its frames matched.
+ */
+export interface CaseVerdict {
+  readonly screen: string;
+  readonly set: string | null;
+  readonly kind: 'parity' | 'mismatch';
+  /** The differing pixels of the first differing frame; 0 at parity. */
+  readonly pixels: number;
+  /** That frame's time, ms; 0 at parity. */
+  readonly time: number;
+}
+
+/**
+ * @brief A case as the toolbar names it: the set alone ("initial values"
+ *        for none) when every case is of one screen, else the screen and set.
+ */
+export function caseLabel(verdict: Pick<CaseVerdict, 'screen' | 'set'>, oneScreen: boolean): string {
+  const set = verdict.set ?? 'initial values';
+  return oneScreen ? set : `${verdict.screen} · ${set}`;
+}
+
+/**
+ * What the toolbar shows about the last run. A finished run carries every
+ * case's verdict, per set and per screen; a mismatch names the first.
+ */
 export type TestRunView =
   | { readonly kind: 'none' }
   | { readonly kind: 'waiting'; readonly reason: string }
   | { readonly kind: 'running' }
-  | { readonly kind: 'parity'; readonly finishedAt: number; readonly editsSince: number }
-  | { readonly kind: 'mismatch'; readonly finishedAt: number; readonly editsSince: number; readonly pixels: number; readonly time: number }
+  | { readonly kind: 'parity'; readonly finishedAt: number; readonly editsSince: number; readonly cases?: readonly CaseVerdict[] }
+  | {
+      readonly kind: 'mismatch';
+      readonly finishedAt: number;
+      readonly editsSince: number;
+      readonly pixels: number;
+      readonly time: number;
+      readonly cases?: readonly CaseVerdict[];
+      /** The first mismatching case, when the run had more than one. */
+      readonly at?: string;
+    }
   | { readonly kind: 'failed'; readonly finishedAt: number; readonly editsSince: number };
 
 /**
@@ -124,10 +161,12 @@ export function verdictText(view: TestRunView, now: number): string {
       return `waiting: ${view.reason}`;
     case 'running':
       return 'running…';
-    case 'parity':
-      return `✓ parity · ${formatAgo(now - view.finishedAt)}${since(view.editsSince)}`;
+    case 'parity': {
+      const count = view.cases?.length ?? 1;
+      return `✓ parity${count > 1 ? ` · ${count} cases` : ''} · ${formatAgo(now - view.finishedAt)}${since(view.editsSince)}`;
+    }
     case 'mismatch':
-      return `≠ ${view.pixels} px differ at ${view.time} ms${since(view.editsSince)}`;
+      return `≠ ${view.pixels} px differ at ${view.time} ms${view.at === undefined ? '' : ` with ${view.at}`}${since(view.editsSince)}`;
     case 'failed':
       return `✕ test run failed${since(view.editsSince)}`;
   }

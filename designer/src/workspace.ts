@@ -30,6 +30,8 @@
  *     - projectSections: Each project file's section rows, for the Explorer
  *     - designHidden:   The elements the author hid in the designer (never exported)
  *     - activeTarget:   The target the designer shows (per browser, never exported)
+ *     - activeSampleSet: The sample set the canvas shows (per browser, never exported)
+ *     - samples:        The project's sample sets, and every change to them
  *     - wasm, loop:     The editor Wasm and the edit loop
  *     - testRun:        Run and its parity verdict
  *     - formHighlight:  The range of the project-file form's focused section, for the XML
@@ -56,6 +58,9 @@
 import type { ConnectionState, ServedProjectFileSystem } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 import { DesignHiddenModel } from './canvas/design-hidden';
 import { ActiveTarget } from './project/active-target';
+import { ActiveSampleSet } from './samples/active-sample-set';
+import { SampleSets } from './samples/sample-sets';
+import { isSampleSetPath } from './samples/sample-set';
 import { nextTrees, type ElementNode } from './documents/element-tree';
 import { isFormFile } from './forms/form-model';
 import { nextSectionRows, type SectionRow } from './forms/form-sections';
@@ -70,6 +75,7 @@ import { TestRunController } from './test-run/test-run-controller';
 import { saveTarget } from './ui/save-status';
 import { EditorWasmController } from './wasm/editor-wasm-controller';
 import type { FontBrowseRequest } from './fonts/font-browse';
+import { EXPECTED_VERSION_HEADER } from '@u8g2gl/core/project-fs/served-project-file-system.js';
 
 /** A file to show, and optionally the position to put the caret at. */
 export interface OpenRequest {
@@ -121,6 +127,12 @@ export class Workspace {
    * written to the XML. Loaded at `start()`, with the project's name.
    */
   readonly activeTarget = new ActiveTarget();
+  /**
+   * The sample set the canvas draws with (ui_spec §11): a view setting of
+   * this browser, never written to the project. None draws the initial
+   * values. Loaded at `start()`, with the project's name.
+   */
+  readonly activeSampleSet = new ActiveSampleSet();
   /** The Problems panel's rows. */
   readonly problems = new Observable<readonly ProblemRow[]>([]);
   /** The Output panel's lines, oldest first. */
@@ -160,6 +172,8 @@ export class Workspace {
   /** The screen texts the element trees were last built from. */
   private treeTexts: ReadonlyMap<string, string> = new Map();
 
+  /** The project's sample sets: the Sample data view's and the subjects table's edits go through it. */
+  readonly samples: SampleSets;
   /** The editor Wasm the canvas draws with. */
   readonly wasm: EditorWasmController;
   /** The live loop from text to pixels. */
@@ -174,7 +188,7 @@ export class Workspace {
    */
   constructor(fs: ServedProjectFileSystem, session: DesignSession) {
     this.session = session;
-    this.documents = new ProjectDocuments(fs, (line) => this.log(line));
+    this.documents = new ProjectDocuments(fs, (line) => this.log(line), (path, version) => removeFile(session, path, version));
     // The server going and coming back. Events sent in the gap were lost, so
     // a return re-lists the project, as ServedProjectFileSystem.connect asks.
     // The workspace lives as long as the page, so this is never unsubscribed.
@@ -189,6 +203,7 @@ export class Workspace {
       }
     });
     this.selection = new SelectionModel((path) => this.documents.textOf(path));
+    this.samples = new SampleSets(this.documents, this.activeSampleSet, (line) => this.log(line), (path) => this.save(path));
     // Canvas or tree to XML: a selection made on the canvas or in the
     // Explorer's tree shows its file, so the editor can reveal it, and the
     // canvas draws that file's screen. An open request without a position
@@ -211,11 +226,25 @@ export class Workspace {
       canvas: this.loop.frameState,
       settled: () => this.loop.settled(),
       restoreCanvas: () => this.loop.requestRun(),
+      // A sample set is not staged as a document: the run sends each set as
+      // the canvas applies it (`sampleSets`), and the firmware never reads one.
       dirtyDocuments: () =>
-        [...this.documents.dirty.get()].sort().flatMap((path) => {
-          const model = this.documents.modelOf(path);
-          return model === undefined ? [] : [{ path, content: model.getValue(), version: String(model.getVersionId()) }];
+        [...this.documents.dirty.get()]
+          .filter((path) => !isSampleSetPath(path))
+          .sort()
+          .flatMap((path) => {
+            const model = this.documents.modelOf(path);
+            return model === undefined ? [] : [{ path, content: model.getValue(), version: String(model.getVersionId()) }];
+          }),
+      sampleSets: () =>
+        this.samples.names.get().flatMap((name) => {
+          const text = this.documents.textOf(this.samples.pathOf(name));
+          return text === undefined ? [] : [{ name, text }];
         }),
+      activeSampleSet: () => {
+        const name = this.activeSampleSet.name.get();
+        return name !== undefined && this.samples.names.get().includes(name) ? name : undefined;
+      },
       onEdit: (listener) => this.documents.onDidChangeContent(() => listener()),
       log: (line) => this.log(line),
     });
@@ -230,6 +259,7 @@ export class Workspace {
   start(): void {
     this.designHidden.load(this.projectName.get());
     this.activeTarget.load(this.projectName.get());
+    this.activeSampleSet.load(this.projectName.get());
     this.documents.onDidChangeOnDisk((path) => this.wasm.fileChanged(path));
     this.loop.start();
     this.testRun.start();
@@ -350,5 +380,25 @@ export class Workspace {
   log(line: string): void {
     const stamp = new Date().toTimeString().slice(0, 8);
     this.output.set([...this.output.get(), `${stamp}  ${line}`].slice(-OUTPUT_LIMIT));
+  }
+}
+
+// removeFile
+// The design server's conditional removal (`DELETE /api/file`, sample sets
+// only), with the session's token and the version last read.
+//   session — the server and token
+//   path    — project-relative
+//   version — the version the documents last read
+async function removeFile(session: DesignSession, path: string, version: string): Promise<{ readonly ok: boolean; readonly message?: string }> {
+  try {
+    const response = await fetch(`${session.origin}/api/file?path=${encodeURIComponent(path)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.token}`, [EXPECTED_VERSION_HEADER]: version },
+    });
+    if (response.ok) return { ok: true };
+    const answer = (await response.json().catch(() => ({}))) as { readonly message?: unknown };
+    return { ok: false, message: typeof answer.message === 'string' ? answer.message : `HTTP ${response.status}` };
+  } catch (cause) {
+    return { ok: false, message: cause instanceof Error ? cause.message : String(cause) };
   }
 }

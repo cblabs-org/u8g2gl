@@ -8,6 +8,43 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-24	cli v0.26.xx	U8G2GL
+  * 0.26.0: Sample sets in the designer. A set is samples/<set>.json in
+    the project (u8g2gl_samples: 1; values by subject; rows by screen
+    file, then element, each row keyed by the manifest's <field> names),
+    never compiled: generate and validate ignore samples/, and a project
+    with sets generates the same files. Every set is checked against the
+    project and each problem is in Problems with the file, the line and
+    column, and its JSON path (U8G2GL_SAMPLE_* codes): JSON that does not
+    parse, an unknown version, subject, screen, element or field, an
+    element with no <data>, a wrong type, a value out of min/max or
+    values, a string over max_len (from the instance's props, in
+    characters), an array over its repeat, and rows over capacity; what
+    checks clean still applies. Sets are project documents, edited and
+    undone through the same model as the XML, one undo step per edit.
+    The active set is per-browser view state, and the canvas draws its
+    values and the drawn screen's rows. The Sample data view is enabled:
+    pick, create, duplicate, rename and delete sets (delete asks first);
+    a table of each subject's value per set beside the compiled-in
+    initial value, inherited where a set leaves it out; every collection
+    instance as a typed grid with its capacity, add, remove and reorder;
+    paste of a JSON array or CSV with a header row, every refused value
+    reported by row and field; selecting a collection on the canvas opens
+    its grid. Generated sets (empty, one row, full longest, the last made
+    of each font's widest glyph as the new editor-only bridge export
+    measureText() measures it) and, while samples/ is empty, the four
+    conventional sets: typical, empty, longest-plausible and worst-case.
+    The canvas toolbar's Data switcher, cycled by Alt+] and Alt+[. The
+    subjects table gains a sample column per set. Test runs check every
+    screen with the initial values and with each set, and report parity
+    per set and per screen, in the toolbar and the bug report: the stage
+    writes a C++ function per set that fills the firmware through the
+    ui_set_<subject>() setters and each widget's begin(), access method
+    and commit(), reached through ui_screen_<s>.objs[i] and held to the
+    generated objs table, and the harness calls it after ui_init(). The
+    design server's DELETE /api/file removes a sample set, and only that,
+    at the version read. Runtime 0.15.0 and schema 0.7 are unchanged, and
+    no generated output moves.
 2026-11-22	runtime v0.15.xx	U8G2GL
   * 0.15.0: A style's border draws. Any element with border="true" now
     draws a one-pixel outline it did not draw before, on the device and

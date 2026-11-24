@@ -14,15 +14,18 @@
  *          flags, the U8G2 and runtime objects, the memory display, and how a
  *          compile error is reported (../build/compile-units.ts).
  * Description: Generation is prepareBuild()'s, into the build cache and never
- *              the project. The harness adds one unit, the screen table
+ *              the project. The harness adds two units: the screen table
  *              (screen-table.ts), read from the scene generated beside the
- *              firmware code. Objects:
+ *              firmware code, and the sample sets (sample-set-unit.ts), a
+ *              function per set the run checks, empty when it checks none.
+ *              Objects:
  *              - U8G2 and the runtime (with the memory display): the editor
  *                build's caches, at the same flags and configuration hash, so
  *                a project that has built its editor Wasm compiles neither;
  *              - the harness: its own framework cache, with the runtime's key;
- *              - the firmware units, the widgets, and the screen table: the
- *                project's `obj-firmware/`, compiled without `U8G2GL_EDITOR`,
+ *              - the firmware units, the widgets, the screen table and the
+ *                sample sets: the project's `obj-firmware/`, compiled without
+ *                `U8G2GL_EDITOR`,
  *                as the device's build compiles them. The widgets therefore
  *                compile twice per project, once per target, and only when
  *                they change.
@@ -57,6 +60,7 @@ import {
 import { readFrameworkSources } from '../build/framework-sources.js';
 import { prepareBuild } from '../build/prepare-build.js';
 import { readSceneLayout, SCREEN_TABLE_UNIT, screenTableUnit, type SceneLayout } from './screen-table.js';
+import { readSampleStage, SAMPLE_SET_EXPORTS, SAMPLE_SET_UNIT, sampleSetUnit, type TestRunSampleSet } from './sample-set-unit.js';
 
 /** The files a harness build writes: the Emscripten loader and its module. */
 export const HARNESS_FILES = { loader: 'u8g2gl_harness.js', module: 'u8g2gl_harness.wasm' } as const;
@@ -77,7 +81,7 @@ const HARNESS_LINK_FLAGS: readonly string[] = [
   '-sMODULARIZE=1',
   '-sEXPORT_NAME=createU8g2glHarness',
   '-sEXPORTED_RUNTIME_METHODS=[HEAPU8,HEAPU32,UTF8ToString]',
-  '-sEXPORTED_FUNCTIONS=[_malloc,_free,_getScreenCount,_getScreenName,_getDisplayWidth,_getDisplayHeight,_runScreen,_getFrameCount,_getFramePtr,_getBufferSize,_getLastError]',
+  `-sEXPORTED_FUNCTIONS=[_malloc,_free,_getScreenCount,_getScreenName,_getDisplayWidth,_getDisplayHeight,_runScreen,_getFrameCount,_getFramePtr,_getBufferSize,_getLastError,${SAMPLE_SET_EXPORTS.join(',')}]`,
   '-sALLOW_MEMORY_GROWTH=1',
 ];
 
@@ -91,6 +95,8 @@ export interface TestRunBuildOptions {
   readonly frameworkRoot: string;
   readonly toolchain: SelectedToolchain;
   readonly host: ToolchainHost;
+  /** The sample sets the run checks, numbered as the harness selects them; none when omitted. */
+  readonly sets?: readonly TestRunSampleSet[];
 }
 
 /** What a build produced. */
@@ -147,6 +153,16 @@ export async function buildTestRunHarness(options: TestRunBuildOptions): Promise
     writeFileSync(tableUnit, tableSource);
   }
 
+  // --- Step 2b: The sample sets, each checked against the generated objs tables ---
+  const samples = sampleSetUnit(options.sets ?? [], readSampleStage(projectRoot, readText(sceneFile) ?? '', prepared.generatedDir));
+  if (!samples.ok) {
+    return { status: 'failed', diagnostics: [{ code: 'U8G2GL_TEST_RUN_SAMPLES', severity: 'error', file: '', line: 1, column: 1, message: samples.message }] };
+  }
+  const samplesUnit = join(tableDir, SAMPLE_SET_UNIT);
+  if (readText(samplesUnit) !== samples.source) {
+    writeFileSync(samplesUnit, samples.source);
+  }
+
   // --- Step 3: Compile what has no object for its key, in parallel ---
   const framework = readFrameworkSources(options.frameworkRoot);
   const setup = frameworkBuildSetup(framework, toolchain, cacheRoot, join(prepared.generatedDir, 'u8g2gl_generated_config.h'));
@@ -178,7 +194,7 @@ export async function buildTestRunHarness(options: TestRunBuildOptions): Promise
       dir: setup.harnessDir,
       extra: '',
     })),
-    ...[...firmwareUnits, ...prepared.widgetUnits, tableUnit].map((source) => ({
+    ...[...firmwareUnits, ...prepared.widgetUnits, tableUnit, samplesUnit].map((source) => ({
       source,
       driver: toolchain.emxx,
       flags: firmwareFlags,

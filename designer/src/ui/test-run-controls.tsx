@@ -12,7 +12,9 @@
  * Description: `TestRunControls` is the button, disabled with its reason as
  *              the tooltip when Run is unavailable, and the verdict, which
  *              re-renders once a second while it shows an age, and beside it
- *              the *after a pause* setting. On a mismatch
+ *              the *after a pause* setting. A run of more than one case (a
+ *              screen with each sample set) lists every case's verdict, so
+ *              parity is reported per set and per screen. On a mismatch
  *              it says that a mismatch is a framework bug and offers *Save bug
  *              report*, then shows the path written. `TestRunDiffInfo` is the
  *              overlay's legend: both frames' SHA-256 hashes and the time,
@@ -26,7 +28,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { verdictText } from '../test-run/verdict';
+import { caseLabel, verdictText } from '../test-run/verdict';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -78,6 +80,23 @@ export function TestRunControls(): React.JSX.Element {
       {text !== '' && (
         <span className={`verdict verdict-${view.kind}`} data-verdict={view.kind} title={view.kind === 'mismatch' ? 'A mismatch is a framework bug' : undefined}>
           {text}
+        </span>
+      )}
+      {(view.kind === 'parity' || view.kind === 'mismatch') && (view.cases?.length ?? 0) > 1 && (
+        <span className="verdict-cases" role="list" aria-label="Verdict per sample set and screen">
+          {view.cases?.map((verdict) => (
+            <span
+              key={`${verdict.screen}\u0000${verdict.set ?? ''}`}
+              role="listitem"
+              className={`verdict-case verdict-${verdict.kind}`}
+              data-screen={verdict.screen}
+              data-set={verdict.set ?? ''}
+              data-verdict={verdict.kind}
+              title={verdict.kind === 'mismatch' ? `${verdict.pixels} px differ at ${verdict.time} ms` : 'Parity'}
+            >
+              {verdict.kind === 'parity' ? '✓' : '≠'} {caseLabel(verdict, new Set(view.cases?.map((c) => c.screen)).size <= 1)}
+            </span>
+          ))}
         </span>
       )}
       {view.kind === 'mismatch' && (

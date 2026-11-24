@@ -94,6 +94,8 @@
  *     Designer view:
  *     - setDesignHidden():  Elements the designer hides from the frame
  *     - getRuntimeHidden(): Elements the last frame left out by runtime rules
+ *     Text:
+ *     - measureText():      A string's width in pixels, in a loaded font
  *     Injected assets:
  *     - injectFont():       A font's U8G2 table, by the name scenes use
  *     - injectImage():      An image's XBM bytes and size, by name
@@ -270,6 +272,12 @@ constexpr int32_t kSceneVersion = 4;
 // Virtual display, sized for each scene (memory_display.h, shared with the
 // test-run harness so both hosts hold their frames the same way)
 memory_display s_display;
+
+// A display of its own for measureText(): U8G2 measures only through a
+// configured instance, and measuring must neither need a scene nor disturb
+// the scene's display. One 8 × 8 tile; nothing is ever drawn on it.
+memory_display s_measure_display;
+bool s_measure_ready = false;
 
 // The active screen's objects live here, sized for the classes it constructs
 std::vector<std::max_align_t> s_arena;
@@ -1648,6 +1656,46 @@ const char* getRuntimeHidden() {
     }
     s_runtime_hidden_json += "]";
     return s_runtime_hidden_json.c_str();
+}
+
+/**
+ * @brief A string's width in pixels, as the real renderer measures it.
+ *
+ * The designer uses it to make the widest text a field can hold (the
+ * *full, longest* sample set): the printable ASCII glyph with the largest
+ * advance in the font that draws it, repeated to its `max_len`. Measured by
+ * U8G2's own `getUTF8Width()` in the font as loaded — injected first, else
+ * compiled in, as a scene's fonts are found — so the answer is the device's.
+ * Editor target only: firmware has no use for it.
+ *
+ * @param font_name The font's name, as a scene names it.
+ * @param text      UTF-8 text.
+ * @return The width in pixels, or -1 with getLastError() saying why: no font
+ *         of that name is loaded, or no text was given.
+ */
+EMSCRIPTEN_KEEPALIVE
+int32_t measureText(const char* font_name, const char* text) {
+    clear_last_error();
+    if (font_name == nullptr || text == nullptr) {
+        set_error("measureText: a font name and a text are needed");
+        return -1;
+    }
+    const void* font = asset_for(U8G2GL_EDITOR_FONT, font_name);
+    if (font == nullptr) {
+        set_error(std::string("measureText: font '") + font_name + "' is not loaded");
+        return -1;
+    }
+    if (!s_measure_ready) {
+        std::string error;
+        if (!s_measure_display.setup(8, 8, &error)) {
+            set_error("measureText: " + error);
+            return -1;
+        }
+        s_measure_ready = true;
+    }
+    U8G2& display = s_measure_display.u8g2();
+    display.setFont(static_cast<const uint8_t*>(font));
+    return static_cast<int32_t>(display.getUTF8Width(text));
 }
 
 /**

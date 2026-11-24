@@ -20,6 +20,7 @@
  * - placeCaret():       Put the caret at a text offset in an open file
  * - bufferText():       An open file's buffer
  * - frameInfo():        The current frame state
+ * - litIn():            How many of a device rectangle's pixels are lit
  * - canvasPixels():     A hash of the frame canvas's pixels
  * - nextFrames():       Resolve after the page has drawn N animation frames
  * - devicePoint():      Where a device pixel's centre is on the page
@@ -106,6 +107,23 @@ export async function canvasPixels(page: Page): Promise<string> {
   });
 }
 
+/**
+ * @brief How many of a device rectangle's pixels are lit on the frame canvas,
+ *        which is drawn one canvas pixel per device pixel: a lit pixel is the
+ *        amber `LIT`, whose red channel is full, an unlit one near black.
+ */
+export async function litIn(page: Page, rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }): Promise<number> {
+  return page.evaluate((rect) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('.canvas-frame canvas.frame');
+    const context = canvas?.getContext('2d');
+    if (canvas == null || context == null) return 0;
+    const data = context.getImageData(rect.x, rect.y, rect.width, rect.height).data;
+    let lit = 0;
+    for (let i = 0; i < data.length; i += 4) if ((data[i] ?? 0) > 128) lit += 1;
+    return lit;
+  }, rect);
+}
+
 /** @brief Resolves after the page has drawn `count` more animation frames. */
 export async function nextFrames(page: Page, count = 1): Promise<void> {
   await page.evaluate(
@@ -159,15 +177,28 @@ export async function dropTag(page: Page, tag: string, x: number, y: number): Pr
   // Palette is taller than the sidebar, and a drag cannot start off screen.
   const entry = page.locator(`.palette-tag[data-tag="${tag}"]`);
   await entry.scrollIntoViewIfNeeded();
-  const point = await devicePoint(page, x, y);
+  const canvas = page.locator('.canvas-frame canvas.frame');
+  const box = await canvas.boundingBox();
+  const size = await canvas.evaluate((element: HTMLCanvasElement) => ({ width: element.width, height: element.height }));
   const source = await entry.boundingBox();
   if (source === null) throw new Error(`<${tag}> is not in the Palette`);
+  if (box === null || size.width === 0) throw new Error('the frame canvas is not laid out');
   // The mouse, not dragTo: dragTo's target is an offset it rounds again, which
   // at 1× can land on the neighbouring device pixel. A drag event's position
-  // is whole screen pixels, so aim at the whole pixel inside the centre.
+  // is whole screen pixels, and the canvas maps a point to the device pixel
+  // floor((p − edge) / scale), so aim at a whole screen pixel inside the
+  // device pixel's span [edge, edge + scale): the one nearest its centre.
+  // Rounding the centre is not enough: at 1× it lies on x.5 and can round
+  // onto the next pixel, depending on where the layout put the canvas.
+  const inside = (start: number, scale: number, device: number): number => {
+    const from = start + device * scale;
+    const centre = from + scale / 2;
+    const below = Math.floor(centre);
+    return below >= from && below < from + scale ? below : Math.ceil(from);
+  };
   await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
   await page.mouse.down();
-  await page.mouse.move(Math.round(point.x), Math.round(point.y), { steps: 5 });
+  await page.mouse.move(inside(box.x, box.width / size.width, x), inside(box.y, box.height / size.height, y), { steps: 5 });
   await page.mouse.up();
 }
 

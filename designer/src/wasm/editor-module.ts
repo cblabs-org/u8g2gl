@@ -28,6 +28,9 @@
  *     - applySampleData():  Set subject values
  *     - applyCollectionData(): Fill collection widgets' rows (schema 0.7 `<data>`)
  *
+ *     Text:
+ *     - measureText():      A string's width in pixels, in a loaded font
+ *
  *     Frame:
  *     - renderFrame():      Tick and draw; a view of the 1-bit buffer
  *     - displaySize():      The scene's display
@@ -120,6 +123,14 @@ export interface EditorModule {
   clearInjected(): void;
   /** @brief The active screen's elements drawn as placeholders. */
   placeholders(): readonly Placeholder[];
+  /**
+   * @brief A string's width in pixels, measured by U8G2 in a font the module
+   *        has loaded (injected, else compiled in): what the device draws.
+   *
+   * @return The width; undefined when the font is not loaded, or the module
+   *         predates the export (a project Wasm cached by an older CLI).
+   */
+  measureText(font: string, text: string): number | undefined;
   /** @brief The build hash a project editor Wasm carries; undefined for the framework's. */
   buildHash(): string | undefined;
   /**
@@ -168,6 +179,7 @@ interface EmscriptenModule {
   _clearInjected?: () => void;
   _setDesignHidden?: (pointer: number) => number;
   _getRuntimeHidden?: () => number;
+  _measureText?: (font: number, text: number) => number;
 }
 
 /** The factory a MODULARIZE loader defines. */
@@ -277,6 +289,12 @@ function wrap(module: EmscriptenModule): EditorModule {
     setDesignHidden(names) {
       const set = module._setDesignHidden;
       return set !== undefined && withString((p) => set(p), JSON.stringify(names)) === 1;
+    },
+    measureText(font, text) {
+      const measure = module._measureText;
+      if (measure === undefined) return undefined;
+      const width = withString((f) => withString((t) => measure(f, t), text), font);
+      return width < 0 ? undefined : width;
     },
     runtimeHidden() {
       const get = module._getRuntimeHidden;

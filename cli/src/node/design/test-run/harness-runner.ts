@@ -8,7 +8,8 @@
  *          the firmware target's half of a parity check. The harness boots
  *          the generated code once per instance, as firmware does, so this
  *          module owns the rule that each screen gets a fresh instance —
- *          a fresh `ui_init()` — compiled once and instantiated per screen.
+ *          a fresh `ui_init()` — compiled once and instantiated per screen,
+ *          and per sample set, which the instance applies after its boot.
  * Description: The Emscripten loader is a CommonJS factory
  *              (`createU8g2glHarness`); it is given the module's bytes, read
  *              once, so a second screen costs an instantiation and not a
@@ -29,6 +30,8 @@ import { HARNESS_FILES } from './test-run-build.js';
 /** The frames one screen produced, one per requested time. */
 export interface HarnessRun {
   readonly screen: string;
+  /** The sample set applied after boot; undefined for none (the initial values). */
+  readonly set: string | undefined;
   readonly times: readonly number[];
   /** Each a copy of the display buffer, U8G2's vertical_top_lsb layout. */
   readonly frames: readonly Uint8Array[];
@@ -38,16 +41,19 @@ export interface HarnessRun {
 export interface LoadedHarness {
   /** Screen names in document order. */
   readonly screens: readonly string[];
+  /** The sample sets the harness was built with, in the order it numbers them. */
+  readonly sets: readonly string[];
   readonly display: { readonly width: number; readonly height: number };
   /**
    * @brief Boots a fresh instance and runs one screen at the given times.
    *
    * @param screen A name from `screens`.
    * @param times  Milliseconds, non-decreasing.
-   * @throws Error naming the harness's reason, for an unknown screen or
-   *         decreasing times: both are the caller's error, not the project's.
+   * @param set    A name from `sets`, applied after `ui_init()`; none when omitted.
+   * @throws Error naming the harness's reason, for an unknown screen or set,
+   *         or decreasing times: each the caller's error, not the project's.
    */
-  run(screen: string, times: readonly number[]): Promise<HarnessRun>;
+  run(screen: string, times: readonly number[], set?: string): Promise<HarnessRun>;
 }
 
 /** The harness's exports, as this module uses them. */
@@ -66,6 +72,9 @@ interface HarnessModule {
   _getFramePtr(index: number): number;
   _getBufferSize(): number;
   _getLastError(): number;
+  _getSampleSetCount(): number;
+  _getSampleSetName(index: number): number;
+  _selectSampleSet(index: number): number;
 }
 
 type HarnessFactory = (overrides: { wasmBinary: Uint8Array }) => Promise<HarnessModule>;
@@ -86,17 +95,24 @@ export async function loadHarness(harnessDir: string): Promise<LoadedHarness> {
   const probe = await instantiate();
   const screens = Array.from({ length: probe._getScreenCount() }, (_, i) => probe.UTF8ToString(probe._getScreenName(i)));
   const display = { width: probe._getDisplayWidth(), height: probe._getDisplayHeight() };
+  const sets = Array.from({ length: probe._getSampleSetCount() }, (_, i) => probe.UTF8ToString(probe._getSampleSetName(i)));
 
   return {
     screens,
+    sets,
     display,
-    async run(screen, times) {
-      // --- Step 3: A fresh instance per screen: firmware boots once ---
+    async run(screen, times, set) {
+      // --- Step 3: A fresh instance per screen and set: firmware boots once ---
       const index = screens.indexOf(screen);
       if (index < 0) {
         throw new Error(`the harness has no screen '${screen}'`);
       }
+      const setIndex = set === undefined ? -1 : sets.indexOf(set);
+      if (set !== undefined && setIndex < 0) {
+        throw new Error(`the harness has no sample set '${set}'`);
+      }
       const module = await instantiate();
+      module._selectSampleSet(setIndex);
       const timesPtr = module._malloc(Math.max(1, times.length) * 4);
       try {
         module.HEAPU32.set(times, timesPtr >>> 2);
@@ -111,7 +127,7 @@ export async function loadHarness(harnessDir: string): Promise<LoadedHarness> {
         const ptr = module._getFramePtr(i);
         return module.HEAPU8.slice(ptr, ptr + size);
       });
-      return { screen, times: [...times], frames };
+      return { screen, set, times: [...times], frames };
     },
   };
 }

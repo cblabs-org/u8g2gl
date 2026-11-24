@@ -1272,7 +1272,7 @@ returns `false` on the device), and a bad row naming the element, the row index
 and the field. A widget whose storage is smaller than its declared capacity
 ([Q-19]) refuses a row itself; the rows it took stay, as on the device, and the
 call says so. The live loop applies the rows after every scene, as it applies
-sample values; sample sets themselves are E-3b's (ui_spec §11).
+sample values; sample sets and the per-set test run are §9.6's.
 
 **PR-08 still owns the firmware ingestion API.** §9.2's *generated* typed API
 (`ui_departures_rows`) and generated storage are not part of this path. A widget
@@ -1307,6 +1307,89 @@ code and `u8g2gl.xml` request a build. A project with no widgets draws any font 
 the framework Wasm the designer ships, with no toolchain at all. A project editor
 Wasm cached by an older CLI, which lacks the exports, draws the fonts it was built
 with, and the status bar says so.
+
+### 9.6 Sample sets and the per-set test run
+
+*2026-11-24 (E-3b, Q1a).* **A sample set is never compiled, and `generate` and
+`validate` ignore `samples/`** (ui_spec §11): a project with sets generates the
+same files as one without. The designer applies the active set to the canvas
+after every scene — its values over the initial ones through `applySampleData()`,
+its rows for the drawn screen through `applyCollectionData()` (§9.4) — and a test
+run checks the firmware against every set, not only against the initial values.
+
+**The firmware half applies a set as an application applies data.** The test run
+([D-9], §17) boots the generated firmware code unmodified, so a set reaches it only
+through public calls. The test-run stage writes one C++ unit beside the screen
+table, `u8g2gl_harness_samples.cpp`, holding one function per set:
+
+```cpp
+// typical
+void ui_sample_set_0() {
+    ui_set_platform("4");
+    ui_set_box_fill(int32_t{3});
+    {  // departures.formation: carriages, 1 row
+        wd_train_formation* obj = static_cast<wd_train_formation*>(ui_screen_departures.objs[4]);
+        obj->begin();
+        obj->add_carriage(int32_t{1}, static_cast<const char*>("first"), false, false, int32_t{40});
+        obj->commit();
+    }
+    {  // departures.services: rows, 1 row
+        wd_service_list* obj = static_cast<wd_service_list*>(ui_screen_departures.objs[5]);
+        obj->begin();
+        static const char* const row_0_cells[] = {"10:15", "Reading", "3", "On time"};
+        obj->add_row(row_0_cells, size_t{4});
+        obj->commit();
+    }
+}
+```
+
+- **Scalars** go through `ui_set_<subject>(value)`.
+- **A collection** is reached through `ui_screen_<s>.objs[i]` — the generated objects
+  are `static` in each screen's unit, and nothing else names them — cast to its
+  class, and filled with `begin()`, the `<data>`'s declared access method per row,
+  and `commit()`: the widget's own hand-written ingestion API. Arguments are typed
+  as the registry's fill thunk passes them (`int32_t`, `bool`, `const char*`, and a
+  repeated field as `const char* const*` and `size_t`), so overload resolution is
+  the same in both halves.
+- **`i`** is the element's `object` index in the scene generated with the firmware
+  code: the realiser's document-order index, which the generator emits `objs` in.
+- **The guard.** Before writing the unit, the stage reads each screen's generated
+  `ui_screen_<s>_objs[]` table and holds every staged index to it: entry `i` must be
+  `&ui_obj_<element>`. A drift refuses the run (`U8G2GL_TEST_RUN_SAMPLES`), naming
+  the index, what the table holds there and what was expected, so an index drift
+  fails loudly instead of filling the wrong widget. A unit test proves the
+  departures fixture's every collection resolves to its own entry and that a table
+  with two entries swapped is refused.
+- **Wiring.** The unit also defines `u8g2gl_harness_apply_sample_set()` and the
+  harness exports that choose a set (`selectSampleSet()`, `getSampleSetCount()`,
+  `getSampleSetName()`). `wasm/harness.cpp` makes one call to it, after `ui_init()`
+  and before the first frame; with no set selected it does nothing, so a run with
+  no sets is exactly the run before sets existed.
+
+**The editor half** applies the same set as the canvas does, through
+`applySampleData()` and `applyCollectionData()`, so the two halves are given the
+same data and fill it by different routes: the editor through its registry's fill
+thunk, the firmware through the widget's own methods. The designer sends each set
+as it applies it — its checked values, and its rows by screen name, element and
+data name — so a set's problems (ui_spec §11.1) are left out of both halves alike.
+
+**Every screen, every set.** A run boots a fresh harness instance for every screen
+with the initial values, then for every screen with each set, and the result's
+`runs` holds each case's frames. The designer compares each with its own and
+reports parity per set and per screen; the bug report records the mismatching
+case's screen and set. The CLI's `sample-set-parity.test.ts` checks the departures
+fixture across its four conventional sets, and that each set's frame draws what it
+holds (empty services are blank, the worst case's are fuller than typical's), so
+two blank frames cannot pass by agreeing.
+
+**PR-08 still owns the firmware ingestion API.** The staged unit is test-run
+plumbing, never part of the firmware target or of `generate`'s output: an
+application still fills a widget through its own `begin()`/access/`commit()`, and
+§9.2's generated typed API (`ui_departures_rows`) remains PR-08's.
+
+**`measureText(font, text)`**, a bridge export (editor target only), gives a
+string's width in pixels from U8G2's own `getUTF8Width()` in a loaded font, so the
+designer can make the *full, longest* set's widest text (ui_spec §11.3).
 
 ---
 

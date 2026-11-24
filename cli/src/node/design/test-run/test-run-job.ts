@@ -17,7 +17,14 @@
  *              - `documents`: every buffer differing from disk,
  *                `{ path, content, version }` (stage-project.ts);
  *              - `times` (optional): frame times in ms, non-decreasing;
- *                TEST_RUN_TIMES when absent.
+ *                TEST_RUN_TIMES when absent;
+ *              - `sets` (optional): the sample sets to check, each as the
+ *                canvas applies it (sample-set-unit.ts).
+ *              Every screen is run from boot with the initial values, then
+ *              once per set, each on a fresh harness instance, and the
+ *              result's `runs` holds them all, so parity is reported per set
+ *              and per screen. `screen` and `frames` stay the requested
+ *              screen's run with the initial values, as before sets.
  *              The result carries each frame's bytes (base64) and SHA-256,
  *              the timings, and the versions tested: each posted document's,
  *              the generator's, the runtime's and the compiler's. A failure
@@ -31,6 +38,7 @@
  * - TEST_RUN_TIMES:          The fixed frame times
  * - TestRunParams:           What a request asks for
  * - TestRunFrame:            One frame of the result
+ * - TestRunCase:             One screen's frames with one set
  * - TestRunResult:           A succeeded run
  * - parseTestRunParams():    Validate a request's params
  * - TestRunJobOptions:       Where the job builds, and with what
@@ -52,6 +60,7 @@ import { EDITOR_WASM_FAILURE } from '../build/editor-wasm-job.js';
 import { editorBuildCacheRoot } from '../build/editor-wasm-build.js';
 import { locateFrameworkRoot } from '../build/framework-sources.js';
 import { loadHarness } from './harness-runner.js';
+import { parseTestRunSampleSets, type TestRunSampleSet } from './sample-set-unit.js';
 import { checkStagedDocuments, stageProject, type StagedDocument } from './stage-project.js';
 import { buildTestRunHarness } from './test-run-build.js';
 
@@ -73,6 +82,8 @@ export interface TestRunParams {
   readonly screen: string;
   readonly documents: readonly StagedDocument[];
   readonly times: readonly number[];
+  /** The sample sets to check besides the initial values; none when absent. */
+  readonly sets: readonly TestRunSampleSet[];
 }
 
 /** One frame of a run. */
@@ -84,11 +95,24 @@ export interface TestRunFrame {
   readonly bytes: string;
 }
 
+/** One screen run from boot with one set (or the initial values). */
+export interface TestRunCase {
+  readonly screen: string;
+  /** The set's name; null for the initial values alone. */
+  readonly set: string | null;
+  readonly frames: readonly TestRunFrame[];
+}
+
 /** A succeeded run, as the job's record serves it. */
 export interface TestRunResult {
   readonly screen: string;
   readonly display: { readonly width: number; readonly height: number };
   readonly frames: readonly TestRunFrame[];
+  /**
+   * Every screen with the initial values, then with each set, in screen order
+   * and set order: what parity is reported for, per set and per screen.
+   */
+  readonly runs: readonly TestRunCase[];
   /** Whether the harness was linked for this run, or found current. */
   readonly build: 'built' | 'current';
   readonly harnessHash: string;
@@ -121,7 +145,7 @@ export function parseTestRunParams(params: unknown): TestRunParams | string {
   if (typeof params !== 'object' || params === null) {
     return 'a test run needs { "screen", "documents" }';
   }
-  const { screen, documents, times } = params as { screen?: unknown; documents?: unknown; times?: unknown };
+  const { screen, documents, times, sets } = params as { screen?: unknown; documents?: unknown; times?: unknown; sets?: unknown };
   if (typeof screen !== 'string' || screen === '') {
     return 'a test run needs the screen the canvas shows';
   }
@@ -153,7 +177,11 @@ export function parseTestRunParams(params: unknown): TestRunParams | string {
   ) {
     return `times must be 1 to ${MAX_TIMES} non-decreasing whole milliseconds`;
   }
-  return { screen, documents: parsed, times: wanted as number[] };
+  const parsedSets = parseTestRunSampleSets(sets);
+  if (typeof parsedSets === 'string') {
+    return parsedSets;
+  }
+  return { screen, documents: parsed, times: wanted as number[], sets: parsedSets };
 }
 
 /** Where the job builds, and with what. Every field has a real-machine default. */
@@ -177,9 +205,13 @@ interface RunContext {
 }
 
 /**
- * @brief One test run: stage the text, build the harness, run the frame loop.
+ * @brief One test run: stage the text, build the harness, then run every
+ *        screen with the initial values and with each posted sample set, each
+ *        on a freshly booted harness.
  *
- * @return The result, or the diagnostics that stopped the build.
+ * @return The result, whose `runs` holds every case and whose `frames`
+ *         repeat the requested screen's run with the initial values; or the
+ *         diagnostics that stopped the build.
  */
 export async function runTestRun(
   context: RunContext,
@@ -198,6 +230,7 @@ export async function runTestRun(
     frameworkRoot: context.frameworkRoot,
     toolchain: context.toolchain,
     host: context.host,
+    sets: params.sets,
   });
   if (build.status === 'failed') {
     return { ok: false, diagnostics: build.diagnostics };
@@ -211,10 +244,21 @@ export async function runTestRun(
     };
   }
 
-  // --- Step 3: The frame loop, on a freshly booted harness ---
+  // --- Step 3: Every screen with the initial values, then with each set, each on a freshly booted harness ---
+  // `frames` stays the requested screen's initial-values run, as it was
+  // before sets, so a client that reads only it still gets its answer.
   const runStarted = Date.now();
   const harness = await loadHarness(build.harnessDir);
-  const run = await harness.run(params.screen, params.times);
+  const encode = (frames: readonly Uint8Array[]): TestRunFrame[] =>
+    frames.map((frame, i) => ({ time: params.times[i] ?? 0, sha256: sha256(frame), bytes: Buffer.from(frame).toString('base64') }));
+  const runs: TestRunCase[] = [];
+  for (const screen of build.layout.screens) {
+    for (const set of [undefined, ...params.sets.map((s) => s.name)]) {
+      const run = await harness.run(screen, params.times, set);
+      runs.push({ screen, set: set ?? null, frames: encode(run.frames) });
+    }
+  }
+  const requested = runs.find((r) => r.screen === params.screen && r.set === null);
   const runMs = Date.now() - runStarted;
 
   return {
@@ -222,11 +266,8 @@ export async function runTestRun(
     result: {
       screen: params.screen,
       display: harness.display,
-      frames: run.frames.map((frame, i) => ({
-        time: params.times[i] ?? 0,
-        sha256: sha256(frame),
-        bytes: Buffer.from(frame).toString('base64'),
-      })),
+      frames: requested?.frames ?? [],
+      runs,
       build: build.status,
       harnessHash: build.harnessHash,
       versions: {

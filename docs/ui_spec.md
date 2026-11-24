@@ -289,7 +289,7 @@ Every Explorer entry has a **context menu**, opened by right-click, Shift+F10 or
 
 The server starts these programs itself, with an argument array and never a shell; the editor command is split once at start-up and never comes from a request.
 
-**The activity bar** draws each view as a Lucide icon (§6, the Palette's own set): Explorer `files`, Palette `shapes`, Assets `image`, Fonts `type`, Sample data `database`, Flow `workflow`, Search `search`. The name is the button's tooltip and accessible label; a view not in this release is shown disabled. *2026-11-20 (E-2k2).* **Fonts** is enabled: the Fonts view (§12). Assets, Sample data, Flow and Search are not yet.
+**The activity bar** draws each view as a Lucide icon (§6, the Palette's own set): Explorer `files`, Palette `shapes`, Assets `image`, Fonts `type`, Sample data `database`, Flow `workflow`, Search `search`. The name is the button's tooltip and accessible label; a view not in this release is shown disabled. *2026-11-20 (E-2k2).* **Fonts** is enabled: the Fonts view (§12). *2026-11-24 (E-3b).* **Sample data** is enabled: the Sample data view (§11.2). Assets, Flow and Search are not yet.
 
 **The Palette** is a grid of 56 px icon tiles, each its element's icon over its label (cut short with an ellipsis; the tag when there is no label), grouped Framework / Project / Drawing and filed by category. A tooltip on hover and on keyboard focus gives the label, the `<tag>` and the description. The filter matches all three; tiles are drag sources onto the canvas; they are in the tab order, and the arrow keys move between them. An element's icon is its own, else its category's, else a generic one. The icons are [Lucide](https://lucide.dev), vendored whole (THIRD-PARTY-NOTICES.md), so a project widget's icon is not limited to the ones the framework uses.
 
@@ -376,7 +376,7 @@ There are two kinds of hidden, and they never mix:
 
 **`globals.xml`: subjects, styles, constants, and renaming.** *2026-11-21 (E-2k3).* Who uses a name is answered once, by the CLI's **reference finder** (`cli/src/core/references/`), which every list, guard and rename below reads. It finds references structurally, never by searching text, in every file the project loads (`u8g2gl.xml`, `globals.xml`, every screen, every widget manifest wherever it lives), with the exact text of each: `bind_*` attributes and `<bind_flag_if_*> subject=`; props a manifest types `subject`, `style`, `font` or `image`, and their `default`s; `<style name>` children, `style=` and `focus_style=`; `style_font=` overrides and a style's `font`, global or a screen's own; and each `#name` the resolver's expression tokeniser reads in an attribute value, so `#margin` in `#margin_top + 1` is not one. A screen that declares a style of its own shadows a global style of the same name there, as the validator resolves it; a widget's template sees global styles only.
 
-- **The subjects table** replaces the subjects list. Each row is one subject: its name; its type; **Initial value**, headed as the value the firmware boots with, its ⓘ saying it is compiled in until the application calls `ui_set_<name>()`; `max_len` for a string, with what its buffer costs (`max_len + 1` bytes, §18); and **Used by**, each binding by screen and element. A click on a user selects that element on its screen, as the Explorer does. Every field is the generic form's control, committing on Enter or blur as one undo stop, with its own problems beneath it. Sample values (§11) join as columns later.
+- **The subjects table** replaces the subjects list. Each row is one subject: its name; its type; **Initial value**, headed as the value the firmware boots with, its ⓘ saying it is compiled in until the application calls `ui_set_<name>()`; `max_len` for a string, with what its buffer costs (`max_len + 1` bytes, §18); and **Used by**, each binding by screen and element. A click on a user selects that element on its screen, as the Explorer does. Every field is the generic form's control, committing on Enter or blur as one undo stop, with its own problems beneath it. *2026-11-24 (E-3b).* Sample values join as columns, one per set (§11.5).
 - **A style's card** keeps its §10 fields, driven by `STYLE_PROPERTIES`, and ends with a **preview**: a label and a button in the style, side by side, drawn by the real renderer on a one-screen project over the project's own `globals.xml`, as the Fonts view draws its ruler, and drawn again whenever that text changes. Each is captioned with what the runtime draws of a style on it: the label its font, draw colour, font mode, alignment, and `border` (a one-pixel outline, rounded by `radius`); the button those, plus `invert` (a filled box, when not disabled), `radius` (box and frame), `padding` beside a left or right alignment, and `border`, which its own `border_width` frame stands in for when `border_width` is above 0. *2026-11-22 (R-border).* The framework now draws a style's `border` on every element (design_spec §10), so the captions name it, and the note that said no element drew it is gone. The card lists **Used by**, by screen and element, names the screens whose own style shadows it, and gives the **radius bound**: the largest radius its users with a literal `width` and `height` allow (`min(width, height) / 2` of the smallest, named), which explains the validator's existing check before it fires and adds no rule. A user that sets its own `radius` is left out, since its own value wins (§10); with no literal-sized user, the card says the radius is checked where each user is placed.
 - **A constant** lists every `#name` reference by file and attribute, one inside an expression included, each a link to it.
 - **Every kind refuses Remove while it is used**, subjects, constants, styles, fonts and images alike, naming every user the finder reports, a widget template's element or a prop's default included, so Remove can never leave the project failing to validate. A global style's uses on a screen that shadows it do not hold it.
@@ -558,13 +558,92 @@ This matters more in monochrome than in colour UI because **layout is length-dep
 | Edited in | Subjects table, "Initial value" | Subjects table, one column per set; Sample data view | Sample data view, a typed grid per instance |
 
 - A set may leave a subject out. Then the initial value applies, and the UI shows that it was inherited. With neither, the element shows the visible placeholder below.
-- **Sample sets live in `samples/<set>.json`** in the project (S1, closing [U-6]): shared through source control, read by the designer and by test runs, ignored by `generate`, outside the schema. The active set is per-browser view state. The file format is E-3b's.
-- Conventional sets, offered on project creation: **typical**, **empty**, **longest plausible**, **worst case**.
-- **Collection widgets take sample rows** ([D-8]: collections are not subjects). A widget declares the shape of its rows with `<data>` in its manifest (design_spec §6.5), and the editor fills it by name through the registry (design_spec §9.4, delivered by E-3a): every field of every row is typed, and every collection's capacity is the instance's own. The Sample data view's grids, paste, and the generated *empty*, *one* and *full, longest* sets are E-3b's.
-- Switchable from the canvas toolbar and cycleable by keyboard, so a layout can be swept against every set in seconds.
+- **Sample sets live in `samples/<set>.json`** in the project (S1, closing [U-6]): shared through source control, read by the designer and by test runs, **ignored by `generate` and `validate`**, outside the schema. The active set is per-browser view state (`u8g2gl.samples:<project>` in the browser's storage), never written to the project. No set active is the initial values alone.
+- **Collection widgets take sample rows** ([D-8]: collections are not subjects). A widget declares the shape of its rows with `<data>` in its manifest (design_spec §6.5), and the editor fills it by name through the registry (design_spec §9.4): every field of every row is typed, and every collection's capacity is the instance's own.
 - **Never compiled** ([UD-6]).
 
 An element bound to a subject with no sample value renders a visible placeholder rather than blank, so the omission is obvious rather than silent.
+
+### 11.1 The set file
+
+*E-3b, 2026-11-24.* One JSON file per set, `samples/<set>.json`, one level deep:
+
+```json
+{
+  "u8g2gl_samples": 1,
+  "values": { "platform": "4", "box_fill": 3 },
+  "rows": {
+    "screens/screen_departures.xml": {
+      "formation": [ { "number": 1, "class_type": "first", "wheelchair": false, "bike": false, "loading_pct": 40 } ],
+      "services":  [ { "cells": ["10:15", "Reading", "3", "On time"] } ]
+    }
+  }
+}
+```
+
+- `u8g2gl_samples` is the format version, 1.
+- `values` is keyed by subject name: a string, an integer (int, and time in seconds), or a boolean, by the subject's type.
+- `rows` is keyed by the screen's project-relative file, forward slashes, then the element's name. Each element's rows are an array of objects keyed by the manifest's `<field>` names; a `repeat` field is an array of strings. A set addresses an element's only `<data>`: an element whose manifest declares several is a problem.
+- A set name is letters, digits, spaces, `_`, `.` and `-`, starting with a letter or digit, so the file name is portable.
+- The designer writes two-space JSON with a final newline, in the document's own member order, so one edited value is one changed line.
+
+**Checks.** Every set is checked against the project on every run of the live loop, and each problem is a row in Problems (and a marker in the set's editor tab) naming the set file, the line and column of the value at fault, and its JSON path, e.g. `rows["screens/screen_departures.xml"].services[3].cells[1]`:
+
+| Problem | Code | Severity |
+|---|---|---|
+| Not JSON (with the line and column) | `U8G2GL_SAMPLE_JSON` | error |
+| A missing or unknown `u8g2gl_samples` | `U8G2GL_SAMPLE_VERSION` | error |
+| A member of the wrong shape, or one the format lacks | `U8G2GL_SAMPLE_SHAPE` | warning |
+| An unknown subject | `U8G2GL_SAMPLE_UNKNOWN_SUBJECT` | warning |
+| A screen file the project does not read | `U8G2GL_SAMPLE_UNKNOWN_SCREEN` | warning |
+| An element the screen does not have | `U8G2GL_SAMPLE_UNKNOWN_ELEMENT` | warning |
+| An element whose manifest declares no `<data>` (or several) | `U8G2GL_SAMPLE_NO_DATA` | warning |
+| A field the `<data>` does not declare | `U8G2GL_SAMPLE_UNKNOWN_FIELD` | warning |
+| A wrong type, a value outside `min`/`max` or not in `values`, a string over its `max_len` (resolved from the instance's props, counted in characters), an array longer than its `repeat`, a missing field | `U8G2GL_SAMPLE_VALUE` | warning |
+| Rows beyond the instance's capacity | `U8G2GL_SAMPLE_CAPACITY` | warning |
+
+A set that does not parse, or has an unknown version, applies nothing. Otherwise **the parts that check clean still apply**: a bad value is left out (its subject inherits), a bad row is left out, rows beyond the capacity are left out. What reaches the bridge has been checked as the bridge checks it, so the canvas never loses its frame to a bad set. A set's problems never block a build or hatch the canvas: a set is never compiled.
+
+**Set files are project documents.** They open in an editor tab (as plain text) and are saved and undone through the same model as the XML: every edit the designer makes to a set is one undo step on its document, and the set is unsaved until the author saves it (⌘S in its tab, ⌘⌥S, or the view's Save). A set edit never touches project XML. An edit made outside the designer reaches it as an XML edit does (§16.1). Creating, duplicating, renaming and deleting a set are file operations the author asks for by name, and happen on disk at once; the design server removes only sample sets, and only at the version the designer read.
+
+### 11.2 The Sample data view
+
+The activity bar's **Sample data** view (§6). While it shows, the primary sidebar widens, so a service list's cells fit.
+
+- **Sets.** Pick the active set, or *None* (the initial values). *New…*, *Duplicate…*, *Rename…* and *Delete…*; a delete asks first, in the view, naming the file and any unsaved changes it loses. *Save*, *Undo* and *Redo* act on the active set's file. A rename moves the active set with it.
+- **Values.** One row per subject; the initial value, labelled as compiled in, and one column per set. A value a set leaves out shows the initial value, dimmed and marked *inherited*; editing it writes it into that set, and ↺ makes it inherited again.
+- **Collections.** Every collection instance on every screen, with its rows in the active set as a typed grid: a checkbox for a bool, a dropdown for an enum, a number held to `min`/`max` (a typed 150 for a 0–100 field is written as 100), a string counted against `max_len` (`12 / 24`, flagged when over, never cut), and a `repeat` field as its cells. Rows are added (a row of defaults), removed and reordered; the capacity is shown (`8 / 12`) and *+ Row* stops at it. Text and number cells commit on Enter or blur, so one edit is one undo step.
+- **Paste.** A grid's *Paste…* takes a JSON array of row objects, or CSV with a header row (RFC 4180: quoted commas, doubled quotes and line breaks in quotes). Fields are mapped by name, exactly or ignoring case; a repeated field takes `cells[0]`, `cells.0`, or the bare name repeated, left to right. A field no column gives takes its default and a column no field has is ignored, each said once. **Every refused value is reported by row and field** (`row 2, cells[1]: 25 characters, over the max_len of 24`), a row with one is left out, rows beyond the capacity are refused, and **the accepted rows still land**. This is the route from a real departures feed into the designer.
+- **Canvas link.** Selecting a collection element on the canvas opens its grid in the view and scrolls to it.
+
+### 11.3 Generated and conventional sets
+
+The view generates sets from the declarations, on request, as ordinary set files the author can edit afterwards (ruling 8):
+
+- **Empty:** every collection with no rows, every string subject empty, numbers 0, bools false.
+- **One row:** a single row per collection, each string its field's name so the row can be seen; subjects inherited.
+- **Full, longest:** every collection at its capacity, every repeated field at its `repeat`, every string at its `max_len`, made of the printable ASCII glyph (`!` to `~`) with the largest advance in the font that draws it. The advance is measured by the real renderer (the bridge's `measureText(font, text)`, editor target only): `width("cc") − width("c")`, because U8G2 counts a string's last glyph by its ink. A tie goes to `W` when it is among the widest, as in every monospaced font. A string with no measurable font (one set only through a style, say) uses `W`, and Output says so.
+
+In every generated row a number takes its `min` (else 0 within its bounds), an enum its first value, a bool false.
+
+**Conventional sets** (Q3a). There is no project-creation flow, so while `samples/` is empty the view offers one action, *Create the conventional sets*, which writes:
+
+- **typical:** the initial values written out, and one row per collection;
+- **empty:** the *empty* set;
+- **longest-plausible:** a copy of *typical*, for the author to lengthen to the longest real data the product must survive;
+- **worst-case:** the *full, longest* set.
+
+The names are file names a shell needs no quoting for.
+
+### 11.4 The set switcher
+
+The canvas toolbar's **Data** dropdown chooses the set the canvas shows: *no sample set*, then each set by name. **⌥] / Alt+]** and **⌥[ / Alt+[** cycle through them from anywhere in the designer, the XML editor included, with *no sample set* the stop before the first; the dropdown's tooltip names both keys. Switching only changes what is handed to the editor Wasm after the scene, so it is as quick as any frame, and one layout is swept against every set in seconds.
+
+**Test runs check every set** (design_spec §9.6). Run compares every screen with the initial values and with each set, and reports parity per set and per screen: *✓ parity · 5 cases* with one chip per case, or the first mismatch with its case (*≠ 1 px differ at 0 ms with worst-case*), and the bug report records the case's screen and set.
+
+### 11.5 The subjects table's set columns
+
+The subjects table (§6.4) has one **sample** column per set beside **Initial value**, which stays labelled as what the firmware boots with. Each is the Sample data view's own value cell: a value a set leaves out is shown inherited, and an edit writes the set's file, never `globals.xml`.
 
 ---
 
@@ -640,7 +719,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 | **Palette metadata** | Display name, category, icon per element | **Done (0.5; icons done, 0.6)** — *2026-10-31: `label`, `category` and `description` on `<api>` ([design_spec.md §13.1](design_spec.md)); the Palette files by category and shows the label and description. 2026-11-10: `icon` on `<api>`, which every framework manifest declares; a tile shows its element's icon, else its category's* |
 | **Conditional property visibility** | `visible_when` — `scroll_px_per_sec` is meaningless unless `long_mode` scrolls ([D-19]). Tracked as [Q-7] | **Declined at C4** — *2026-10-31 ([EDITOR-DESIGN.md](../.agents/skills/principal-architect-workspace/e-d-editor-design/EDITOR-DESIGN.md) §8): every prop shows* |
 | **Editor-target generation** | Manifests must generate a registry and property thunks for the `editor` target as well as setters for `firmware` ([UD-4]) | **Must add to PR-04 scope** — *2026-10-26: done, fixture-bound; E-1d makes it project-driven* |
-| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`). 2026-11-17: [U-6] closed by S1, `samples/<set>.json` outside the schema (§11); a collection's row shape is schema 0.7's `<data>` (design_spec §6.5)* |
+| **Sample data** | Named sets of design-time subject values, including collection rows. Never compiled | **Must add** ([U-6]) — *2026-10-26: not in schema 0.4; E-3's, outside the schema (E-D's leaning: `samples/*.json`). 2026-11-17: [U-6] closed by S1, `samples/<set>.json` outside the schema (§11); a collection's row shape is schema 0.7's `<data>` (design_spec §6.5). 2026-11-24: settled; E-3b specified the format, its checks and the view (§11)* |
 | **Stable element identity** | The editor must address elements across edits | **Settled** ([U-1], PR-03). `name` is required. The CLI errors on a missing name; the editor generates one and persists it on save |
 | **Round-trip fidelity** | Comments, attribute order and whitespace preserved. Not a schema feature but a parser contract ([UD-3]) | **Must state** — *2026-10-26: no CST exists yet; E-1a delivers it* |
 | **Editor view state** | Zoom, selection, panel sizes, active sample set | **Sidecar** `.u8g2gl-editor.json`, *not* project XML — per-user, and would otherwise make every pan a source-control change |
@@ -655,7 +734,7 @@ Per [design_spec.md §1.5](design_spec.md), omission is the default.
 
 *(**U-1** closed in PR-03 — see §16.1. **U-3** closed 2026-11-14, E-2k1: a switcher on one canvas, see below. **U-6** closed 2026-11-17, E-3: see below.)*
 
-**`[U-6]` Where sample data lives — closed 2026-11-17 (E-3, the owner's decision S1).** In `samples/<set>.json` in the project: shared through source control, read by the designer and by test runs, ignored by `generate`, and outside the schema (§11). JSON, because it is data, never compiled, and what a live feed produces. The active set is per-browser view state. The format itself is E-3b's. Collection rows no longer wait on PR-08: E-3a delivered the editor's fill path (design_spec §9.4).
+**`[U-6]` Where sample data lives — closed 2026-11-17 (E-3, the owner's decision S1).** In `samples/<set>.json` in the project: shared through source control, read by the designer and by test runs, ignored by `generate`, and outside the schema (§11). JSON, because it is data, never compiled, and what a live feed produces. The active set is per-browser view state. The format, specified by E-3b, is in §11.1, and `validate` ignores `samples/` as `generate` does. Collection rows no longer wait on PR-08: E-3a delivered the editor's fill path (design_spec §9.4).
 
 **`[U-3]` Multi-target — closed 2026-11-14 (E-2k1, the owner's decision D1).** One canvas with a target switcher in the status bar (§6.4). The canvas, inserts, the impact preview and any budget figure follow the active target, which is per-browser view state and never written to the XML; a missing or renamed target falls back to the first. [Q-1], per-target overrides in the screen files, is unaffected: the switcher shows each target as its display resolves it.
 

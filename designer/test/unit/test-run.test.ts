@@ -103,6 +103,7 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     selectScreen: () => true,
     applySampleData: () => true,
     applyCollectionData: () => true,
+    measureText: () => undefined,
     renderFrame: () => live,
     displaySize: () => ({ width: 8, height: 8 }),
     lastError: () => '',
@@ -129,7 +130,13 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     wasmStatus: status,
     module: new Observable<EditorModule | undefined>(module),
     lastRun: new Observable<CompletedRun | undefined>({
-      result: { scene: '{}', screen: 'home', subjectValues: '{}' },
+      result: {
+        scene: '{}',
+        screen: 'home',
+        subjectValues: '{}',
+        model: { screens: [{ name: 'home', loc: { file: 'screens/screen_home.xml' } }], project: { targets: [] } },
+        sampleShape: { subjects: [], collections: [], screenFiles: new Set(), elements: new Map() },
+      },
       assets: undefined,
     } as unknown as CompletedRun),
     wellFormed,
@@ -137,6 +144,8 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     settled: () => Promise.resolve(),
     restoreCanvas: () => restored.push(1),
     dirtyDocuments: () => [{ path: 'screens/screen_home.xml', content: '<screen/>', version: '3' }],
+    sampleSets: () => [],
+    activeSampleSet: () => undefined,
     onEdit: (listener) => {
       editListeners.add(listener);
       return () => editListeners.delete(listener);
@@ -202,7 +211,7 @@ test('a run posts the dirty text, restores the canvas, and shows parity; each ed
   await h.until(() => h.controller.view.get().kind === 'parity');
   expect(h.controller.view.get()).toMatchObject({ kind: 'parity', editsSince: 0 });
   expect(h.posted).toEqual([
-    { screen: 'home', documents: [{ path: 'screens/screen_home.xml', content: '<screen/>', version: '3' }], times: TEST_RUN_TIMES },
+    { screen: 'home', documents: [{ path: 'screens/screen_home.xml', content: '<screen/>', version: '3' }], times: TEST_RUN_TIMES, sets: [] },
   ]);
   expect(h.restored).toEqual([1]);
   // Its live frames are the exported view: the designer's hiding is never set.

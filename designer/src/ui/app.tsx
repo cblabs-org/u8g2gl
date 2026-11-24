@@ -47,6 +47,7 @@ import { SessionBanner } from './session-banner';
 import { useUnsavedGuard } from './use-unsaved-guard';
 import { Palette } from '../palette/palette';
 import { FontsView } from '../fonts/fonts-view';
+import { SamplesView } from '../samples/samples-view';
 
 /** The Dockview component of each panel kind. */
 const COMPONENTS = {
@@ -142,6 +143,22 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     return () => window.removeEventListener('keydown', onKey, { capture: true });
   }, [workspace]);
 
+  // --- ⌥] / Alt+] and ⌥[ / Alt+[ anywhere cycle the canvas's sample set ---
+  // Matched by code, because with Option held a Mac keyboard reports another
+  // character than the bracket, as for ⌘⌥S above.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+      const by = event.code === 'BracketRight' ? 1 : event.code === 'BracketLeft' ? -1 : 0;
+      if (by === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      workspace.samples.cycle(by);
+    };
+    window.addEventListener('keydown', onKey, { capture: true });
+    return () => window.removeEventListener('keydown', onKey, { capture: true });
+  }, [workspace]);
+
   // --- Requests to bring Output to the front, as after a failed save ---
   useEffect(() => workspace.onShowOutput(() => dock.current?.getPanel('output')?.api.setActive()), [workspace]);
 
@@ -174,9 +191,9 @@ export function App({ workspace }: { readonly workspace: Workspace }): React.JSX
     <WorkspaceContext.Provider value={workspace}>
       <div className="window">
         <SessionBanner />
-        <div className="shell">
+        <div className="shell" data-sidebar={view}>
           <ActivityBar active={view} onSelect={setView} />
-          {view === 'explorer' ? <Explorer /> : view === 'palette' ? <Palette /> : <FontsView />}
+          {view === 'explorer' ? <Explorer /> : view === 'palette' ? <Palette /> : view === 'fonts' ? <FontsView /> : <SamplesView />}
           <main className="editor-area">
             <DockviewReact components={COMPONENTS} onReady={onReady} theme={themeDark} />
           </main>

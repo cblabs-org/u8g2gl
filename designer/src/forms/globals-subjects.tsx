@@ -6,6 +6,7 @@
  * File: designer/src/forms/globals-subjects.tsx
  * Purpose: globals.xml's subjects as a table (ui_spec §6.4): one row per
  *          subject with its name, type, the value the firmware boots with,
+ *          its value in each sample set beside it (ruling 10, ui_spec §11),
  *          a string's `max_len` with what it costs, and who binds it, so the
  *          author sees at a glance what each subject is for and what it
  *          costs, and can go straight to a binding.
@@ -16,6 +17,13 @@
  *              the row. "Used by" is the reference finder's answer; a click
  *              selects that element on its screen. Remove goes through the
  *              form's own guard, which refuses a subject still bound.
+ *
+ *              The sample columns, one per set, are the Sample data view's own
+ *              cells (`samples/sample-cells.tsx`): a value a set leaves out is
+ *              shown as inherited from the initial value, and an edit writes
+ *              the set's file, never globals.xml. "Initial value" stays
+ *              labelled as what the firmware boots with: it is compiled in,
+ *              and a sample value never is.
  *
  * Exports:
  * - SubjectsTable:    The table, for the subjects section
@@ -30,6 +38,9 @@ import { nameUsers } from './asset-usage';
 import { FieldControl } from './form-controls';
 import type { FormField, FormList, FormNode } from './form-model';
 import type { FormActions, FormViewState } from './form-view';
+import { SubjectValueCell } from '../samples/sample-cells';
+import { withValue } from '../samples/sample-sets';
+import { useObservable } from '../ui/use-observable';
 
 /** No rows. */
 const NONE: readonly ProblemRow[] = [];
@@ -80,6 +91,11 @@ export function SubjectsTable({
   readonly rowExtra?: (item: FormNode) => ReactNode;
 }): React.JSX.Element {
   const refs = workspaceReferences(workspace);
+  // The sets, and a run after each edit to one, so the columns follow the sets' text.
+  const sets = useObservable(workspace.samples.names);
+  const run = useObservable(workspace.loop.lastRun);
+  const sampleSubjects = run?.result.sampleShape.subjects ?? [];
+  const setDocuments = new Map(sets.map((set) => [set, workspace.samples.documentOf(set)]));
   // cell
   // One field's generic control, or nothing for an attribute this kind lacks.
   const cell = (item: FormNode, attribute: string): ReactNode => {
@@ -104,6 +120,11 @@ export function SubjectsTable({
                 </span>
                 <span className="subject-heading-note">boots with</span>
               </th>
+              {sets.map((set) => (
+                <th key={set} scope="col" data-column="sample" data-set={set} title={`The value in the sample set ${set}: never compiled in`}>
+                  {set} <span className="subject-heading-note">sample</span>
+                </th>
+              ))}
               <th scope="col">max_len</th>
               <th scope="col">Used by</th>
               <th scope="col">
@@ -140,6 +161,19 @@ export function SubjectsTable({
                     </span>
                   </td>
                   <td data-column="value">{cell(item, 'value')}</td>
+                  {sets.map((set) => {
+                    const subject = sampleSubjects.find((candidate) => candidate.name === name);
+                    const document = setDocuments.get(set);
+                    return (
+                      <td key={set} data-column="sample" data-set={set}>
+                        {subject === undefined || document === undefined ? (
+                          <span className="subject-none">—</span>
+                        ) : (
+                          <SubjectValueCell subject={subject} set={set} value={document.values[name]} onCommit={(value) => void workspace.samples.edit(set, (d) => withValue(d, name, value))} />
+                        )}
+                      </td>
+                    );
+                  })}
                   <td data-column="max_len">
                     {cell(item, 'max_len')}
                     {cost !== undefined && (

@@ -5,8 +5,9 @@
  *
  * File: designer/src/documents/project-documents.ts
  * Purpose: The project's documents as the designer holds them: the text on
- *          disk, with its version, for every XML document the project reads,
- *          and a Monaco model for each one the user has opened. Text is the
+ *          disk, with its version, for every XML document the project reads
+ *          and every sample set (`samples/*.json`), and a Monaco model for
+ *          each one the user has opened. Text is the
  *          single source of truth ([UD-3]); this is where it is kept, and the
  *          only place the pipeline reads it from, so the canvas can never show
  *          a document other than the one in the editor.
@@ -60,6 +61,11 @@
  *     - textOf():          One document's current text
  *     - texts():           Every document's current text
  *
+ *     Whole-document edits (the Sample data view's):
+ *     - replaceText():     Replace a document's text as one undo step
+ *     - create():          Write a new document, never over an existing one
+ *     - remove():          Delete a sample set at the version last read
+ *
  *     Saving and conflicts:
  *     - dirty:             The paths whose buffer differs from what was saved
  *     - notSaved:          The dirty paths whose last save failed
@@ -94,6 +100,13 @@ export interface DiskText {
 /** What a save did. */
 export type SaveOutcome = 'saved' | 'unchanged' | 'conflict' | 'failed';
 
+/**
+ * Deletes a project file on the server at the version last read: the design
+ * server's `DELETE /api/file`, which takes sample sets only. The served file
+ * system has no removal, so the documents are handed this.
+ */
+export type FileRemover = (path: string, version: string) => Promise<{ readonly ok: boolean; readonly message?: string }>;
+
 /** An open document: its model and the undo position it was last saved at. */
 interface OpenDocument {
   readonly model: monaco.editor.ITextModel;
@@ -117,6 +130,7 @@ export class ProjectDocuments {
 
   private readonly fs: ServedProjectFileSystem;
   private readonly log: (line: string) => void;
+  private readonly remover: FileRemover | undefined;
   private readonly disk = new Map<string, DiskText>();
   private readonly open_ = new Map<string, OpenDocument>();
   private readonly contentListeners = new Set<(path: string, changes: readonly TextChange[]) => void>();
@@ -126,10 +140,12 @@ export class ProjectDocuments {
   /**
    * @param fs  The served project file system, already connected.
    * @param log Where saves and reloads are reported (the Output panel).
+   * @param remover How a sample set is deleted; none means `remove()` fails.
    */
-  constructor(fs: ServedProjectFileSystem, log: (line: string) => void = () => undefined) {
+  constructor(fs: ServedProjectFileSystem, log: (line: string) => void = () => undefined, remover?: FileRemover) {
     this.fs = fs;
     this.log = log;
+    this.remover = remover;
   }
 
   /** The file system the documents are read from and saved to. */
@@ -234,7 +250,8 @@ export class ProjectDocuments {
     // The URI carries the project path, so markers set for a file find it.
     const model = api.editor.createModel(
       withGeneratedNames(path, disk.text, projectStaticChildNames(this.texts())),
-      'xml',
+      // A sample set is JSON, which the shell's Monaco has no grammar for.
+      classifyProjectFile(path) === 'sample' ? 'plaintext' : 'xml',
       api.Uri.from({ scheme: 'u8g2gl', path: `/${path}` }),
     );
     const document: OpenDocument = { model, savedAt: model.getAlternativeVersionId() };
@@ -291,6 +308,81 @@ export class ProjectDocuments {
       texts.set(path, this.open_.get(path)?.model.getValue() ?? disk.text);
     }
     return texts;
+  }
+
+  /**
+   * @brief Replaces a document's whole text as one edit, so one undo restores it.
+   *
+   * The document is opened if it is not, and is then dirty like any edit:
+   * saving is the author's, as for the XML. A text equal to the current one
+   * makes no edit.
+   *
+   * @param path A loaded document.
+   * @param text Its new text.
+   * @return False when the path is not a loaded document or Monaco has not loaded.
+   */
+  replaceText(path: string, text: string): boolean {
+    const model = this.open(path);
+    if (model === undefined) return false;
+    if (model.getValue() === text) return true;
+    model.pushStackElement();
+    model.pushEditOperations([], [{ range: model.getFullModelRange(), text }], () => null);
+    model.pushStackElement();
+    return true;
+  }
+
+  /**
+   * @brief Writes a new document: created on disk at once, never over a file
+   *        that exists. Creating a sample set is the author's explicit action,
+   *        so it does not wait for a save.
+   *
+   * @param path A project path no file has.
+   * @param text Its text.
+   * @return `saved`, `conflict` when a file is already there, or `failed`.
+   */
+  async create(path: string, text: string): Promise<SaveOutcome> {
+    const result = await this.fs.write(path, text, { expectedVersion: null });
+    if (!result.ok) {
+      this.log(result.code === 'conflict' ? `${path} already exists: not created` : `could not create ${path}: ${result.message}`);
+      return result.code === 'conflict' ? 'conflict' : 'failed';
+    }
+    this.disk.set(path, { text, version: result.version, bom: false });
+    if (!this.files.get().includes(path)) {
+      this.files.set([...this.files.get(), path].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    }
+    this.log(`created ${path}`);
+    for (const listener of [...this.diskListeners]) listener(path);
+    return 'saved';
+  }
+
+  /**
+   * @brief Deletes a sample set from disk, at the version last read, and
+   *        forgets its document, buffer included.
+   *
+   * The caller has asked the author first: unlike closing a tab, this loses
+   * the file. A set changed on disk since it was read is not deleted.
+   *
+   * @param path A loaded sample set.
+   * @return Whether it was deleted; a refusal is logged.
+   */
+  async remove(path: string): Promise<boolean> {
+    const disk = this.disk.get(path);
+    if (disk === undefined || this.remover === undefined) return false;
+    const result = await this.remover(path, disk.version);
+    if (!result.ok) {
+      this.log(`could not delete ${path}: ${result.message ?? 'refused'}`);
+      return false;
+    }
+    const document = this.open_.get(path);
+    this.open_.delete(path);
+    this.disk.delete(path);
+    if (this.conflicts.get().has(path)) this.setConflict(path, undefined);
+    this.updateDirty(path);
+    document?.model.dispose();
+    this.files.set(this.files.get().filter((p) => p !== path));
+    this.log(`deleted ${path}`);
+    for (const listener of [...this.diskListeners]) listener(path);
+    return true;
   }
 
   /**
