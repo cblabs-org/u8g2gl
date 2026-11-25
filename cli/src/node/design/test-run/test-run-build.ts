@@ -153,8 +153,8 @@ export async function buildTestRunHarness(options: TestRunBuildOptions): Promise
     writeFileSync(tableUnit, tableSource);
   }
 
-  // --- Step 2b: The sample sets, each checked against the generated objs tables ---
-  const samples = sampleSetUnit(options.sets ?? [], readSampleStage(projectRoot, readText(sceneFile) ?? '', prepared.generatedDir));
+  // --- Step 2b: The sample sets, each filled through the generated collection facades ---
+  const samples = sampleSetUnit(options.sets ?? [], readSampleStage(projectRoot, readText(sceneFile) ?? ''));
   if (!samples.ok) {
     return { status: 'failed', diagnostics: [{ code: 'U8G2GL_TEST_RUN_SAMPLES', severity: 'error', file: '', line: 1, column: 1, message: samples.message }] };
   }

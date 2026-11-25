@@ -14,13 +14,16 @@
  *          method, and the editor host calls it through the registry's
  *          add-by-name entry. Equal draw logs, row for row, are the proof.
  *          It also holds the departures widget to `max_cell_chars` meaning
- *          usable characters, as a string subject's `max_len` does.
+ *          usable characters, as a string subject's `max_len` does, and to
+ *          keeping its rows only in the storage it is handed (§9.2).
  *
  * Description: Compiles test/static_children/'s committed generated units (both
  *              targets) with the departures fixture's own wd_service_list C++.
  *              Each case fills a list through its §9.2 API — begin(), add_row(),
  *              commit() — renders it through u8g2gl_render_object() into the
- *              U8G2 stub, and compares the stub's ordered call logs.
+ *              U8G2 stub, and compares the stub's ordered call logs. A list
+ *              configured by hand is handed storage by hand, with the layout
+ *              the generator emits for the fixture.
  */
 #include <gtest/gtest.h>
 
@@ -32,6 +35,7 @@
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_editor.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "wd_service_list.hpp"
 
@@ -93,10 +97,27 @@ std::vector<std::string> drawn_cells(const std::vector<std::string>& log) {
     return cells;
 }
 
+// The board's rows as the generator lays them out for screen_board.xml:
+// max_cols 4 cells of max_cell_chars 24 + 1 bytes, a 100-byte row, max_rows 4.
+constexpr u8g2gl_rows_field kCellFields[] = {{0, 25, 4, U8G2GL_FIELD_STRING}};
+constexpr u8g2gl_rows_layout kBoardRows = {kCellFields, 100, 1};
+
+// The same row with max_cell_chars 10: 4 cells of 11 bytes.
+constexpr u8g2gl_rows_field kShortCellFields[] = {{0, 11, 4, U8G2GL_FIELD_STRING}};
+constexpr u8g2gl_rows_layout kShortRows = {kShortCellFields, 44, 1};
+
+// One list's storage, as a generated unit declares it for an instance.
+struct hand_storage {
+    alignas(4) uint8_t bytes[4 * 100] = {};
+};
+
 // hand_written
 // The board as screen_board.xml describes it, configured by hand: the same
-// setters, then the same add_column() calls in the same order.
-void hand_written(wd_service_list& list) {
+// setters, the same add_column() calls in the same order, then its storage.
+//   list    — the list
+//   storage — its buffer, outliving it
+//   layout  — its row layout; the board's own by default
+void hand_written(wd_service_list& list, hand_storage& storage, const u8g2gl_rows_layout& layout = kBoardRows) {
     list.set_coords(0, 0, 128, 40);
     list.set_font(ui_font_u8g2_font_6x10_mr);
     list.set_max_rows(4);
@@ -105,6 +126,7 @@ void hand_written(wd_service_list& list) {
     list.add_column(50, U8G2GL_ALIGN_LEFT);
     list.add_column(16, U8G2GL_ALIGN_CENTER);
     list.add_column(32, U8G2GL_ALIGN_RIGHT);
+    list.attach_rows(0, u8g2gl_rows(storage.bytes, 4, &layout));
 }
 
 }  // namespace
@@ -118,7 +140,8 @@ TEST(StaticChildren, GeneratedFirmwareLaysOutAsTheHandWrittenCalls) {
     fill(*generated);
 
     wd_service_list by_hand;
-    hand_written(by_hand);
+    hand_storage storage;
+    hand_written(by_hand, storage);
     fill(by_hand);
 
     const std::vector<std::string> expected = rendered(&by_hand);
@@ -140,7 +163,8 @@ TEST(StaticChildren, EditorHostLaysOutAsTheHandWrittenCalls) {
     fill(*built);
 
     wd_service_list by_hand;
-    hand_written(by_hand);
+    hand_storage storage;
+    hand_written(by_hand, storage);
     fill(by_hand);
 
     EXPECT_EQ(drawn_cells(rendered(&by_hand)).size(), 12u);
@@ -150,9 +174,11 @@ TEST(StaticChildren, EditorHostLaysOutAsTheHandWrittenCalls) {
 // --- max_cell_chars counts usable characters ---
 
 TEST(StaticChildren, ACellOfExactlyMaxCellCharsSurvivesWhole) {
+    // max_cell_chars="10" sizes the storage: the generator lays each cell out
+    // as 10 + 1 bytes, and the widget truncates to what it is handed.
     wd_service_list list;
-    hand_written(list);
-    list.set_max_cell_chars(10);
+    hand_storage storage;
+    hand_written(list, storage, kShortRows);
     const char* const row[] = {"0123456789", "0123456789A", "", ""};
     list.begin();
     ASSERT_TRUE(list.add_row(row, 4));
@@ -166,7 +192,8 @@ TEST(StaticChildren, ACellOfExactlyMaxCellCharsSurvivesWhole) {
 
 TEST(StaticChildren, TheDefaultCellHoldsTwentyFourCharacters) {
     wd_service_list list;
-    hand_written(list);
+    hand_storage storage;
+    hand_written(list, storage);
     const char* const row[] = {"ABCDEFGHIJKLMNOPQRSTUVWX", "", "", ""};
     list.begin();
     ASSERT_TRUE(list.add_row(row, 4));
@@ -174,6 +201,37 @@ TEST(StaticChildren, TheDefaultCellHoldsTwentyFourCharacters) {
     const std::vector<std::string> cells = drawn_cells(rendered(&list));
     ASSERT_EQ(cells.size(), 1u);
     EXPECT_EQ(cells[0], "ABCDEFGHIJKLMNOPQRSTUVWX");
+}
+
+// --- Storage (§9.2): the rows live only in the buffer the widget is handed ---
+
+TEST(StaticChildren, WithNoStorageAttachedAListHasNoCapacityAndRefusesARow) {
+    wd_service_list list;
+    const char* const row[] = {"a"};
+    EXPECT_EQ(list.capacity(), 0u);
+    list.begin();
+    EXPECT_FALSE(list.add_row(row, 1));
+    list.commit();
+    EXPECT_EQ(list.row_count(), 0u);
+}
+
+TEST(StaticChildren, AListsCapacityIsItsStoragesAndItsRowsAreWrittenThere) {
+    wd_service_list list;
+    hand_storage storage;
+    hand_written(list, storage);
+    EXPECT_EQ(list.capacity(), 4u);
+    fill(list);
+    // The second row's second cell, in place: 100 bytes per row, 25 per cell.
+    EXPECT_STREQ(reinterpret_cast<const char*>(storage.bytes + 100 + 25), "London Paddington");
+}
+
+TEST(StaticChildren, TheGeneratedInitHandsTheListStorageOfItsDeclaredCapacity) {
+    // max_rows="4" in screen_board.xml: the generated buffer holds four rows,
+    // and the handle names the same object the screen's table does.
+    ui_init();
+    auto* generated = static_cast<wd_service_list*>(ui_screen_board.objs[0]);
+    EXPECT_EQ(generated->capacity(), 4u);
+    EXPECT_EQ(&ui_board_board, generated);
 }
 
 // --- The fill entry: the widget's own refusal stops the fill (Q-19) ---

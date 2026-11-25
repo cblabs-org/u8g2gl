@@ -198,8 +198,8 @@ export const DIAGNOSTIC_CODES = {
   BOUND_POSITION_HAS_CHILDREN: 'U8G2GL_BOUND_POSITION_HAS_CHILDREN',
   /**
    * The document uses a construct the schema accepts but the generator does not
-   * build yet — focus rings, events and screen navigation (PR-09), collections
-   * and composites with their own C++ class (PR-08). The message names the PR
+   * build yet — focus rings, events and screen navigation (PR-09), and
+   * composites with their own C++ class (a later PR). The message names the PR
    * that delivers it.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
@@ -456,6 +456,33 @@ export const DIAGNOSTIC_CODES = {
    * checked: their glyph sets are U8G2's and are not guessed.
    */
   GLYPH_OUTSIDE_RANGE: 'U8G2GL_GLYPH_OUTSIDE_RANGE',
+  /**
+   * Two identifiers the generator itself composes would be one C++ name: an
+   * element handle `ui_<screen>_<element>` (§9.2), a collection facade or its
+   * type, or a collection's storage, against each other or against an
+   * identifier §13.4's table already holds — a screen function or
+   * descriptor, a subject or its `ui_set_` setter, a font, image, style or
+   * object. Composed names can meet where no author-written name does: screen
+   * `a_b`'s element `c` and screen `a`'s element `b_c` are both `ui_a_b_c`.
+   * An error in both journeys, located at the later source and naming both,
+   * and never resolved by renaming (§13.4). `U8G2GL_NAME_COLLISION` remains
+   * the code for two identifiers of §13.4's own table.
+   */
+  GENERATED_NAME_COLLISION: 'U8G2GL_GENERATED_NAME_COLLISION',
+  /**
+   * A collection's storage cannot be sized, so it cannot be generated (§9.2,
+   * §18): a `<data>`'s rows are a fixed byte layout, allocated per instance as
+   * capacity × row bytes, and every count must resolve to a non-negative
+   * integer for that instance. Raised for a `string` field with no `max_len`
+   * (located at the field in its manifest), for a `<data>` with no
+   * `capacity` (at the `<data>`), and for a `capacity`, `repeat` or `max_len`
+   * naming a prop this instance leaves unset with no default, or sets to
+   * something that is not a non-negative integer (at the instance). The
+   * message names the widget, the `<data>` and, where one is at fault, the
+   * field. At the refusal policy, as Pass 9 reports realisation's other
+   * refusals: an error in `generate`, a warning in `validate`.
+   */
+  UNSIZED_DATA: 'U8G2GL_UNSIZED_DATA',
 } as const;
 
 /**

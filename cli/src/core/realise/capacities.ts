@@ -35,6 +35,14 @@
  *              a full subject drops a binding, and the widget silently never
  *              updates.
  *
+ *              **Collection storage is one of them** ([Q-19], §9.2): every
+ *              `<data>` of every object, sized per instance as capacity × row
+ *              bytes by `collection-storage.ts`, the one module that lays a row
+ *              out. Carried here so the firmware emitter, the scene and §18
+ *              all read the figures from the same capacities, never laying a
+ *              block out twice. A block that cannot be sized is left out; Pass 9
+ *              reports it, and `generate` refuses the build.
+ *
  *              Deterministic: subjects in declaration order, styles in
  *              declaration order, screens in document order; the counters are
  *              `Map`s that are read but never iterated (§13.9).
@@ -47,7 +55,10 @@
  */
 
 import type { Globals, SubjectDecl } from '../schema/globals.js';
+import type { ManifestRegistry } from '../manifest/manifest-registry.js';
+import type { ResolvedScreen } from '../resolver/index.js';
 import { walkRealised } from './realise.js';
+import { collectionStorage, type CollectionStorage } from './collection-storage.js';
 import type { RealisedScreen } from './model.js';
 
 /**
@@ -92,6 +103,12 @@ export interface Capacities {
   readonly styleNames: readonly string[];
   /** Every declared subject, in declaration order, with its observer count. */
   readonly subjects: readonly SubjectObservers[];
+  /**
+   * Every collection's storage, in document order: each object's `<data>`,
+   * sized for that instance ([Q-19], §9.2). A block that cannot be sized is
+   * absent, and Pass 9 has reported it.
+   */
+  readonly collections: readonly CollectionStorage[];
 }
 
 /** Everything {@link computeCapacities} needs. */
@@ -99,6 +116,10 @@ export interface CapacitiesInput {
   readonly globals: Globals;
   /** Screens already realised and flattened. */
   readonly screens: readonly RealisedScreen[];
+  /** The same screens resolved, in the same order: each instance's int props, which size its storage. */
+  readonly resolved: readonly ResolvedScreen[];
+  /** The effective manifests, for each object's `<data>`. */
+  readonly manifests: ManifestRegistry;
 }
 
 // styleNamesOf
@@ -131,9 +152,10 @@ function styleNamesOf(input: CapacitiesInput): string[] {
 /**
  * @brief Counts every generated capacity from what realisation decided ([D-21]).
  *
- * @param input Globals and the realised screens.
- * @return The capacities, and every subject's observer count. Deterministic for
- *         a given document (§13.9).
+ * @param input Globals, the realised screens, their resolution and the
+ *              manifests.
+ * @return The capacities, every subject's observer count and every
+ *         collection's storage. Deterministic for a given document (§13.9).
  */
 export function computeCapacities(input: CapacitiesInput): Capacities {
   // --- Step 1: Objects per screen, and bindings per object ---
@@ -207,5 +229,7 @@ export function computeCapacities(input: CapacitiesInput): Capacities {
     styles: styleNames.length,
     styleNames,
     subjects,
+    collections: collectionStorage({ realised: input.screens, resolved: input.resolved, manifests: input.manifests })
+      .collections,
   };
 }

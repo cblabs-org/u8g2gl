@@ -55,6 +55,26 @@ target_compile_options(test_obj PRIVATE
 
 u8g2gl_discover_tests(test_obj)
 
+# --- Collection storage (design_spec §9.2): the row view's layout and checks ---
+add_executable(test_rows
+    test_rows.cpp
+)
+
+target_include_directories(test_rows PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/stubs
+)
+
+target_link_libraries(test_rows PRIVATE
+    u8g2gl
+    GTest::gtest_main
+)
+
+target_compile_options(test_rows PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+
+u8g2gl_discover_tests(test_rows)
+
 add_executable(test_subject
     test_subject.cpp
 )
@@ -1189,6 +1209,33 @@ target_compile_options(test_static_children PRIVATE
 )
 u8g2gl_discover_tests(test_static_children)
 
+# --- §18's collection-storage figure against sizeof (design_spec §9.2) ---
+# The fixture's generated screen unit is #included by the test, which makes its
+# static buffer visible to sizeof, so the unit is not compiled separately here.
+add_executable(test_storage_sizeof
+    test_storage_sizeof.cpp
+    ${U8G2GL_FIXTURE_DIR}/support/fixture_u8g2_fonts.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list/wd_service_list.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_images.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated/ui_subjects.cpp
+)
+target_include_directories(test_storage_sizeof PRIVATE
+    ${U8G2GL_STATIC_CHILDREN_DIR}/generated
+    ${U8G2GL_FIXTURE_DIR}/support
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list
+)
+target_link_libraries(test_storage_sizeof PRIVATE
+    u8g2gl_static_children_fonts
+    u8g2gl_editor_runtime
+    GTest::gtest_main
+)
+target_compile_options(test_storage_sizeof PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_storage_sizeof)
+
 # --- Fill guard: a <data> that disagrees with its C++ fails the editor build ---
 # The generated registry static_asserts that a <data>'s declared fields can call
 # its access method (schema 0.7, design_spec §9.2), so a manifest out of step
@@ -1305,6 +1352,50 @@ target_compile_options(test_wasm_parity PRIVATE
 )
 u8g2gl_discover_tests(test_wasm_parity)
 
+
+# --- The generated collection facade (design_spec §9.2), drawn by real U8G2 ---
+# test/collection_data/'s committed firmware units, compiled with the departures
+# widgets, the runtime and real U8G2 onto the memory display the Wasm hosts
+# draw on, so a fill through the facades is checked in lit pixels. The
+# runtime is compiled here with the fixture's generated capacities.
+set(U8G2GL_COLLECTION_DATA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/collection_data)
+add_executable(test_collection_facade
+    test_collection_facade.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/memory_display.cpp
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list/wd_service_list.cpp
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation/wd_train_formation.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_images.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_screen_board.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated/ui_subjects.cpp
+)
+target_include_directories(test_collection_facade PRIVATE
+    ${PROJECT_SOURCE_DIR}/wasm
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    ${U8G2GL_COLLECTION_DATA_DIR}/generated
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_service_list
+    ${U8G2GL_DEPARTURES_WIDGETS}/wd_train_formation
+)
+target_include_directories(test_collection_facade SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(test_collection_facade PRIVATE
+    ARDUINO=10819
+    U8G2GL_GENERATED_CONFIG="u8g2gl_generated_config.h"
+)
+target_link_libraries(test_collection_facade PRIVATE
+    u8g2gl_parity_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_collection_facade PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_collection_facade)
 
 # --- Firmware pays nothing for the editor ([UD-4]) ---
 # The registry and src/u8g2gl_editor.cpp compile to nothing without

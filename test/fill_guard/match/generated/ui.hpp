@@ -14,7 +14,9 @@
 #include "u8g2gl_generated_config.h"
 
 // --- Runtime (§13.7) ---
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_style.h"
@@ -72,6 +74,11 @@ bool ui_display_matches(U8G2& display);
 // --- Images (§14.2) ---
 // globals.xml declares no <xbm> images.
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class wd_tally;
+
 // --- Screens (§13.7) ---
 
 // screen 'home'
@@ -81,6 +88,20 @@ void ui_screen_home_deactivate();
 uint32_t ui_screen_home_tick(uint32_t now_ms);
 void ui_screen_home_render(U8G2& display);
 extern u8g2gl_screen ui_screen_home;
+// Its named objects (§9.2), each bound to its static in ui_screen_home.cpp:
+extern wd_tally& ui_home_tally;
+// tally <data name="marks">: begin(), add_row() per row (the widget's add_mark()), commit() (§9.2)
+struct ui_home_tally_marks_t {
+    /** @brief Start a batch: the widget's begin(). */
+    void begin() const;
+    /** @brief Stage one row through add_mark(); false past capacity(), the widget's own refusal. */
+    bool add_row(int32_t at) const;
+    /** @brief Publish the batch: the widget's commit(). */
+    void commit() const;
+    /** @brief Rows this instance holds, as its XML declares them. */
+    size_t capacity() const { return 4; }
+};
+extern const ui_home_tally_marks_t ui_home_tally_marks;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

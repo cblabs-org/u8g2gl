@@ -73,6 +73,10 @@
  *     - u8g2gl_editor_flag_clear():    A draw call's guard term, by name
  *     - u8g2gl_editor_draw():          Draw-by-name
  *
+ *     Collection storage (§9.2):
+ *     - u8g2gl_editor_field_type():    A scene's field type name as its u8g2gl_field_type_t
+ *     - u8g2gl_editor_rows_fit():      Whether a host-built row layout stays inside its row
+ *
  *     For generated code:
  *     - u8g2gl_editor_bind_call():     Pass a format only where the runtime takes one
  *     - u8g2gl_editor_row_call():      Call a data access method, reading a bool return
@@ -88,6 +92,7 @@
 #include <type_traits>
 
 #include "u8g2gl_obj.h"
+#include "u8g2gl_rows.h"
 #include "u8g2gl_style.h"
 #include "u8g2gl_subject.h"
 #include "u8g2gl_types.h"
@@ -518,6 +523,28 @@ bool u8g2gl_editor_flag_clear(const u8g2gl_editor_registry& registry, const char
  */
 bool u8g2gl_editor_draw(const u8g2gl_editor_drawing& drawing, U8G2& display, const u8g2gl_editor_value* args,
                         uint8_t count);
+
+// --- Collection storage (§9.2) ---
+// The scene carries each collection's row layout exactly as the generator laid
+// it out (its `storage`), so an editor host builds the same u8g2gl_rows_layout
+// the firmware unit declares, allocates capacity x row bytes with the scene,
+// and hands the widget a view after the properties step. These two check what
+// the host read from the scene before it trusts it.
+
+/**
+ * @brief A scene field's type, as the u8g2gl_field_type_t its layout uses.
+ * @param name "int", "bool", "string" or "enum".
+ * @param out  Receives the type; must be non-null; untouched when the name is none of them.
+ * @return false for any other name.
+ */
+bool u8g2gl_editor_field_type(const char* name, u8g2gl_field_type_t* out);
+
+/**
+ * @brief Whether a row layout a host built stays inside its own row: every
+ *        repeat of every field within `row_bytes`, and every repeat at least
+ *        one byte. A view over a layout that did not would read past the row.
+ */
+bool u8g2gl_editor_rows_fit(const u8g2gl_rows_layout& layout);
 
 // --- For generated code ---
 

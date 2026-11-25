@@ -8,27 +8,21 @@
  *          only against the initial values (ruling 9, Q1a). The harness boots
  *          the generated firmware code unmodified, so a set must be applied to
  *          it the way an application would apply live data: through the public
- *          subject setters, and through each collection widget's own
- *          `begin()`, declared access method per row, and `commit()`. This
+ *          subject setters, and through each collection's generated facade
+ *          (§9.2), which forwards to the widget's own `begin()`, declared
+ *          access method per row, and `commit()`. This
  *          module writes the one C++ unit that does that, a function per set,
  *          beside the screen table (screen-table.ts).
  * Description: The designer sends each set as it applies it to the canvas —
  *              its checked values, and its rows by screen name, element and
  *              data name — so both halves of the check are given the same
  *              data, and fill it by different routes: the editor through its
- *              registry's fill thunk, the firmware through the widget's methods.
- *
- *              A collection is reached through `ui_screen_<s>.objs[i]`: the
- *              generated objects are `static` in each screen's unit, and the
- *              firmware ingestion API that would name them is not generated
- *              yet (design_spec §9.2, §9.6). `i` is
- *              the element's object index in the scene generated with the
- *              firmware code (its `object`, the realiser's document-order
- *              index, which the generator emits `objs` in), cast to its class.
- *              **Guard:** before writing, each index is checked against the
- *              generated screen unit's own `objs` table, entry by entry, and a
- *              mismatch refuses the run naming both, so an index drift fails
- *              loudly instead of filling the wrong widget.
+ *              registry's fill thunk, the firmware through the generated
+ *              collection facade an application uses (design_spec §9.2),
+ *              `ui_<screen>_<element>_<data>`: its `begin()`, typed
+ *              `add_row()` per row and `commit()`, which forward to the
+ *              widget's own methods. The facade is named, not indexed, so
+ *              there is no object index to drift from the generated table.
  *
  *              The unit also defines `u8g2gl_harness_apply_sample_set()`,
  *              which the harness calls once after `ui_init()` and before the
@@ -44,17 +38,13 @@
  * - TestRunSampleSet:        One set, as the designer sends it
  * - SampleStage:             What the unit is written against
  * - parseTestRunSampleSets(): Validate a request's sets
- * - readObjsTables():        Each screen's generated `objs` table, by screen
- * - readSampleStage():       The stage, from a generated project
+ * - readSampleStage():       The stage, from the project and its scene
  * - sampleSetUnit():         The unit's C++ text, or why it cannot be written
  */
 
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { classOf } from '../../../core/generator/emit/screen-model.js';
 import type { ManifestRegistry } from '../../../core/manifest/manifest-registry.js';
-import { screenDescriptorIdentifier, screenTableIdentifier, subjectSetterIdentifier } from '../../../core/resolver/index.js';
-import { objectIdentifier } from '../../../core/resolver/mangle.js';
+import { collectionFacadeIdentifiers } from '../../../core/realise/index.js';
+import { subjectSetterIdentifier } from '../../../core/resolver/index.js';
 import type { SubjectType } from '../../../core/schema/globals.js';
 import { loadProject } from '../../load-project.js';
 
@@ -84,19 +74,16 @@ export interface TestRunSampleSet {
 interface SceneObject {
   readonly name: string;
   readonly tag: string;
-  readonly object: number;
 }
 
 /** What the unit is written against: the project the harness was generated from. */
 export interface SampleStage {
   /** The subjects, by name, with their types. */
   readonly subjects: ReadonlyMap<string, SubjectType>;
-  /** The manifests: a class's `<data>` and its header. */
+  /** The manifests: a class's `<data>`. */
   readonly manifests: ManifestRegistry;
   /** Each screen's objects in the scene, by screen name. */
   readonly objects: ReadonlyMap<string, readonly SceneObject[]>;
-  /** Each screen's generated `objs` table, entry by entry (`&ui_obj_…`). */
-  readonly objsTables: ReadonlyMap<string, readonly string[]>;
 }
 
 /**
@@ -133,45 +120,12 @@ export function parseTestRunSampleSets(sets: unknown): readonly TestRunSampleSet
 }
 
 /**
- * @brief Each screen's `objs` table, from the generated firmware units' text.
- *
- * Reads `static u8g2gl_obj* const ui_screen_<s>_objs[] = { &a, &b, … };`
- * entry by entry: the generator's own table, which the guard holds each
- * staged index to.
- *
- * @param units Every generated `.cpp` text.
- * @param screens The screen names to look for.
- */
-export function readObjsTables(units: readonly string[], screens: readonly string[]): Map<string, string[]> {
-  const tables = new Map<string, string[]>();
-  for (const screen of screens) {
-    const name = screenTableIdentifier(screen, 'objs');
-    for (const text of units) {
-      const start = text.indexOf(`${name}[] = {`);
-      if (start < 0) continue;
-      const end = text.indexOf('};', start);
-      const body = text.slice(text.indexOf('{', start) + 1, end < 0 ? undefined : end);
-      tables.set(
-        screen,
-        body
-          .split('\n')
-          .map((line) => line.trim().replace(/,$/, ''))
-          .filter((line) => line.startsWith('&')),
-      );
-      break;
-    }
-  }
-  return tables;
-}
-
-/**
- * @brief The stage, from a project and what was generated from it.
+ * @brief The stage, from a project and the scene generated from it.
  *
  * @param projectRoot  The (staged) project the harness generates from.
  * @param sceneJson    The scene generated beside the firmware code.
- * @param generatedDir The firmware code's directory.
  */
-export function readSampleStage(projectRoot: string, sceneJson: string, generatedDir: string): SampleStage {
+export function readSampleStage(projectRoot: string, sceneJson: string): SampleStage {
   const loaded = loadProject(projectRoot);
   const subjects = new Map((loaded.model.globals.subjects ?? []).map((s) => [s.name, s.type] as const));
   const scene = JSON.parse(sceneJson) as { screens?: Array<{ name?: string; elements?: Array<Record<string, unknown>> }> };
@@ -181,17 +135,13 @@ export function readSampleStage(projectRoot: string, sceneJson: string, generate
     objects.set(
       screen.name,
       (screen.elements ?? []).flatMap((e): SceneObject[] =>
-        e.realisation === 'object' && typeof e.name === 'string' && typeof e.tag === 'string' && typeof e.object === 'number'
-          ? [{ name: e.name, tag: e.tag, object: e.object }]
+        e.realisation === 'object' && typeof e.name === 'string' && typeof e.tag === 'string'
+          ? [{ name: e.name, tag: e.tag }]
           : [],
       ),
     );
   }
-  const units = readdirSync(generatedDir)
-    .filter((name) => name.endsWith('.cpp'))
-    .sort()
-    .map((name) => readFileSync(join(generatedDir, name), 'utf8'));
-  return { subjects, manifests: loaded.model.manifests, objects, objsTables: readObjsTables(units, [...objects.keys()]) };
+  return { subjects, manifests: loaded.model.manifests, objects };
 }
 
 /**
@@ -200,12 +150,10 @@ export function readSampleStage(projectRoot: string, sceneJson: string, generate
  * @param sets  The sets, in the order the harness numbers them.
  * @param stage The project they are applied to.
  * @return The text, or the reason a set cannot be staged: a subject, screen,
- *         element or data name the project does not have, a value of the wrong
- *         type, or an object index the generated `objs` table does not agree
- *         with (the guard).
+ *         element or data name the project does not have, or a value of the
+ *         wrong type.
  */
 export function sampleSetUnit(sets: readonly TestRunSampleSet[], stage: SampleStage): { readonly ok: true; readonly source: string } | { readonly ok: false; readonly message: string } {
-  const includes = new Set<string>();
   const functions: string[] = [];
   for (const [index, set] of sets.entries()) {
     const body: string[] = [];
@@ -219,32 +167,21 @@ export function sampleSetUnit(sets: readonly TestRunSampleSet[], stage: SampleSt
       body.push(`    ${subjectSetterIdentifier(subject)}(${literal});`);
     }
 
-    // --- Step 2: Each collection, through objs[i] and its own methods ---
+    // --- Step 2: Each collection, through its generated facade (§9.2) ---
     for (const [screen, elements] of Object.entries(set.rows)) {
       const objects = stage.objects.get(screen);
-      const table = stage.objsTables.get(screen);
-      if (objects === undefined || table === undefined) return refuse(set, `the project has no screen '${screen}'`);
+      if (objects === undefined) return refuse(set, `the project has no screen '${screen}'`);
       for (const [element, blocks] of Object.entries(elements)) {
         const found = objects.find((o) => o.name === element);
         const manifest = found === undefined ? undefined : stage.manifests.get(found.tag);
         if (found === undefined || manifest === undefined) return refuse(set, `screen '${screen}' has no object '${element}'`);
-        // The guard: the index must name this element in the generator's own table.
-        const expected = `&${objectIdentifier(element)}`;
-        if (table[found.object] !== expected) {
-          return refuse(
-            set,
-            `${screenTableIdentifier(screen, 'objs')}[${found.object}] is ${table[found.object] ?? 'past the end'}, not ${expected}: the scene's object index and the generated table disagree`,
-          );
-        }
-        const cls = classOf(manifest);
-        includes.add(cls.include);
         for (const [dataName, rows] of Object.entries(blocks)) {
           const data = (manifest.api.data ?? []).find((d) => d.name === dataName);
           if (data === undefined) return refuse(set, `<${found.tag}> declares no <data name="${dataName}">`);
           const at = `${screen}.${element}`;
+          const facade = collectionFacadeIdentifiers(screen, element, data.name).object;
           body.push(`    {  // ${at}: ${data.name}, ${rows.length} row${rows.length === 1 ? '' : 's'}`);
-          body.push(`        ${cls.name}* obj = static_cast<${cls.name}*>(${screenDescriptorIdentifier(screen)}.objs[${found.object}]);`);
-          body.push('        obj->begin();');
+          body.push(`        ${facade}.begin();`);
           for (const [r, row] of rows.entries()) {
             const args: string[] = [];
             for (const field of data.fields) {
@@ -265,9 +202,9 @@ export function sampleSetUnit(sets: readonly TestRunSampleSet[], stage: SampleSt
               if (literal === undefined) return refuse(set, `${at} row ${r}: ${field.name} must be ${article(field.type)} ${field.type}`);
               args.push(literal);
             }
-            body.push(`        obj->${data.access}(${args.join(', ')});`);
+            body.push(`        ${facade}.add_row(${args.join(', ')});`);
           }
-          body.push('        obj->commit();', '    }');
+          body.push(`        ${facade}.commit();`, '    }');
         }
       }
     }
@@ -287,7 +224,6 @@ export function sampleSetUnit(sets: readonly TestRunSampleSet[], stage: SampleSt
       '#include <cstdint>',
       '',
       '#include "ui.hpp"',
-      ...[...includes].sort(),
       '',
       'namespace {',
       '',
@@ -347,9 +283,9 @@ function subjectLiteral(type: SubjectType, value: Scalar): string | undefined {
 }
 
 // fieldLiteral
-// A single field's value as the access method's argument, typed as the editor
-// registry passes it (int32_t, bool, const char*), so overload resolution is
-// the same in both halves.
+// A single field's value as the facade's add_row() argument, typed as the
+// facade declares it and the editor registry passes it (int32_t, bool,
+// const char*), so both halves call the widget's method the same way.
 function fieldLiteral(type: string, value: Scalar): string | undefined {
   if (type === 'int') return typeof value === 'number' && Number.isInteger(value) && Math.abs(value) <= 2147483647 ? `int32_t{${value}}` : undefined;
   if (type === 'bool') return typeof value === 'boolean' ? String(value) : undefined;

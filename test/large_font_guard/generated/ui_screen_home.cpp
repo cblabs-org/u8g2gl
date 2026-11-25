@@ -12,6 +12,10 @@
 static u8g2gl_label ui_obj_title;  // 0
 static u8g2gl_label ui_obj_body;  // 1
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+u8g2gl_label& ui_home_title = ui_obj_title;
+u8g2gl_label& ui_home_body = ui_obj_body;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

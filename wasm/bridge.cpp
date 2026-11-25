@@ -27,7 +27,10 @@
  *
  *              Sizes are the scene's, not constants: the display buffer is
  *              allocated for the scene's display, the object arena for the
- *              classes the active screen constructs, each string subject for
+ *              classes the active screen constructs and for each collection's
+ *              storage (an object's `storage`, the generator's own row layout,
+ *              §9.2, handed to the widget after its static children and freed
+ *              with the scene), each string subject for
  *              its declared `max_len` (the runtime default when it declares
  *              none), and each subject's observer slots for the bindings that
  *              name it. The binding pool is the runtime's, sized by the
@@ -136,6 +139,7 @@
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_editor.h"
 #include "u8g2gl/u8g2gl_obj.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_subject.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "u8g2gl/u8g2gl_types.h"
@@ -267,7 +271,7 @@ private:
 
 // The scene description version this bridge reads: `version` in ui_scene.json,
 // written by the CLI's scene emitter (emit/scene.ts). Bump both together.
-constexpr int32_t kSceneVersion = 4;
+constexpr int32_t kSceneVersion = 5;
 
 // Virtual display, sized for each scene (memory_display.h, shared with the
 // test-run harness so both hosts hold their frames the same way)
@@ -316,6 +320,18 @@ std::vector<const u8g2gl_editor_class*> s_classes;  // nullptr for a placeholder
 std::vector<uint8_t> s_parents;
 std::vector<placeholder_record> s_placeholders;
 std::string s_placeholders_json;
+
+/**
+ * One collection's storage for the active screen (§9.2): the layout the scene
+ * describes and the arena bytes it was allocated, which the widget's view
+ * points into. Heap-held so the layout's address survives the vector growing;
+ * freed with the screen's objects.
+ */
+struct collection_storage {
+    std::vector<u8g2gl_rows_field> fields;
+    u8g2gl_rows_layout layout{nullptr, 0, 0};
+};
+std::vector<std::unique_ptr<collection_storage>> s_storage;
 
 // The designer's own hiding: element names to leave out of the frame. Kept
 // across selectScreen() (names are per file, and an unknown one is ignored),
@@ -580,6 +596,8 @@ void destroy_objects() {
     s_objects.clear();
     s_classes.clear();
     s_parents.clear();
+    // After the objects: their views point into these layouts and the arena.
+    s_storage.clear();
     s_placeholders.clear();
     s_runtime_hidden.clear();
     s_arena.clear();
@@ -661,10 +679,71 @@ bool add_static_children(const u8g2gl_editor_class& cls, u8g2gl_obj* obj, const 
     return true;
 }
 
+// storage_bytes
+// The arena bytes an object element's collections take, padding included, so
+// the arena is sized before anything is built in it.
+//   element — the scene element; `storage` is absent when it has no <data>
+size_t storage_bytes(const scene_json& element) {
+    size_t bytes = 0;
+    for (const scene_json& block : element.get("storage").items()) {
+        const int32_t size = block.get("bytes").as_int();
+        bytes += size > 0 ? arena_bytes(static_cast<size_t>(size), alignof(int32_t)) : 0;
+    }
+    return bytes;
+}
+
+// attach_storage
+// Allocates each of an object's collections in the arena, with the layout the
+// scene describes, and hands the widget its view, keyed by the block's
+// position: its <data> declaration index, as generated init keys it (§9.2).
+// A block of no bytes is attached nothing, as firmware attaches nothing.
+//   index   — the object's index in s_objects
+//   element — its scene element
+bool attach_storage(size_t index, const scene_json& element) {
+    const std::string& name = element.get("name").as_string();
+    const auto& blocks = element.get("storage").items();
+    for (size_t b = 0; b < blocks.size(); ++b) {
+        const scene_json& block = blocks[b];
+        const std::string where = name + " " + block.get("data").as_string();
+        auto storage = std::make_unique<collection_storage>();
+        for (const scene_json& field : block.get("fields").items()) {
+            u8g2gl_rows_field entry{};
+            if (!u8g2gl_editor_field_type(field.get("type").as_string().c_str(), &entry.type)) {
+                return fail(where + ": storage field '" + field.get("name").as_string() + "' has no row type");
+            }
+            entry.offset = static_cast<uint32_t>(field.get("offset").as_int());
+            entry.size = static_cast<uint32_t>(field.get("size").as_int());
+            entry.repeat = static_cast<uint32_t>(field.get("repeat").as_int());
+            storage->fields.push_back(entry);
+        }
+        const int32_t capacity = block.get("capacity").as_int();
+        const int32_t row_bytes = block.get("row_bytes").as_int();
+        const int32_t bytes = block.get("bytes").as_int();
+        storage->layout = {storage->fields.empty() ? nullptr : storage->fields.data(),
+                           static_cast<uint32_t>(row_bytes), static_cast<uint8_t>(storage->fields.size())};
+        if (capacity < 0 || row_bytes < 0 || static_cast<int64_t>(capacity) * row_bytes != bytes ||
+            storage->fields.size() > std::numeric_limits<uint8_t>::max() || !u8g2gl_editor_rows_fit(storage->layout)) {
+            return fail(where + ": storage does not fit its layout");
+        }
+        if (bytes == 0) {
+            continue;
+        }
+        void* buffer = arena_allocate(static_cast<size_t>(bytes), alignof(int32_t));
+        if (buffer == nullptr) {
+            return fail(where + ": arena allocation failed for " + std::to_string(bytes) + " bytes of storage");
+        }
+        s_objects[index]->attach_rows(static_cast<uint8_t>(b),
+                                      u8g2gl_rows(static_cast<uint8_t*>(buffer), static_cast<size_t>(capacity),
+                                                  &storage->layout));
+        s_storage.push_back(std::move(storage));
+    }
+    return true;
+}
+
 // configure_object
 // The "properties" init step: the rectangle, then each property through its
-// registry thunk, then each static child. A placeholder takes only the
-// rectangle.
+// registry thunk, then each static child, then each collection's storage. A
+// placeholder takes only the rectangle.
 //   index   — the object's index in s_objects
 //   element — its scene element
 bool configure_object(size_t index, const scene_json& element) {
@@ -702,7 +781,7 @@ bool configure_object(size_t index, const scene_json& element) {
             return fail(name + "." + prop + ": property set refused");
         }
     }
-    return add_static_children(cls, s_objects[index], element);
+    return add_static_children(cls, s_objects[index], element) && attach_storage(index, element);
 }
 
 // apply_styles
@@ -824,7 +903,7 @@ bool build_screen(const std::string& screen_name) {
     for (const scene_json* element : objects) {
         const u8g2gl_editor_class* cls = u8g2gl_editor_find_class(reg, element->get("class").as_string().c_str());
         classes.push_back(cls);
-        arena_needed += cls != nullptr ? arena_bytes(cls->size, cls->align)
+        arena_needed += cls != nullptr ? arena_bytes(cls->size, cls->align) + storage_bytes(*element)
                                        : arena_bytes(sizeof(editor_placeholder), alignof(editor_placeholder));
     }
     s_arena.assign((arena_needed + sizeof(std::max_align_t) - 1) / sizeof(std::max_align_t), std::max_align_t{});

@@ -19,8 +19,10 @@
  *
  * Description: Compiled only into the collection-data test Wasm
  *              (wasm/CMakeLists.txt), never into the framework or a project
- *              editor build. Test code, so it keeps its widgets and display as
- *              statics: one call renders one frame.
+ *              editor build. Test code, so it keeps its widgets, their row
+ *              storage and the display as statics: one call renders one frame.
+ *              The storage is declared as the generator declares it for
+ *              screen_board.xml (§9.2), so both sides size their rows alike.
  *
  * Exported Functions (extern "C"):
  *     - renderReference():  Build, fill and draw the board; the frame buffer
@@ -38,6 +40,7 @@
 #include "U8g2lib.h"
 #include "memory_display.h"
 #include "u8g2gl/u8g2gl_core.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_tree.h"
 #include "wd_service_list.hpp"
 #include "wd_train_formation.hpp"
@@ -45,6 +48,19 @@
 namespace {
 
 memory_display s_reference_display;
+
+// The rows' storage, laid out as the generated unit lays it out for
+// screen_board.xml: eight carriages of twelve bytes, and three service rows of
+// four 24-character cells.
+constexpr u8g2gl_rows_field kCarriageFields[] = {
+    {0, 4, 1, U8G2GL_FIELD_INT},  {4, 1, 1, U8G2GL_FIELD_ENUM}, {5, 1, 1, U8G2GL_FIELD_BOOL},
+    {6, 1, 1, U8G2GL_FIELD_BOOL}, {8, 4, 1, U8G2GL_FIELD_INT},
+};
+constexpr u8g2gl_rows_layout kCarriages = {kCarriageFields, 12, 5};
+constexpr u8g2gl_rows_field kCellFields[] = {{0, 25, 4, U8G2GL_FIELD_STRING}};
+constexpr u8g2gl_rows_layout kCells = {kCellFields, 100, 1};
+alignas(4) uint8_t s_carriages[8 * 12];
+alignas(4) uint8_t s_cells[3 * 100];
 
 }  // namespace
 
@@ -82,6 +98,8 @@ uint8_t* renderReference() {
     services.add_column(58, U8G2GL_ALIGN_LEFT);
     services.add_column(12, U8G2GL_ALIGN_CENTER);
     services.add_column(28, U8G2GL_ALIGN_RIGHT);
+    formation.attach_rows(0, u8g2gl_rows(s_carriages, 8, &kCarriages));
+    services.attach_rows(0, u8g2gl_rows(s_cells, 3, &kCells));
 
     // --- Step 3: The rows, through each widget's own ingestion API (§9.2) ---
     formation.begin();

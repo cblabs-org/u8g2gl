@@ -290,7 +290,7 @@ The spec as committed jumps from XML tags straight to widget behaviour and never
 
 | PR | Repo | Scope | Depends |
 |---|---|---|---|
-| **PR-08** | both | **Re-scoped 2026-09-13:** custom elements via `extends` (§6.5), collection API (§9). Composites (§6.4) are no longer here — PR-3R made a composite a `WidgetManifest` with a `view`, and PR-04 expands them (§13.6). **Plus E-D's requirement, below:** a declared-capacity collection is fillable by name through the editor registry — ✅ **delivered by E-3a** (2026-11-17): `<data>` in the manifest and the registry's fill entry (design_spec §6.5, §9.4). PR-08 still owns §9.2's generated firmware ingestion API and storage | PR-07 |
+| **PR-08** | both | **Re-scoped 2026-09-13:** custom elements via `extends` (§6.5), collection API (§9). Composites (§6.4) are no longer here — PR-3R made a composite a `WidgetManifest` with a `view`, and PR-04 expands them (§13.6). **Plus E-D's requirement, below:** a declared-capacity collection is fillable by name through the editor registry — ✅ **delivered by E-3a** (2026-11-17): `<data>` in the manifest and the registry's fill entry (design_spec §6.5, §9.4). **✅ Delivered 2026-11-24 (PR-08):** named element handles `ui_<screen>_<element>` in `ui.hpp`; generated collection storage, sized per instance from §6.5's row encoding and handed over through `u8g2gl_obj::attach_rows()` and the new runtime type `u8g2gl_rows`, which closes [Q-19]; §18 reporting each instance's storage exactly, and the designer's RAM line; §9.2's generated collection facade `ui_<screen>_<element>_<data>`, which E-3b's test run now fills through. Runtime 0.16.0, CLI 0.27.0, schema still 0.7. **Deferred:** a composite with a C++ class of its own (`<view>` and `extends` together) stays refused, its message naming a later PR (ruling 6) | PR-07 |
 | **PR-09** | foundation | Focus groups (§12.2), input dispatch via `ButtonModule`/`EncoderModule` | PR-07 |
 | **PR-08b** | U8G2GL | `<row>`/`<col>` stacking sugar (§7.2), *if real usage has shown the need* | PR-08 |
 
@@ -308,7 +308,8 @@ editor registry generates a fill entry per `<data>` that calls the widget's own 
 method and `commit()`, and the bridge's `applyCollectionData()` takes rows by element and data
 name, checked against the declared fields and capacity (design_spec §6.5, §9.4, §13.7). The
 departures board's service lists and train formation are filled this way in the Wasm parity
-test. PR-08's own scope is unchanged: the generated firmware API is still its.
+test. PR-08 then delivered the generated firmware API beside it (2026-11-24): the facade calls
+the same widget methods with the same argument types, so the two routes cannot diverge.
 
 ### Editor track — design_spec §20 Phase 3
 
@@ -347,7 +348,7 @@ the shell) joins it at E-2.
 | **E-1e** | U8G2GL | The shell: Vite, React, Dockview, Monaco; live diagnostics; save and conflict handling; read-only canvas | E-1c, E-1d |
 | **E-2** | U8G2GL | Canvas with direct manipulation; property panel and palette driven by `<api>` manifests ([D-17]). Needs PR-06's Wasm runtime ([UD-4]) ✅ **Done**, as E-2a to E-2d (#36 to #39) | E-1b, E-1e |
 | **E-2T** | U8G2GL | Test run: firmware-target harness in Wasm, parity verdict against the live frame ✅ **Done**: Run (⌘↵) in the canvas toolbar, the parity corpus over every fixture project in CI | E-2 |
-| **E-3** | U8G2GL | Sample data for binding preview and collections; screen navigation design. **E-3a ✅** (the data shape: `<data>`, static `<element>` children, the editor fill path); E-3b, sample sets in the designer, follows E-2k3 | E-2 · [U-6] closed by S1 |
+| **E-3** | U8G2GL | Sample data for binding preview and collections; screen navigation design. **E-3a ✅** (the data shape: `<data>`, static `<element>` children, the editor fill path); **E-3b ✅** (#66): sample sets in the designer and the per-set test run | E-2 · [U-6] closed by S1 |
 
 **What runs where.** The per-edit loop runs in the browser: [D-10] made the CLI isomorphic, so
 parse, validate, realise and check run client-side, and the editor Wasm renders the frame. E-D

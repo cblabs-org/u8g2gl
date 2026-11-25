@@ -88,6 +88,14 @@ extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
 // --- Images (§14.2) ---
 extern const uint8_t ui_image_icon_wifi[];
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class u8g2gl_clock;
+class u8g2gl_label;
+class u8g2gl_obj;
+class u8g2gl_xbm;
+
 // --- Screens (§13.7) ---
 
 // screen 'home'
@@ -97,6 +105,15 @@ void ui_screen_home_deactivate();
 uint32_t ui_screen_home_tick(uint32_t now_ms);
 void ui_screen_home_render(U8G2& display);
 extern u8g2gl_screen ui_screen_home;
+// Its named objects (§9.2), each bound to its static in ui_screen_home.cpp:
+extern u8g2gl_obj& ui_home_badge;
+extern u8g2gl_label& ui_home_title;
+extern u8g2gl_label& ui_home_lvl_a;
+extern u8g2gl_label& ui_home_lvl_b;
+extern u8g2gl_label& ui_home_lvl_c;
+extern u8g2gl_clock& ui_home_clock;
+extern u8g2gl_xbm& ui_home_wifi;
+extern u8g2gl_label& ui_home_scroller;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

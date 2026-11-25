@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(u8g2gl VERSION 0.15.0 LANGUAGES CXX)
+project(u8g2gl VERSION 0.16.0 LANGUAGES CXX)
 
 # --- Runtime version agreement (§16, .agents/rules/03-versioning.md) ---
 # The runtime version is stated three times: here, for CMake packaging; in
@@ -55,6 +55,7 @@ option(U8G2GL_BUILD_TESTS "Build U8G2GL tests" ON)
 set(U8G2GL_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_obj.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_rows.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_label.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_xbm.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_glyph.cpp

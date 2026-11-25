@@ -8,6 +8,48 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-24	cli v0.27.xx	U8G2GL
+  * 0.27.0: Collections are generated (design_spec 9.2; Q-19 closed).
+    ui.hpp declares a typed handle to every named object written in a
+    screen, extern <class>& ui_<screen>_<element>, bound in the screen's
+    unit to its static object, which stays static; a drawing element and
+    an element expanded from a composite's template get none. A <data>
+    block's row has a fixed layout from its fields (string max_len + 1,
+    int32_t, one-byte bool and enum index, naturally aligned, the row
+    padded to 4), and each instance's <data> gets a static buffer of
+    capacity x row bytes from its own props, with a constexpr layout,
+    handed to the widget at init through attach_rows(). Each <data> on
+    each instance also gets a const facade ui_<screen>_<element>_<data>
+    whose begin(), typed add_row() (the fields in order, typed as the
+    editor's fill thunk passes them; a repeated field as pointer and
+    count, with an initializer_list overload) and commit() forward to the
+    widget, and whose capacity() is the instance's. The budget reports
+    each instance's collection storage exactly, with its derivation, and
+    the designer's property panel states that figure for a widget with
+    <data>; a project widget without <data> keeps the muted line. New
+    diagnostics: U8G2GL_GENERATED_NAME_COLLISION, for a handle, facade or
+    storage name that collides with another generated identifier, an
+    error naming both; U8G2GL_UNSIZED_DATA, for a <data> whose storage
+    cannot be sized (a string with no max_len, no capacity, a count left
+    unset), a warning in validate and an error in generate. The scene
+    description is version 5 and carries each object's storage, which the
+    editor Wasm allocates per scene. Test runs fill each sample set's
+    collections through the facades; the objs[i] route and its index guard
+    are gone. A composite with a C++ class of its own is still refused,
+    its message now naming a later PR. Generated code requires runtime
+    0.16.0. Schema 0.7 is unchanged.
+2026-11-24	runtime v0.16.xx	U8G2GL
+  * 0.16.0: Generated collection storage. New u8g2gl_rows.h: u8g2gl_rows,
+    a non-owning, bounds-checked view over a collection's rows in a
+    buffer the generator sizes per instance, with typed accessors per
+    field and repeat index (int, bool, string truncated at max_len, enum
+    index), the capacity in rows, and u8g2gl_row_added() for the generated
+    facade. New virtual u8g2gl_obj::attach_rows(data_index, rows), called
+    by generated init after the setters and static children; the default
+    does nothing. Editor target: u8g2gl_editor_field_type() and
+    u8g2gl_editor_rows_fit() check the row layout a host reads from the
+    scene. No heap. Schema minor unchanged at 7.
+    Built and tested against U8G2 2.36.18.
 2026-11-24	cli v0.26.xx	U8G2GL
   * 0.26.0: Sample sets in the designer. A set is samples/<set>.json in
     the project (u8g2gl_samples: 1; values by subject; rows by screen

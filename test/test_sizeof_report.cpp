@@ -18,8 +18,9 @@
  * Description: Prints sizeof for u8g2gl_obj, the 7 concrete widgets (label,
  *              xbm, glyph, progress_bar, clock, switch, button), and the two
  *              host-declared timing objects (u8g2gl_timer, u8g2gl_wall_clock,
- *              §11.1), and asserts upper bounds that hold on any supported
- *              pointer width.
+ *              §11.1), and u8g2gl_rows, the view a collection widget holds per
+ *              `<data>` (§9.2), and asserts upper bounds that hold on any
+ *              supported pointer width.
  *              u8g2gl_scrolling_label was absorbed into u8g2gl_label as
  *              long_mode="scroll" (PR-3R WO2, [D-19]) and no longer exists as
  *              a separate type.
@@ -42,6 +43,7 @@
 #include "u8g2gl/u8g2gl_xbm.h"
 #include "u8g2gl/u8g2gl_glyph.h"
 #include "u8g2gl/u8g2gl_progress_bar.h"
+#include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_clock.h"
 #include "u8g2gl/u8g2gl_switch.h"
 #include "u8g2gl/u8g2gl_button.h"
@@ -84,6 +86,7 @@ void report_all_sizes() {
     U8G2GL_REPORT_SIZE(u8g2gl_button);
     U8G2GL_REPORT_SIZE(u8g2gl_timer);
     U8G2GL_REPORT_SIZE(u8g2gl_wall_clock);
+    U8G2GL_REPORT_SIZE(u8g2gl_rows);
 }
 
 /// Field-for-field mirror of the private `u8g2gl_binding_desc` declared
@@ -124,6 +127,9 @@ TEST(SizeOfReport, AllWidgets) {
     EXPECT_LE(sizeof(u8g2gl_button), 80u);
     EXPECT_LE(sizeof(u8g2gl_timer), 40u);
     EXPECT_LE(sizeof(u8g2gl_wall_clock), 56u);
+    // Three words: buffer, layout and capacity. The rows themselves are the
+    // generated buffer's, reported by §18, not part of any widget.
+    EXPECT_LE(sizeof(u8g2gl_rows), 3u * sizeof(void*));
 }
 
 // Measures the width the §18 RAM budget is actually a claim about. ESP32,

@@ -42,7 +42,7 @@ const BUILTIN_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /
 `;
 
 // <focus_ring> is the not-yet-supported construct this suite reaches for: <bdf>
-// and <convert> build, so only PR-08/PR-09 constructs remain.
+// and <convert> build, so only classed composites and PR-09's constructs remain.
 function screenXml(screen: string, label: string | undefined, focusRing = false): string {
   const name = label === undefined ? '' : ` name="${label}"`;
   const ring = focusRing ? `\n        <focus_ring wrap="true"><entry name="${label}" /></focus_ring>` : '';

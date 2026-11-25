@@ -397,4 +397,50 @@ bool u8g2gl_editor_draw(const u8g2gl_editor_drawing& drawing, U8G2& display, con
     return drawing.draw(display, args);
 }
 
+// --- Collection storage (§9.2) ---
+
+// u8g2gl_editor_field_type
+// A scene field's type name looked up in the four a row carries.
+//   name — the scene's `type`, or nullptr
+//   out  — receives the type; written only on a match
+bool u8g2gl_editor_field_type(const char* name, u8g2gl_field_type_t* out) {
+    if (name == nullptr) {
+        return false;
+    }
+    static const struct {
+        const char* name;
+        u8g2gl_field_type_t type;
+    } kTypes[] = {
+        {"int", U8G2GL_FIELD_INT},
+        {"bool", U8G2GL_FIELD_BOOL},
+        {"string", U8G2GL_FIELD_STRING},
+        {"enum", U8G2GL_FIELD_ENUM},
+    };
+    for (const auto& entry : kTypes) {
+        if (std::strcmp(name, entry.name) == 0) {
+            *out = entry.type;
+            return true;
+        }
+    }
+    return false;
+}
+
+// u8g2gl_editor_rows_fit
+// Each field's last repeat must end inside the row. Computed in 64 bits, so a
+// hostile scene's large counts cannot wrap the check.
+bool u8g2gl_editor_rows_fit(const u8g2gl_rows_layout& layout) {
+    if (layout.field_count > 0 && layout.fields == nullptr) {
+        return false;
+    }
+    for (uint8_t i = 0; i < layout.field_count; ++i) {
+        const u8g2gl_rows_field& field = layout.fields[i];
+        const uint64_t end = static_cast<uint64_t>(field.offset) +
+                             static_cast<uint64_t>(field.size) * static_cast<uint64_t>(field.repeat);
+        if (field.size == 0 || end > layout.row_bytes) {
+            return false;
+        }
+    }
+    return true;
+}
+
 #endif  // U8G2GL_EDITOR

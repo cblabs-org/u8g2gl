@@ -6,10 +6,37 @@
 
 #include "ui.hpp"
 
+#include "u8g2gl/u8g2gl_rows.h"
 #include "wd_service_list.hpp"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
 static wd_service_list ui_obj_board;  // 0
+
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+wd_service_list& ui_board_board = ui_obj_board;
+
+// --- Collection storage: one buffer per instance per <data> (§9.2, §18) ---
+// Each sized from its own instance's props, capacity x row bytes; the row
+// layout follows from the manifest's <field>s, so this is the buffer's size,
+// never an assumption about the widget's.
+// board <data name="rows">: 4 rows × 100 bytes (cells: 4 × string, 25 bytes each, max_len 24 + 1, at 0; padded to 4) = 400 bytes
+static constexpr u8g2gl_rows_field ui_rows_board_rows_fields[] = {
+    {0, 25, 4, U8G2GL_FIELD_STRING},  // cells
+};
+static constexpr u8g2gl_rows_layout ui_rows_board_rows_layout = {ui_rows_board_rows_fields, 100, 1};
+alignas(4) static uint8_t ui_rows_board_rows[400];
+
+// --- Collection facades: the typed fill API ui.hpp declares (§9.2) ---
+// Each forwards to the widget's own begin(), access method and commit().
+const ui_board_board_rows_t ui_board_board_rows{};
+void ui_board_board_rows_t::begin() const { ui_obj_board.begin(); }
+bool ui_board_board_rows_t::add_row(const char* const* cells, size_t cells_count) const {
+    return u8g2gl_row_added([&] { return ui_obj_board.add_row(cells, cells_count); });
+}
+bool ui_board_board_rows_t::add_row(std::initializer_list<const char*> cells) const {
+    return add_row(cells.begin(), cells.size());
+}
+void ui_board_board_rows_t::commit() const { ui_obj_board.commit(); }
 
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
@@ -39,6 +66,7 @@ void ui_screen_board_init() {
     ui_obj_board.add_column(50, U8G2GL_ALIGN_LEFT);  // <column>
     ui_obj_board.add_column(16, U8G2GL_ALIGN_CENTER);  // <column>
     ui_obj_board.add_column(32, U8G2GL_ALIGN_RIGHT);  // <column>
+    ui_obj_board.attach_rows(0, u8g2gl_rows(ui_rows_board_rows, 4, &ui_rows_board_rows_layout));  // <data name="rows">
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---

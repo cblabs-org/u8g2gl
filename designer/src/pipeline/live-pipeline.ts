@@ -41,6 +41,11 @@
  *              It resolves against the active target (`pickTarget`): the one
  *              the status bar chose, else the first.
  *
+ *              And each element's collection storage on the active screen
+ *              (§9.2), by name: the bytes §18 reports for its `<data>`, from
+ *              the same capacities the scene's storage is described from, so
+ *              the property panel states the figure the build allocates.
+ *
  *              It also returns the subjects' declared values, which the
  *              caller applies after every scene, since a rebuild clears them.
  *              And it checks every sample set among the texts against the
@@ -54,7 +59,7 @@
  * - Rect:                  A device-space rectangle
  * - CompiledAssets:        The fonts and images compileProjectAssets() produced
  * - TextPipelineInput:     Texts, cache, assets and the active screen
- * - TextPipelineResult:    Diagnostics, scene, hit targets, placements and stage timings
+ * - TextPipelineResult:    Diagnostics, scene, hit targets, placements, storage and stage timings
  * - TEXT_STAGES:           The stages, in order
  * - runTextPipeline():     One run
  * - activeScreenName():    The screen a file shows, or the project's first
@@ -64,7 +69,13 @@ import type { CompileProjectAssetsResult } from '@u8g2gl/core/assets/index.js';
 import { checkProject, finaliseDiagnostics, GENERATE_REFUSAL_POLICY } from '@u8g2gl/core/generator/index.js';
 import { describeScenes } from '@u8g2gl/core/generator/emit/scene.js';
 import { placeScreen, type Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
-import { computeCapacities, realiseScreens, type RealisedElement, type RealisedScreen } from '@u8g2gl/core/realise/index.js';
+import {
+  computeCapacities,
+  realiseScreens,
+  type CollectionStorage,
+  type RealisedElement,
+  type RealisedScreen,
+} from '@u8g2gl/core/realise/index.js';
 import { createScreenPipeline, drawnExtent, findOrientedDisplay } from '@u8g2gl/core/resolver/index.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { ProjectModel } from '@u8g2gl/core/generator/check-project.js';
@@ -162,6 +173,13 @@ export interface TextPipelineResult {
    */
   readonly placements: ReadonlyMap<string, Placement>;
   /**
+   * Each object on `screen` with `<data>`, by name, to its collections'
+   * storage in declaration order ([Q-19], §9.2): exactly the blocks the build
+   * allocates and §18 reports. An element whose block cannot be sized has
+   * none here, and a problem says why.
+   */
+  readonly storage: ReadonlyMap<string, readonly CollectionStorage[]>;
+  /**
    * Each subject's declared initial value, as the `{ name: value }` JSON
    * `applySampleData` takes: the frame the firmware draws at boot. A test run
    * applies these; the canvas applies `sampleValues`.
@@ -252,9 +270,16 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
   let targets: readonly HitTarget[] = [];
   let placements: ReadonlyMap<string, Placement> = new Map();
   let drawnBy: ReadonlyMap<string, string> = new Map();
+  let storage: ReadonlyMap<string, readonly CollectionStorage[]> = new Map();
   if (wellFormed && target !== undefined && input.assets !== undefined) {
     try {
-      const capacities = computeCapacities({ globals: model.globals, screens: realisation.screens });
+      const capacities = computeCapacities({
+        globals: model.globals,
+        screens: realisation.screens,
+        resolved: pipeline.resolution.screens,
+        manifests: model.manifests,
+      });
+      storage = storageByName(capacities.collections, screen);
       scene = JSON.stringify(
         describeScenes({
           project: {
@@ -289,6 +314,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
       targets = [];
       placements = new Map();
       drawnBy = new Map();
+      storage = new Map();
     }
   }
   lap('scene');
@@ -323,6 +349,7 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
     targets,
     placements,
     drawnBy,
+    storage,
     subjectValues,
     sampleShape,
     sampleProblems,
@@ -342,6 +369,25 @@ export function runTextPipeline(input: TextPipelineInput): TextPipelineResult {
 export function activeScreenName(model: ProjectModel, activeFile: string | undefined): string | undefined {
   const own = activeFile === undefined ? undefined : model.screens.find((s) => s.loc?.file === activeFile);
   return (own ?? model.screens[0])?.name;
+}
+
+// storageByName
+// One screen's collections, grouped by the element they belong to, in
+// declaration order: what the panel's RAM line reads for a selection.
+//   collections — every sized block, from the capacities
+//   screen      — the drawn screen's name
+function storageByName(
+  collections: readonly CollectionStorage[],
+  screen: string | undefined,
+): ReadonlyMap<string, readonly CollectionStorage[]> {
+  const byName = new Map<string, CollectionStorage[]>();
+  for (const block of collections) {
+    if (block.screen !== screen) continue;
+    const blocks = byName.get(block.element.identifier) ?? [];
+    blocks.push(block);
+    byName.set(block.element.identifier, blocks);
+  }
+  return byName;
 }
 
 // declaredValues

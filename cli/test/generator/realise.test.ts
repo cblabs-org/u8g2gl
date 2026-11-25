@@ -245,9 +245,9 @@ describe('realisation — the rule is evaluated whole, not short-circuited', () 
     expect(byIdentifier(result, 'btn').reasons).toContain('event');
   });
 
-  it("records a composite's typed child pointer, a condition PR-08 has not enabled yet", () => {
+  it("records a composite's typed child pointer, a condition a later PR enables", () => {
     // A composite that also declares a C++ class of its own holds typed member
-    // pointers to its children ([D-6] as [D-18] amends it). Refused until PR-08,
+    // pointers to its children ([D-6] as [D-18] amends it). Refused until a later PR,
     // and modelled here so the reason is true the day it is allowed.
     const classed = composite(
       'fancy_bar',
@@ -354,7 +354,7 @@ describe('realisation — the overload is chosen by the subject type', () => {
 describe('capacities — counted from what was realised ([D-21])', () => {
   it('counts the worked example against WO2 one-binding-one-slot-one-observer', () => {
     const result = realise(WORKED_EXAMPLE, [STATUS_BAR]);
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.maxObjectsPerScreen).toBe(5);
     expect(capacities.busiestScreen).toBe('home');
     // One binding each on bar_location, bar_wifi_icon, bar_clock and msg; the
@@ -373,7 +373,7 @@ describe('capacities — counted from what was realised ([D-21])', () => {
         `        <u8g2gl_label name="none" x="0" y="40" width="40" height="10" font="${FONT}" text="Hi" />`,
       ].join('\n'),
     );
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.maxObjectsPerScreen).toBe(3);
     expect(capacities.maxBindingsPerObject).toBe(3);
     expect(capacities.busiestObject).toBe('busy');
@@ -422,7 +422,7 @@ describe('capacities — per-subject observer counts drive the _n<N> types', () 
         `        <u8g2gl_label name="lbl" x="0" y="40" width="50" height="10" font="${FONT}" bind_text="level" />`,
       ].join('\n'),
     );
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     const level = capacities.subjects.find((entry) => entry.subject.name === 'level');
     expect(level).toMatchObject({ objectBindings: 1, frameDirty: true, observers: 2 });
     // Only the object's binding consumes a pool slot.
@@ -436,7 +436,7 @@ describe('capacities — per-subject observer counts drive the _n<N> types', () 
         `        <u8g2gl_label name="b" x="0" y="20" width="40" height="10" font="${FONT}" bind_text="station_name" />`,
       ].join('\n'),
     );
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.subjects.find((entry) => entry.subject.name === 'station_name')).toMatchObject({
       objectBindings: 2,
       frameDirty: false,
@@ -451,7 +451,7 @@ describe('capacities — per-subject observer counts drive the _n<N> types', () 
         '        <u8g2gl_box name="b2" x="0" y="20" width="10" height="10" bind_height="level" />',
       ].join('\n'),
     );
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.subjects.find((entry) => entry.subject.name === 'level')).toMatchObject({
       objectBindings: 0,
       frameDirty: true,
@@ -462,14 +462,14 @@ describe('capacities — per-subject observer counts drive the _n<N> types', () 
 
   it('carries max_len for a string subject (§8.2)', () => {
     const result = realise(WORKED_EXAMPLE, [STATUS_BAR]);
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.subjects.find((entry) => entry.subject.name === 'station_name')?.maxLen).toBe(48);
     expect(capacities.subjects.find((entry) => entry.subject.name === 'level')?.maxLen).toBeUndefined();
   });
 
   it('reports every declared subject, in declaration order (§13.9)', () => {
     const result = realise(WORKED_EXAMPLE, [STATUS_BAR]);
-    const capacities = computeCapacities({ globals: globals(), screens: result.screens });
+    const capacities = computeCapacities({ globals: globals(), screens: result.screens, resolved: [], manifests: frameworkRegistry() });
     expect(capacities.subjects.map((entry) => entry.subject.name)).toEqual([
       'station_name',
       'wifi_connected',

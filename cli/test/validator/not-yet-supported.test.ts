@@ -168,7 +168,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
   // Checked on the parsed model here; since PR-04 WO7 the parser keeps `extends`
   // on a manifest with a <view>, and test/integration/classed-composite.test.ts
   // proves the same refusal from real XML.
-  it('reports a composite that also extends a C++ class (PR-08), from the declared manifest', () => {
+  it('reports a composite that also extends a C++ class, deferred to a later PR, from the declared manifest', () => {
     const card = parseWidgetManifestFile(CARD_COMPOSITE_XML, 'widgets/wd_card/wd_card.xml').value!;
     const classed: WidgetManifest = { ...card, extends: 'u8g2gl_obj' };
 
@@ -177,7 +177,7 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
 
     expect(composite?.message).toBe(
       "Composite <wd_card> also extends C++ class 'u8g2gl_obj': a composite with a C++ class of its own — " +
-        "it is delivered in PR-08, and 'u8g2gl generate' refuses it until then.",
+        "it is delivered in a later PR, and 'u8g2gl generate' refuses it until then.",
     );
     expect(composite?.file).toBe('widgets/wd_card/wd_card.xml');
     // A composite with no declared `extends` inherits u8g2gl_obj through the

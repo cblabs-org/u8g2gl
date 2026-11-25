@@ -22,8 +22,11 @@ import { generate } from '../../src/core/generator/index.js';
 import { getGeneratorVersion } from '../../src/node/generator-version.js';
 import { loadProject } from '../../src/node/load-project.js';
 
-const PRERELEASE = '0.16.0-beta.1';
-const STABLE = '0.16.0';
+// A version no generated file states for any other reason: the stamps are
+// compared by replacing one with the other, so a STABLE equal to the runtime
+// floor the generator also emits would be replaced there too.
+const PRERELEASE = '0.99.0-beta.1';
+const STABLE = '0.99.0';
 
 const FIXTURES = [
   resolve(__dirname, '../../../test/generated_fixture'),

@@ -20,6 +20,10 @@ static u8g2gl_label ui_obj_ghost;  // 2
 // "panel_edge" is not here: no object required (§13.5)
 // "blip" is not here: no object required (§13.5)
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+u8g2gl_obj& ui_gauges_panel = ui_obj_panel;
+u8g2gl_label& ui_gauges_ghost = ui_obj_ghost;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

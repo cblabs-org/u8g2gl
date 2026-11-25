@@ -212,7 +212,7 @@ interface DecisionContext {
 //
 // Conditions that cannot fire in PR-04 are evaluated all the same — a focus ring
 // and an event are refused until PR-09, a composite's typed child pointer until
-// PR-08 — so that the reason reported is the true one the day they are allowed,
+// a later PR — so that the reason reported is the true one the day they are allowed,
 // and so that switching them on needs no change here.
 //   element     — the expanded element
 //   manifest    — its effective manifest, or undefined for an unknown tag
@@ -244,7 +244,7 @@ function reasonsOf(
     // The enclosing composite has a C++ class of its own, so its generated code
     // holds a typed member pointer to this child ([D-6] as [D-18] amends it).
     // Only a *direct* child: a deeper element is reached through its own parent,
-    // not through the composite. Refused until PR-08, and modelled here.
+    // not through the composite. Refused until a later PR, and modelled here.
     typed_child_pointer: hasOwnClass(context.parent, context.manifests),
   };
   return REALISATION_REASONS.filter((reason) => held[reason]);

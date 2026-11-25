@@ -15,8 +15,11 @@
  *          objects exactly as `generate` will, so both depend on this rule and
  *          it depends on neither. The direction is realise <- validator <-
  *          generator; `test/architecture/layering.test.ts` holds it.
- * Description: Re-exports model.ts (the shapes), realise.ts (the analysis) and
- *              capacities.ts (the counting). Isomorphic.
+ * Description: Re-exports model.ts (the shapes), realise.ts (the analysis),
+ *              capacities.ts (the counting), collection-storage.ts (the row
+ *              layout every collection's storage is sized by) and handles.ts
+ *              (the identifiers the generator composes for an application).
+ *              Isomorphic.
  *
  * Exports:
  * - U8G2GL_NO_PARENT, MAX_OBJECTS_PER_SCREEN, REALISATION_REASONS,
@@ -24,6 +27,12 @@
  *   RealisedElement, DrawStep, RealisedScreen, RealisationResult (model.ts)
  * - realiseScreens, walkRealised, RealiseInput (realise.ts)
  * - computeCapacities, Capacities, CapacitiesInput, SubjectObservers (capacities.ts)
+ * - ROW_ALIGNMENT, RowFieldType, FieldShape, RowField, RowLayout, fieldBytes, rowLayout,
+ *   CollectionStorage, CollectionStorageInput, CollectionStorageResult,
+ *   collectionStorage, storageDerivation (collection-storage.ts)
+ * - elementHandleIdentifier, collectionFacadeIdentifiers, storageIdentifiers,
+ *   handledElements, generatedNames, checkGeneratedNames,
+ *   GeneratedName, GeneratedNamesInput (handles.ts)
  */
 
 export {
@@ -46,3 +55,27 @@ export {
   type CapacitiesInput,
   type SubjectObservers,
 } from './capacities.js';
+export {
+  elementHandleIdentifier,
+  collectionFacadeIdentifiers,
+  storageIdentifiers,
+  handledElements,
+  generatedNames,
+  checkGeneratedNames,
+  type GeneratedName,
+  type GeneratedNamesInput,
+} from './handles.js';
+export {
+  ROW_ALIGNMENT,
+  fieldBytes,
+  rowLayout,
+  collectionStorage,
+  storageDerivation,
+  type RowFieldType,
+  type FieldShape,
+  type RowField,
+  type RowLayout,
+  type CollectionStorage,
+  type CollectionStorageInput,
+  type CollectionStorageResult,
+} from './collection-storage.js';

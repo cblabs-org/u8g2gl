@@ -355,9 +355,14 @@ export function generate(input: GenerateInput): GenerateResult {
   // against this very display, and these are the objects and bindings Pass 9
   // has just checked against §13.3's ceiling (PR-04 WO8c).
   const capacities =
-    realisation === undefined
+    realisation === undefined || pipeline === undefined
       ? undefined
-      : computeCapacities({ globals: input.globals, screens: realisation.screens });
+      : computeCapacities({
+          globals: input.globals,
+          screens: realisation.screens,
+          resolved: pipeline.resolution.screens,
+          manifests: input.manifests,
+        });
 
   // --- Step 6: Emit every file (§13.7) ---
   // The screens are emitted from the very realisation Pass 9 judged and the very

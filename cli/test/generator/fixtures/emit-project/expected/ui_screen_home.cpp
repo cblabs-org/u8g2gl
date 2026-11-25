@@ -26,6 +26,16 @@ static u8g2gl_label ui_obj_scroller;  // 8
 // "rule" is not here: no object required (§13.5)
 // "level_bar" is not here: no object required (§13.5)
 
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+u8g2gl_obj& ui_home_badge = ui_obj_badge;
+u8g2gl_label& ui_home_title = ui_obj_title;
+u8g2gl_label& ui_home_lvl_a = ui_obj_lvl_a;
+u8g2gl_label& ui_home_lvl_b = ui_obj_lvl_b;
+u8g2gl_label& ui_home_lvl_c = ui_obj_lvl_c;
+u8g2gl_clock& ui_home_clock = ui_obj_clock;
+u8g2gl_xbm& ui_home_wifi = ui_obj_wifi;
+u8g2gl_label& ui_home_scroller = ui_obj_scroller;
+
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
 // or U8G2GL_NO_PARENT directly under <view>. Visibility and clipping walk

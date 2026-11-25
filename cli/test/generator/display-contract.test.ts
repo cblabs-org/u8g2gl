@@ -99,7 +99,7 @@ describe('the display contract in ui.hpp (design_spec §16)', () => {
       project: { schema: '0.7', name: 'p', version: '1.0.0', targets: [] },
       globals: { consts: [], subjects: [], styles: [], fonts: [], images: [] },
       screens: [],
-      capacities: { maxObjectsPerScreen: 0, maxBindingsPerObject: 0, totalBindings: 0, styles: 0, styleNames: [], subjects: [] },
+      capacities: { maxObjectsPerScreen: 0, maxBindingsPerObject: 0, totalBindings: 0, styles: 0, styleNames: [], subjects: [], collections: [] },
       manifests: frameworkRegistry(),
       images: new Map(),
       stamp: '',

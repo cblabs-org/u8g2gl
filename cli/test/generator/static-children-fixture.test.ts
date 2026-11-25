@@ -223,7 +223,9 @@ describe('emission', () => {
   it('calls the access method after the setters, once per child, in document order', async () => {
     const { firmware } = await regenerate(DEPARTURES);
     const unit = firmware.files.find((file) => file.path === 'ui_screen_departures.cpp')!.content;
-    const services = unit.split('\n').filter((line) => line.includes('ui_obj_services.'));
+    // From init on: the collection facade above it forwards to the same object.
+    const init = unit.slice(unit.indexOf('void ui_screen_departures_init() {'));
+    const services = init.split('\n').filter((line) => line.includes('ui_obj_services.'));
     expect(services).toEqual([
       '    ui_obj_services.set_coords(0, 51, 190, 13);',
       '    ui_obj_services.set_font(ui_font_u8g2_font_6x10_mr);',
@@ -232,6 +234,8 @@ describe('emission', () => {
       '    ui_obj_services.add_column(102, U8G2GL_ALIGN_LEFT);  // <column>',
       '    ui_obj_services.add_column(16, U8G2GL_ALIGN_CENTER);  // <column>',
       '    ui_obj_services.add_column(40, U8G2GL_ALIGN_RIGHT);  // <column>',
+      // Its storage, after the static children (§9.2).
+      '    ui_obj_services.attach_rows(0, u8g2gl_rows(ui_rows_services_rows, 10, &ui_rows_services_rows_layout));  // <data name="rows">',
       '    next = u8g2gl_min(next, ui_obj_services.tick(now_ms));',
     ]);
   });
@@ -242,7 +246,7 @@ describe('emission', () => {
       version: number;
       screens: { elements: { name: string; static_children?: unknown }[] }[];
     };
-    expect(scene.version).toBe(4);
+    expect(scene.version).toBe(5);
     const elements = scene.screens[0]!.elements;
     expect(elements.find((e) => e.name === 'services')?.static_children).toEqual([
       { element: 'column', args: [{ name: 'width', value: 32 }, { name: 'align', value: 'left' }] },

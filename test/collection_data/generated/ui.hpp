@@ -14,7 +14,9 @@
 #include "u8g2gl_generated_config.h"
 
 // --- Runtime (§13.7) ---
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_style.h"
@@ -72,6 +74,12 @@ extern const uint8_t* const ui_font_u8g2_font_6x10_mr;
 // --- Images (§14.2) ---
 // globals.xml declares no <xbm> images.
 
+// --- Element classes, for the handles below (§9.2) ---
+// Declared, not included: a handle is a reference, which needs no complete
+// type. To call through one, include the class's own header.
+class wd_service_list;
+class wd_train_formation;
+
 // --- Screens (§13.7) ---
 
 // screen 'board'
@@ -81,6 +89,35 @@ void ui_screen_board_deactivate();
 uint32_t ui_screen_board_tick(uint32_t now_ms);
 void ui_screen_board_render(U8G2& display);
 extern u8g2gl_screen ui_screen_board;
+// Its named objects (§9.2), each bound to its static in ui_screen_board.cpp:
+extern wd_train_formation& ui_board_formation;
+extern wd_service_list& ui_board_services;
+// formation <data name="carriages">: begin(), add_row() per row (the widget's add_carriage()), commit() (§9.2)
+struct ui_board_formation_carriages_t {
+    /** @brief Start a batch: the widget's begin(). */
+    void begin() const;
+    /** @brief Stage one row through add_carriage(); false past capacity(), the widget's own refusal. */
+    bool add_row(int32_t number, const char* class_type, bool wheelchair, bool bike, int32_t loading_pct) const;
+    /** @brief Publish the batch: the widget's commit(). */
+    void commit() const;
+    /** @brief Rows this instance holds, as its XML declares them. */
+    size_t capacity() const { return 8; }
+};
+extern const ui_board_formation_carriages_t ui_board_formation_carriages;
+// services <data name="rows">: begin(), add_row() per row (the widget's add_row()), commit() (§9.2)
+struct ui_board_services_rows_t {
+    /** @brief Start a batch: the widget's begin(). */
+    void begin() const;
+    /** @brief Stage one row through add_row(); false past capacity(), the widget's own refusal. */
+    bool add_row(const char* const* cells, size_t cells_count) const;
+    /** @brief The same row, each repeated field as a list. */
+    bool add_row(std::initializer_list<const char*> cells) const;
+    /** @brief Publish the batch: the widget's commit(). */
+    void commit() const;
+    /** @brief Rows this instance holds, as its XML declares them. */
+    size_t capacity() const { return 3; }
+};
+extern const ui_board_services_rows_t ui_board_services_rows;
 
 // --- Project (§13.7) ---
 // init is ordered: construct, set properties, apply styles, then register

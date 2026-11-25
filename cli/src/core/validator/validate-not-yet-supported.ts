@@ -21,7 +21,7 @@
  *              - `<focus_ring>`, `<event_cb>`, `<screen_load_event>`,
  *                `<screen_back_event>` → PR-09 (decision 1)
  *              - a composite that also has a C++ class (`view` + `extends`)
- *                → PR-08 (decision 1)
+ *                → a later PR (deferred past PR-08, which delivered collections)
  *              A declared static child (`<column>`, an `<element>` of its
  *              parent's manifest, §6.5) is no longer refused: schema 0.7's
  *              generator builds it.
@@ -70,8 +70,10 @@ export const DEFAULT_REFUSAL_POLICY: RefusalPolicy = 'warning';
 
 // The PR that delivers each deferred construct. Named once so the messages
 // cannot disagree with each other, and so each PR finds its own entries here.
+// A classed composite has no PR yet: nothing that ships needs one, so it is
+// deferred to "a later PR" rather than given a number nothing plans for.
 const FOCUS_AND_EVENTS_PR = 'PR-09';
-const CLASSED_COMPOSITES_PR = 'PR-08';
+const CLASSED_COMPOSITES_PR = 'a later PR';
 
 // deferredDiagnostic
 // Builds one NOT_YET_SUPPORTED diagnostic at the caller's policy severity.

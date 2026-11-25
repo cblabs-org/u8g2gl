@@ -27,6 +27,13 @@
  *              (EDITOR-DESIGN §3.6), on every selected element at once.
  *              Nothing is written until a field commits.
  *
+ *              The header's RAM line follows [Q-19]'s rule, now that §18
+ *              computes a project widget's collection storage: for an element
+ *              whose manifest declares `<data>`, the bytes the build allocates
+ *              for each block and how they follow (the pipeline's `storage`,
+ *              from the capacities the scene is described from); for a project
+ *              widget without `<data>`, the muted line that no figure exists.
+ *
  *              With one element selected whose manifest declares `<element>`s,
  *              `staticChildren` holds a table of its static children
  *              (`static-children.ts`, design_spec §6.5), and `editStaticChildren()`
@@ -58,6 +65,7 @@ import type { Workspace } from '../workspace';
 import { panelUpdateEnded, panelUpdateStarted } from '../perf/panel-probe';
 import { handleRefusalReasons } from '../editing/line-ends';
 import { attributeEdits, ROOT_TARGET } from './commit-edits';
+import { costNotes } from './cost-notes';
 import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, type FieldProblem } from './element-facts';
 import { fieldState, sameFieldState, type FieldState } from './field-state';
 import { panelLayout, sharedLayout, type FieldSpec, type PanelLayout } from './panel-layout';
@@ -146,9 +154,6 @@ const SCREEN_NAME_FIELD: FieldSpec = {
   help: "The screen's name: generated code's identifier for it, and what a screen_load_event names (§13.3).",
   source: 'screen',
 };
-
-/** The [Q-19] rule's line: no figure for a cost §18 cannot compute. */
-const PROJECT_COST_NOTE = 'RAM cost not reported for project widgets ([Q-19])';
 
 /** Nothing to show yet. */
 const WAITING: PanelView = { kind: 'empty', message: 'Waiting for the first frame…' };
@@ -359,7 +364,7 @@ export class PanelController {
     view.summary.set({
       title: facts.length === 1 ? layout.tag : `${facts.length} elements`,
       subtitle: facts.map((fact) => fact.name).join(', '),
-      notes: project && !layout.drawing ? [PROJECT_COST_NOTE] : [],
+      notes: project && !layout.drawing ? costNotes(facts.map((fact) => fact.name), manifests, run.result.storage) : [],
       resize: refused.length === 0 ? undefined : `Can't resize: ${refused.join('; ')}`,
       problems: facts.flatMap((fact) => fact.problems.get(ELEMENT_PROBLEMS) ?? []),
     });

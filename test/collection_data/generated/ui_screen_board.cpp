@@ -6,12 +6,56 @@
 
 #include "ui.hpp"
 
+#include "u8g2gl/u8g2gl_rows.h"
 #include "wd_service_list.hpp"
 #include "wd_train_formation.hpp"
 
 // --- Objects, in document order: index is draw order (§13.3) ---
 static wd_train_formation ui_obj_formation;  // 0
 static wd_service_list ui_obj_services;  // 1
+
+// --- Handles: the named objects ui.hpp declares (§9.2) ---
+wd_train_formation& ui_board_formation = ui_obj_formation;
+wd_service_list& ui_board_services = ui_obj_services;
+
+// --- Collection storage: one buffer per instance per <data> (§9.2, §18) ---
+// Each sized from its own instance's props, capacity x row bytes; the row
+// layout follows from the manifest's <field>s, so this is the buffer's size,
+// never an assumption about the widget's.
+// formation <data name="carriages">: 8 rows × 12 bytes (number: int, 4 bytes, at 0; class_type: enum, 1 byte, at 4; wheelchair: bool, 1 byte, at 5; bike: bool, 1 byte, at 6; loading_pct: int, 4 bytes, at 8; padded to 4) = 96 bytes
+static constexpr u8g2gl_rows_field ui_rows_formation_carriages_fields[] = {
+    {0, 4, 1, U8G2GL_FIELD_INT},  // number
+    {4, 1, 1, U8G2GL_FIELD_ENUM},  // class_type
+    {5, 1, 1, U8G2GL_FIELD_BOOL},  // wheelchair
+    {6, 1, 1, U8G2GL_FIELD_BOOL},  // bike
+    {8, 4, 1, U8G2GL_FIELD_INT},  // loading_pct
+};
+static constexpr u8g2gl_rows_layout ui_rows_formation_carriages_layout = {ui_rows_formation_carriages_fields, 12, 5};
+alignas(4) static uint8_t ui_rows_formation_carriages[96];
+// services <data name="rows">: 3 rows × 100 bytes (cells: 4 × string, 25 bytes each, max_len 24 + 1, at 0; padded to 4) = 300 bytes
+static constexpr u8g2gl_rows_field ui_rows_services_rows_fields[] = {
+    {0, 25, 4, U8G2GL_FIELD_STRING},  // cells
+};
+static constexpr u8g2gl_rows_layout ui_rows_services_rows_layout = {ui_rows_services_rows_fields, 100, 1};
+alignas(4) static uint8_t ui_rows_services_rows[300];
+
+// --- Collection facades: the typed fill API ui.hpp declares (§9.2) ---
+// Each forwards to the widget's own begin(), access method and commit().
+const ui_board_formation_carriages_t ui_board_formation_carriages{};
+void ui_board_formation_carriages_t::begin() const { ui_obj_formation.begin(); }
+bool ui_board_formation_carriages_t::add_row(int32_t number, const char* class_type, bool wheelchair, bool bike, int32_t loading_pct) const {
+    return u8g2gl_row_added([&] { return ui_obj_formation.add_carriage(number, class_type, wheelchair, bike, loading_pct); });
+}
+void ui_board_formation_carriages_t::commit() const { ui_obj_formation.commit(); }
+const ui_board_services_rows_t ui_board_services_rows{};
+void ui_board_services_rows_t::begin() const { ui_obj_services.begin(); }
+bool ui_board_services_rows_t::add_row(const char* const* cells, size_t cells_count) const {
+    return u8g2gl_row_added([&] { return ui_obj_services.add_row(cells, cells_count); });
+}
+bool ui_board_services_rows_t::add_row(std::initializer_list<const char*> cells) const {
+    return add_row(cells.begin(), cells.size());
+}
+void ui_board_services_rows_t::commit() const { ui_obj_services.commit(); }
 
 // --- Object and parent tables (§13.3) ---
 // Parallel arrays: parents[i] is the index of the object containing objs[i],
@@ -38,6 +82,7 @@ void ui_screen_board_init() {
     ui_obj_formation.set_coords(0, 0, 128, 30);
     ui_obj_formation.set_font(ui_font_u8g2_font_6x10_mr);
     ui_obj_formation.set_max_carriages(8);
+    ui_obj_formation.attach_rows(0, u8g2gl_rows(ui_rows_formation_carriages, 8, &ui_rows_formation_carriages_layout));  // <data name="carriages">
 
     ui_obj_services.set_coords(0, 32, 128, 32);
     ui_obj_services.set_font(ui_font_u8g2_font_6x10_mr);
@@ -47,6 +92,7 @@ void ui_screen_board_init() {
     ui_obj_services.add_column(58, U8G2GL_ALIGN_LEFT);  // <column>
     ui_obj_services.add_column(12, U8G2GL_ALIGN_CENTER);  // <column>
     ui_obj_services.add_column(28, U8G2GL_ALIGN_RIGHT);  // <column>
+    ui_obj_services.attach_rows(0, u8g2gl_rows(ui_rows_services_rows, 3, &ui_rows_services_rows_layout));  // <data name="rows">
 
     // --- Step 4: Register bindings, last, so no observer fires against a
     // partly configured object (§13.7) ---
