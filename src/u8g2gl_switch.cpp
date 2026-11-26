@@ -67,6 +67,24 @@ void u8g2gl_switch::on_value_changed(void* binding) {
     sw->set_value(subject->get());
 }
 
+// u8g2gl_switch::on_press_input
+// Toggles from input. A bound switch writes its subject and lets its own
+// observer apply the value, so the switch and every other binding of the
+// subject change in the same notification; an unbound one sets itself.
+// Returns true: the value always changes, which is what fires value_changed.
+bool u8g2gl_switch::on_press_input() {
+    const bool next = !value_;
+    auto* subject = static_cast<u8g2gl_subject_bool_base*>(
+        bound_value_subject(&u8g2gl_switch::on_value_changed));
+    if (subject != nullptr) {
+        subject->set(next);
+    }
+    // For a bound switch the observer has already applied `next`, so this is
+    // a no-op; for an unbound one it is the toggle.
+    set_value(next);
+    return true;
+}
+
 // u8g2gl_switch::tick
 // Static widget lifecycle: returns U8G2GL_IDLE as the switch does not animate.
 // Returning U8G2GL_IDLE allows framework sleep-hinting to put the microcontroller

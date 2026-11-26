@@ -139,6 +139,9 @@ TEST_F(Core, SetActiveScreen) {
     u8g2gl_screen screen{};
     u8g2gl_set_active_screen(&screen);
     EXPECT_EQ(u8g2gl_get_active_screen(), &screen);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, ScreenActivateCalledOnSet) {
@@ -149,6 +152,9 @@ TEST_F(Core, ScreenActivateCalledOnSet) {
     u8g2gl_set_active_screen(&screen);
     EXPECT_EQ(s_activate_count, 1);
     EXPECT_TRUE(screen.dirty); // Activation forces first frame
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, ScreenDeactivateOnSwitch) {
@@ -165,6 +171,9 @@ TEST_F(Core, ScreenDeactivateOnSwitch) {
     EXPECT_EQ(s_deactivate_count, 1);
     EXPECT_EQ(s_activate_b_count, 1);
     EXPECT_EQ(u8g2gl_get_active_screen(), &screen_b);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Frame Gate Tests ---
@@ -183,6 +192,9 @@ TEST_F(Core, DirtyRendersAndClears) {
     EXPECT_EQ(display.clear_count, 1);
     EXPECT_EQ(display.send_count, 1);
     EXPECT_FALSE(screen.dirty);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, NotDirtyDoesNotRender) {
@@ -203,6 +215,9 @@ TEST_F(Core, NotDirtyDoesNotRender) {
     EXPECT_EQ(s_render_count, 1);
     EXPECT_EQ(display.clear_count, 1);
     EXPECT_EQ(display.send_count, 1);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, MarkDirtyCausesRender) {
@@ -223,6 +238,9 @@ TEST_F(Core, MarkDirtyCausesRender) {
     EXPECT_EQ(display.clear_count, 2);
     EXPECT_EQ(display.send_count, 2);
     EXPECT_FALSE(screen.dirty);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Deadline Aggregation Tests ---
@@ -241,6 +259,9 @@ TEST_F(Core, SingleWidgetDeadline) {
     EXPECT_EQ(s_widget1.tick_count, 1);
     EXPECT_EQ(s_widget1.last_tick_time, 0u);
     EXPECT_EQ(sleep_ms, 500u);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, TwoWidgetMinimumDeadline) {
@@ -256,6 +277,9 @@ TEST_F(Core, TwoWidgetMinimumDeadline) {
     U8G2 display;
     uint32_t sleep_ms = ui_handler(display);
     EXPECT_EQ(sleep_ms, 300u);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, AllIdleReturnsIdle) {
@@ -271,6 +295,9 @@ TEST_F(Core, AllIdleReturnsIdle) {
     U8G2 display;
     uint32_t sleep_ms = ui_handler(display);
     EXPECT_EQ(sleep_ms, U8G2GL_IDLE);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, MixedIdleAndDeadline) {
@@ -286,6 +313,9 @@ TEST_F(Core, MixedIdleAndDeadline) {
     U8G2 display;
     uint32_t sleep_ms = ui_handler(display);
     EXPECT_EQ(sleep_ms, 200u);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Visibility Tests ---
@@ -321,6 +351,9 @@ TEST_F(Core, HiddenWidgetNotRendered) {
 
     EXPECT_EQ(s_widget1.render_count, 1);
     EXPECT_EQ(s_widget2.render_count, 0);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Object mark_dirty triggers screen dirty ---
@@ -344,6 +377,9 @@ TEST_F(Core, ObjMarkDirtyGatesFrame) {
     ui_handler(display);
     EXPECT_EQ(s_render_count, 2);
     EXPECT_FALSE(screen.dirty);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- PR-3R WO1: imperative set_hidden() must gate the frame same as
@@ -368,6 +404,9 @@ TEST_F(Core, ObjSetHiddenGatesFrame) {
     ui_handler(display);
     EXPECT_EQ(s_render_count, 2);
     EXPECT_FALSE(screen.dirty);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Per-object render wrapper: u8g2gl_render_object() (§11.3) ---
@@ -447,6 +486,9 @@ TEST_F(Core, RenderObjectHiddenAncestorSuppressesChild) {
     ui_handler(display);
     EXPECT_EQ(container.render_count, 1);
     EXPECT_EQ(child.render_count, 1);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, RenderObjectClipsChildToAncestorBounds) {
@@ -863,6 +905,9 @@ TEST_F(Core, ElapsedSubtractedFromDeadline) {
     U8G2 display;
     uint32_t sleep_ms = ui_handler(display);
     EXPECT_EQ(sleep_ms, 450u); // 500 - 50 = 450
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, ElapsedExceedsDeadlineReturnsZero) {
@@ -882,6 +927,9 @@ TEST_F(Core, ElapsedExceedsDeadlineReturnsZero) {
     U8G2 display;
     uint32_t sleep_ms = ui_handler(display);
     EXPECT_EQ(sleep_ms, 0u);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, RunInPeriod) {
@@ -909,6 +957,9 @@ TEST_F(Core, RunInPeriod) {
     uint32_t res3 = ui_handler_run_in_period(display, 50);
     EXPECT_EQ(res3, U8G2GL_IDLE);
     EXPECT_EQ(s_render_count, 2); // Executed!
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Timers in ui_handler() (§11.1) ---
@@ -936,6 +987,9 @@ TEST_F(Core, HandlerReturnsEarlierOfTimerAndWidgetDeadlines) {
     EXPECT_EQ(ui_handler(display), 40u);    // the widget is sooner
     s_widget1.next_deadline = U8G2GL_IDLE;
     EXPECT_EQ(ui_handler(display), 100u);   // an idle widget leaves the timer's
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(Core, TimersRunWithNoActiveScreen) {
@@ -979,6 +1033,9 @@ TEST_F(Core, TimerWritingBoundSubjectRedrawsInSameCall) {
     EXPECT_EQ(subject.get(), 1);
     EXPECT_EQ(s_render_count, 2);           // drawn by the call that ran the timer
     EXPECT_EQ(display.send_count, 2);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Dirty flag ordering: a subject written during a render is not lost ---
@@ -1036,6 +1093,9 @@ TEST_F(DirtyOrdering, SubjectWrittenDuringRenderIsDrawnByTheNextCall) {
     ui_handler(display);
     EXPECT_EQ(s_ordering_render_count, 2);
     EXPECT_EQ(display.send_count, 2);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 TEST_F(DirtyOrdering, PendingWorkReturnsZeroAndPlainFrameReturnsTheDeadline) {
@@ -1057,6 +1117,9 @@ TEST_F(DirtyOrdering, PendingWorkReturnsZeroAndPlainFrameReturnsTheDeadline) {
     // A frame with nothing pending neither redraws nor reports 0.
     EXPECT_EQ(ui_handler(display), 500u);
     EXPECT_EQ(s_ordering_render_count, 2);
+    // Deactivate while the local screen is still alive; the runtime
+    // reads the outgoing screen when it next switches.
+    u8g2gl_set_active_screen(nullptr);
 }
 
 // --- Final sizeof Report (§18/Q-4) ---

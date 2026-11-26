@@ -19,15 +19,19 @@
  *          the default value" apart from "never set". Without that distinction a
  *          style could not selectively override.
  *
- * Description: The monochrome property set, the per-property set_mask, and
- *              merge_from() which composes a style over another
+ * Description: The monochrome property set, the per-property set_mask,
+ *              merge_from() which composes a style over another, and
+ *              clear_except() which undoes a merge while keeping chosen
+ *              properties
  *
  * Exported Classes:
  * - u8g2gl_style: struct holding the 9 style properties
  *
  *     Style API:
- *     - u8g2gl_style_cascade(): Merge two styles
- *     - u8g2gl_style_set_font(), etc.: Individual property setters
+ *     - set_font(), etc.: Individual property setters, recording set_mask
+ *     - merge_from():     Compose another style's set properties over this one,
+ *                         optionally leaving some untouched (§10 precedence)
+ *     - clear_except():   Reset every property but the ones kept to unset
  */
 #ifndef U8G2GL_STYLE_H
 #define U8G2GL_STYLE_H
@@ -84,10 +88,30 @@ struct u8g2gl_style {
     // --- Query ---
     bool has(u8g2gl_style_prop_t prop) const;
 
-    // --- Merge: apply all SET properties from `other` onto this style ---
-    // Properties in `other` that are not set do not overwrite.
-    // This is how cascade works: base style + inline overrides.
-    void merge_from(const u8g2gl_style& other);
+    /**
+     * @brief Compose @p other's explicitly-set properties over this style.
+     *
+     * Properties @p other leaves unset do not overwrite. Neither do the
+     * properties named in @p keep_mask, whatever @p other says: that is how an
+     * object's own setters win over a named style applied after them, which
+     * §10 requires of a `focus_style` applied at run time.
+     *
+     * @param other     Style to merge in.
+     * @param keep_mask u8g2gl_style_prop_t bits left untouched; 0 merges all.
+     */
+    void merge_from(const u8g2gl_style& other, uint16_t keep_mask = 0);
+
+    /**
+     * @brief Reset every property not in @p keep_mask to its default, and
+     *        clear its set_mask bit.
+     *
+     * Undoes merges while keeping chosen properties: an object losing focus
+     * keeps the properties it set itself and drops everything its styles
+     * contributed, before its base style is merged in again.
+     *
+     * @param keep_mask u8g2gl_style_prop_t bits whose value and set bit stay.
+     */
+    void clear_except(uint16_t keep_mask);
 
     // --- Reset ---
     void clear();

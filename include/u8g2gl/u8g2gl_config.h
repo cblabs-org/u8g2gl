@@ -58,6 +58,7 @@
  * - U8G2GL_MAX_STRING_LEN: Maximum length of a bound string
  * - U8G2GL_MAX_BINDINGS_PER_OBJ: Maximum bindings on one object
  * - U8G2GL_MAX_TOTAL_BINDINGS: Maximum number of active bindings in the static pool
+ * - U8G2GL_SCREEN_STACK_DEPTH: Screens `<screen_back_event>` can return through (§12.3)
  *
  * Consumed Macros:
  * - U8G2GL_GENERATED_CONFIG: Quoted name of the project's generated capacity header
@@ -113,6 +114,15 @@
 // Override at compile time via -D flag
 #ifndef U8G2GL_MAX_TOTAL_BINDINGS
 #define U8G2GL_MAX_TOTAL_BINDINGS (U8G2GL_MAX_OBJECTS_PER_SCREEN * U8G2GL_MAX_BINDINGS_PER_OBJ)
+#endif
+
+// How many screens `<screen_back_event>` can return through (§12.3). Each
+// `<screen_load_event>` pushes the screen it leaves; a push onto a full stack
+// drops the oldest entry, so deeper navigation is the application's to
+// manage. A fixed, static array of one pointer and one byte per entry ([D-1]).
+// Override at compile time via -D flag.
+#ifndef U8G2GL_SCREEN_STACK_DEPTH
+#define U8G2GL_SCREEN_STACK_DEPTH 4
 #endif
 
 #endif // U8G2GL_CONFIG_H

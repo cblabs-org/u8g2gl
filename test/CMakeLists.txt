@@ -844,6 +844,30 @@ target_compile_options(test_style_border PRIVATE
 )
 u8g2gl_discover_tests(test_style_border)
 
+# --- Real U8G2: input, focus and navigation (§12) ---
+# Focus movement, presses, the screen stack and focus_style, drawn through the
+# runtime compiled against real U8G2, as test_style_border is.
+add_executable(test_input
+    test_input.cpp
+    $<TARGET_OBJECTS:u8g2gl_real_u8g2>
+)
+target_include_directories(test_input PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+)
+target_include_directories(test_input SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+)
+target_link_libraries(test_input PRIVATE
+    u8g2gl_u8g2_csrc_arduino
+    u8g2gl_u8g2_fonts_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_input PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+u8g2gl_discover_tests(test_input)
+
 # --- Real U8G2: the clock's seconds share its HH:MM baseline ---
 # The panel is an SSD1322 256x64, so the test draws through that driver, which
 # no other target links; it is compiled here with ARDUINO defined like

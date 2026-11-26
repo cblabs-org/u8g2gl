@@ -27,7 +27,8 @@
  * - u8g2gl_font_mode_t: Font rendering mode
  * - u8g2gl_bitmap_mode_t: Bitmap rendering mode
  * - u8g2gl_long_mode_t: Label overflow behaviour ([D-19])
- * - u8g2gl_event_t: Event types for focus/input
+ * - u8g2gl_event_t: The input events an application dispatches (§12.1)
+ * - u8g2gl_trigger_t: What an element's event fires on (§12.3)
  */
 #ifndef U8G2GL_TYPES_H
 #define U8G2GL_TYPES_H
@@ -50,6 +51,9 @@ static constexpr uint8_t U8G2GL_NO_PARENT = UINT8_MAX;
 static constexpr uint8_t U8G2GL_FLAG_HIDDEN   = 0x01;
 static constexpr uint8_t U8G2GL_FLAG_DIRTY    = 0x02;
 static constexpr uint8_t U8G2GL_FLAG_DISABLED = 0x04;
+// Set and cleared only by the runtime's focus ring (§12.2), never by a setter
+// or a binding: exactly one ring member holds it while its screen is active.
+static constexpr uint8_t U8G2GL_FLAG_FOCUSED  = 0x08;
 
 // Alignment enum (WO6 Finding C: explicit narrow base type, was untyped `int`)
 enum u8g2gl_align_t : uint8_t {
@@ -100,14 +104,39 @@ inline uint32_t u8g2gl_min(uint32_t a, uint32_t b) {
     return a < b ? a : b;
 }
 
-// Event enum stub (for §12, don't implement dispatch)
+/**
+ * @brief A semantic input event, which the application dispatches with
+ *        ui_dispatch() (§12.1).
+ *
+ * The application reads its own hardware, debounces it and times long presses;
+ * the framework never times input. An encoder and a set of buttons map onto
+ * the same three actions: CW and NEXT move focus forward, CCW and PREV move it
+ * back, CLICK and PRESS fire the focused element's `press` events, and the two
+ * long events fire its `long_press` events.
+ *
+ * The first five values keep the numbers they had before dispatch existed; the
+ * rest are appended, so no existing value changes meaning.
+ */
 enum u8g2gl_event_t : uint8_t {
-    U8G2GL_EVENT_NONE = 0,
-    U8G2GL_EVENT_ENCODER_CW,
-    U8G2GL_EVENT_ENCODER_CCW,
-    U8G2GL_EVENT_ENCODER_CLICK,
-    U8G2GL_EVENT_BUTTON_PRESS,
-    U8G2GL_EVENT_BUTTON_LONG_PRESS,
+    U8G2GL_EVENT_NONE = 0,              ///< No event; dispatching it does nothing
+    U8G2GL_EVENT_ENCODER_CW,            ///< Move focus forward
+    U8G2GL_EVENT_ENCODER_CCW,           ///< Move focus back
+    U8G2GL_EVENT_ENCODER_CLICK,         ///< Fire the focused element's `press`
+    U8G2GL_EVENT_BUTTON_PRESS,          ///< Fire the focused element's `press`
+    U8G2GL_EVENT_BUTTON_LONG_PRESS,     ///< Fire the focused element's `long_press`
+    U8G2GL_EVENT_ENCODER_LONG_CLICK,    ///< Fire the focused element's `long_press`
+    U8G2GL_EVENT_BUTTON_NEXT,           ///< Move focus forward
+    U8G2GL_EVENT_BUTTON_PREV,           ///< Move focus back
+};
+
+/**
+ * @brief What an element's event fires on (§12.3); also passed to an
+ *        `<event_cb>` callback, so one callback can serve several triggers.
+ */
+enum u8g2gl_trigger_t : uint8_t {
+    U8G2GL_TRIGGER_PRESS = 0,           ///< A press reached the focused element
+    U8G2GL_TRIGGER_LONG_PRESS,          ///< A long press reached the focused element
+    U8G2GL_TRIGGER_VALUE_CHANGED,       ///< Input changed the element's value; never a binding or a setter
 };
 
 #endif // U8G2GL_TYPES_H

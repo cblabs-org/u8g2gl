@@ -134,9 +134,10 @@ public:
     /**
      * @brief Render the button into the U8G2 display buffer.
      *
-     * Applies resolved styling (font, color). If focused (DISABLED flag clear and
-     * style.invert true), fills background with drawBox/drawRBox and renders text
-     * with draw color 0. Renders border frame(s) and centers UTF-8 text within
+     * Applies resolved styling (font, color). Drawn inverted — the background
+     * filled with drawBox/drawRBox and the text in draw color 0 — when the
+     * button is not disabled and either holds focus (U8G2GL_FLAG_FOCUSED) or
+     * its style sets `invert` (§12.2). Renders border frame(s) and centers UTF-8 text within
      * the button bounds.
      *
      * @param display U8G2 display context to draw into.

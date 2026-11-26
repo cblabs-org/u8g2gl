@@ -39,6 +39,7 @@
  *     Visibility & flags:
  *     - set_hidden():        Exclude from rendering
  *     - has_flag():          Test a U8G2GL_FLAG_* bit
+ *     - is_focused():        Whether the focus ring has focused this object (§12.2)
  *
  *     Hierarchy:
  *     - set_parent_index():  Index into the screen's flat object array
@@ -52,8 +53,17 @@
  *                            own bind_* method
  *     - bound_text():        (protected) a text binding's current text, read at
  *                            render time
+ *     - bound_value_subject(): (protected) the subject a widget's own value
+ *                            binding observes, for input that writes it back
  *     - on_text_binding_changed(): (protected, virtual) the hook a bound
  *                            subject's change calls
+ *
+ *     Style and focus (§10, §12):
+ *     - apply_style():       Merge a named style, below the object's own properties
+ *     - set_focused():       (framework) take or lose focus, applying or
+ *                            undoing a focus style
+ *     - on_press_input():    (virtual) a press reached this focused object; the
+ *                            switch toggles
  *
  *     Lifecycle (virtual):
  *     - tick():              Advance animation; returns next deadline
@@ -393,7 +403,18 @@ public:
 
     /**
      * @brief Layer a named style's explicitly-set properties over this object's
-     *        resolved style.
+     *        resolved style, below the properties the object set itself.
+     *
+     * **An element's own properties win over a named style (§10)**, whichever
+     * came first: a property set through one of the style setters below is
+     * recorded as the object's own, and no later apply_style() overwrites it.
+     * Generated init applies named styles before properties (§13.7), so at
+     * init nothing is the object's own yet and this is a plain merge.
+     *
+     * @p style becomes the object's base style: the one its resolved style is
+     * rebuilt from when it loses focus (set_focused()). A second call replaces
+     * the first as the base, so an object built from several named styles must
+     * be given them merged into one if it can lose a focus style.
      *
      * Changes everything the style sets at once, so — like the setters below —
      * this marks the frame dirty whenever the resulting resolved style actually
@@ -402,16 +423,56 @@ public:
      * style) is therefore not a repaint.
      *
      * @param style Style to merge in; only its explicitly-set properties apply.
+     *              Must outlive this object — named styles are statically
+     *              allocated by generated code.
      */
     void apply_style(const u8g2gl_style& style);
     const u8g2gl_style& get_resolved_style() const;
 
-    // Individual style setters that generated code calls as inline overrides.
-    // Each delegates to the embedded u8g2gl_style and marks the frame dirty,
-    // guarded on the value actually changing — the same change-guard pattern
-    // WO1 established for geometry and flags (§11.2). This was a live defect,
-    // not a latent one: before PR-3R WO2 these called the style setter and
-    // returned, so changing a font, colour, padding or alignment at runtime
+    /**
+     * @brief Take or lose focus (§12.2). Called by the framework's focus ring
+     *        only; an application moves focus by dispatching events.
+     *
+     * Taking focus sets U8G2GL_FLAG_FOCUSED and merges @p focus_style, below
+     * the object's own properties as apply_style() does. Losing it clears the
+     * flag and, when there is a focus style to undo, rebuilds the resolved
+     * style: every property the object did not set itself is cleared, and the
+     * base style is merged in again. The result is exactly the style the
+     * object had before it took focus. Either way the frame is marked dirty,
+     * because the focused look changes even with no focus style (a button
+     * inverts).
+     *
+     * @param focused     true to take focus, false to lose it.
+     * @param focus_style The ring member's `focus_style`, or nullptr for none.
+     *                    Pass the same style to both calls.
+     */
+    void set_focused(bool focused, const u8g2gl_style* focus_style);
+
+    /** @brief Whether the focus ring has focused this object (U8G2GL_FLAG_FOCUSED). */
+    bool is_focused() const;
+
+    /**
+     * @brief A press reached this object while it held focus.
+     *
+     * Called by ui_dispatch() before the object's `press` events run, so a
+     * `press` callback sees what the press did. The default does nothing. The
+     * switch overrides it to toggle (§12.3): input is the one place a value
+     * changes from the device's side, and the only source of `value_changed`.
+     * Adds a vtable slot only; no per-object bytes.
+     *
+     * @return true when the press changed the object's value, which fires the
+     *         object's `value_changed` events.
+     */
+    virtual bool on_press_input();
+
+    // Individual style setters that generated code calls as inline overrides,
+    // and an attribute setter for a style property calls too. Each records the
+    // property as the object's own, so no named style applied later overwrites
+    // it (§10), then delegates to the embedded u8g2gl_style and marks the frame
+    // dirty, guarded on the value actually changing — the same change-guard
+    // pattern WO1 established for geometry and flags (§11.2). This was a live
+    // defect, not a latent one: before PR-3R WO2 these called the style setter
+    // and returned, so changing a font, colour, padding or alignment at runtime
     // produced no repaint on a static screen (surfaced by the Chief Architect
     // after WO1 — see PROJECT.md).
     void set_font(const uint8_t* font);
@@ -526,13 +587,16 @@ public:
 protected:
     // Members are ordered largest-alignment-first and kept deliberately few:
     // this type is instantiated once per element, so its size is multiplied
-    // across every screen. See PD-3 for the measured budget.
+    // across every screen. See PD-3 for the measured budget. The focus fields
+    // cost one pointer: own_style_mask_ fills padding that sat before style_.
+    const u8g2gl_style* base_style_ = nullptr;  ///< Last named style applied; rebuilt from on losing focus
     int16_t x_ = 0;
     int16_t y_ = 0;
     int16_t w_ = 0;
     int16_t h_ = 0;
     uint8_t flags_ = 0;
     uint8_t parent_index_ = U8G2GL_NO_PARENT;
+    uint16_t own_style_mask_ = 0;  ///< u8g2gl_style_prop_t bits this object's own setters set (§10)
     u8g2gl_style style_;    ///< Resolved style — embedded, not referenced, so no indirection per draw
 
     // --- Value bindings for subclasses (§8.4, PR-04 WO2) ---
@@ -573,6 +637,21 @@ protected:
      * @return The subject, or nullptr if the binding is no longer active.
      */
     static void* binding_subject(void* binding);
+
+    /**
+     * @brief The subject this object's own value binding observes, or nullptr
+     *        when it has none.
+     *
+     * For a widget whose input writes its value back (the switch, §12.3): the
+     * write goes through the subject's own setter, so every other binding of
+     * that subject updates, and this widget with them. A value binding is
+     * found by the observer callback the widget registered it with, so a
+     * widget with several value bindings can ask for each one.
+     *
+     * @param cb The callback the widget passed to add_value_binding().
+     * @return The subject, type-erased; the caller knows its type from @p cb.
+     */
+    void* bound_value_subject(u8g2gl_observer_cb cb) const;
 
     // --- Text binding, for text-drawing widgets (§8.4) ---
 

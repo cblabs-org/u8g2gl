@@ -67,6 +67,7 @@ set(U8G2GL_RUNTIME_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_subject.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_style.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_core.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_input.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_timer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/u8g2gl_wall_clock.cpp

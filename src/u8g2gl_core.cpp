@@ -114,13 +114,20 @@ static void mark_screen_dirty(u8g2gl_screen* screen) {
     }
 }
 
-// u8g2gl_set_active_screen
+// u8g2gl_activate_screen
 // Switches the active screen, running the outgoing screen's deactivate hook
-// before the incoming screen's activate hook so the two never overlap.
-//   screen — the screen to make active, or nullptr to leave none active
-void u8g2gl_set_active_screen(u8g2gl_screen* screen) {
-    if (s_active_screen && s_active_screen->deactivate_fn) {
-        s_active_screen->deactivate_fn();
+// before the incoming screen's activate hook so the two never overlap. Focus
+// leaves the outgoing screen first, while its objects are still configured,
+// and enters the incoming one last, after its activate hook, so a hook that
+// shows or hides members decides what can take focus.
+//   screen    — the screen to make active, or nullptr to leave none active
+//   focus_pos — ring position to restore, or U8G2GL_NO_FOCUS for the first
+void u8g2gl_activate_screen(u8g2gl_screen* screen, uint8_t focus_pos) {
+    if (s_active_screen) {
+        u8g2gl_focus_leave(*s_active_screen);
+        if (s_active_screen->deactivate_fn) {
+            s_active_screen->deactivate_fn();
+        }
     }
     s_active_screen = screen;
     if (screen) {
@@ -132,7 +139,15 @@ void u8g2gl_set_active_screen(u8g2gl_screen* screen) {
         if (screen->activate_fn) {
             screen->activate_fn();
         }
+        u8g2gl_focus_enter(*screen, focus_pos);
     }
+}
+
+// u8g2gl_set_active_screen
+// The public switch: focus goes to the ring's first focusable member.
+//   screen — the screen to make active, or nullptr to leave none active
+void u8g2gl_set_active_screen(u8g2gl_screen* screen) {
+    u8g2gl_activate_screen(screen, U8G2GL_NO_FOCUS);
 }
 
 u8g2gl_screen* u8g2gl_get_active_screen() {

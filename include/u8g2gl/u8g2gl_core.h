@@ -21,7 +21,8 @@
  *          and are none of the framework's business.
  *
  * Description: Tick-source registration, the u8g2gl_screen descriptor that binds
- *              a generated screen's arrays and lifecycle functions together,
+ *              a generated screen's arrays, lifecycle functions and input
+ *              tables together,
  *              active-screen selection, frame-level dirty gating, and the
  *              ui_handler entry points
  *
@@ -50,6 +51,7 @@
 #include "u8g2gl_types.h"
 #include "u8g2gl_obj.h"
 #include "u8g2gl_tree.h"
+#include "u8g2gl_input.h"
 #include <cstdint>
 
 // Forward declare
@@ -107,6 +109,18 @@ struct u8g2gl_screen {
     void (*render_fn)(U8G2& display);           ///< Draw every visible object
 
     bool dirty;   ///< Set when anything changed; gates the sendBuffer, not individual objects
+
+    // --- Input (§12) ---
+    // Appended with defaults, so a screen with no ring and no events — every
+    // screen generated before input existed — initialises only the fields
+    // above and ignores input. The tables are const and generated; focus_pos
+    // is the one mutable field, like dirty.
+    const u8g2gl_focus_stop* ring = nullptr;    ///< Focus ring in the author's order, or nullptr for none
+    const u8g2gl_obj_event* events = nullptr;   ///< Element events, grouped by object
+    uint8_t ring_count = 0;                     ///< Entries in @ref ring
+    bool ring_wrap = false;                     ///< Whether moving past an end wraps to the other
+    uint8_t event_count = 0;                    ///< Entries in @ref events
+    uint8_t focus_pos = U8G2GL_NO_FOCUS;        ///< Position in @ref ring holding focus, or U8G2GL_NO_FOCUS
 };
 
 // --- Screen management ---
@@ -114,9 +128,11 @@ struct u8g2gl_screen {
 /**
  * @brief Make a screen the active one.
  *
- * Calls the outgoing screen's deactivate_fn and the incoming screen's
- * activate_fn, and marks the frame dirty so the new screen paints immediately
- * rather than waiting for something else to change.
+ * The outgoing screen's focused element loses focus and its deactivate_fn
+ * runs; then the incoming screen's activate_fn runs, and focus goes to the
+ * first visible, enabled member of its ring (§12.2). The frame is marked dirty
+ * so the new screen paints immediately rather than waiting for something else
+ * to change. The screen stack (u8g2gl_input.h) is left as it is.
  *
  * @param screen The screen to activate. Screens are statically allocated by
  *               generated code, so this pointer is expected to remain valid for

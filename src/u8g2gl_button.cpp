@@ -104,9 +104,13 @@ void u8g2gl_button::render(U8G2& display) {
     }
 
     // --- Step 3: Check focus inversion state (§12.2) ---
-    // Invert when style indicates focus (invert flag) and the button is NOT disabled.
-    // A disabled button must not display focus highlights even if navigation lands on it.
-    bool is_focused = !has_flag(U8G2GL_FLAG_DISABLED) && style_.invert;
+    // Invert when the focus ring has focused the button, or when its style
+    // sets `invert`, which drew the focused look before the ring existed and
+    // still does, so no existing button's pixels change. Never while disabled:
+    // the ring skips a disabled button, and one disabled while focused must
+    // not keep the highlight.
+    bool is_focused = !has_flag(U8G2GL_FLAG_DISABLED) &&
+                      (has_flag(U8G2GL_FLAG_FOCUSED) || style_.invert);
 
     // --- Step 4: Draw background inversion if focused ---
     // u8g2gl_draw_box() issues exactly the call this did — drawRBox when
