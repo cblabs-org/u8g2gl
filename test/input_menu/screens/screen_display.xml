@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="display">
+    <view>
+        <u8g2gl_label name="title" x="0" y="0" width="128" height="12"
+                      font="u8g2_font_6x10_mr" text="Display" />
+        <u8g2gl_label name="lbl_wifi" x="0" y="17" width="60" height="12"
+                      font="u8g2_font_6x10_mr" text="Wi-Fi" />
+        <u8g2gl_switch name="sw_wifi" x="64" y="17" width="24" height="12" bind_value="wifi_enabled" />
+
+        <u8g2gl_button name="btn_back" x="0" y="40" width="60" height="14"
+                       font="u8g2_font_6x10_mr" text="Back">
+            <screen_back_event trigger="press" />
+        </u8g2gl_button>
+
+        <focus_ring wrap="false">
+            <focus name="btn_back" />
+        </focus_ring>
+    </view>
+</screen>

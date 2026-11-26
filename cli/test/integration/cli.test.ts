@@ -53,10 +53,10 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
-  // valid-project's two <bdf> fonts compile, so only its <focus_ring> (PR-09) is valid as
-  // authored but not generated yet — `validate` passes with exactly that one
-  // warning, and `generate` refuses the same project
-  // (test/integration/generate.test.ts).
+  // valid-project's two <bdf> fonts compile, and its <focus_ring> builds since
+  // PR-09. Its one member is a label with no events, a highlight-only stop, so
+  // `validate` passes with exactly that one warning, which `generate` reports
+  // too (test/integration/generate.test.ts).
   it('u8g2gl validate valid-project/ -> exit 0, no output on stderr', async () => {
     const res = await runCliSubprocess(['validate', validProjectDir]);
 
@@ -84,7 +84,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
     expect(parsed.warnings).toBe(1);
     expect(Array.isArray(parsed.diagnostics)).toBe(true);
     expect(parsed.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual([
-      'warning U8G2GL_NOT_YET_SUPPORTED',
+      'warning U8G2GL_INERT_FOCUS_STOP',
     ]);
   });
 
@@ -206,7 +206,7 @@ describe('U8G2GL CLI End-to-End Integration', () => {
         diagnostics: Array<{ code: string; severity: string; message: string }>;
         errors: number;
       };
-      // valid-project's one known warning (its <focus_ring>) is unaffected.
+      // valid-project's one known warning (its focus-ring stop) is unaffected.
       const errors = parsed.diagnostics.filter((d) => d.severity === 'error');
       expect(errors.map((d) => `${d.code} ${d.message}`)).toEqual([
         "U8G2GL_MALFORMED_XML Unknown element '<foo>' in <u8g2gl>",

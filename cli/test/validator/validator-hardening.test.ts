@@ -149,7 +149,7 @@ describe('two renames, codes stable (WO9 f7, WO8c f3)', () => {
     expect(Object.keys(DIAGNOSTIC_CODES)).not.toContain('UNRESOLVED_GEOMETRY');
   });
 
-  it("refusalPolicy sets the severity of realisation's refusal as well as a not-yet-supported one", () => {
+  it("refusalPolicy sets the severity of realisation's refusal; an event is no longer one (PR-09)", () => {
     const project = model(
       '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4"><u8g2gl_box name="inner" x="0" y="0" width="1" height="1" /></u8g2gl_box>\n' +
         '        <u8g2gl_label name="l" x="0" y="10" width="20" height="10" font="u8g2_font_6x10_mr"><event_cb trigger="press" callback="on_press" /></u8g2gl_label>',
@@ -162,14 +162,8 @@ describe('two renames, codes stable (WO9 f7, WO8c f3)', () => {
         )
         .map((d) => `${d.code}:${d.severity}`)
         .sort();
-    expect(severities('error')).toEqual([
-      'U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT:error',
-      'U8G2GL_NOT_YET_SUPPORTED:error',
-    ]);
-    expect(severities('warning')).toEqual([
-      'U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT:warning',
-      'U8G2GL_NOT_YET_SUPPORTED:warning',
-    ]);
+    expect(severities('error')).toEqual(['U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT:error']);
+    expect(severities('warning')).toEqual(['U8G2GL_DRAWING_ELEMENT_NEEDS_OBJECT:warning']);
   });
 });
 
@@ -832,7 +826,15 @@ describe('the collision table is total (WO10 f5, WO11 f6)', () => {
     const expansion = expandScreens({ globals: project.globals, screens: project.screens, manifests: project.manifests });
     const table = mangleIdentifiers({ globals: project.globals, screens: expansion.screens });
     const fixed = table.global.filter((entry) => entry.source.kind === 'fixed').map((entry) => entry.identifier);
-    expect(fixed).toEqual(['ui_init', 'ui_display_matches', 'ui_subjects_init', 'ui_styles_init', 'ui_editor_registry', 'ui_handler']);
+    expect(fixed).toEqual([
+      'ui_init',
+      'ui_display_matches',
+      'ui_subjects_init',
+      'ui_styles_init',
+      'ui_editor_registry',
+      'ui_handler',
+      'ui_dispatch',
+    ]);
     // Spelled once: no core source but mangle.ts writes any of them as a literal.
     const mangle = join('src', 'core', 'resolver', 'mangle.ts');
     const offenders = sourceFiles(join(CLI_ROOT, 'src', 'core')).filter(

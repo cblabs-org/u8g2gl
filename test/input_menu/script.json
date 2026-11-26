@@ -1,0 +1,18 @@
+{
+  "comment": "The scripted input both targets replay (design_spec §12): test/test_input_parity.cpp natively, wasm/test/input-parity.test.mjs in Wasm. Each step names a u8g2gl_event_t without its U8G2GL_EVENT_ prefix, lowercased, and what the step must leave: the active screen, the focused element and the callbacks reached.",
+  "screen": "settings",
+  "steps": [
+    { "event": "button_next", "screen": "settings", "focused": "sw_wifi", "callbacks": [] },
+    { "event": "button_press", "screen": "settings", "focused": "sw_wifi", "callbacks": ["on_wifi_changed sw_wifi value_changed"] },
+    { "event": "encoder_cw", "screen": "settings", "focused": "btn_reset", "callbacks": [] },
+    { "event": "encoder_click", "screen": "settings", "focused": "btn_reset", "callbacks": ["on_reset btn_reset press"] },
+    { "event": "button_long_press", "screen": "settings", "focused": "btn_reset", "callbacks": ["on_factory_reset btn_reset long_press"] },
+    { "event": "encoder_cw", "screen": "settings", "focused": "lbl_about", "callbacks": [] },
+    { "event": "encoder_click", "screen": "settings", "focused": "lbl_about", "callbacks": [] },
+    { "event": "encoder_cw", "screen": "settings", "focused": "btn_display", "callbacks": [] },
+    { "event": "button_press", "screen": "display", "focused": "btn_back", "callbacks": [] },
+    { "event": "button_next", "screen": "display", "focused": "btn_back", "callbacks": [] },
+    { "event": "button_press", "screen": "settings", "focused": "btn_display", "callbacks": [] },
+    { "event": "encoder_ccw", "screen": "settings", "focused": "lbl_about", "callbacks": [] }
+  ]
+}

@@ -18,7 +18,8 @@
  *              no observer fires against a half-built UI (§13.7).
  *
  *              `ui_display_matches()` is defined here too, beside the other
- *              project-level function `ui.hpp` declares. It compares U8G2's own
+ *              project-level function `ui.hpp` declares, and, for a project
+ *              with a focus ring or an event, `ui_dispatch()` (§12.1). It compares U8G2's own
  *              getters with the contract's macros, so it needs nothing from the
  *              runtime and allocates nothing (design_spec §16).
  *
@@ -44,6 +45,8 @@ import {
   UI_INIT_FUNCTION,
 } from './ui-hpp.js';
 import { section, type EmittedUnit, type ProjectEmitInput } from './unit.js';
+import { projectInputOf } from './screen-model.js';
+import { UI_DISPATCH_FUNCTION } from '../../schema/input-model.js';
 
 /** The unit defining `ui_init()`, beside the `ui.hpp` that declares it. */
 export const UI_INIT_UNIT = 'ui.cpp';
@@ -110,6 +113,17 @@ export function emitUiInitUnit(input: ProjectEmitInput): EmittedUnit {
     '}',
     '',
   ];
+  if (projectInputOf(input.realised).hasInput) {
+    lines.push(
+      section('ui_dispatch: input events reach the active screen (§12.1)'),
+      '// The runtime owns focus, the element events and the screen stack; this is',
+      "// the project's name for its entry point, beside ui_handler().",
+      `bool ${UI_DISPATCH_FUNCTION}(u8g2gl_event_t event) {`,
+      '    return u8g2gl_dispatch(event);',
+      '}',
+      '',
+    );
+  }
 
   return { content: lines.join('\n'), diagnostics: [] };
 }

@@ -18,7 +18,9 @@
  *
  * Description: The table unit (written by the CLI's test-run build, never by
  *              hand) includes the project's `ui.hpp` and this header, and
- *              defines the four symbols declared here. The harness itself
+ *              defines the four symbols declared here, and each of the
+ *              project's `<event_cb>` callbacks, recording itself through
+ *              the harness. The harness itself
  *              includes no project header, so one harness source serves every
  *              project.
  *
@@ -30,6 +32,9 @@
  * - u8g2gl_harness_screen_count:    How many
  * - u8g2gl_harness_display_width:   The project's panel width in pixels
  * - u8g2gl_harness_display_height:  The project's panel height in pixels
+ *
+ * Defined by the harness, called by the screen table unit's callbacks:
+ * - u8g2gl_harness_record_callback(): One reached callback, for runEvents()
  *
  * Defined by the generated firmware code (§13.7):
  * - ui_init():                      The one call an application makes at boot
@@ -51,6 +56,18 @@ extern const u8g2gl_harness_screen u8g2gl_harness_screens[];
 extern const uint8_t u8g2gl_harness_screen_count;
 extern const int32_t u8g2gl_harness_display_width;
 extern const int32_t u8g2gl_harness_display_height;
+
+/**
+ * @brief Records that a callback was reached (§12.3), for runEvents().
+ *
+ * Called by each `<event_cb>` callback the screen table unit defines in place
+ * of the application's. Defined by the harness.
+ *
+ * @param callback The callback's name.
+ * @param target   The element whose event fired.
+ * @param trigger  What fired it.
+ */
+void u8g2gl_harness_record_callback(const char* callback, u8g2gl_obj& target, u8g2gl_trigger_t trigger);
 
 // The generated firmware target's boot entry point (§13.7). Declared here,
 // not through the project's ui.hpp, so the harness compiles once for every

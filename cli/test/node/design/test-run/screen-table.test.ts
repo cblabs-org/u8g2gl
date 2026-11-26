@@ -28,7 +28,7 @@ const TOOLCHAIN: SelectedToolchain = { source: 'path', version: '5.0.3', emxx: '
 describe('the screen table', () => {
   it('reads the screens, in document order, and the display from a scene', () => {
     const scene = readFileSync(join(FRAMEWORK_ROOT, 'test', 'generated_fixture', 'generated_editor', 'ui_scene.json'), 'utf8');
-    expect(readSceneLayout(scene)).toEqual({ display: { width: 128, height: 64 }, screens: ['bounds', 'gauges', 'home'] });
+    expect(readSceneLayout(scene)).toMatchObject({ display: { width: 128, height: 64 }, screens: ['bounds', 'gauges', 'home'], callbacks: [] });
   });
 
   it('refuses text that is not a sized scene', () => {
@@ -38,7 +38,7 @@ describe('the screen table', () => {
   });
 
   it('names each screen by the generated descriptor and records the panel', () => {
-    const unit = screenTableUnit({ display: { width: 256, height: 64 }, screens: ['home', 'settings'] });
+    const unit = screenTableUnit({ display: { width: 256, height: 64 }, screens: ['home', 'settings'], callbacks: [], objects: [] });
     expect(unit).toContain('#include "ui.hpp"');
     expect(unit).toContain('#include "harness.h"');
     expect(unit).toContain('    {"home", &ui_screen_home},\n    {"settings", &ui_screen_settings},');
@@ -48,13 +48,13 @@ describe('the screen table', () => {
   });
 
   it('is deterministic, so the table\'s object is reused until a screen or the display changes', () => {
-    const layout = { display: { width: 128, height: 64 }, screens: ['a', 'b'] };
+    const layout = { display: { width: 128, height: 64 }, screens: ['a', 'b'], callbacks: [], objects: [] };
     expect(screenTableUnit(layout)).toBe(screenTableUnit({ ...layout, screens: [...layout.screens] }));
     expect(screenTableUnit(layout)).not.toBe(screenTableUnit({ ...layout, screens: ['b', 'a'] }));
   });
 
   it('still links for a project with no screens: one null row the count excludes', () => {
-    const unit = screenTableUnit({ display: { width: 128, height: 64 }, screens: [] });
+    const unit = screenTableUnit({ display: { width: 128, height: 64 }, screens: [], callbacks: [], objects: [] });
     expect(unit).toContain('    {nullptr, nullptr},');
     expect(unit).toContain('u8g2gl_harness_screen_count = 0;');
   });
@@ -107,5 +107,33 @@ describe('the caches and flags the harness shares with the editor Wasm', () => {
     expect(fixture.u8g2Dir).toBe(departures.u8g2Dir);
     expect(fixture.runtimeDir).not.toBe(departures.runtimeDir);
     expect(fixture.harnessDir).not.toBe(departures.harnessDir);
+  });
+  it("reads a scene's callbacks once each, in first use, and each screen's object names (§12)", () => {
+    const scene = JSON.stringify({
+      display: { width: 128, height: 64 },
+      screens: [
+        {
+          name: 'a',
+          elements: [
+            { name: 'go', realisation: 'object', object: 0, events: [{ trigger: 'press', action: 'callback', callback: 'on_go' }] },
+            { name: 'line', realisation: 'draw_calls' },
+            { name: 'sw', realisation: 'object', object: 1, events: [{ trigger: 'value_changed', action: 'callback', callback: 'on_go' }] },
+          ],
+        },
+        { name: 'b', elements: [{ name: 'back', realisation: 'object', object: 0, events: [{ trigger: 'press', action: 'screen_back' }, { trigger: 'long_press', action: 'callback', callback: 'on_hold' }] }] },
+      ],
+    });
+    expect(readSceneLayout(scene)).toEqual({
+      display: { width: 128, height: 64 },
+      screens: ['a', 'b'],
+      callbacks: ['on_go', 'on_hold'],
+      objects: [['go', 'sw'], ['back']],
+    });
+  });
+
+  it('defines each callback, recording itself with the harness in place of the application', () => {
+    const unit = screenTableUnit({ display: { width: 128, height: 64 }, screens: ['a'], callbacks: ['on_go'], objects: [] });
+    expect(unit).toContain('void on_go(u8g2gl_obj& target, u8g2gl_trigger_t trigger) {');
+    expect(unit).toContain('    u8g2gl_harness_record_callback("on_go", target, trigger);');
   });
 });

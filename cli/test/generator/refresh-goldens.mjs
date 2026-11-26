@@ -74,6 +74,12 @@ const FIXTURES = [
     expected: resolve(here, '../../../test/collection_data/generated'),
     editor: resolve(here, '../../../test/collection_data/generated_editor'),
   },
+  // A settings menu on two screens (§12), built into the input parity Wasm test.
+  {
+    project: resolve(here, '../../../test/input_menu'),
+    expected: resolve(here, '../../../test/input_menu/generated'),
+    editor: resolve(here, '../../../test/input_menu/generated_editor'),
+  },
   // A <data> that matches its C++ signature and one that does not: the C++
   // suite compiles both registries, and the second must fail its static_assert.
   {

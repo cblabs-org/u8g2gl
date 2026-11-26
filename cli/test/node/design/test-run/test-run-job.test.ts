@@ -41,7 +41,7 @@ afterAll(removeTempDirs);
 
 describe('the test-run params', () => {
   it('takes the screen and the dirty documents, and the fixed times by default', () => {
-    expect(parseTestRunParams({ screen: 'home', documents: [] })).toEqual({ screen: 'home', documents: [], times: TEST_RUN_TIMES, sets: [] });
+    expect(parseTestRunParams({ screen: 'home', documents: [] })).toEqual({ screen: 'home', documents: [], times: TEST_RUN_TIMES, sets: [], events: [] });
     expect(TEST_RUN_TIMES).toEqual([0, 16, 100, 250, 500, 1000, 2000, 5000]);
     const document = { path: 'screens/screen_home.xml', content: '<screen/>', version: '7' };
     expect(parseTestRunParams({ screen: 'home', documents: [document], times: [0, 0, 5] })).toEqual({
@@ -49,10 +49,19 @@ describe('the test-run params', () => {
       documents: [document],
       times: [0, 0, 5],
       sets: [],
+      events: [],
     });
     // Sample sets, as the canvas applies them, ride along.
     const set = { name: 'typical', values: { platform: '4' }, rows: { home: { list: { rows: [{ cells: ['a'] }] } } } };
     expect(parseTestRunParams({ screen: 'home', documents: [], sets: [set] })).toMatchObject({ sets: [set] });
+  });
+
+  it('takes a scripted input sequence by event name, and refuses an unknown one (§12)', () => {
+    expect(parseTestRunParams({ screen: 'home', documents: [], events: ['button_next', 'button_press'] })).toMatchObject({
+      events: ['button_next', 'button_press'],
+    });
+    expect(parseTestRunParams({ screen: 'home', documents: [], events: ['click'] })).toContain('events must be');
+    expect(parseTestRunParams({ screen: 'home', documents: [], events: 'button_next' })).toContain('events must be');
   });
 
   it('refuses what is not a run of the text the canvas showed', () => {

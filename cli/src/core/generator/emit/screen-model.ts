@@ -48,13 +48,20 @@
  * - StaticCall, staticChildCalls(): An object's static children (§6.5), as access calls
  * - argPropOf():          An `<arg>` as the PropDef its value is spelled through
  * - ElementHandle, elementHandles(): The handle `ui.hpp` declares per named object (§9.2)
+ * - FocusStop, ObjectEvent, ScreenInput, screenInputOf(): A screen's ring and
+ *   events (§12), as object indices both targets emit
+ * - needsComposedBaseStyle(): Whether an object's named styles must be merged
+ *   into one base before it is applied (§10, focus_style)
+ * - ProjectInput, projectInputOf(): Whether a project has input, and the
+ *   callbacks `ui.hpp` declares (§12.3)
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../schema/diagnostic.js';
 import type { SourceLocation } from '../../schema/source-location.js';
 import type { ElementArgDef, PropDef } from '../../schema/widget-manifest.js';
 import { isStyleAttribute } from '../../schema/globals.js';
-import { FLAG_COMPARISONS, staticChildrenOf, type WidgetNode } from '../../schema/widget-node.js';
+import { FLAG_COMPARISONS, namedStyles, staticChildrenOf, type EventChild, type WidgetNode } from '../../schema/widget-node.js';
+import { eventsOf } from '../../schema/input-model.js';
 import { ROOT_CLASS_MANIFEST, type EffectiveManifest, type ManifestRegistry } from '../../manifest/index.js';
 import { geometryBindingFor, type ResolvedElement, type ResolvedScreen } from '../../resolver/index.js';
 import {
@@ -599,4 +606,113 @@ export function elementHandles(screen: RealisedScreen, manifests: ManifestRegist
       element,
     };
   });
+}
+
+/** One focus-ring stop (§12.2): the object it focuses and its focus style. */
+export interface FocusStop {
+  readonly object: RealisedElement;
+  /** The element's `focus_style` as written, or undefined for none. */
+  readonly focusStyle: string | undefined;
+}
+
+/** One element event (§12.3), on the object it belongs to. */
+export interface ObjectEvent {
+  readonly object: RealisedElement;
+  readonly event: EventChild;
+}
+
+/** A screen's input (§12): its ring, when it declares one, and its events. */
+export interface ScreenInput {
+  readonly ring: { readonly wrap: boolean; readonly stops: readonly FocusStop[] } | undefined;
+  /** Grouped by object, in object order; each object's in document order. */
+  readonly events: readonly ObjectEvent[];
+}
+
+// focusStyleOf
+// An element's `focus_style` as written, or undefined. The parser mirrors the
+// attribute as `focusStyle`, so either spelling is read.
+function focusStyleOf(node: WidgetNode): string | undefined {
+  const value = node.attributes.focus_style ?? node.attributes.focusStyle;
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * @brief A screen's ring and events as both targets emit them (ruling 6).
+ *
+ * A ring entry names an element written in the screen, which realisation
+ * made an object (finding 2); one with no such object — an unknown name,
+ * which Pass 2 refuses — is left out rather than guessed. The ring keeps the
+ * author's order and adds nothing (Q1a).
+ *
+ * @param screen The realised screen.
+ */
+export function screenInputOf(screen: RealisedScreen): ScreenInput {
+  const ring = screen.screen.view?.focusRing;
+  const stops: FocusStop[] = [];
+  for (const entry of ring?.entries ?? []) {
+    const object = screen.objects.find(
+      (candidate) => candidate.element.instantiation.length === 0 && candidate.element.name === entry.name,
+    );
+    if (object !== undefined && entry.name !== '') {
+      stops.push({ object, focusStyle: focusStyleOf(object.element.node) });
+    }
+  }
+  const events: ObjectEvent[] = [];
+  for (const object of screen.objects) {
+    for (const event of eventsOf(object.element.node)) {
+      events.push({ object, event });
+    }
+  }
+  return { ring: ring === undefined ? undefined : { wrap: ring.wrap, stops }, events };
+}
+
+/**
+ * @brief Whether an object's named styles must be merged into one style before
+ *        it is applied, rather than applied one by one.
+ *
+ * An object remembers one base style, the last it was given, and rebuilds
+ * from it on losing focus (§10). That is exact for one named style, and loses
+ * the earlier ones of several, so a ring member with a `focus_style` and more
+ * than one named style gets them merged into one, in order, and applied once.
+ * The resolved style is the same either way: merging in order is what
+ * applying in order does.
+ *
+ * @param object The object.
+ * @param input  Its screen's input.
+ */
+export function needsComposedBaseStyle(object: RealisedElement, input: ScreenInput): boolean {
+  const stop = input.ring?.stops.find((candidate) => candidate.object === object);
+  return stop?.focusStyle !== undefined && namedStyles(object.element.node).length > 1;
+}
+
+/** What a project's input needs from its umbrella units (§12). */
+export interface ProjectInput {
+  /** Whether any screen has a ring or any element an event: `ui_dispatch()` is emitted only then. */
+  readonly hasInput: boolean;
+  /** Every `<event_cb>` callback, once each, in first-use order. */
+  readonly callbacks: readonly string[];
+}
+
+/**
+ * @brief Whether a project has input, and the callbacks `ui.hpp` declares.
+ *
+ * `ui_dispatch()` is emitted only for a project with a ring or an event, so a
+ * project without either regenerates exactly as before input existed.
+ *
+ * @param realised Every realised screen, in load order; none for the editor
+ *                 target's project units, which declare no callback.
+ */
+export function projectInputOf(realised: readonly RealisedScreen[] | undefined): ProjectInput {
+  let hasInput = false;
+  const callbacks: string[] = [];
+  for (const screen of realised ?? []) {
+    const input = screenInputOf(screen);
+    hasInput = hasInput || input.ring !== undefined || input.events.length > 0;
+    for (const { event } of input.events) {
+      if (event.type === 'event_cb' && event.callback !== undefined && !callbacks.includes(event.callback)) {
+        callbacks.push(event.callback);
+      }
+    }
+  }
+  return { hasInput, callbacks };
 }

@@ -382,7 +382,7 @@ describe('the scene description (WO11, ui_spec §4.1 step 6)', () => {
     expect(element(byName('bounds'), 'temp').bindings).toEqual([
       { name: 'bind_text', subject: 'temperature', subject_type: 'int', fmt: '%d°C' },
     ]);
-    expect(scene.version).toBe(5);
+    expect(scene.version).toBe(6);
   });
 
   it('marks a bound draw call inside a container with the object whose clip it is drawn in (§13.5)', () => {

@@ -132,19 +132,22 @@ describe('generate() (PR-04 WO5b)', () => {
     expect(diagnostic?.file).toBe('u8g2gl.xml');
   });
 
-  it('refuses a not-yet-supported construct that validate only warns about — same code and location', () => {
+  it('builds a focus ring, warning as validate warns — same code and location (PR-09)', () => {
+    // The ring's one member is a label with no events: a highlight-only stop,
+    // which both journeys warn about and neither refuses.
     const input = model({ focusRing: true });
     const validated = checkProject(input, 'warning');
     const generated = generate({ ...input, generatorVersion: '1.0.0' });
 
-    const warned = validated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NOT_YET_SUPPORTED);
-    const refused = generated.diagnostics.filter((d) => d.code === DIAGNOSTIC_CODES.NOT_YET_SUPPORTED);
+    const inert = (ds: readonly Diagnostic[]): Diagnostic[] =>
+      ds.filter((d) => d.code === DIAGNOSTIC_CODES.INERT_FOCUS_STOP);
 
     expect(validated.errors).toBe(0);
-    expect(warned).toHaveLength(1);
-    expect(warned[0]?.severity).toBe('warning');
-    expect(generated.files).toEqual([]);
-    expect(refused).toEqual(warned.map((d) => ({ ...d, severity: 'error' })));
+    expect(inert(validated.diagnostics)).toHaveLength(1);
+    expect(inert(generated.diagnostics)).toEqual(inert(validated.diagnostics));
+    expect(generated.diagnostics.some((d) => d.code === DIAGNOSTIC_CODES.NOT_YET_SUPPORTED)).toBe(false);
+    const home = generated.files.find((file) => file.path === 'ui_screen_home.cpp')?.content ?? '';
+    expect(home).toContain('static const u8g2gl_focus_stop ui_screen_home_ring[] = {');
   });
 
   it('refuses a missing name with the diagnostic validate reports — never inventing one', () => {

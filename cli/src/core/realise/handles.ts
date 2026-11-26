@@ -35,6 +35,10 @@
  *              beside it. Those are `static` in their screen's unit, so they
  *              are checked against the globals and that screen's names only.
  *
+ *              Each `<event_cb>`'s callback is declared in `ui.hpp` too
+ *              (§12.3), by the name the author wrote. It is global, checked as
+ *              a handle is, and counted once however many events share it.
+ *
  *              Each collection also gets a facade in `ui.hpp` (§9.2): an
  *              object `ui_<screen>_<element>_<data>` of type
  *              `ui_<screen>_<element>_<data>_t`, the typed `begin()`,
@@ -53,6 +57,7 @@
  */
 
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
+import { callbackIdentifierProblem, eventsOf } from '../schema/input-model.js';
 import type { Globals } from '../schema/globals.js';
 import type { SourceLocation } from '../schema/source-location.js';
 import {
@@ -153,8 +158,8 @@ function elementLoc(element: RealisedElement): SourceLocation | undefined {
 
 /**
  * @brief Every identifier the generator composes for a project, in document
- *        order: per screen, each handled object's handle, then each
- *        collection's facade and storage.
+ *        order: per screen, each callback not yet seen, each handled object's
+ *        handle, then each collection's facade and storage.
  *
  * Storage names are composed for every `<data>` of every object, whether or
  * not the block can be sized: the names do not depend on its size, and a
@@ -166,9 +171,29 @@ function elementLoc(element: RealisedElement): SourceLocation | undefined {
  */
 export function generatedNames(realised: readonly RealisedScreen[], manifests: ManifestRegistry): readonly GeneratedName[] {
   const names: GeneratedName[] = [];
+  const callbacks = new Set<string>();
   for (const screen of realised) {
     const screenName = screen.screen.name;
     if (!screenName) continue;
+    // One declaration per callback, however many events share it (ruling 5).
+    // An invalid name is Pass 11's U8G2GL_INVALID_CALLBACK, not a collision.
+    for (const element of screen.objects) {
+      for (const event of eventsOf(element.element.node)) {
+        const callback = event.callback;
+        if (event.type !== 'event_cb' || callback === undefined || callbackIdentifierProblem(callback) !== undefined) {
+          continue;
+        }
+        if (callbacks.has(callback)) continue;
+        callbacks.add(callback);
+        const loc = event.loc ?? elementLoc(element);
+        names.push({
+          identifier: callback,
+          scope: { kind: 'global' },
+          description: `the <event_cb> callback '${callback}' of <${element.element.node.tag}> on screen '${screenName}'`,
+          ...(loc !== undefined ? { loc } : {}),
+        });
+      }
+    }
     for (const element of handledElements(screen)) {
       const loc = elementLoc(element);
       names.push({

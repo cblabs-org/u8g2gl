@@ -94,6 +94,10 @@
  *     - getDisplayHeight(): Height of the virtual display in pixels
  *     - getBufferPtr():     Pointer to the raw U8G2 frame buffer
  *     - getBufferSize():    Byte length of the raw U8G2 frame buffer
+ *     Input preview (§12):
+ *     - setPreview():       Start or stop running the built screen's focus ring
+ *     - dispatchEvent():    Dispatch one input event through the runtime
+ *     - getInputState():    The previewed screen, focus, stack depth and callbacks
  *     Designer view:
  *     - setDesignHidden():  Elements the designer hides from the frame
  *     - getRuntimeHidden(): Elements the last frame left out by runtime rules
@@ -121,6 +125,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <initializer_list>
 #include <limits>
@@ -138,6 +143,7 @@
 #include "u8g2gl/u8g2gl_coord.h"
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_editor.h"
+#include "u8g2gl/u8g2gl_input.h"
 #include "u8g2gl/u8g2gl_obj.h"
 #include "u8g2gl/u8g2gl_rows.h"
 #include "u8g2gl/u8g2gl_subject.h"
@@ -271,7 +277,7 @@ private:
 
 // The scene description version this bridge reads: `version` in ui_scene.json,
 // written by the CLI's scene emitter (emit/scene.ts). Bump both together.
-constexpr int32_t kSceneVersion = 5;
+constexpr int32_t kSceneVersion = 6;
 
 // Virtual display, sized for each scene (memory_display.h, shared with the
 // test-run harness so both hosts hold their frames the same way)
@@ -332,6 +338,45 @@ struct collection_storage {
     u8g2gl_rows_layout layout{nullptr, 0, 0};
 };
 std::vector<std::unique_ptr<collection_storage>> s_storage;
+
+// --- Input (§12) ---
+// One runtime screen descriptor per scene screen, so the runtime's dispatch,
+// focus ring and screen stack run here exactly as on the device: each points
+// at its screen's ring and event tables, built from the scene at apply, and
+// the built screen's descriptor at the objects. Only the built screen has
+// objects; a descriptor whose screen is not built has none, so nothing on it
+// is focusable. Activating one (a load or a back) rebuilds its screen through
+// on_screen_activated(), which the runtime calls before it gives focus.
+struct screen_input {
+    std::vector<u8g2gl_focus_stop> ring;
+    std::vector<u8g2gl_obj_event> events;
+};
+std::vector<u8g2gl_screen> s_descriptors;
+std::vector<screen_input> s_screen_inputs;
+
+// The scene's named styles as runtime styles, by name, so an object applies
+// them through apply_style() as generated init does (§10). Each object gets
+// one style, its named styles merged in order: the base a lost focus
+// rebuilds from, as the firmware's is. Freed with the screen's objects.
+std::unordered_map<std::string, std::unique_ptr<u8g2gl_style>> s_named_styles;
+std::vector<std::unique_ptr<u8g2gl_style>> s_object_styles;
+
+// Whether the canvas is previewing input: only then is a descriptor active in
+// the runtime, so editing never shows a focused element.
+bool s_preview = false;
+
+/** One callback a dispatch reached: reported to the designer, never run (ruling 7). */
+struct callback_record {
+    std::string callback;
+    std::string element;
+    std::string trigger;
+};
+std::vector<callback_record> s_callbacks;
+std::string s_input_state_json;
+// Set when a load or back could not rebuild its screen; the dispatch reports it.
+bool s_rebuild_failed = false;
+
+size_t screen_index_of(const std::string& name);
 
 // The designer's own hiding: element names to leave out of the frame. Kept
 // across selectScreen() (names are per file, and an unknown one is ignored),
@@ -603,6 +648,13 @@ void destroy_objects() {
     s_arena.clear();
     s_arena_used = 0;
     s_active_screen = nullptr;
+    s_object_styles.clear();
+    // The descriptors outlive the objects, so none may keep pointing at them.
+    for (u8g2gl_screen& descriptor : s_descriptors) {
+        descriptor.objs = nullptr;
+        descriptor.parents = nullptr;
+        descriptor.obj_count = 0;
+    }
     // No object points into a retired asset any more, and the next screen
     // records its own missing fonts.
     s_retired_assets.clear();
@@ -784,9 +836,83 @@ bool configure_object(size_t index, const scene_json& element) {
     return add_static_children(cls, s_objects[index], element) && attach_storage(index, element);
 }
 
+// style_text
+// A style property's value as text: the scene writes each as the author did,
+// and an int may arrive as a number.
+std::string style_text(const scene_json& value) {
+    return value.is_number() ? std::to_string(value.as_int()) : value.is_bool() ? (value.as_bool() ? "true" : "false")
+                                                                                : value.as_string();
+}
+
+// style_from
+// One scene style as the runtime style generated ui_styles_init() builds: each
+// of §10's nine properties through its u8g2gl_style setter, so set_mask holds
+// exactly what the author set. The font resolves as an element's does.
+//   style — the scene style, `{ name, properties: [{ name, value }] }`
+//   out   — receives the properties
+bool style_from(const scene_json& style, u8g2gl_style* out) {
+    const std::string where = "style '" + style.get("name").as_string() + "'";
+    for (const scene_json& property : style.get("properties").items()) {
+        const std::string& name = property.get("name").as_string();
+        const std::string text = style_text(property.get("value"));
+        const bool truth = text == "true";
+        if (name == "font") {
+            u8g2gl_editor_value value;
+            if (!value_for(U8G2GL_EDITOR_FONT, property.get("value"), where + ".font", &value)) {
+                return false;
+            }
+            out->set_font(static_cast<const uint8_t*>(value.pointer));
+        } else if (name == "draw_color") {
+            out->set_draw_color(text == "xor" ? U8G2GL_COLOR_XOR : text == "0" ? U8G2GL_COLOR_0 : U8G2GL_COLOR_1);
+        } else if (name == "invert") {
+            out->set_invert(truth);
+        } else if (name == "border") {
+            out->set_border(truth);
+        } else if (name == "padding") {
+            out->set_padding(static_cast<int16_t>(std::atoi(text.c_str())));
+        } else if (name == "radius") {
+            out->set_radius(static_cast<int16_t>(std::atoi(text.c_str())));
+        } else if (name == "align") {
+            out->set_align(text == "center" ? U8G2GL_ALIGN_CENTER : text == "right" ? U8G2GL_ALIGN_RIGHT : U8G2GL_ALIGN_LEFT);
+        } else if (name == "font_mode") {
+            out->set_font_mode(text == "transparent" ? U8G2GL_FONT_MODE_TRANSPARENT : U8G2GL_FONT_MODE_SOLID);
+        } else if (name == "bitmap_mode") {
+            out->set_bitmap_mode(text == "transparent" ? U8G2GL_BITMAP_MODE_TRANSPARENT : U8G2GL_BITMAP_MODE_SOLID);
+        } else {
+            return fail(where + ": '" + name + "' is not a style property (§10)");
+        }
+    }
+    return true;
+}
+
+// named_style
+// A scene style built as a runtime style, built once per scene and kept by
+// name, so a focus style and an object's base are the same object each time.
+//   name — the style's name
+const u8g2gl_style* named_style(const std::string& name) {
+    const auto found = s_named_styles.find(name);
+    if (found != s_named_styles.end()) {
+        return found->second.get();
+    }
+    for (const scene_json& candidate : s_scene.get("styles").items()) {
+        if (candidate.get("name").as_string() == name) {
+            auto style = std::make_unique<u8g2gl_style>();
+            if (!style_from(candidate, style.get())) {
+                return nullptr;
+            }
+            const u8g2gl_style* built = style.get();
+            s_named_styles.emplace(name, std::move(style));
+            return built;
+        }
+    }
+    return nullptr;
+}
+
 // apply_styles
-// The "styles" init step: each named style's properties, then the element's
-// own overrides, through the same thunks as properties. Skipped for a placeholder.
+// The "styles" init step: the element's named styles, merged in order into one
+// runtime style it applies with apply_style() — the base a lost focus rebuilds
+// from, as firmware's is (§10) — then its own overrides, through the same
+// thunks as properties, which record them as its own. Skipped for a placeholder.
 //   index   — the object's index in s_objects
 //   element — its scene element
 bool apply_styles(size_t index, const scene_json& element) {
@@ -808,22 +934,18 @@ bool apply_styles(size_t index, const scene_json& element) {
         }
         return true;
     };
-    for (const scene_json& style_name : element.get("styles").items()) {
-        const scene_json* style = nullptr;
-        for (const scene_json& candidate : s_scene.get("styles").items()) {
-            if (candidate.get("name").as_string() == style_name.as_string()) {
-                style = &candidate;
-                break;
+    const auto& styles = element.get("styles").items();
+    if (!styles.empty()) {
+        auto base = std::make_unique<u8g2gl_style>();
+        for (const scene_json& style_name : styles) {
+            const u8g2gl_style* style = named_style(style_name.as_string());
+            if (style == nullptr) {
+                return fail(name + ": style '" + style_name.as_string() + "' not found in scene");
             }
+            base->merge_from(*style);
         }
-        if (style == nullptr) {
-            return fail(name + ": style '" + style_name.as_string() + "' not found in scene");
-        }
-        for (const scene_json& property : style->get("properties").items()) {
-            if (!set_prop(property, name + " style " + style_name.as_string())) {
-                return false;
-            }
-        }
+        s_objects[index]->apply_style(*base);
+        s_object_styles.push_back(std::move(base));
     }
     for (const scene_json& property : element.get("style_overrides").items()) {
         if (!set_prop(property, name + " override")) {
@@ -927,7 +1049,176 @@ bool build_screen(const std::string& screen_name) {
             }
         }
     }
+
+    // --- Step 4: Point the screen's runtime descriptor at its objects ---
+    const size_t screen_index = screen_index_of(screen_name);
+    if (screen_index < s_descriptors.size()) {
+        u8g2gl_screen& descriptor = s_descriptors[screen_index];
+        descriptor.objs = s_objects.data();
+        descriptor.parents = s_parents.data();
+        descriptor.obj_count = static_cast<uint8_t>(s_objects.size());
+    }
     return true;
+}
+
+// screen_index_of
+// A scene screen's position, which is its descriptor's; the screen count when
+// there is none.
+//   name — the screen's name
+size_t screen_index_of(const std::string& name) {
+    const auto& screens = s_scene.get("screens").items();
+    for (size_t i = 0; i < screens.size(); ++i) {
+        if (screens[i].get("name").as_string() == name) {
+            return i;
+        }
+    }
+    return screens.size();
+}
+
+// trigger_name
+// A trigger as the scene spells it.
+const char* trigger_name(u8g2gl_trigger_t trigger) {
+    switch (trigger) {
+        case U8G2GL_TRIGGER_PRESS: return "press";
+        case U8G2GL_TRIGGER_LONG_PRESS: return "long_press";
+        case U8G2GL_TRIGGER_VALUE_CHANGED: return "value_changed";
+    }
+    return "press";
+}
+
+// record_callback
+// The callback every editor event table names: the designer shows a callback,
+// it does not run it (ruling 7). The runtime runs an object's entries in table
+// order, so the n-th call for one object and trigger in a dispatch is that
+// object's n-th callback event for the trigger in the scene.
+//   target  — the element whose event fired
+//   trigger — what fired it
+void record_callback(u8g2gl_obj& target, u8g2gl_trigger_t trigger) {
+    if (s_active_screen == nullptr) {
+        return;
+    }
+    const auto found = std::find(s_objects.begin(), s_objects.end(), &target);
+    if (found == s_objects.end()) {
+        return;
+    }
+    const int32_t index = static_cast<int32_t>(found - s_objects.begin());
+    const std::string fired = trigger_name(trigger);
+    for (const scene_json& element : s_active_screen->get("elements").items()) {
+        if (element.get("realisation").as_string() != "object" || element.get("object").as_int() != index) {
+            continue;
+        }
+        size_t earlier = 0;
+        for (const callback_record& record : s_callbacks) {
+            earlier += (record.element == element.get("name").as_string() && record.trigger == fired) ? 1 : 0;
+        }
+        for (const scene_json& event : element.get("events").items()) {
+            if (event.get("action").as_string() != "callback" || event.get("trigger").as_string() != fired) {
+                continue;
+            }
+            if (earlier == 0) {
+                s_callbacks.push_back({event.get("callback").as_string(), element.get("name").as_string(), fired});
+                return;
+            }
+            --earlier;
+        }
+    }
+}
+
+// on_screen_activated
+// Every descriptor's activate_fn. The runtime has already made the descriptor
+// active and taken focus from the screen it left; this builds the screen's
+// objects, so the runtime gives focus on objects that exist, then returns.
+void on_screen_activated() {
+    u8g2gl_screen* active = u8g2gl_get_active_screen();
+    if (active == nullptr || s_descriptors.empty() || active < s_descriptors.data() ||
+        active >= s_descriptors.data() + s_descriptors.size()) {
+        return;
+    }
+    const size_t index = static_cast<size_t>(active - s_descriptors.data());
+    const std::string& name = s_scene.get("screens").items()[index].get("name").as_string();
+    if (s_active_screen != nullptr && s_active_screen->get("name").as_string() == name) {
+        return;  // already built: the preview started on it
+    }
+    destroy_objects();
+    if (!build_screen(name)) {
+        s_rebuild_failed = true;
+    }
+}
+
+// build_descriptors
+// One runtime descriptor per scene screen, with its ring and event table from
+// the scene (§12). The ring's object indices and the event targets are fixed
+// by the scene, so they are built once per scene; only the objects change.
+bool build_descriptors() {
+    const auto& screens = s_scene.get("screens").items();
+    s_descriptors.assign(screens.size(), u8g2gl_screen{});
+    s_screen_inputs.assign(screens.size(), screen_input{});
+    for (size_t i = 0; i < screens.size(); ++i) {
+        const scene_json& screen = screens[i];
+        screen_input& input = s_screen_inputs[i];
+        // --- Step 1: The ring, in the author's order ---
+        if (screen.has("ring")) {
+            for (const scene_json& stop : screen.get("ring").get("stops").items()) {
+                const u8g2gl_style* focus_style = nullptr;
+                if (!stop.get("focus_style").is_null()) {
+                    focus_style = named_style(stop.get("focus_style").as_string());
+                    if (focus_style == nullptr) {
+                        return fail("focus style '" + stop.get("focus_style").as_string() + "' not found in scene");
+                    }
+                }
+                input.ring.push_back({focus_style, static_cast<uint8_t>(stop.get("object").as_int())});
+            }
+        }
+        // --- Step 2: Every object's events, in object order ---
+        for (const scene_json& element : screen.get("elements").items()) {
+            if (element.get("realisation").as_string() != "object") {
+                continue;
+            }
+            const uint8_t index = static_cast<uint8_t>(element.get("object").as_int());
+            for (const scene_json& event : element.get("events").items()) {
+                const std::string& trigger = event.get("trigger").as_string();
+                const std::string& action = event.get("action").as_string();
+                u8g2gl_obj_event entry{nullptr, nullptr, index, U8G2GL_TRIGGER_PRESS, U8G2GL_ACTION_CALLBACK};
+                entry.trigger = trigger == "long_press" ? U8G2GL_TRIGGER_LONG_PRESS
+                              : trigger == "value_changed" ? U8G2GL_TRIGGER_VALUE_CHANGED
+                                                           : U8G2GL_TRIGGER_PRESS;
+                if (action == "screen_load") {
+                    const size_t target = screen_index_of(event.get("screen").as_string());
+                    if (target >= screens.size()) {
+                        return fail("event loads unknown screen '" + event.get("screen").as_string() + "'");
+                    }
+                    entry.action = U8G2GL_ACTION_SCREEN_LOAD;
+                    entry.screen = &s_descriptors[target];
+                } else if (action == "screen_back") {
+                    entry.action = U8G2GL_ACTION_SCREEN_BACK;
+                } else {
+                    entry.callback = record_callback;
+                }
+                input.events.push_back(entry);
+            }
+        }
+        // --- Step 3: The descriptor, as the generator emits one ---
+        u8g2gl_screen& descriptor = s_descriptors[i];
+        descriptor.activate_fn = on_screen_activated;
+        descriptor.ring = input.ring.empty() ? nullptr : input.ring.data();
+        descriptor.ring_count = static_cast<uint8_t>(input.ring.size());
+        descriptor.ring_wrap = screen.has("ring") && screen.get("ring").get("wrap").as_bool();
+        descriptor.events = input.events.empty() ? nullptr : input.events.data();
+        descriptor.event_count = static_cast<uint8_t>(input.events.size());
+    }
+    return true;
+}
+
+// end_preview
+// Leaves input preview: focus leaves the active screen, its focus style is
+// undone, and the stack is forgotten. Before anything destroys objects or
+// descriptors the runtime still points at.
+void end_preview() {
+    if (u8g2gl_get_active_screen() != nullptr) {
+        u8g2gl_set_active_screen(nullptr);
+    }
+    u8g2gl_screen_stack_clear();
+    s_preview = false;
 }
 
 bool evaluate_visibility(const scene_json& element, bool* shown) {
@@ -1266,9 +1557,15 @@ extern "C" {
  */
 EMSCRIPTEN_KEEPALIVE
 void teardown() {
-    // Objects first: placeholders point into s_scene, and bound objects
+    // Out of preview first, while the objects and descriptors it points at exist.
+    end_preview();
+    // Objects next: placeholders point into s_scene, and bound objects
     // unregister from subjects as they are destroyed.
     destroy_objects();
+    s_descriptors.clear();
+    s_screen_inputs.clear();
+    s_named_styles.clear();
+    s_callbacks.clear();
     s_subjects.clear();
     s_scene = scene_json{};
     clear_last_error();
@@ -1376,7 +1673,7 @@ int applyScene(const char* json_str) {
         }
     }
 
-    if (!build_screen(default_screen)) {
+    if (!build_descriptors() || !build_screen(default_screen)) {
         return 0;
     }
 
@@ -1395,6 +1692,7 @@ int selectScreen(const char* screen_name) {
         set_error("null screen name provided");
         return 0;
     }
+    end_preview();
     destroy_objects();
     if (!build_screen(screen_name)) {
         return 0;
@@ -1636,6 +1934,108 @@ uint8_t* renderFrame(uint32_t current_ms) {
     }
 
     return s_display.buffer();
+}
+
+/**
+ * @brief Start or stop previewing input on the built screen (§12).
+ *
+ * Starting activates the built screen's runtime descriptor, so focus goes to
+ * its ring's first visible, enabled member exactly as on the device; stopping
+ * takes focus away, undoing any focus style, and forgets the screen stack. A
+ * toggled switch keeps its subject's new value: the designer re-applies its
+ * scene to restore the editing state.
+ *
+ * @param on 1 to start, 0 to stop.
+ * @return 1 on success; 0 with no screen built (check getLastError()).
+ */
+EMSCRIPTEN_KEEPALIVE
+int setPreview(int on) {
+    clear_last_error();
+    if (on == 0) {
+        end_preview();
+        return 1;
+    }
+    if (s_active_screen == nullptr) {
+        set_error("cannot preview input: no screen active");
+        return 0;
+    }
+    const size_t index = screen_index_of(s_active_screen->get("name").as_string());
+    if (index >= s_descriptors.size()) {
+        set_error("cannot preview input: the screen has no descriptor");
+        return 0;
+    }
+    end_preview();
+    s_preview = true;
+    s_callbacks.clear();
+    u8g2gl_set_active_screen(&s_descriptors[index]);
+    return 1;
+}
+
+/**
+ * @brief Dispatch one input event through the runtime, as ui_dispatch() does
+ *        on the device (§12.1).
+ *
+ * A load or a back rebuilds the screen it activates, so the next frame shows
+ * it; getInputState() then names it. A callback is recorded, not run.
+ *
+ * @param event A u8g2gl_event_t value.
+ * @return 1 if the event did something, 0 if it did nothing; -1 with preview
+ *         off, or when a screen it activated could not be built (check
+ *         getLastError()).
+ */
+EMSCRIPTEN_KEEPALIVE
+int dispatchEvent(int event) {
+    clear_last_error();
+    if (!s_preview) {
+        set_error("cannot dispatch: input preview is off");
+        return -1;
+    }
+    s_callbacks.clear();
+    s_rebuild_failed = false;
+    const bool acted = u8g2gl_dispatch(static_cast<u8g2gl_event_t>(event));
+    if (s_rebuild_failed) {
+        return -1;
+    }
+    return acted ? 1 : 0;
+}
+
+/**
+ * @brief The input preview's state, as JSON: `{ "preview", "screen", "focused",
+ *        "depth", "callbacks": [{ "callback", "element", "trigger" }] }`.
+ *
+ * `screen` is the built screen; `focused` the focused element's name or null;
+ * `depth` the screen stack's; `callbacks` what the last dispatch reached. Valid
+ * until the next call.
+ */
+EMSCRIPTEN_KEEPALIVE
+const char* getInputState() {
+    std::string json = "{\"preview\":";
+    json += s_preview ? "true" : "false";
+    json += ",\"screen\":";
+    json += s_active_screen == nullptr ? "null" : "\"" + json_escape(s_active_screen->get("name").as_string()) + "\"";
+    json += ",\"focused\":";
+    const u8g2gl_obj* focused = s_preview ? u8g2gl_get_focused() : nullptr;
+    std::string focused_name;
+    if (focused != nullptr && s_active_screen != nullptr) {
+        for (const scene_json& element : s_active_screen->get("elements").items()) {
+            const int32_t index = element.get("realisation").as_string() == "object" ? element.get("object").as_int() : -1;
+            if (index >= 0 && static_cast<size_t>(index) < s_objects.size() && s_objects[static_cast<size_t>(index)] == focused) {
+                focused_name = element.get("name").as_string();
+            }
+        }
+    }
+    json += focused_name.empty() ? "null" : "\"" + json_escape(focused_name) + "\"";
+    json += ",\"depth\":" + std::to_string(u8g2gl_screen_stack_depth());
+    json += ",\"callbacks\":[";
+    for (size_t i = 0; i < s_callbacks.size(); ++i) {
+        const callback_record& record = s_callbacks[i];
+        json += (i == 0 ? "" : ",");
+        json += "{\"callback\":\"" + json_escape(record.callback) + "\",\"element\":\"" +
+                json_escape(record.element) + "\",\"trigger\":\"" + record.trigger + "\"}";
+    }
+    json += "]}";
+    s_input_state_json = std::move(json);
+    return s_input_state_json.c_str();
 }
 
 /**

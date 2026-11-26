@@ -1376,6 +1376,56 @@ target_compile_options(test_wasm_parity PRIVATE
 )
 u8g2gl_discover_tests(test_wasm_parity)
 
+# --- Input parity (§12, ruling 7): firmware and editor, one scripted sequence ---
+# test/input_menu/'s committed firmware units and its scene, both driven
+# through test/input_menu/script.json in one program on real U8G2: the
+# firmware through ui_dispatch() and ui_handler(), the editor through the
+# bridge compiled natively, as test_wasm_parity does. Every step's frame,
+# screen, focus and callbacks must agree. The runtime keeps default
+# capacities, because both targets bind in one process; the firmware units
+# read their own generated ones, as test_editor's do.
+set(U8G2GL_INPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/input_menu)
+add_executable(test_input_parity
+    test_input_parity.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/memory_display.cpp
+    ${PROJECT_SOURCE_DIR}/wasm/bridge.cpp
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host/scene_json.cpp
+    ${U8G2GL_INPUT_DIR}/generated_editor/ui_editor_registry.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_images.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_screen_display.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_screen_settings.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_subjects.cpp
+)
+target_include_directories(test_input_parity PRIVATE
+    ${PROJECT_SOURCE_DIR}/wasm
+    ${PROJECT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/real_u8g2
+    ${CMAKE_CURRENT_SOURCE_DIR}/editor_host
+    ${U8G2GL_INPUT_DIR}/generated
+)
+target_include_directories(test_input_parity SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(test_input_parity PRIVATE
+    ARDUINO=10819
+    U8G2GL_EDITOR
+    U8G2GL_INPUT_SCENE_PATH="${U8G2GL_INPUT_DIR}/generated_editor/ui_scene.json"
+    U8G2GL_INPUT_SCRIPT_PATH="${U8G2GL_INPUT_DIR}/script.json"
+)
+target_link_libraries(test_input_parity PRIVATE
+    u8g2gl_parity_csrc
+    GTest::gtest_main
+)
+target_compile_options(test_input_parity PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+u8g2gl_discover_tests(test_input_parity)
+
 
 # --- The generated collection facade (design_spec §9.2), drawn by real U8G2 ---
 # test/collection_data/'s committed firmware units, compiled with the departures

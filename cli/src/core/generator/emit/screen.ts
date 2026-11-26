@@ -52,6 +52,16 @@
  *              across every object ([D-15]); `render`; and the `u8g2gl_screen`
  *              descriptor `ui_handler()` drives.
  *
+ *              A screen with input (§12, ruling 6) also gets, after the object
+ *              tables, its focus ring and its event table as `const` arrays,
+ *              which its descriptor points at: object indices, each stop's
+ *              focus style, each event's trigger, action, target screen
+ *              descriptor and callback. Nothing is registered at run time and
+ *              nothing allocates. A ring member with a focus style and more
+ *              than one named style applies them merged into one base
+ *              (`needsComposedBaseStyle()`), because losing focus rebuilds
+ *              from one. A screen without input emits none of this.
+ *
  *              Coordinates are converted from the resolver's container-relative
  *              space into the runtime's absolute one through `placement.ts`, by
  *              `screen-model.ts`'s placeScreen(). init's configuring steps come
@@ -80,11 +90,14 @@ import { isStyleAttribute, STYLE_ATTRIBUTES } from '../../schema/globals.js';
 import { namedStyles } from '../../schema/widget-node.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import {
+  EVENTS_TABLE,
+  RING_TABLE,
   screenFunctionIdentifier,
   screenTableIdentifier,
   subjectIdentifier,
   type ResolvedScreen,
 } from '../../resolver/index.js';
+import { ACTION_ENUMERATORS, isEventTrigger, TRIGGER_ENUMERATORS } from '../../schema/input-model.js';
 import { objectIdentifier } from '../../resolver/mangle.js';
 import {
   ROW_ALIGNMENT,
@@ -107,7 +120,9 @@ import {
   placeScreen,
   argPropOf,
   elementHandles,
+  needsComposedBaseStyle,
   rectangleOf,
+  screenInputOf,
   staticChildCalls,
   styleOverridesOf,
   typed,
@@ -115,6 +130,7 @@ import {
   type FlagComparison,
   type InitStep,
   type Placement,
+  type ScreenInput,
 } from './screen-model.js';
 import { includeBlock, section, type EmittedUnit } from './unit.js';
 import { facadeDefinition, facadeOf } from './facades.js';
@@ -214,6 +230,8 @@ interface ScreenContext {
   readonly placements: ReadonlyMap<RealisedElement, Placement>;
   /** The screen's objects in array order, so an index can be named in a comment. */
   readonly objects: readonly RealisedElement[];
+  /** The screen's ring and events (§12), for the styles a ring member needs. */
+  readonly input: ScreenInput;
   readonly diagnostics: Diagnostic[];
 }
 
@@ -287,9 +305,18 @@ function propertyLines(object: RealisedElement, placement: Placement): string[] 
 // points are exported and must never apply an override the validator refuses.
 function styleLines(object: RealisedElement, placement: Placement, context: ScreenContext): string[] {
   const node = placement.absolute.node;
-  const lines = namedStyles(node).map(
-    (name) => `    ${cpp(object)}.apply_style(${cppValue(typed('style', 'style'), name)});`,
-  );
+  const styleOf = (name: string): string => cppValue(typed('style', 'style'), name);
+  const lines = needsComposedBaseStyle(object, context.input)
+    ? [
+        '    {',
+        '        // Merged into one base: losing focus rebuilds from the one style the',
+        '        // object was given, so several applied one by one would lose all but the last (§10).',
+        '        static u8g2gl_style base;',
+        ...namedStyles(node).map((name) => `        base.merge_from(${styleOf(name)});`),
+        `        ${cpp(object)}.apply_style(base);`,
+        '    }',
+      ]
+    : namedStyles(node).map((name) => `    ${cpp(object)}.apply_style(${styleOf(name)});`);
   const overrides = styleOverridesOf(placement);
   for (const { prop, value } of overrides.applied) {
     try {
@@ -540,6 +567,53 @@ function renderBody(steps: readonly RenderStep[]): string[] {
   return lines;
 }
 
+// inputTableLines
+// The ring and the event table (§12, ruling 6), each row commented with the
+// object it names so a reviewer can read it against the declarations. A ring
+// with no stops, or a screen with no events, emits no array: the descriptor
+// holds nullptr instead, because a C++ array cannot be empty.
+//   input       — the screen's ring and events
+//   ringTable   — the ring's identifier
+//   eventsTable — the event table's identifier
+function inputTableLines(input: ScreenInput, ringTable: string, eventsTable: string): string[] {
+  const lines: string[] = [section('Focus ring and events (§12): const tables the descriptor points at')];
+  const stops = input.ring?.stops ?? [];
+  if (stops.length > 0) {
+    lines.push(
+      "// The ring in the author's order: each stop's object index and focus style.",
+      `static const u8g2gl_focus_stop ${ringTable}[] = {`,
+      ...stops.map(
+        (stop) =>
+          `    {${stop.focusStyle === undefined ? 'nullptr' : `&${cppValue(typed('style', 'style'), stop.focusStyle)}`}, ` +
+          `${stop.object.objectIndex ?? 0}},  // ${cpp(stop.object)}`,
+      ),
+      '};',
+    );
+  } else if (input.ring !== undefined) {
+    lines.push('// The ring lists no object, so the screen ignores input (§12.2).');
+  }
+  if (input.events.length > 0) {
+    lines.push(
+      ...(stops.length > 0 ? [''] : []),
+      '// Each element event: { target screen, callback, object, trigger, action }.',
+      `static const u8g2gl_obj_event ${eventsTable}[] = {`,
+      ...input.events.map(({ object, event }) => {
+        const target = event.type === 'screen_load_event' && event.screen !== undefined
+          ? `&${screenDescriptorIdentifier(event.screen)}`
+          : 'nullptr';
+        const callback = event.type === 'event_cb' && event.callback !== undefined ? event.callback : 'nullptr';
+        const trigger = isEventTrigger(event.trigger) ? TRIGGER_ENUMERATORS[event.trigger] : 'U8G2GL_TRIGGER_PRESS';
+        return (
+          `    {${target}, ${callback}, ${object.objectIndex ?? 0}, ${trigger}, ${ACTION_ENUMERATORS[event.type]}},` +
+          `  // ${cpp(object)}`
+        );
+      }),
+      '};',
+    );
+  }
+  return lines;
+}
+
 // stepsOrNone
 // A step's lines, or a comment saying the step has nothing to do, so every
 // init reads with the same four steps whatever the screen holds.
@@ -569,9 +643,11 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
   if (screenPlacements.diagnostics.length > 0) {
     return { content: '', diagnostics: [...screenPlacements.diagnostics] };
   }
+  const screenInput = screenInputOf(realised);
   const context: ScreenContext = {
     placements: screenPlacements.placements,
     objects: realised.objects,
+    input: screenInput,
     diagnostics: [],
   };
   const placed = (element: RealisedElement): Placement => {
@@ -695,6 +771,15 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     );
   }
 
+  // The ring and the event table (§12, ruling 6): const data the descriptor
+  // points at, so nothing is registered at run time and nothing allocates.
+  const ringTable = screenTableIdentifier(name, RING_TABLE);
+  const eventsTable = screenTableIdentifier(name, EVENTS_TABLE);
+  const hasInput = screenInput.ring !== undefined || screenInput.events.length > 0;
+  if (hasInput) {
+    lines.push('', ...inputTableLines(screenInput, ringTable, eventsTable));
+  }
+
   // The configuring steps in the one order screen-model.ts states (§13.7).
   const stepBlocks: Record<InitStep, { readonly title: string; readonly heading: string[]; readonly body: string[] }> = {
     properties: {
@@ -738,8 +823,15 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     '}',
     '',
     section('activate / deactivate (§12.4)'),
-    '// Nothing to do: this build generates no event or focus handling, and',
-    '// u8g2gl_set_active_screen() already marks the new screen dirty.',
+    ...(hasInput
+      ? [
+          '// Nothing to do: u8g2gl_set_active_screen() marks the new screen dirty and',
+          "// gives focus to its ring's first visible, enabled member (§12.2).",
+        ]
+      : [
+          '// Nothing to do: this build generates no event or focus handling, and',
+          '// u8g2gl_set_active_screen() already marks the new screen dirty.',
+        ]),
     `void ${fn('activate')}() {}`,
     '',
     `void ${fn('deactivate')}() {}`,
@@ -777,6 +869,15 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     `    ${fn('tick')},`,
     `    ${fn('render')},`,
     '    false,',
+    ...(hasInput
+      ? [
+          `    ${screenInput.ring !== undefined && screenInput.ring.stops.length > 0 ? ringTable : 'nullptr'},`,
+          `    ${screenInput.events.length > 0 ? eventsTable : 'nullptr'},`,
+          `    ${screenInput.ring?.stops.length ?? 0},  // ring entries`,
+          `    ${screenInput.ring?.wrap === true ? 'true' : 'false'},  // wrap`,
+          `    ${screenInput.events.length},  // events`,
+        ]
+      : []),
     '};',
     '',
   );

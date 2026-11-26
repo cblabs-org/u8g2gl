@@ -81,7 +81,7 @@ const HARNESS_LINK_FLAGS: readonly string[] = [
   '-sMODULARIZE=1',
   '-sEXPORT_NAME=createU8g2glHarness',
   '-sEXPORTED_RUNTIME_METHODS=[HEAPU8,HEAPU32,UTF8ToString]',
-  `-sEXPORTED_FUNCTIONS=[_malloc,_free,_getScreenCount,_getScreenName,_getDisplayWidth,_getDisplayHeight,_runScreen,_getFrameCount,_getFramePtr,_getBufferSize,_getLastError,${SAMPLE_SET_EXPORTS.join(',')}]`,
+  `-sEXPORTED_FUNCTIONS=[_malloc,_free,_getScreenCount,_getScreenName,_getDisplayWidth,_getDisplayHeight,_runScreen,_runEvents,_getStepScreen,_getStepCallbacks,_getFrameCount,_getFramePtr,_getBufferSize,_getLastError,${SAMPLE_SET_EXPORTS.join(',')}]`,
   '-sALLOW_MEMORY_GROWTH=1',
 ];
 

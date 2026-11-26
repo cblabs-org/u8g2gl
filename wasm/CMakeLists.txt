@@ -98,7 +98,7 @@ set(EMSCRIPTEN_LINK_FLAGS
     "-sMODULARIZE=1"
     "-sEXPORT_NAME='createU8g2glEditor'"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','HEAPU8','lengthBytesUTF8']"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_applyCollectionData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders','_setDesignHidden','_getRuntimeHidden']"
+    "-sEXPORTED_FUNCTIONS=['_malloc','_free','_applyScene','_applySampleData','_applyCollectionData','_renderFrame','_getDisplayWidth','_getDisplayHeight','_getBufferPtr','_getBufferSize','_teardown','_selectScreen','_getLastError','_getPlaceholders','_setDesignHidden','_getRuntimeHidden','_setPreview','_dispatchEvent','_getInputState']"
     "-sALLOW_MEMORY_GROWTH=1"
 )
 string(JOIN " " EMSCRIPTEN_LINK_FLAGS_STR ${EMSCRIPTEN_LINK_FLAGS})
@@ -156,7 +156,7 @@ target_compile_options(u8g2gl_editor_collections PRIVATE
 target_link_libraries(u8g2gl_editor_collections PRIVATE
     u8g2_wasm_csrc
 )
-string(REPLACE "'_getRuntimeHidden']" "'_getRuntimeHidden','_renderReference']"
+string(REPLACE "'_getInputState']" "'_getInputState','_renderReference']"
     U8G2GL_COLLECTION_LINK_FLAGS_STR "${EMSCRIPTEN_LINK_FLAGS_STR}")
 set_target_properties(u8g2gl_editor_collections PROPERTIES
     OUTPUT_NAME "u8g2gl_editor"
@@ -210,4 +210,92 @@ set_target_properties(u8g2gl_editor_compiled_assets PROPERTIES
     SUFFIX ".js"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/compiled_assets"
     LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+)
+
+# --- Input parity (§12, ruling 7): the editor and the firmware, in Wasm ---
+# test/input_menu/'s scene through the bridge, and its generated firmware
+# through the test-run harness, each driven by test/input_menu/script.json in
+# wasm/test/input-parity.test.mjs, which compares their frames after every
+# step. The harness's screen table and sample-set units are the ones the design
+# server generates for a test run, committed under support/ and checked against
+# their generators by cli/test/node/design/test-run/input-support.test.ts.
+set(U8G2GL_INPUT_DIR ${PROJECT_SOURCE_DIR}/test/input_menu)
+
+add_executable(u8g2gl_editor_input
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${PROJECT_SOURCE_DIR}/test/editor_host/scene_json.cpp
+    ${U8G2GL_INPUT_DIR}/generated_editor/ui_editor_registry.cpp
+    memory_display.cpp
+    bridge.cpp
+)
+target_include_directories(u8g2gl_editor_input PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/test/real_u8g2
+    ${PROJECT_SOURCE_DIR}/test/editor_host
+    ${U8G2GL_INPUT_DIR}/generated
+)
+target_include_directories(u8g2gl_editor_input SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_editor_input PRIVATE
+    ARDUINO=10819
+    U8G2GL_EDITOR
+    U8G2GL_GENERATED_CONFIG="editor_config.h"
+)
+target_compile_options(u8g2gl_editor_input PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+target_link_libraries(u8g2gl_editor_input PRIVATE
+    u8g2_wasm_csrc
+)
+set_target_properties(u8g2gl_editor_input PROPERTIES
+    OUTPUT_NAME "u8g2gl_editor"
+    SUFFIX ".js"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/input"
+    LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
+)
+
+# The harness with the link settings test-run-build.ts names, so this module
+# is the one a design server's test run links for the same project.
+add_executable(u8g2gl_harness_input
+    ${U8G2GL_RUNTIME_SOURCES}
+    ${U8G2GL_INPUT_DIR}/generated/ui.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_fonts.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_images.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_screen_display.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_screen_settings.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_styles.cpp
+    ${U8G2GL_INPUT_DIR}/generated/ui_subjects.cpp
+    ${U8G2GL_INPUT_DIR}/support/u8g2gl_harness_screens.cpp
+    ${U8G2GL_INPUT_DIR}/support/u8g2gl_harness_samples.cpp
+    memory_display.cpp
+    harness.cpp
+)
+target_include_directories(u8g2gl_harness_input PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/test/real_u8g2
+    ${U8G2GL_INPUT_DIR}/generated
+)
+target_include_directories(u8g2gl_harness_input SYSTEM PRIVATE
+    ${U8G2GL_U8G2_DIR}/cppsrc
+    ${U8G2GL_U8G2_DIR}/csrc
+)
+target_compile_definitions(u8g2gl_harness_input PRIVATE
+    ARDUINO=10819
+    U8G2GL_GENERATED_CONFIG="u8g2gl_generated_config.h"
+)
+target_compile_options(u8g2gl_harness_input PRIVATE
+    -Wall -Wextra -Wpedantic -Wno-macro-redefined
+)
+target_link_libraries(u8g2gl_harness_input PRIVATE
+    u8g2_wasm_csrc
+)
+set_target_properties(u8g2gl_harness_input PROPERTIES
+    OUTPUT_NAME "u8g2gl_harness"
+    SUFFIX ".js"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/input"
+    LINK_FLAGS "-O3 -sMODULARIZE=1 -sEXPORT_NAME=createU8g2glHarness -sEXPORTED_RUNTIME_METHODS=[HEAPU8,HEAPU32,UTF8ToString] -sEXPORTED_FUNCTIONS=[_malloc,_free,_getScreenCount,_getScreenName,_getDisplayWidth,_getDisplayHeight,_runScreen,_runEvents,_getStepScreen,_getStepCallbacks,_getFrameCount,_getFramePtr,_getBufferSize,_getLastError,_getSampleSetCount,_getSampleSetName,_selectSampleSet] -sALLOW_MEMORY_GROWTH=1"
 )
