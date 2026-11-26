@@ -49,6 +49,7 @@
  * Exports:
  * - ReportInput:            What building the report needs
  * - buildGenerateReport():  The three reports for one successful build
+ * - COLLECTION_STORAGE_ITEM: The item each collection's storage line carries
  */
 
 import type { DisplayRecord } from '../../schema/display-record.js';
@@ -411,6 +412,13 @@ function framebufferLine(input: ReportInput): BudgetLine {
   };
 }
 
+/**
+ * The item of each collection's storage line, one per instance per `<data>`
+ * (§9.2): named so the text report can print each one's name and derivation,
+ * which a reader needs to tell several such lines apart.
+ */
+export const COLLECTION_STORAGE_ITEM = 'collection storage';
+
 // collectionStorageLines
 // One line per instance per <data>: the buffer generated code allocates for it
 // ([Q-19], §9.2), exactly, with how its bytes follow from its layout. Read from
@@ -419,7 +427,7 @@ function framebufferLine(input: ReportInput): BudgetLine {
 //   capacities — [D-21]'s figures, as emitted
 function collectionStorageLines(capacities: Capacities): readonly BudgetLine[] {
   return capacities.collections.map((storage) => ({
-    item: 'collection storage',
+    item: COLLECTION_STORAGE_ITEM,
     count: storage.capacity,
     names: [`${storage.screen}.${storage.element.identifier}.${storage.data.name}`],
     figure: measured(storage.bytes, `${storageDerivation(storage)}, generated per instance (§9.2)`),

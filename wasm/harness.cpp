@@ -81,6 +81,11 @@
 #include "u8g2gl/u8g2gl_core.h"
 #include "u8g2gl/u8g2gl_input.h"
 
+// The sample set the test run checks, applied as an application applies data:
+// defined by the design server's sample-set unit beside the screen table, and
+// a no-op when the run selects no set.
+extern "C" void u8g2gl_harness_apply_sample_set();
+
 namespace {
 
 memory_display s_display;
@@ -156,10 +161,6 @@ void keep_frame() {
 
 }  // namespace
 
-// The sample set the test run checks, applied as an application applies data:
-// defined by the design server's sample-set unit beside the screen table, and
-// a no-op when the run selects no set.
-extern "C" void u8g2gl_harness_apply_sample_set();
 
 // u8g2gl_harness_record_callback
 // Appends one reached callback to the step being run, as JSON: the callback's

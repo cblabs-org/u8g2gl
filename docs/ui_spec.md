@@ -470,6 +470,19 @@ Every attribute a handle writes must be an integer literal. A binding or an expr
 
 **Hidden in the designer.** While any element of the drawn screen is hidden with the Explorer's eye (§6.3), the toolbar shows **N hidden · Show all**: the canvas is then not the exported view, and says so.
 
+**Input preview** (design_spec §12, PR-09). **◎ Preview input** on the toolbar runs the drawn screen's focus ring on the canvas through the editor Wasm — the device's own dispatch, focus and screen stack, not a model of them (ruling 7). Focus goes to the ring's first visible, enabled member, as on the device. Then:
+
+| Button | Key | Does |
+|---|---|---|
+| ◀ Prev | ← or ↑ | `BUTTON_PREV`: focus back |
+| Next ▶ | → or ↓ | `BUTTON_NEXT`: focus forward |
+| Press | Enter | `BUTTON_PRESS`: the focused element's `press` — a switch toggles, writing its bound subject |
+| Long | Shift+Enter | `BUTTON_LONG_PRESS`: its `long_press` |
+| ↩ Back | Backspace | Back through the screen stack, as a `<screen_back_event>` does |
+| ◎ Stop preview | Esc | Leave the preview |
+
+The keys are the preview's while it runs, except where the author is typing (a form control or the XML editor). A `<screen_load_event>` or a back switches the canvas to the screen it lands on. A callback is never run: the toolbar shows it, with its target and trigger — `callback on_reset(btn_reset, press)`. The toolbar names the focused element. Any edit to the text ends the preview; stopping it applies the scene afresh and returns to the screen it began on, so a toggled subject goes back to what the text and the sample set say.
+
 ---
 
 ## 9. The Property Panel
@@ -522,6 +535,42 @@ and the smallest text edit, computed from the current text with the element
 found by name, as every field is (§10). A table shows for one selected element
 only. A static child is never named, so opening a screen never writes a name
 into one ([U-1]).
+
+### 9.6 Input: events, focus_style and the focus ring
+
+Everything §12 of design_spec defines is authored here, so none of it is
+XML-only (PR-09).
+
+**An element's Input section.** One selected element ends with its **Input**
+section: whether it is in its screen's focus ring and at which stop; its
+`focus_style`, a dropdown of the styles in scope; and its events, a row each in
+document order — the trigger (`press`, `long_press`, `value_changed`), then the
+action: **Load screen**, with the target picked from the project's screens;
+**Back**; or **Callback**, with the C function's name, committed on Enter or on
+leaving the field. ↑ and ↓ move a row, × removes it, and **Add event** appends
+one of the chosen action with trigger `press`. Changing a row's action rewrites
+that event element, keeping its trigger.
+
+**The screen's Focus ring.** With nothing selected, the screen's panel ends
+with its **Focus ring**: its members in order, each with ↑, ↓ and ×; `wrap`;
+and **Add to ring**, whose dropdown offers only the named elements written in
+the screen that are not members yet. Membership is opt-in and author-curated
+(design_spec §12.2): nothing joins the ring unless picked, and an element left
+out never takes focus. Adding the first member writes `<focus_ring
+wrap="true">` at the end of `<view>`; removing the last removes it, because an
+empty ring and no ring mean the same — the screen ignores input.
+
+**The Explorer** marks each ring member's row with its stop, **◎2**, from the
+ring as written; a ring's `<focus>` entries are no rows of their own.
+
+**Problems where they are made.** Each event row and ring member shows the
+diagnostics located inside it: an unknown target screen or an invalid callback
+on its row; a ring member with no events that is not a switch
+(`U8G2GL_INERT_FOCUS_STOP`, a warning — a highlight-only stop can be
+deliberate) or a duplicate on its member.
+
+Every change is one undo stop and the smallest text edit, computed from the
+current text with the element found by name, as every field is (§10).
 
 ---
 
@@ -612,7 +661,7 @@ The activity bar's **Sample data** view (§6). While it shows, the primary sideb
 
 - **Sets.** Pick the active set, or *None* (the initial values). *New…*, *Duplicate…*, *Rename…* and *Delete…*; a delete asks first, in the view, naming the file and any unsaved changes it loses. *Save*, *Undo* and *Redo* act on the active set's file. A rename moves the active set with it.
 - **Values.** One row per subject; the initial value, labelled as compiled in, and one column per set. A value a set leaves out shows the initial value, dimmed and marked *inherited*; editing it writes it into that set, and ↺ makes it inherited again.
-- **Collections.** Every collection instance on every screen, with its rows in the active set as a typed grid: a checkbox for a bool, a dropdown for an enum, a number held to `min`/`max` (a typed 150 for a 0–100 field is written as 100), a string counted against `max_len` (`12 / 24`, flagged when over, never cut), and a `repeat` field as its cells. Rows are added (a row of defaults), removed and reordered; the capacity is shown (`8 / 12`) and *+ Row* stops at it. Text and number cells commit on Enter or blur, so one edit is one undo step.
+- **Collections.** Every collection instance on every screen, with its rows in the active set as a typed grid: a checkbox for a bool, a dropdown for an enum, a number within `min`/`max` (a typed 9090 for a 0–100 field is marked invalid, as the panel marks an invalid field, says why, and is not written — never clamped to a value the author did not type; PR-09, Q4a), a string counted against `max_len` (`12 / 24`, flagged when over, never cut), and a `repeat` field as its cells. Rows are added (a row of defaults), removed and reordered; the capacity is shown (`8 / 12`) and *+ Row* stops at it. Text and number cells commit on Enter or blur, so one edit is one undo step.
 - **Paste.** A grid's *Paste…* takes a JSON array of row objects, or CSV with a header row (RFC 4180: quoted commas, doubled quotes and line breaks in quotes). Fields are mapped by name, exactly or ignoring case; a repeated field takes `cells[0]`, `cells.0`, or the bare name repeated, left to right. A field no column gives takes its default and a column no field has is ignored, each said once. **Every refused value is reported by row and field** (`row 2, cells[1]: 25 characters, over the max_len of 24`), a row with one is left out, rows beyond the capacity are refused, and **the accepted rows still land**. This is the route from a real departures feed into the designer.
 - **Canvas link.** Selecting a collection element on the canvas opens its grid in the view and scrolls to it.
 

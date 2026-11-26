@@ -19,7 +19,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
-import { bufferText, clickCanvas, litIn, openFile, openShell } from './support/shell';
+import { bufferText, canvasPixels, clickCanvas, litIn, openFile, openShell } from './support/shell';
 
 const MENU = 'screens/screen_menu.xml';
 const DETAIL = 'screens/screen_detail.xml';
@@ -48,8 +48,9 @@ const GLOBALS_TEXT = readFileSync(join(PROJECT_FIXTURE, 'globals.xml'), 'utf8').
   '    <subjects>\n        <bool name="wifi" value="false" />\n',
 );
 
-/** The switch's box, in device pixels. */
-const SWITCH = { x: 70, y: 2, width: 24, height: 12 };
+/** The go button's box, in device pixels, and how many lit pixels mean it is drawn inverted. */
+const GO = { x: 0, y: 0, width: 60, height: 14 };
+const GO_INVERTED = (60 * 14) / 2;
 
 let session: DesignSession | undefined;
 test.afterEach(async () => {
@@ -61,6 +62,17 @@ test.afterEach(async () => {
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Properties' });
 /** The input preview's state, on the toolbar. */
 const previewState = (page: Page) => page.locator('.input-preview-state');
+
+/** The frame's pixels once two reads a frame apart agree: a frame, not a frame in between. */
+async function settledPixels(page: Page): Promise<string> {
+  let last = await canvasPixels(page);
+  for (;;) {
+    await page.waitForTimeout(100);
+    const now = await canvasPixels(page);
+    if (now === last) return now;
+    last = now;
+  }
+}
 
 /** Opens a screen with a still frame and nothing selected. */
 async function showScreen(page: Page, path: string): Promise<void> {
@@ -132,15 +144,23 @@ test('a focus ring and events authored from the forms alone, previewed on the ca
 
   // --- Preview: step focus, toggle the bound switch, load and go back ---
   await openFile(page, MENU);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => litIn(page, GO)).toBeLessThan(GO_INVERTED);
+  const editing = await settledPixels(page);
   await page.getByRole('button', { name: '◎ Preview input' }).click();
   await expect(previewState(page)).toHaveAttribute('data-focused', 'go');
-  const off = await litIn(page, SWITCH);
+  // The focused button draws inverted (Q3a): the frame is no longer the editing one.
+  await expect.poll(() => canvasPixels(page)).not.toBe(editing);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(previewState(page)).toHaveAttribute('data-focused', 'sw');
+  const off = await canvasPixels(page);
   await page.getByRole('button', { name: 'Press', exact: true }).click();
-  await expect.poll(() => litIn(page, SWITCH)).not.toBe(off);  // the thumb moved
+  await expect.poll(() => canvasPixels(page)).not.toBe(off);  // the thumb moved: focus did not
   await page.keyboard.press('ArrowLeft');  // the key does what Previous does
   await expect(previewState(page)).toHaveAttribute('data-focused', 'go');
+  // Settled: the go button drawn inverted, as focus draws it (Q3a).
+  await expect.poll(() => litIn(page, GO)).toBeGreaterThan(GO_INVERTED);
+  const goWithSwitchOn = await canvasPixels(page);
   await page.keyboard.press('Enter');
   await expect(previewState(page)).toHaveAttribute('data-screen', 'detail');
   await expect(page.locator('.canvas-toolbar .screen-name')).toHaveText('detail');
@@ -148,12 +168,17 @@ test('a focus ring and events authored from the forms alone, previewed on the ca
   await page.getByRole('button', { name: 'Press', exact: true }).click();
   await expect(previewState(page)).toHaveAttribute('data-screen', 'menu');
   await expect(previewState(page)).toHaveAttribute('data-focused', 'go');
-  await expect.poll(() => litIn(page, SWITCH)).not.toBe(off);  // still on: the subject kept its value
+  // The same frame as before the load: focus restored, and the switch still on,
+  // because the subject kept its value across the load and back.
+  // Settled: the go button inverted again, as before the load.
+  await expect.poll(() => litIn(page, GO)).toBeGreaterThan(GO_INVERTED);
+  await expect.poll(() => canvasPixels(page)).toBe(goWithSwitchOn);
 
-  // --- Leaving restores the editing state: the switch as the text says ---
+  // --- Leaving restores the editing state: no focus, the switch as the text says ---
   await page.getByRole('button', { name: '◎ Stop preview' }).click();
   await expect(page.getByRole('button', { name: '◎ Preview input' })).toBeVisible();
-  await expect.poll(() => litIn(page, SWITCH)).toBe(off);
+  await expect.poll(() => litIn(page, GO)).toBeLessThan(GO_INVERTED);
+  await expect.poll(() => settledPixels(page)).toBe(editing);
 
   // --- Saved, the files on disk are the buffers ---
   await page.locator('.status-bar .unsaved-save').click();
