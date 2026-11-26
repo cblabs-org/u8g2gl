@@ -97,6 +97,7 @@
  *     Input preview (§12):
  *     - setPreview():       Start or stop running the built screen's focus ring
  *     - dispatchEvent():    Dispatch one input event through the runtime
+ *     - previewBack():      Go back through the runtime's screen stack
  *     - getInputState():    The previewed screen, focus, stack depth and callbacks
  *     Designer view:
  *     - setDesignHidden():  Elements the designer hides from the frame
@@ -1997,6 +1998,26 @@ int dispatchEvent(int event) {
         return -1;
     }
     return acted ? 1 : 0;
+}
+
+/**
+ * @brief Go back through the runtime's screen stack, as a `<screen_back_event>`
+ *        does (§12.3): the designer's Back, which no input event is.
+ *
+ * @return 1 if it went back, 0 with an empty stack, -1 with preview off or a
+ *         screen that could not be built (check getLastError()).
+ */
+EMSCRIPTEN_KEEPALIVE
+int previewBack() {
+    clear_last_error();
+    if (!s_preview) {
+        set_error("cannot go back: input preview is off");
+        return -1;
+    }
+    s_callbacks.clear();
+    s_rebuild_failed = false;
+    const bool went = u8g2gl_screen_back();
+    return s_rebuild_failed ? -1 : went ? 1 : 0;
 }
 
 /**

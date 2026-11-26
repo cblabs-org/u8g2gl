@@ -39,17 +39,32 @@
  *              (`static-children.ts`, design_spec §6.5), and `editStaticChildren()`
  *              lands each table action the same way: one undo stop.
  *
+ *              Input (§12): with one element selected, `input` holds its
+ *              events (`element-events.ts`), its `focus_style` and its place
+ *              in the screen's ring; with nothing selected, `ring` holds the
+ *              screen's focus ring and what may be added to it
+ *              (`focus-ring.ts`). `editEvents()` and `editRing()` land each
+ *              action as one undo stop. Each event row and ring member
+ *              carries the diagnostics located inside it, so Pass 11's
+ *              findings show where they are made.
+ *
  * Exports:
  * - PanelSummary:     The header's lines: tag, names, notes, a resize refusal and element problems
  * - PanelOptions:     The choices the dropdowns and pickers offer
  * - FontOption, SubjectOption, ImageOption: One choice each
  * - PanelView:        What the panel shows: nothing, a screen, or elements
+ * - ElementInput:     One element's events, focus style and ring position (§12)
+ * - RingPanel:        The screen's ring, with each member's problems (§12.2)
  * - PanelController:  The state
  *
  *     - view:          The panel's structure, observable
  *     - options:       The dropdowns' choices, observable
  *     - start(), dispose()
  *     - staticChildren: The selected element's static child tables, observable
+ *     - input:         The selected element's events, focus style and ring position, observable
+ *     - ring:          The screen's focus ring, observable
+ *     - editEvents():  Add, remove, reorder or change an event, as one undo stop
+ *     - editRing():    Add, remove or reorder a ring member, or set wrap, as one undo stop
  *     - commit():      Write a field's value, or remove it (reset), as one undo stop
  *     - editStaticChildren(): Add, remove, reorder or set a static child, as one undo stop
  *     - detach():      Replace an expression with the literal the scene computed
@@ -70,6 +85,9 @@ import { ELEMENT_PROBLEMS, elementFacts, namedCstElements, type ElementFacts, ty
 import { fieldState, sameFieldState, type FieldState } from './field-state';
 import { panelLayout, sharedLayout, type FieldSpec, type PanelLayout } from './panel-layout';
 import { staticChildEdits, staticChildTables, type StaticChildAction, type StaticChildTable } from './static-children';
+import { elementEventEdits, elementEvents, type ElementEvent, type ElementEventEdit } from './element-events';
+import { focusRingEdits, focusRingOf, type FocusRingEdit, type FocusRingView } from './focus-ring';
+import type { Diagnostic } from '@u8g2gl/core/schema/diagnostic.js';
 import type { TextEdit } from '@u8g2gl/core/cst/index.js';
 import FONT_HEIGHTS from '@u8g2gl/data/u8g2-font-heights.json' with { type: 'json' };
 
@@ -125,6 +143,27 @@ export interface PanelOptions {
   /** Styles in scope: the globals' and the drawn screen's. */
   readonly styles: readonly string[];
   readonly images: readonly ImageOption[];
+  /** The project's screens, for a `<screen_load_event>`'s target. */
+  readonly screens: readonly string[];
+}
+
+/** One event row, with the diagnostics located inside it. */
+export interface EventRow extends ElementEvent {
+  readonly problems: readonly FieldProblem[];
+}
+
+/** One element's input (§12): its events, its focus style and its place in the ring. */
+export interface ElementInput {
+  readonly events: readonly EventRow[];
+  /** `focus_style` as written; undefined when absent. */
+  readonly focusStyle: string | undefined;
+  /** Its 1-based position in its screen's ring; undefined when it is not a member. */
+  readonly ringPosition: number | undefined;
+}
+
+/** The screen's ring as the panel shows it, each member with its problems. */
+export interface RingPanel extends FocusRingView {
+  readonly problems: readonly (readonly FieldProblem[])[];
 }
 
 /** What the panel shows. A new view means a new structure; its observables carry the rest. */
@@ -163,7 +202,11 @@ export class PanelController {
   /** The panel's structure; replaced only when the fields shown change. */
   readonly view = new Observable<PanelView>(WAITING);
   /** The choices the dropdowns offer. */
-  readonly options = new Observable<PanelOptions>({ fonts: [], subjects: [], styles: [], images: [] }, sameOptions);
+  readonly options = new Observable<PanelOptions>({ fonts: [], subjects: [], styles: [], images: [], screens: [] }, sameOptions);
+  /** The one selected element's input (§12); undefined for a screen or several elements. */
+  readonly input = new Observable<ElementInput | undefined>(undefined, sameJson);
+  /** The shown screen's focus ring (§12.2); undefined while elements are selected. */
+  readonly ring = new Observable<RingPanel | undefined>(undefined, sameJson);
   /**
    * The one selected element's static children, a table per `<element>` its
    * manifest declares; empty for a screen, several elements, or an element
@@ -231,6 +274,38 @@ export class PanelController {
     const model = this.workspace.documents.open(view.file);
     if (model === undefined || manifest === undefined) return false;
     return this.apply(view.file, staticChildEdits(model.getValue(), view.file, name, manifest.api.elements, action));
+  }
+
+  /**
+   * @brief Adds, removes, reorders or changes one of the selected element's
+   *        events (§12.3), as one undo stop.
+   *
+   * @param action The table action.
+   * @return True if the text changed.
+   */
+  editEvents(action: ElementEventEdit): boolean {
+    const view = this.view.get();
+    const name = view.kind === 'elements' && view.names.length === 1 ? view.names[0] : undefined;
+    if (view.kind !== 'elements' || name === undefined || this.workspace.loop.lastRun.get()?.result.wellFormed === false) return false;
+    const model = this.workspace.documents.open(view.file);
+    if (model === undefined) return false;
+    return this.apply(view.file, elementEventEdits(model.getValue(), view.file, name, action));
+  }
+
+  /**
+   * @brief Adds, removes or reorders a member of the shown screen's focus
+   *        ring, or sets its wrap (§12.2), as one undo stop. Adds only what
+   *        the author picked: membership is never inferred.
+   *
+   * @param action The action.
+   * @return True if the text changed.
+   */
+  editRing(action: FocusRingEdit): boolean {
+    const view = this.view.get();
+    if (view.kind !== 'screen' || this.workspace.loop.lastRun.get()?.result.wellFormed === false) return false;
+    const model = this.workspace.documents.open(view.file);
+    if (model === undefined) return false;
+    return this.apply(view.file, focusRingEdits(model.getValue(), view.file, action));
   }
 
   // apply
@@ -377,6 +452,19 @@ export class PanelController {
     this.staticChildren.set(
       element === undefined || manifest === undefined ? [] : staticChildTables(element, manifest.api.elements, manifest.name),
     );
+
+    // --- Step 5: Its input, for one element (§12) ---
+    this.ring.set(undefined);
+    if (element === undefined || cst === undefined || only === undefined) {
+      this.input.set(undefined);
+    } else {
+      const position = focusRingOf(cst, (tag) => run.result.model.manifests.has(tag)).members.indexOf(only.name);
+      this.input.set({
+        events: elementEvents(element).map((event) => ({ ...event, problems: problemsWithin(cst, run.result.diagnostics, event.range) })),
+        focusStyle: element.attributes.find((attribute) => attribute.name === 'focus_style')?.value,
+        ringPosition: position < 0 ? undefined : position + 1,
+      });
+    }
   }
 
   // showScreen
@@ -384,12 +472,16 @@ export class PanelController {
   //   run — the last pipeline run
   private showScreen(run: CompletedRun): void {
     this.staticChildren.set([]);
+    this.input.set(undefined);
     const file = run.result.screenFile;
     const cst = file === undefined ? undefined : this.cstOf(file);
     if (file === undefined || cst?.root === undefined) {
       this.publish('no-screen', { kind: 'empty', message: 'The project has no screen to show.' });
       return;
     }
+    // The screen's focus ring (§12.2), each member with its problems.
+    const ring = focusRingOf(cst, (tag) => run.result.model.manifests.has(tag));
+    this.ring.set({ ...ring, problems: ring.ranges.map((range) => problemsWithin(cst, run.result.diagnostics, range)) });
     const layout: PanelLayout = {
       tag: cst.root.name,
       origin: undefined,
@@ -452,6 +544,8 @@ export class PanelController {
   // Shows a view with no fields, once per distinct key.
   private publish(key: string, view: PanelView): void {
     this.staticChildren.set([]);
+    this.input.set(undefined);
+    this.ring.set(undefined);
     if (key === this.viewKey) return;
     this.viewKey = key;
     this.view.set(view);
@@ -522,7 +616,31 @@ function optionsOf(run: CompletedRun): PanelOptions {
       const compiled = run.assets?.images.get(image.name);
       return { name: image.name, width: compiled?.width ?? 0, height: compiled?.height ?? 0, bytes: compiled?.bytes ?? [] };
     }),
+    screens: screens.map((s) => s.name).filter((name) => name !== ''),
   };
+}
+
+// problemsWithin
+// The diagnostics in `cst`'s file located inside a half-open range: an event
+// row's or a ring member's, so a Pass 11 finding shows beside what it is about.
+function problemsWithin(cst: CstDocument, diagnostics: readonly Diagnostic[], range: { readonly start: number; readonly end: number }): FieldProblem[] {
+  const problems: FieldProblem[] = [];
+  for (const diagnostic of diagnostics) {
+    if (diagnostic.file !== cst.file) continue;
+    const offset = cst.lines.offsetOf(diagnostic.line, diagnostic.column);
+    if (offset === undefined || offset < range.start || offset >= range.end) continue;
+    if (!problems.some((problem) => problem.message === diagnostic.message)) {
+      problems.push({ severity: diagnostic.severity, message: diagnostic.message });
+    }
+  }
+  return problems;
+}
+
+// sameJson
+// Two plain values that serialise the same: the input and ring views hold
+// only strings, numbers and arrays of them.
+function sameJson<T>(a: T, b: T): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 // sameSummary
@@ -557,5 +675,11 @@ function sameOptions(a: PanelOptions, b: PanelOptions): boolean {
   const sameImages =
     a.images.length === b.images.length &&
     a.images.every((image, i) => image.name === b.images[i]?.name && image.bytes === b.images[i]?.bytes);
-  return fonts(a) === fonts(b) && subjects(a) === subjects(b) && a.styles.join(',') === b.styles.join(',') && sameImages;
+  return (
+    fonts(a) === fonts(b) &&
+    subjects(a) === subjects(b) &&
+    a.styles.join(',') === b.styles.join(',') &&
+    a.screens.join(',') === b.screens.join(',') &&
+    sameImages
+  );
 }

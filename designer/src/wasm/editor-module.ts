@@ -20,6 +20,7 @@
  *
  * Exports:
  * - Placeholder:          An element drawn as a placeholder, and why
+ * - InputState:           What input preview shows: the screen, focus, depth and callbacks
  * - EditorModule:         The bridge's API
  *
  *     Scene:
@@ -46,6 +47,13 @@
  *     - setDesignHidden():  Elements the designer leaves out of the frame
  *     - runtimeHidden():    Elements the last frame left out by the runtime's rules
  *
+ *     Input preview (§12):
+ *     - inputPreview:       Whether the module can run a screen's focus ring
+ *     - setPreview():       Start or stop running it on the built screen
+ *     - dispatchEvent():    One input event, through the runtime's own dispatch
+ *     - previewBack():      Back through the runtime's screen stack
+ *     - inputState():       The previewed screen, focus, stack depth and callbacks
+ *
  *     Reporting:
  *     - lastError():        Why the last call failed, or its warning
  *     - placeholders():     Elements the module has no class for
@@ -64,6 +72,19 @@ export interface Placeholder {
   readonly class: string;
   /** `[x, y, width, height]`, device pixels. */
   readonly rect: readonly number[];
+}
+
+/** The input preview's state, as the bridge reports it (§12). */
+export interface InputState {
+  readonly preview: boolean;
+  /** The screen built, which a load or back may have changed. */
+  readonly screen: string | null;
+  /** The focused element's name; null when nothing is. */
+  readonly focused: string | null;
+  /** How many screens back can return through. */
+  readonly depth: number;
+  /** The callbacks the last dispatch reached: shown, never run. */
+  readonly callbacks: ReadonlyArray<{ readonly callback: string; readonly element: string; readonly trigger: string }>;
 }
 
 /** One loaded editor Wasm. */
@@ -153,6 +174,27 @@ export interface EditorModule {
    *        designer's hiding. Undefined when the module does not report it.
    */
   runtimeHidden(): readonly string[] | undefined;
+  /**
+   * Whether this module can preview input. A project editor Wasm built by an
+   * older CLI cannot; the designer then says the preview needs a rebuild.
+   */
+  readonly inputPreview: boolean;
+  /**
+   * @brief Starts previewing input on the built screen — focus goes to its
+   *        ring's first focusable member, as on the device — or stops,
+   *        undoing focus and forgetting the screen stack.
+   * @return False with `lastError()` if refused, or when the module cannot preview.
+   */
+  setPreview(on: boolean): boolean;
+  /**
+   * @brief Dispatches one u8g2gl_event_t through the runtime (§12.1).
+   * @return 1 if it did something, 0 if not, -1 with `lastError()` on failure.
+   */
+  dispatchEvent(event: number): number;
+  /** @brief Back through the runtime's screen stack; as dispatchEvent(). */
+  previewBack(): number;
+  /** @brief The preview's state; undefined when the module cannot preview. */
+  inputState(): InputState | undefined;
 }
 
 /** The Emscripten module object, as far as the wrapper uses it. */
@@ -180,6 +222,10 @@ interface EmscriptenModule {
   _setDesignHidden?: (pointer: number) => number;
   _getRuntimeHidden?: () => number;
   _measureText?: (font: number, text: number) => number;
+  _setPreview?: (on: number) => number;
+  _dispatchEvent?: (event: number) => number;
+  _previewBack?: () => number;
+  _getInputState?: () => number;
 }
 
 /** The factory a MODULARIZE loader defines. */
@@ -299,6 +345,18 @@ function wrap(module: EmscriptenModule): EditorModule {
     runtimeHidden() {
       const get = module._getRuntimeHidden;
       return get === undefined ? undefined : (JSON.parse(module.UTF8ToString(get())) as string[]);
+    },
+    inputPreview:
+      module._setPreview !== undefined &&
+      module._dispatchEvent !== undefined &&
+      module._previewBack !== undefined &&
+      module._getInputState !== undefined,
+    setPreview: (on) => module._setPreview?.(on ? 1 : 0) === 1,
+    dispatchEvent: (event) => module._dispatchEvent?.(event) ?? -1,
+    previewBack: () => module._previewBack?.() ?? -1,
+    inputState() {
+      const get = module._getInputState;
+      return get === undefined ? undefined : (JSON.parse(module.UTF8ToString(get())) as InputState);
     },
   };
 }

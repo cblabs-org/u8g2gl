@@ -20,12 +20,16 @@
  *              tokenise has no tree, and `nextTrees()` then keeps the file's
  *              last good one, as the selection keeps its names.
  *
+ *              A focus ring's entries (`<focus name>`, §12.2) name elements
+ *              rather than being ones, so they are no rows: each member's row
+ *              carries its ring position instead, for the Explorer's marker.
+ *
  *              The designer's own hiding needs a hidden row's descendants
  *              (`descendantNames()`), so that question is answered here, from
  *              the same tree the rows are drawn from.
  *
  * Exports:
- * - ElementNode:        One row: name, tag, and the rows nested under it
+ * - ElementNode:        One row: name, tag, ring position, and the rows nested under it
  * - elementTree():      A text's tree; undefined when it does not tokenise
  * - nextTrees():        Each screen's tree after a run, the last good one kept
  * - sameTree():         Whether two trees would draw the same rows
@@ -40,7 +44,16 @@ export interface ElementNode {
   readonly name: string;
   readonly tag: string;
   readonly children: readonly ElementNode[];
+  /** Its 1-based position in the screen's focus ring (§12.2); absent when not a member. */
+  readonly ring?: number;
 }
+
+/**
+ * The tags a `<focus_ring>` lists its members with (the parser reads both).
+ * Such a tag names an element rather than being one, so it is no row of its
+ * own: its position is the member's marker instead.
+ */
+const RING_ENTRY_TAGS: ReadonlySet<string> = new Set(['focus', 'entry']);
 
 /** A node under construction, with the span its descendants must fall inside. */
 interface OpenNode {
@@ -63,13 +76,21 @@ export function elementTree(text: string): ElementNode[] | undefined {
   // --- Step 1: Walk the spans in document order, keeping the open ancestors ---
   // A span starts after its ancestors' and ends no later than theirs, so the
   // stack of open spans is always the chain of named ancestors.
+  // The ring's entries name members, in ring order; the first naming of a
+  // member is its position.
+  const positions = new Map<string, number>();
+  for (const span of spans.filter((candidate) => RING_ENTRY_TAGS.has(candidate.tag))) {
+    if (!positions.has(span.name)) positions.set(span.name, positions.size + 1);
+  }
   const roots: ElementNode[] = [];
   const open: OpenNode[] = [];
   for (const span of spans) {
+    if (RING_ENTRY_TAGS.has(span.tag)) continue;
     while (open.length > 0 && (open[open.length - 1] as OpenNode).end <= span.start) open.pop();
 
     // --- Step 2: Attach it to the nearest named ancestor, or the top level ---
-    const node = { name: span.name, tag: span.tag, children: [] as ElementNode[] };
+    const ring = positions.get(span.name);
+    const node = { name: span.name, tag: span.tag, children: [] as ElementNode[], ...(ring === undefined ? {} : { ring }) };
     const parent = open[open.length - 1];
     (parent === undefined ? roots : parent.node.children).push(node);
     open.push({ node, end: span.end });
@@ -130,7 +151,7 @@ export function sameTree(a: readonly ElementNode[], b: readonly ElementNode[]): 
     a.length === b.length &&
     a.every((node, i) => {
       const other = b[i] as ElementNode;
-      return node.name === other.name && node.tag === other.tag && sameTree(node.children, other.children);
+      return node.name === other.name && node.tag === other.tag && node.ring === other.ring && sameTree(node.children, other.children);
     })
   );
 }

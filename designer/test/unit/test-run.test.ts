@@ -119,6 +119,11 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     injectFont: () => true,
     injectImage: () => true,
     clearInjected: () => undefined,
+    inputPreview: false,
+    setPreview: () => false,
+    dispatchEvent: () => -1,
+    previewBack: () => -1,
+    inputState: () => undefined,
   };
   const editListeners = new Set<() => void>();
   const posted: unknown[] = [];
