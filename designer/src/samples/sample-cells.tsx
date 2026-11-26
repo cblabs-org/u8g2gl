@@ -226,7 +226,7 @@ function NumberCell({
     if (held !== undefined) onCommit(held);
   };
   return (
-    <span className="sample-number-cell" data-invalid={problem !== undefined}>
+    <span className="sample-number-cell" data-invalid={problem !== undefined} data-written={text}>
       <input
         type="number"
         className="sample-number"

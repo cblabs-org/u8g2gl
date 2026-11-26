@@ -109,7 +109,8 @@
  *     Test run:
  *     - addDiagnosticSource(): More diagnostics for Problems (a failed run's)
  *     - settled():        Resolves once the latest text is drawn
- *     - requestRun():     Book a normal run: restores the canvas after Run's frames
+ *     - requestRun():     Book a normal run
+ *     - restoreAfterTestRun(): Apply afresh after Run's frames, ending any preview
  *     - showDiff():       Mark a mismatch's differing pixels on the overlay
  *
  *     Measurement:
@@ -531,6 +532,18 @@ export class EditLoop {
 
   /** @brief Books a normal run on the next frame, as an edit would. */
   requestRun(): void {
+    this.scheduler.request();
+  }
+
+  /**
+   * @brief Books a run that applies the scene afresh: what a test run calls
+   *        once it has applied scenes of its own to the module. An input
+   *        preview cannot survive that, so it ends, and the next run does not
+   *        take the module's state for the preview's.
+   */
+  restoreAfterTestRun(): void {
+    this.endPreview('a test run applied the scene');
+    this.appliedScene = undefined;
     this.scheduler.request();
   }
 

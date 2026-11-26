@@ -18,7 +18,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
+import { emscriptenOnPath, PROJECT_FIXTURE, startDesign, type DesignSession } from './support/design-session';
 import { bufferText, canvasPixels, clickCanvas, litIn, openFile, openShell } from './support/shell';
 
 const MENU = 'screens/screen_menu.xml';
@@ -202,4 +202,33 @@ test('an event added and then undone leaves the text as it was', async ({ page }
   await page.keyboard.press(mac ? 'Meta+z' : 'Control+z');
   await page.keyboard.press(mac ? 'Meta+z' : 'Control+z');
   await expect.poll(() => bufferText(page, MENU)).toBe(MENU_TEXT);
+});
+
+test('Run on screens with a focus ring reports parity: the canvas side activates each screen, as the device does, and leaves the editing canvas unfocused', async ({ page }) => {
+  test.skip(!emscriptenOnPath(), 'skipped, no Emscripten 5.0.3 on PATH');
+  test.setTimeout(600_000);
+  // Both screens ring their buttons: activation focuses each first member,
+  // which draws inverted on the device (§12.2), so the canvas must too.
+  const ringed = (text: string, members: readonly string[]): string =>
+    text.replace(
+      '    </view>',
+      `\n        <focus_ring wrap="true">\n${members.map((m) => `            <focus name="${m}" />\n`).join('')}        </focus_ring>\n    </view>`,
+    );
+  session = await startDesign({
+    toolchain: true,
+    files: { [MENU]: ringed(MENU_TEXT, ['go', 'sw']), [DETAIL]: ringed(DETAIL_TEXT, ['back']), 'globals.xml': GLOBALS_TEXT },
+  });
+  await openShell(page, session.url);
+  await expect(page.locator('.status-item.wasm')).toHaveAttribute('data-wasm', 'current', { timeout: 400_000 });
+  await openFile(page, MENU);
+  await page.getByRole('button', { name: /live/ }).click();
+  await expect(page.locator('.run-button')).toHaveAttribute('data-availability', 'ready');
+  await expect.poll(() => litIn(page, GO)).toBeLessThan(GO_INVERTED);
+  const editing = await settledPixels(page);
+
+  await page.locator('.run-button').click();
+  await expect(page.locator('.verdict')).toHaveAttribute('data-verdict', 'parity', { timeout: 300_000 });
+
+  // Leaving the run restores the editing state: nothing focused.
+  await expect.poll(() => settledPixels(page)).toBe(editing);
 });

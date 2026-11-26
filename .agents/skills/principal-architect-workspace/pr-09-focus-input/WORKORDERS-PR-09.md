@@ -341,3 +341,41 @@ Provenance checked first: this file names `pr-09-focus-input`, whose PROJECT.md 
     `samples.spec.ts`'s clamping case was rewritten to expect the refusal.
 16. **The readability review (readability-reviewer agent):** no P1 or P2 findings. All of its P3 items and
     its P4 suggestions were fixed, except "See PD-3", which is a published decision ID.
+
+### Addendum (worker, 2026-11-26): the PA's verification defect
+
+- **Defect.** The designer's Run failed parity on every screen with a focus ring: 696 px on `display` and
+  936 px on `settings`.
+  - The device activates the screen, which focuses the ring's first member, and a button draws inverted when
+    focused. The live side compared against the editing canvas, which has no focus.
+- **Fix.**
+  - **`test-run-controller.ts`:** for each case's live frames, the screen is activated after the data
+    (`setPreview(true)`, the bridge's activation through the runtime), as firmware boots. It is deactivated
+    before the canvas is restored.
+  - **Edit loop:** a new `restoreAfterTestRun()` applies the scene afresh and ends any input preview, so the
+    editing canvas never shows focus.
+  - A module too old to preview draws as before.
+- **Regression tests.** Each failed before the fix and passes after it.
+  - **Designer unit** (`test-run.test.ts`): a ringed screen gets parity, with activation then deactivation.
+  - **Server level** (`parity-corpus.test.ts`): `test/input_menu` joins the corpus, and the corpus's live side
+    activates as the designer's does. Without the activation step it reports `display @ 0 ms: 696 px
+    differ`; with it, 16 frames compared and 0 differ.
+  - **e2e** (`input.spec.ts`, needs Emscripten): Run on two ringed screens reports parity and leaves the
+    editing canvas unfocused. Against the old controller it reports `mismatch`.
+- **Nit.** A new `<focus_ring>` is written with the document's own indentation step and a blank line before
+  it. Removing its last member removes both, so the text round-trips; this is unit-tested.
+- **e2e race fixed in my own WO4 test.** `samples.spec.ts:154`'s number-cell case went straight on to the
+  next grid edit after writing 100. With the project renderer, that edit could start from the grid's rows
+  before 100 was in them, and undo it.
+  - The cell now carries `data-written`, and the test waits for it before going on. That passed 6/6 alone and
+    in the full run.
+  - The underlying lost-update race between quick successive grid edits predates PR-09, so I left it.
+- **Suites, one at a time.**
+  - CLI: 3294 passed + 27 skipped. The two new skips are corpus cases that need Emscripten.
+  - With Emscripten on PATH, the parity corpus passes 7/7.
+  - Designer unit 358.
+  - `build:e2e`, then e2e with Emscripten on PATH: 172 passed, 1 failed.
+    - The failure was `samples.spec.ts:257` ("sets are created, duplicated, renamed…"): ENOENT reading a
+      just-saved set. It is not a known flake, but this change doesn't touch it, and it passed 3/3 alone.
+  - Production 3/3. The home-path guard passes.
+  - Wasm was not re-run: neither the bridge nor the harness changed.

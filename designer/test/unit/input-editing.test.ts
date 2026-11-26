@@ -123,6 +123,8 @@ test('the ring offers only named elements written in the screen, and adds nothin
 
   // --- The first member writes the ring, wrapping by default ---
   let text = ring(SCREEN, { kind: 'add', name: 'sw' });
+  // Indented with the document's own four-space step, set off by a blank line.
+  expect(text).toContain('        </u8g2gl_label>\n\n        <focus_ring wrap="true">\n            <focus name="sw" />\n        </focus_ring>\n    </view>');
   const first = parsed(text).value!.view.focusRing;
   expect(first).toMatchObject({ wrap: true, entries: [{ name: 'sw' }] });
   expect(focusRingOf(parseCst(text, FILE).cst, isElement).candidates).toEqual(['go', 'about']);

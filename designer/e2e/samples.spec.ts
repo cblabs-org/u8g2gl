@@ -183,8 +183,11 @@ test('the formation grid fills the canvas, one undo step per edit, saved into th
   expect(await setText()).toBe(beforeOutOfRange);
   await pct.fill('100');
   await pct.press('Enter');
-  await expect(pct).toHaveValue('100');
   await expect(pct).toHaveAttribute('aria-invalid', 'false');
+  // Written, and back in the grid, before the next edit: each grid edit writes
+  // from the rows the grid holds, so one made sooner would undo this one.
+  await expect(grid.locator('.sample-number-cell:has([aria-label="loading_pct of row 2"])')).toHaveAttribute('data-written', '100');
+  await expect(pct).toHaveValue('100');
 
   // --- An enum is a dropdown; a bool a checkbox ---
   await grid.getByRole('combobox', { name: 'class_type of row 1' }).selectOption('first');

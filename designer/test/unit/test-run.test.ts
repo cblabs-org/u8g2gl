@@ -91,20 +91,27 @@ test('Run is unavailable for each reason it can be, and waits for a rebuild rath
 const UNTIL_DEADLINE_MS = 10_000;
 
 /** A fake target, a fake server, and a controller over them. */
-function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
+function harness(options: { harnessFrame?: Uint8Array; fail?: string; activated?: Uint8Array } = {}) {
   const status = new Observable<WasmStatus>({ kind: 'current', hash: 'h' });
   const canvas = new Observable<{ placeholders: readonly unknown[]; stale: boolean }>({ placeholders: [], stale: false });
   const wellFormed = new Observable<boolean>(true);
   const live = frame([1, 1]);
   // A test run must draw the exported view, so it never sets the designer's hiding.
   let designHiddenCalls = 0;
+  // The bridge's preview: on, the screen is active as on the device, and a
+  // screen with a ring draws its first member focused (`activated`).
+  let previewOn = false;
+  const previewCalls: boolean[] = [];
   const module: EditorModule = {
-    applyScene: () => true,
+    applyScene: () => {
+      previewOn = false;
+      return true;
+    },
     selectScreen: () => true,
     applySampleData: () => true,
     applyCollectionData: () => true,
     measureText: () => undefined,
-    renderFrame: () => live,
+    renderFrame: () => (previewOn && options.activated !== undefined ? options.activated : live),
     displaySize: () => ({ width: 8, height: 8 }),
     lastError: () => '',
     placeholders: () => [],
@@ -119,8 +126,12 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     injectFont: () => true,
     injectImage: () => true,
     clearInjected: () => undefined,
-    inputPreview: false,
-    setPreview: () => false,
+    inputPreview: true,
+    setPreview: (on) => {
+      previewOn = on;
+      previewCalls.push(on);
+      return true;
+    },
     dispatchEvent: () => -1,
     previewBack: () => -1,
     inputState: () => undefined,
@@ -206,6 +217,8 @@ function harness(options: { harnessFrame?: Uint8Array; fail?: string } = {}) {
     until,
     edit: () => editListeners.forEach((l) => l()),
     designHiddenCalls: () => designHiddenCalls,
+    previewCalls,
+    previewOn: () => previewOn,
   };
 }
 
@@ -224,6 +237,20 @@ test('a run posts the dirty text, restores the canvas, and shows parity; each ed
   h.edit();
   h.edit();
   expect(h.controller.view.get()).toMatchObject({ kind: 'parity', editsSince: 2 });
+});
+
+test('a screen with a focus ring is drawn as the device draws it after activation, and the canvas is left unfocused', async () => {
+  // The device activates the screen, which focuses the ring's first member
+  // (§12.2): the firmware frame has it focused, and so must the live one.
+  const focused = frame([1, 1], [2, 2], [3, 3]);
+  const h = harness({ harnessFrame: focused, activated: focused });
+  h.controller.run();
+  await h.until(() => h.controller.view.get().kind !== 'running');
+  expect(h.controller.view.get()).toMatchObject({ kind: 'parity' });
+  // Activated for the live frames, then deactivated before the canvas is restored.
+  expect(h.previewCalls).toEqual([true, false]);
+  expect(h.previewOn()).toBe(false);
+  expect(h.restored).toEqual([1]);
 });
 
 test('a mismatch shows the overlay, which the next edit clears; the verdict stays, marked stale', async () => {

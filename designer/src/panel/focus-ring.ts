@@ -30,6 +30,7 @@
  */
 
 import {
+  indentStep,
   insertAttribute,
   insertElement,
   parseCst,
@@ -180,16 +181,29 @@ export function focusRingEdits(text: string, file: string, action: FocusRingEdit
         return insertElement(cst, ring, childElements(ring).length, entry);
       }
       // The first member writes the ring, last in the view, wrapping as the
-      // parser's default does.
+      // parser's default does, indented with the document's own step and,
+      // after the view's elements, set off from them by a blank line, as a
+      // ring is written by hand.
       const view = viewOf(cst);
       if (view === undefined) return [];
-      return insertElement(cst, view, childElements(view).length, `<focus_ring wrap="true">\n  ${entry}\n</focus_ring>`);
+      const edits = insertElement(cst, view, childElements(view).length, `<focus_ring wrap="true">\n${indentStep(cst)}${entry}\n</focus_ring>`);
+      const [first, ...rest] = edits;
+      const eol = cst.text.includes('\r\n') ? '\r\n' : '\n';
+      return childElements(view).length === 0 || first === undefined || !first.text.endsWith(eol)
+        ? edits
+        : [{ ...first, text: `${eol}${first.text}` }, ...rest];
     }
     case 'remove': {
       const entry = entries[action.row];
       if (entry === undefined || ring === undefined) return [];
-      // The last member takes the ring with it: an empty ring is no ring.
-      return entries.length === 1 ? removeElement(cst, ring) : removeElement(cst, entry);
+      // The last member takes the ring with it: an empty ring is no ring, and
+      // so does the blank line an add set it off with.
+      if (entries.length > 1) return removeElement(cst, entry);
+      const [edit, ...rest] = removeElement(cst, ring);
+      if (edit === undefined) return [];
+      const before = /\r?\n[ \t]*\r?\n$/.exec(cst.text.slice(0, edit.start));
+      const blank = before === null ? 0 : before[0].length - (before[0].match(/^\r?\n/)?.[0].length ?? 0);
+      return [{ ...edit, start: edit.start - blank }, ...rest];
     }
     case 'move': {
       const a = entries[action.row];
