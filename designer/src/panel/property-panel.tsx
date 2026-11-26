@@ -37,12 +37,14 @@
  *              in the screen's ring, its `focus_style` picked from the named
  *              styles, and its events, each a trigger then an action — load a
  *              screen picked from the project's, back, or a callback by name —
- *              with add, remove and move up/down. With nothing selected the
+ *              with add, remove and move up/down, each event two lines so it
+ *              fits the panel. With nothing selected the
  *              screen's **Focus ring** follows its fields: the members in
  *              order, each with move and remove, `wrap`, and an add that offers
  *              only the named elements written in the screen and not yet in
  *              it. Nothing joins the ring unless picked. Each event row and
- *              member shows the problems located inside it.
+ *              member shows the problems located inside it, and each of these
+ *              controls has an ⓘ for its help, as a field does.
  *
  * Exports:
  * - PropertyPanel:  The region
@@ -367,9 +369,110 @@ function RowProblems({ problems }: { readonly problems: readonly { readonly seve
   );
 }
 
+/** The help shown for the Input and Focus ring controls (ui_spec §9.2), with a facts line. */
+const INPUT_HELP = {
+  focus_style: {
+    help: 'The named style applied while this element has focus, and removed when it loses focus. A property the element sets itself still wins over it (§10).',
+    facts: 'named style · optional',
+  },
+  trigger: {
+    help: 'What fires the event. press: an encoder click or the press button. long_press: their long variants, which your firmware times. value_changed: input changed the element\'s value, as a press toggles a switch; a binding or your own ui_set_… call never fires it.',
+    facts: 'press · long_press · value_changed',
+  },
+  action: {
+    help: 'What the event does. Load screen shows another screen and pushes this one, with its focus, onto the back stack. Back returns to the last screen pushed, restoring its focus. Callback calls your C function. An element\'s events run in the order listed.',
+    facts: 'Load screen · Back · Callback',
+  },
+  target: {
+    help: 'For Load screen, the screen to show. For Callback, the function to call: ui.hpp declares it as void name(u8g2gl_obj& target, u8g2gl_trigger_t trigger), and your application defines it. One callback may serve many elements.',
+    facts: 'screen · or a C identifier outside u8g2gl_',
+  },
+  ring: {
+    help: 'The elements input moves focus through, in this order. Membership is opt-in: only an element added here ever takes focus, and a screen with no ring ignores input. Hidden and disabled members are skipped.',
+    facts: 'named elements written in this screen',
+  },
+  wrap: {
+    help: 'On, moving past the last member returns to the first, and back from the first goes to the last. Off, focus stops at either end.',
+    facts: 'bool',
+  },
+} as const satisfies Record<string, { readonly help: string; readonly facts: string }>;
+
+/**
+ * @brief A control's name with an ⓘ that opens its help, as a field's
+ *        (`FieldRow`): on hover, focus and click, beside the panel.
+ */
+function InfoLabel({ name, topic, htmlFor }: { readonly name: string; readonly topic: keyof typeof INPUT_HELP; readonly htmlFor?: string }): React.JSX.Element {
+  const tooltip = useTooltip(placeBesidePanel);
+  const { onPointerEnter, onPointerLeave, onFocus, onBlur } = tooltipTriggers(tooltip);
+  const tooltipId = `input-tooltip-${topic}`;
+  const { help, facts } = INPUT_HELP[topic];
+  return (
+    <span className="field-name" data-help={topic} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+      <label htmlFor={htmlFor}>{name}</label>
+      <button
+        type="button"
+        className="field-info"
+        aria-label={`About ${name}`}
+        aria-describedby={tooltip.at !== undefined ? tooltipId : undefined}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        // As FieldRow's: Safari does not focus a button it clicks.
+        onClick={(event) => tooltip.show(event.currentTarget)}
+      >
+        <Icon name="info" size={INFO_ICON_SIZE} />
+      </button>
+      {tooltip.at !== undefined && (
+        <Tooltip id={tooltipId} at={tooltip.at} className="field-tooltip">
+          <span className="field-tooltip-help">{help}</span>
+          <span className="field-tooltip-facts">{facts}</span>
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
+/**
+ * @brief A row's move up, move down and remove, each titled with what it does.
+ *
+ * @param what   What the row is, for the buttons' names ("event 2", "go").
+ * @param remove The remove button's name.
+ */
+function RowActions({
+  what,
+  remove,
+  first,
+  last,
+  move,
+  onRemove,
+}: {
+  readonly what: string;
+  readonly remove: string;
+  readonly first: boolean;
+  readonly last: boolean;
+  readonly move: (by: -1 | 1) => void;
+  readonly onRemove: () => void;
+}): React.JSX.Element {
+  return (
+    <span className="row-actions">
+      <button type="button" aria-label={`Move ${what} up`} title="Move up" disabled={first} onClick={() => move(-1)}>
+        ↑
+      </button>
+      <button type="button" aria-label={`Move ${what} down`} title="Move down" disabled={last} onClick={() => move(1)}>
+        ↓
+      </button>
+      <button type="button" aria-label={remove} title={remove} onClick={onRemove}>
+        ×
+      </button>
+    </span>
+  );
+}
+
 /**
  * @brief The selected element's input (§12): its ring position, its
- *        focus_style, and a row per event.
+ *        focus_style, and its events.
+ *
+ * Each event is two lines, so it fits the panel at any width: its trigger, its
+ * action and its row actions, then its target across the panel.
  */
 function ElementInputSection({ controller }: { readonly controller: PanelController }): React.JSX.Element | null {
   countRender('PanelInput');
@@ -388,66 +491,72 @@ function ElementInputSection({ controller }: { readonly controller: PanelControl
       </p>
       <div className="field" data-field="focus_style">
         <div className="field-label">
-          <span className="field-name">
-            <label htmlFor="input-focus-style">focus_style</label>
-          </span>
+          <InfoLabel name="focus_style" topic="focus_style" htmlFor="input-focus-style" />
         </div>
-        <select
-          id="input-focus-style"
-          aria-label="focus_style"
-          value={input.focusStyle ?? ''}
-          onChange={(event) => controller.commit('focus_style', event.target.value === '' ? undefined : event.target.value)}
-        >
-          <option value="">(none)</option>
-          {[...new Set([...options.styles, ...(input.focusStyle === undefined ? [] : [input.focusStyle])])].map((style) => (
-            <option key={style} value={style}>
-              {style}
-            </option>
-          ))}
-        </select>
+        <div className="field-controls">
+          <select
+            id="input-focus-style"
+            aria-label="focus_style"
+            value={input.focusStyle ?? ''}
+            onChange={(event) => controller.commit('focus_style', event.target.value === '' ? undefined : event.target.value)}
+          >
+            <option value="">(none)</option>
+            {[...new Set([...options.styles, ...(input.focusStyle === undefined ? [] : [input.focusStyle])])].map((style) => (
+              <option key={style} value={style}>
+                {style}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      <table className="event-table">
-        <thead>
-          <tr>
-            <th scope="col">trigger</th>
-            <th scope="col">action</th>
-            <th scope="col">target</th>
-            <th scope="col" aria-label="Order" />
-          </tr>
-        </thead>
-        <tbody>
-          {input.events.map((event, index) => (
-            <tr key={index} data-row={index} data-action={event.action}>
-              <td>
-                <select
-                  aria-label={`Event ${index + 1} trigger`}
-                  value={event.trigger}
-                  onChange={(change) => controller.editEvents({ kind: 'trigger', row: index, trigger: change.target.value as EventTrigger })}
-                >
-                  {[...new Set([...EVENT_TRIGGERS, event.trigger])].map((trigger) => (
-                    <option key={trigger} value={trigger}>
-                      {trigger}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <select
-                  aria-label={`Event ${index + 1} action`}
-                  value={event.action}
-                  onChange={(change) => {
-                    const action = change.target.value as EventAction;
-                    controller.editEvents({ kind: 'action', row: index, action, target: defaultTarget(action) });
-                  }}
-                >
-                  {EVENT_ACTIONS.map((entry) => (
-                    <option key={entry.action} value={entry.action}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
+      {input.events.length > 0 && (
+        <div className="event-legend field-label">
+          <InfoLabel name="trigger" topic="trigger" />
+          <InfoLabel name="action" topic="action" />
+          <InfoLabel name="target" topic="target" />
+        </div>
+      )}
+      <ol className="event-list">
+        {input.events.map((event, index) => (
+          <li key={index} className="event-row" data-row={index} data-action={event.action}>
+            <div className="event-head">
+              <select
+                aria-label={`Event ${index + 1} trigger`}
+                value={event.trigger}
+                onChange={(change) => controller.editEvents({ kind: 'trigger', row: index, trigger: change.target.value as EventTrigger })}
+              >
+                {[...new Set([...EVENT_TRIGGERS, event.trigger])].map((trigger) => (
+                  <option key={trigger} value={trigger}>
+                    {trigger}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={`Event ${index + 1} action`}
+                value={event.action}
+                onChange={(change) => {
+                  const action = change.target.value as EventAction;
+                  controller.editEvents({ kind: 'action', row: index, action, target: defaultTarget(action) });
+                }}
+              >
+                {EVENT_ACTIONS.map((entry) => (
+                  <option key={entry.action} value={entry.action}>
+                    {entry.label}
+                  </option>
+                ))}
+              </select>
+              <RowActions
+                what={`event ${index + 1}`}
+                remove={`Remove event ${index + 1}`}
+                first={index === 0}
+                last={index === input.events.length - 1}
+                move={(by) => controller.editEvents({ kind: 'move', row: index, by })}
+                onRemove={() => controller.editEvents({ kind: 'remove', row: index })}
+              />
+            </div>
+            {event.action !== 'screen_back' && (
+              <div className="event-target">
+                <span className="event-target-kind">{event.action === 'screen_load' ? 'screen' : 'callback'}</span>
                 {event.action === 'screen_load' && (
                   <select
                     aria-label={`Event ${index + 1} screen`}
@@ -468,30 +577,12 @@ function ElementInputSection({ controller }: { readonly controller: PanelControl
                     commit={(value) => controller.editEvents({ kind: 'target', row: index, target: value })}
                   />
                 )}
-              </td>
-              <td className="row-actions">
-                <button type="button" aria-label={`Move event ${index + 1} up`} disabled={index === 0} onClick={() => controller.editEvents({ kind: 'move', row: index, by: -1 })}>
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Move event ${index + 1} down`}
-                  disabled={index === input.events.length - 1}
-                  onClick={() => controller.editEvents({ kind: 'move', row: index, by: 1 })}
-                >
-                  ↓
-                </button>
-                <button type="button" aria-label={`Remove event ${index + 1}`} onClick={() => controller.editEvents({ kind: 'remove', row: index })}>
-                  ×
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {input.events.map((event, index) => (
-        <RowProblems key={index} problems={event.problems} />
-      ))}
+              </div>
+            )}
+            <RowProblems problems={event.problems} />
+          </li>
+        ))}
+      </ol>
       <div className="field-actions">
         <select aria-label="New event action" value={adding} onChange={(event) => setAdding(event.target.value as EventAction)}>
           {EVENT_ACTIONS.map((entry) => (
@@ -552,31 +643,33 @@ function FocusRingSection({ controller }: { readonly controller: PanelController
           ? 'Focus moves through these, in this order, skipping hidden and disabled ones (§12.2).'
           : 'No focus ring: this screen ignores input. Add a member to start one; nothing joins it on its own.'}
       </p>
-      {ring.exists && (
-        <label className="ring-wrap">
-          <input type="checkbox" aria-label="wrap" checked={ring.wrap} onChange={(event) => controller.editRing({ kind: 'wrap', wrap: event.target.checked })} /> wrap
-        </label>
-      )}
+      <div className="ring-legend field-label">
+        <InfoLabel name="members" topic="ring" />
+        {ring.exists && (
+          <span className="ring-wrap">
+            <input
+              id="ring-wrap"
+              type="checkbox"
+              aria-label="wrap"
+              checked={ring.wrap}
+              onChange={(event) => controller.editRing({ kind: 'wrap', wrap: event.target.checked })}
+            />
+            <InfoLabel name="wrap" topic="wrap" htmlFor="ring-wrap" />
+          </span>
+        )}
+      </div>
       <ol className="ring-members">
         {ring.members.map((member, index) => (
           <li key={`${member}:${index}`} data-member={member}>
             <span className="ring-member-name">{member === '' ? '(no name)' : member}</span>
-            <span className="row-actions">
-              <button type="button" aria-label={`Move ${member} up`} disabled={index === 0} onClick={() => controller.editRing({ kind: 'move', row: index, by: -1 })}>
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label={`Move ${member} down`}
-                disabled={index === ring.members.length - 1}
-                onClick={() => controller.editRing({ kind: 'move', row: index, by: 1 })}
-              >
-                ↓
-              </button>
-              <button type="button" aria-label={`Remove ${member} from the ring`} onClick={() => controller.editRing({ kind: 'remove', row: index })}>
-                ×
-              </button>
-            </span>
+            <RowActions
+              what={member}
+              remove={`Remove ${member} from the ring`}
+              first={index === 0}
+              last={index === ring.members.length - 1}
+              move={(by) => controller.editRing({ kind: 'move', row: index, by })}
+              onRemove={() => controller.editRing({ kind: 'remove', row: index })}
+            />
             <RowProblems problems={ring.problems[index] ?? []} />
           </li>
         ))}

@@ -9,6 +9,13 @@ history is in git. See docs/RELEASING.md.
 
 
 2026-11-26	cli v0.28.xx	U8G2GL
+  * 0.28.1: The designer's Input and Focus ring sections fit the property
+    panel: each event is two lines (trigger, action and its move and remove
+    buttons, then its target screen or callback across the panel), so a long
+    callback name no longer scrolls the panel sideways, and the row buttons
+    are styled and titled as the static-children table's. focus_style, an
+    event's trigger, action and target, the ring's members and wrap each
+    have their help behind an ⓘ, as every other property does.
   * 0.28.0: Focus, input and navigation are generated (design_spec 12).
     A screen with a <focus_ring> or any element event gets its ring (each
     stop's object index and focus_style) and its event table (trigger,

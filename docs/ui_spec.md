@@ -549,7 +549,12 @@ action: **Load screen**, with the target picked from the project's screens;
 **Back**; or **Callback**, with the C function's name, committed on Enter or on
 leaving the field. ↑ and ↓ move a row, × removes it, and **Add event** appends
 one of the chosen action with trigger `press`. Changing a row's action rewrites
-that event element, keeping its trigger.
+that event element, keeping its trigger. Each event is two lines, so the section
+fits the panel at any width and never scrolls it sideways: the trigger, the
+action and the row's ↑ ↓ ×, then its target (the screen, or the callback's name)
+across the panel. `focus_style`, trigger, action and target each have an ⓘ for
+their help, as a field does (§9.2), and so do the Focus ring's members and
+`wrap`.
 
 **The screen's Focus ring.** With nothing selected, the screen's panel ends
 with its **Focus ring**: its members in order, each with ↑, ↓ and ×; `wrap`;

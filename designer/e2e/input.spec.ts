@@ -9,7 +9,8 @@
  *          from each element's, then the canvas preview stepping focus,
  *          toggling a bound switch, loading another screen and going back —
  *          the device's own code running in the bridge — and the files on disk
- *          holding exactly what the forms wrote.
+ *          holding exactly what the forms wrote. The input controls fit the
+ *          panel, and each has its help behind an ⓘ.
  * Description: `u8g2gl design` on a copy of the departures project with two
  *              screens of framework elements added and a bool subject in its
  *              globals, so the framework editor Wasm draws them all.
@@ -202,6 +203,58 @@ test('an event added and then undone leaves the text as it was', async ({ page }
   await page.keyboard.press(mac ? 'Meta+z' : 'Control+z');
   await page.keyboard.press(mac ? 'Meta+z' : 'Control+z');
   await expect.poll(() => bufferText(page, MENU)).toBe(MENU_TEXT);
+});
+
+test('the input controls fit the panel, one event per two lines, and each has its help behind an ⓘ', async ({ page }) => {
+  session = await startDesign({ files: { [MENU]: MENU_TEXT, [DETAIL]: DETAIL_TEXT, 'globals.xml': GLOBALS_TEXT } });
+  await openShell(page, session.url);
+  await openFile(page, MENU);
+  await page.getByRole('button', { name: /live/ }).click();
+
+  // --- An element with a callback and a screen load, with long targets ---
+  await select(page, 'go', 10, 7);
+  await addEvent(page, 'Callback');
+  await addEvent(page, 'Load screen');
+  const input = panel(page).locator('[data-section="input"]');
+  const callback = input.getByRole('textbox', { name: 'Event 1 callback' });
+  await callback.fill('on_a_callback_name_long_enough_to_overflow_a_table_cell');
+  await callback.press('Enter');
+  await expect.poll(() => bufferText(page, MENU)).toContain('callback="on_a_callback_name_long_enough_to_overflow_a_table_cell"');
+
+  // Nothing scrolls the panel sideways, and every control ends inside it.
+  const overflow = await panel(page).evaluate((region) => {
+    const right = region.getBoundingClientRect().right;
+    const controls = Array.from(region.querySelectorAll('[data-section="input"] :is(select, input, button)'));
+    return { scroll: region.scrollWidth - region.clientWidth, outside: controls.filter((c) => c.getBoundingClientRect().right > right + 0.5).length };
+  });
+  expect(overflow).toEqual({ scroll: 0, outside: 0 });
+  // Each event is a head line (trigger, action, its row actions) and its target beneath.
+  await expect(input.locator('.event-row')).toHaveCount(2);
+  await expect(input.locator('.event-row').nth(0).locator('.event-target-kind')).toHaveText('callback');
+  await expect(input.locator('.event-row').nth(1).locator('.event-target-kind')).toHaveText('screen');
+  await expect(input.getByRole('button', { name: 'Move event 1 down' })).toHaveAttribute('title', 'Move down');
+
+  // --- Each control's help, on hover, as a field's ---
+  const tooltip = page.getByRole('tooltip');
+  for (const [name, text] of [
+    ['focus_style', /removed when it loses focus/],
+    ['trigger', /value_changed/],
+    ['action', /back stack/],
+    ['target', /u8g2gl_trigger_t trigger/],
+  ] as const) {
+    await input.getByRole('button', { name: `About ${name}` }).hover();
+    await expect(tooltip.locator('.field-tooltip-help')).toHaveText(text);
+  }
+
+  // --- The screen's focus ring: its members and wrap, each with help ---
+  await showScreen(page, DETAIL);
+  await addToRing(page, 'back');
+  const ring = panel(page).locator('[data-section="focus-ring"]');
+  await ring.getByRole('button', { name: 'About members' }).hover();
+  await expect(tooltip.locator('.field-tooltip-help')).toHaveText(/Membership is opt-in/);
+  await ring.getByRole('button', { name: 'About wrap' }).hover();
+  await expect(tooltip.locator('.field-tooltip-help')).toHaveText(/focus stops at either end/);
+  await expect(ring.getByRole('button', { name: 'Remove back from the ring' })).toHaveAttribute('title', 'Remove back from the ring');
 });
 
 test('Run on screens with a focus ring reports parity: the canvas side activates each screen, as the device does, and leaves the editing canvas unfocused', async ({ page }) => {
