@@ -53,8 +53,8 @@ function runCliSubprocess(args: readonly string[]): Promise<ExecResult> {
 }
 
 describe('U8G2GL CLI End-to-End Integration', () => {
-  // valid-project's two <bdf> fonts compile, and its <focus_ring> builds since
-  // PR-09. Its one member is a label with no events, a highlight-only stop, so
+  // valid-project's two <bdf> fonts compile, and its <focus_ring> builds
+  // (§12). Its one member is a label with no events, a highlight-only stop, so
   // `validate` passes with exactly that one warning, which `generate` reports
   // too (test/integration/generate.test.ts).
   it('u8g2gl validate valid-project/ -> exit 0, no output on stderr', async () => {

@@ -190,7 +190,7 @@ describe('Pass 11: focus rings and events (§12)', () => {
     expect(summary(project)).toEqual([]);
   });
 
-  it('warns of a ring member with no events that is not a switch (Q1a), and not of a switch', () => {
+  it('warns of a ring member with no events that is not a switch, and not of a switch', () => {
     const project = inputWith([
       [
         's',

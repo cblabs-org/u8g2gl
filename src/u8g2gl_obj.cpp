@@ -237,8 +237,8 @@ static bool u8g2gl_style_fields_equal(const u8g2gl_style& a, const u8g2gl_style&
 // Merges a named style's explicitly-set properties over the resolved style,
 // except the properties this object set itself (§10), and remembers the style
 // as the base a lost focus rebuilds from. Guarded on the merge actually
-// changing anything — same change-guard pattern as the geometry and flag
-// mutators (WO1) and the setters below (WO2). Without the guard, generated
+// changing anything — the change-guard pattern of the geometry and flag
+// mutators and the setters below (§11.2). Without the guard, generated
 // code re-running init() or rebinding to an unchanged named style would dirty
 // the frame every time.
 //   style — style to merge in; only its explicitly-set properties apply

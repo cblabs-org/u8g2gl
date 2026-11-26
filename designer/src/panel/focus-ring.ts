@@ -6,7 +6,7 @@
  * File: designer/src/panel/focus-ring.ts
  * Purpose: A screen's focus ring (§12.2) as the property panel edits it: an
  *          ordered list the author adds to, removes from and reorders, with
- *          `wrap`. Membership is opt-in and author-curated (Q1a): the ring is
+ *          `wrap`. Membership is opt-in and author-curated (§12.2): the ring is
  *          exactly the `<focus name>` entries written, in their order, and this
  *          module never adds one the author did not choose. As everywhere in
  *          the panel, each change is the smallest text edit, computed from the

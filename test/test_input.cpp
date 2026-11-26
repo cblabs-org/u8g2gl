@@ -399,7 +399,7 @@ TEST_F(Input, AMemberDisabledWhileFocusedTakesNoPress) {
     EXPECT_EQ(s_call_count, 0u);
 }
 
-// --- The switch (§12.3, Q2a) ---
+// --- The switch (§12.3) ---
 
 TEST_F(Input, PressTogglesABoundSwitchThroughItsSubject) {
     u8g2gl_subject_bool enabled;
@@ -719,7 +719,7 @@ TEST_F(Input, ASetterCalledWhileFocusedSurvivesTheRestore) {
     EXPECT_EQ(item.get_resolved_style().padding, 5);
 }
 
-// --- The button (Q3a) ---
+// --- The button (§12.2) ---
 
 TEST_F(Input, AFocusedButtonDrawsInverted) {
     u8g2gl_button plain, styled;

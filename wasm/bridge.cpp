@@ -366,7 +366,7 @@ std::vector<std::unique_ptr<u8g2gl_style>> s_object_styles;
 // the runtime, so editing never shows a focused element.
 bool s_preview = false;
 
-/** One callback a dispatch reached: reported to the designer, never run (ruling 7). */
+/** One callback a dispatch reached: reported to the designer, never run (§12.3). */
 struct callback_record {
     std::string callback;
     std::string element;
@@ -1089,7 +1089,7 @@ const char* trigger_name(u8g2gl_trigger_t trigger) {
 
 // record_callback
 // The callback every editor event table names: the designer shows a callback,
-// it does not run it (ruling 7). The runtime runs an object's entries in table
+// it does not run it (§12.3). The runtime runs an object's entries in table
 // order, so the n-th call for one object and trigger in a dispatch is that
 // object's n-th callback event for the trigger in the scene.
 //   target  — the element whose event fired

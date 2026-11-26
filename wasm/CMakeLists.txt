@@ -212,7 +212,7 @@ set_target_properties(u8g2gl_editor_compiled_assets PROPERTIES
     LINK_FLAGS "${EMSCRIPTEN_LINK_FLAGS_STR}"
 )
 
-# --- Input parity (§12, ruling 7): the editor and the firmware, in Wasm ---
+# --- Input parity (§12): the editor and the firmware, in Wasm ---
 # test/input_menu/'s scene through the bridge, and its generated firmware
 # through the test-run harness, each driven by test/input_menu/script.json in
 # wasm/test/input-parity.test.mjs, which compares their frames after every

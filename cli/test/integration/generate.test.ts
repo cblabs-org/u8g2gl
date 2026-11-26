@@ -159,7 +159,7 @@ afterAll(() => {
 
 describe('u8g2gl generate (PR-04 WO5b)', () => {
   it('warns where validate warns — same code, file, line, column and message — and builds the ring', async () => {
-    // valid-project's <focus_ring> builds since PR-09. Its one member is a label
+    // valid-project's <focus_ring> builds (§12). Its one member is a label
     // with no events, a highlight-only stop, so both journeys warn about it the
     // same way. Run on a copy: generating writes into the project.
     const dir = mkdtempSync(resolve(__dirname, '../../tmp/generate-valid-'));

@@ -75,9 +75,8 @@ function pixel(frame: Uint8Array, width: number, x: number, y: number): boolean 
 
 const CORPUS: readonly CorpusProject[] = [
   { name: 'departures', dir: DEPARTURES_PROJECT },
-  // generate refuses it: it uses <focus_ring>, which focus navigation (§12.2)
-  // delivers. Its frames join the corpus when that refusal is lifted.
-  { name: 'valid-project', dir: join(CLI_ROOT, 'test', 'integration', 'fixtures', 'valid-project'), refusedWith: 'U8G2GL_NOT_YET_SUPPORTED' },
+  // It declares a <focus_ring>, which builds (§12.2), so its frames are compared too.
+  { name: 'valid-project', dir: join(CLI_ROOT, 'test', 'integration', 'fixtures', 'valid-project') },
   { name: 'emit-project', dir: join(CLI_ROOT, 'test', 'generator', 'fixtures', 'emit-project') },
   { name: 'generated_fixture', dir: join(FRAMEWORK_ROOT, 'test', 'generated_fixture') },
   // The departures widgets as first written, at schema 0.4, before their

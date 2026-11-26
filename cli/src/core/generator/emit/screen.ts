@@ -52,7 +52,7 @@
  *              across every object ([D-15]); `render`; and the `u8g2gl_screen`
  *              descriptor `ui_handler()` drives.
  *
- *              A screen with input (§12, ruling 6) also gets, after the object
+ *              A screen with input (§12.3) also gets, after the object
  *              tables, its focus ring and its event table as `const` arrays,
  *              which its descriptor points at: object indices, each stop's
  *              focus style, each event's trigger, action, target screen
@@ -568,7 +568,7 @@ function renderBody(steps: readonly RenderStep[]): string[] {
 }
 
 // inputTableLines
-// The ring and the event table (§12, ruling 6), each row commented with the
+// The ring and the event table (§12.3), each row commented with the
 // object it names so a reviewer can read it against the declarations. A ring
 // with no stops, or a screen with no events, emits no array: the descriptor
 // holds nullptr instead, because a C++ array cannot be empty.
@@ -771,7 +771,7 @@ export function emitScreenUnit(input: ScreenEmitInput): EmittedUnit {
     );
   }
 
-  // The ring and the event table (§12, ruling 6): const data the descriptor
+  // The ring and the event table (§12.3): const data the descriptor
   // points at, so nothing is registered at run time and nothing allocates.
   const ringTable = screenTableIdentifier(name, RING_TABLE);
   const eventsTable = screenTableIdentifier(name, EVENTS_TABLE);

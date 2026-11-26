@@ -30,6 +30,7 @@ import { registerTestRunJob, TEST_RUN_JOB, type TestRunResult } from '../../../.
 import { buildTestRunHarness, HARNESS_FILES, type TestRunBuild } from '../../../../src/node/design/test-run/test-run-build.js';
 import { detectToolchain, type SelectedToolchain } from '../../../../src/node/toolchain/detect-toolchain.js';
 import { nodeToolchainHost } from '../../../../src/node/toolchain/toolchain-host.js';
+import { INPUT_EVENTS } from '../../../../src/core/schema/input-model.js';
 import { toolchainCacheRoot } from '../../../../src/node/toolchain/toolchain-paths.js';
 import { DEPARTURES_PROJECT, FRAMEWORK_ROOT } from '../build/departures-project.js';
 import { makeTempDir, removeTempDirs } from '../temp-project.js';
@@ -79,7 +80,7 @@ describe.skipIf(toolchain === undefined)('the test-run harness build (needs Emsc
     );
     expect(result.compiled).not.toContain('bridge.cpp');
     expect(result.compiled).not.toContain('scene_json.cpp');
-    expect(result.layout).toEqual({ display: { width: 256, height: 64 }, screens: ['departures'] });
+    expect(result.layout).toEqual({ display: { width: 256, height: 64 }, screens: ['departures'], callbacks: [], objects: [expect.any(Array)] });
 
     const harness = await loadHarness(result.harnessDir);
     expect(harness.screens).toEqual(['departures']);
@@ -94,6 +95,34 @@ describe.skipIf(toolchain === undefined)('the test-run harness build (needs Emsc
     expect(litPixels(run.frames[0]!)).toBeGreaterThan(0);
     const { compileMs, linkMs, totalMs } = result.timings;
     console.log(`harness built cold in ${totalMs} ms (compile ${compileMs}, link -O3 ${linkMs}); ${litPixels(run.frames[0]!)} lit pixels at t = 0`);
+  }, 300_000);
+
+  it("replays the input fixture's script through runEvents(): screens, callbacks and lit frames each step (§12)", async () => {
+    // --- Step 1: The fixture's own harness, as a test run builds it ---
+    const input = join(makeTempDir('harness-input'), 'project');
+    cpSync(join(FRAMEWORK_ROOT, 'test', 'input_menu'), input, { recursive: true });
+    const result = await build(input);
+    expect(result.status, JSON.stringify(result.diagnostics)).not.toBe('failed');
+    if (result.status === 'failed') return;
+    expect(result.layout.callbacks).toEqual(['on_wifi_changed', 'on_reset', 'on_factory_reset']);
+
+    // --- Step 2: The script, as INPUT_EVENTS numbers it ---
+    const script = JSON.parse(readFileSync(join(input, 'script.json'), 'utf-8')) as {
+      screen: string;
+      steps: { event: keyof typeof INPUT_EVENTS; screen: string; callbacks: string[] }[];
+    };
+    const harness = await loadHarness(result.harnessDir);
+    const replay = await harness.runEvents(script.screen, script.steps.map((step) => INPUT_EVENTS[step.event]));
+    expect(replay.frames).toHaveLength(script.steps.length + 1);
+
+    // --- Step 3: Each step's screen and callbacks, named, and never a blank frame ---
+    script.steps.forEach((step, i) => {
+      const screen = replay.screens[i + 1] ?? null;
+      expect(screen).toBe(step.screen);
+      const objects = result.layout.objects[result.layout.screens.indexOf(screen ?? '')] ?? [];
+      expect((replay.callbacks[i + 1] ?? []).map((call) => `${call.callback} ${objects[call.object] ?? '?'} ${call.trigger}`)).toEqual(step.callbacks);
+      expect(litPixels(replay.frames[i + 1]!)).toBeGreaterThan(0);
+    });
   }, 300_000);
 
   it('is current, compiling and linking nothing, when no input changed', async () => {

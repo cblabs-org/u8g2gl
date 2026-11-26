@@ -31,6 +31,7 @@
  * - u8g2gl_action_t:    What an element's event does
  * - u8g2gl_focus_stop:  One focus-ring entry: an object index and its focus style
  * - u8g2gl_obj_event:   One element event: object, trigger and action
+ * - U8G2GL_NO_FOCUS:    The ring position meaning nothing is focused
  *
  * Exported Functions:
  *     Input:

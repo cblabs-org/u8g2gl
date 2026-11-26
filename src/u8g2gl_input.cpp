@@ -245,6 +245,9 @@ bool u8g2gl_dispatch(u8g2gl_event_t event) {
     return false;
 }
 
+// u8g2gl_get_focused
+// The active screen's focused object, read from its ring position; nullptr
+// with no screen or nothing focused.
 u8g2gl_obj* u8g2gl_get_focused() {
     u8g2gl_screen* screen = u8g2gl_get_active_screen();
     if (screen == nullptr || screen->focus_pos >= screen->ring_count) {

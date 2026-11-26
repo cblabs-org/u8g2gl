@@ -16,8 +16,8 @@
  *              **The one element-class list here is deliberate.** Whether an
  *              element's press changes its value is C++ behaviour — the class
  *              overrides `u8g2gl_obj::on_press_input()` — and the manifest
- *              vocabulary has no attribute to say so: adding one was Q1b,
- *              which the owner declined to keep schema 0.7 free of new surface.
+ *              vocabulary has no attribute to say so, and one would be new
+ *              schema surface (§1.5), which schema 0.7 deliberately does not add.
  *              So the runtime classes that override it are named here, matched
  *              against an element's whole `extends` chain, so a custom widget
  *              extending `u8g2gl_switch` inherits the answer exactly as it
@@ -84,7 +84,7 @@ export function isPressTrigger(trigger: EventTrigger): boolean {
 
 /**
  * @brief Whether an element's input can change its value, and so fire
- *        `value_changed` (§12.3, Q2a).
+ *        `value_changed` (§12.3).
  *
  * @param chain The element's effective manifest chain, its own tag first
  *              (`EffectiveManifest.chain`); empty for an unknown tag.
@@ -106,7 +106,7 @@ export function eventsOf(node: WidgetNode): readonly EventChild[] {
 
 /**
  * @brief Why a callback name cannot be declared in `ui.hpp` and defined by the
- *        application, or undefined when it can (§12.3, ruling 5).
+ *        application, or undefined when it can (§12.3).
  *
  * The name is the application's own C++ function, so it keeps C's rule rather
  * than §13.4's lowercase rule for names the generator prefixes: `onReset` is

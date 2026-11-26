@@ -6,7 +6,7 @@
  * File: src/core/validator/validate-input.ts
  * Purpose: Pass 11 — judges each screen's focus ring and every element's
  *          events (§12) before the generator spells them as tables. The ring
- *          is exactly what the author wrote, never inferred (Q1a), so the
+ *          is exactly what the author wrote, never inferred (§12.2), so the
  *          checks here are about what the author can be told: a target or
  *          callback the build cannot emit is an error, and a ring or event that
  *          is valid but can never do anything is a warning, because it may be

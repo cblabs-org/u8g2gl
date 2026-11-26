@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: designer/src/ui/input-preview-controls.tsx
- * Purpose: The canvas toolbar's input preview (§12, ruling 7): a toggle, then
+ * Purpose: The canvas toolbar's input preview (§12): a toggle, then
  *          buttons — each with a key — for next, previous, press, long press
  *          and back, so the author can step focus through a screen, toggle a
  *          bound switch and follow a load to another screen and back, all on

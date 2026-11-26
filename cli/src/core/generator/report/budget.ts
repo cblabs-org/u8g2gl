@@ -288,7 +288,7 @@ function flashLines(input: ReportInput): readonly BudgetLine[] {
 }
 
 // inputTableLines
-// The two const tables a screen with input emits (§12, ruling 6): its ring and
+// The two const tables a screen with input emits (§12.3): its ring and
 // its event table. Each is counted exactly, by entry, from the realisation the
 // tables were emitted from; the bytes per entry are sizeof a runtime struct,
 // which §13.7 keeps from the generator, so the figure is unmeasured and the

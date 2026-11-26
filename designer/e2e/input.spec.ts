@@ -115,7 +115,7 @@ test('a focus ring and events authored from the forms alone, previewed on the ca
   await addToRing(page, 'go');
   await addToRing(page, 'sw');
   await expect(ring.locator('[data-member]')).toHaveText([/^go/, /^sw/]);
-  // The highlight-only check (Q1a): go has no events yet, so it is flagged.
+  // The highlight-only check (§12.2): go has no events yet, so it is flagged.
   await expect(ring.locator('[data-member="go"] .field-problem')).toContainText('has no events');
   // The Explorer marks each member with its stop.
   await expect(page.locator('.element-tree [aria-label="focus ring stop 1"]')).toBeVisible();
@@ -149,7 +149,7 @@ test('a focus ring and events authored from the forms alone, previewed on the ca
   const editing = await settledPixels(page);
   await page.getByRole('button', { name: '◎ Preview input' }).click();
   await expect(previewState(page)).toHaveAttribute('data-focused', 'go');
-  // The focused button draws inverted (Q3a): the frame is no longer the editing one.
+  // The focused button draws inverted (§12.2): the frame is no longer the editing one.
   await expect.poll(() => canvasPixels(page)).not.toBe(editing);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(previewState(page)).toHaveAttribute('data-focused', 'sw');
@@ -158,7 +158,7 @@ test('a focus ring and events authored from the forms alone, previewed on the ca
   await expect.poll(() => canvasPixels(page)).not.toBe(off);  // the thumb moved: focus did not
   await page.keyboard.press('ArrowLeft');  // the key does what Previous does
   await expect(previewState(page)).toHaveAttribute('data-focused', 'go');
-  // Settled: the go button drawn inverted, as focus draws it (Q3a).
+  // Settled: the go button drawn inverted, as focus draws it (§12.2).
   await expect.poll(() => litIn(page, GO)).toBeGreaterThan(GO_INVERTED);
   const goWithSwitchOn = await canvasPixels(page);
   await page.keyboard.press('Enter');

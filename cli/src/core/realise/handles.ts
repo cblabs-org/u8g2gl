@@ -175,7 +175,7 @@ export function generatedNames(realised: readonly RealisedScreen[], manifests: M
   for (const screen of realised) {
     const screenName = screen.screen.name;
     if (!screenName) continue;
-    // One declaration per callback, however many events share it (ruling 5).
+    // One declaration per callback, however many events share it (§12.3).
     // An invalid name is Pass 11's U8G2GL_INVALID_CALLBACK, not a collision.
     for (const element of screen.objects) {
       for (const event of eventsOf(element.element.node)) {

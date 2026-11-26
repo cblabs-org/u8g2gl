@@ -454,7 +454,8 @@ public:
     /**
      * @brief A press reached this object while it held focus.
      *
-     * Called by ui_dispatch() before the object's `press` events run, so a
+     * Called by u8g2gl_dispatch() (which the generated ui_dispatch() wraps)
+     * before the object's `press` events run, so a
      * `press` callback sees what the press did. The default does nothing. The
      * switch overrides it to toggle (§12.3): input is the one place a value
      * changes from the device's side, and the only source of `value_changed`.
@@ -470,11 +471,9 @@ public:
     // property as the object's own, so no named style applied later overwrites
     // it (§10), then delegates to the embedded u8g2gl_style and marks the frame
     // dirty, guarded on the value actually changing — the same change-guard
-    // pattern WO1 established for geometry and flags (§11.2). This was a live
-    // defect, not a latent one: before PR-3R WO2 these called the style setter
-    // and returned, so changing a font, colour, padding or alignment at runtime
-    // produced no repaint on a static screen (surfaced by the Chief Architect
-    // after WO1 — see PROJECT.md).
+    // pattern the geometry and flag mutators use (§11.2). Without the mark,
+    // changing a font, colour, padding or alignment at run time would leave a
+    // static screen unrepainted.
     void set_font(const uint8_t* font);
     void set_draw_color(u8g2gl_color_t c);
     void set_invert(bool v);

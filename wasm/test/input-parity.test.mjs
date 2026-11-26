@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  *
  * File: wasm/test/input-parity.test.mjs
- * Purpose: Input parity in the real Wasm (§12, ruling 7): the input fixture's
+ * Purpose: Input parity in the real Wasm (§12): the input fixture's
  *          scene through the editor bridge, as the designer's canvas previews
  *          it, and its generated firmware through the test-run harness, as a
  *          design server's test run runs it, both driven by one scripted event

@@ -106,7 +106,7 @@ inline uint32_t u8g2gl_min(uint32_t a, uint32_t b) {
 
 /**
  * @brief A semantic input event, which the application dispatches with
- *        ui_dispatch() (§12.1).
+ *        ui_dispatch(), the generated wrapper over u8g2gl_dispatch() (§12.1).
  *
  * The application reads its own hardware, debounces it and times long presses;
  * the framework never times input. An encoder and a set of buttons map onto

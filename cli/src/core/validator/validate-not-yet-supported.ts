@@ -7,10 +7,9 @@
  * Purpose: Pass 8 — names every construct the schema accepts but the generator
  *          does not build yet. Without it such a document would validate
  *          cleanly and then either be refused obscurely by `generate` or, worse,
- *          generate without the construct. The Chief Architect's PR-04 decision
- *          1 fixed the set; this module is the one place that lists it, so each
- *          later PR deletes its own entry here when it lands, as PR-09 deleted
- *          the focus ring and the three events.
+ *          generate without the construct. This module is the one place that
+ *          lists the set, so a construct's entry is deleted here when the
+ *          generator learns to build it.
  * Description: The severity is a parameter, not a branch — the same shape as the
  *              [U-1] missing-name policy (ui_spec §16.1). `validate` and the
  *              designer pass `'warning'`, so an author is told without the document
@@ -25,7 +24,7 @@
  *                that screen; what a widget's own ring would mean inside the
  *                screen's is not defined, so it stays refused rather than
  *                being silently dropped. A screen's ring and every event are
- *                built since PR-09.
+ *                built (§12).
  *              A declared static child (`<column>`, an `<element>` of its
  *              parent's manifest, §6.5) is no longer refused: schema 0.7's
  *              generator builds it.
@@ -141,7 +140,6 @@ export function validateNotYetSupported(input: ValidateInput): readonly Diagnost
   const severity = input.refusalPolicy ?? DEFAULT_REFUSAL_POLICY;
   const diagnostics: Diagnostic[] = [];
 
-  // --- Composites — a class of their own, and a ring of their own ---
   for (const composite of input.manifests.declaredComposites) {
     // Checked on the declared manifest: the registry gives every composite
     // u8g2gl_obj as its base, so only a declared `extends` means the author

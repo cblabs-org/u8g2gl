@@ -41,8 +41,8 @@ const PROJECT_XML = `<u8g2gl schema="0.7" name="gen" version="1.0.0">
 const BUILTIN_GLOBALS_XML = `<globals><fonts><builtin name="u8g2_font_6x10_mr" /></fonts></globals>
 `;
 
-// <focus_ring> is the not-yet-supported construct this suite reaches for: <bdf>
-// and <convert> build, so only classed composites and PR-09's constructs remain.
+// <focus_ring> is the input construct this suite reaches for: it builds (§12),
+// and a ring member with no events is the warning both journeys report.
 function screenXml(screen: string, label: string | undefined, focusRing = false): string {
   const name = label === undefined ? '' : ` name="${label}"`;
   const ring = focusRing ? `\n        <focus_ring wrap="true"><entry name="${label}" /></focus_ring>` : '';
@@ -132,7 +132,7 @@ describe('generate() (PR-04 WO5b)', () => {
     expect(diagnostic?.file).toBe('u8g2gl.xml');
   });
 
-  it('builds a focus ring, warning as validate warns — same code and location (PR-09)', () => {
+  it('builds a focus ring, warning as validate warns — same code and location', () => {
     // The ring's one member is a label with no events: a highlight-only stop,
     // which both journeys warn about and neither refuses.
     const input = model({ focusRing: true });

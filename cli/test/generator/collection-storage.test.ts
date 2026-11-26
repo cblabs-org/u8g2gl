@@ -256,7 +256,7 @@ describe('a block that cannot be sized is refused by generate, naming the widget
   });
 });
 
-describe('the text §18 report (Q4a)', () => {
+describe('the text §18 report', () => {
   it("prints each storage line's name and derivation, as --json gives them", async () => {
     const { text, ram } = await built(DEPARTURES);
     const lines = ram.filter((line) => line.item === 'collection storage');

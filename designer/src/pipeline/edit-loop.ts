@@ -61,7 +61,7 @@
  *              a shape's guards, with the current sample data) are published
  *              for the Explorer's "hidden by data" marker.
  *
- *              Input preview (§12, ruling 7): while it runs, the bridge runs
+ *              Input preview (§12): while it runs, the bridge runs
  *              the drawn screen's focus ring, dispatch and screen stack — the
  *              device's own code — and a run whose scene is the one the
  *              preview started on draws without applying it again, which
@@ -442,7 +442,7 @@ export class EditLoop {
   /**
    * @brief Starts previewing input on the drawn screen: the canvas then runs
    *        the device's own focus ring, dispatch and screen stack, through the
-   *        bridge (ruling 7).
+   *        bridge (§12.3).
    *
    * @return False, with the reason in Output, when the frame is not live or
    *         the loaded Wasm cannot preview.

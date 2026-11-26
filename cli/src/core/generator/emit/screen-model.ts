@@ -637,12 +637,12 @@ function focusStyleOf(node: WidgetNode): string | undefined {
 }
 
 /**
- * @brief A screen's ring and events as both targets emit them (ruling 6).
+ * @brief A screen's ring and events as both targets emit them (§12).
  *
  * A ring entry names an element written in the screen, which realisation
- * made an object (finding 2); one with no such object — an unknown name,
+ * made an object (§13.5); one with no such object — an unknown name,
  * which Pass 2 refuses — is left out rather than guessed. The ring keeps the
- * author's order and adds nothing (Q1a).
+ * author's order and adds nothing: membership is never inferred (§12.2).
  *
  * @param screen The realised screen.
  */

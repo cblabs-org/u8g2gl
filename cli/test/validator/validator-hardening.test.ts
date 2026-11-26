@@ -149,7 +149,7 @@ describe('two renames, codes stable (WO9 f7, WO8c f3)', () => {
     expect(Object.keys(DIAGNOSTIC_CODES)).not.toContain('UNRESOLVED_GEOMETRY');
   });
 
-  it("refusalPolicy sets the severity of realisation's refusal; an event is no longer one (PR-09)", () => {
+  it("refusalPolicy sets the severity of realisation's refusal; an event is no longer one", () => {
     const project = model(
       '        <u8g2gl_box name="b" x="0" y="0" width="4" height="4"><u8g2gl_box name="inner" x="0" y="0" width="1" height="1" /></u8g2gl_box>\n' +
         '        <u8g2gl_label name="l" x="0" y="10" width="20" height="10" font="u8g2_font_6x10_mr"><event_cb trigger="press" callback="on_press" /></u8g2gl_label>',

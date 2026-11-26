@@ -8,7 +8,7 @@
  *          with the PR that delivers it, at one location, and at the severity the
  *          caller's policy chooses (PR-04 decisions 1 and 3, WO5b).
  * Description: One document carrying a screen's focus ring and all three events,
- *              which build since PR-09 and so are no longer reported, and
+ *              which build and so are no longer reported, and
  *              composites carrying what is still deferred: a C++ class of their
  *              own, and a focus ring of their own. Checked under both policies;
  *              the two runs must agree on everything but severity.
@@ -127,7 +127,7 @@ function deferred(diagnostics: readonly Diagnostic[]): Diagnostic[] {
 }
 
 describe('validateNotYetSupported (PR-04 WO5b)', () => {
-  it("no longer reports a screen's focus ring or any of the three events: they build since PR-09", () => {
+  it("no longer reports a screen's focus ring or any of the three events: they build (§12)", () => {
     // <bdf> and <convert> are not reported: both build. A declared static
     // child (`<column>` in `<wd_list>`, §6.5) builds since schema 0.7.
     expect(deferred(validateNotYetSupported(inputWith()))).toEqual([]);

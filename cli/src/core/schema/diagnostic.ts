@@ -198,9 +198,9 @@ export const DIAGNOSTIC_CODES = {
   BOUND_POSITION_HAS_CHILDREN: 'U8G2GL_BOUND_POSITION_HAS_CHILDREN',
   /**
    * The document uses a construct the schema accepts but the generator does not
-   * build yet — focus rings, events and screen navigation (PR-09), and
-   * composites with their own C++ class (a later PR). The message names the PR
-   * that delivers it.
+   * build yet — a composite with its own C++ class, and a `<focus_ring>` in a
+   * composite's own template (each a later PR; a screen's ring and every event
+   * build, §12). The message says it is deferred.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
    * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).

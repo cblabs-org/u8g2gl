@@ -51,7 +51,7 @@
  *              any element — also gets `ui_dispatch()`, defined in `ui.cpp`,
  *              and a declaration of each `<event_cb>` callback, once each,
  *              which the application defines: a missing definition is a link
- *              error naming it (ruling 5). A project with neither gets none
+ *              error naming it (§12.3). A project with neither gets none
  *              of it, so it regenerates exactly as before input existed.
  *
  *              **Each named object gets a handle** beside its screen's
