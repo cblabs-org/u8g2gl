@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<screen name="settings">
+    <view>
+        <u8g2gl_button name="btn_display" x="0" y="0" width="80" height="14"
+                       font="u8g2_font_6x10_mr" text="Display">
+            <screen_load_event trigger="press" screen="display" />
+        </u8g2gl_button>
+
+        <u8g2gl_label name="lbl_wifi" x="0" y="17" width="60" height="12"
+                      font="u8g2_font_6x10_mr" text="Wi-Fi" />
+        <u8g2gl_switch name="sw_wifi" x="64" y="17" width="24" height="12" bind_value="wifi_enabled">
+            <event_cb trigger="value_changed" callback="on_wifi_changed" />
+        </u8g2gl_switch>
+
+        <u8g2gl_button name="btn_reset" x="0" y="32" width="80" height="14"
+                       font="u8g2_font_6x10_mr" text="Reset">
+            <event_cb trigger="press" callback="on_reset" />
+            <event_cb trigger="long_press" callback="on_factory_reset" />
+        </u8g2gl_button>
+
+        <u8g2gl_label name="lbl_about" x="0" y="49" width="80" height="14"
+                      font="u8g2_font_6x10_mr" text="About" style="item" focus_style="selected">
+            <style name="quiet" />
+        </u8g2gl_label>
+
+        <focus_ring wrap="true">
+            <focus name="btn_display" />
+            <focus name="sw_wifi" />
+            <focus name="btn_reset" />
+            <focus name="lbl_about" />
+        </focus_ring>
+    </view>
+</screen>

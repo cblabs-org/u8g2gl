@@ -15,7 +15,7 @@
  */
 
 import { expect, test } from '@playwright/test';
-import { capacityLabel, defaultCell, heldInteger, newRow, repeatedCells, stringCount, withRepeatedCell } from '../../src/samples/grid-rules';
+import { capacityLabel, defaultCell, heldInteger, newRow, numberProblem, repeatedCells, stringCount, withRepeatedCell } from '../../src/samples/grid-rules';
 import { parseCsv, pasteRows } from '../../src/samples/paste-rows';
 import type { SampleBlock, SampleField } from '../../src/samples/sample-shape';
 
@@ -59,6 +59,18 @@ test('a typed number is held to min and max and rounded; a non-number keeps the 
   expect(heldInteger(pct, 41.6)).toBe(42);
   expect(heldInteger(pct, Number.NaN)).toBeUndefined();
   expect(heldInteger(field('free', 'int'), 1e6)).toBe(1e6);
+});
+
+test('a typed number outside min..max is refused with the reason; inside, rounded, empty or not a number is not', () => {
+  const pct = CARRIAGES.fields[4] as SampleField;
+  expect(numberProblem(pct, '9090')).toBe('9090 is outside 0–100, so it is not written');
+  expect(numberProblem(pct, '-3')).toBe('-3 is outside 0–100, so it is not written');
+  expect(numberProblem(pct, '100')).toBeUndefined();
+  expect(numberProblem(pct, '41.6')).toBeUndefined();
+  expect(numberProblem(pct, '')).toBeUndefined();
+  expect(numberProblem(pct, 'x')).toBeUndefined();
+  expect(numberProblem(field('low', 'int', { min: 1 }), '0')).toBe('0 is below the minimum of 1, so it is not written');
+  expect(numberProblem(field('free', 'int'), '1e6')).toBeUndefined();
 });
 
 test('a string is counted in characters against max_len, and one over it is flagged but kept', () => {

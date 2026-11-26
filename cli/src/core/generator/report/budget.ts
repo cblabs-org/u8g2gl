@@ -49,6 +49,7 @@
  * Exports:
  * - ReportInput:            What building the report needs
  * - buildGenerateReport():  The three reports for one successful build
+ * - COLLECTION_STORAGE_ITEM: The item each collection's storage line carries
  */
 
 import type { DisplayRecord } from '../../schema/display-record.js';
@@ -56,7 +57,7 @@ import type { Globals } from '../../schema/globals.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { Target } from '../../schema/project.js';
 import type { CompiledFont } from '../../fonts/index.js';
-import { classOf } from '../emit/screen-model.js';
+import { classOf, screenInputOf } from '../emit/screen-model.js';
 import {
   emittedBindingPoolSlots,
   GENERATED_CONFIG_HEADER,
@@ -148,6 +149,13 @@ const FLASH_REASON =
  * two drift.
  */
 const RUNTIME_DEFAULT_BINDING_POOL_SLOTS = 32 * 8;
+
+/**
+ * `u8g2gl_config.h`'s default `U8G2GL_SCREEN_STACK_DEPTH` (§12.3). The
+ * generator does not emit it, so the application's build decides; the budget
+ * names the default beside the line.
+ */
+const RUNTIME_DEFAULT_SCREEN_STACK_DEPTH = 4;
 
 /** The reason a widget instance's RAM cost is unmeasured — the same §13.7 rule. */
 const SIZEOF_REASON =
@@ -274,8 +282,56 @@ function flashLines(input: ReportInput): readonly BudgetLine[] {
       names: images.names,
       figure: measured(images.bytes, 'the byte count of the arrays this build emits (§14.2)'),
     },
+    ...inputTableLines(input),
     { item: 'generated code', figure: unmeasured(FLASH_REASON) },
   ];
+}
+
+// inputTableLines
+// The two const tables a screen with input emits (§12.3): its ring and
+// its event table. Each is counted exactly, by entry, from the realisation the
+// tables were emitted from; the bytes per entry are sizeof a runtime struct,
+// which §13.7 keeps from the generator, so the figure is unmeasured and the
+// note says what it is. Absent for a project with no ring and no event, whose
+// report is unchanged.
+//   input — the report input; reads `realised`
+function inputTableLines(input: ReportInput): readonly BudgetLine[] {
+  const ringScreens: string[] = [];
+  const eventScreens: string[] = [];
+  let stops = 0;
+  let events = 0;
+  for (const screen of input.realised) {
+    const screenInput = screenInputOf(screen);
+    if (screenInput.ring !== undefined && screenInput.ring.stops.length > 0) {
+      ringScreens.push(screen.screen.name);
+      stops += screenInput.ring.stops.length;
+    }
+    if (screenInput.events.length > 0) {
+      eventScreens.push(screen.screen.name);
+      events += screenInput.events.length;
+    }
+  }
+  const lines: BudgetLine[] = [];
+  if (stops > 0) {
+    lines.push({
+      item: 'focus ring entries',
+      count: stops,
+      names: ringScreens,
+      figure: unmeasured(SIZEOF_REASON),
+      note: 'one u8g2gl_focus_stop per <focus> (u8g2gl_input.h): a style pointer and an object index',
+    });
+  }
+  if (events > 0) {
+    lines.push({
+      item: 'element event entries',
+      count: events,
+      names: eventScreens,
+      figure: unmeasured(SIZEOF_REASON),
+      note:
+        'one u8g2gl_obj_event per event (u8g2gl_input.h): a screen pointer, a callback pointer and three bytes',
+    });
+  }
+  return lines;
 }
 
 // stringSubjectStorage
@@ -356,6 +412,13 @@ function framebufferLine(input: ReportInput): BudgetLine {
   };
 }
 
+/**
+ * The item of each collection's storage line, one per instance per `<data>`
+ * (§9.2): named so the text report can print each one's name and derivation,
+ * which a reader needs to tell several such lines apart.
+ */
+export const COLLECTION_STORAGE_ITEM = 'collection storage';
+
 // collectionStorageLines
 // One line per instance per <data>: the buffer generated code allocates for it
 // ([Q-19], §9.2), exactly, with how its bytes follow from its layout. Read from
@@ -364,7 +427,7 @@ function framebufferLine(input: ReportInput): BudgetLine {
 //   capacities — [D-21]'s figures, as emitted
 function collectionStorageLines(capacities: Capacities): readonly BudgetLine[] {
   return capacities.collections.map((storage) => ({
-    item: 'collection storage',
+    item: COLLECTION_STORAGE_ITEM,
     count: storage.capacity,
     names: [`${storage.screen}.${storage.element.identifier}.${storage.data.name}`],
     figure: measured(storage.bytes, `${storageDerivation(storage)}, generated per instance (§9.2)`),
@@ -423,6 +486,19 @@ function ramLines(input: ReportInput): readonly BudgetLine[] {
       figure: unmeasured(SIZEOF_REASON),
     },
   );
+
+  // The screen stack exists in every firmware, but only a project with input
+  // can push onto it, so only such a project's report names it (§12.3).
+  if (inputTableLines(input).length > 0) {
+    lines.push({
+      item: 'screen stack entries',
+      count: RUNTIME_DEFAULT_SCREEN_STACK_DEPTH,
+      figure: unmeasured(SIZEOF_REASON),
+      note:
+        `U8G2GL_SCREEN_STACK_DEPTH, the runtime default of ${RUNTIME_DEFAULT_SCREEN_STACK_DEPTH}, unless the ` +
+        'application build overrides it: one screen pointer and one focus position per entry',
+    });
+  }
 
   return lines;
 }

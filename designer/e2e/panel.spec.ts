@@ -74,7 +74,9 @@ test('selecting an element shows its manifest’s fields: geometry first, its ow
   await expect(panel(page).locator('.panel-title')).toHaveText('u8g2gl_clock');
   await expect(panel(page).locator('.panel-subtitle')).toHaveText('sys_clock');
   const sections = panel(page).locator('.panel-section');
-  await expect(sections).toHaveCount(3);
+  // Geometry, its own props, u8g2gl_obj's, then its Input (§12, ui_spec §9.6).
+  await expect(sections).toHaveCount(4);
+  await expect(sections.nth(3)).toHaveAttribute('data-section', 'input');
   await expect(sections.nth(0).locator('.field').evaluateAll((fields) => fields.map((f) => f.getAttribute('data-field')))).resolves.toEqual(['x', 'y', 'width', 'height']);
   await expect(sections.nth(1).locator('.field').evaluateAll((fields) => fields.map((f) => f.getAttribute('data-field')))).resolves.toEqual([
     'time',

@@ -39,4 +39,4 @@ export {
   type RealisationReport,
   type GenerateReport,
 } from './model.js';
-export { buildGenerateReport, type ReportInput } from './budget.js';
+export { buildGenerateReport, COLLECTION_STORAGE_ITEM, type ReportInput } from './budget.js';

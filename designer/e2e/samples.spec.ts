@@ -170,11 +170,26 @@ test('the formation grid fills the canvas, one undo step per edit, saved into th
   await expect.poll(() => litIn(page, FORMATION)).toBeGreaterThan(blank);
   const two = await litIn(page, FORMATION);
 
-  // --- A typed number is held to max; an enum is a dropdown; a bool a checkbox ---
+  // --- A typed number outside its bounds is marked and not written; one inside is ---
   const grid = collection(page, 'formation').locator('table.sample-grid');
-  await grid.getByRole('spinbutton', { name: 'loading_pct of row 2' }).fill('150');
-  await grid.getByRole('spinbutton', { name: 'loading_pct of row 2' }).press('Enter');
-  await expect(grid.getByRole('spinbutton', { name: 'loading_pct of row 2' })).toHaveValue('100');
+  const pct = grid.getByRole('spinbutton', { name: 'loading_pct of row 2' });
+  const setText = (): Promise<string> => page.evaluate((path) => (window as unknown as TestHandle).__u8g2gl.documents.textOf(path) ?? '', SET);
+  const beforeOutOfRange = await setText();
+  await pct.fill('9090');
+  await pct.press('Enter');
+  await expect(pct).toHaveValue('9090');
+  await expect(pct).toHaveAttribute('aria-invalid', 'true');
+  await expect(grid.locator('.sample-number-cell[data-invalid="true"] .field-problem')).toHaveText('9090 is outside 0–100, so it is not written');
+  expect(await setText()).toBe(beforeOutOfRange);
+  await pct.fill('100');
+  await pct.press('Enter');
+  await expect(pct).toHaveAttribute('aria-invalid', 'false');
+  // Written, and back in the grid, before the next edit: each grid edit writes
+  // from the rows the grid holds, so one made sooner would undo this one.
+  await expect(grid.locator('.sample-number-cell:has([aria-label="loading_pct of row 2"])')).toHaveAttribute('data-written', '100');
+  await expect(pct).toHaveValue('100');
+
+  // --- An enum is a dropdown; a bool a checkbox ---
   await grid.getByRole('combobox', { name: 'class_type of row 1' }).selectOption('first');
   // A click, not check(): the box shows the set's value, which the edit changes a frame later.
   await grid.getByRole('checkbox', { name: 'wheelchair of row 1' }).click();

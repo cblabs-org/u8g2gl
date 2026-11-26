@@ -45,6 +45,8 @@
 .sample-count { font-size: 9px; color: var(--text-dim); }
 .sample-string[data-over='true'] .sample-count { color: var(--warning); }
 .sample-string[data-over='true'] input { border-color: var(--warning); }
+/* A number typed outside its field's bounds: refused, and marked as the panel marks an invalid field. */
+.sample-number-cell[data-invalid='true'] input { border-color: var(--error); }
 .sample-row-actions { white-space: nowrap; }
 .sample-row-actions button { padding: 0 3px; background: none; border: none; color: var(--text-dim); cursor: pointer; }
 .sample-row-actions button:disabled { opacity: 0.3; cursor: default; }

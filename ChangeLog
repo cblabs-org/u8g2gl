@@ -8,6 +8,55 @@ The log starts at runtime 0.11 and CLI 0.15 and is not backfilled; earlier
 history is in git. See docs/RELEASING.md.
 
 
+2026-11-26	cli v0.28.xx	U8G2GL
+  * 0.28.0: Focus, input and navigation are generated (design_spec 12).
+    A screen with a <focus_ring> or any element event gets its ring (each
+    stop's object index and focus_style) and its event table (trigger,
+    action, target screen descriptor, callback) as const arrays its
+    descriptor points at; ui.hpp declares ui_dispatch(), defined in ui.cpp,
+    and each <event_cb> callback once, as void cb(u8g2gl_obj& target,
+    u8g2gl_trigger_t trigger), so a missing definition is a link error. A
+    ring member with a focus_style and several named styles applies them
+    merged into one base. A project with no ring and no event generates
+    exactly as before. Pass 8 no longer refuses <focus_ring>, <event_cb>,
+    <screen_load_event> or <screen_back_event>; a composite's own
+    <focus_ring> is still refused (a later PR). New diagnostics, in
+    validate, generate and the designer: errors U8G2GL_DUPLICATE_FOCUS_ENTRY,
+    U8G2GL_UNKNOWN_TRIGGER, U8G2GL_UNKNOWN_SCREEN and
+    U8G2GL_INVALID_CALLBACK; warnings U8G2GL_VALUE_CHANGED_UNREACHABLE,
+    U8G2GL_INERT_FOCUS_STOP (a ring member with no events that is not a
+    switch) and U8G2GL_PRESS_UNREACHABLE (a press on an element no ring
+    lists). A callback joins U8G2GL_GENERATED_NAME_COLLISION's check. The
+    budget reports focus ring and event entries and the screen stack by
+    count, for a project with input; the text report now prints each
+    collection storage line's name and derivation. The scene description is
+    version 6 and carries each screen's ring and each object's events; the
+    editor Wasm runs the runtime's own dispatch on them (setPreview,
+    dispatchEvent, previewBack, getInputState), and a test run can replay a
+    scripted event sequence through the harness (runEvents). The designer
+    authors a ring and events from its panels, marks ring members in the
+    Explorer, previews focus on the canvas, and refuses a sample number
+    typed outside its field's bounds instead of clamping it. Generated code
+    requires runtime 0.17.0. Schema 0.7 is unchanged.
+2026-11-26	runtime v0.17.xx	U8G2GL
+  * 0.17.0: Input dispatch, focus and navigation (design_spec 12). New
+    u8g2gl_input.h: u8g2gl_dispatch(), the ring and event table types the
+    generator emits, the u8g2gl_event_cb_t callback signature, and a static
+    screen stack (u8g2gl_screen_load(), u8g2gl_screen_back(),
+    U8G2GL_SCREEN_STACK_DEPTH, default 4, dropping the oldest when full).
+    u8g2gl_event_t gains ENCODER_LONG_CLICK, BUTTON_NEXT and BUTTON_PREV,
+    the existing values unchanged; u8g2gl_trigger_t is new; so is
+    U8G2GL_FLAG_FOCUSED. u8g2gl_screen gains ring, events and focus
+    fields, appended with defaults. Activation focuses the ring's first
+    visible, enabled member; moves skip hidden and disabled ones. An
+    object now records the style properties its own setters set, and
+    apply_style() no longer overwrites them (the 10 precedence rule); a
+    focus_style is merged on focus and undone on losing it. A press on a
+    focused switch toggles it, writing its bound subject, and fires
+    value_changed, which a setter or binding never does. A button draws
+    inverted when focused or styled invert. sizeof(u8g2gl_obj) grows by one
+    pointer. No heap.
+    Built and tested against U8G2 2.36.18.
 2026-11-24	cli v0.27.xx	U8G2GL
   * 0.27.0: Collections are generated (design_spec 9.2; Q-19 closed).
     ui.hpp declares a typed handle to every named object written in a

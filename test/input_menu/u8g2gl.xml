@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The input fixture (design_spec §12): a settings menu on two screens.
+
+     The settings screen has a wrapping focus ring of four stops: a button whose
+     press loads the display screen, a switch bound to a bool subject (a press
+     toggles it and writes the subject; its value_changed calls back), a button
+     with a press callback and a long-press callback, and a label that is a
+     highlight-only stop, shown by its focus_style over two named styles. The
+     display screen has a back button and a second switch bound to the same
+     subject. Its generated/ and generated_editor/ directories are committed:
+     wasm/test/input-parity.test.mjs drives both targets through one scripted
+     event sequence and compares their frames after every step.
+     cli/test/generator/input-fixture.test.ts fails if regenerating this project
+     changes a committed byte. Refresh deliberately with
+     cli/test/generator/refresh-goldens.mjs. -->
+<u8g2gl schema="0.7" name="input_menu" version="1.0.0">
+    <targets>
+        <target name="host" setup="U8G2_SSD1306_128X64_NONAME_F_HW_I2C" rotation="R0" />
+    </targets>
+    <output dir="generated" />
+</u8g2gl>

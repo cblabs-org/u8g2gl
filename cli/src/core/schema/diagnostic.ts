@@ -198,9 +198,9 @@ export const DIAGNOSTIC_CODES = {
   BOUND_POSITION_HAS_CHILDREN: 'U8G2GL_BOUND_POSITION_HAS_CHILDREN',
   /**
    * The document uses a construct the schema accepts but the generator does not
-   * build yet — focus rings, events and screen navigation (PR-09), and
-   * composites with their own C++ class (a later PR). The message names the PR
-   * that delivers it.
+   * build yet — a composite with its own C++ class, and a `<focus_ring>` in a
+   * composite's own template (each a later PR; a screen's ring and every event
+   * build, §12). The message says it is deferred.
    *
    * **Emitted at two severities, chosen by the caller's `RefusalPolicy`,
    * never inside the check** — the same journey split as `MISSING_NAME` ([U-1]).
@@ -483,6 +483,56 @@ export const DIAGNOSTIC_CODES = {
    * refusals: an error in `generate`, a warning in `validate`.
    */
   UNSIZED_DATA: 'U8G2GL_UNSIZED_DATA',
+  /**
+   * One `<focus_ring>` names the same element twice (§12.2). A ring is an
+   * ordered list of distinct stops; a repeat would make one element two stops,
+   * so focus would appear to stay put on a move. An error, located at the
+   * second `<focus>`, naming the element.
+   */
+  DUPLICATE_FOCUS_ENTRY: 'U8G2GL_DUPLICATE_FOCUS_ENTRY',
+  /**
+   * A `<screen_load_event>`'s `screen` names no screen in the project (§12.3),
+   * or names none at all. The generator emits the target as a pointer to its
+   * descriptor, so an unknown one cannot be built. An error, located at the
+   * event, naming the element and the target, with near-match suggestions.
+   */
+  UNKNOWN_SCREEN: 'U8G2GL_UNKNOWN_SCREEN',
+  /**
+   * An `<event_cb>`'s `callback` is not a C identifier the generated `ui.hpp`
+   * can declare (§12.3): empty, not `[A-Za-z_][A-Za-z0-9_]*`, a C++ keyword,
+   * or inside the runtime's `u8g2gl_` namespace. An error, located at the
+   * event, naming the element and the callback. A callback that is a valid
+   * identifier but collides with a generated one is
+   * `U8G2GL_GENERATED_NAME_COLLISION`.
+   */
+  INVALID_CALLBACK: 'U8G2GL_INVALID_CALLBACK',
+  /**
+   * An event's `trigger` is not one of `press`, `long_press` and
+   * `value_changed` (§12.3). An error, located at the event, naming the
+   * element and the trigger, with near-match suggestions.
+   */
+  UNKNOWN_TRIGGER: 'U8G2GL_UNKNOWN_TRIGGER',
+  /**
+   * A `value_changed` event on an element whose input never changes its value
+   * (§12.3): only input fires it, never a binding or a setter, and in schema
+   * 0.7 only the switch's press changes a value. A warning, located at the
+   * event, naming the element: the event is valid but can never fire.
+   */
+  VALUE_CHANGED_UNREACHABLE: 'U8G2GL_VALUE_CHANGED_UNREACHABLE',
+  /**
+   * A focus-ring member with no events that is not a switch (§12.2): focus
+   * stops on it and a press does nothing. A warning, not an error, because a
+   * highlight-only stop — stepping through labels to show a `focus_style` —
+   * can be deliberate. Located at its `<focus>`, naming the element.
+   */
+  INERT_FOCUS_STOP: 'U8G2GL_INERT_FOCUS_STOP',
+  /**
+   * An element with a `press` or `long_press` event that its screen's ring
+   * does not list (§12.2): only the focused element takes a press, and ring
+   * membership is never inferred, so the event can never fire. A warning,
+   * located at the event, naming the element.
+   */
+  PRESS_UNREACHABLE: 'U8G2GL_PRESS_UNREACHABLE',
 } as const;
 
 /**

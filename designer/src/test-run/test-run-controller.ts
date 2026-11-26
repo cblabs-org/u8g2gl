@@ -16,9 +16,12 @@
  *                 loaded editor Wasm, from a fresh apply, at TEST_RUN_TIMES,
  *                 for every case: each screen with the initial values, then
  *                 with each sample set, applied as the canvas applies it
- *                 (`applySampleData()` and `applyCollectionData()`); then the
- *                 loop is asked for a normal run, so the canvas is restored
- *                 on the next frame;
+ *                 (`applySampleData()` and `applyCollectionData()`), then
+ *                 the screen activated as the device activates it, its ring's
+ *                 first member focused (§12.2); then the screen deactivated
+ *                 and the loop asked to apply the scene afresh, so the
+ *                 editing canvas, with no focus, is restored on the next
+ *                 frame;
  *              2. every buffer that differs from disk is posted to the
  *                 server's `test-run` job with its version and the screen, so
  *                 the server tests the same text, unsaved, with each set as
@@ -354,11 +357,17 @@ export class TestRunController {
       for (const set of [undefined, ...sets]) {
         const values = set === undefined ? result.subjectValues : sampleValuesJson(result.subjectValues, set.applied);
         const rows = set === undefined ? undefined : collectionDataJson(set.applied, screen.file);
+        // Activated last, as the firmware boots: data first, then the screen,
+        // whose activation focuses its ring's first visible, enabled member
+        // (§12.2) — a focused button draws inverted. Without it every screen
+        // with a ring differs by that member. A module too old to preview
+        // cannot activate, and draws as before.
         const applied =
           module.applyScene(result.scene) &&
           module.selectScreen(screen.name) &&
           module.applySampleData(values) &&
-          (rows === undefined || module.applyCollectionData(rows));
+          (rows === undefined || module.applyCollectionData(rows)) &&
+          (!module.inputPreview || module.setPreview(true));
         const frames: Uint8Array[] = [];
         for (const time of TEST_RUN_TIMES) {
           const frame = applied ? module.renderFrame(time) : undefined;
@@ -370,6 +379,8 @@ export class TestRunController {
       }
     }
     const { width, height } = module.displaySize();
+    // The editing canvas shows no focus: deactivate before it is restored.
+    if (module.inputPreview) module.setPreview(false);
     this.target.restoreCanvas();
     if (refusal !== undefined) {
       throw new Error(`the editor Wasm refused the scene: ${refusal}`);

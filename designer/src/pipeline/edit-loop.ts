@@ -61,6 +61,15 @@
  *              a shape's guards, with the current sample data) are published
  *              for the Explorer's "hidden by data" marker.
  *
+ *              Input preview (§12): while it runs, the bridge runs
+ *              the drawn screen's focus ring, dispatch and screen stack — the
+ *              device's own code — and a run whose scene is the one the
+ *              preview started on draws without applying it again, which
+ *              would end the preview. A load or a back opens the screen it
+ *              lands on, so the canvas follows. Any other scene (an edit) ends
+ *              the preview; stopping it reapplies the scene and returns to
+ *              the screen it started on, restoring the editing state.
+ *
  *              The canvas draws the active sample set (`samples/`): its values
  *              over the declared ones, and its rows for the drawn screen, both
  *              applied after each `applyScene`, which clears them. Every set's
@@ -91,10 +100,17 @@
  *     - canvasEditing:    False while a document is not well-formed (§3.8)
  *     - lastRun:          The latest run, for the property panel
  *
+ *     Input preview (§12):
+ *     - preview:          The preview's state while it runs, observable
+ *     - startPreview(), stopPreview(): Start or stop it on the drawn screen
+ *     - dispatch():       One input event, as the device's ui_dispatch() takes it
+ *     - back():           Back through the device's screen stack
+ *
  *     Test run:
  *     - addDiagnosticSource(): More diagnostics for Problems (a failed run's)
  *     - settled():        Resolves once the latest text is drawn
- *     - requestRun():     Book a normal run: restores the canvas after Run's frames
+ *     - requestRun():     Book a normal run
+ *     - restoreAfterTestRun(): Apply afresh after Run's frames, ending any preview
  *     - showDiff():       Mark a mismatch's differing pixels on the overlay
  *
  *     Measurement:
@@ -113,7 +129,7 @@ import { ProjectAssets } from '../project/project-assets';
 import { ProjectModelCache } from '../project/project-model';
 import { Observable } from '../state/observable';
 import { AssetInjector, type InjectionState } from '../wasm/asset-injector';
-import type { EditorModule, Placeholder } from '../wasm/editor-module';
+import type { EditorModule, InputState, Placeholder } from '../wasm/editor-module';
 import type { EditorWasmController } from '../wasm/editor-wasm-controller';
 import type { HitTarget } from '../selection/hit-test';
 import type { Placement } from '@u8g2gl/core/generator/emit/screen-model.js';
@@ -273,6 +289,10 @@ export class EditLoop {
   /** The drawn screen's effectively hidden names (design-hidden.ts), as of the last frame. */
   private hiddenNow: ReadonlySet<string> = NO_NAMES;
   private applied: EditorModule | undefined;
+  /** The scene the applied module was last given, so a preview knows when the text moved on. */
+  private appliedScene: string | undefined;
+  /** The file the canvas showed when the preview started, to return to. */
+  private previewReturn: string | undefined;
   private tickHandle: number | undefined;
   private drawn = 0;
   /** The bridge's last refusal of the active set's rows, so it is logged once. */
@@ -414,8 +434,116 @@ export class EditLoop {
     });
   }
 
+  /**
+   * The input preview (§12), while it runs: the screen, focus, stack depth and
+   * the callbacks the last event reached. Undefined while editing.
+   */
+  readonly preview = new Observable<InputState | undefined>(undefined, sameInputState);
+
+  /**
+   * @brief Starts previewing input on the drawn screen: the canvas then runs
+   *        the device's own focus ring, dispatch and screen stack, through the
+   *        bridge (§12.3).
+   *
+   * @return False, with the reason in Output, when the frame is not live or
+   *         the loaded Wasm cannot preview.
+   */
+  startPreview(): boolean {
+    const module = this.applied;
+    if (module === undefined || this.frameState.get().stale) {
+      this.workspace.log('input preview needs a live frame');
+      return false;
+    }
+    if (!module.inputPreview) {
+      this.workspace.log("input preview needs the project's editor Wasm to be rebuilt");
+      return false;
+    }
+    if (!module.setPreview(true)) {
+      this.workspace.log(`input preview refused: ${module.lastError()}`);
+      return false;
+    }
+    this.previewReturn = this.workspace.activeFile.get();
+    this.preview.set(module.inputState());
+    this.scheduler.request();
+    return true;
+  }
+
+  /**
+   * @brief One input event on the preview, as the device's ui_dispatch() takes
+   *        it; a load or a back switches the canvas to the screen it shows.
+   *
+   * @param event A u8g2gl_event_t value (INPUT_EVENTS).
+   */
+  dispatch(event: number): void {
+    this.previewStep((module) => module.dispatchEvent(event));
+  }
+
+  /** @brief Back through the device's screen stack (§12.3), on the preview. */
+  back(): void {
+    this.previewStep((module) => module.previewBack());
+  }
+
+  /**
+   * @brief Stops the preview and restores the editing state: the screen the
+   *        canvas showed, and every subject as the text and sample set say,
+   *        by applying the scene afresh.
+   */
+  stopPreview(): void {
+    this.endPreview(undefined);
+  }
+
+  // previewStep
+  // One preview action: then the state it left, a switch of the canvas's
+  // screen when a load or back changed it, and a frame.
+  //   step — the module call
+  private previewStep(step: (module: EditorModule) => number): void {
+    const module = this.applied;
+    if (module === undefined || this.preview.get() === undefined) return;
+    if (step(module) < 0) {
+      this.workspace.log(`input preview: ${module.lastError()}`);
+    }
+    const state = module.inputState();
+    this.preview.set(state);
+    const shown = this.frameState.get().screen;
+    if (state?.screen !== null && state?.screen !== undefined && state.screen !== shown) {
+      const file = this.lastRun.get()?.result.model.screens.find((screen) => screen.name === state.screen)?.loc?.file;
+      if (file !== undefined) this.workspace.openFile({ path: file });
+    }
+    this.scheduler.request();
+  }
+
+  // endPreview
+  // Leaves the preview, saying why in Output when it was not asked for, and
+  // books a run that applies the scene afresh.
+  //   reason — why it ended on its own; undefined when the author stopped it
+  private endPreview(reason: string | undefined): void {
+    if (this.preview.get() === undefined) return;
+    this.applied?.setPreview(false);
+    this.preview.set(undefined);
+    this.appliedScene = undefined;
+    if (reason !== undefined) this.workspace.log(`input preview: ${reason}`);
+    const back = this.previewReturn;
+    this.previewReturn = undefined;
+    if (reason === undefined && back !== undefined && back !== this.workspace.activeFile.get()) {
+      this.workspace.openFile({ path: back });
+    }
+    this.scheduler.request();
+  }
+
   /** @brief Books a normal run on the next frame, as an edit would. */
   requestRun(): void {
+    this.scheduler.request();
+  }
+
+  /**
+   * @brief Books a run that applies the scene afresh: what a test run calls
+   *        once it has applied scenes of its own to the module. An input
+   *        preview cannot survive that, so it ends, and the next run does not
+   *        take the module's state for the preview's.
+   */
+  restoreAfterTestRun(): void {
+    this.endPreview('a test run applied the scene');
+    this.appliedScene = undefined;
     this.scheduler.request();
   }
 
@@ -508,14 +636,24 @@ export class EditLoop {
     } else {
       let lap = performance.now();
       const hidden = this.hiddenFor(result, module);
+      // While input is previewed on the scene it was started on, the bridge
+      // already holds the screen the preview is on, rebuilt by a load or a
+      // back: applying again would end the preview. Any other scene, or
+      // another module, ends it, and the run applies as usual.
+      const previewing = this.preview.get() !== undefined && module === this.applied && result.scene === this.appliedScene;
+      if (!previewing && this.preview.get() !== undefined) {
+        this.endPreview('the text changed, so the preview ended');
+      }
       const applied =
-        module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.sampleValues);
+        previewing ||
+        (module.applyScene(result.scene) && module.selectScreen(result.screen) && module.applySampleData(result.sampleValues));
+      if (applied && !previewing) this.appliedScene = result.scene;
       // The active set's rows, which the rebuild just cleared. They were
       // checked as the bridge checks them, so a refusal here means the loaded
       // Wasm is older than its widgets' <data> (or lacks their class): the
       // frame is drawn without rows rather than lost.
       // Said in Output once per new refusal, not once per frame.
-      if (applied) {
+      if (applied && !previewing) {
         const refusal =
           result.collectionData === undefined || module.applyCollectionData(result.collectionData) ? undefined : module.lastError();
         if (refusal !== undefined && refusal !== this.sampleRefusal) this.workspace.log(`the sample set's rows were not applied: ${refusal}`);
@@ -809,4 +947,10 @@ function assetNoteOf(injection: InjectionState, warning: string): { readonly ass
 //   name — the set's name, as the browser remembers it
 function activeSetPath(name: string | undefined): string | undefined {
   return name === undefined ? undefined : sampleSetPath(name);
+}
+
+// sameInputState
+// Two preview states that show the same.
+function sameInputState(a: InputState | undefined, b: InputState | undefined): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }

@@ -235,17 +235,60 @@ static bool u8g2gl_style_fields_equal(const u8g2gl_style& a, const u8g2gl_style&
 
 // u8g2gl_obj::apply_style
 // Merges a named style's explicitly-set properties over the resolved style,
-// guarded on the merge actually changing anything — same change-guard pattern
-// as the geometry and flag mutators (WO1) and the setters below (WO2). Without
-// the guard, generated code re-running init() or rebinding to an unchanged
-// named style would dirty the frame every time.
+// except the properties this object set itself (§10), and remembers the style
+// as the base a lost focus rebuilds from. Guarded on the merge actually
+// changing anything — the change-guard pattern of the geometry and flag
+// mutators and the setters below (§11.2). Without the guard, generated
+// code re-running init() or rebinding to an unchanged named style would dirty
+// the frame every time.
 //   style — style to merge in; only its explicitly-set properties apply
 void u8g2gl_obj::apply_style(const u8g2gl_style& style) {
+    base_style_ = &style;
     u8g2gl_style before = style_;
-    style_.merge_from(style);
+    style_.merge_from(style, own_style_mask_);
     if (!u8g2gl_style_fields_equal(before, style_)) {
         mark_dirty();
     }
+}
+
+// u8g2gl_obj::set_focused
+// Takes or loses focus for the focus ring. The flag changes either way; the
+// resolved style changes only when there is a focus style, so an element with
+// none keeps its style untouched. The mark is unconditional because the flag
+// alone changes what a button draws.
+//   focused     — true to take focus, false to lose it
+//   focus_style — the ring member's focus style, or nullptr
+void u8g2gl_obj::set_focused(bool focused, const u8g2gl_style* focus_style) {
+    if (focused) {
+        set_flag(U8G2GL_FLAG_FOCUSED);
+        if (focus_style != nullptr) {
+            style_.merge_from(*focus_style, own_style_mask_);
+        }
+    } else {
+        clear_flag(U8G2GL_FLAG_FOCUSED);
+        // Rebuild rather than subtract: the focus style may have overwritten
+        // a base-style value, which only the base style still holds. Own
+        // properties are kept as they stand, so a setter called while focused
+        // survives too.
+        if (focus_style != nullptr) {
+            style_.clear_except(own_style_mask_);
+            if (base_style_ != nullptr) {
+                style_.merge_from(*base_style_, own_style_mask_);
+            }
+        }
+    }
+    mark_dirty();
+}
+
+bool u8g2gl_obj::is_focused() const {
+    return has_flag(U8G2GL_FLAG_FOCUSED);
+}
+
+// u8g2gl_obj::on_press_input
+// Default: a press changes nothing on an element with no value of its own; its
+// `press` events still run.
+bool u8g2gl_obj::on_press_input() {
+    return false;
 }
 
 const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
@@ -259,6 +302,10 @@ const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
 // binding observer re-notifying with an unchanged value) would dirty the
 // frame on every call and defeat §11.2's gate; a real change is still marked
 // immediately, so no repaint is lost.
+//
+// Each records its property in own_style_mask_ first, before the guard: a
+// value equal to what a named style already set is still the element's own
+// statement, and a focus style applied later must not overwrite it (§10).
 //
 // The guard checks style_.has(PROP) as well as the value: a property's value
 // can equal the struct's default (e.g. align defaulting to LEFT) without ever
@@ -274,6 +321,7 @@ const u8g2gl_style& u8g2gl_obj::get_resolved_style() const {
 // at runtime produced no repaint on a static screen (surfaced by the Chief
 // Architect after WO1 — see PROJECT.md).
 void u8g2gl_obj::set_font(const uint8_t* font) {
+    own_style_mask_ |= U8G2GL_STYLE_FONT;
     if (style_.has(U8G2GL_STYLE_FONT) && font == style_.font) {
         return;
     }
@@ -282,6 +330,7 @@ void u8g2gl_obj::set_font(const uint8_t* font) {
 }
 
 void u8g2gl_obj::set_draw_color(u8g2gl_color_t c) {
+    own_style_mask_ |= U8G2GL_STYLE_DRAW_COLOR;
     if (style_.has(U8G2GL_STYLE_DRAW_COLOR) && c == style_.draw_color) {
         return;
     }
@@ -290,6 +339,7 @@ void u8g2gl_obj::set_draw_color(u8g2gl_color_t c) {
 }
 
 void u8g2gl_obj::set_invert(bool v) {
+    own_style_mask_ |= U8G2GL_STYLE_INVERT;
     if (style_.has(U8G2GL_STYLE_INVERT) && v == style_.invert) {
         return;
     }
@@ -298,6 +348,7 @@ void u8g2gl_obj::set_invert(bool v) {
 }
 
 void u8g2gl_obj::set_padding(int16_t p) {
+    own_style_mask_ |= U8G2GL_STYLE_PADDING;
     if (style_.has(U8G2GL_STYLE_PADDING) && p == style_.padding) {
         return;
     }
@@ -306,6 +357,7 @@ void u8g2gl_obj::set_padding(int16_t p) {
 }
 
 void u8g2gl_obj::set_border(bool b) {
+    own_style_mask_ |= U8G2GL_STYLE_BORDER;
     if (style_.has(U8G2GL_STYLE_BORDER) && b == style_.border) {
         return;
     }
@@ -314,6 +366,7 @@ void u8g2gl_obj::set_border(bool b) {
 }
 
 void u8g2gl_obj::set_radius(int16_t r) {
+    own_style_mask_ |= U8G2GL_STYLE_RADIUS;
     if (style_.has(U8G2GL_STYLE_RADIUS) && r == style_.radius) {
         return;
     }
@@ -322,6 +375,7 @@ void u8g2gl_obj::set_radius(int16_t r) {
 }
 
 void u8g2gl_obj::set_align(u8g2gl_align_t a) {
+    own_style_mask_ |= U8G2GL_STYLE_ALIGN;
     if (style_.has(U8G2GL_STYLE_ALIGN) && a == style_.align) {
         return;
     }
@@ -330,6 +384,7 @@ void u8g2gl_obj::set_align(u8g2gl_align_t a) {
 }
 
 void u8g2gl_obj::set_font_mode(u8g2gl_font_mode_t m) {
+    own_style_mask_ |= U8G2GL_STYLE_FONT_MODE;
     if (style_.has(U8G2GL_STYLE_FONT_MODE) && m == style_.font_mode) {
         return;
     }
@@ -338,6 +393,7 @@ void u8g2gl_obj::set_font_mode(u8g2gl_font_mode_t m) {
 }
 
 void u8g2gl_obj::set_bitmap_mode(u8g2gl_bitmap_mode_t m) {
+    own_style_mask_ |= U8G2GL_STYLE_BITMAP_MODE;
     if (style_.has(U8G2GL_STYLE_BITMAP_MODE) && m == style_.bitmap_mode) {
         return;
     }
@@ -471,6 +527,20 @@ static u8g2gl_binding_desc* u8g2gl_find_text_binding(const u8g2gl_obj* obj) {
     for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
         if (s_binding_pool[i].active && s_binding_pool[i].obj == obj && s_binding_pool[i].is_text) {
             return &s_binding_pool[i];
+        }
+    }
+    return nullptr;
+}
+
+// u8g2gl_obj::bound_value_subject
+// Finds this object's active value binding registered with @p cb, and returns
+// its subject. A scan of the pool, as bound_text() is, and only on input.
+//   cb — the observer callback the widget registered the binding with
+void* u8g2gl_obj::bound_value_subject(u8g2gl_observer_cb cb) const {
+    for (size_t i = 0; i < U8G2GL_MAX_TOTAL_BINDINGS; ++i) {
+        const u8g2gl_binding_desc& b = s_binding_pool[i];
+        if (b.active && b.obj == this && b.cb == cb) {
+            return b.subject;
         }
     }
     return nullptr;

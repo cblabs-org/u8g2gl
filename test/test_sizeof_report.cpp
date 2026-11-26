@@ -117,8 +117,11 @@ TEST(SizeOfReport, AllWidgets) {
     report_all_sizes();
 
     // --- Ceilings for the widest supported pointer width (64-bit) ---
+    // The label's rose from 80 with focus (§10, §12): the base object gained
+    // one pointer, its base style, and every element inherits it. The other
+    // ceilings already had the room.
     EXPECT_LE(sizeof(u8g2gl_obj), 64u);
-    EXPECT_LE(sizeof(u8g2gl_label), 80u);
+    EXPECT_LE(sizeof(u8g2gl_label), 88u);
     EXPECT_LE(sizeof(u8g2gl_xbm), 80u);
     EXPECT_LE(sizeof(u8g2gl_glyph), 72u);
     EXPECT_LE(sizeof(u8g2gl_progress_bar), 88u);
@@ -156,7 +159,7 @@ TEST(SizeOfReport, ThirtyTwoBitTarget) {
     // from the first real 32-bit run; the printed table above is that run's
     // evidence.
     EXPECT_LE(sizeof(u8g2gl_obj), 64u);
-    EXPECT_LE(sizeof(u8g2gl_label), 80u);
+    EXPECT_LE(sizeof(u8g2gl_label), 88u);
     EXPECT_LE(sizeof(u8g2gl_xbm), 80u);
     EXPECT_LE(sizeof(u8g2gl_glyph), 72u);
     EXPECT_LE(sizeof(u8g2gl_progress_bar), 88u);

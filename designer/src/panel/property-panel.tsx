@@ -32,6 +32,18 @@
  *              a row per child with each argument's own typed control, and
  *              add, remove and move up/down. Each change is one undo stop.
  *
+ *              Input (§12) is authored here too, so nothing in it is XML-only.
+ *              One selected element ends with its **Input** section: its place
+ *              in the screen's ring, its `focus_style` picked from the named
+ *              styles, and its events, each a trigger then an action — load a
+ *              screen picked from the project's, back, or a callback by name —
+ *              with add, remove and move up/down. With nothing selected the
+ *              screen's **Focus ring** follows its fields: the members in
+ *              order, each with move and remove, `wrap`, and an add that offers
+ *              only the named elements written in the screen and not yet in
+ *              it. Nothing joins the ring unless picked. Each event row and
+ *              member shows the problems located inside it.
+ *
  * Exports:
  * - PropertyPanel:  The region
  */
@@ -50,6 +62,9 @@ import { fieldFacts } from './field-facts';
 import type { FieldState } from './field-state';
 import type { FieldSpec, PanelSection } from './panel-layout';
 import type { StaticChildTable } from './static-children';
+import { EVENT_ACTIONS, type EventAction } from './element-events';
+import { EVENT_TRIGGERS } from '@u8g2gl/core/schema/input-model.js';
+import type { EventTrigger } from '@u8g2gl/core/schema/widget-node.js';
 import './panel.css';
 
 /** @brief The property panel region. */
@@ -77,6 +92,8 @@ export function PropertyPanel(): React.JSX.Element {
             <Section key={`${view.file}:${view.names.join(',')}:${section.id}`} section={section} fields={view.fields} controller={controller} />
           ))}
           <StaticChildren controller={controller} />
+          <ElementInputSection controller={controller} />
+          <FocusRingSection controller={controller} />
         </>
       )}
     </aside>
@@ -333,6 +350,250 @@ function StaticChildTableView({ table, controller }: { readonly table: StaticChi
       <button type="button" className="action" onClick={() => controller.editStaticChildren({ kind: 'add', tag })}>
         {`Add <${tag}>`}
       </button>
+    </section>
+  );
+}
+
+/** @brief A row's problems, as the panel shows a field's. */
+function RowProblems({ problems }: { readonly problems: readonly { readonly severity: string; readonly message: string }[] }): React.JSX.Element {
+  return (
+    <>
+      {problems.map((problem) => (
+        <p key={problem.message} className={`field-problem ${problem.severity}`}>
+          {problem.message}
+        </p>
+      ))}
+    </>
+  );
+}
+
+/**
+ * @brief The selected element's input (§12): its ring position, its
+ *        focus_style, and a row per event.
+ */
+function ElementInputSection({ controller }: { readonly controller: PanelController }): React.JSX.Element | null {
+  countRender('PanelInput');
+  const input = useObservable(controller.input);
+  const options = useObservable(controller.options);
+  const [adding, setAdding] = useState<EventAction>('callback');
+  if (input === undefined) return null;
+  const defaultTarget = (action: EventAction): string => (action === 'screen_load' ? (options.screens[0] ?? '') : action === 'callback' ? 'on_event' : '');
+  return (
+    <section className="panel-section element-input" data-section="input">
+      <h3>Input</h3>
+      <p className="panel-note" data-ring-position={input.ringPosition ?? ''}>
+        {input.ringPosition === undefined
+          ? "Not in this screen's focus ring, so it never takes focus. Add it from the screen's Focus ring (select nothing)."
+          : `Focus ring stop ${input.ringPosition}.`}
+      </p>
+      <div className="field" data-field="focus_style">
+        <div className="field-label">
+          <span className="field-name">
+            <label htmlFor="input-focus-style">focus_style</label>
+          </span>
+        </div>
+        <select
+          id="input-focus-style"
+          aria-label="focus_style"
+          value={input.focusStyle ?? ''}
+          onChange={(event) => controller.commit('focus_style', event.target.value === '' ? undefined : event.target.value)}
+        >
+          <option value="">(none)</option>
+          {[...new Set([...options.styles, ...(input.focusStyle === undefined ? [] : [input.focusStyle])])].map((style) => (
+            <option key={style} value={style}>
+              {style}
+            </option>
+          ))}
+        </select>
+      </div>
+      <table className="event-table">
+        <thead>
+          <tr>
+            <th scope="col">trigger</th>
+            <th scope="col">action</th>
+            <th scope="col">target</th>
+            <th scope="col" aria-label="Order" />
+          </tr>
+        </thead>
+        <tbody>
+          {input.events.map((event, index) => (
+            <tr key={index} data-row={index} data-action={event.action}>
+              <td>
+                <select
+                  aria-label={`Event ${index + 1} trigger`}
+                  value={event.trigger}
+                  onChange={(change) => controller.editEvents({ kind: 'trigger', row: index, trigger: change.target.value as EventTrigger })}
+                >
+                  {[...new Set([...EVENT_TRIGGERS, event.trigger])].map((trigger) => (
+                    <option key={trigger} value={trigger}>
+                      {trigger}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <select
+                  aria-label={`Event ${index + 1} action`}
+                  value={event.action}
+                  onChange={(change) => {
+                    const action = change.target.value as EventAction;
+                    controller.editEvents({ kind: 'action', row: index, action, target: defaultTarget(action) });
+                  }}
+                >
+                  {EVENT_ACTIONS.map((entry) => (
+                    <option key={entry.action} value={entry.action}>
+                      {entry.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                {event.action === 'screen_load' && (
+                  <select
+                    aria-label={`Event ${index + 1} screen`}
+                    value={event.screen}
+                    onChange={(change) => controller.editEvents({ kind: 'target', row: index, target: change.target.value })}
+                  >
+                    {[...new Set([...options.screens, event.screen])].map((screen) => (
+                      <option key={screen} value={screen}>
+                        {screen === '' ? '(none)' : screen}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {event.action === 'callback' && (
+                  <CallbackInput
+                    label={`Event ${index + 1} callback`}
+                    value={event.callback}
+                    commit={(value) => controller.editEvents({ kind: 'target', row: index, target: value })}
+                  />
+                )}
+              </td>
+              <td className="row-actions">
+                <button type="button" aria-label={`Move event ${index + 1} up`} disabled={index === 0} onClick={() => controller.editEvents({ kind: 'move', row: index, by: -1 })}>
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move event ${index + 1} down`}
+                  disabled={index === input.events.length - 1}
+                  onClick={() => controller.editEvents({ kind: 'move', row: index, by: 1 })}
+                >
+                  ↓
+                </button>
+                <button type="button" aria-label={`Remove event ${index + 1}`} onClick={() => controller.editEvents({ kind: 'remove', row: index })}>
+                  ×
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {input.events.map((event, index) => (
+        <RowProblems key={index} problems={event.problems} />
+      ))}
+      <div className="field-actions">
+        <select aria-label="New event action" value={adding} onChange={(event) => setAdding(event.target.value as EventAction)}>
+          {EVENT_ACTIONS.map((entry) => (
+            <option key={entry.action} value={entry.action}>
+              {entry.label}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="action" onClick={() => controller.editEvents({ kind: 'add', action: adding, trigger: 'press', target: defaultTarget(adding) })}>
+          Add event
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * @brief A callback's name: committed on Enter or on leaving the field, so a
+ *        name is written whole, never a keystroke at a time.
+ */
+function CallbackInput({ label, value, commit }: { readonly label: string; readonly value: string; readonly commit: (value: string) => void }): React.JSX.Element {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const done = (): void => {
+    if (draft !== value) commit(draft.trim());
+  };
+  return (
+    <input
+      type="text"
+      aria-label={label}
+      value={draft}
+      spellCheck={false}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={done}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') done();
+        if (event.key === 'Escape') setDraft(value);
+      }}
+    />
+  );
+}
+
+/**
+ * @brief The shown screen's focus ring (§12.2): the members in order, wrap, and
+ *        an add offering only named elements written in the screen.
+ */
+function FocusRingSection({ controller }: { readonly controller: PanelController }): React.JSX.Element | null {
+  countRender('PanelFocusRing');
+  const ring = useObservable(controller.ring);
+  const [picked, setPicked] = useState('');
+  if (ring === undefined) return null;
+  const choice = ring.candidates.includes(picked) ? picked : (ring.candidates[0] ?? '');
+  return (
+    <section className="panel-section focus-ring" data-section="focus-ring">
+      <h3>Focus ring</h3>
+      <p className="panel-note">
+        {ring.exists
+          ? 'Focus moves through these, in this order, skipping hidden and disabled ones (§12.2).'
+          : 'No focus ring: this screen ignores input. Add a member to start one; nothing joins it on its own.'}
+      </p>
+      {ring.exists && (
+        <label className="ring-wrap">
+          <input type="checkbox" aria-label="wrap" checked={ring.wrap} onChange={(event) => controller.editRing({ kind: 'wrap', wrap: event.target.checked })} /> wrap
+        </label>
+      )}
+      <ol className="ring-members">
+        {ring.members.map((member, index) => (
+          <li key={`${member}:${index}`} data-member={member}>
+            <span className="ring-member-name">{member === '' ? '(no name)' : member}</span>
+            <span className="row-actions">
+              <button type="button" aria-label={`Move ${member} up`} disabled={index === 0} onClick={() => controller.editRing({ kind: 'move', row: index, by: -1 })}>
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label={`Move ${member} down`}
+                disabled={index === ring.members.length - 1}
+                onClick={() => controller.editRing({ kind: 'move', row: index, by: 1 })}
+              >
+                ↓
+              </button>
+              <button type="button" aria-label={`Remove ${member} from the ring`} onClick={() => controller.editRing({ kind: 'remove', row: index })}>
+                ×
+              </button>
+            </span>
+            <RowProblems problems={ring.problems[index] ?? []} />
+          </li>
+        ))}
+      </ol>
+      <div className="field-actions">
+        <select aria-label="Element to add to the ring" value={choice} disabled={ring.candidates.length === 0} onChange={(event) => setPicked(event.target.value)}>
+          {ring.candidates.length === 0 && <option value="">(every named element is in the ring)</option>}
+          {ring.candidates.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <button type="button" className="action" disabled={choice === ''} onClick={() => controller.editRing({ kind: 'add', name: choice })}>
+          Add to ring
+        </button>
+      </div>
     </section>
   );
 }

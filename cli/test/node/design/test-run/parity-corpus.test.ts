@@ -75,10 +75,12 @@ function pixel(frame: Uint8Array, width: number, x: number, y: number): boolean 
 
 const CORPUS: readonly CorpusProject[] = [
   { name: 'departures', dir: DEPARTURES_PROJECT },
-  // generate refuses it: it uses <focus_ring>, which focus navigation (§12.2)
-  // delivers. Its frames join the corpus when that refusal is lifted.
-  { name: 'valid-project', dir: join(CLI_ROOT, 'test', 'integration', 'fixtures', 'valid-project'), refusedWith: 'U8G2GL_NOT_YET_SUPPORTED' },
+  // It declares a <focus_ring>, which builds (§12.2), so its frames are compared too.
+  { name: 'valid-project', dir: join(CLI_ROOT, 'test', 'integration', 'fixtures', 'valid-project') },
   { name: 'emit-project', dir: join(CLI_ROOT, 'test', 'generator', 'fixtures', 'emit-project') },
+  // Two screens, each with a focus ring whose first member is a button: on
+  // activation it is focused and drawn inverted, on both targets (§12.2).
+  { name: 'input_menu', dir: join(FRAMEWORK_ROOT, 'test', 'input_menu') },
   { name: 'generated_fixture', dir: join(FRAMEWORK_ROOT, 'test', 'generated_fixture') },
   // The departures widgets as first written, at schema 0.4, before their
   // manifests carried palette metadata: the validator still accepts 0.4.
@@ -187,6 +189,10 @@ describe.skipIf(toolchain === undefined)('the parity corpus: firmware frames equ
         expect(editor.applyScene(scene), editor.getLastError()).toBe(true);
         expect(editor._module.ccall('selectScreen', 'number', ['string'], [screen]), editor.getLastError()).toBe(1);
         expect(editor.applySampleData(values), editor.getLastError()).toBe(true);
+        // Then activated, as the device's boot activates it and the designer's
+        // Run does: a screen's ring focuses its first member, which a button
+        // draws inverted (§12.2), so without this a ringed screen differs.
+        expect(editor._module.ccall('setPreview', 'number', ['number'], [1]), editor.getLastError()).toBe(1);
         TEST_RUN_TIMES.forEach((time, i) => {
           const live = editor.renderFrame(time);
           const fw = firmware.frames[i];

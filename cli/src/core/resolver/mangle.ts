@@ -38,7 +38,7 @@
  *              local styles are visible only in its own unit. The table is total
  *              (PR-04 WO11b): each screen's descriptor and every fixed name —
  *              `ui_init`, `ui_subjects_init`, `ui_styles_init`, the editor
- *              registry, the runtime's `ui_handler` — are in it as well as each
+ *              registry, the runtime's `ui_handler`, `ui_dispatch` — are in it as well as each
  *              screen's functions and tables, and the
  *              `ui_obj_` family is checked in each screen's scope against all of
  *              them. An author-written name
@@ -49,6 +49,8 @@
  * - RESERVED_IDENTIFIER_PREFIXES:     §13.4's reserved prefixes
  * - CPP_KEYWORDS:                     §13.4's reserved keywords (re-exported from schema/cpp-keywords.ts)
  * - SCREEN_FUNCTIONS, SCREEN_TABLES:  Suffixes of each screen's generated symbols
+ * - RING_TABLE, EVENTS_TABLE, inputTablesOf(): The input tables a screen with
+ *                                     a ring or events emits (§12)
  * - IdentifierKind, IdentifierSource, MangledIdentifier, ScreenIdentifiers,
  *   IdentifierTable, MangleInput:     The table's model
  * - OBJECT_IDENTIFIER_PREFIX:         `ui_obj_`, the emitted objects' family
@@ -62,6 +64,7 @@
  */
 
 import { CPP_KEYWORDS } from '../schema/cpp-keywords.js';
+import { UI_DISPATCH_FUNCTION } from '../schema/input-model.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../schema/diagnostic.js';
 import type { Globals } from '../schema/globals.js';
 import type { SourceLocation } from '../schema/source-location.js';
@@ -95,6 +98,36 @@ export const SCREEN_FUNCTIONS: readonly string[] = ['init', 'activate', 'deactiv
 
 /** The object and parent tables §13.3 emits per screen: `ui_screen_<name>_<suffix>`. */
 export const SCREEN_TABLES: readonly string[] = ['objs', 'parents'];
+
+/**
+ * The input tables §12 emits for a screen that has them: its focus ring when
+ * it declares one, its event table when any element on it carries an event.
+ * Registered only for such a screen, because only such a screen emits them.
+ */
+export const RING_TABLE = 'ring';
+export const EVENTS_TABLE = 'events';
+
+// hasEvents
+// Whether any element of an expanded tree carries an event.
+//   elements — expanded elements, recursively
+function hasEvents(elements: readonly ExpandedElement[]): boolean {
+  return elements.some(
+    (element) =>
+      element.node.children.some((child) => 'kind' in child && child.kind === 'event') || hasEvents(element.children),
+  );
+}
+
+/**
+ * @brief The input tables one screen emits, in the order its unit emits them.
+ *
+ * @param expanded The screen after composite expansion.
+ */
+export function inputTablesOf(expanded: ExpandedScreen): readonly string[] {
+  return [
+    ...(expanded.screen.view?.focusRing !== undefined ? [RING_TABLE] : []),
+    ...(hasEvents(expanded.elements) ? [EVENTS_TABLE] : []),
+  ];
+}
 
 /** Which row of §13.4's table an identifier comes from. */
 export type IdentifierKind =
@@ -222,6 +255,7 @@ const FIXED_IDENTIFIERS: readonly { readonly identifier: string; readonly descri
   { identifier: STYLES_INIT_FUNCTION, description: 'the generated ui_styles_init()' },
   { identifier: EDITOR_REGISTRY_FUNCTION, description: 'the editor registry' },
   { identifier: RUNTIME_HANDLER_FUNCTION, description: "the runtime's ui_handler()" },
+  { identifier: UI_DISPATCH_FUNCTION, description: 'the generated ui_dispatch() (§12.1)' },
 ];
 
 /** `ui_screen_home_objs`. */
@@ -510,7 +544,7 @@ export function mangleIdentifiers(input: MangleInput): IdentifierTable {
 
   // --- Step 1: Identifiers every translation unit sees through ui.hpp ---
   const global: Entry[] = [];
-  for (const { screen } of input.screens) {
+  for (const { screen, elements } of input.screens) {
     if (!screen.name) {
       continue;
     }
@@ -518,7 +552,7 @@ export function mangleIdentifiers(input: MangleInput): IdentifierTable {
     for (const fn of SCREEN_FUNCTIONS) {
       global.push(makeEntry(screenFunctionIdentifier(screen.name, fn), 'screen_function', description, screen.loc, `screen:${screen.name}`));
     }
-    for (const table of SCREEN_TABLES) {
+    for (const table of [...SCREEN_TABLES, ...inputTablesOf({ screen, elements })]) {
       global.push(makeEntry(screenTableIdentifier(screen.name, table), 'screen_table', description, screen.loc, `screen:${screen.name}`));
     }
     global.push(

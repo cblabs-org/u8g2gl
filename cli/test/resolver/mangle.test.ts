@@ -105,6 +105,7 @@ describe('mangleIdentifiers (PR-04 WO7)', () => {
       ['ui_styles_init', 'fixed'],
       ['ui_editor_registry', 'fixed'],
       ['ui_handler', 'fixed'],
+      ['ui_dispatch', 'fixed'],
       ['ui_subject_temperature', 'subject'],
       ['ui_set_temperature', 'subject_setter'],
       ['ui_font_small_9', 'font'],

@@ -19,7 +19,13 @@
  *              - `times` (optional): frame times in ms, non-decreasing;
  *                TEST_RUN_TIMES when absent;
  *              - `sets` (optional): the sample sets to check, each as the
- *                canvas applies it (sample-set-unit.ts).
+ *                canvas applies it (sample-set-unit.ts);
+ *              - `events` (optional): a scripted input sequence (§12), each
+ *                an INPUT_EVENTS name. The requested screen is then also run
+ *                from boot through the sequence, and the result's `input`
+ *                holds a frame after the boot and after each event, with the
+ *                screen then active and the callbacks the event reached, for
+ *                the designer to compare step by step with its own replay.
  *              Every screen is run from boot with the initial values, then
  *              once per set, each on a fresh harness instance, and the
  *              result's `runs` holds them all, so parity is reported per set
@@ -39,6 +45,7 @@
  * - TestRunParams:           What a request asks for
  * - TestRunFrame:            One frame of the result
  * - TestRunCase:             One screen's frames with one set
+ * - TestRunInputStep:        One step of a scripted input run (§12)
  * - TestRunResult:           A succeeded run
  * - parseTestRunParams():    Validate a request's params
  * - TestRunJobOptions:       Where the job builds, and with what
@@ -54,6 +61,7 @@ import { detectToolchain, type SelectedToolchain } from '../../toolchain/detect-
 import { nodeToolchainHost, type ToolchainHost } from '../../toolchain/toolchain-host.js';
 import { EMSCRIPTEN_VERSION, toolchainCacheRoot } from '../../toolchain/toolchain-paths.js';
 import { RUNTIME_VERSION } from '../../../data/runtime-version.js';
+import { INPUT_EVENTS, type InputEventName } from '../../../core/schema/input-model.js';
 import type { Diagnostic } from '../../../core/schema/diagnostic.js';
 import { sha256 } from '../build/compile-units.js';
 import { EDITOR_WASM_FAILURE } from '../build/editor-wasm-job.js';
@@ -77,6 +85,9 @@ export const TEST_RUN_TIMES: readonly number[] = [0, 16, 100, 250, 500, 1000, 20
 /** The most frame times one run may ask for. */
 const MAX_TIMES = 64;
 
+/** The most input events one scripted run may ask for. */
+const MAX_EVENTS = 64;
+
 /** A request's params, validated. */
 export interface TestRunParams {
   readonly screen: string;
@@ -84,6 +95,20 @@ export interface TestRunParams {
   readonly times: readonly number[];
   /** The sample sets to check besides the initial values; none when absent. */
   readonly sets: readonly TestRunSampleSet[];
+  /** A scripted input sequence (§12) to replay on the requested screen; none when absent. */
+  readonly events: readonly InputEventName[];
+}
+
+/** One step of a scripted input run: the frame after it, and what it did. */
+export interface TestRunInputStep {
+  /** The event dispatched; null for the boot frame. */
+  readonly event: InputEventName | null;
+  /** The screen active after the step. */
+  readonly screen: string | null;
+  /** The callbacks the event reached: recorded, not run. */
+  readonly callbacks: ReadonlyArray<{ readonly callback: string; readonly element: string; readonly trigger: string }>;
+  readonly sha256: string;
+  readonly bytes: string;
 }
 
 /** One frame of a run. */
@@ -113,6 +138,8 @@ export interface TestRunResult {
    * and set order: what parity is reported for, per set and per screen.
    */
   readonly runs: readonly TestRunCase[];
+  /** The requested screen driven through `events`, when the request had any (§12). */
+  readonly input?: { readonly screen: string; readonly steps: readonly TestRunInputStep[] };
   /** Whether the harness was linked for this run, or found current. */
   readonly build: 'built' | 'current';
   readonly harnessHash: string;
@@ -145,7 +172,13 @@ export function parseTestRunParams(params: unknown): TestRunParams | string {
   if (typeof params !== 'object' || params === null) {
     return 'a test run needs { "screen", "documents" }';
   }
-  const { screen, documents, times, sets } = params as { screen?: unknown; documents?: unknown; times?: unknown; sets?: unknown };
+  const { screen, documents, times, sets, events } = params as {
+    screen?: unknown;
+    documents?: unknown;
+    times?: unknown;
+    sets?: unknown;
+    events?: unknown;
+  };
   if (typeof screen !== 'string' || screen === '') {
     return 'a test run needs the screen the canvas shows';
   }
@@ -181,7 +214,15 @@ export function parseTestRunParams(params: unknown): TestRunParams | string {
   if (typeof parsedSets === 'string') {
     return parsedSets;
   }
-  return { screen, documents: parsed, times: wanted as number[], sets: parsedSets };
+  const script = events === undefined ? [] : events;
+  if (
+    !Array.isArray(script) ||
+    script.length > MAX_EVENTS ||
+    !script.every((event): event is InputEventName => typeof event === 'string' && event in INPUT_EVENTS)
+  ) {
+    return `events must be up to ${MAX_EVENTS} of ${Object.keys(INPUT_EVENTS).join(', ')}`;
+  }
+  return { screen, documents: parsed, times: wanted as number[], sets: parsedSets, events: script };
 }
 
 /** Where the job builds, and with what. Every field has a real-machine default. */
@@ -259,6 +300,30 @@ export async function runTestRun(
     }
   }
   const requested = runs.find((r) => r.screen === params.screen && r.set === null);
+
+  // --- Step 4: The scripted input sequence, on the requested screen from boot ---
+  let input: TestRunResult['input'];
+  if (params.events.length > 0) {
+    const replay = await harness.runEvents(params.screen, params.events.map((event) => INPUT_EVENTS[event]));
+    input = {
+      screen: params.screen,
+      steps: replay.frames.map((frame, i) => {
+        const stepScreen = replay.screens[i] ?? null;
+        const names = build.layout.objects[stepScreen === null ? -1 : build.layout.screens.indexOf(stepScreen)] ?? [];
+        return {
+          event: i === 0 ? null : (params.events[i - 1] ?? null),
+          screen: stepScreen,
+          callbacks: (replay.callbacks[i] ?? []).map(({ callback, object, trigger }) => ({
+            callback,
+            element: names[object] ?? '',
+            trigger,
+          })),
+          sha256: sha256(frame),
+          bytes: Buffer.from(frame).toString('base64'),
+        };
+      }),
+    };
+  }
   const runMs = Date.now() - runStarted;
 
   return {
@@ -268,6 +333,7 @@ export async function runTestRun(
       display: harness.display,
       frames: requested?.frames ?? [],
       runs,
+      ...(input === undefined ? {} : { input }),
       build: build.status,
       harnessHash: build.harnessHash,
       versions: {

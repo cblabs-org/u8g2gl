@@ -53,6 +53,7 @@ import {
   type RefusalPolicy,
 } from './validate-not-yet-supported.js';
 import { validateRealisation } from './validate-realisation.js';
+import { validateInput } from './validate-input.js';
 import { validateGlyphRanges } from './validate-glyph-ranges.js';
 
 /**
@@ -183,6 +184,8 @@ export function compareDiagnostics(a: Diagnostic, b: Diagnostic): number {
  * 7. Identifier naming rules & collisions (validateIdentifiers)
  * 8. Constructs not yet generated, at `input.refusalPolicy` (validateNotYetSupported)
  * 9. The exact object ceiling, and realisation's refusals (validateRealisation)
+ * 10. Static text outside a `<bdf>` font's range (validateGlyphRanges)
+ * 11. Focus rings and events (validateInput)
  *
  * @param input The parsed project AST models and display catalogue.
  * @return Ordered diagnostics with error and warning totals.
@@ -233,6 +236,9 @@ export function validate(input: ValidateInput): ValidateResult {
 
   // Pass 10: Static text using a glyph its <bdf> font's range leaves out (§14.1)
   allDiagnostics.push(...validateGlyphRanges(passInput));
+
+  // Pass 11: Focus rings and events (§12): targets, callbacks, and what can never fire
+  allDiagnostics.push(...validateInput(passInput));
 
   // Sort deterministically by file, then line, then column, then code (§13.9)
   allDiagnostics.sort(compareDiagnostics);

@@ -290,7 +290,7 @@ export function parseWidgetManifest(
   // with a `<view>` child, not a second tag. Both shapes keep `extends`
   // exactly as written (PR-04 WO7). A composite normally declares none — it
   // has no C++ class of its own — but one that does is claiming a class, which
-  // Pass 8 refuses until PR-08. Dropping it here made that refusal unreachable
+  // Pass 8 refuses. Dropping it here made that refusal unreachable
   // from real XML (PR-04 WO5b F1): the author's `extends` vanished silently.
   //
   // No default is filled in here (PR-04 WO2, F2). Defaulting a missing

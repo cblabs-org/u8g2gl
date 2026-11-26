@@ -15,7 +15,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -158,33 +158,35 @@ afterAll(() => {
 });
 
 describe('u8g2gl generate (PR-04 WO5b)', () => {
-  it('refuses what validate warns about — same code, file, line, column and message — and writes nothing', async () => {
-    const validated = JSON.parse((await runCli(['validate', validProjectDir, '--json'])).stdout) as GenerateJson;
-    const res = await runCli(['generate', validProjectDir, '--json']);
+  it('warns where validate warns — same code, file, line, column and message — and builds the ring', async () => {
+    // valid-project's <focus_ring> builds (§12). Its one member is a label
+    // with no events, a highlight-only stop, so both journeys warn about it the
+    // same way. Run on a copy: generating writes into the project.
+    const dir = mkdtempSync(resolve(__dirname, '../../tmp/generate-valid-'));
+    tempDirs.push(dir);
+    cpSync(validProjectDir, dir, { recursive: true });
+    const validated = JSON.parse((await runCli(['validate', dir, '--json'])).stdout) as GenerateJson;
+    const res = await runCli(['generate', dir, '--json']);
     const generated = JSON.parse(res.stdout) as GenerateJson;
 
     const located = (ds: JsonDiagnostic[]): string[] =>
-      ds
-        .filter((d) => d.code === 'U8G2GL_NOT_YET_SUPPORTED')
-        .map((d) => `${d.code} ${d.file}:${d.line}:${d.column} ${d.message}`);
+      ds.map((d) => `${d.severity} ${d.code} ${d.file}:${d.line}:${d.column} ${d.message}`);
 
-    expect(res.code).toBe(1);
-    // Only <focus_ring> is not-yet-supported: valid-project's two <bdf> fonts compile.
+    expect(res.code).toBe(0);
     expect(located(validated.diagnostics)).toHaveLength(1);
+    expect(validated.diagnostics[0]?.code).toBe('U8G2GL_INERT_FOCUS_STOP');
     expect(located(generated.diagnostics)).toEqual(located(validated.diagnostics));
-    expect(validated.diagnostics.every((d) => d.severity === 'warning')).toBe(true);
-    expect(generated.diagnostics.every((d) => d.severity === 'error')).toBe(true);
-    expect(generated.errors).toBe(1);
-    expect(generated.files).toEqual([]);
-    expect(existsSync(join(validProjectDir, 'generated'))).toBe(false);
+    expect(generated.errors).toBe(0);
+    expect(readFileSync(join(dir, 'generated/ui_screen_home.cpp'), 'utf-8')).toContain(
+      'static const u8g2gl_focus_stop ui_screen_home_ring[] = {',
+    );
   });
 
-  it('prints the refusal with source lines, and says nothing was written', async () => {
-    const res = await runCli(['generate', validProjectDir]);
+  it('prints a refusal with its source lines, and says nothing was written', async () => {
+    const res = await runCli(['generate', createProject({ unnamed: true })]);
 
     expect(res.code).toBe(1);
-    expect(res.stderr).toContain('<focus_ring wrap="true">');
-    expect(res.stderr).toContain('PR-09');
+    expect(res.stderr).toContain('<u8g2gl_label x="0"');
     expect(res.stderr).toContain('Generation refused: 1 error(s), 0 warning(s). Nothing was written.');
   });
 
@@ -450,7 +452,7 @@ describe('u8g2gl generate (PR-04 WO5b)', () => {
   });
 
   it('omits the budget when the build was refused, as it empties files', async () => {
-    const parsed = JSON.parse((await runCli(['generate', validProjectDir, '--json'])).stdout) as GenerateJson;
+    const parsed = JSON.parse((await runCli(['generate', createProject({ unnamed: true }), '--json'])).stdout) as GenerateJson;
 
     expect(parsed.files).toEqual([]);
     // A report for code that was not written would describe nothing.

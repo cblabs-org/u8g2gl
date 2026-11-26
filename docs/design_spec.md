@@ -1515,7 +1515,13 @@ Past the bound, the band U8G2 draws between the corner discs — `w - r - r`, `u
 
 Inline overrides use the `style_` prefix: `style_invert="true"`. Inline overrides are restricted to the nine properties in the table above: `style_` tells a reader "this is styling", and a general per-element override of any property that happens to have a setter is a different feature, which §1.5 says waits for a demonstrated need.
 
-**An element's own attributes win over a named style**, and so do its inline `style_` overrides: an attribute on the element is the more specific statement of intent, the same rule CSS and LVGL use. That applies to styles applied later too — a `focus_style` (§12) must not overwrite a property the element set itself. The generator handles init by applying named styles before properties (§13.7). The runtime must keep the rule when it applies styles at run time, which means tracking which properties the element set itself.
+**An element's own attributes win over a named style**, and so do its inline `style_` overrides: an attribute on the element is the more specific statement of intent, the same rule CSS and LVGL use. That applies to styles applied later too — a `focus_style` (§12) must not overwrite a property the element set itself. The generator handles init by applying named styles before properties (§13.7). The runtime keeps the rule at run time (PR-09, ruling 3):
+
+- **Each object records which style properties its own setters set** — `set_font()`, `set_radius()` and the rest, whether generated from an attribute or a `style_` override — in a mask beside its resolved style, and **`apply_style()` merges only the properties not in that mask**. At init nothing is in the mask yet when styles are applied, so the merge is the plain one it always was, and no existing output changed.
+- **`apply_style()` remembers its style as the object's base**: the one its resolved style is rebuilt from when it loses focus.
+- **Gaining focus merges the `focus_style`**, below the object's own properties as above. **Losing it** clears every property not in the mask and merges the base again, so the object draws exactly as it did before — a setter called while it was focused included.
+- **Several named styles on a ring member with a `focus_style`** are merged, in order, into one base the generator emits for it, because an object remembers one base. The resolved style is the same either way.
+- **Cost:** one pointer per object; the mask fills padding that was already there. Measured: `sizeof(u8g2gl_obj)` 48 → 56 bytes on a 64-bit host, 32 → 36 on 32-bit (Wasm). An element with no `focus_style` never has its style touched by focus.
 
 **Omitted from LVGL Pro** (no monochrome meaning): `bg_color`, `bg_opa`, `bg_grad_*`, `shadow_*`, `transform_scale`, `text_color`, `<bind_style>`.
 
@@ -1692,7 +1698,7 @@ Every widget in the reference implementation uses `(w + 7) / 8`, which under-cov
 
 ## 12. Input, Focus & Navigation
 
-v0.1 listed trigger events (`button_press`, `encoder_cw`, …) and a `<screen_load_event>` tag, but had no focus model — so "a button press on this label" had no defined meaning, because nothing determined which label received it. This section supplies the missing model.
+v0.1 listed trigger events (`button_press`, `encoder_cw`, …) and a `<screen_load_event>` tag, but had no focus model — so "a button press on this label" had no defined meaning, because nothing determined which label received it. This section supplies the missing model. It is implemented since PR-09 (runtime 0.17.0, CLI 0.28.0); its PA rulings 1–7 are what this section states.
 
 ### 12.1 Boundary
 
@@ -1706,9 +1712,20 @@ ui_dispatch(U8G2GL_EVENT_BUTTON_LONG_PRESS);
 
 *Rationale:* Button wiring, active-high versus active-low, debounce timing, and encoder decoding are all board-specific and already solved by libraries the user has chosen. A framework that tried to own them would be wrong on most boards.
 
+**The events** (`u8g2gl_event_t`, `u8g2gl_types.h`):
+
+| Event | Does |
+|---|---|
+| `ENCODER_CW`, `BUTTON_NEXT` | Move focus forward |
+| `ENCODER_CCW`, `BUTTON_PREV` | Move focus back |
+| `ENCODER_CLICK`, `BUTTON_PRESS` | Fire the focused element's `press` |
+| `ENCODER_LONG_CLICK`, `BUTTON_LONG_PRESS` | Fire its `long_press` |
+
+**The application times long presses**; the framework never times input. `ui_dispatch()` is generated in `ui.cpp` for a project with a ring or an event, and calls the runtime's `u8g2gl_dispatch()`. Dispatch is synchronous, allocates nothing, and returns whether the event did something (focus moved, or a press reached a focused element). It is not re-entrant: a callback must not dispatch.
+
 ### 12.2 Focus Ring
 
-A screen declares an explicit, ordered focus ring. Only named, focusable elements may appear in it.
+A screen declares an explicit, ordered focus ring.
 
 ```xml
 <screen name="settings">
@@ -1729,9 +1746,11 @@ A screen declares an explicit, ordered focus ring. Only named, focusable element
 </screen>
 ```
 
-- `EncoderCW` / `EncoderCCW` (and `ButtonNext` / `ButtonPrev`) move focus, skipping hidden and disabled elements.
-- `EncoderClick` / `ButtonPress` dispatches to the focused element.
-- Exactly one element holds focus. A screen with no `<focus_ring>` is non-interactive and ignores input.
+- **Membership is opt-in and author-curated** (Q1a). The ring is exactly the `<focus name>` entries written, in their order; nothing joins it on its own, an element left out never takes focus, and **a screen with no `<focus_ring>` ignores input**. Any named element written in the screen may be a member, and being one makes it an object (§13.5). An element inside a composite's template is not written in the screen, so it cannot be one; a composite's own `<focus_ring>` is refused until a later PR.
+- **On activation**, focus goes to the ring's first visible, enabled member (`U8G2GL_FLAG_FOCUSED`, set and cleared only by the runtime). With none, nothing is focused, and the next move takes the first that has become focusable.
+- **Moving** skips a member hidden by itself or by an ancestor, or disabled. With `wrap="false"` moving past either end does nothing; `wrap` is `true` when absent. A focus change marks both objects dirty.
+- **What focus looks like.** A button draws inverted while focused, as it does when its style sets `invert`, so no existing button changed (Q3a); never while disabled. Any element shows its `focus_style` while focused (§10).
+- **The checks** (Pass 11), each naming the element: the same element twice in one ring is an error (`U8G2GL_DUPLICATE_FOCUS_ENTRY`), as is a `<focus>` naming no element written in the screen (`U8G2GL_UNKNOWN_WIDGET`). **A ring member with no events that is not a switch is a warning** (`U8G2GL_INERT_FOCUS_STOP`): focus stops on it and a press does nothing, which is right for a highlight-only stop shown by its `focus_style` and wrong otherwise.
 
 *Rationale for an explicit ring rather than inferred tab order:* with absolute positioning there is no reliable reading order to infer from, and an explicit list is both readable and diffable.
 
@@ -1751,9 +1770,23 @@ A screen declares an explicit, ordered focus ring. Only named, focusable element
 </u8g2gl_button>
 ```
 
-Triggers on focusable elements: `press`, `long_press`. Triggers on any element: `value_changed`.
+**Triggers.** `press` and `long_press` fire on the focused element only, so an element with either that no ring lists can never fire it (`U8G2GL_PRESS_UNREACHABLE`, a warning). `value_changed` fires when **input** changes an element's value — never a binding, never the application's own `ui_set_…` (Q2a); in schema 0.7 only the switch can, so `value_changed` elsewhere is a warning (`U8G2GL_VALUE_CHANGED_UNREACHABLE`). An unknown trigger is an error (`U8G2GL_UNKNOWN_TRIGGER`).
 
-`<screen_back_event>` pops a small fixed-depth screen stack (default 4, configurable). Deeper navigation is the application's responsibility.
+**A press, in order:** the focused element's own response first — **a focused switch toggles**, and when bound to a bool subject it writes the subject through its ordinary setter, so every other binding of that subject updates (the one place a binding works both ways) — then its `press` events, then, if the press changed its value, its `value_changed` events. A `press` callback therefore sees the new value. An element's events run in document order and **stop as soon as one changes the active screen**: the rest belong to a screen no longer showing.
+
+**`<screen_load_event screen>`** pushes the active screen and its focus position, then activates the target; its target must be a screen in the project (`U8G2GL_UNKNOWN_SCREEN`). **`<screen_back_event>`** pops the stack and activates that screen, restoring its focus position, or the ring's first focusable member if that one is no longer focusable; on an empty stack it does nothing. The stack is static, `U8G2GL_SCREEN_STACK_DEPTH` entries (default 4, set at compile time); a load onto a full stack drops the oldest. Deeper navigation is the application's. `u8g2gl_set_active_screen()` leaves the stack as it is, and `u8g2gl_screen_stack_clear()` forgets it.
+
+**`<event_cb callback>`** calls the application's function, declared in `ui.hpp` and defined by the application:
+
+```cpp
+void on_reset_pressed(u8g2gl_obj& target, u8g2gl_trigger_t trigger);
+```
+
+One callback may serve many elements and triggers; the arguments say which. A missing definition is a link error naming it. The name must be a C identifier (`[A-Za-z_][A-Za-z0-9_]*`), not a C++ keyword and not in the runtime's `u8g2gl_` namespace (`U8G2GL_INVALID_CALLBACK`), and it joins the generated-name collision check (`U8G2GL_GENERATED_NAME_COLLISION`).
+
+**What is generated** (ruling 6): for each screen with input, its ring (each stop's object index and focus style) and its event table (object, trigger, action, target screen descriptor, callback) as `const` arrays its `u8g2gl_screen` descriptor points at. Nothing is registered at run time and nothing allocates. §18 counts the entries (and the screen stack); their bytes are `sizeof` the runtime's structs, which §13.7 keeps from the generator.
+
+**In the designer** (ruling 7) the scene carries the same ring and events, and the editor Wasm runs the runtime's own dispatch on them, so focus moves on the canvas exactly as on the device; a load switches the designer's screen, and a callback is shown, never run (ui_spec §8, §9.6).
 
 ### 12.4 Screen Lifecycle
 

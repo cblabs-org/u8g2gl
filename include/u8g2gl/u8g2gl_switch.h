@@ -28,6 +28,10 @@
  *     Binding:
  *     - bind_value(): Drive the state from a bool subject
  *
+ *     Input (§12.3):
+ *     - on_press_input(): A press on the focused switch toggles it, writing a
+ *                         bound subject
+ *
  *     Lifecycle (overrides):
  *     - tick():   Advance animation state; always returns U8G2GL_IDLE
  *     - render(): Draw switch track and handle to U8G2 display buffer
@@ -95,6 +99,22 @@ public:
      *         observer capacity is exhausted; no binding is registered.
      */
     bool bind_value(u8g2gl_subject_bool_base* subject);
+
+    // --- Input ---
+
+    /**
+     * @brief Toggle, because a press reached this switch while it held focus.
+     *
+     * When the switch is bound to a bool subject (bind_value()), the toggle
+     * writes the subject through its ordinary setter, so every other binding
+     * of that subject updates and this switch follows through its own
+     * observer. That is the one place a binding works both ways (§12.3). An
+     * unbound switch toggles its own state.
+     *
+     * @return true: a toggle always changes the value, so the switch's
+     *         `value_changed` events fire.
+     */
+    bool on_press_input() override;
 
     // --- Lifecycle ---
 

@@ -7,8 +7,11 @@
  * Purpose: Pins Pass 8 — every construct `generate` does not build yet is named,
  *          with the PR that delivers it, at one location, and at the severity the
  *          caller's policy chooses (PR-04 decisions 1 and 3, WO5b).
- * Description: One document carrying every deferred construct is checked under
- *              both policies; the two runs must agree on everything but severity.
+ * Description: One document carrying a screen's focus ring and all three events,
+ *              which build and so are no longer reported, and
+ *              composites carrying what is still deferred: a C++ class of their
+ *              own, and a focus ring of their own. Checked under both policies;
+ *              the two runs must agree on everything but severity.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -88,6 +91,23 @@ const CARD_COMPOSITE_XML = `<widget name="wd_card">
 </widget>
 `;
 
+// Line numbers matter: the location assertion below names line 8.
+const RING_COMPOSITE_XML = [
+  '<widget name="wd_menu">',
+  '    <api>',
+  '        <prop name="caption" type="string" default="" />',
+  '    </api>',
+  '    <view>',
+  '        <u8g2gl_button name="first" x="0" y="0" width="64" height="12" text="$caption">',
+  '        </u8g2gl_button>',
+  '        <focus_ring wrap="false">',
+  '            <focus name="first" />',
+  '        </focus_ring>',
+  '    </view>',
+  '</widget>',
+  '',
+].join('\n');
+
 /** The document above as validator input, with the given extra project manifests. */
 function inputWith(extra: readonly WidgetManifest[] = []): ValidateInput {
   const list = parseWidgetManifestFile(LIST_MANIFEST_XML, 'widgets/wd_list/wd_list.xml').value!;
@@ -107,32 +127,21 @@ function deferred(diagnostics: readonly Diagnostic[]): Diagnostic[] {
 }
 
 describe('validateNotYetSupported (PR-04 WO5b)', () => {
-  it('names every deferred construct in a screen and globals, with the PR that delivers it', () => {
-    const found = deferred(validateNotYetSupported(inputWith()));
-    const byText = new Map(found.map((d) => [d.offendingText, d]));
-
-    // <bdf> and <convert> are not reported: both build.
-    // A declared static child (`<column>` in `<wd_list>`, §6.5) builds since
-    // schema 0.7, so it is not reported either.
-    expect(found.map((d) => d.offendingText).sort()).toEqual(
-      ['event_cb', 'focus_ring', 'screen_back_event', 'screen_load_event'].sort(),
-    );
-    for (const pr9 of ['focus_ring', 'event_cb', 'screen_load_event', 'screen_back_event']) {
-      expect(byText.get(pr9)?.message).toContain('PR-09');
-    }
+  it("no longer reports a screen's focus ring or any of the three events: they build (§12)", () => {
+    // <bdf> and <convert> are not reported: both build. A declared static
+    // child (`<column>` in `<wd_list>`, §6.5) builds since schema 0.7.
+    expect(deferred(validateNotYetSupported(inputWith()))).toEqual([]);
   });
 
-  it('locates each construct where it is declared', () => {
-    const found = deferred(validateNotYetSupported(inputWith()));
-    const at = (text: string): string => {
-      const d = found.find((x) => x.offendingText === text);
-      return `${d?.file}:${d?.line}:${d?.column}`;
-    };
+  it("locates a composite's own focus ring where it is declared, deferred to a later PR", () => {
+    const menu = parseWidgetManifestFile(RING_COMPOSITE_XML, 'widgets/wd_menu/wd_menu.xml').value!;
+    const found = deferred(validateNotYetSupported(inputWith([menu])));
 
-    expect(at('event_cb')).toBe('screens/screen_home.xml:4:13');
-    expect(at('screen_load_event')).toBe('screens/screen_home.xml:5:13');
-    expect(at('screen_back_event')).toBe('screens/screen_home.xml:6:13');
-    expect(at('focus_ring')).toBe('screens/screen_home.xml:11:9');
+    expect(found.map((d) => `${d.offendingText} ${d.file}:${d.line}:${d.column}`)).toEqual([
+      'focus_ring widgets/wd_menu/wd_menu.xml:8:9',
+    ]);
+    expect(found[0]?.message).toContain('a later PR');
+    expect(found[0]?.message).toContain('wd_menu');
   });
 
   it('reports nothing for builtin fonts, xbm and convert images, and plain elements', () => {
@@ -145,24 +154,25 @@ describe('validateNotYetSupported (PR-04 WO5b)', () => {
   });
 
   it('warns by default and under "warning", errors under "error" — same code, location and message', () => {
-    const byDefault = deferred(validate(inputWith()).diagnostics);
-    const warned = deferred(validate({ ...inputWith(), refusalPolicy: 'warning' }).diagnostics);
-    const refused = deferred(validate({ ...inputWith(), refusalPolicy: 'error' }).diagnostics);
+    const card = parseWidgetManifestFile(CARD_COMPOSITE_XML, 'widgets/wd_card/wd_card.xml').value!;
+    const menu = parseWidgetManifestFile(RING_COMPOSITE_XML, 'widgets/wd_menu/wd_menu.xml').value!;
+    const extra = [{ ...card, extends: 'u8g2gl_obj' }, menu];
+    const byDefault = deferred(validate(inputWith(extra)).diagnostics);
+    const warned = deferred(validate({ ...inputWith(extra), refusalPolicy: 'warning' }).diagnostics);
+    const refused = deferred(validate({ ...inputWith(extra), refusalPolicy: 'error' }).diagnostics);
 
-    expect(byDefault).toHaveLength(4);
+    expect(byDefault).toHaveLength(2);
     expect(byDefault).toEqual(warned);
     expect(warned.every((d) => d.severity === 'warning')).toBe(true);
     expect(refused.every((d) => d.severity === 'error')).toBe(true);
     expect(refused.map((d) => ({ ...d, severity: 'warning' }))).toEqual(warned);
   });
 
-  it('checks a composite template on the same path as a screen', () => {
+  it("does not report an event in a composite's template: it builds, per instance", () => {
     const card = parseWidgetManifestFile(CARD_COMPOSITE_XML, 'widgets/wd_card/wd_card.xml').value!;
     const found = deferred(validateNotYetSupported(inputWith([card])));
-    const inCard = found.filter((d) => d.file === 'widgets/wd_card/wd_card.xml');
 
-    expect(inCard.map((d) => d.offendingText)).toEqual(['event_cb']);
-    expect(inCard[0]?.line).toBe(7);
+    expect(found.filter((d) => d.file === 'widgets/wd_card/wd_card.xml')).toEqual([]);
   });
 
   // Checked on the parsed model here; since PR-04 WO7 the parser keeps `extends`

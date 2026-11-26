@@ -18,6 +18,12 @@
  *              the resolver's own rule (`screenDescriptorIdentifier()`), the
  *              one the generator declares it with.
  *
+ *              It also defines each `<event_cb>` callback the project names
+ *              (§12.3), which an application would define itself: each
+ *              records its name, target and trigger with the harness
+ *              (`u8g2gl_harness_record_callback()`), so a test run reports
+ *              which callbacks a scripted input reached, as the canvas does.
+ *
  * Exports:
  * - SCREEN_TABLE_UNIT:     The unit's file name
  * - SceneLayout:           The screens and display a scene describes
@@ -35,6 +41,47 @@ export interface SceneLayout {
   readonly display: { readonly width: number; readonly height: number };
   /** Screen names in document order. */
   readonly screens: readonly string[];
+  /** Every `<event_cb>` callback the screens name, once each, in first-use order. */
+  readonly callbacks: readonly string[];
+  /** Per screen, in `screens` order, each object's element name by object index. */
+  readonly objects: readonly (readonly string[])[];
+}
+
+// sceneObjects
+// Each object's element name by its index, for one scene screen: what turns
+// an object index the harness reports back into the name the designer shows.
+//   screen — one of the scene's `screens`
+function sceneObjects(screen: unknown): string[] {
+  const names: string[] = [];
+  const elements = (screen as { elements?: unknown }).elements;
+  for (const element of Array.isArray(elements) ? elements : []) {
+    const { realisation, object, name } = element as { realisation?: unknown; object?: unknown; name?: unknown };
+    if (realisation === 'object' && typeof object === 'number' && typeof name === 'string') {
+      names[object] = name;
+    }
+  }
+  return Array.from(names, (name) => name ?? '');
+}
+
+// sceneCallbacks
+// The callbacks a scene's screens name, in first-use order: each object's
+// `events`, where an `<event_cb>`'s action is `callback` (scene format 6).
+//   screens — the scene's `screens`
+function sceneCallbacks(screens: readonly unknown[]): string[] {
+  const callbacks: string[] = [];
+  for (const screen of screens) {
+    const elements = (screen as { elements?: unknown }).elements;
+    for (const element of Array.isArray(elements) ? elements : []) {
+      const events = (element as { events?: unknown }).events;
+      for (const event of Array.isArray(events) ? events : []) {
+        const { action, callback } = event as { action?: unknown; callback?: unknown };
+        if (action === 'callback' && typeof callback === 'string' && !callbacks.includes(callback)) {
+          callbacks.push(callback);
+        }
+      }
+    }
+  }
+  return callbacks;
 }
 
 /**
@@ -67,7 +114,12 @@ export function readSceneLayout(sceneJson: string): SceneLayout | undefined {
   if (!names.every((name): name is string => typeof name === 'string')) {
     return undefined;
   }
-  return { display: { width, height }, screens: names };
+  return {
+    display: { width, height },
+    screens: names,
+    callbacks: sceneCallbacks(screens as unknown[]),
+    objects: (screens as unknown[]).map(sceneObjects),
+  };
 }
 
 /**
@@ -96,6 +148,18 @@ export function screenTableUnit(layout: SceneLayout): string {
     `const uint8_t u8g2gl_harness_screen_count = ${layout.screens.length};`,
     `const int32_t u8g2gl_harness_display_width = ${layout.display.width};`,
     `const int32_t u8g2gl_harness_display_height = ${layout.display.height};`,
+    ...(layout.callbacks.length === 0
+      ? []
+      : [
+          '',
+          "// The project's <event_cb> callbacks, which ui.hpp declares and an",
+          '// application would define: each records itself with the harness.',
+          ...layout.callbacks.flatMap((callback) => [
+            `void ${callback}(u8g2gl_obj& target, u8g2gl_trigger_t trigger) {`,
+            `    u8g2gl_harness_record_callback(${cString(callback)}, target, trigger);`,
+            '}',
+          ]),
+        ]),
     '',
   ].join('\n');
 }

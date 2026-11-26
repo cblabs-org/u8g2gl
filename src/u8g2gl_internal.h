@@ -13,11 +13,14 @@
  *          rather than in include/u8g2gl/, so it never becomes API surface
  *          that a later release would have to keep.
  *
- * Description: Cross-module hooks between the frame (u8g2gl_core.cpp) and the
- *              timers (u8g2gl_timer.cpp)
+ * Description: Cross-module hooks between the frame (u8g2gl_core.cpp), the
+ *              timers (u8g2gl_timer.cpp) and input (u8g2gl_input.cpp)
  *
- * Exported Classes:
- * - u8g2gl_resume_notify(): Fire the registered resume callback
+ * Exported Functions:
+ * - u8g2gl_resume_notify():   Fire the registered resume callback
+ * - u8g2gl_activate_screen(): Switch screens, entering focus at a given position
+ * - u8g2gl_focus_enter():     Give an activated screen its focus
+ * - u8g2gl_focus_leave():     Take focus from a screen being left
  */
 #ifndef U8G2GL_INTERNAL_H
 #define U8G2GL_INTERNAL_H
@@ -32,5 +35,34 @@
  * here and not in the public u8g2gl_core.h.
  */
 void u8g2gl_resume_notify();
+
+#include <cstdint>
+
+struct u8g2gl_screen;
+
+/**
+ * @brief Library-internal: make @p screen active, entering its focus at
+ *        @p focus_pos.
+ *
+ * The one implementation behind u8g2gl_set_active_screen() (first focusable
+ * member) and the screen stack's back (the remembered position). Lives in
+ * u8g2gl_core.cpp, which owns the active screen.
+ *
+ * @param screen    The screen to activate, or nullptr for none.
+ * @param focus_pos Ring position to restore, or U8G2GL_NO_FOCUS for the first.
+ */
+void u8g2gl_activate_screen(u8g2gl_screen* screen, uint8_t focus_pos);
+
+/**
+ * @brief Library-internal: focus @p screen's ring at @p focus_pos if that member
+ *        is focusable, else at its first focusable member, else nowhere.
+ */
+void u8g2gl_focus_enter(u8g2gl_screen& screen, uint8_t focus_pos);
+
+/**
+ * @brief Library-internal: the focused member of @p screen loses focus, and the
+ *        screen is left with nothing focused.
+ */
+void u8g2gl_focus_leave(u8g2gl_screen& screen);
 
 #endif // U8G2GL_INTERNAL_H

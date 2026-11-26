@@ -246,7 +246,7 @@ describe('emission', () => {
       version: number;
       screens: { elements: { name: string; static_children?: unknown }[] }[];
     };
-    expect(scene.version).toBe(5);
+    expect(scene.version).toBe(6);
     const elements = scene.screens[0]!.elements;
     expect(elements.find((e) => e.name === 'services')?.static_children).toEqual([
       { element: 'column', args: [{ name: 'width', value: 32 }, { name: 'align', value: 'left' }] },

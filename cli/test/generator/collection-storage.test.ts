@@ -30,6 +30,7 @@ import { rowLayout, ROW_ALIGNMENT } from '../../src/core/realise/index.js';
 import { findTargetDisplay } from '../../src/core/resolver/index.js';
 import { DIAGNOSTIC_CODES, type Diagnostic } from '../../src/core/schema/diagnostic.js';
 import { CATALOGUE } from '../../src/data/catalogue.js';
+import { formatBudgetReport } from '../../src/node/format-budget.js';
 import { loadProject } from '../../src/node/load-project.js';
 import { frameworkRegistry } from '../helpers/manifest-registry.js';
 
@@ -39,6 +40,7 @@ const STATIC_CHILDREN = resolve(__dirname, '../../../test/static_children');
 /** A project generated as the CLI generates it, its editor target and its §18 report. */
 async function built(dir: string): Promise<{
   readonly result: GenerateResult;
+  readonly text: string;
   readonly ram: readonly BudgetLine[];
   readonly scene: { screens: { elements: Record<string, unknown>[] }[] };
 }> {
@@ -73,7 +75,7 @@ async function built(dir: string): Promise<{
     target: result.target!,
   });
   const scene = JSON.parse(editor.files.find((file) => file.path === 'ui_scene.json')!.content);
-  return { result, ram: report.budget.ram, scene };
+  return { result, text: formatBudgetReport(report), ram: report.budget.ram, scene };
 }
 
 /** The storage line §18 reports for one block, by `screen.element.data`. */
@@ -251,5 +253,21 @@ describe('a block that cannot be sized is refused by generate, naming the widget
     expect(result.files.find((file) => file.path === 'ui_screen_home.cpp')?.content).toContain(
       'alignas(4) static uint8_t ui_rows_t_rows[12];',
     );
+  });
+});
+
+describe('the text §18 report', () => {
+  it("prints each storage line's name and derivation, as --json gives them", async () => {
+    const { text, ram } = await built(DEPARTURES);
+    const lines = ram.filter((line) => line.item === 'collection storage');
+    expect(lines.length).toBeGreaterThan(1);
+    for (const line of lines) {
+      const name = line.names?.[0] ?? '';
+      expect(text).toMatch(new RegExp(`collection storage \\(${line.count}\\) ${name.replace(/\./g, '\\.')}\\s+\\d+ bytes`));
+      if (line.figure.kind === MEASURED_KIND) {
+        // Wrapped to the report's width, so compared with the spaces collapsed.
+        expect(text.replace(/\s+/g, ' ')).toContain(`storage — ${name}: ${line.figure.derivation}`.replace(/\s+/g, ' '));
+      }
+    }
   });
 });

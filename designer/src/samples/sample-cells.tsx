@@ -17,7 +17,9 @@
  *              shows the initial value as a placeholder, marked inherited, and
  *              clearing a value (↺) makes it inherited again. A value that does
  *              not check (a type the field does not take) is still shown, so
- *              the author can see what to fix.
+ *              the author can see what to fix. A number typed outside its
+ *              field's `min`..`max` is marked invalid, says why, and is not
+ *              written (not clamped to a value the author did not type).
  *
  * Exports:
  * - DraftInput:        A text or number input that commits on Enter or blur
@@ -26,7 +28,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { heldInteger, repeatedCells, stringCount, withRepeatedCell } from './grid-rules';
+import { heldInteger, numberProblem, repeatedCells, stringCount, withRepeatedCell } from './grid-rules';
 import { subjectValueProblem } from './sample-set';
 import type { SampleField, SampleSubject } from './sample-shape';
 import './samples.css';
@@ -193,23 +195,64 @@ export function FieldCell({
       );
     }
     case 'int':
-      return (
-        <DraftInput
-          label={label}
-          type="number"
-          className="sample-number"
-          min={field.min}
-          max={field.max}
-          value={typeof value === 'number' ? String(value) : String(value ?? '')}
-          onCommit={(text) => {
-            const held = heldInteger(field, Number(text));
-            if (held !== undefined && text.trim() !== '') onCommit(held);
-          }}
-        />
-      );
+      return <NumberCell field={field} text={typeof value === 'number' ? String(value) : String(value ?? '')} label={label} onCommit={onCommit} />;
     default:
       return <StringCell field={field} text={typeof value === 'string' ? value : String(value ?? '')} label={label} onCommit={onCommit} />;
   }
+}
+
+// NumberCell
+// An int field's input. A typed value outside the field's bounds is marked
+// invalid, as the panel marks an invalid field, says why, and is not written:
+// the draft stays, so the author sees what was refused. Escape restores the
+// written value.
+function NumberCell({
+  field,
+  text,
+  label,
+  onCommit,
+}: {
+  readonly field: SampleField;
+  readonly text: string;
+  readonly label: string;
+  readonly onCommit: (value: number) => void;
+}): React.JSX.Element {
+  const [draft, setDraft] = useState(text);
+  useEffect(() => setDraft(text), [text]);
+  const problem = numberProblem(field, draft);
+  const commit = (): void => {
+    if (draft === text || problem !== undefined || draft.trim() === '') return;
+    const held = heldInteger(field, Number(draft));
+    if (held !== undefined) onCommit(held);
+  };
+  return (
+    <span className="sample-number-cell" data-invalid={problem !== undefined} data-written={text}>
+      <input
+        type="number"
+        className="sample-number"
+        aria-label={label}
+        aria-invalid={problem !== undefined}
+        min={field.min}
+        max={field.max}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          } else if (event.key === 'Escape') {
+            setDraft(text);
+          }
+        }}
+      />
+      {problem !== undefined && (
+        <span className="field-problem error" role="note">
+          {problem}
+        </span>
+      )}
+    </span>
+  );
 }
 
 // StringCell

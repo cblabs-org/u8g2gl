@@ -26,7 +26,9 @@
  *              subscribe to the selection themselves, and Run with the last
  *              test run's verdict (`test-run-controls.tsx`), whose mismatch
  *              legend sits over the stage, and the sample-set switcher
- *              (`samples/sample-set-switcher.tsx`). The banner says why the
+ *              (`samples/sample-set-switcher.tsx`), and the input preview
+ *              (`input-preview-controls.tsx`, §12), which runs the screen's
+ *              focus ring and events on the canvas. The banner says why the
  *              frame is the last good one, or what the renderer cannot draw. While
  *              anything on the drawn screen is hidden in the designer, the
  *              toolbar says so (`design-hidden-badge.tsx`). While a project
@@ -48,6 +50,7 @@ import { AlignToolbar } from './align-toolbar';
 import { CanvasSaveButton } from './canvas-save-button';
 import { DesignHiddenBadge } from './design-hidden-badge';
 import { TestRunControls, TestRunDiffInfo } from './test-run-controls';
+import { InputPreviewControls } from './input-preview-controls';
 import { useObservable } from './use-observable';
 import { useWorkspace } from './workspace-context';
 import { countRender } from '../perf/render-count';
@@ -151,6 +154,7 @@ export function CanvasPanel(): React.JSX.Element {
         <CanvasSaveButton />
         <AlignToolbar editor={editor} />
         <TestRunControls />
+        <InputPreviewControls />
         <span className="spacer" />
         <DesignHiddenBadge />
         {placeholderNote !== undefined && <span className="placeholder-note">{placeholderNote}</span>}

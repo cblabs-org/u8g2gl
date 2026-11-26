@@ -225,7 +225,7 @@ export class Workspace {
       wellFormed: this.loop.canvasEditing,
       canvas: this.loop.frameState,
       settled: () => this.loop.settled(),
-      restoreCanvas: () => this.loop.requestRun(),
+      restoreCanvas: () => this.loop.restoreAfterTestRun(),
       // A sample set is not staged as a document: the run sends each set as
       // the canvas applies it (`sampleSets`), and the firmware never reads one.
       dirtyDocuments: () =>

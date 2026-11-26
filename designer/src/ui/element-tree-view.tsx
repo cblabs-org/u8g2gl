@@ -33,7 +33,9 @@
  *              sample data carries a quiet "hidden by data" mark, which is not
  *              the eye: the two kinds of hidden never mix. When the loaded
  *              editor Wasm cannot hide (a project build older than the CLI),
- *              every eye is disabled and says why.
+ *              every eye is disabled and says why. A focus ring member's row
+ *              is marked with its stop number (◎2, §12.2), from the ring as
+ *              written.
  *
  *              The view subscribes to the selection itself, and only to this
  *              screen's part of it, so a selection change re-renders the tree
@@ -294,6 +296,11 @@ export function ElementTreeView({
             <Icon name={iconOf(node.tag)} size={14} className="element-icon" />
             <span className="element-name">{node.name}</span>
             <span className="element-tag">{node.tag}</span>
+            {node.ring !== undefined && (
+              <span className="ring-mark" role="img" aria-label={`focus ring stop ${node.ring}`} title={`Focus ring stop ${node.ring} (§12.2)`}>
+                ◎{node.ring}
+              </span>
+            )}
             {byData.has(node.name) && (
               <span className="data-hidden-mark" role="img" aria-label="hidden by data" title={HIDDEN_BY_DATA}>
                 <Icon name="circle-slash" size={12} />

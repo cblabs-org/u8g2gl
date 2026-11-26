@@ -184,6 +184,10 @@ test('a selection change re-renders only what shows the selection: the status ba
     name === 'PanelHeader' ||
     // The panel's static-children table (§6.5) is the selected element's.
     name === 'PanelStaticChildren' ||
+    // Its Input section and the screen's Focus ring (§12) are the selected
+    // element's, or the screen's when nothing is selected.
+    name === 'PanelInput' ||
+    name === 'PanelFocusRing' ||
     name === 'AlignToolbar' ||
     name === 'ElementTree' ||
     name.startsWith('PanelField:');

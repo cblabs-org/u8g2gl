@@ -57,8 +57,8 @@ bool editor_host::load(const std::string& scene_path) {
     if (!parse_error.empty()) {
         return fail(parse_error);
     }
-    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 5) {
-        return fail("not a version 5 u8g2gl scene description");
+    if (scene_.get("format").as_string() != "u8g2gl-scene" || scene_.get("version").as_int() != 6) {
+        return fail("not a version 6 u8g2gl scene description");
     }
     for (const scene_json& described : scene_.get("subjects").items()) {
         if (described.has("value")) {

@@ -18,6 +18,7 @@
  *
  * Exports:
  * - HarnessRun:      The frames one screen produced
+ * - HarnessCallback, HarnessInputRun: One screen driven through scripted input (§12)
  * - LoadedHarness:   A harness ready to run screens
  * - loadHarness():   Load one from its build directory
  */
@@ -37,6 +38,25 @@ export interface HarnessRun {
   readonly frames: readonly Uint8Array[];
 }
 
+/** One callback an input step reached, as the harness recorded it. */
+export interface HarnessCallback {
+  readonly callback: string;
+  /** The target's index in the then-active screen's object array. */
+  readonly object: number;
+  readonly trigger: string;
+}
+
+/** One screen driven through a scripted input sequence (§12). */
+export interface HarnessInputRun {
+  readonly screen: string;
+  /** Frame 0 is the boot frame; frame i + 1 follows event i. */
+  readonly frames: readonly Uint8Array[];
+  /** The screen active after each frame's step, by name; null for none. */
+  readonly screens: readonly (string | null)[];
+  /** The callbacks each frame's event reached; none for the boot frame. */
+  readonly callbacks: readonly (readonly HarnessCallback[])[];
+}
+
 /** A harness ready to run screens. */
 export interface LoadedHarness {
   /** Screen names in document order. */
@@ -54,6 +74,15 @@ export interface LoadedHarness {
    *         or decreasing times: each the caller's error, not the project's.
    */
   run(screen: string, times: readonly number[], set?: string): Promise<HarnessRun>;
+  /**
+   * @brief Boots a fresh instance, activates one screen and dispatches each
+   *        event, keeping a frame after the boot and after each (§12).
+   *
+   * @param screen A name from `screens`.
+   * @param events u8g2gl_event_t values (INPUT_EVENTS).
+   * @throws Error naming the harness's reason, for an unknown screen.
+   */
+  runEvents(screen: string, events: readonly number[]): Promise<HarnessInputRun>;
 }
 
 /** The harness's exports, as this module uses them. */
@@ -68,6 +97,9 @@ interface HarnessModule {
   _getDisplayWidth(): number;
   _getDisplayHeight(): number;
   _runScreen(index: number, times: number, count: number): number;
+  _runEvents(index: number, events: number, count: number): number;
+  _getStepScreen(index: number): number;
+  _getStepCallbacks(index: number): number;
   _getFrameCount(): number;
   _getFramePtr(index: number): number;
   _getBufferSize(): number;
@@ -128,6 +160,35 @@ export async function loadHarness(harnessDir: string): Promise<LoadedHarness> {
         return module.HEAPU8.slice(ptr, ptr + size);
       });
       return { screen, set, times: [...times], frames };
+    },
+    async runEvents(screen, events) {
+      const index = screens.indexOf(screen);
+      if (index < 0) {
+        throw new Error(`the harness has no screen '${screen}'`);
+      }
+      const module = await instantiate();
+      module._selectSampleSet(-1);
+      const eventsPtr = module._malloc(Math.max(1, events.length) * 4);
+      try {
+        module.HEAPU32.set(events, eventsPtr >>> 2);
+        if (module._runEvents(index, eventsPtr, events.length) !== 1) {
+          throw new Error(`the harness refused the run: ${module.UTF8ToString(module._getLastError())}`);
+        }
+      } finally {
+        module._free(eventsPtr);
+      }
+      const size = module._getBufferSize();
+      const count = module._getFrameCount();
+      const frames = Array.from({ length: count }, (_, i) => {
+        const ptr = module._getFramePtr(i);
+        return module.HEAPU8.slice(ptr, ptr + size);
+      });
+      const stepScreens = Array.from({ length: count }, (_, i) => screens[module._getStepScreen(i)] ?? null);
+      const callbacks = Array.from(
+        { length: count },
+        (_, i) => JSON.parse(module.UTF8ToString(module._getStepCallbacks(i))) as HarnessCallback[],
+      );
+      return { screen, frames, screens: stepScreens, callbacks };
     },
   };
 }

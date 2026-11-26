@@ -1080,7 +1080,11 @@ TEST(Label, SizeOf) {
     // the `long_mode_` selector that scrolling_label never needed, on top of
     // the moved marquee state. Per §1.3, this ceiling is the measured number,
     // not the estimate — see WO2's Completion Report.
-    EXPECT_LE(sizeof(u8g2gl_label), 80u);
+    //
+    // 88 since focus (§10, §12): u8g2gl_obj gained its base-style pointer, 8
+    // bytes here (its own-property mask fills existing padding), and every
+    // element inherits it.
+    EXPECT_LE(sizeof(u8g2gl_label), 88u);
 }
 
 // =====================================================================

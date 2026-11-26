@@ -47,6 +47,13 @@
  *              `u8g2gl_set_active_screen()` — without the declaration a screen
  *              could be initialised but never shown.
  *
+ *              **A project with input (§12)** — a focus ring, or an event on
+ *              any element — also gets `ui_dispatch()`, defined in `ui.cpp`,
+ *              and a declaration of each `<event_cb>` callback, once each,
+ *              which the application defines: a missing definition is a link
+ *              error naming it (§12.3). A project with neither gets none
+ *              of it, so it regenerates exactly as before input existed.
+ *
  *              **Each named object gets a handle** beside its screen's
  *              functions (§9.2): `extern wd_service_list& ui_departures_services;`,
  *              a reference the screen's unit binds to its `static` object, so
@@ -85,7 +92,8 @@ import { imageDeclarations, PROGMEM_MACRO } from './images.js';
 import { STYLES_INIT_FUNCTION, styleIdentifiers } from './styles.js';
 import { SUBJECTS_INIT_FUNCTION, subjectDeclarations } from './subjects.js';
 import { includeBlock, section, type DisplayContract, type EmittedUnit, type ProjectEmitInput } from './unit.js';
-import { elementHandles, type ElementHandle } from './screen-model.js';
+import { elementHandles, projectInputOf, type ElementHandle } from './screen-model.js';
+import { UI_DISPATCH_FUNCTION } from '../../schema/input-model.js';
 import { FACADE_HEADERS, facadeDeclaration, facadeOf } from './facades.js';
 import { compareCodeUnits } from '../../order.js';
 
@@ -332,6 +340,35 @@ export function emitUiHeader(input: ProjectEmitInput): EmittedUnit {
     // Its collections' facades (§9.2), defined in its unit beside the widgets.
     for (const storage of input.capacities.collections.filter((block) => block.screen === screen.name)) {
       lines.push(...facadeDeclaration(facadeOf(storage)));
+    }
+  }
+
+  // --- Input (§12), only for a project that has a ring or an event ---
+  const projectInput = projectInputOf(input.realised);
+  if (projectInput.hasInput) {
+    lines.push(
+      '',
+      section('Input (§12)'),
+      '/**',
+      ' * @brief Deliver one input event to the active screen (§12.1).',
+      ' *',
+      ' * The application reads its own buttons or encoder, debounces them and',
+      ' * times long presses; this moves focus or fires the focused element\'s',
+      ' * events. Synchronous, and allocates nothing.',
+      ' *',
+      ' * @param event The event.',
+      ' * @return true if it moved focus or reached a focused element.',
+      ' */',
+      `bool ${UI_DISPATCH_FUNCTION}(u8g2gl_event_t event);`,
+    );
+    if (projectInput.callbacks.length > 0) {
+      lines.push(
+        '',
+        '// The <event_cb> callbacks (§12.3). The application defines each one; a',
+        '// missing definition is a link error naming it. One may serve many',
+        '// elements: the target and trigger say which fired it.',
+        ...projectInput.callbacks.map((callback) => `void ${callback}(u8g2gl_obj& target, u8g2gl_trigger_t trigger);`),
+      );
     }
   }
 

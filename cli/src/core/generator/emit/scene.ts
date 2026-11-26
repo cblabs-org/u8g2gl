@@ -28,7 +28,8 @@
  *              everything else the text the author wrote, which the host maps
  *              through the registry entry's declared type.
  *
- *              Format, version 5 (version 5 added an object's `storage`;
+ *              Format, version 6 (version 6 added a screen's `ring` and an
+ *              object's `events`; version 5 an object's `storage`;
  *              version 4 an object's `static_children`; version 3 a draw
  *              call's `clip`; version 2 `origin`; version 1 had none of them):
  *              - `u8g2gl_generated`: the marker the **writer** recognises the file
@@ -68,6 +69,17 @@
  *                the widget a view over it after the `properties` step's static
  *                children, and frees it with the scene; with `bytes` 0 it
  *                attaches nothing. Absent on an object with no `<data>`.
+ *              - `ring`, on a screen that declares a `<focus_ring>` (§12.2):
+ *                `{ wrap, stops: [{ object, focus_style }] }`, the stops in the
+ *                author's order, each the object index it focuses and its
+ *                `focus_style` or null. Absent on a screen with none, which
+ *                ignores input.
+ *              - `events`, on an object that carries any (§12.3): `[{ trigger,
+ *                action, screen?, callback? }]` in document order, where
+ *                `action` is `screen_load` (with `screen`), `screen_back` or
+ *                `callback` (with `callback`). The host runs them through the
+ *                runtime's dispatch, as firmware does; a callback is reported
+ *                to the caller, not run. Absent on an object with none.
  *              - A binding or bound argument that sets a position (`bind_x`,
  *                `bind_y`) carries `origin`: its container's absolute corner on
  *                that axis, which the host adds to the subject's value as
@@ -89,7 +101,8 @@
 
 import { styleProperties } from '../../schema/globals.js';
 import type { PropDef } from '../../schema/widget-manifest.js';
-import { namedStyles } from '../../schema/widget-node.js';
+import { namedStyles, type EventChild } from '../../schema/widget-node.js';
+import { eventsOf } from '../../schema/input-model.js';
 import type { ManifestRegistry } from '../../manifest/index.js';
 import type { ResolvedScreen } from '../../resolver/index.js';
 import {
@@ -109,6 +122,7 @@ import {
   INIT_STEPS,
   placeScreen,
   rectangleOf,
+  screenInputOf,
   staticChildCalls,
   styleOverridesOf,
   writtenProperties,
@@ -126,7 +140,7 @@ export const SCENE_FILE = 'ui_scene.json';
  * The format version. A host checks it before reading anything else; bump it
  * for any change a host would read differently.
  */
-export const SCENE_FORMAT_VERSION = 5;
+export const SCENE_FORMAT_VERSION = 6;
 
 /** Everything describing the scenes needs. */
 export interface SceneInput {
@@ -316,6 +330,46 @@ function objectJson(
     })),
     bindings,
     flags,
+    ...eventsJson(element),
+  };
+}
+
+/** The scene's name for each event element's action. */
+const SCENE_ACTIONS: Readonly<Record<EventChild['type'], string>> = {
+  screen_load_event: 'screen_load',
+  screen_back_event: 'screen_back',
+  event_cb: 'callback',
+};
+
+// eventsJson
+// `{ events: [...] }` for an object carrying events (§12.3), in document order,
+// or `{}` for one with none, so a scene without input reads as version 5's did.
+//   element — the realised object
+function eventsJson(element: RealisedElement): { [key: string]: Json } {
+  const events = eventsOf(element.element.node);
+  if (events.length === 0) return {};
+  return {
+    events: events.map((event) => ({
+      trigger: event.trigger,
+      action: SCENE_ACTIONS[event.type],
+      ...(event.type === 'screen_load_event' ? { screen: event.screen ?? '' } : {}),
+      ...(event.type === 'event_cb' ? { callback: event.callback ?? '' } : {}),
+    })),
+  };
+}
+
+// ringJson
+// `{ ring: {...} }` for a screen that declares a focus ring (§12.2), from the
+// one decision firmware emission reads (screen-model.ts), or `{}`.
+//   realised — the screen
+function ringJson(realised: RealisedScreen): { [key: string]: Json } {
+  const { ring } = screenInputOf(realised);
+  if (ring === undefined) return {};
+  return {
+    ring: {
+      wrap: ring.wrap,
+      stops: ring.stops.map((stop) => ({ object: stop.object.objectIndex ?? 0, focus_style: stop.focusStyle ?? null })),
+    },
   };
 }
 
@@ -398,6 +452,7 @@ function screenJson(
     name: realised.screen.name,
     objects: realised.objects.length,
     parents: realised.parents.map((parent) => (parent === U8G2GL_NO_PARENT ? null : parent)),
+    ...ringJson(realised),
     elements: realised.drawOrder.map((step) =>
       step.kind === 'object'
         ? objectJson(

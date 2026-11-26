@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<globals>
+    <subjects>
+        <bool name="wifi_enabled" value="false" />
+    </subjects>
+
+    <styles>
+        <!-- The about label's two named styles: merged into one base, because
+             losing focus rebuilds from one (§10). -->
+        <style name="item" padding="2" />
+        <style name="quiet" align="right" />
+        <!-- The about label's focus style: an outline while focused. -->
+        <style name="selected" border="true" radius="2" />
+    </styles>
+
+    <fonts>
+        <builtin name="u8g2_font_6x10_mr" />
+    </fonts>
+</globals>

@@ -23,6 +23,7 @@
  * - defaultCell():     A field's value in a new row
  * - newRow():          A row of defaults for a `<data>` block
  * - heldInteger():     A typed number held to a field's bounds
+ * - numberProblem():   Why a typed number is outside an int field's bounds, if it is
  * - characterCount():  A string's length in characters
  * - stringCount():     A string cell's count against its max_len
  * - repeatedCells():   A repeated field's cells, as many as it repeats
@@ -71,6 +72,35 @@ export function heldInteger(field: SampleField, value: number): number | undefin
   if (field.min !== undefined && held < field.min) held = field.min;
   if (field.max !== undefined && held > field.max) held = field.max;
   return held;
+}
+
+/**
+ * @brief Why a typed number cannot be written to an int field, or undefined
+ *        when it can.
+ *
+ * A number outside the field's `min`..`max` is refused rather than clamped:
+ * clamping would write a value the author did not type, and leave the typed
+ * one showing as if it had been taken. An empty text and a non-number are not
+ * this rule's: the cell keeps its value for those, as before.
+ *
+ * @param field The int field.
+ * @param text  The text typed.
+ * @return A sentence the cell shows beside itself, or undefined.
+ */
+export function numberProblem(field: SampleField, text: string): string | undefined {
+  const value = Number(text);
+  if (text.trim() === '' || !Number.isFinite(value)) return undefined;
+  const rounded = Math.round(value);
+  const below = field.min !== undefined && rounded < field.min;
+  const above = field.max !== undefined && rounded > field.max;
+  if (!below && !above) return undefined;
+  const where =
+    field.min !== undefined && field.max !== undefined
+      ? `outside ${field.min}–${field.max}`
+      : below
+        ? `below the minimum of ${field.min ?? ''}`
+        : `above the maximum of ${field.max ?? ''}`;
+  return `${text.trim()} is ${where}, so it is not written`;
 }
 
 /** @brief A string's length in characters (code points), as `max_len` counts them. */

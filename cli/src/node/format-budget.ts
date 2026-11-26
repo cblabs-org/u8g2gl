@@ -24,7 +24,9 @@
  *              where a reader finishes. Byte figures are printed exactly, in
  *              bytes: §18's example rounds to `3.2 KB`, but every figure this
  *              report can substantiate is small and exact, and rounding an exact
- *              number is a loss of information for no gain.
+ *              number is a loss of information for no gain. Each collection's
+ *              storage line carries its name, and its derivation follows the
+ *              RAM table, as `--json` gives both.
  *
  * Exports:
  * - FormatBudgetOptions:    Colour option, as the other formatters take it
@@ -32,6 +34,7 @@
  */
 
 import {
+  COLLECTION_STORAGE_ITEM,
   MEASURED_KIND,
   type BudgetLine,
   type CapacityEntry,
@@ -66,7 +69,10 @@ const UNMEASURED_WORD = 'unmeasured';
 //   line — the budget line
 function label(line: BudgetLine): string {
   const count = line.count === undefined ? '' : ` (${line.count})`;
-  return `${line.item}${count}`;
+  // A storage line is one of several alike, one per instance per <data>, so
+  // its name is what tells it from the next (§9.2).
+  const named = line.item === COLLECTION_STORAGE_ITEM && line.names !== undefined ? ` ${line.names.join(', ')}` : '';
+  return `${line.item}${count}${named}`;
 }
 
 // figureText
@@ -116,6 +122,14 @@ function costTable(title: string, lines: readonly BudgetLine[], useColor: boolea
       continue;
     }
     out.push(...wrapReason(`note — ${line.item}: ${line.note}`, '    '));
+  }
+  // How each storage line's bytes follow from its layout, as --json gives it:
+  // the figure is exact, and the derivation is how a reader checks it.
+  for (const line of lines) {
+    if (line.item !== COLLECTION_STORAGE_ITEM || line.figure.kind !== MEASURED_KIND) {
+      continue;
+    }
+    out.push(...wrapReason(`storage — ${(line.names ?? []).join(', ')}: ${line.figure.derivation}`, '    '));
   }
   return out;
 }

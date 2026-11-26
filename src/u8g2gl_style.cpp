@@ -13,7 +13,8 @@
  *          "explicitly set to the default" from "never set" — without that a
  *          named style could not be selectively overridden by an object.
  *
- * Description: Property setters, set_mask maintenance, merge_from and clear
+ * Description: Property setters, set_mask maintenance, merge_from,
+ *              clear_except and clear
  */
 #include "u8g2gl/u8g2gl_style.h"
 
@@ -80,51 +81,84 @@ bool u8g2gl_style::has(u8g2gl_style_prop_t prop) const {
 
 // u8g2gl_style::merge_from
 // Composes another style over this one: every property @p other explicitly set
-// replaces the corresponding property here, and everything it left unset is
-// untouched. Used to layer a named style under an object's own inline overrides.
+// replaces the corresponding property here, unless @p keep_mask names it, and
+// everything it left unset is untouched. Used to layer a named style under an
+// object's own inline overrides, and a focus style over both (§10).
 //
 // Written as one explicit block per property rather than a loop over the mask.
 // A loop would need a table mapping each bit to a field offset, which is more
 // machinery, harder to read, and no smaller once the table is counted — the
 // property set is fixed and small by design (§10).
-//   other — the style to merge in; only its set properties are copied
-void u8g2gl_style::merge_from(const u8g2gl_style& other) {
-    if (other.has(U8G2GL_STYLE_FONT)) {
+//   other     — the style to merge in; only its set properties are copied
+//   keep_mask — properties left as they are, whatever other sets
+void u8g2gl_style::merge_from(const u8g2gl_style& other, uint16_t keep_mask) {
+    const uint16_t take = static_cast<uint16_t>(other.set_mask & ~keep_mask);
+    if (take & U8G2GL_STYLE_FONT) {
         font = other.font;
-        set_mask |= U8G2GL_STYLE_FONT;
     }
-    if (other.has(U8G2GL_STYLE_DRAW_COLOR)) {
+    if (take & U8G2GL_STYLE_DRAW_COLOR) {
         draw_color = other.draw_color;
-        set_mask |= U8G2GL_STYLE_DRAW_COLOR;
     }
-    if (other.has(U8G2GL_STYLE_INVERT)) {
+    if (take & U8G2GL_STYLE_INVERT) {
         invert = other.invert;
-        set_mask |= U8G2GL_STYLE_INVERT;
     }
-    if (other.has(U8G2GL_STYLE_PADDING)) {
+    if (take & U8G2GL_STYLE_PADDING) {
         padding = other.padding;
-        set_mask |= U8G2GL_STYLE_PADDING;
     }
-    if (other.has(U8G2GL_STYLE_BORDER)) {
+    if (take & U8G2GL_STYLE_BORDER) {
         border = other.border;
-        set_mask |= U8G2GL_STYLE_BORDER;
     }
-    if (other.has(U8G2GL_STYLE_RADIUS)) {
+    if (take & U8G2GL_STYLE_RADIUS) {
         radius = other.radius;
-        set_mask |= U8G2GL_STYLE_RADIUS;
     }
-    if (other.has(U8G2GL_STYLE_ALIGN)) {
+    if (take & U8G2GL_STYLE_ALIGN) {
         align = other.align;
-        set_mask |= U8G2GL_STYLE_ALIGN;
     }
-    if (other.has(U8G2GL_STYLE_FONT_MODE)) {
+    if (take & U8G2GL_STYLE_FONT_MODE) {
         font_mode = other.font_mode;
-        set_mask |= U8G2GL_STYLE_FONT_MODE;
     }
-    if (other.has(U8G2GL_STYLE_BITMAP_MODE)) {
+    if (take & U8G2GL_STYLE_BITMAP_MODE) {
         bitmap_mode = other.bitmap_mode;
-        set_mask |= U8G2GL_STYLE_BITMAP_MODE;
     }
+    set_mask = static_cast<uint16_t>(set_mask | take);
+}
+
+// u8g2gl_style::clear_except
+// Resets each property outside @p keep_mask to the value a default-constructed
+// style holds, and drops its set bit. A default-constructed style is the one
+// statement of the defaults, so they are copied from it rather than repeated.
+//   keep_mask — properties whose value and set bit are left alone
+void u8g2gl_style::clear_except(uint16_t keep_mask) {
+    const u8g2gl_style defaults;
+    const uint16_t drop = static_cast<uint16_t>(~keep_mask);
+    if (drop & U8G2GL_STYLE_FONT) {
+        font = defaults.font;
+    }
+    if (drop & U8G2GL_STYLE_DRAW_COLOR) {
+        draw_color = defaults.draw_color;
+    }
+    if (drop & U8G2GL_STYLE_INVERT) {
+        invert = defaults.invert;
+    }
+    if (drop & U8G2GL_STYLE_PADDING) {
+        padding = defaults.padding;
+    }
+    if (drop & U8G2GL_STYLE_BORDER) {
+        border = defaults.border;
+    }
+    if (drop & U8G2GL_STYLE_RADIUS) {
+        radius = defaults.radius;
+    }
+    if (drop & U8G2GL_STYLE_ALIGN) {
+        align = defaults.align;
+    }
+    if (drop & U8G2GL_STYLE_FONT_MODE) {
+        font_mode = defaults.font_mode;
+    }
+    if (drop & U8G2GL_STYLE_BITMAP_MODE) {
+        bitmap_mode = defaults.bitmap_mode;
+    }
+    set_mask = static_cast<uint16_t>(set_mask & keep_mask);
 }
 
 void u8g2gl_style::clear() {
