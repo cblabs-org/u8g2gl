@@ -234,3 +234,110 @@ Append it here under `## Report (worker, <date>)`:
 - each golden's change, explained;
 - anything found outside scope;
 - deviations, and choices the rulings didn't settle.
+
+## Report (worker, 2026-11-26)
+
+Provenance checked first: this file names `pr-09-focus-input`, whose PROJECT.md status log (committed in
+`52ba10a`) records the owner's own "Approve as recommended" of 2026-11-26.
+
+### Commits per WO
+- **WO1** `u8g2gl-09/wo1-runtime`: `bd15c93` feat(runtime): input dispatch, focus ring, triggers and screen stack.
+- **WO2** `u8g2gl-09/wo2-generator`: `6c00218` feat(generator): focus rings, events and the editor dispatch.
+- **WO3** `u8g2gl-09/wo3-designer`: `6cf0c13` feat(designer): author and preview focus rings and events.
+- **WO4** `u8g2gl-09/wo4-docs-review`: `f081178` docs, versions and loose ends; the review-fixes commit after
+  it; this report. Nothing pushed, tagged or published.
+
+### Suites (final, one at a time, on the WO4 tip)
+- **Baseline at `834dcfa`:** Wasm 7/7, ctest 560/560 (1 skipped: SizeOfReport.ThirtyTwoBitTarget), CLI 3255 +
+  25 skipped (3280), designer unit 351, e2e 153 passed + 17 skipped (170), production 3/3.
+- **Final:**
+  - Wasm 8/8: the seven, plus the new `input-parity.test.mjs` (68 checks).
+  - ctest 587/587, with the same 1 skipped: 26 new `test_input` and 1 `test_input_parity`.
+  - CLI 3294 passed + 25 skipped (3319). The Emscripten-only CLI tests also ran with Emscripten on PATH, as CI
+    runs them: all passed, including `valid-project` now compared pixel for pixel and a new harness `runEvents`
+    test.
+  - designer unit 357.
+  - e2e 155 passed + 17 skipped (172).
+  - production 3/3.
+  - `check-package` PASS (u8g2gl-0.28.0.tgz). The home-path guard passes.
+- **Flakes:** none of the known three failed.
+  - My own new e2e (`input.spec.ts`) raced once, comparing a frame captured mid-update. Fixed by waiting for a
+    settled frame. Afterwards it passed 6/6, and the full run passed.
+  - The first full e2e run failed `overlays.spec.ts:139` and `panel.spec.ts:70`. Both are real consequences
+    of the new panel section (a fourth section, and Input and Focus ring re-rendering on selection), not
+    flakes. Both tests were updated with comments, and both pass.
+- **Environment:** for about an hour, every exec of the emsdk's own binaries (clang, its python) hung in
+  kernel wait (state U). Reading the files was unaffected. It cleared by itself, and every Wasm-dependent suite
+  above ran after that.
+
+### Sizes
+- **`sizeof(u8g2gl_obj)`:** 48 → 56 bytes on 64-bit, and 32 → 36 on 32-bit (Wasm). That is one pointer, the
+  base style. The own-property mask fills existing padding. The label's 64-bit ceilings rise 80 → 88 in
+  `test_label` and `test_sizeof_report`; no other ceiling moved.
+- **`sizeof(u8g2gl_screen)`:** 36 → 48 (32-bit) and 72 → 96 (64-bit), per screen.
+- **The new tables on the settings fixture (`test/input_menu`)**, at 32-bit:
+  - 5 ring stops × 8 B = 40 B.
+  - 5 events × 12 B = 60 B, both const.
+  - The screen stack is 4 × 8 B = 32 B RAM.
+  - At 64-bit: 16 B per stop and 24 B per event.
+  - §18 reports the entries by count, unmeasured in bytes (see deviations).
+
+### Golden changes
+- **Firmware goldens of fixtures without input:** unchanged by WO1–WO3.
+- **WO2:** the five committed `generated_editor/ui_scene.json` (generated_fixture, static_children,
+  collection_data, fill_guard ×2) move by `"version": 5` → `6` only.
+- **WO4:** the eight committed `u8g2gl_generated_config.h` files move by the runtime floor only (the `#error`
+  text and `U8G2GL_REQUIRE_RUNTIME_AT_LEAST(0, 16, 0)` → `(0, 17, 0)`).
+- **New:** `test/input_menu/` and its goldens, plus the harness `support/` units, which are checked against
+  their generators.
+- No existing button's pixels moved: the D-9 snapshot golden and every parity test are unchanged.
+
+### Outside scope (not touched)
+- **An orphaned `u8g2gl design` process from an earlier session** (pid 43300, on
+  `tmp/e2e/session-J6ZvCp`, port 0) was already running before I started. It is not on 5321, 5399 or 5401.
+  It is not mine, so I left it.
+- **A `<style name>` child of an element shows as an Explorer row.** This predates PR-09. A ring's `<focus>`
+  entries no longer do.
+- **Older work-order, ruling and finding citations remain across the CLI.** This is pre-existing, and §4.1
+  says not to sweep them.
+
+### Deviations, and choices the rulings didn't settle
+1. **`ui_dispatch()` is generated only for a project with a ring or an event.** That keeps every existing
+   golden byte-identical, as the WO requires. A project without input can still call `u8g2gl_dispatch()`.
+2. **Where the tables live:**
+   - The event table is per screen, with each entry carrying its object index, not per object. That keeps
+     `u8g2gl_obj` at +1 pointer (gate C3).
+   - The `focus_style` pointer lives in each ring stop.
+3. **Several named styles on a ring member with a `focus_style`.** An object keeps one base style, so these
+   are merged into one function-local static base in init. Single-style elements are unchanged.
+4. **Order and stopping.** A press runs the element's own toggle, then its `press` events, then
+   `value_changed`. An element's events stop once one changes the active screen.
+5. **Which elements produce `value_changed`.** This is a named runtime-class list,
+   `VALUE_INPUT_CLASSES = ['u8g2gl_switch']`, matched over the `extends` chain (`core/schema/input-model.ts`).
+   The manifest can't express it without schema surface (Q1b declined). This sits uneasily with [D-17].
+6. **Composites:**
+   - A composite's own `<focus_ring>` stays refused (NOT_YET_SUPPORTED, "a later PR").
+   - Events in composite templates build per instance, and get the unreachable-press warning.
+7. **Diagnostics:**
+   - Added `U8G2GL_UNKNOWN_TRIGGER`. The parser cast any trigger text.
+   - A callback must be a C identifier, not a keyword, and outside `u8g2gl_`.
+   - A `<focus>` naming no element stays Pass 2's `U8G2GL_UNKNOWN_WIDGET`.
+8. **§18 bytes for the tables are unmeasured, with the struct shape in the note.** Bytes are `sizeof` the
+   runtime's, which §13.7 keeps from the generator. They are measured above instead.
+9. **The bridge now applies named styles as runtime `u8g2gl_style`s through `apply_style()`**, not property
+   thunks. Without that the editor would treat every style property as the object's own. The pixels are
+   unchanged (snapshot golden).
+10. **Bridge `previewBack()`:** no input event is "back", so the designer's Back calls `u8g2gl_screen_back()`.
+11. **The test run replays scripted events server-side**, through `events` and the harness's `runEvents`. The
+    designer's Run button doesn't send a script yet. Canvas parity is proven by the native and Wasm parity
+    tests and by the e2e.
+12. **`.github/workflows/ci.yml` gained the two new Wasm targets and the input-parity step.** That file is
+    outside the listed boundary, but without the change the new Wasm test would never run in CI.
+13. **`test_core`:** 21 tests now deactivate their stack-local screen before it goes out of scope. TearDown
+    had always read the dangling pointer; the new focus code made that a crash.
+14. **A WO2 defect fixed on the WO4 branch.** The harness's sample-set declaration was out of order, and the
+    Wasm build found it once Emscripten ran again.
+15. **The designer's number cell now refuses an out-of-range value instead of clamping it (Q4a).**
+    `samples.spec.ts`'s clamping case was rewritten to expect the refusal.
+16. **The readability review (readability-reviewer agent):** no P1 or P2 findings. All of its P3 items and
+    its P4 suggestions were fixed, except "See PD-3", which is a published decision ID.
