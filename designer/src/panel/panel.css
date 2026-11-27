@@ -98,16 +98,38 @@
 .static-child-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
 .static-child-table th { text-align: left; font-weight: normal; color: var(--text-dim); padding: 0 2px; }
 .static-child-table td { padding: 1px 2px; vertical-align: top; }
-/* An element's events and a screen's focus ring (§12). */
-.event-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-.event-table th { text-align: left; font-weight: normal; color: var(--text-dim); padding: 0 2px; }
-.event-table td { padding: 1px 2px; vertical-align: top; }
-.event-table select, .event-table input { max-width: 100%; }
+/* A row's move up, move down and remove: the static children, events and ring members. */
+.row-actions { display: inline-flex; gap: 2px; white-space: nowrap; }
+.row-actions button { padding: 0 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
+.row-actions button:disabled { opacity: 0.4; cursor: default; }
+/* An element's events and a screen's focus ring (§12). Every control shrinks to
+   the panel, so neither section ever scrolls it sideways. */
+.element-input select,
+.element-input input[type='text'],
+.focus-ring select {
+  min-width: 0;
+  padding: 2px 5px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font: 12px ui-monospace, Menlo, monospace;
+}
+.element-input .field-actions select,
+.focus-ring .field-actions select { flex: 1; }
+.event-legend { display: flex; gap: 10px; justify-content: flex-start; margin-top: 8px; }
+.event-list { margin: 2px 0 4px; padding: 0; list-style: none; }
+.event-row { padding: 4px 0; border-top: 1px solid var(--border); }
+.event-row:last-child { border-bottom: 1px solid var(--border); }
+.event-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 4px; align-items: center; }
+.event-target { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.event-target > select,
+.event-target > input { flex: 1; }
+.event-target-kind { flex: none; width: 52px; color: var(--text-dim); font: 11px ui-monospace, Menlo, monospace; }
+.ring-legend { margin-top: 6px; }
+.ring-wrap { display: inline-flex; align-items: center; gap: 3px; }
 .ring-members { margin: 4px 0; padding-left: 20px; }
-.ring-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.ring-member-name { flex: 1; }
-.ring-wrap { display: block; margin: 4px 0; }
-.static-child-table .row-actions { white-space: nowrap; }
-.static-child-table .row-actions button { padding: 0 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--text); cursor: pointer; }
-.static-child-table .row-actions button:disabled { opacity: 0.4; cursor: default; }
+.ring-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 1px 0; }
+.ring-members li > .field-problem { flex-basis: 100%; }
+.ring-member-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: ui-monospace, Menlo, monospace; }
 .static-children > .action { padding: 1px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 3px; color: var(--info); cursor: pointer; }

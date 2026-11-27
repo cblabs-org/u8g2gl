@@ -1,6 +1,6 @@
 {
   "name": "u8g2gl",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "description": "CLI and schema toolkit for U8G2GL",
   "license": "MIT",
   "author": "Matt McNeill (CB Labs)",
